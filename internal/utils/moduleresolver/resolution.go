@@ -17,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
 // Options selects runtime files independently of the compiler's
@@ -30,9 +31,11 @@ type Options struct {
 	Conditions       []string            `json:"conditions"`
 	ExtensionAliases map[string][]string `json:"extensionAliases"`
 	Aliases          []Alias             `json:"aliases"`
+	Fallbacks        []Alias             `json:"fallbacks,omitempty"`
 	MainFields       []MainField         `json:"mainFields"`
 	MainFiles        []string            `json:"mainFiles"`
 	AliasFields      [][]string          `json:"aliasFields"`
+	FullySpecified   bool                `json:"fullySpecified,omitempty"`
 	// Local imports disable directory lookup unless entry options enable it.
 	// Require callers retain the ordinary Node directory lookup.
 	NoDirectory bool `json:"noDirectory"`
@@ -48,6 +51,7 @@ type resolutionKey struct{ name, file, options string }
 type Result struct {
 	Path, ResourceSuffix, Error string
 	recursive                   bool
+	terminal                    bool
 }
 
 // ResolveModule resolves a runtime package through this generation's FS.
@@ -110,11 +114,13 @@ func (resolver *nodeResolver) resolveRequest(name string) Result {
 	}
 	var resolveError string
 	var recursive bool
+	var terminal bool
 bases:
 	for _, base := range append(slices.Clone(options.Paths), tspath.GetDirectoryPath(containingFile)) {
 		base = tspath.ResolvePath(p.CurrentDirectory(), base)
 		resolveError = "Can't resolve '" + originalName + "' in '" + base + "'"
 		recursive = false
+		terminal = false
 		if !resolver.mainTarget {
 			if result, matched := resolver.aliasField(name, base, false); matched {
 				if result.Error == "" && result.Path != "" {
@@ -122,6 +128,7 @@ bases:
 				}
 				resolveError = result.Error
 				recursive = result.recursive
+				terminal = result.terminal
 				continue
 			}
 		}
@@ -130,7 +137,9 @@ bases:
 		if strings.Contains(name, `\`) && tspath.GetRootLength(base) == 1 && !tspath.IsRootedDiskPath(name) {
 			continue
 		}
-		if modules.IsNodeBuiltin(name) {
+		// Explicit fallbacks replace the default builtin exemption and must
+		// run after ordinary package lookup, like any other fallback.
+		if modules.IsNodeBuiltin(name) && len(options.Fallbacks) == 0 {
 			resolveError = ""
 			continue
 		}
@@ -140,14 +149,32 @@ bases:
 				explicitExtension: path.Ext(name), resolved: map[string]string{},
 				request:        name,
 				noModuleSearch: len(options.Modules) == 0 && !tspath.IsExternalModuleNameRelative(name),
+				fullySpecified: options.FullySpecified,
+			}
+			// Bare package entry points retain main/index lookup. Nested paths and
+			// relative requests must name a file when fullySpecified is enabled.
+			if view.fullySpecified && !tspath.IsExternalModuleNameRelative(name) && !strings.HasPrefix(name, "#") {
+				if packageName, rest := module.ParsePackageName(name); packageName != "" && rest == "" {
+					// Self-references go directly through exports, without the
+					// external package-entry lookup that relaxes fullySpecified.
+					owner := packagejson.FindNearest(p, tspath.ResolvePath(base, "__import__.js"))
+					view.fullySpecified = false
+					if owner != nil && owner.Field("name") == packageName {
+						switch owner.Field("exports") {
+						case nil, false, "", float64(0):
+						default:
+							view.fullySpecified = true
+						}
+					}
+				}
 			}
 			if options.NoDirectory {
 				view.blockedDirectory = view.physical(tspath.ResolvePath(base, name))
 			}
 			resolver := view.newResolver(p.CurrentDirectory())
 			result, _ := resolver.ResolveModuleName(name, tspath.ResolvePath(base, "__import__.js"), core.ResolutionModeCommonJS, nil)
-			if view.recursiveError != "" {
-				resolveError, recursive = view.recursiveError, true
+			if view.failure.Error != "" {
+				resolveError, recursive, terminal = view.failure.Error, view.failure.recursive, view.failure.terminal
 				break
 			}
 			if !view.unresolved && result != nil && result.IsResolved() {
@@ -158,6 +185,7 @@ bases:
 				return Result{Path: view.Realpath(result.ResolvedFileName), ResourceSuffix: view.resourceSuffix}
 			}
 			if view.exportsFile != "" {
+				terminal = true
 				request := name
 				if view.importsTarget != "" {
 					request = view.importsTarget
@@ -176,6 +204,7 @@ bases:
 				// different copy in a later module directory.
 				break
 			} else if view.importsFile != "" && !view.importsMatched {
+				terminal = true
 				resolveError = "Package import " + name + " is not imported from package " + tspath.GetDirectoryPath(view.importsFile) + " (see imports field in " + view.importsFile + ")"
 			}
 			if view.importsFile != "" {
@@ -187,7 +216,7 @@ bases:
 			}
 		}
 	}
-	return Result{Error: resolveError, recursive: recursive}
+	return Result{Error: resolveError, recursive: recursive, terminal: terminal}
 }
 
 // The private view projects runtime candidates onto tsgo's file probes.
@@ -210,7 +239,7 @@ type nodeResolutionFS struct {
 	options           Options
 	resolver          *nodeResolver
 	resourceSuffix    string
-	recursiveError    string
+	failure           Result
 	explicitExtension string
 	resolved          map[string]string
 	activeDirectories map[string]bool
@@ -218,6 +247,7 @@ type nodeResolutionFS struct {
 	request           string
 	noModuleSearch    bool
 	blockedDirectory  string
+	fullySpecified    bool
 	exportsFile       string
 	importsFile       string
 	importsMatched    bool
@@ -273,6 +303,9 @@ func (f *nodeResolutionFS) probe(name string, applyAlias bool) string {
 	if f.FS.FileExists(name) {
 		return name
 	}
+	if f.fullySpecified {
+		return ""
+	}
 	for _, extension := range f.options.Extensions {
 		if found := f.probeFile(name + extension); found != "" {
 			return found
@@ -282,7 +315,7 @@ func (f *nodeResolutionFS) probe(name string, applyAlias bool) string {
 }
 
 func (f *nodeResolutionFS) aliasFile(name string) (string, bool) {
-	result, matched := f.resolver.alias(name)
+	result, matched := f.resolver.alias(name, f.options.Aliases)
 	if !matched {
 		result, matched = f.resolver.aliasField(name, tspath.GetDirectoryPath(name), true)
 	}
@@ -293,8 +326,8 @@ func (f *nodeResolutionFS) aliasFile(name string) (string, bool) {
 }
 
 func (f *nodeResolutionFS) redirectedFile(name string, result Result) string {
-	if result.recursive {
-		f.recursiveError = result.Error
+	if result.recursive || result.terminal {
+		f.failure = result
 	}
 	if result.Error != "" {
 		return ""
@@ -331,19 +364,25 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 		f.unresolved = true
 		return true
 	case strings.HasSuffix(physical, "/"+nodeMainTarget+nodeTargetSuffix):
+		if f.fullySpecified {
+			return false
+		}
 		result := f.resolver.mainEntry(tspath.GetDirectoryPath(physical))
-		if result.recursive {
-			f.recursiveError = result.Error
+		if result.recursive || result.terminal {
+			f.failure = result
 			return true
 		}
 		resolved = f.redirectedFile(physical, result)
 	case strings.HasSuffix(physical, nodeTargetSuffix), strings.HasSuffix(physical, nodeExportSuffix):
+		if f.fullySpecified && strings.HasSuffix(physical, nodeTargetSuffix) {
+			return false
+		}
 		target := strings.TrimSuffix(strings.TrimSuffix(physical, nodeTargetSuffix), nodeExportSuffix)
 		// Relative imports maps honor extension aliases; package main and
 		// exports targets retain their explicitly selected extensions.
 		applyAlias := strings.HasPrefix(f.request, "#") && f.importsTarget == ""
 		resolved = f.probe(target, applyAlias)
-		if resolved == "" && !f.options.NoDirectory && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
+		if resolved == "" && !f.options.NoDirectory && !f.fullySpecified && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
 			// enhanced-resolve permits directory exports. Ask tsgo to resolve
 			// their main/index using its regular relative-directory traversal.
 			// Guard package main cycles before creating a nested resolver.
@@ -366,7 +405,10 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 			f.unresolved = true
 			return true
 		}
-	case f.options.MainFiles != nil && f.isDirectoryIndex(name, physical):
+	case (f.options.MainFiles != nil || f.fullySpecified) && f.isDirectoryIndex(name, physical):
+		if f.fullySpecified {
+			return false
+		}
 		for _, entry := range f.options.MainFiles {
 			if strings.Contains(entry, `\`) && tspath.GetRootLength(physical) == 1 && !tspath.IsRootedDiskPath(entry) {
 				continue
@@ -391,6 +433,15 @@ func (f *nodeResolutionFS) DirectoryExists(name string) bool {
 		return false
 	}
 	physical := strings.TrimSuffix(strings.TrimSuffix(f.physical(name), nodeTargetSuffix), nodeExportSuffix)
+	if f.fullySpecified {
+		if tspath.IsExternalModuleNameRelative(f.request) {
+			if physical == tspath.ResolvePath(f.base, f.request) {
+				return false
+			}
+		} else if strings.HasSuffix(name, "/node_modules/"+strings.TrimRight(f.request, "/")) {
+			return false
+		}
+	}
 	return (f.blockedDirectory == "" || strings.TrimRight(physical, "/") != strings.TrimRight(f.blockedDirectory, "/")) && f.FS.DirectoryExists(physical)
 }
 
@@ -408,6 +459,7 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 	}
 	if !json.Valid([]byte(text)) {
 		f.unresolved = true
+		f.failure = Result{Error: "Invalid package.json at " + f.physical(name), terminal: true}
 		return "", false
 	}
 	value, err := hujson.Parse([]byte(text))
@@ -507,6 +559,7 @@ func (f *nodeResolutionFS) recordImports(entries *hujson.Object, fileName string
 				}
 				if !tspath.IsExternalModuleNameRelative(name) {
 					f.importsTarget = name
+					f.fullySpecified = false
 				}
 			}
 		} else {

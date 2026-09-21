@@ -69,8 +69,8 @@ export default defineConfig([
   defaults are shown above. An empty list disables extension guessing;
   explicit filenames can still resolve.
 - `resolverConfig`: overrides module resolution. Supported properties are
-  `modules`, `alias`, `extensions`, `extensionAlias`, `conditionNames`,
-  `mainFields`, `mainFiles`, and `aliasFields`. For example,
+  `modules`, `alias`, `fallback`, `fullySpecified`, `extensions`,
+  `extensionAlias`, `conditionNames`, `mainFields`, `mainFiles`, and `aliasFields`. For example,
   `{ modules: ['custom_modules', 'node_modules'] }` adds a module directory,
   and `{ alias: { virtual: './shim.js' } }` redirects a request. Directory
   defaults are `mainFields: ['main']` and `mainFiles: ['index']`.
@@ -90,29 +90,19 @@ For TypeScript files, the default mapping substitutes `.ts` for `.js`, `.mts`
 for `.mjs`, `.cts` for `.cjs`, and `.tsx` for `.jsx` in preserve mode or `.js`
 in React modes. `allowImportingTsExtensions` uses source extensions directly.
 
+`resolverConfig.fallback` redirects unresolved requests, for example
+`{ fallback: { virtual: './shim.js' } }`. Existing targets take precedence.
+`fullySpecified: true` disables extension and directory-entry guessing for
+ordinary requests: `./helper.js` can resolve while `./helper` cannot. Package
+entry points and alias redirects retain their normal lookup behavior.
+
 ## Differences from upstream
 
-Only the `resolverConfig` properties listed above affect this rule.
-Options such as `fallback`, `symlinks`, and `fullySpecified` do not change its
-checks. For example,
-`fallback: { virtual: './shim.js' }` does not redirect an unresolved `virtual`
-request. Use `alias` when the redirect should apply to every matching request.
-
-Overlapping object-form aliases are matched in alphabetical order. Upstream
-tries them in declaration order;
-for example, `alias: { '@app/special': './present.js', '@app': './absent' }`
-resolves `@app/special` upstream but reports it in rslint when only
-`present.js` exists. Use an alias array when overlapping names need an
-explicit priority.
-
-Some invalid package imports mappings produce different diagnostic text.
-For example, `"#entry": [null, "./entry.js"]` produces an unresolved-import
-message in rslint and `Invalid value used as weak map key` upstream.
-
-Circular aliases such as `alias: { a: 'b', b: 'a' }` are reported by both
-linters. Rslint reports `Recursive alias while resolving 'a'`; the upstream
-message starts with `Recursion in resolving`. Correct the circular mapping
-to resolve the error.
+- `resolverConfig` options not listed above, including `symlinks`, are not supported.
+- Overlapping object-form `alias` and `fallback` entries use alphabetical priority
+  instead of declaration order. Use arrays to set priority.
+- Error messages for malformed `package.json` files, invalid imports mappings,
+  and circular aliases may differ.
 
 ## References
 

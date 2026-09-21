@@ -252,7 +252,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-has-check': 'error', // not implemented
     // 'unicorn/prefer-hoisting-branch-code': 'error', // not implemented
     // 'unicorn/prefer-https': 'error', // not implemented
-    // 'unicorn/prefer-identifier-import-export-specifiers': 'error', // not implemented
+    'unicorn/prefer-identifier-import-export-specifiers': 'error',
     // 'unicorn/prefer-import-meta-properties': 'off', // not implemented
     // 'unicorn/prefer-includes': 'error', // not implemented
     // 'unicorn/prefer-includes-over-repeated-comparisons': 'error', // not implemented

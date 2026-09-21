@@ -2,36 +2,22 @@ package prefer_hooks_on_top
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
+	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_hooks_on_top"
 )
 
-func buildNoHookOnTopMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "noHookOnTop",
-		Description: "Hooks should come before test cases",
-	}
-}
-
-var PreferHooksOnTopRule = rule.Rule{
-	Name:   "jest/prefer-hooks-on-top",
-	Schema: rule.EmptyArraySchema,
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		hooksContext := []bool{false}
-
-		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				if utils.IsTypeOfJestFnCall(node, ctx, utils.JestFnTypeTest) {
-					hooksContext[len(hooksContext)-1] = true
+var PreferHooksOnTopRule = shared.NewRule(shared.Config{
+	Name: "jest/prefer-hooks-on-top",
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		return shared.Runtime{
+			Parse: func(node *ast.Node) *shared.ParsedCall {
+				parsed := jestUtils.ParseJestFnCall(node, ctx)
+				if parsed == nil {
+					return nil
 				}
-				if hooksContext[len(hooksContext)-1] && utils.IsTypeOfJestFnCall(node, ctx, utils.JestFnTypeHook) {
-					ctx.ReportNode(node, buildNoHookOnTopMessage())
-				}
-				hooksContext = append(hooksContext, false)
-			},
-			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
-				hooksContext = hooksContext[:len(hooksContext)-1]
+				return &parsed.ParsedCall
 			},
 		}
 	},
-}
+})

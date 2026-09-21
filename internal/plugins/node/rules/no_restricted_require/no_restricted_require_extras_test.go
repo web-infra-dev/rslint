@@ -60,6 +60,32 @@ func runRestrictedRequireTests(t *testing.T, root rule_tester.Root, valid []rule
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &NoRestrictedRequireRule, valid, invalid)
 }
 
+func TestNoRestrictedRequireBuiltinFallback(t *testing.T) {
+	root := restrictedRequireRoot(t)
+	var invalid []rule_tester.InvalidTestCase
+	for _, name := range []string{"fs", "node:fs"} {
+		for _, target := range []struct{ alias, file string }{
+			{"./server/api.js", "server/api.js"},
+			{"./server", "server/index.js"},
+		} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code:     "require('" + name + "');",
+				Options:  []any{[]any{filepath.Join(root.Dir, target.file)}},
+				Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{name: target.alias}}}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restricted", Message: "'" + name + "' module is restricted from being used.",
+					Line: 1, Column: 9, EndLine: 1, EndColumn: 11 + len(name),
+				}},
+			})
+		}
+	}
+	runRestrictedRequireTests(t, root, []rule_tester.ValidTestCase{{
+		Code:     "require('node:fs');",
+		Options:  []any{[]any{filepath.Join(root.Dir, "server/api.js")}},
+		Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{"fs": "./server/api.js"}}}},
+	}}, invalid)
+}
+
 // Expectations verified against eslint-plugin-n v18.3.0 with the TypeScript parser.
 func TestNoRestrictedRequireExtras(t *testing.T) {
 	root := restrictedRequireRoot(t)

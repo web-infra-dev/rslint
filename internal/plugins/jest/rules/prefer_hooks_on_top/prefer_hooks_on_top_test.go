@@ -62,6 +62,67 @@ describe('foo', () => {
     });
   });
 })`},
+			// A function body is a scope of its own: a hook in a function that
+			// is never called registers nothing, so the suite's cases cannot
+			// make it report.
+			{Code: `describe('foo', () => {
+  test('bar', () => {});
+
+  function unused() {
+    beforeEach(() => {});
+  }
+})`},
+			// A function passed to describe by name is that suite's body, so the
+			// cases registered above it do not count against it.
+			{Code: `test('bar', () => {});
+
+function foo() {
+  beforeEach(() => {});
+  test('baz', () => {});
+}
+
+describe('foo', foo)`},
+			// A constructor and an accessor are scopes of their own as well:
+			// each body runs only when the class is instantiated or the
+			// property is touched.
+			{Code: `class Helper {
+  constructor() {
+    test('bar', () => {});
+  }
+}
+beforeEach(() => {})`},
+			{Code: `test('bar', () => {});
+class Helper {
+  constructor() {
+    beforeEach(() => {});
+  }
+}`},
+			{Code: `class Helper {
+  get value() {
+    test('bar', () => {});
+    return null;
+  }
+}
+beforeEach(() => {})`},
+			{Code: `test('bar', () => {});
+class Helper {
+  get value() {
+    beforeEach(() => {});
+    return null;
+  }
+}`},
+			{Code: `class Helper {
+  set value(v) {
+    test('bar', () => {});
+  }
+}
+beforeEach(() => {})`},
+			{Code: `test('bar', () => {});
+class Helper {
+  set value(v) {
+    beforeEach(() => {});
+  }
+}`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

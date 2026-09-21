@@ -114,11 +114,17 @@ func (tracker *Tracker) TrackExpression(node *ast.Node, value *Trace) {
 		return
 	}
 
-	if ast.IsAccessExpression(parent) && utils.AccessExpressionObject(parent) == node {
+	if object, property := utils.MemberExpressionParts(parent); object == node {
 		if utils.IsInJsxTagName(parent) {
 			return
 		}
-		name, ok := tracker.accessExpressionStaticName(parent)
+		var name string
+		var ok bool
+		if parent.Kind == ast.KindElementAccessExpression {
+			name, ok = tracker.propertyNames().EvalAccessExpressionName(parent)
+		} else if property != nil {
+			name, ok = utils.GetStaticPropertyName(property)
+		}
 		if next := value.Properties[name]; ok && next != nil {
 			next.read(parent)
 			tracker.TrackExpression(parent, next)
@@ -269,13 +275,6 @@ func (tracker *Tracker) trackGlobalVariable(name string, value *Trace) {
 		}
 		return false
 	})
-}
-
-func (tracker *Tracker) accessExpressionStaticName(node *ast.Node) (string, bool) {
-	if node.Kind == ast.KindElementAccessExpression {
-		return tracker.propertyNames().EvalAccessExpressionName(node)
-	}
-	return utils.AccessExpressionStaticName(node)
 }
 
 func (tracker *Tracker) staticPropertyName(node *ast.Node) (string, bool) {
