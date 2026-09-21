@@ -14,17 +14,17 @@ Import presets from `@rslint/core`:
 
 <PresetImportSnippet />
 
-The `nodePlugin.configs.recommended`, `recommendedModule`, and `recommendedScript` presets correspond to [eslint-plugin-n's `recommended`, `recommended-module`, and `recommended-script`](https://github.com/eslint-community/eslint-plugin-n/tree/v18.3.0/lib/configs). They enable native `node/*` rules and declare Node.js globals:
+The `node.configs.recommended`, `recommended-module`, and `recommended-script` presets correspond to [eslint-plugin-n's `recommended`, `recommended-module`, and `recommended-script`](https://github.com/eslint-community/eslint-plugin-n/tree/v18.3.0/lib/configs). They enable native `node/*` rules and declare Node.js globals:
 
 ```ts
-import { defineConfig, nodePlugin } from '@rslint/core';
+import { defineConfig, node } from '@rslint/core';
 
-export default defineConfig([nodePlugin.configs.recommended]);
+export default defineConfig([node.configs.recommended]);
 ```
 
-`recommended` is an array of flat config entries. When selected, it reads the nearest valid `package.json` from the process working directory: `"type": "module"` selects ES modules, otherwise CommonJS. Overrides treat `.mjs` as ES modules and `.cjs` as CommonJS, including dotfiles. Like upstream, this default does not detect each file's nearest package type; use file-scoped `recommendedModule` or `recommendedScript` entries for packages with different types.
+`recommended` is an array of flat config entries. When selected, it reads the nearest valid `package.json` from the process working directory: `"type": "module"` selects ES modules, otherwise CommonJS. Overrides treat `.mjs` as ES modules and `.cjs` as CommonJS, including dotfiles. Like upstream, this default does not detect each file's nearest package type; use file-scoped `recommended-module` or `recommended-script` entries for packages with different types.
 
-`recommendedModule` disables the CommonJS globals (`require`, `module`, `exports`, `__dirname`, and `__filename`) and ignores `modules` in `node/no-unsupported-features/es-syntax`. `recommendedScript` uses `sourceType: 'commonjs'`, enables those globals, and keeps the syntax rule's `ignores` empty. Both include the bundled Node.js and ES2021 global sets, following upstream's flat config shape. `sourceType` controls lint scopes and strict-mode behavior; it does not change TypeScript parsing.
+`recommended-module` disables the CommonJS globals (`require`, `module`, `exports`, `__dirname`, and `__filename`) and ignores `modules` in `node/no-unsupported-features/es-syntax`. `recommended-script` uses `sourceType: 'commonjs'`, enables those globals, and keeps the syntax rule's `ignores` empty. Both include the bundled Node.js and ES2021 global sets, following upstream's flat config shape. `sourceType` controls lint scopes and strict-mode behavior; it does not change TypeScript parsing.
 
 The upstream `process-exit-as-throw` rule is not implemented and is omitted, as with unavailable rules in other presets. Set `engines.node` in `package.json` or `settings.node.version` to configure the Node.js version checked by the three `node/no-unsupported-features/*` rules.
 

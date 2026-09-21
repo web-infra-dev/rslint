@@ -50,13 +50,13 @@ export const importPlugin = {
   configs: { recommended: importRecommended },
 };
 
-export const nodePlugin = {
+export const node = {
   configs: {
     get recommended() {
       return createNodeRecommended();
     },
-    recommendedModule: nodeRecommendedModule,
-    recommendedScript: nodeRecommendedScript,
+    'recommended-module': nodeRecommendedModule,
+    'recommended-script': nodeRecommendedScript,
   },
 };
 

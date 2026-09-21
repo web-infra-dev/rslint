@@ -36,9 +36,18 @@ function resolvePresetConfig(
   const mod = (rslintCore as Record<string, unknown>)[importName] as
     | { configs?: Record<string, RslintConfigEntry | RslintConfigEntry[]> }
     | undefined;
-  const prefix = `${importName}.configs.`;
-  if (!presetName.startsWith(prefix)) return [];
-  const configKey = presetName.slice(prefix.length);
+  const prefix = `${importName}.configs`;
+  let configKey: string;
+  if (presetName.startsWith(`${prefix}.`)) {
+    configKey = presetName.slice(prefix.length + 1);
+  } else if (
+    presetName.startsWith(`${prefix}['`) &&
+    presetName.endsWith("']")
+  ) {
+    configKey = presetName.slice(prefix.length + 2, -2);
+  } else {
+    return [];
+  }
   const config = mod?.configs?.[configKey];
   return config ? [config].flat() : [];
 }

@@ -12,7 +12,7 @@ export {
   reactPlugin,
   reactHooksPlugin,
   importPlugin,
-  nodePlugin,
+  node,
   promisePlugin,
   jestPlugin,
   rstestPlugin,

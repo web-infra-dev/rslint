@@ -5,7 +5,8 @@
  */
 export interface PluginPresetMeta {
   /**
-   * Dot-path to the preset config object, e.g. `reactPlugin.configs.recommended`.
+   * JavaScript access expression for the preset, e.g.
+   * `reactPlugin.configs.recommended` or `node.configs['recommended-module']`.
    */
   name: string;
   /** Human-readable preset description, shown in the docs preset table. */
@@ -120,18 +121,18 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
   {
     prefix: 'node',
     group: 'eslint-plugin-node',
-    importName: 'nodePlugin',
+    importName: 'node',
     presets: [
       {
-        name: 'nodePlugin.configs.recommended',
+        name: 'node.configs.recommended',
         description: 'Node.js rules for mixed CommonJS and ES modules',
       },
       {
-        name: 'nodePlugin.configs.recommendedModule',
+        name: "node.configs['recommended-module']",
         description: 'Node.js rules for ES modules',
       },
       {
-        name: 'nodePlugin.configs.recommendedScript',
+        name: "node.configs['recommended-script']",
         description: 'Node.js rules for CommonJS',
       },
     ],
