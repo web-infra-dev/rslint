@@ -201,6 +201,7 @@ define.test({
     './tests/eslint-plugin-node/rules/prefer-global/text-decoder.test.ts',
     './tests/eslint-plugin-node/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-node/rules/prefer-promises/dns.test.ts',
+    './tests/eslint-plugin-node/rules/prefer-promises/fs.test.ts',
 
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/default.test.ts',
