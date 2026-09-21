@@ -11,11 +11,29 @@ import (
 
 func (c *syntaxChecker) visit(node *ast.Node) {
 	source := c.ctx.SourceFile
-	if node.Modifiers() != nil && ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) {
-		c.report("modules", node)
+	if modifiers := node.Modifiers(); modifiers != nil {
+		for _, modifier := range modifiers.Nodes {
+			if modifier.Kind == ast.KindExportKeyword {
+				c.reportRange("modules", node, core.NewTextRange(scanner.GetTokenPosOfNode(modifier, source, false), node.End()))
+			}
+		}
 	}
 	switch node.Kind {
 	case ast.KindArrowFunction, ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+		if node.Kind == ast.KindMethodDeclaration || node.Kind == ast.KindGetAccessor || node.Kind == ast.KindSetAccessor {
+			if utils.IsPlainClassMember(node) && (ast.IsClassLike(node.Parent) || node.Parent.Kind == ast.KindObjectLiteralExpression) {
+				c.property(node)
+				if node.Kind == ast.KindMethodDeclaration && node.Parent.Kind == ast.KindObjectLiteralExpression {
+					c.report("property-shorthands", node)
+				}
+				if node.Kind == ast.KindGetAccessor || node.Kind == ast.KindSetAccessor {
+					c.report("accessor-properties", node)
+				}
+				if node.Name().Kind == ast.KindPrivateIdentifier {
+					c.report("class-fields", node.Name())
+				}
+			}
+		}
 		if node.Body() == nil {
 			return
 		}
@@ -34,6 +52,17 @@ func (c *syntaxChecker) visit(node *ast.Node) {
 			c.reportRange("arrow-functions", node, loc)
 		}
 		params := utils.ESTreeParameters(node)
+		for _, param := range params {
+			if ast.IsParameterPropertyDeclaration(param, node) {
+				continue
+			}
+			if param.Initializer() != nil {
+				c.report("default-parameters", param)
+			}
+			if param.AsParameterDeclaration().DotDotDotToken != nil {
+				c.report("rest-parameters", param)
+			}
+		}
 		if len(params) > 0 {
 			c.trailingFunctionComma(node, params[len(params)-1])
 		}
@@ -46,18 +75,6 @@ func (c *syntaxChecker) visit(node *ast.Node) {
 			}
 			if node.Parent.Kind == ast.KindLabeledStatement {
 				c.report("labelled-function-declarations", node.Parent)
-			}
-		}
-		if node.Kind == ast.KindMethodDeclaration || node.Kind == ast.KindGetAccessor || node.Kind == ast.KindSetAccessor {
-			c.property(node)
-			if node.Kind == ast.KindMethodDeclaration && node.Parent.Kind == ast.KindObjectLiteralExpression {
-				c.report("property-shorthands", node)
-			}
-			if node.Kind == ast.KindGetAccessor || node.Kind == ast.KindSetAccessor {
-				c.report("accessor-properties", node)
-			}
-			if node.Name().Kind == ast.KindPrivateIdentifier {
-				c.report("class-fields", node.Name())
 			}
 		}
 	case ast.KindVariableDeclarationList:
@@ -73,14 +90,6 @@ func (c *syntaxChecker) visit(node *ast.Node) {
 		if init := node.Initializer(); init != nil && node.Parent.Kind == ast.KindVariableDeclarationList && node.Parent.Parent.Kind == ast.KindForInStatement {
 			c.report("initializers-in-for-in", init)
 		}
-	case ast.KindParameter:
-		p := node.AsParameterDeclaration()
-		if p.Initializer != nil {
-			c.report("default-parameters", node)
-		}
-		if p.DotDotDotToken != nil {
-			c.report("rest-parameters", node)
-		}
 	case ast.KindBindingElement:
 		c.property(node)
 		if node.AsBindingElement().DotDotDotToken != nil && node.Parent.Kind == ast.KindObjectBindingPattern {
@@ -92,6 +101,23 @@ func (c *syntaxChecker) visit(node *ast.Node) {
 	case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression:
 		c.destructuring(node)
 		c.trailingComma(node)
+		// tsgo also uses literal nodes for assignment patterns, including loop
+		// targets. Its assignment-target helper preserves nested/default edges.
+		if !ast.IsAssignmentTarget(node) {
+			if node.Kind == ast.KindArrayLiteralExpression {
+				for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
+					if element.Kind == ast.KindSpreadElement {
+						c.report("spread-elements", element)
+					}
+				}
+			} else {
+				for _, property := range node.Properties() {
+					if property.Kind == ast.KindShorthandPropertyAssignment {
+						c.report("property-shorthands", property)
+					}
+				}
+			}
+		}
 	case ast.KindClassDeclaration, ast.KindClassExpression:
 		c.reportRange("classes", node, core.NewTextRange(utils.FindFunctionKeywordPos(source, node), node.End()))
 	case ast.KindClassStaticBlockDeclaration:
@@ -234,6 +260,9 @@ func (c *syntaxChecker) visit(node *ast.Node) {
 	case ast.KindTemplateHead, ast.KindTemplateMiddle, ast.KindTemplateTail:
 		c.escapes(node)
 	case ast.KindImportDeclaration, ast.KindExportDeclaration, ast.KindExportAssignment:
+		if node.Kind == ast.KindExportAssignment && node.AsExportAssignment().IsExportEquals {
+			return
+		}
 		c.report("modules", node)
 		if node.Kind == ast.KindExportDeclaration {
 			clause := node.AsExportDeclaration().ExportClause
@@ -280,6 +309,9 @@ func (c *syntaxChecker) destructuring(node *ast.Node) {
 	}
 	switch parent.Kind {
 	case ast.KindVariableDeclaration, ast.KindParameter:
+		if parent.Kind == ast.KindParameter && (parent.Parent.Body() == nil || ast.IsParameterPropertyDeclaration(parent, parent.Parent)) {
+			return
+		}
 		if parent.Name() == target {
 			c.report("destructuring", node)
 		}

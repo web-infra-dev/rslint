@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/evaluator"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
@@ -19,6 +20,9 @@ import (
 // Create one evaluator per linted file; it keeps write-reference and recursion
 // state for that file.
 type StaticStringEvaluator struct {
+	// GlobalAccess optionally supplies the rule context's configured globals.
+	// When nil, unshadowed standard globals are assumed to be available.
+	GlobalAccess           func(string) GlobalAccess
 	typeChecker            *checker.Checker
 	sourceFile             *ast.SourceFile
 	referenceResolver      StaticReferenceResolver
@@ -306,12 +310,12 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 			return staticEvalResult{}
 		}
 		identifier := node.AsIdentifier()
-		if identifier != nil && identifier.Text == "undefined" && !IsShadowed(node, "undefined") {
+		if identifier != nil && staticEvaluator.isBuiltinIdentifier(node, "undefined") {
 			return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 		}
 		return staticEvaluator.evalIdentifier(node)
 	case ast.KindTemplateExpression:
-		return staticEvaluator.evalTemplateExpression(node)
+		return staticEvaluator.evalTemplateExpression(node, false)
 	case ast.KindBinaryExpression:
 		return staticEvaluator.evalBinaryExpression(node)
 	case ast.KindPrefixUnaryExpression:
@@ -434,7 +438,7 @@ func (staticEvaluator *StaticStringEvaluator) resolveIdentifierInitializer(node 
 	return declaration.Initializer, symbol, true
 }
 
-func (staticEvaluator *StaticStringEvaluator) evalTemplateExpression(node *ast.Node) staticEvalResult {
+func (staticEvaluator *StaticStringEvaluator) evalTemplateExpression(node *ast.Node, raw bool) staticEvalResult {
 	template := node.AsTemplateExpression()
 	if template == nil {
 		return staticEvalResult{}
@@ -442,7 +446,7 @@ func (staticEvaluator *StaticStringEvaluator) evalTemplateExpression(node *ast.N
 
 	var builder strings.Builder
 	if template.Head != nil {
-		builder.WriteString(template.Head.Text())
+		builder.WriteString(templateLiteralText(template.Head, raw))
 	}
 	if template.TemplateSpans != nil {
 		for _, spanNode := range template.TemplateSpans.Nodes {
@@ -460,7 +464,7 @@ func (staticEvaluator *StaticStringEvaluator) evalTemplateExpression(node *ast.N
 			}
 			builder.WriteString(value)
 			if span.Literal != nil {
-				builder.WriteString(span.Literal.Text())
+				builder.WriteString(templateLiteralText(span.Literal, raw))
 			}
 		}
 	}
@@ -867,7 +871,8 @@ func (staticEvaluator *StaticStringEvaluator) evalMemberAccess(node *ast.Node) s
 		return staticEvalResult{}
 	}
 	if staticEvaluator.resolveIdentifiers {
-		if number, ok := staticGlobalNumber(objectNode, key); ok {
+		if number, ok := staticGlobalNumber(objectNode, key); ok &&
+			(staticEvaluator.GlobalAccess == nil || staticEvaluator.GlobalAccess(SkipAssertionsAndParens(objectNode).Text()).IsDeclared()) {
 			return staticEvalResult{value: staticNumberValue(number), ok: true}
 		}
 	}
@@ -1093,7 +1098,7 @@ func (staticEvaluator *StaticStringEvaluator) objectPassThroughArgument(node *as
 	}
 
 	object := SkipAssertionsAndParens(AccessExpressionObject(callee))
-	if !isIdentifierWithText(object, "Object") || IsShadowed(object, "Object") {
+	if !staticEvaluator.isBuiltinIdentifier(object, "Object") {
 		return nil, false
 	}
 
@@ -1596,12 +1601,31 @@ func (staticEvaluator *StaticStringEvaluator) evalStringRawTag(node *ast.Node) s
 
 	switch tagged.Template.Kind {
 	case ast.KindNoSubstitutionTemplateLiteral:
-		return staticEvalResult{value: tagged.Template.Text(), ok: true}
+		return staticEvalResult{value: templateLiteralText(tagged.Template, true), ok: true}
 	case ast.KindTemplateExpression:
-		return staticEvaluator.evalTemplateExpression(tagged.Template)
+		return staticEvaluator.evalTemplateExpression(tagged.Template, true)
 	default:
 		return staticEvalResult{}
 	}
+}
+
+func templateLiteralText(node *ast.Node, raw bool) string {
+	if !raw {
+		return node.Text()
+	}
+	text := node.TemplateLiteralLikeData().RawText
+	if text == "" {
+		// Like tsgo's tagged-template transform, recover raw text from source
+		// for no-substitution literals, which do not store a separate RawText.
+		text = scanner.GetSourceTextOfNodeFromSourceFile(ast.GetSourceFileOfNode(node), node, false)
+		endLength := 2 // Heads and middles end with ${.
+		if node.Kind == ast.KindNoSubstitutionTemplateLiteral || node.Kind == ast.KindTemplateTail {
+			endLength = 1
+		}
+		text = text[1 : len(text)-endLength]
+	}
+	// Both cooked and raw template values normalize CRLF and CR to LF.
+	return strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
 }
 
 func (staticEvaluator *StaticStringEvaluator) isStringRawTag(tag *ast.Node) bool {
@@ -1624,7 +1648,7 @@ func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Nod
 	if node == nil {
 		return false
 	}
-	if isIdentifierWithText(node, "String") && !IsShadowed(node, "String") {
+	if staticEvaluator.isBuiltinIdentifier(node, "String") {
 		return true
 	}
 	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
@@ -1641,7 +1665,7 @@ func (staticEvaluator *StaticStringEvaluator) isBuiltinArrayValue(node *ast.Node
 	if node == nil {
 		return false
 	}
-	if isIdentifierWithText(node, "Array") && !IsShadowed(node, "Array") {
+	if staticEvaluator.isBuiltinIdentifier(node, "Array") {
 		return true
 	}
 	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
@@ -1651,6 +1675,20 @@ func (staticEvaluator *StaticStringEvaluator) isBuiltinArrayValue(node *ast.Node
 	resolvingAliases[symbol] = true
 	defer delete(resolvingAliases, symbol)
 	return staticEvaluator.isBuiltinArrayValue(initializer, resolvingAliases)
+}
+
+func (staticEvaluator *StaticStringEvaluator) isBuiltinIdentifier(node *ast.Node, name string) bool {
+	if !isIdentifierWithText(node, name) || staticEvaluator.GlobalAccess != nil && !staticEvaluator.GlobalAccess(name).IsDeclared() {
+		return false
+	}
+	if refs, ok := staticEvaluator.referenceResolver.(interface {
+		IsGlobalNameReference(location *ast.Node, name string, meaning ast.SymbolFlags) bool
+	}); ok {
+		// eslint-utils' static lookup considers type-only bindings too. Reuse
+		// the existing reference index instead of scanning every enclosing scope.
+		return refs.IsGlobalNameReference(node, name, ast.SymbolFlagsAll)
+	}
+	return !IsShadowed(node, name)
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalWithTsgo(node *ast.Node) (result staticEvalResult) {

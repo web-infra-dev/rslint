@@ -73,11 +73,11 @@ var ESSyntaxRule = rule.Rule{
 		for _, kind := range []ast.Kind{
 			ast.KindArrowFunction, ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor,
 			ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindStringLiteral, ast.KindRegularExpressionLiteral, ast.KindIdentifier, ast.KindPrivateIdentifier,
-			ast.KindVariableStatement, ast.KindVariableDeclarationList, ast.KindVariableDeclaration, ast.KindParameter, ast.KindBindingElement,
+			ast.KindVariableStatement, ast.KindVariableDeclarationList, ast.KindVariableDeclaration, ast.KindBindingElement,
 			ast.KindClassDeclaration, ast.KindClassExpression, ast.KindClassStaticBlockDeclaration, ast.KindPropertyDeclaration,
 			ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment,
 			ast.KindObjectBindingPattern, ast.KindArrayBindingPattern, ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression,
-			ast.KindForOfStatement, ast.KindForInStatement, ast.KindAwaitExpression, ast.KindCatchClause,
+			ast.KindForOfStatement, ast.KindAwaitExpression, ast.KindCatchClause,
 			ast.KindBinaryExpression, ast.KindCallExpression, ast.KindNewExpression, ast.KindPropertyAccessExpression, ast.KindElementAccessExpression,
 			ast.KindSpreadAssignment, ast.KindMetaProperty, ast.KindSuperKeyword,
 			ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression, ast.KindTemplateHead, ast.KindTemplateMiddle, ast.KindTemplateTail, ast.KindTaggedTemplateExpression,
@@ -85,21 +85,6 @@ var ESSyntaxRule = rule.Rule{
 			ast.KindTypeAliasDeclaration, ast.KindInterfaceDeclaration, ast.KindEnumDeclaration, ast.KindModuleDeclaration, ast.KindImportEqualsDeclaration,
 		} {
 			listeners[kind] = check.visit
-		}
-		// The same tsgo nodes represent expressions and assignment patterns.
-		listeners[rule.ListenerOnNotAllowPattern(ast.KindArrayLiteralExpression)] = func(node *ast.Node) {
-			for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
-				if element.Kind == ast.KindSpreadElement {
-					check.report("spread-elements", element)
-				}
-			}
-		}
-		listeners[rule.ListenerOnNotAllowPattern(ast.KindObjectLiteralExpression)] = func(node *ast.Node) {
-			for _, property := range node.Properties() {
-				if property.Kind == ast.KindShorthandPropertyAssignment {
-					check.report("property-shorthands", property)
-				}
-			}
 		}
 		listeners[rule.ListenerOnExit(ast.KindEndOfFile)] = func(*ast.Node) {
 			check.checkBuiltins()
@@ -152,7 +137,7 @@ func camelName(name string) string {
 func (c *syntaxChecker) report(name string, node *ast.Node) {
 	if _, enabled := c.enabled[name]; node != nil && enabled {
 		node = ast.SkipParentheses(node)
-		c.reportRange(name, node, utils.TrimNodeTextRange(c.ctx.SourceFile, node))
+		c.reportRange(name, node, utils.NodeTextRangeSkippingDecorators(c.ctx.SourceFile, node))
 	}
 }
 func (c *syntaxChecker) reportRange(name string, node *ast.Node, loc core.TextRange) {
@@ -183,6 +168,7 @@ func (c *syntaxChecker) reportRange(name string, node *ast.Node, loc core.TextRa
 func (c *syntaxChecker) static() *utils.StaticStringEvaluator {
 	if c.evaluator == nil {
 		c.evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(nil, c.ctx.SourceFile, c.ctx.Refs)
+		c.evaluator.GlobalAccess = c.ctx.Globals.Access
 	}
 	return c.evaluator
 }

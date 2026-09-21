@@ -227,9 +227,12 @@ func (c *syntaxChecker) inferExpressionType(node *ast.Node) string {
 			return a
 		}
 	case ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression:
-		callee := utils.ESTreeRuntimeExpression(node.Expression())
+		callee := utils.ESTreeCallCallee(node.Expression())
 		if node.Kind == ast.KindTaggedTemplateExpression {
-			callee = utils.ESTreeRuntimeExpression(node.AsTaggedTemplateExpression().Tag)
+			callee = utils.ESTreeCallCallee(node.AsTaggedTemplateExpression().Tag)
+		}
+		if callee == nil {
+			return ""
 		}
 		if callee.Kind == ast.KindIdentifier && c.globalIdentifier(callee) && builtinConstructor(callee.Text()) {
 			return callee.Text()
@@ -300,7 +303,7 @@ func builtinConstructor(name string) bool {
 	return strings.Contains(" String Number Boolean Symbol BigInt Object Function Array RegExp Date Promise Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array BigInt64Array BigUint64Array ArrayBuffer SharedArrayBuffer ", " "+name+" ")
 }
 func (c *syntaxChecker) globalIdentifier(node *ast.Node) bool {
-	return node != nil && node.Kind == ast.KindIdentifier && c.ctx.Globals.Access(node.Text()).IsDeclared() && c.ctx.Refs.IsGlobalReference(node)
+	return node != nil && node.Kind == ast.KindIdentifier && c.ctx.Globals.Access(node.Text()).IsDeclared() && c.ctx.Refs.IsGlobalNameReference(node, node.Text(), ast.SymbolFlagsAll)
 }
 func isLegacyAccessor(name string) bool {
 	return name == "__defineGetter__" || name == "__defineSetter__" || name == "__lookupGetter__" || name == "__lookupSetter__"
@@ -312,6 +315,12 @@ func (c *syntaxChecker) legacyAccessorIdentifier(node *ast.Node) {
 	outer := utils.OutermostParenthesizedExpression(node)
 	if _, key := utils.MemberExpressionParts(outer.Parent); key == outer {
 		return
+	}
+	if outer.Parent.Kind == ast.KindComputedPropertyName {
+		owner := outer.Parent.Parent.Parent
+		if owner.Kind == ast.KindObjectLiteralExpression || owner.Kind == ast.KindObjectBindingPattern {
+			return
+		}
 	}
 	c.report("legacy-object-prototype-accessor-methods", node)
 }

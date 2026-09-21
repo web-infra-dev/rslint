@@ -28,8 +28,21 @@ func (c *syntaxChecker) regexp(node *ast.Node, pattern, flags string) {
 		}
 	}
 	report := func() {
+		patternsReported := false
 		for _, feature := range features {
-			if found[feature.name] {
+			if regexpPatternFeature(feature.name) {
+				if _, enabled := c.enabled[feature.name]; !enabled || patternsReported {
+					continue
+				}
+				// Upstream combines pattern checks at the first enabled pattern
+				// listener. Keep same-location diagnostics in that order.
+				patternsReported = true
+				for _, patternFeature := range features {
+					if regexpPatternFeature(patternFeature.name) && found[patternFeature.name] {
+						c.report(patternFeature.name, node)
+					}
+				}
+			} else if found[feature.name] {
 				c.report(feature.name, node)
 			}
 		}
@@ -80,6 +93,10 @@ func (c *syntaxChecker) regexp(node *ast.Node, pattern, flags string) {
 		}
 	}
 	report()
+}
+
+func regexpPatternFeature(name string) bool {
+	return name == "regexp-lookbehind-assertions" || name == "regexp-named-capture-groups" || strings.HasPrefix(name, "regexp-unicode-property-escapes")
 }
 
 // New property names in the editions tracked by es-x 7.8.0. Validation and
