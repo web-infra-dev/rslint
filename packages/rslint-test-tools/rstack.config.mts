@@ -704,6 +704,7 @@ define.test({
     './tests/rstest/rules/no-restricted-rstest-methods.test.ts',
     './tests/rstest/rules/no-standalone-expect.test.ts',
     './tests/rstest/rules/no-unnecessary-assertion.test.ts',
+    './tests/rstest/rules/no-unneeded-async-expect-function.test.ts',
     './tests/rstest/rules/padding-around-after-all-blocks.test.ts',
     './tests/rstest/rules/padding-around-after-each-blocks.test.ts',
     './tests/rstest/rules/padding-around-all.test.ts',
