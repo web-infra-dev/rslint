@@ -4,64 +4,33 @@ import (
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
-	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
+	jest "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
+	framework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_expect_resolves"
 )
 
-func buildExpectResolvesErrorMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "expectResolves",
-		Description: "Use `await expect(...).resolves instead",
-	}
-}
-
-var PreferExpectResolvesRule = rule.Rule{
-	Name:   "jest/prefer-expect-resolves",
-	Schema: rule.EmptyArraySchema,
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
-				if jestFnCall == nil || jestFnCall.Kind != jestUtils.JestFnTypeExpect {
-					return
-				}
-
-				expectCall := jestFnCall.Head.Local.Node.Parent
-				if expectCall == nil || expectCall.Kind != ast.KindCallExpression {
-					return
-				}
-
-				args := expectCall.Arguments()
-				if len(args) == 0 {
-					return
-				}
-
-				awaitNode := ast.SkipParentheses(args[0])
-				if awaitNode == nil || awaitNode.Kind != ast.KindAwaitExpression {
-					return
-				}
-
-				awaitExpr := awaitNode.AsAwaitExpression()
-				if awaitExpr == nil || awaitExpr.Expression == nil {
-					return
-				}
-
-				sourceFile := ctx.SourceFile
-				awaitRange := rslintUtils.TrimNodeTextRange(sourceFile, awaitNode)
-				argumentRange := rslintUtils.TrimNodeTextRange(sourceFile, awaitExpr.Expression)
-
-				fixes := []rule.RuleFix{
-					rule.RuleFixInsertBefore(sourceFile, expectCall, "await "),
-					rule.RuleFixRemoveRange(core.NewTextRange(awaitRange.Pos(), argumentRange.Pos())),
-				}
-				if !slices.Contains(jestFnCall.Modifiers, "resolves") && !slices.Contains(jestFnCall.Modifiers, "rejects") {
-					fixes = append(fixes, rule.RuleFixInsertAfter(expectCall, ".resolves"))
-				}
-
-				ctx.ReportNodeWithFixes(awaitNode, buildExpectResolvesErrorMessage(), fixes...)
-			},
+var PreferExpectResolvesRule = shared.NewRule(shared.Config{
+	Name:    "jest/prefer-expect-resolves",
+	Message: rule.RuleMessage{Id: "expectResolves", Description: "Use `await expect(...).resolves instead"},
+	Prepare: func(ctx rule.RuleContext) func(*ast.Node) *shared.ExpectCall {
+		return func(node *ast.Node) *shared.ExpectCall {
+			parsed := jest.ParseJestFnCall(node, ctx)
+			if parsed == nil || parsed.Kind != jest.JestFnTypeExpect || parsed.MatcherEntry == nil {
+				return nil
+			}
+			head := parsed.Head.Local.Node.Parent
+			if head == nil || head.Kind != ast.KindCallExpression {
+				return nil
+			}
+			matcher := framework.InvokedAccessorCall(parsed.MatcherEntry)
+			if matcher == nil || matcher != node {
+				return nil
+			}
+			return &shared.ExpectCall{
+				Head: head, Matcher: matcher, Editable: true,
+				AddResolves: !slices.Contains(parsed.Modifiers, "resolves") && !slices.Contains(parsed.Modifiers, "rejects"),
+			}
 		}
 	},
-}
+})

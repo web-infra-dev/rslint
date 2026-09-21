@@ -707,6 +707,7 @@ define.test({
     './tests/rstest/rules/prefer-comparison-matcher.test.ts',
     './tests/rstest/rules/prefer-equality-matcher.test.ts',
     './tests/rstest/rules/prefer-expect-type-of.test.ts',
+    './tests/rstest/rules/prefer-expect-resolves.test.ts',
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
     './tests/rstest/rules/prefer-lowercase-title.test.ts',
     './tests/rstest/rules/prefer-import-in-mock.test.ts',

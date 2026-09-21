@@ -40,12 +40,23 @@ ruleTester.run('prefer-expect-resolves', {} as never, {
           expect(await someValue(),).toBe(true);
         });
       `,
-      output: `
+      errors: [
+        {
+          endColumn: 27,
+          column: 10,
+          messageId: 'expectResolves',
+          suggestions: [
+            {
+              messageId: 'suggestExpectResolves',
+              output: `
         it('passes', async () => {
           await expect(someValue(),).resolves.toBe(true);
         });
       `,
-      errors: [{ endColumn: 27, column: 10, messageId: 'expectResolves' }],
+            },
+          ],
+        },
+      ],
     },
     {
       code: `
@@ -66,7 +77,7 @@ ruleTester.run('prefer-expect-resolves', {} as never, {
     },
     {
       code: `
-        import { expect as pleaseExpect } from '@jest/globals';
+        import { expect as pleaseExpect } from '@rstest/core';
 
         it('is true', async () => {
           const myPromise = Promise.resolve(true);
@@ -75,7 +86,7 @@ ruleTester.run('prefer-expect-resolves', {} as never, {
         });
       `,
       output: `
-        import { expect as pleaseExpect } from '@jest/globals';
+        import { expect as pleaseExpect } from '@rstest/core';
 
         it('is true', async () => {
           const myPromise = Promise.resolve(true);
