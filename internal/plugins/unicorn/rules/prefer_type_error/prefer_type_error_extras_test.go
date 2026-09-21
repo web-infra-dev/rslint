@@ -45,6 +45,19 @@ func TestPreferTypeErrorExtras(t *testing.T) {
 			},
 			valid("if (value instanceof ns.Error) { throw new Error(); }"),
 			valid("if (SomeThing['isArray'](value)) { throw new Error(); }"),
+			// ESTree exposes optional chains as ChainExpression, which upstream
+			// does not classify as a type-checking expression.
+			valid("if (utils?.isArray(value)) { throw new Error(); }"),
+			valid("if (utils.isArray?.(value)) { throw new Error(); }"),
+			valid("if (wrapper?.utils.isArray(value)) { throw new Error(); }"),
+			// tsgo uses BinaryExpression for ESTree SequenceExpression and
+			// AssignmentExpression shapes. Those are not upstream binary checks.
+			valid("if (Array.isArray(value), flag) { throw new Error(); }"),
+			valid("if (flag = Array.isArray(value)) { throw new Error(); }"),
+			valid("if (flag += Number.isNaN(value)) { throw new Error(); }"),
+			valid("if (flag &&= Array.isArray(value)) { throw new Error(); }"),
+			valid("if (flag ||= Array.isArray(value)) { throw new Error(); }"),
+			valid("if (flag ??= Array.isArray(value)) { throw new Error(); }"),
 			valid("{ throw new Error(); }"),
 		},
 		[]rule_tester.InvalidTestCase{

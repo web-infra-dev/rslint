@@ -128,6 +128,9 @@ func errorConstructorIdentifier(node *ast.Node) *ast.Node {
 
 func isTypecheckingExpression(ctx rule.RuleContext, node *ast.Node, callExpression *ast.CallExpression) bool {
 	node = ast.SkipParentheses(node)
+	if node == nil || unicornutil.HasOptionalChainElement(node) {
+		return false
+	}
 
 	switch node.Kind {
 	case ast.KindIdentifier:
@@ -203,6 +206,9 @@ func isTypecheckingBinaryExpression(ctx rule.RuleContext, binary *ast.BinaryExpr
 		return !isErrorConstructor(binary.Right)
 	}
 
+	if operator == ast.KindCommaToken || ast.IsAssignmentOperator(operator) {
+		return false
+	}
 	if isExistenceCheck(binary) {
 		return false
 	}
