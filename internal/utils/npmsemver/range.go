@@ -13,7 +13,14 @@ import (
 
 // Range is an immutable npm-compatible version range, normalized by tsgo.
 // Its zero value is an empty range. Parse must succeed before using a range.
-type Range struct{ alternatives [][]versionComparator }
+type Range struct {
+	alternatives [][]versionComparator
+	raw          string
+}
+
+// Raw returns npm's whitespace-normalized input, before comparator expansion.
+func (version Range) Raw() string { return version.raw }
+
 type versionComparator struct {
 	operator   string
 	version    [3]uint64
@@ -36,6 +43,7 @@ func Parse(text string) (Range, bool) {
 		}
 		return r
 	}, ecmascript.StringTrim(text))
+	raw := strings.Join(strings.Fields(text), " ")
 	// npm's range grammar is ASCII after JS whitespace normalization. Do not
 	// let Go's broader whitespace handling accept characters such as U+0085.
 	for _, character := range text {
@@ -118,7 +126,7 @@ func Parse(text string) (Range, bool) {
 			arms[i] = strings.Join(tokens, " ")
 		}
 	}
-	var result Range
+	result := Range{raw: raw}
 	var emptyAlternative []versionComparator
 	for _, arm := range arms {
 		terms := strings.Fields(arm)
