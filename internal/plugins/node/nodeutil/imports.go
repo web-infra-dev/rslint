@@ -168,7 +168,7 @@ func resolveImport(p *program.Program, name, fileName string, typeOnly bool, opt
 		return moduleresolver.Result{Path: name}
 	}
 	moduleName, _ := ImportModuleName(name)
-	if moduleName == "" {
+	if moduleName == "" && !modules.IsNodeBuiltin(name) {
 		if options.MainFields == nil {
 			options.MainFields = []moduleresolver.MainField{}
 		}
@@ -254,6 +254,7 @@ func RequireResolutionOptions(ctx rule.RuleContext, options map[string]any) modu
 // Explicit resolver options replace the corresponding defaults, including
 // TypeScript aliases and extension mappings. An empty list remains meaningful.
 func applyResolverConfig(options *moduleresolver.Options, config map[string]any) {
+	options.FullySpecified, _ = config["fullySpecified"].(bool)
 	for key, destination := range map[string]*[]string{
 		"modules": &options.Modules, "extensions": &options.Extensions, "conditionNames": &options.Conditions,
 		"mainFiles": &options.MainFiles,
@@ -313,11 +314,15 @@ func applyResolverConfig(options *moduleresolver.Options, config map[string]any)
 			}
 		}
 	}
-	value, present := config["alias"]
-	if present {
+	if value, present := config["alias"]; present {
 		// A configured empty list also disables the tsconfig fallback.
-		options.Aliases = []moduleresolver.Alias{}
+		options.Aliases = resolverAliases(value)
 	}
+	options.Fallbacks = resolverAliases(config["fallback"])
+}
+
+func resolverAliases(value any) []moduleresolver.Alias {
+	aliases := []moduleresolver.Alias{}
 	appendAlias := func(name string, targets any, exact bool) {
 		alias := moduleresolver.Alias{Name: name, OnlyModule: exact}
 		switch targets := targets.(type) {
@@ -328,7 +333,7 @@ func applyResolverConfig(options *moduleresolver.Options, config map[string]any)
 		case bool:
 			alias.Ignore = !targets
 		}
-		options.Aliases = append(options.Aliases, alias)
+		aliases = append(aliases, alias)
 	}
 	switch aliases := value.(type) {
 	case map[string]any:
@@ -348,4 +353,5 @@ func applyResolverConfig(options *moduleresolver.Options, config map[string]any)
 			}
 		}
 	}
+	return aliases
 }

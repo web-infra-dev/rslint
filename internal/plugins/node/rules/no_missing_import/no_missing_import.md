@@ -92,7 +92,7 @@ in React modes. With `allowImportingTsExtensions`, the default extension list
 also includes `.ts`, `.mts`, and `.cts`, and emitted extensions are not
 substituted. Type-only imports also activate the `types` export condition.
 
-Supported `resolverConfig` properties are `modules`, `alias`, `extensions`,
+Supported `resolverConfig` properties are `modules`, `alias`, `fallback`, `fullySpecified`, `extensions`,
 `extensionAlias`, `conditionNames`, `mainFields`, `mainFiles`, and `aliasFields`.
 
 `resolverConfig.mainFields` selects package entry fields in order, for example
@@ -101,33 +101,23 @@ such as `['api', 'index']`. `aliasFields: ['browser']` applies package mappings
 including `false` to ignore a target. Field names can be nested arrays, such as
 `[['build', 'main'], 'main']`. Empty entry lists disable that lookup.
 
+`resolverConfig.fallback` redirects unresolved requests, for example
+`{ fallback: { virtual: './shim.js' } }`. Existing targets take precedence.
+`fullySpecified: true` disables extension and directory-entry guessing for
+ordinary requests: `./helper.js` can resolve while `./helper` cannot. Package
+entry points and alias redirects retain their normal lookup behavior.
+
 ## Differences from upstream
 
-Other `resolverConfig` properties, including `fallback`, `symlinks`, and
-`fullySpecified`, are ignored. For example, `fallback: { virtual: './shim.js' }`
-does not redirect an unresolved `virtual` request. Use `alias` if the redirect
-should apply to every matching request.
-
-Package entry names containing literal backslashes are not resolved on POSIX;
-use `/` for portable directory separators. On Windows, rslint accepts relative
-paths such as `require('.\\entry.js')`; upstream can treat these as package names instead.
-
-When object-form aliases overlap, rslint tries their names in sorted order;
-upstream uses declaration order. Use an alias array to specify priority, such as
-`[{ name: 'pkg/entry', alias: './entry.js' }, { name: 'pkg', alias: './fallback' }]`.
-
-Some invalid `package.json#imports` mappings, such as
-`"#entry": [null, "./entry.js"]`, produce different error messages. Both
-linters report an error; rslint reports that the import cannot be resolved.
-
-An unpaired Unicode surrogate in a module name, such as `import('\uD800')`,
-may appear as replacement characters in the reported name. File lookup still
-matches Node.js: `import './\uD800.js'` resolves an existing file named `�.js`.
-
-Disabling a wildcard alias affects only matching requests. For example,
-`alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
-resolves `pkg` and unrelated packages. Upstream can ignore those other requests
-as well. Use exact alias names when identical behavior is required.
+- `resolverConfig` options not listed above, including `symlinks`, are not supported.
+- Overlapping object-form `alias` and `fallback` entries use alphabetical priority
+  instead of declaration order. Use arrays to set priority.
+- Package entry paths containing backslashes are unsupported on Linux and macOS.
+  On Windows, relative paths containing backslashes can resolve in rslint but fail upstream.
+- Error messages for malformed `package.json` files and invalid imports mappings may differ.
+- Module names containing `\uD800` may show `�` in diagnostics.
+- Disabled wildcard aliases only ignore matching modules; upstream may also ignore
+  unrelated modules. Use exact alias names for consistent results.
 
 ## References
 

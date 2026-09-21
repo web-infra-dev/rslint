@@ -49,7 +49,7 @@ func (resolver *nodeResolver) resolve(name string) (result Result) {
 			}
 		}()
 	}
-	if len(resolver.options.Aliases) == 0 && len(resolver.options.AliasFields) == 0 && len(resolver.options.MainFields) == 0 {
+	if len(resolver.options.Aliases) == 0 && len(resolver.options.Fallbacks) == 0 && len(resolver.options.AliasFields) == 0 && len(resolver.options.MainFields) == 0 {
 		if modules.IsNodeBuiltin(name) {
 			return Result{}
 		}
@@ -69,20 +69,27 @@ func (resolver *nodeResolver) resolve(name string) (result Result) {
 		request = request[:index]
 	}
 	if !resolver.mainTarget {
-		if result, matched := resolver.alias(request); matched {
+		defer func() {
+			if result.Error != "" && !result.recursive && !result.terminal {
+				if fallback, matched := resolver.alias(request, resolver.options.Fallbacks); matched {
+					result = fallback
+				}
+			}
+		}()
+		if result, matched := resolver.alias(request, resolver.options.Aliases); matched {
 			return result
 		}
 	}
 
-	if modules.IsNodeBuiltin(request) && len(resolver.options.AliasFields) == 0 {
+	if modules.IsNodeBuiltin(request) && len(resolver.options.AliasFields) == 0 && len(resolver.options.Fallbacks) == 0 {
 		return Result{}
 	}
 	result = resolver.resolveRequest(name)
 	return result
 }
 
-func (resolver *nodeResolver) alias(request string) (Result, bool) {
-	for _, alias := range resolver.options.Aliases {
+func (resolver *nodeResolver) alias(request string, aliases []Alias) (Result, bool) {
+	for _, alias := range aliases {
 		name, candidate := alias.Name, request
 		if tspath.IsRootedDiskPath(name) && tspath.IsRootedDiskPath(candidate) {
 			name, candidate = tspath.NormalizePath(name), tspath.NormalizePath(candidate)
@@ -110,8 +117,9 @@ func (resolver *nodeResolver) alias(request string) (Result, bool) {
 			matched = true
 			child := *resolver
 			child.mainTarget = false
+			child.options.FullySpecified = false
 			last = child.resolve(target)
-			if last.Error == "" || last.recursive {
+			if last.Error == "" || last.recursive || last.terminal {
 				return last, true
 			}
 		}

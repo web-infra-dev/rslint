@@ -184,8 +184,11 @@ filesystem and generation-scoped cache, reusing tsgo's resolver for package
 traversal and export-path validation. It selects runtime files independently of
 compiler declaration lookup and does not load resolved files into the Program.
 Explicit options select aliases, extensions, export conditions, package entry
-fields and directory entry names. Package alias fields reuse shared package
-metadata; all aliases reuse the same file probes before symlink resolution.
+fields and directory entry names. Fallback aliases run only after ordinary
+resolution fails; `fullySpecified` limits file/directory guessing for the request
+while package entry points and alias redirects retain their own lookup rules.
+Package alias fields reuse shared package metadata; all aliases reuse the same
+file probes before symlink resolution.
 Results retain failure details and separate resource suffixes from filesystem
 paths. `internal/utils/tsconfig` shares explicit and nearest config queries using
 tsgo's parser, including `extends`, without creating another Program.

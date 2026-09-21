@@ -10,6 +10,106 @@ import {
 } from './helpers.js';
 
 describe('CLI JS config integration', () => {
+  test.each([
+    {
+      name: 'fallback arrays preserve priority',
+      request: '@app/special',
+      resolverConfig: {
+        fallback: [
+          { name: '@app/special', alias: './present.js' },
+          { name: '@app', alias: './absent' },
+        ],
+      },
+      errors: false,
+    },
+    {
+      name: 'reversing fallback arrays changes resolution',
+      request: '@app/special',
+      resolverConfig: {
+        fallback: [
+          { name: '@app', alias: './absent' },
+          { name: '@app/special', alias: './present.js' },
+        ],
+      },
+      errors: true,
+    },
+    {
+      name: 'fallback resolves a missing target',
+      request: 'virtual',
+      resolverConfig: { fallback: { virtual: './present.js' } },
+      errors: false,
+    },
+    {
+      name: 'fullySpecified requires the extension',
+      request: './present',
+      resolverConfig: { fullySpecified: true },
+      errors: true,
+    },
+    {
+      name: 'fullySpecified accepts an explicit extension',
+      request: './present.js',
+      resolverConfig: { fullySpecified: true },
+      errors: false,
+    },
+  ])(
+    'shared Node resolver: $name',
+    async ({ request, resolverConfig, errors }) => {
+      const tempDir = await createTempDir({
+        'input.cjs': `require(${JSON.stringify(request)});`,
+        'input.mjs': `import ${JSON.stringify(request)};`,
+        'present.js': 'export {};',
+        'rslint.config.mjs': `export default [{
+        plugins: ['node'],
+        languageOptions: { globals: { require: 'readonly' } },
+        rules: {
+          'node/no-missing-import': ['error', ${JSON.stringify({ resolverConfig })}],
+          'node/no-missing-require': ['error', ${JSON.stringify({ resolverConfig })}]
+        }
+      }];`,
+      });
+      try {
+        const result = await runRslint(['input.cjs', 'input.mjs'], tempDir);
+        expect(result.exitCode).toBe(errors ? 1 : 0);
+        if (errors) {
+          expect(result.stdout).toContain('node/no-missing-import');
+          expect(result.stdout).toContain('node/no-missing-require');
+        }
+      } finally {
+        await cleanupTempDir(tempDir);
+      }
+    },
+  );
+
+  test('uses fallback arrays in shared settings and CLI overrides', async () => {
+    const tempDir = await createTempDir({
+      'input.cjs': "require('@app/special');",
+      'present.js': 'module.exports = 1;',
+      'rslint.config.mjs': `export default [
+        { plugins: ['node'], languageOptions: { sourceType: 'commonjs' },
+          rules: { 'node/no-missing-require': 'error' },
+          settings: { node: { resolverConfig: { fallback: [
+            { name: '@app/special', alias: './present.js' },
+            { name: '@app', alias: './absent' }
+          ] } } } }
+      ];`,
+    });
+    try {
+      expect((await runRslint(['input.cjs'], tempDir)).exitCode).toBe(0);
+      const result = await runRslint(
+        [
+          'input.cjs',
+          '--rule',
+          'node/no-missing-require: ["error", {"resolverConfig":{"fallback":[{"name":"@app","alias":"./absent"},{"name":"@app/special","alias":"./present.js"}]}}]',
+        ],
+        tempDir,
+      );
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toContain('node/no-missing-require');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('should auto-detect rslint.config.js', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,

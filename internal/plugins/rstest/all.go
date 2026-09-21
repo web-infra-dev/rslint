@@ -45,6 +45,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_equality_matcher"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_expect_type_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_on_top"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_import_in_mock"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_lowercase_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_importing_rstest_globals"
@@ -59,10 +60,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_have_length"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_todo"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_awaited_expect_poll"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_hook"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_local_test_context_for_concurrent_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_mock_type_parameters"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_test_timeout"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_to_throw_message"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_top_level_describe"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/unbound_method"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect_in_promise"
@@ -118,6 +121,7 @@ func GetAllRules() []rule.Rule {
 		prefer_equality_matcher.PreferEqualityMatcherRule,
 		prefer_expect_type_of.PreferExpectTypeOfRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
+		prefer_hooks_on_top.PreferHooksOnTopRule,
 		prefer_lowercase_title.PreferLowercaseTitleRule,
 		prefer_import_in_mock.PreferImportInMockRule,
 		prefer_importing_rstest_globals.PreferImportingRstestGlobalsRule,
@@ -132,10 +136,12 @@ func GetAllRules() []rule.Rule {
 		prefer_to_have_length.PreferToHaveLengthRule,
 		prefer_todo.PreferTodoRule,
 		require_awaited_expect_poll.RequireAwaitedExpectPollRule,
+		require_hook.RequireHookRule,
 		require_local_test_context_for_concurrent_snapshots.RequireLocalTestContextForConcurrentSnapshotsRule,
 		require_mock_type_parameters.RequireMockTypeParametersRule,
 		require_test_timeout.RequireTestTimeoutRule,
 		require_to_throw_message.RequireToThrowMessageRule,
+		require_top_level_describe.RequireTopLevelDescribeRule,
 		unbound_method.UnboundMethodRule,
 		valid_expect.ValidExpectRule,
 		valid_expect_in_promise.ValidExpectInPromiseRule,
