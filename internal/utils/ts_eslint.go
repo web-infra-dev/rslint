@@ -1021,21 +1021,20 @@ func ESTreeFunctionRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRa
 }
 
 // FindFunctionKeywordPos returns the start position of the function head,
-// skipping only `export` and `default` keywords. Other modifiers like `async`
+// skipping `export` and `default` keywords and decorators preceding them.
+// Decorators after those keywords and other modifiers like `async`
 // and `declare` are kept because they are part of the function signature
 // (matching ESLint's behavior where FunctionDeclaration.loc excludes export/default).
 func FindFunctionKeywordPos(sourceFile *ast.SourceFile, node *ast.Node) int {
-	s := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
-	end := node.End()
-	for s.TokenStart() < end {
-		tok := s.Token()
-		if tok == ast.KindExportKeyword || tok == ast.KindDefaultKeyword {
-			s.Scan()
-			continue
+	start := node.Pos()
+	if modifiers := node.Modifiers(); modifiers != nil {
+		for _, modifier := range modifiers.Nodes {
+			if modifier.Kind == ast.KindExportKeyword || modifier.Kind == ast.KindDefaultKeyword {
+				start = modifier.End()
+			}
 		}
-		return s.TokenStart()
 	}
-	return TrimNodeTextRange(sourceFile, node).Pos()
+	return scanner.SkipTrivia(sourceFile.Text(), start)
 }
 
 var arrayPredicateFunctions = []string{"every", "filter", "find", "findIndex", "findLast", "findLastIndex", "some"}

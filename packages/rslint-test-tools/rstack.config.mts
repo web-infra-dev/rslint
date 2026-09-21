@@ -198,6 +198,7 @@ define.test({
     './tests/eslint-plugin-node/rules/no-unpublished-bin.test.ts',
     './tests/eslint-plugin-node/rules/no-unpublished-import.test.ts',
     './tests/eslint-plugin-node/rules/no-unpublished-require.test.ts',
+    './tests/eslint-plugin-node/rules/no-unsupported-features/es-syntax.test.ts',
     './tests/eslint-plugin-node/rules/prefer-global/buffer.test.ts',
     './tests/eslint-plugin-node/rules/prefer-global/console.test.ts',
     './tests/eslint-plugin-node/rules/prefer-global/process.test.ts',

@@ -27,6 +27,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_unpublished_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_unpublished_require"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_unsupported_features/es_builtins"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_unsupported_features/es_syntax"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_unsupported_features/node_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/buffer"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/console"
@@ -70,6 +71,7 @@ func GetAllRules() []rule.Rule {
 		no_unpublished_bin.NoUnpublishedBinRule,
 		no_unpublished_import.NoUnpublishedImportRule,
 		no_unpublished_require.NoUnpublishedRequireRule,
+		es_syntax.ESSyntaxRule,
 		buffer.PreferGlobalBufferRule,
 		console.PreferGlobalConsoleRule,
 		process.ProcessRule,
