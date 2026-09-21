@@ -61,6 +61,7 @@ var NoDoneCallbackRule = rule.Rule{
 	Name:   "jest/no-done-callback",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				callExpr := node.AsCallExpression()
@@ -68,7 +69,7 @@ var NoDoneCallbackRule = rule.Rule{
 					return
 				}
 
-				jestFnCall := utils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseFnCall(node)
 				if jestFnCall == nil {
 					return
 				}

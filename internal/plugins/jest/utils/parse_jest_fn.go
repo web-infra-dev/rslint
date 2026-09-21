@@ -22,10 +22,11 @@ type ParsedJestFnCallHead = testFramework.ParsedCallHead
 type ParsedJestFnCallHeadEntry = testFramework.ParsedCallHeadEntry
 
 const (
-	ExpectParseReasonNone            = ""
-	ExpectParseReasonMatcherNotFound = "matcher-not-found"
-	ExpectParseReasonModifierUnknown = "modifier-unknown"
-	jestGlobalsModule                = "@jest/globals"
+	ExpectParseReasonNone             = ""
+	ExpectParseReasonMatcherNotFound  = "matcher-not-found"
+	ExpectParseReasonMatcherNotCalled = "matcher-not-called"
+	ExpectParseReasonModifierUnknown  = "modifier-unknown"
+	jestGlobalsModule                 = "@jest/globals"
 )
 
 // IsTypeOfJestFnCall reports whether node parses as a Jest call of one of the
@@ -41,13 +42,17 @@ func IsTypeOfJestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...JestFnTyp
 }
 
 func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
+	return parseJestFnCallWithReason(node, ctx).parsed
+}
+
+func parseJestFnCallWithReason(node *ast.Node, ctx rule.RuleContext) jestCallParseResult {
 	if node == nil || node.Kind != ast.KindCallExpression {
-		return nil
+		return jestCallParseResult{}
 	}
 
 	memberEntries := GetJestFnMemberEntries(node)
 	if len(memberEntries) == 0 {
-		return nil
+		return jestCallParseResult{}
 	}
 
 	localName := memberEntries[0].Name
@@ -58,25 +63,25 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 
 	callExpr := node.AsCallExpression()
 	if isEachFactoryCall(callExpr, members) || isInvalidTaggedTemplateCall(callExpr, members) || isInnerExpectCall(node, localName, members, ctx.Settings) {
-		return nil
+		return jestCallParseResult{}
 	}
 
 	localNode := resolveHeadLocalNode(callExpr)
 	name, originalNode, headType := ResolveJestFunctionReference(node, localName, localNode, ctx)
 	if name == "" {
-		return nil
+		return jestCallParseResult{}
 	}
 	name = ApplyGlobalJestAlias(name, ctx.Settings)
 	if !JEST_METHOD_NAMES[name] {
-		return nil
+		return jestCallParseResult{}
 	}
 
 	kind := GetJestKind(name)
 	if kind == JestFnTypeUnknown {
-		return nil
+		return jestCallParseResult{}
 	}
 	if kind != JestFnTypeExpect && kind != JestFnTypeJest && !isValidJestCall(name, members) {
-		return nil
+		return jestCallParseResult{}
 	}
 
 	parsed := &ParsedJestFnCall{
@@ -101,12 +106,19 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	if kind == JestFnTypeExpect {
-		if !applyParsedExpectCall(parsed) {
-			return nil
+		reason := applyParsedExpectCall(parsed)
+		if reason != ExpectParseReasonNone {
+			if reason == ExpectParseReasonMatcherNotFound && IsMemberAccessNode(node.Parent) {
+				reason = ExpectParseReasonMatcherNotCalled
+			}
+			if FindTopMostCallExpression(node) != node {
+				reason = ExpectParseReasonNone
+			}
+			return jestCallParseResult{reason: reason}
 		}
 	}
 
-	return parsed
+	return jestCallParseResult{parsed: parsed}
 }
 
 // FindTopMostCallExpression walks up member/call chains to the outermost CallExpression,
@@ -142,10 +154,10 @@ func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
 	return testFramework.FindImportDeclaration(node)
 }
 
-func applyParsedExpectCall(parsed *ParsedJestFnCall) bool {
+func applyParsedExpectCall(parsed *ParsedJestFnCall) string {
 	modifierEntries, matcher, err := FindExpectModifiersAndMatcher(parsed.MemberEntries)
 	if err != "" {
-		return false
+		return err
 	}
 
 	parsed.ModifierEntries = modifierEntries
@@ -157,7 +169,7 @@ func applyParsedExpectCall(parsed *ParsedJestFnCall) bool {
 			parsed.Modifiers[i] = entry.Name
 		}
 	}
-	return true
+	return ExpectParseReasonNone
 }
 
 // isInnerExpectCall detects expect() calls embedded in a matcher chain
@@ -373,51 +385,45 @@ func ReceiverBeforeInvocation(matcherCall *ast.Node) *ast.Node {
 	}
 }
 
-// TestCallbackInfo describes a Jest test callback passed by reference (e.g. it('foo', getValue)).
-type TestCallbackInfo struct {
-	FunctionNode *ast.Node
-	Name         string
-}
-
-// ResolveTestCallbackFunction resolves the callback function node for a Jest test call.
+// resolveNamedTestCallback resolves the callback function node for a Jest test call.
 // Inline callbacks are not returned; they are tracked via the enclosing test call.
-func ResolveTestCallbackFunction(ctx rule.RuleContext, callExpr *ast.CallExpression) TestCallbackInfo {
+func resolveNamedTestCallback(ctx rule.RuleContext, callExpr *ast.CallExpression) jestCallbackInfo {
 	if callExpr == nil || callExpr.Arguments == nil || len(callExpr.Arguments.Nodes) < 2 {
-		return TestCallbackInfo{}
+		return jestCallbackInfo{}
 	}
 
 	callback := ast.SkipParentheses(callExpr.Arguments.Nodes[1])
 	if callback == nil || ast.IsFunctionExpressionOrArrowFunction(callback) {
-		return TestCallbackInfo{}
+		return jestCallbackInfo{}
 	}
 	if callback.Kind != ast.KindIdentifier {
-		return TestCallbackInfo{}
+		return jestCallbackInfo{}
 	}
 
 	name := callback.AsIdentifier().Text
 	decl := internalUtils.GetDeclaration(ctx.TypeChecker, callback)
 	if decl == nil {
-		return TestCallbackInfo{Name: name}
+		return jestCallbackInfo{name: name}
 	}
 
 	switch decl.Kind {
 	case ast.KindFunctionDeclaration:
 		fn := decl.AsFunctionDeclaration()
 		if fn == nil {
-			return TestCallbackInfo{Name: name}
+			return jestCallbackInfo{name: name}
 		}
-		return TestCallbackInfo{FunctionNode: fn.AsNode(), Name: name}
+		return jestCallbackInfo{functionNode: fn.AsNode(), name: name}
 	case ast.KindVariableDeclaration:
 		vd := decl.AsVariableDeclaration()
 		if vd == nil {
-			return TestCallbackInfo{Name: name}
+			return jestCallbackInfo{name: name}
 		}
 		if fn := testCallbackInitializerFunction(vd.Initializer); fn != nil {
-			return TestCallbackInfo{FunctionNode: fn, Name: name}
+			return jestCallbackInfo{functionNode: fn, name: name}
 		}
-		return TestCallbackInfo{Name: name}
+		return jestCallbackInfo{name: name}
 	default:
-		return TestCallbackInfo{Name: name}
+		return jestCallbackInfo{name: name}
 	}
 }
 

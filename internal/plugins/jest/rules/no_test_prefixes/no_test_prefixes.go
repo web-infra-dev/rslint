@@ -22,9 +22,10 @@ var NoTestPrefixesRule = rule.Rule{
 	Name:   "jest/no-test-prefixes",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseFnCall(node)
 				if jestFnCall == nil {
 					return
 				}

@@ -57,9 +57,10 @@ var ValidDescribeCallbackRule = rule.Rule{
 	Name:   "jest/valid-describe-callback",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseFnCall(node)
 				if jestFnCall == nil || jestFnCall.Kind != utils.JestFnTypeDescribe {
 					return
 				}

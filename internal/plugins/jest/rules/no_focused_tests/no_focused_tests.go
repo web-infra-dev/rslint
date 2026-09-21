@@ -31,9 +31,10 @@ var NoFocusedTestsRule = rule.Rule{
 	Name:   "jest/no-focused-tests",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseFnCall(node)
 				if jestFnCall == nil ||
 					(jestFnCall.Kind != jestUtils.JestFnTypeDescribe &&
 						jestFnCall.Kind != jestUtils.JestFnTypeTest) {

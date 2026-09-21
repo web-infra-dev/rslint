@@ -17,12 +17,12 @@ var NoInterpolationInSnapshotsRule = rule.Rule{
 	Name:   "jest/no-interpolation-in-snapshots",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseExpectCall(node)
 
 				if jestFnCall == nil ||
-					jestFnCall.Kind != utils.JestFnTypeExpect ||
 					!utils.INLINE_SNAPSHOT_MATCHERS[jestFnCall.Matcher] {
 					return
 				}

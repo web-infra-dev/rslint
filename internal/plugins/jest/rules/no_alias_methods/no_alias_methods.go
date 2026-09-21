@@ -36,14 +36,11 @@ var NoAliasMethodsRule = rule.Rule{
 	Name:   "jest/no-alias-methods",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseExpectCall(node)
 				if jestFnCall == nil {
-					return
-				}
-
-				if jestFnCall.Kind != utils.JestFnTypeExpect {
 					return
 				}
 
