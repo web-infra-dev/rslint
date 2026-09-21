@@ -132,6 +132,29 @@ func TestConvertPath(t *testing.T) {
 	if !ok || got != "src/cli.js" {
 		t.Fatalf("mixed capture numbering = %q, %v", got, ok)
 	}
+	// Reusing compiled expressions must preserve first-match priority and must
+	// not let an invalid later entry suppress earlier successful conversions.
+	for _, invalid := range []any{[]any{"[", "unused"}, []any{"missing replacement"}} {
+		converter := compilePathConverter(map[string]any{"convertPath": []any{
+			map[string]any{"include": []any{"src/**"}, "exclude": []any{"src/skip.js"}, "replace": []any{`^src/(.*)$`, "dist/$1"}},
+			map[string]any{"include": []any{"**"}, "replace": invalid},
+		}}, nil)
+		for _, test := range []struct {
+			input, want string
+			ok          bool
+		}{
+			{"src/a.js", "dist/a.js", true},
+			{"src/b.js", "dist/b.js", true},
+			{"src/skip.js", "src/skip.js", false},
+			{"other.js", "other.js", false},
+			{"src/a.js", "dist/a.js", true},
+		} {
+			got, ok := converter.convert(test.input)
+			if got != test.want || ok != test.ok {
+				t.Errorf("reused conversion of %q = %q, %v; want %q, %v", test.input, got, ok, test.want, test.ok)
+			}
+		}
+	}
 }
 
 func TestPublicationGenerationAndConfiguration(t *testing.T) {

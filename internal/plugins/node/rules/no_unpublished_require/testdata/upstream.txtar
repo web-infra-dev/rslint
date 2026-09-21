@@ -1,0 +1,187 @@
+Fixtures from eslint-plugin-n v18.3.0, tests/fixtures/no-unpublished.
+-- package.json --
+{}
+-- 1/ignore1.js --
+
+-- 1/ignore2.js --
+
+-- 1/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "dependencies": {
+        "aaa": "0.0.0"
+    },
+    "devDependencies": {
+        "bbb": "0.0.0",
+        "foo": "0.0.0"
+    }
+}
+-- 2/.npmignore --
+ignore1.js
+ignore2.js
+-- 2/ignore1.js --
+
+-- 2/ignore2.js --
+
+-- 2/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "dependencies": {
+        "aaa": "0.0.0"
+    },
+    "devDependencies": {
+        "bbb": "0.0.0"
+    }
+}
+-- 3/.npmignore --
+ignore1.js
+ignore2.js
+*.json
+-- 3/ignore1.js --
+
+-- 3/ignore2.js --
+
+-- 3/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "files": [
+        "pub"
+    ],
+    "dependencies": {
+        "aaa": "0.0.0"
+    },
+    "devDependencies": {
+        "bbb": "0.0.0"
+    }
+}
+-- 3/pub/abc.json --
+{
+    "hello": "world"
+}
+-- 3/pub/ignore1.js --
+
+-- 3/pub/ignore2.js --
+
+-- 3/src/a.jsx --
+
+-- 3/src/pub/a.js --
+
+-- 3/src/readme.js --
+
+-- brace-extglob/index.js --
+require("./src/helper.js")
+-- brace-extglob/package.json --
+{
+    "name": "brace-extglob",
+    "version": "1.0.0",
+    "main": "index.js",
+    "files": [
+        "{bin,src}/**/!(*.test).js"
+    ]
+}
+-- brace-extglob/src/helper.js --
+module.exports = "published"
+-- brace-extglob/src/helper.test.js --
+module.exports = "not published"
+-- brace-sequence/file1.js --
+module.exports = "published"
+-- brace-sequence/index.js --
+require("./file1.js")
+-- brace-sequence/package.json --
+{
+    "name": "brace-sequence",
+    "version": "1.0.0",
+    "main": "index.js",
+    "files": [
+        "file{1..3}.js"
+    ]
+}
+-- case-insensitive/Foo.js --
+module.exports = "published"
+-- case-insensitive/index.js --
+require("./Foo.js")
+-- case-insensitive/package.json --
+{
+    "name": "case-insensitive",
+    "version": "1.0.0",
+    "main": "index.js",
+    "files": [
+        "{foo,bar}.js"
+    ]
+}
+-- extended-basename-exclusion/index.js --
+require("./src/test.js")
+-- extended-basename-exclusion/package.json --
+{
+    "name": "extended-basename-exclusion",
+    "version": "1.0.0",
+    "main": "index.js",
+    "files": [
+        "src",
+        "!{test,spec}.js"
+    ]
+}
+-- extended-basename-exclusion/src/test.js --
+module.exports = "not published"
+-- issue126/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "files": [
+        "lib",
+        "!test.js"
+    ],
+    "devDependencies": {
+        "bbb": "0.0.0"
+    }
+}
+-- issue48n/package.json --
+{
+    "files": [
+        "**/*.js"
+    ]
+}
+-- issue99/bin.js --
+#!/usr/bin/env node
+-- issue99/index.js --
+
+-- issue99/package.json --
+{
+    "bin": "./bin.js",
+    "exports": "./index.js",
+    "files": [
+        "./index.js",
+        "bin.js"
+    ]
+}
+-- negative-in-files/lib/__test__/index.js --
+
+-- negative-in-files/lib/index.js --
+
+-- negative-in-files/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "files": [
+        "lib",
+        "!**/__test__"
+    ],
+    "dependencies": {
+        "aaa": "0.0.0"
+    },
+    "devDependencies": {
+        "bbb": "0.0.0"
+    }
+}
+-- private-package/package.json --
+{
+    "private": true,
+    "name": "test",
+    "version": "0.0.0",
+    "devDependencies": {
+        "bbb": "0.0.0"
+    }
+}

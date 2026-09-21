@@ -165,10 +165,11 @@ while `FindNearestValid` explicitly skips invalid objects for Node's policy.
 Node and Jest share this Program-scoped metadata cache but keep their own field
 validation, configuration priority and invalid-package behavior.
 Node `bin` aliases, path conversion, workspace dependency checks and npm
-publication policy remain in `internal/plugins/node/nodeutil`. Publication paths
-and metadata exemptions are relative to the containing package; compiled
-publication data is cached per package and Program generation. Configured pattern
-caches include the complete ordered list in their key.
+publication policy remain in `internal/plugins/node/nodeutil`. Import and require
+rules share publication checks and select their own references and resolution
+mode. Publication paths and metadata exemptions are relative to the containing
+package; compiled publication data is cached per package and Program generation.
+Configured pattern caches include the complete ordered list in their key.
 
 `internal/utils/modules` collects import/export, dynamic import, CommonJS and AMD
 source expressions without evaluating them or resolving targets. It reuses the
