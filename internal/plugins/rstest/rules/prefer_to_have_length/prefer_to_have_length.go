@@ -26,42 +26,8 @@ func isDiscardedAssertion(node *ast.Node) bool {
 }
 
 func isSafeExpectedLength(node *ast.Node) bool {
-	_, negativeZero, ok := staticNumericLiteral(node)
+	_, negativeZero, ok := testFramework.StaticNumericLiteral(node)
 	return ok && !negativeZero
-}
-
-func staticNumericLiteral(node *ast.Node) (zero, negativeZero, ok bool) {
-	for node != nil {
-		node = ast.SkipParentheses(node)
-		switch node.Kind {
-		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
-		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
-		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
-		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
-		case ast.KindNumericLiteral:
-			return utils.NormalizeNumericLiteral(node.AsNumericLiteral().Text) == "0", false, true
-		case ast.KindPrefixUnaryExpression:
-			unary := node.AsPrefixUnaryExpression()
-			if unary == nil || (unary.Operator != ast.KindPlusToken && unary.Operator != ast.KindMinusToken) {
-				return false, false, false
-			}
-			zero, negativeZero, ok := staticNumericLiteral(unary.Operand)
-			if !ok {
-				return false, false, false
-			}
-			if zero && unary.Operator == ast.KindMinusToken {
-				negativeZero = !negativeZero
-			}
-			return zero, negativeZero, true
-		default:
-			return false, false, false
-		}
-	}
-	return false, false, false
 }
 
 func isSafeLengthReceiver(node *ast.Node) bool {

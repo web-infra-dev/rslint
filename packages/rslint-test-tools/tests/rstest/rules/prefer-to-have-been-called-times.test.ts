@@ -35,9 +35,27 @@ ruleTester.run('prefer-to-have-been-called-times', {} as never, {
     },
     {
       code: 'expect(method.mock.calls).resolves.toHaveLength(x);',
-      output: 'expect(method).resolves.toHaveBeenCalledTimes(x);',
+      output: null,
       column: 36,
       endColumn: 48,
+    },
+    {
+      code: "expect(fn.mock.calls).toHaveLength('1');",
+      output: null,
+      column: 23,
+      endColumn: 35,
+    },
+    {
+      code: 'expect(fn.mock.calls).toHaveLength((fn.mockClear(), 1));',
+      output: null,
+      column: 23,
+      endColumn: 35,
+    },
+    {
+      code: 'class Derived extends Base { static verify() { expect(super.mock.calls).toHaveLength(1); } }',
+      output: null,
+      column: 73,
+      endColumn: 85,
     },
     {
       code: 'expect(method["mock"].calls).toHaveLength(0);',

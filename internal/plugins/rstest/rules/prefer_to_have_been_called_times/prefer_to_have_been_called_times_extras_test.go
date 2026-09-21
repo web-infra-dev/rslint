@@ -104,9 +104,6 @@ func TestPreferToHaveBeenCalledTimesExtras(t *testing.T) {
 		{`expect(mocks[index].mock.calls).toHaveLength(1);`, `expect(mocks[index]).toHaveBeenCalledTimes(1);`},
 		{`expect((fn as never).mock.calls).toHaveLength(1);`, `expect((fn as never)).toHaveBeenCalledTimes(1);`},
 		{`expect(fn.mock.calls, 'called once').toHaveLength(1);`, `expect(fn, 'called once').toHaveBeenCalledTimes(1);`},
-		{`expect(fn.mock.calls).toHaveLength(count);`, `expect(fn).toHaveBeenCalledTimes(count);`},
-		{`expect(fn.mock.calls).toHaveLength(1, 2);`, `expect(fn).toHaveBeenCalledTimes(1, 2);`},
-		{`expect(fn.mock.calls).toHaveLength();`, `expect(fn).toHaveBeenCalledTimes();`},
 		{`expect(fn.mock.calls).not.toHaveLength(1);`, `expect(fn).not.toHaveBeenCalledTimes(1);`},
 		{`expect(fn.mock.calls).rejects.not.toHaveLength(1);`, `expect(fn).rejects.not.toHaveBeenCalledTimes(1);`},
 		{`expect(fn.mock.calls)?.toHaveLength(1);`, `expect(fn)?.toHaveBeenCalledTimes(1);`},
@@ -122,6 +119,27 @@ func TestPreferToHaveBeenCalledTimesExtras(t *testing.T) {
 	} {
 		add(pair[0], pair[1])
 	}
+	for _, count := range []string{"0", "2", "0x2", "0b10", "2.0", "2_0", "(2)", "2 as const", "<number>2", "+2", "2!"} {
+		add("expect(fn.mock.calls).toHaveLength("+count+");",
+			"expect(fn).toHaveBeenCalledTimes("+count+");")
+	}
+	// toHaveLength compares loosely and toHaveBeenCalledTimes strictly, so a
+	// count that is not provably a number is reported without a fix.
+	for _, count := range []string{"", "count", "'1'", "`1`", "true", "null", "1n", "1 + 1", "...counts", "1, 2", "await total"} {
+		add("expect(fn.mock.calls).toHaveLength("+count+");", "")
+	}
+	// expect() captures the calls array; anything evaluated before the matcher
+	// runs that can reset the mock changes what the rewrite would read.
+	for _, code := range []string{
+		`expect(fn.mock.calls).toHaveLength((fn.mockClear(), 1));`,
+		`expect(fn.mock.calls, (fn.mockClear(), 'called once')).toHaveLength(1);`,
+		`expect(fn.mock.calls, message()).toHaveLength(1);`,
+		`expect(fn.mock.calls, messages[0]).toHaveLength(1);`,
+	} {
+		add(code, "")
+	}
+	// A bare `super` is not a value, so the rewritten expect() would not parse.
+	add(`class Derived extends Base { static verify() { expect(super.mock.calls).toHaveLength(1); } }`, "")
 	for _, factory := range []string{"expect", "expect.soft"} {
 		add(factory+`(fn.mock.calls).toHaveLength(1);`, factory+`(fn).toHaveBeenCalledTimes(1);`)
 	}

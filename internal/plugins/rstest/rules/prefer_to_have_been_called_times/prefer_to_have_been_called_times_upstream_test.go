@@ -35,8 +35,9 @@ func TestPreferToHaveBeenCalledTimesUpstream(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferMatcher", Line: 1, Column: 27, EndLine: 1, EndColumn: 39}},
 			},
 			{
+				// Rstest: a non-literal count is reported without a fix, because
+				// toHaveLength compares loosely and toHaveBeenCalledTimes strictly.
 				Code:   `expect(method.mock.calls).resolves.toHaveLength(x);`,
-				Output: []string{`expect(method).resolves.toHaveBeenCalledTimes(x);`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferMatcher", Line: 1, Column: 36, EndLine: 1, EndColumn: 48}},
 			},
 			{

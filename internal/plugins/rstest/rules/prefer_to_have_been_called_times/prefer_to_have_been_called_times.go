@@ -31,7 +31,7 @@ var PreferToHaveBeenCalledTimesRule = rule.Rule{
 				if arguments == nil || len(arguments.Nodes) == 0 {
 					return
 				}
-				mockCalls := parseMockCallsAccess(arguments.Nodes[0])
+				receiver, mockCalls := parseMockCallsAccess(arguments.Nodes[0])
 				if mockCalls == nil {
 					return
 				}
@@ -52,6 +52,9 @@ var PreferToHaveBeenCalledTimesRule = rule.Rule{
 							matcherCall == nil ||
 							parsed.Expression != matcherCall ||
 							!isDiscardedAssertion(parsed.Expression) {
+							return nil
+						}
+						if !isFixableRewrite(receiver, matcherCall, arguments.Nodes) {
 							return nil
 						}
 						nameRange, name, ok := testFramework.AccessorReplacement(ctx.SourceFile, matcher.Entry.Node, "toHaveBeenCalledTimes")
@@ -89,17 +92,47 @@ var PreferToHaveBeenCalledTimesRule = rule.Rule{
 	},
 }
 
-// parseMockCallsAccess returns the `mock` and `calls` key nodes of a
-// `<value>.mock.calls` access, or nil when node is any other expression.
-func parseMockCallsAccess(node *ast.Node) []*ast.Node {
+// isFixableRewrite reports whether replacing the asserted mock.calls array with
+// the mock itself preserves the assertion's result.
+//
+// expect() captures the calls array when it runs, while toHaveBeenCalledTimes
+// reads mock.calls when the matcher runs, so anything evaluated in between that
+// can reset the mock changes the count the rewritten assertion sees. The two
+// matchers also disagree on non-numbers: toHaveLength compares loosely and
+// toHaveBeenCalledTimes strictly, so a rewritten `toHaveLength('1')` fails and a
+// rewritten `not.toHaveLength('1')` starts passing.
+func isFixableRewrite(receiver, matcherCall *ast.Node, headArguments []*ast.Node) bool {
+	// A bare `super` is not a value, so `expect(super)` would not parse.
+	if receiver == nil || ast.SkipParentheses(receiver).Kind == ast.KindSuperKeyword {
+		return false
+	}
+	matcherArguments := matcherCall.Arguments()
+	if len(matcherArguments) != 1 {
+		return false
+	}
+	if _, _, ok := testFramework.StaticNumericLiteral(matcherArguments[0]); !ok {
+		return false
+	}
+	for _, argument := range headArguments[1:] {
+		if !testFramework.IsSideEffectFreeLiteral(argument) {
+			return false
+		}
+	}
+	return true
+}
+
+// parseMockCallsAccess returns the receiver and the `mock` and `calls` key
+// nodes of a `<value>.mock.calls` access, or nil when node is any other
+// expression.
+func parseMockCallsAccess(node *ast.Node) (*ast.Node, []*ast.Node) {
 	receiver, calls := unwrapStaticMember(node, "calls")
 	if calls == nil {
-		return nil
+		return nil, nil
 	}
-	if _, mock := unwrapStaticMember(receiver, "mock"); mock != nil {
-		return []*ast.Node{mock, calls}
+	if inner, mock := unwrapStaticMember(receiver, "mock"); mock != nil {
+		return inner, []*ast.Node{mock, calls}
 	}
-	return nil
+	return nil, nil
 }
 
 // unwrapStaticMember returns the receiver and key node of a non-optional
