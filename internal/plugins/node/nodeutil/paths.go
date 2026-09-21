@@ -68,12 +68,25 @@ func isBinFile(fileName string, bin any, directory string, caseSensitive bool) b
 // ConvertPath applies the configured source-to-published path mapping.
 // The boolean is false if the conversion cannot be evaluated safely.
 func ConvertPath(fileName string, options, settings map[string]any) (string, bool) {
-	conversion := options["convertPath"]
-	for _, name := range []string{"n", "node"} {
-		if conversion == nil {
-			if shared, ok := settings[name].(map[string]any); ok {
-				conversion = shared["convertPath"]
-			}
+	return compilePathConverter(options, settings).convert(fileName)
+}
+
+type pathConversion struct {
+	include, exclude []*GlobMatcher
+	expression       *esregexp.RegExp
+	replacement      string
+}
+
+type pathConverter []pathConversion
+
+// Compile once when a publication check converts several targets. Matching and
+// replacement still use the existing JavaScript-compatible helpers.
+func compilePathConverter(options, settings map[string]any) pathConverter {
+	var conversion any
+	for _, value := range settingValues("convertPath", options, settings) {
+		if value != nil {
+			conversion = value
+			break
 		}
 	}
 	var entries []any
@@ -87,6 +100,7 @@ func ConvertPath(fileName string, options, settings map[string]any) (string, boo
 			entries = append(entries, map[string]any{"include": []any{pattern}, "replace": value[pattern]})
 		}
 	}
+	var converter pathConverter
 	for _, entry := range entries {
 		value, ok := entry.(map[string]any)
 		if !ok {
@@ -94,17 +108,34 @@ func ConvertPath(fileName string, options, settings map[string]any) (string, boo
 		}
 		replacement := utils.ToStringSlice(value["replace"])
 		if len(replacement) != 2 {
-			return fileName, false
+			return append(converter, pathConversion{})
 		}
 		expression, err := esregexp.Compile(replacement[0], "")
 		if err != nil {
+			return append(converter, pathConversion{})
+		}
+		conversion := pathConversion{expression: expression, replacement: replacement[1]}
+		for _, pattern := range utils.ToStringSlice(value["include"]) {
+			conversion.include = append(conversion.include, CompileGlob(pattern))
+		}
+		for _, pattern := range utils.ToStringSlice(value["exclude"]) {
+			conversion.exclude = append(conversion.exclude, CompileGlob(pattern))
+		}
+		converter = append(converter, conversion)
+	}
+	return converter
+}
+
+func (converter pathConverter) convert(fileName string) (string, bool) {
+	for _, conversion := range converter {
+		// Preserve first-match behavior: an invalid later entry must not
+		// disable an earlier successful conversion.
+		if conversion.expression == nil {
 			return fileName, false
 		}
-		matches := func(pattern string) bool {
-			return CompileGlob(pattern).Match(fileName)
-		}
-		if slices.ContainsFunc(utils.ToStringSlice(value["include"]), matches) && !slices.ContainsFunc(utils.ToStringSlice(value["exclude"]), matches) {
-			converted, err := expression.ReplaceFirst(fileName, replacement[1])
+		matches := func(pattern *GlobMatcher) bool { return pattern.Match(fileName) }
+		if slices.ContainsFunc(conversion.include, matches) && !slices.ContainsFunc(conversion.exclude, matches) {
+			converted, err := conversion.expression.ReplaceFirst(fileName, conversion.replacement)
 			return converted, err == nil
 		}
 	}
