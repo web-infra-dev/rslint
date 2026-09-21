@@ -31,6 +31,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/text_decoder"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/text_encoder"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/url"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/url_search_params"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_promises/dns"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -68,6 +69,7 @@ func GetAllRules() []rule.Rule {
 		text_decoder.TextDecoderRule,
 		text_encoder.TextEncoderRule,
 		url.PreferGlobalURLRule,
+		url_search_params.URLSearchParamsRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 		dns.PreferPromisesDNSRule,
 	}
