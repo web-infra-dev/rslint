@@ -36,7 +36,7 @@ var PreferToHaveBeenCalledTimesRule = rule.Rule{
 					return
 				}
 				for _, matcher := range parsed.Matchers {
-					if subjectMutatingChaiMatchers[matcher.Name] {
+					if testFramework.IsSubjectMutatingChaiMatcher(matcher.Name) {
 						break
 					}
 					if matcher.Kind != rstestUtils.RstestExpectMatcherCall || matcher.Name != "toHaveLength" {
@@ -87,24 +87,6 @@ var PreferToHaveBeenCalledTimesRule = rule.Rule{
 			},
 		}
 	},
-}
-
-// These Chai matchers replace the assertion object's current value, so a later
-// toHaveLength no longer measures the mock.calls array passed to expect().
-// Kept in sync with the identical table in rstest/prefer-to-have-length, which
-// is the second consumer; the pair should move to a shared helper.
-var subjectMutatingChaiMatchers = map[string]bool{
-	"property":                  true,
-	"ownProperty":               true,
-	"haveOwnProperty":           true,
-	"ownPropertyDescriptor":     true,
-	"haveOwnPropertyDescriptor": true,
-	"toContain":                 true,
-	"toThrow":                   true,
-	"toThrowError":              true,
-	"throw":                     true,
-	"throws":                    true,
-	"Throw":                     true,
 }
 
 // parseMockCallsAccess returns the `mock` and `calls` key nodes of a

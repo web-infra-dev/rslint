@@ -15,23 +15,6 @@ func endsAtOnlyMatcher(parsed *rstestUtils.ParsedRstestExpectCall) bool {
 		parsed.MemberEntries[len(parsed.MemberEntries)-1].Node == parsed.MatcherEntry.Node
 }
 
-// These Chai matchers replace the assertion object's current value. A later
-// equality matcher therefore no longer compares the value originally passed
-// to expect(), so prefer-to-have-length must stop at this boundary.
-var subjectMutatingChaiMatchers = map[string]bool{
-	"property":                  true,
-	"ownProperty":               true,
-	"haveOwnProperty":           true,
-	"ownPropertyDescriptor":     true,
-	"haveOwnPropertyDescriptor": true,
-	"toContain":                 true,
-	"toThrow":                   true,
-	"toThrowError":              true,
-	"throw":                     true,
-	"throws":                    true,
-	"Throw":                     true,
-}
-
 func isDiscardedAssertion(node *ast.Node) bool {
 	for parent := node.Parent; parent != nil; parent = parent.Parent {
 		if parent.Kind == ast.KindParenthesizedExpression {
@@ -167,7 +150,7 @@ var PreferToHaveLengthRule = shared.NewRule(shared.Config{
 			matches := make([]*shared.ExpectCall, 0, len(parsed.Matchers))
 			for index := range parsed.Matchers {
 				matcher := &parsed.Matchers[index]
-				if subjectMutatingChaiMatchers[matcher.Name] {
+				if testFramework.IsSubjectMutatingChaiMatcher(matcher.Name) {
 					break
 				}
 				if matcher.Kind != rstestUtils.RstestExpectMatcherCall ||
