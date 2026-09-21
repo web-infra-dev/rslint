@@ -1,0 +1,51 @@
+Additional fixtures for CommonJS publication checks.
+-- public/package.json --
+{"name": "self", "files": ["src", "dist", "vendor", "!src/hidden*", "!src/tool", "!src/odd", "!src/target.ts"], "dependencies": {"runtime": "*", "null-version": null}, "peerDependencies": {"peer": "*"}, "optionalDependencies": {"optional": "*"}, "devDependencies": {"dev": "*", "@scope/dev": "*", "runtime": "*", "peer": "*", "optional": "*", "self": "*", "virtual:foo": "*", "@alias/hidden": "*", "true": "*", "9007199254740992": "*", "empty-version": "*", "null-version": "*", "fs": "*"}, "imports": {"#hidden": "./src/hidden.js", "#public": "./src/public.js", "#choice": {"import": "./src/public.js", "require": "./src/hidden.js"}}}
+-- public/.npmignore --
+src/entry/index.js
+-- public/tsconfig.json --
+{"compilerOptions": {"paths": {"@alias/*": ["src/*"], "#alias/*": ["src/*"]}}}
+-- public/src/public.js --
+module.exports = 1;
+-- public/src/hidden.js --
+module.exports = 1;
+-- public/src/target.ts --
+export const value = 1;
+-- public/src/odd.xyz --
+module.exports = 1;
+-- public/dist/hidden.js --
+module.exports = 1;
+-- public/vendor/tool.js --
+module.exports = 1;
+-- public/src/dir/package.json --
+{"main":"../hidden.js","browser":"../public.js","private":true}
+-- public/src/entry/index.js --
+module.exports = 1;
+-- public/src/entry/alternate.js --
+module.exports = 1;
+-- public/src/nested/.npmignore --
+ignored.js
+-- public/src/nested/ignored.js --
+module.exports = 1;
+-- private/package.json --
+{"private":true,"devDependencies":{"dev":"*"}}
+-- string-private/package.json --
+{"private":"true","devDependencies":{"dev":"*"}}
+-- workspace/package.json --
+{"workspaces":["child"],"dependencies":{"dev":"*"}}
+-- workspace/child/package.json --
+{"devDependencies":{"dev":"*"}}
+-- git/package.json --
+{"devDependencies":{"dev":"*"}}
+-- git/.gitignore --
+input.js
+-- npm/package.json --
+{"devDependencies":{"dev":"*"}}
+-- npm/.gitignore --
+input.js
+-- npm/.npmignore --
+other.js
+-- main/package.json --
+{"main":"index.js","files":[],"devDependencies":{"dev":"*"}}
+-- metadata/package.json --
+{"files":[],"devDependencies":{"dev":"*"}}
