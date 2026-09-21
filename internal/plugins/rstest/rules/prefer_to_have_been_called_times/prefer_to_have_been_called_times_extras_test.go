@@ -51,6 +51,13 @@ func TestPreferToHaveBeenCalledTimesExtras(t *testing.T) {
 		`expect((fn.mock.calls as never)).toHaveLength(1);`,
 		`expect(fn.mock.calls!).toHaveLength(1);`,
 	)
+	// Chai matchers that replace the assertion subject end the chain for this rule.
+	addValid(
+		`expect(fn.mock.calls).property(0).toHaveLength(1);`,
+		`expect(fn.mock.calls).toContain(call).toHaveLength(1);`,
+		`expect(fn.mock.calls).toThrow().toHaveLength(1);`,
+		`expect(fn.mock.calls).ownProperty('0').toHaveLength(1);`,
+	)
 	// Neighbouring mock state and unrelated subjects.
 	addValid(
 		`expect(fn.mock.results).toHaveLength(1);`,
@@ -65,8 +72,14 @@ func TestPreferToHaveBeenCalledTimesExtras(t *testing.T) {
 		`expect(fn.mock.calls)[toHaveLength](1);`,
 		`expect(fn.mock.calls)["toHave" + "Length"](1);`,
 	)
-	// expect.element asserts on a browser locator, which carries no mock context.
-	addValid(`expect.element(fn.mock.calls).toHaveLength(1);`)
+	// Only expect() and expect.soft() assert directly on the value passed in.
+	// expect.poll takes a callback, so this argument throws before any matcher runs.
+	addValid(
+		`expect.element(fn.mock.calls).toHaveLength(1);`,
+		`await expect.poll(fn.mock.calls).toHaveLength(1);`,
+		`await expect.poll(fn.mock.calls, { timeout: 10 }).not.toHaveLength(1);`,
+		`await expect.poll(() => fn.mock.calls).toHaveLength(1);`,
+	)
 	// Roots that are not Rstest's expect.
 	addValid(
 		`import { expect } from 'vitest'; expect(fn.mock.calls).toHaveLength(1);`,
@@ -104,6 +117,8 @@ func TestPreferToHaveBeenCalledTimesExtras(t *testing.T) {
 		{`expect(fn.mock.calls) /* keep */ .toHaveLength(1);`, `expect(fn) /* keep */ .toHaveBeenCalledTimes(1);`},
 		{`expect(fn.mock.calls).toHaveLength(/* keep */ 1);`, `expect(fn).toHaveBeenCalledTimes(/* keep */ 1);`},
 		{"expect(\n  fn.mock.calls,\n).toHaveLength(1);", "expect(\n  fn,\n).toHaveBeenCalledTimes(1);"},
+		{`expect<unknown[]>(fn.mock.calls).toHaveLength(0);`, `expect(fn).toHaveBeenCalledTimes(0);`},
+		{`expect<unknown[]>(fn.mock.calls).toHaveLength<never>(0);`, `expect(fn).toHaveBeenCalledTimes(0);`},
 	} {
 		add(pair[0], pair[1])
 	}
@@ -137,9 +152,9 @@ func TestPreferToHaveBeenCalledTimesExtras(t *testing.T) {
 	// Comments between the removed accessors survive the fix.
 	add(`expect(fn /* keep */ .mock.calls).toHaveLength(1);`, `expect(fn /* keep */ ).toHaveBeenCalledTimes(1);`)
 	add(`expect(fn.mock /* keep */ .calls).toHaveLength(1);`, `expect(fn /* keep */ ).toHaveBeenCalledTimes(1);`)
-	// expect.poll re-invokes its argument, so rewriting the subject would call the mock.
-	add(`await expect.poll(fn.mock.calls).toHaveLength(1);`, "")
-	add(`await expect.poll(fn.mock.calls, { timeout: 10 }).not.toHaveLength(1);`, "")
+	// Removing type arguments would delete a comment written inside them.
+	add(`expect</* keep */ unknown[]>(fn.mock.calls).toHaveLength(0);`, "")
+	add(`expect(fn.mock.calls).toHaveLength</* keep */ never>(0);`, "")
 	// The rewritten subject stays on the Chai assertion the chain returns.
 	for _, code := range []string{
 		`expect(fn.mock.calls).toHaveLength(1).toContainEqual([1]);`,

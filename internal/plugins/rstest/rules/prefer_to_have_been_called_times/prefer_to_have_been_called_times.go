@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -18,8 +19,12 @@ var PreferToHaveBeenCalledTimesRule = rule.Rule{
 				if parsed == nil ||
 					parsed.Reason != rstestUtils.RstestExpectParseReasonNone ||
 					parsed.Head == nil ||
-					// expect.element asserts on a browser locator, which has no mock context.
-					parsed.Entry == rstestUtils.RstestExpectEntryElement {
+					// expect.element asserts on a browser locator, which has no mock
+					// context, and expect.poll takes a callback rather than the value
+					// this rule reads, so `mock.calls` can only reach it as an argument
+					// that already throws at runtime.
+					(parsed.Entry != rstestUtils.RstestExpectEntryCall &&
+						parsed.Entry != rstestUtils.RstestExpectEntrySoft) {
 					return
 				}
 				arguments := parsed.Head.AsCallExpression().Arguments
@@ -31,17 +36,21 @@ var PreferToHaveBeenCalledTimesRule = rule.Rule{
 					return
 				}
 				for _, matcher := range parsed.Matchers {
+					if subjectMutatingChaiMatchers[matcher.Name] {
+						break
+					}
 					if matcher.Kind != rstestUtils.RstestExpectMatcherCall || matcher.Name != "toHaveLength" {
 						continue
 					}
+					matcherCall := testFramework.InvokedAccessorCall(&matcher.Entry)
 					ctx.ReportNodeWithDeferredFixes(matcher.Entry.Node, rule.RuleMessage{
 						Id: "preferMatcher", Description: "Prefer `toHaveBeenCalledTimes`",
 					}, func() []rule.RuleFix {
 						// Rewriting the factory argument changes the subject that the
 						// returned Chai assertion carries, so it must not be reused.
-						if parsed.Entry == rstestUtils.RstestExpectEntryPoll ||
-							len(parsed.Matchers) != 1 ||
-							parsed.Expression != testFramework.InvokedAccessorCall(&matcher.Entry) ||
+						if len(parsed.Matchers) != 1 ||
+							matcherCall == nil ||
+							parsed.Expression != matcherCall ||
 							!isDiscardedAssertion(parsed.Expression) {
 							return nil
 						}
@@ -59,12 +68,43 @@ var PreferToHaveBeenCalledTimesRule = rule.Rule{
 								fixes = append(fixes, rule.RuleFixRemoveRange(textRange))
 							}
 						}
+						// expect<T>() pins the subject's type and the matcher's type
+						// arguments describe toHaveLength, so both stop type-checking
+						// once the subject and the matcher change.
+						for _, call := range []*ast.Node{parsed.Head, matcherCall} {
+							if call.AsCallExpression().TypeArguments == nil {
+								continue
+							}
+							typeRange, ok := testFramework.CallTypeArgumentListRange(ctx.SourceFile, call)
+							if !ok || utils.HasCommentInSpan(ctx.Comments.All(), typeRange.Pos(), typeRange.End()) {
+								return nil
+							}
+							fixes = append(fixes, rule.RuleFixRemoveRange(typeRange))
+						}
 						return fixes
 					})
 				}
 			},
 		}
 	},
+}
+
+// These Chai matchers replace the assertion object's current value, so a later
+// toHaveLength no longer measures the mock.calls array passed to expect().
+// Kept in sync with the identical table in rstest/prefer-to-have-length, which
+// is the second consumer; the pair should move to a shared helper.
+var subjectMutatingChaiMatchers = map[string]bool{
+	"property":                  true,
+	"ownProperty":               true,
+	"haveOwnProperty":           true,
+	"ownPropertyDescriptor":     true,
+	"haveOwnPropertyDescriptor": true,
+	"toContain":                 true,
+	"toThrow":                   true,
+	"toThrowError":              true,
+	"throw":                     true,
+	"throws":                    true,
+	"Throw":                     true,
 }
 
 // parseMockCallsAccess returns the `mock` and `calls` key nodes of a

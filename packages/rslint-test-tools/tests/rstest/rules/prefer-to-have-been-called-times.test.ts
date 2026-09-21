@@ -22,6 +22,9 @@ ruleTester.run('prefer-to-have-been-called-times', {} as never, {
     'expect(fn.mock.calls).toContain(1, 2, 3);',
     'expect(fn?.mock.calls).toHaveLength(1);',
     'expect(fn[mock].calls).toHaveLength(1);',
+    'expect(fn.mock.calls).property(0).toHaveLength(1);',
+    'expect.poll(fn.mock.calls).toHaveLength(1);',
+    'expect.element(fn.mock.calls).toHaveLength(1);',
   ].map((code) => ({ code })),
   invalid: [
     {
@@ -45,6 +48,12 @@ ruleTester.run('prefer-to-have-been-called-times', {} as never, {
     {
       code: 'expect(my.method.mock.calls).not.toHaveLength(0);',
       output: 'expect(my.method).not.toHaveBeenCalledTimes(0);',
+      column: 34,
+      endColumn: 46,
+    },
+    {
+      code: 'expect<unknown[]>(fn.mock.calls).toHaveLength(0);',
+      output: 'expect(fn).toHaveBeenCalledTimes(0);',
       column: 34,
       endColumn: 46,
     },
