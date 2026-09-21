@@ -82,6 +82,47 @@ function foo() {
 }
 
 describe('foo', foo)`},
+			// A constructor and an accessor are scopes of their own as well:
+			// each body runs only when the class is instantiated or the
+			// property is touched.
+			{Code: `class Helper {
+  constructor() {
+    test('bar', () => {});
+  }
+}
+beforeEach(() => {})`},
+			{Code: `test('bar', () => {});
+class Helper {
+  constructor() {
+    beforeEach(() => {});
+  }
+}`},
+			{Code: `class Helper {
+  get value() {
+    test('bar', () => {});
+    return null;
+  }
+}
+beforeEach(() => {})`},
+			{Code: `test('bar', () => {});
+class Helper {
+  get value() {
+    beforeEach(() => {});
+    return null;
+  }
+}`},
+			{Code: `class Helper {
+  set value(v) {
+    test('bar', () => {});
+  }
+}
+beforeEach(() => {})`},
+			{Code: `test('bar', () => {});
+class Helper {
+  set value(v) {
+    beforeEach(() => {});
+  }
+}`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

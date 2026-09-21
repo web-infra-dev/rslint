@@ -45,6 +45,12 @@ func buildNoHookOnTopMessage() rule.RuleMessage {
 // answers how a file reads top to bottom, where a missed report is a smaller
 // failure than one that cannot be acted on.
 //
+// That covers a constructor and an accessor as much as a plain function, since
+// each runs only when the class is instantiated or the property is touched. A
+// class static block is deliberately left out: it runs when the class
+// declaration is evaluated, so what it registers really does belong to the
+// scope the class sits in.
+//
 // Whether a call registers a test case is the framework parser's decision, not
 // this engine's: an API factory such as an Rstest `test.extend({...})` chain
 // that only builds another test function parses as no test-framework call, so
@@ -98,6 +104,12 @@ func NewRule(config Config) rule.Rule {
 				rule.ListenerOnExit(ast.KindArrowFunction):       popScope,
 				ast.KindMethodDeclaration:                        pushScope,
 				rule.ListenerOnExit(ast.KindMethodDeclaration):   popScope,
+				ast.KindConstructor:                              pushScope,
+				rule.ListenerOnExit(ast.KindConstructor):         popScope,
+				ast.KindGetAccessor:                              pushScope,
+				rule.ListenerOnExit(ast.KindGetAccessor):         popScope,
+				ast.KindSetAccessor:                              pushScope,
+				rule.ListenerOnExit(ast.KindSetAccessor):         popScope,
 			}
 		},
 	}

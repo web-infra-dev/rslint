@@ -135,6 +135,47 @@ describe("checkout", () => {
     },
   };
 });`},
+			// ---- A constructor and an accessor are scopes of their own as
+			// well: each body runs only when the class is instantiated or the
+			// property is touched, so neither direction may cross the boundary ----
+			{Code: `class Helper {
+  constructor() {
+    test("charges the card", () => {});
+  }
+}
+beforeEach(() => {});`},
+			{Code: `test("charges the card", () => {});
+class Helper {
+  constructor() {
+    beforeEach(() => {});
+  }
+}`},
+			{Code: `class Helper {
+  get gateway() {
+    test("charges the card", () => {});
+    return null;
+  }
+}
+beforeEach(() => {});`},
+			{Code: `test("charges the card", () => {});
+class Helper {
+  get gateway() {
+    beforeEach(() => {});
+    return null;
+  }
+}`},
+			{Code: `class Helper {
+  set gateway(value) {
+    test("charges the card", () => {});
+  }
+}
+beforeEach(() => {});`},
+			{Code: `test("charges the card", () => {});
+class Helper {
+  set gateway(value) {
+    beforeEach(() => {});
+  }
+}`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- The file body is a scope of its own ----
