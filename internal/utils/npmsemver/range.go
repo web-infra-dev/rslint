@@ -250,6 +250,12 @@ func (version Range) IsSubsetOf(supported string) bool {
 	if !ok {
 		return false
 	}
+	return version.IsSubsetOfRange(domain)
+}
+
+// IsSubsetOfRange compares already parsed ranges using the same npm subset
+// semantics as IsSubsetOf. Callers can reuse immutable support ranges.
+func (version Range) IsSubsetOfRange(domain Range) bool {
 	for _, sub := range version.alternatives {
 		lower, upper, empty := versionBounds(sub)
 		if empty {

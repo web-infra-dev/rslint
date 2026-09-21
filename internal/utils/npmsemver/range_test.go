@@ -8,6 +8,10 @@ func TestRawRange(t *testing.T) {
 		{"^16 || >=20", "^16 || >=20"},
 		{" \ufeff>=\u00a0 16.0.0\n\t< 20 ", ">= 16.0.0 < 20"},
 		{"v16.0.0+build", "v16.0.0+build"},
+		{"^14 || >=16", "^14 || >=16"},
+		{"  >= 14.0.0\t<15  ", ">= 14.0.0 <15"},
+		{"\u00a0>=\ufeff14.0.0\u2028<15", ">= 14.0.0 <15"},
+		{"~> 16.0.0", "~> 16.0.0"},
 	} {
 		version, ok := Parse(test.input)
 		if !ok || version.Raw() != test.raw {
@@ -108,6 +112,8 @@ func TestReplacementRanges(t *testing.T) {
 
 // Expected containment from node-semver 7.8.5, resolved by eslint-plugin-n v18.3.0.
 func TestNodeProtocolSubsetRanges(t *testing.T) {
+	esm, _ := Parse("^12.20.0 || >=14.13.1")
+	cjs, _ := Parse("^14.18.0 || >=16.0.0")
 	for _, test := range []struct {
 		text     string
 		esm, cjs bool
@@ -194,6 +200,12 @@ func TestNodeProtocolSubsetRanges(t *testing.T) {
 			}
 			if got := r.IsSubsetOf("^14.18.0 || >=16.0.0"); got != test.cjs {
 				t.Errorf("CJS: got %v, want %v", got, test.cjs)
+			}
+			if got := r.IsSubsetOfRange(esm); got != test.esm {
+				t.Errorf("parsed ESM: got %v, want %v", got, test.esm)
+			}
+			if got := r.IsSubsetOfRange(cjs); got != test.cjs {
+				t.Errorf("parsed CJS: got %v, want %v", got, test.cjs)
 			}
 		})
 	}
