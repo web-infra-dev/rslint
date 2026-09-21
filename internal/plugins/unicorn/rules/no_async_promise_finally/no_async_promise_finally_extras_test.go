@@ -26,7 +26,7 @@ func TestNoAsyncPromiseFinallyExtras(t *testing.T) {
 		&no_async_promise_finally.NoAsyncPromiseFinallyRule,
 		[]rule_tester.ValidTestCase{
 			validTS("type Callback = () => void; promise.finally((async function * () {}) as Callback);"),
-			validTS("function foo(promise: PromiseLike<string>) { promise.finally(async () => {}); }"),
+			validTS("function foo(object: {finally(handler: () => void): void} | {finally(handler: () => Promise<void>): void}) { object.finally(async () => {}); }"),
 			valid("const method = getMethod(); promise[method](async () => {});"),
 			valid("const cleanup = object.cleanup; promise.finally(cleanup);"),
 		},
@@ -35,18 +35,23 @@ func TestNoAsyncPromiseFinallyExtras(t *testing.T) {
 			invalidTS("type Callback = () => void; promise.finally(<Callback>(async () => {}));", "<Callback>(async () => {})"),
 			invalidTS("type Callback = () => void; const cleanup = (async () => {}) satisfies Callback; promise.finally(cleanup);", "cleanup"),
 			invalidTS("function foo(promise: any) { promise.finally(async () => {}); }", "async () => {}"),
+			invalidTS("function foo(promise: PromiseLike<string>) { promise.finally(async () => {}); }", "async () => {}"),
+			invalidTS("function foo(promise: MissingPromiseType) { promise.finally(async () => {}); }", "async () => {}"),
+			invalidTS("function foo(promise: Promise<string> | {finally(handler: () => void): void}) { promise.finally(async () => {}); }", "async () => {}"),
 		},
 	)
 }
 
 func TestNoAsyncPromiseFinallySourceOnly(t *testing.T) {
-	code := "const method = \"finally\"; const cleanup = async () => {}; promise[method](cleanup);"
+	code := "const method = \"finally\"; const cleanup = async () => {}; promise[method](cleanup); async function declared() {} promise.finally(declared);"
 	diagnostics := lintNoAsyncPromiseFinallySourceOnly(t, code)
-	if len(diagnostics) != 1 {
-		t.Fatalf("project:false diagnostics = %d, want 1: %+v", len(diagnostics), diagnostics)
+	if len(diagnostics) != 2 {
+		t.Fatalf("project:false diagnostics = %d, want 2: %+v", len(diagnostics), diagnostics)
 	}
-	if diagnostics[0].Message.Id != "no-async-promise-finally" {
-		t.Fatalf("project:false message id = %q", diagnostics[0].Message.Id)
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Message.Id != "no-async-promise-finally" {
+			t.Fatalf("project:false message id = %q", diagnostic.Message.Id)
+		}
 	}
 }
 
