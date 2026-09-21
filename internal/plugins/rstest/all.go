@@ -42,13 +42,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_with"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_comparison_matcher"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_each"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_ending_with_an_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_equality_matcher"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_expect_type_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_on_top"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_import_in_mock"
-	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_lowercase_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_importing_rstest_globals"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_lowercase_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_rs_mocked"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_boolean_matchers"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_equal"
@@ -119,6 +120,7 @@ func GetAllRules() []rule.Rule {
 		prefer_called_with.PreferCalledWithRule,
 		prefer_comparison_matcher.PreferComparisonMatcherRule,
 		prefer_each.PreferEachRule,
+		prefer_ending_with_an_expect.PreferEndingWithAnExpectRule,
 		prefer_equality_matcher.PreferEqualityMatcherRule,
 		prefer_expect_type_of.PreferExpectTypeOfRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
