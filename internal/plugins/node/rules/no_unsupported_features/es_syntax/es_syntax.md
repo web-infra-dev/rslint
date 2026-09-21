@@ -98,9 +98,6 @@ is used to recognize receivers, including unions and constrained generics.
 - With `version: ">=15 || >20 <15"`, dynamic imports and nullish coalescing
   are accepted: the impossible `>20 <15` alternative matches no Node.js version.
   Upstream reports both features. Use `>=15` to get the same result in both tools.
-- Legacy octal literals such as `0755` produce a syntax error. Upstream accepts
-  this spelling in non-strict code. Use the decimal spelling `493` if
-  compatibility with Node.js versions before modern octal syntax is required.
 
 ## References
 
