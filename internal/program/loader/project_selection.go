@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"sort"
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -50,6 +49,7 @@ type ProjectSourceSelection struct {
 
 type projectSelectionSlot struct {
 	parseOnce      sync.Once
+	metadataReady  chan struct{}
 	config         *tsoptions.ParsedCommandLine
 	parseErr       error
 	exactRoots     map[string]struct{}
@@ -72,7 +72,7 @@ type projectSelection struct {
 	rootIdentities *programFileIndex
 }
 
-func (selection *projectSelection) metadata(index int) (*projectSelectionSlot, error) {
+func (selection *projectSelection) parseMetadata(index int) {
 	slot := &selection.slots[index]
 	slot.parseOnce.Do(func() {
 		if selection.request.Metadata == nil {
@@ -88,6 +88,17 @@ func (selection *projectSelection) metadata(index int) (*projectSelectionSlot, e
 			slot.exactRoots[exactPathID(tspath.NormalizePath(file))] = struct{}{}
 		}
 	})
+}
+
+func (selection *projectSelection) metadata(index int) (*projectSelectionSlot, error) {
+	slot := &selection.slots[index]
+	if slot.metadataReady != nil {
+		// Only the request's metadata workers parse prefetched candidates.
+		// Ordered consumers wait here instead of exceeding their concurrency cap.
+		<-slot.metadataReady
+	} else {
+		selection.parseMetadata(index)
+	}
 	if slot.parseErr != nil {
 		return nil, fmt.Errorf("parse TypeScript config %q: %w", selection.request.Candidates[index].ConfigPath, slot.parseErr)
 	}
@@ -300,59 +311,35 @@ func runTargetProjectTasks(groups []projectTargetGroup, singleThreaded bool, tas
 	return nil
 }
 
-// prefetchRootMetadata restores the declaration-prefix concurrency used by
-// focused lint. The nearest containing directory is only a latency hint, never
-// evidence of ownership. The ordered consumer can use each ready slot without
-// waiting for the whole prefix. Its group must join this work before returning.
-func (selection *projectSelection) prefetchRootMetadata(indexes, pending []int) func() {
-	if len(indexes) <= 2 || len(pending) == 0 {
+// prefetchMetadata shares one bounded worker pool across all target groups.
+// Selection consumes ready results in declaration order and alone reports errors.
+// Programs reuse these parsed configs but are acquired only after selection.
+func (selection *projectSelection) prefetchMetadata(groups []projectTargetGroup) func() {
+	if selection.request.SingleThreaded || runtime.GOMAXPROCS(0) <= 1 {
 		return nil
 	}
-	caseSensitive := selection.request.FS == nil || selection.request.FS.UseCaseSensitiveFileNames()
-	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: caseSensitive}
-	type directoryHint struct {
-		directory string
-		position  int
-	}
-	hints := make([]directoryHint, len(indexes))
-	for position, index := range indexes {
-		hints[position] = directoryHint{
-			directory: tspath.GetDirectoryPath(selection.request.Candidates[index].ConfigPath),
-			position:  position,
-		}
-	}
-	// Only the hints are sorted. The first containing directory reproduces
-	// the longest-directory prediction, with declaration order breaking ties.
-	// Keep ContainsPath's path and case rules instead of inventing another key.
-	sort.SliceStable(hints, func(left, right int) bool {
-		return len(hints[left].directory) > len(hints[right].directory)
-	})
-	end := 1 // The first candidate has already been consumed.
-	for _, targetIndex := range pending {
-		file := selection.request.Targets[targetIndex]
-		for _, hint := range hints {
-			if tspath.ContainsPath(hint.directory, file.Path, options) {
-				end = max(end, hint.position+1)
-				break
+	var indexes []int
+	seen := make([]bool, len(selection.slots))
+	for _, group := range groups {
+		for _, index := range group.projectIndexes {
+			if !seen[index] {
+				seen[index] = true
+				indexes = append(indexes, index)
 			}
 		}
-		if end == len(indexes) {
-			break
-		}
 	}
-	if end <= 2 {
-		// At most one unread slot offers no metadata parallelism. Leave it
-		// to the ordered consumer instead of adding a goroutine and a join.
+	if len(indexes) <= 1 {
 		return nil
 	}
-	prefix := indexes[1:end]
+	for _, index := range indexes {
+		selection.slots[index].metadataReady = make(chan struct{})
+	}
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		forEachSelectedProject(false, prefix, func(index int) {
-			// Store failures in their slots; only a reached candidate can fail
-			// the request. Prefetch never acquires a Program or selects an owner.
-			_, _ = selection.metadata(index)
+		forEachSelectedProject(false, indexes, func(index int) {
+			selection.parseMetadata(index)
+			close(selection.slots[index].metadataReady)
 		})
 	}()
 	return func() { <-done }
@@ -391,17 +378,14 @@ func SelectProjectSources(request ProjectSelectionRequest) ([]ProjectSourceSelec
 		if waitForBuilds != nil {
 			defer waitForBuilds()
 		}
+		if waitForMetadata := selection.prefetchMetadata(groups); waitForMetadata != nil {
+			defer waitForMetadata()
+		}
 		return runTargetProjectTasks(groups, request.SingleThreaded, func(group projectTargetGroup) error {
 			pending := append([]int(nil), group.targetIndexes...)
-			for position, candidate := range group.projectIndexes {
+			for _, candidate := range group.projectIndexes {
 				if len(pending) == 0 {
 					break
-				}
-				// Give the first candidate a chance to finish without lookahead.
-				if position == 1 && !request.SingleThreaded && runtime.GOMAXPROCS(0) > 1 {
-					if waitForMetadata := selection.prefetchRootMetadata(group.projectIndexes, pending); waitForMetadata != nil {
-						defer waitForMetadata()
-					}
 				}
 				var err error
 				pending, err = selection.matchRoots(candidate, pending, owners, enqueueBuild)
