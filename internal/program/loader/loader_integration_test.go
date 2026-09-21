@@ -2496,6 +2496,126 @@ func TestSelectProjectSourcesOverlapsConfirmedBuildsWithRequiredMetadata(t *test
 	}
 }
 
+func TestProjectMetadataPrefetchPreservesDirectoryHints(t *testing.T) {
+	for _, test := range []struct {
+		name            string
+		directories     []string
+		targets         []string
+		indexes         []int
+		caseInsensitive bool
+		want            []int
+	}{
+		{
+			name:        "already consumed candidate remains the longest hint",
+			directories: []string{"/repo/deep", "/other", "/repo"}, targets: []string{"/repo/deep/file.ts"},
+		},
+		{
+			name:        "same directory keeps first declaration",
+			directories: []string{"/other", "/repo", "/repo", "/unused"}, targets: []string{"/repo/file.ts"},
+		},
+		{
+			name:        "longer directory later in the declaration",
+			directories: []string{"/other", "/repo", "/repo/deep", "/unused"}, targets: []string{"/repo/deep/file.ts"}, want: []int{1, 2},
+		},
+		{
+			name:        "directory boundary is not a string prefix",
+			directories: []string{"/other", "/repo/src", "/unused", "/repo/src2"}, targets: []string{"/repo/src2/file.ts"}, want: []int{1, 2, 3},
+		},
+		{
+			name:        "hint position differs from global candidate index",
+			directories: []string{"/repo/b", "/unused", "/other", "/repo/a"}, targets: []string{"/repo/a/file.ts"}, indexes: []int{2, 0, 3, 1}, want: []int{0, 3},
+		},
+		{
+			name:        "all targets contribute to the prefix",
+			directories: []string{"/other", "/repo", "/repo/a", "/repo/b"}, targets: []string{"/repo/a/file.ts", "/repo/b/file.ts", "/elsewhere/file.ts"}, want: []int{1, 2, 3},
+		},
+		{
+			name:        "case sensitive components",
+			directories: []string{"/other", "/repo/a", "/repo/A", "/unused"}, targets: []string{"/repo/A/file.ts"}, want: []int{1, 2},
+		},
+		{
+			name:        "case insensitive ties retain declaration order",
+			directories: []string{"/other", "/repo/a", "/repo/A", "/unused"}, targets: []string{"/repo/A/file.ts"}, caseInsensitive: true,
+		},
+		{
+			name:        "Unicode folding retains original directory byte length",
+			directories: []string{"/other", "/repo/k", "/repo/K", "/unused"}, targets: []string{"/repo/k/file.ts"}, caseInsensitive: true, want: []int{1, 2},
+		},
+		{
+			name:        "drive root ignores case on a case sensitive filesystem",
+			directories: []string{"D:/other", "C:/repo", "c:/repo/deep", "C:/unused"}, targets: []string{"C:/repo/deep/file.ts"}, want: []int{1, 2},
+		},
+		{
+			name:        "UNC root and component case differ",
+			directories: []string{"//SERVER/Other", "//server/share", "//SERVER/Share", "//server/unused"}, targets: []string{"//server/Share/file.ts"}, want: []int{1, 2},
+		},
+		{
+			name:        "URL root comparison is retained",
+			directories: []string{"https://other/repo", "https://host/repo", "https://HOST/repo/deep", "https://host/unused"}, targets: []string{"https://host/repo/deep/file.ts"}, want: []int{1, 2},
+		},
+		{
+			name:        "unreduced directory length is retained",
+			directories: []string{"/other", "/repo/b", "/repo/a/../b", "/unused"}, targets: []string{"/repo/b/file.ts"}, want: []int{1, 2},
+		},
+		{
+			name:        "two candidates offer no prefetch parallelism",
+			directories: []string{"/other", "/repo"}, targets: []string{"/repo/file.ts"},
+		},
+		{
+			name:        "no containing directory",
+			directories: []string{"/other", "/repo/a", "/repo/b"}, targets: []string{"/elsewhere/file.ts"},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			candidates := make([]ProjectCandidate, len(test.directories))
+			indexes := slices.Clone(test.indexes)
+			if indexes == nil {
+				indexes = make([]int, len(candidates))
+				for index := range indexes {
+					indexes[index] = index
+				}
+			}
+			originalIndexes := slices.Clone(indexes)
+			for index, directory := range test.directories {
+				candidates[index].ConfigPath = fmt.Sprintf("%s/tsconfig-%d.json", directory, index)
+			}
+			targets := make([]target.File, len(test.targets))
+			pending := make([]int, len(targets))
+			for index, filePath := range test.targets {
+				targets[index] = target.File{PathIdentity: rslintconfig.PathIdentity{Path: filePath}}
+				pending[index] = index
+			}
+			calls := make([]atomic.Int32, len(candidates))
+			selection := projectSelection{
+				request: ProjectSelectionRequest{
+					Candidates: candidates, Targets: targets,
+					FS: &bindingIndexTestFS{caseSensitive: !test.caseInsensitive},
+					Metadata: func(index int) (*tsoptions.ParsedCommandLine, error) {
+						calls[index].Add(1)
+						return nil, errors.New("prefetched metadata is unavailable")
+					},
+				},
+				slots: make([]projectSelectionSlot, len(candidates)),
+			}
+			if wait := selection.prefetchRootMetadata(indexes, pending); wait != nil {
+				wait()
+			}
+			for index := range candidates {
+				want := int32(0)
+				if slices.Contains(test.want, index) {
+					want = 1
+				}
+				if got := calls[index].Load(); got != want {
+					t.Fatalf("candidate %d read %d times, want %d", index, got, want)
+				}
+			}
+			if !slices.Equal(indexes, originalIndexes) {
+				t.Fatalf("prediction reordered the candidate list: %v", indexes)
+			}
+		})
+	}
+}
+
 func TestSelectProjectSourcesPrefetchesMetadataWithoutSelectingItsErrors(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{

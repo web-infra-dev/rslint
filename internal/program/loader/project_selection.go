@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"sort"
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -304,19 +305,40 @@ func runTargetProjectTasks(groups []projectTargetGroup, singleThreaded bool, tas
 // evidence of ownership. The ordered consumer can use each ready slot without
 // waiting for the whole prefix. Its group must join this work before returning.
 func (selection *projectSelection) prefetchRootMetadata(indexes, pending []int) func() {
+	if len(indexes) <= 2 || len(pending) == 0 {
+		return nil
+	}
 	caseSensitive := selection.request.FS == nil || selection.request.FS.UseCaseSensitiveFileNames()
 	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: caseSensitive}
+	type directoryHint struct {
+		directory string
+		position  int
+	}
+	hints := make([]directoryHint, len(indexes))
+	for position, index := range indexes {
+		hints[position] = directoryHint{
+			directory: tspath.GetDirectoryPath(selection.request.Candidates[index].ConfigPath),
+			position:  position,
+		}
+	}
+	// Only the hints are sorted. The first containing directory reproduces
+	// the longest-directory prediction, with declaration order breaking ties.
+	// Keep ContainsPath's path and case rules instead of inventing another key.
+	sort.SliceStable(hints, func(left, right int) bool {
+		return len(hints[left].directory) > len(hints[right].directory)
+	})
 	end := 1 // The first candidate has already been consumed.
 	for _, targetIndex := range pending {
 		file := selection.request.Targets[targetIndex]
-		predicted, longestDirectory := -1, -1
-		for position, index := range indexes {
-			directory := tspath.GetDirectoryPath(selection.request.Candidates[index].ConfigPath)
-			if len(directory) > longestDirectory && tspath.ContainsPath(directory, file.Path, options) {
-				predicted, longestDirectory = position, len(directory)
+		for _, hint := range hints {
+			if tspath.ContainsPath(hint.directory, file.Path, options) {
+				end = max(end, hint.position+1)
+				break
 			}
 		}
-		end = max(end, predicted+1)
+		if end == len(indexes) {
+			break
+		}
 	}
 	if end <= 2 {
 		// At most one unread slot offers no metadata parallelism. Leave it
