@@ -11,10 +11,15 @@ This rule accepts one string option:
 - `"always"` (default): use the global `TextEncoder`.
 - `"never"`: use `TextEncoder` from the module.
 
+Enable Node.js globals in the configuration:
+
 ```javascript
+import { globals } from "@rslint/core";
+
 export default [
   {
     plugins: ["node"],
+    languageOptions: { globals: globals.node },
     rules: {
       "node/prefer-global/text-encoder": ["error", "always"],
     },
