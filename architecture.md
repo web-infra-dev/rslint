@@ -201,7 +201,8 @@ and message construction there. Rules select exemptions, diagnostic nodes and ed
 
 `internal/utils/npmsemver` shares npm range parsing, minimum-version queries and
 subset checks. It reuses tsgo's range expansion and prerelease comparison while
-adapting JavaScript whitespace, safe integers and npm's generated bounds.
+adapting JavaScript whitespace, safe integers and npm's generated bounds. Ranges
+retain npm's whitespace-normalized input for diagnostic messages.
 `nodeutil` retains the priority of rule options, plugin settings and package
 engine constraints, plus Node's default version range.
 API reference tracking lives in `internal/utils/referencetracker`. Node rules
@@ -212,7 +213,9 @@ the linted file; shorthand assignment properties do not introduce bindings.
 Each tracker owns its callbacks and active recursion stacks, so independent
 paths retain upstream duplicate reports without sharing rule state. Node
 module entry points, builtin aliases, and strict versus legacy ESM behavior
-remain in `nodeutil`. Require targets also share constant argument evaluation
+remain in `nodeutil`; explicit module traces take precedence over builtin aliases
+so rules can distinguish the availability of `fs` and `node:fs`.
+Require targets also share constant argument evaluation
 and loader-parameter removal there.
 The shared constant evaluator reuses compiler number operations through
 `shim/jsnum`; JavaScript coercion and bounded BigInt evaluation stay in `internal/utils`.

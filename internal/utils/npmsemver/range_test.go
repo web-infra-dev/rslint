@@ -2,6 +2,20 @@ package npmsemver
 
 import "testing"
 
+func TestRawRange(t *testing.T) {
+	for _, test := range []struct{ input, raw string }{
+		{"", ""},
+		{"^16 || >=20", "^16 || >=20"},
+		{" \ufeff>=\u00a0 16.0.0\n\t< 20 ", ">= 16.0.0 < 20"},
+		{"v16.0.0+build", "v16.0.0+build"},
+	} {
+		version, ok := Parse(test.input)
+		if !ok || version.Raw() != test.raw {
+			t.Errorf("Parse(%q).Raw() = %q, valid = %v; want %q", test.input, version.Raw(), ok, test.raw)
+		}
+	}
+}
+
 // Replacement-range decisions compared with npm semver 7.8.5.
 func TestReplacementRanges(t *testing.T) {
 	for _, tc := range []struct {
