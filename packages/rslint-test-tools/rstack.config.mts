@@ -829,6 +829,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/prefer-string-trim-start-end.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-then-catch.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-ternary.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-type-error.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-array-join-separator.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-number-to-fixed-digits-argument.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-post-message-target-origin.test.ts',
