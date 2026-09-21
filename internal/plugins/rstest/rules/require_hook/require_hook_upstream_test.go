@@ -21,6 +21,15 @@ func useHookError(line, column int) rule_tester.InvalidTestCaseError {
 	}
 }
 
+func useTestError(name string, line, column int) rule_tester.InvalidTestCaseError {
+	return rule_tester.InvalidTestCaseError{
+		MessageId: "useTest",
+		Message:   name + "() can only be called inside a test",
+		Line:      line,
+		Column:    column,
+	}
+}
+
 func allowedFunctionCalls(names ...string) []any {
 	items := make([]any, 0, len(names))
 	for _, name := range names {

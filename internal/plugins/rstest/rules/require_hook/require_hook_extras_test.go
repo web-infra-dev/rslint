@@ -125,11 +125,29 @@ describe('suite', body);`},
 			},
 			{
 				Code:   `onTestFinished(() => {});`,
-				Errors: []rule_tester.InvalidTestCaseError{useHookError(1, 1)},
+				Errors: []rule_tester.InvalidTestCaseError{useTestError("onTestFinished", 1, 1)},
 			},
 			{
 				Code:   `onTestFailed(() => {});`,
-				Errors: []rule_tester.InvalidTestCaseError{useHookError(1, 1)},
+				Errors: []rule_tester.InvalidTestCaseError{useTestError("onTestFailed", 1, 1)},
+			},
+			{
+				Code:   `import { onTestFinished as cleanup } from '@rstest/core'; cleanup(() => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{useTestError("onTestFinished", 1, 59)},
+			},
+			{
+				Code:   `import * as core from '@rstest/core'; core.onTestFailed(() => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{useTestError("onTestFailed", 1, 39)},
+			},
+			{
+				Code:   `import.meta.rstest.onTestFinished(() => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{useTestError("onTestFinished", 1, 1)},
+			},
+			// A local function of the same name is ordinary setup code.
+			{
+				Code: `function onTestFinished() {}
+onTestFinished();`,
+				Errors: []rule_tester.InvalidTestCaseError{useHookError(2, 1)},
 			},
 
 			// ---- H. ts-go statement shapes ----
@@ -157,6 +175,32 @@ describe('suite', body);`},
 			},
 
 			// ---- I. Suite forms whose body still runs during collection ----
+			// ts-go keeps the parentheses and the type-only syntax that ESTree
+			// erases, so the callback is not the argument node itself.
+			{
+				Code: `describe('suite', (() => {
+  setup();
+}));`,
+				Errors: []rule_tester.InvalidTestCaseError{useHookError(2, 3)},
+			},
+			{
+				Code: `describe('suite', ((() => {
+  setup();
+})));`,
+				Errors: []rule_tester.InvalidTestCaseError{useHookError(2, 3)},
+			},
+			{
+				Code: `describe('suite', (() => {
+  setup();
+}) as () => void);`,
+				Errors: []rule_tester.InvalidTestCaseError{useHookError(2, 3)},
+			},
+			{
+				Code: `describe('suite', (function () {
+  setup();
+})!);`,
+				Errors: []rule_tester.InvalidTestCaseError{useHookError(2, 3)},
+			},
 			// A skipped suite still executes its callback while the file is
 			// collected, so setup written there runs even though no test does.
 			{
@@ -244,6 +288,18 @@ describe('suite', () => {
 			{
 				Code:    `helper.setup();`,
 				Options: allowedFunctionCalls("setup"),
+				Errors:  []rule_tester.InvalidTestCaseError{useHookError(1, 1)},
+			},
+			// An empty entry names nothing. A callee that cannot be named must
+			// not match it.
+			{
+				Code:    `(condition ? setup : teardown)();`,
+				Options: allowedFunctionCalls(""),
+				Errors:  []rule_tester.InvalidTestCaseError{useHookError(1, 1)},
+			},
+			{
+				Code:    `helper[key.value]();`,
+				Options: allowedFunctionCalls(""),
 				Errors:  []rule_tester.InvalidTestCaseError{useHookError(1, 1)},
 			},
 		},

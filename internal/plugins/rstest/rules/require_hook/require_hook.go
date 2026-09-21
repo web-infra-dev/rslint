@@ -21,6 +21,73 @@ func buildUseHookMessage() rule.RuleMessage {
 	}
 }
 
+func buildUseTestMessage(name string) rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "useTest",
+		Description: name + "() can only be called inside a test",
+		Data:        map[string]string{"name": name},
+	}
+}
+
+// executionTimeAPIs are the two Rstest APIs that register work against the
+// test that is currently running. They are not lifecycle hooks: calling either
+// one while the file is collected throws
+// "onTestFinished() can only be called inside a test"
+// (packages/core/src/runtime/runner/runner.ts), so telling the user to move
+// the call into a hook would name a repair that also fails.
+var executionTimeAPIs = map[string]bool{
+	"onTestFinished": true,
+	"onTestFailed":   true,
+}
+
+// executionTimeAPIName returns the execution-time API a call reaches, or "".
+//
+// The receiver is resolved rather than read as written, so a renamed import
+// and a namespace import are both recognized, while a local function that
+// happens to be called `onTestFinished` is not.
+func executionTimeAPIName(ctx rule.RuleContext, node *ast.Node) string {
+	callee := internalUtils.SkipAssertionsAndParens(node.AsCallExpression().Expression)
+	if callee == nil {
+		return ""
+	}
+
+	if callee.Kind == ast.KindIdentifier {
+		name, _, _ := testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules(
+			callee.AsIdentifier().Text,
+			callee,
+			ctx.Refs.Resolve(callee),
+			ctx.SourceFile,
+			rstestUtils.RstestCoreImportModules,
+		)
+		if executionTimeAPIs[name] {
+			return name
+		}
+		return ""
+	}
+
+	member, ok := internalUtils.AccessExpressionStaticName(callee)
+	if !ok || !executionTimeAPIs[member] {
+		return ""
+	}
+	namespace := internalUtils.SkipAssertionsAndParens(callee.Expression())
+	if namespace == nil {
+		return ""
+	}
+	if rstestUtils.IsImportMetaRstest(namespace) {
+		return member
+	}
+	if namespace.Kind != ast.KindIdentifier {
+		return ""
+	}
+	if testFramework.IsModuleNamespaceSymbolModules(
+		ctx.Refs.Resolve(namespace),
+		rstestUtils.RstestCoreImportModules,
+	) {
+		return member
+	}
+	return ""
+}
+
 type Options struct {
 	AllowedFunctionCalls []string
 }
@@ -167,7 +234,13 @@ func shouldBeInHook(
 		if isRstestFnCall(node, ctx, analysis) {
 			return false
 		}
-		return !slices.Contains(allowedFunctionCalls, testFramework.CalleeChainName(node))
+		// An unnameable callee — a conditional expression, a computed member
+		// whose key is not a literal — has no name to match, and upstream's
+		// getNodeName yields undefined rather than the empty string there.
+		// Comparing the empty name would let `allowedFunctionCalls: [""]`
+		// exempt every such call.
+		name := testFramework.CalleeChainName(node)
+		return name == "" || !slices.Contains(allowedFunctionCalls, name)
 	case ast.KindVariableStatement:
 		// `export let value = setup()` is an ExportNamedDeclaration upstream,
 		// so the VariableDeclaration is never a block-body statement there.
@@ -192,6 +265,23 @@ func shouldBeInHook(
 	default:
 		return false
 	}
+}
+
+// messageFor picks the repair the reported statement can actually take. Almost
+// every statement belongs in a lifecycle hook, but Rstest's two execution-time
+// APIs belong inside a test instead.
+func messageFor(ctx rule.RuleContext, statement *ast.Node) rule.RuleMessage {
+	if statement.Kind != ast.KindExpressionStatement {
+		return buildUseHookMessage()
+	}
+	call := ast.SkipParentheses(statement.AsExpressionStatement().Expression)
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return buildUseHookMessage()
+	}
+	if name := executionTimeAPIName(ctx, call); name != "" {
+		return buildUseTestMessage(name)
+	}
+	return buildUseHookMessage()
 }
 
 func hasCallExpressionParent(node *ast.Node) bool {
@@ -232,7 +322,10 @@ func runsDuringCollection(
 	if callback == nil || !testFramework.IsFunction(callback) {
 		return false
 	}
-	call := callback.Parent
+	// ts-go keeps parentheses and TypeScript's type-only syntax as nodes where
+	// ESTree exposes the function directly, so `describe('s', (() => { … }))`
+	// reaches the call one or more wrappers above the callback.
+	call := outermostTransparentWrapper(callback).Parent
 	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -242,11 +335,31 @@ func runsDuringCollection(
 		return false
 	}
 	args := call.AsCallExpression().Arguments
-	if args == nil || len(args.Nodes) < 2 || args.Nodes[1] != callback {
+	if args == nil || len(args.Nodes) < 2 ||
+		internalUtils.SkipAssertionsAndParens(args.Nodes[1]) != callback {
 		return false
 	}
 	parsed := analysis.ParseFnCall(call)
 	return parsed != nil && parsed.Kind == rstestUtils.RstestFnTypeDescribe
+}
+
+// outermostTransparentWrapper returns the outermost expression wrapping node
+// that leaves what a surrounding call receives unchanged. It is the upward
+// counterpart of SkipAssertionsAndParens.
+func outermostTransparentWrapper(node *ast.Node) *ast.Node {
+	for node.Parent != nil {
+		switch node.Parent.Kind {
+		case ast.KindParenthesizedExpression,
+			ast.KindAsExpression,
+			ast.KindSatisfiesExpression,
+			ast.KindNonNullExpression,
+			ast.KindTypeAssertionExpression:
+			node = node.Parent
+		default:
+			return node
+		}
+	}
+	return node
 }
 
 var RequireHookRule = rule.Rule{
@@ -266,7 +379,7 @@ var RequireHookRule = rule.Rule{
 			if !shouldBeInHook(statement, ctx, analysis, opts.AllowedFunctionCalls) {
 				return
 			}
-			ctx.ReportNode(statement, buildUseHookMessage())
+			ctx.ReportNode(statement, messageFor(ctx, statement))
 		}
 
 		return rule.RuleListeners{

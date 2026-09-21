@@ -59,5 +59,28 @@ ruleTester.run('require-hook', {} as never, {
       `,
       errors: [{ messageId: 'useHook', line: 3, column: 3 }],
     },
+    {
+      code: `
+        describe('cities', (() => {
+          seedProducts();
+        }));
+      `,
+      errors: [{ messageId: 'useHook', line: 3, column: 3 }],
+    },
+    {
+      code: `
+        import { onTestFinished } from '@rstest/core';
+
+        onTestFinished(() => closeDatabase());
+      `,
+      errors: [
+        {
+          messageId: 'useTest',
+          data: { name: 'onTestFinished' },
+          line: 4,
+          column: 1,
+        },
+      ],
+    },
   ],
 });

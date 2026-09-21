@@ -13,6 +13,8 @@ The rule reports two kinds of statement at the top level of a file or of a `desc
 - a function call that is not part of Rstest's own API;
 - a `let` or `var` declaration with an initializer other than `null` or `undefined`.
 
+`onTestFinished` and `onTestFailed` are reported with a different message. They register work against the test that is currently running, so Rstest rejects either call while the file is collected with `onTestFinished() can only be called inside a test`. Moving such a call into a test callback is the repair; moving it into a hook is not.
+
 A `const` declaration is left alone, as are Rstest's own calls: test and suite registrations, lifecycle hooks, `expect` chains, and calls on the `rs` / `rstest` utilities object, including through a renamed import, a namespace import, or `import.meta.rstest`. A `describe` callback is only inspected when it is written at the call site; a callback passed by name is not, because the same function may be registered more than once.
 
 ## Incorrect
