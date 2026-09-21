@@ -59,6 +59,7 @@ func TestNoMissingRequireExtras(t *testing.T) {
 		{Code: "require('./remote.js');", FileName: "src/input.js", Options: []any{map[string]any{"resolvePaths": []any{"."}}}, Settings: map[string]any{"cwd": tspath.ResolvePath(root.Dir, "vendor")}},
 		// alias fallback and disabled alias
 		{Code: "require('alias'); require('disabled');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"alias": []any{"./absent.js", "./present.js"}, "disabled": false}}}}},
+		{Code: "require('virtual');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{"virtual": "./present.js"}}}}},
 		// explicit aliases override TypeScript paths
 		{Code: "require('@broken/present');", FileName: "src/input.ts", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"@broken/present": "./present.js"}}}}},
 		// custom export conditions
@@ -89,6 +90,9 @@ func TestNoMissingRequireExtras(t *testing.T) {
 		{Code: "const view = <require.resolve />;", FileName: "src/input.tsx"},
 	}
 	invalid := []rule_tester.InvalidTestCase{
+		// Invalid package metadata must not be hidden by a fallback or ignore.
+		{Code: "require('bad');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{"bad": "./present.js"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: "Invalid package.json at " + tspath.ResolvePath(root.Dir, "node_modules/bad/package.json"), Line: 1, Column: 9, EndLine: 1, EndColumn: 14}}},
+		{Code: "require('bad');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{"bad": false}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: "Invalid package.json at " + tspath.ResolvePath(root.Dir, "node_modules/bad/package.json"), Line: 1, Column: 9, EndLine: 1, EndColumn: 14}}},
 		// aliases, optional calls and computed property names
 		{Code: "const load = require; const {resolve: lookup} = require; load('missing'); lookup?.('missing'); require?.['resolve']?.('missing'); globalThis['require']('missing');", FileName: "src/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve 'missing' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 63, EndLine: 1, EndColumn: 72}, {MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve 'missing' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 84, EndLine: 1, EndColumn: 93}, {MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve 'missing' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 119, EndLine: 1, EndColumn: 128}, {MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve 'missing' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 153, EndLine: 1, EndColumn: 162}}},
 		// parenthesized and escaped calls
@@ -131,8 +135,6 @@ func TestNoMissingRequireExtras(t *testing.T) {
 		{Code: "require('./dir');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"mainFiles": []any{}, "mainFields": []any{}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve './dir' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 9, EndLine: 1, EndColumn: 16}}},
 		// documented recursive alias diagnostic omits the upstream resolver stack
 		{Code: "require('loop');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"loop": "other", "other": "loop"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: "Recursive alias while resolving 'loop'", Line: 1, Column: 9, EndLine: 1, EndColumn: 15}}},
-		// documented unsupported fallback option
-		{Code: "require('virtual');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{"virtual": "./present.js"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve 'virtual' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 9, EndLine: 1, EndColumn: 18}}},
 		// disabled wildcard aliases leave unrelated requests checked
 		{Code: "require('unrelated');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"pkg/*": false}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve 'unrelated' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 9, EndLine: 1, EndColumn: 20}}},
 		// documented invalid imports target diagnostic

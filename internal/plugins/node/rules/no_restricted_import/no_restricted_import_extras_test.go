@@ -31,6 +31,33 @@ func restrictedImportRoot(t *testing.T) rule_tester.Root {
 	return rule_tester.Root{Dir: directory, FS: utils.NewOverlayVFS(base.FS, files)}
 }
 
+func TestNoRestrictedImportBuiltinFallback(t *testing.T) {
+	root := restrictedImportRoot(t)
+	var invalid []rule_tester.InvalidTestCase
+	for _, name := range []string{"fs", "node:fs"} {
+		for _, target := range []struct{ alias, file string }{
+			{"./server/api.js", "server/api.js"},
+			{"./server", "server/index.js"},
+		} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code: "import '" + name + "';", FileName: "input.js",
+				Options:  []any{[]any{filepath.Join(root.Dir, target.file)}},
+				Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{name: target.alias}}}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restricted", Message: "'" + name + "' module is restricted from being used.",
+					Line: 1, Column: 8, EndLine: 1, EndColumn: 10 + len(name),
+				}},
+			})
+		}
+	}
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &NoRestrictedImportRule,
+		[]rule_tester.ValidTestCase{{
+			Code: "import 'node:fs';", FileName: "input.js",
+			Options:  []any{[]any{filepath.Join(root.Dir, "server/api.js")}},
+			Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{"fs": "./server/api.js"}}}},
+		}}, invalid)
+}
+
 func TestNoRestrictedImportLiteralBackslash(t *testing.T) {
 	if filepath.Separator != '/' {
 		t.Skip("Backslash is a literal filename character only on POSIX hosts.")

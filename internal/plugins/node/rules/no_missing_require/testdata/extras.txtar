@@ -43,3 +43,7 @@ export {};
 {"compilerOptions":{"allowJs":true,"allowImportingTsExtensions":true,"noEmit":true}}
 -- direct/present.ts --
 export {};
+-- node_modules/bad/package.json --
+{broken
+-- node_modules/bad/index.js --
+module.exports = 1;

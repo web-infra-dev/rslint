@@ -71,9 +71,9 @@ export default [
   `settings.cwd` when configured.
 - `tryExtensions` defaults to `['.js', '.json', '.node', '.mjs', '.cjs']`.
   An empty array disables extension guessing.
-- `resolverConfig` supports `modules`, `alias`, `extensions`, `extensionAlias`,
-  `conditionNames`, `mainFields`, `mainFiles`, and `aliasFields`, as described
-  for [no-missing-import](../no_missing_import/no_missing_import.md).
+- `resolverConfig` supports `modules`, `alias`, `fallback`, `fullySpecified`,
+  `extensions`, `extensionAlias`, `conditionNames`, `mainFields`, `mainFiles`, and
+  `aliasFields`, as described for [no-missing-import](../no_missing_import/no_missing_import.md).
 
 Except for `ignoreTypeImport` and `ignorePrivate`, these options can also be
 supplied through `settings.node`. Rule options take precedence over shared
@@ -86,32 +86,25 @@ a development dependency from this rule.
 
 Compared with `eslint-plugin-n` v18.3.0:
 
-- Publication checks respect subdirectory ignore files. For example, a
-  `lib/.npmignore` entry for `helper.js` makes an import of `lib/helper.js`
-  report; upstream only reads the root ignore file.
-- Root metadata such as `README.js` is always published, so its development
-  imports are checked even with `files: []`. Conversely, an included file such
-  as `lib/..hidden.js` is not mistaken for a path outside the package.
-- On a filesystem that ignores filename case, the package's `main` entry also
-  ignores case. For example, `main: 'INDEX.js'` keeps `index.js` published even
-  with `files: []`; upstream can skip checking that file's imports.
-- In `files` patterns, `[!b]` excludes `b` and `\*` matches a literal `*`.
-  Whitespace inside an entry remains part of the pattern. Upstream can select
-  different files for these patterns; prefer explicit filenames when the
-  published file list must match both tools.
-- Overlapping object-form `convertPath` patterns are tried in alphabetical
-  order instead of declaration order. Use the ordered array form when a file
-  matches several mappings. Absolute replacements stay absolute, so targets
-  outside the package are reported; use relative replacements for package
-  files. An invalid conversion regex in shared settings skips the check
-  instead of failing lint.
-- `resolverConfig.fallback`, `symlinks`, and `fullySpecified` are ignored.
-  For example, `fallback: { './missing': './helper.js' }` does not redirect
-  the import. Use `alias` when a redirect should apply to every matching
-  request. Overlapping object-form aliases also use alphabetical priority;
-  use an alias array to preserve your intended order. See
-  [no-missing-import](../no_missing_import/no_missing_import.md#differences-from-upstream)
-  for further unusual filename and alias cases.
+- Subdirectory ignore files affect which files are considered published; upstream
+  only uses the package root's ignore file.
+- `README.js` is treated as published even with `files: []`. Included files such
+  as `lib/..hidden.js` are also treated as published.
+- On case-insensitive filesystems, `main` matches filenames regardless of case;
+  upstream can skip checking those files' imports.
+- In `files`, `[!b]` excludes `b`, `\*` matches a literal `*`, and whitespace is
+  significant. Upstream may select different files for these patterns.
+- Overlapping object-form `convertPath`, `resolverConfig.alias`, and
+  `resolverConfig.fallback` entries use alphabetical priority instead of
+  declaration order. Use arrays to set priority.
+- Absolute `convertPath` replacements stay absolute; targets outside the package
+  are reported.
+- An invalid `convertPath` regex in shared settings skips the check instead of
+  failing lint.
+- `resolverConfig` options not listed above, including `symlinks`, are not supported.
+
+See [no-missing-import](../no_missing_import/no_missing_import.md#differences-from-upstream)
+for shared module-resolution differences.
 
 ## References
 

@@ -21,6 +21,7 @@ const nodeMainTarget = ".__rslint_node_main__"
 func (resolver *nodeResolver) resolveAt(name, directory string, mainTarget bool) Result {
 	child := *resolver
 	child.mainTarget = mainTarget
+	child.options.FullySpecified = false
 	child.fileName = tspath.ResolvePath(directory, "__import__.js")
 	// Package fields resolve from their owning package, not resolvePaths.
 	child.options.Paths = nil
@@ -43,7 +44,7 @@ func (resolver *nodeResolver) mainEntry(directory string) Result {
 				continue
 			}
 			result := resolver.resolveAt(tspath.ResolvePath(directory, target), directory, true)
-			if result.Error == "" || result.recursive {
+			if result.Error == "" || result.recursive || result.terminal {
 				return result
 			}
 		}
