@@ -367,6 +367,13 @@ func (r *lintProgramRequest) rebuild(
 			selectedSourceIdentities: make(map[tspath.Path]tspath.Path),
 			metadata:                 metadata,
 		}
+		if state.sources.SourceFileForTarget(r.target.Path, r.target.CanonicalPath) == nil {
+			// This probe cannot benefit this document's resident cache. Return
+			// its Program to shared selection without registering dependency
+			// watchers or rebuilding across a watcher-registration interval.
+			// Only the selector decides ownership and confirms residency.
+			return program, nil
+		}
 		added, safe := r.cover(state)
 		if !safe {
 			return program, nil

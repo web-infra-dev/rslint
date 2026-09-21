@@ -28,3 +28,7 @@ for (const key in values) {}
 debugger;
 -- aliases/src/extra.js --
 debugger;
+-- virtual-alias/first.json --
+{"files":["alias/a.ts","alias/b.ts"],"compilerOptions":{"noLib":true,"noResolve":true}}
+-- virtual-alias/second.json --
+{"files":["real/a.ts"],"compilerOptions":{"noLib":true,"noResolve":true}}

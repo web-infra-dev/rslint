@@ -3201,6 +3201,83 @@ func TestBuildTargetProjectUsesFrozenTargetIdentityForMembership(t *testing.T) {
 	}
 }
 
+func TestLoadProgramsPreservesVirtualFileIdentityUnderDirectorySymlink(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_order_groups.txtar")
+	for _, withDirectProject := range []bool{false, true} {
+		for _, scope := range []ProjectScope{LintTargets, AllDeclared} {
+			t.Run(fmt.Sprintf("direct=%t/scope=%d", withDirectProject, scope), func(t *testing.T) {
+				baseFS := osvfs.FS()
+				dir := tspath.NormalizePath(baseFS.Realpath(archive.Materialize(t, "virtual-alias")))
+				realDir := tspath.ResolvePath(dir, "real")
+				aliasDir := tspath.ResolvePath(dir, "alias")
+				if err := os.MkdirAll(realDir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(realDir, aliasDir); err != nil {
+					t.Skipf("symlinks unavailable: %v", err)
+				}
+				targetPath := tspath.ResolvePath(realDir, "a.ts")
+				aliasPath := tspath.ResolvePath(aliasDir, "a.ts")
+				const targetText = "export const targetBuffer = 111;"
+				fsys := utils.NewOverlayVFS(baseFS, map[string]string{
+					targetPath:                           targetText,
+					aliasPath:                            "export const unrelatedBuffer = 222;",
+					tspath.ResolvePath(aliasDir, "b.ts"): "export const companion = 333;",
+				})
+				// These files have not been saved. Their individual VFS identities
+				// stay distinct even though their existing parent directories alias.
+				if exactPathID(fsys.Realpath(aliasPath)) == exactPathID(fsys.Realpath(targetPath)) {
+					t.Fatal("fixture must provide distinct virtual file identities")
+				}
+				projects := []string{"./first.json"}
+				if withDirectProject {
+					projects = append(projects, "./second.json")
+				}
+				plan := target.Plan{Files: []target.File{testLintTarget(fsys, dir, targetPath)}}
+				session := NewSession(fsys)
+				set, err := session.buildProjectsForTest(t, ProjectBuildRequest{
+					Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig(projects...)},
+					Targets: plan, Scope: scope, SingleThreaded: true,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantProjects := 0
+				if withDirectProject {
+					wantProjects = 1
+				}
+				if scope == AllDeclared {
+					wantProjects = len(projects)
+				}
+				if set.Len() != wantProjects {
+					t.Fatalf("retained projects = %d, want %d", set.Len(), wantProjects)
+				}
+				for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadCLI, session.LoadAPI} {
+					binding, err := load(set, plan, dir, true)
+					if err != nil {
+						t.Fatal(err)
+					}
+					seen := 0
+					for index, paths := range binding.TargetsByProgram {
+						for _, path := range paths {
+							seen++
+							program := binding.Programs[index]
+							source := program.GetSourceFile(path)
+							if source == nil || source.Text() != targetText || exactPathID(path) != exactPathID(targetPath) ||
+								program.CanProvideTypeChecker(source) != withDirectProject {
+								t.Fatalf("virtual dependency replaced target source or types: paths=%v source=%v", binding.TargetsByProgram, source)
+							}
+						}
+					}
+					if seen != 1 {
+						t.Fatalf("lint target count = %d, want 1", seen)
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestBuildTargetProjectDoesNotBorrowAnotherTargetsLiveIdentity(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{

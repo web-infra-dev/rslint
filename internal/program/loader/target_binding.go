@@ -213,7 +213,7 @@ func directRootOwners(
 	}
 
 	// Only an alias in a project before the exact winner can change ownership.
-	// Resolve those root identities once per path, in directory batches.
+	// Resolve those root identities once per path through the VFS.
 	canonicalLimitByTarget := make([]int, len(targets))
 	needsCanonicalRoots := make([]bool, len(roots))
 	for _, group := range groups {

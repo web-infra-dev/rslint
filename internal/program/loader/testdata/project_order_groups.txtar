@@ -8,3 +8,7 @@ export const b = 1;
 {"files":["alias.ts"],"compilerOptions":{"noLib":true}}
 -- second.json --
 {"files":["a.ts","b.ts"],"compilerOptions":{"noLib":true}}
+-- virtual-alias/first.json --
+{"files":["alias/a.ts","alias/b.ts"],"compilerOptions":{"noLib":true,"noResolve":true}}
+-- virtual-alias/second.json --
+{"files":["real/a.ts"],"compilerOptions":{"noLib":true,"noResolve":true}}

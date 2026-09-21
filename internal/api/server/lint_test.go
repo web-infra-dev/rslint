@@ -818,6 +818,40 @@ func TestHandleLint_FileContentsDependenciesDoNotWidenExplicitTargets(t *testing
 	}
 }
 
+func TestHandleLint_VirtualDirectoryAliasDoesNotReplaceTargetText(t *testing.T) {
+	dir := tspath.NormalizePath(osvfs.FS().Realpath(
+		txtarfs.MustParseFile(t, "testdata/project_roots.txtar").Materialize(t, "virtual-alias"),
+	))
+	realDir := tspath.ResolvePath(dir, "real")
+	aliasDir := tspath.ResolvePath(dir, "alias")
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realDir, aliasDir); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	targetPath := tspath.ResolvePath(realDir, "a.ts")
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
+		Config: json.RawMessage(`[{"languageOptions":{"parserOptions":{"project":["./first.json","./second.json"]}},
+			"rules":{"no-console":"error","no-debugger":"error"}}]`),
+		ConfigDirectory: dir, WorkingDirectory: dir, Files: []string{targetPath},
+		FileContents: map[string]string{
+			targetPath:                           "console.log('selected target'); export {};",
+			tspath.ResolvePath(aliasDir, "a.ts"): "debugger; export const unrelatedBuffer = 222;",
+			tspath.ResolvePath(aliasDir, "b.ts"): "export const companion = 333;",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.FileCount != 1 || !slices.Equal(response.LintedFiles, []string{"real/a.ts"}) {
+		t.Fatalf("virtual dependencies changed lint targets: count=%d files=%v", response.FileCount, response.LintedFiles)
+	}
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "real/a.ts" || response.Diagnostics[0].RuleName != "no-console" {
+		t.Fatalf("diagnostics used virtual dependency text instead of target text: %+v", response.Diagnostics)
+	}
+}
+
 func TestHandleLint_FilesPresenceControlsWhetherFileContentsAreTargets(t *testing.T) {
 	dir := t.TempDir()
 	virtualFile := filepath.Join(dir, "virtual.ts")

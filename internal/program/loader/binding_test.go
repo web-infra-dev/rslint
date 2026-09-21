@@ -255,7 +255,7 @@ func TestProgramFileIndex_BuildsGoverningGroupInOneBatch(t *testing.T) {
 	}
 }
 
-func TestProgramFileIndex_CanonicalizesRegularFilesByDirectory(t *testing.T) {
+func TestProgramFileIndex_UsesPerFileIdentityWithinDirectory(t *testing.T) {
 	const (
 		sourceDirectory = "/aliases"
 		firstSource     = "/aliases/first.ts"
@@ -290,20 +290,64 @@ func TestProgramFileIndex_CanonicalizesRegularFilesByDirectory(t *testing.T) {
 	} {
 		sourceFile := index.sourceFile([]int{0}, 0, targetPath)
 		if sourceFile == nil || sourceFile.FileName() != sourcePath {
-			t.Fatalf("directory-derived canonical lookup for %q returned %v", targetPath, sourceFile)
+			t.Fatalf("per-file canonical lookup for %q returned %v", targetPath, sourceFile)
 		}
 	}
-	if calls := fsys.callCount(sourceDirectory); calls != 1 {
-		t.Fatalf("source directory resolved %d times, want 1", calls)
+	if calls := fsys.callCount(sourceDirectory); calls != 0 {
+		t.Fatalf("source identity unexpectedly resolved its directory %d time(s)", calls)
 	}
 	for _, sourcePath := range []string{firstSource, secondSource} {
-		if calls := fsys.callCount(sourcePath); calls != 0 {
-			t.Fatalf("regular source %q unexpectedly resolved per file %d time(s)", sourcePath, calls)
+		if calls := fsys.callCount(sourcePath); calls != 1 {
+			t.Fatalf("source %q resolved per file %d time(s), want 1", sourcePath, calls)
 		}
 	}
 }
 
-func TestProgramFileIndex_FallsBackForUncertainFileIdentity(t *testing.T) {
+func TestProgramFileIndex_DoesNotInferVirtualFileIdentityFromDirectoryEntries(t *testing.T) {
+	const (
+		sourceDirectory = "/aliases"
+		sourcePath      = "/aliases/target.ts"
+		otherSource     = "/aliases/other.ts"
+		targetPath      = "/physical/target.ts"
+	)
+	fsys := newBindingIndexTestFS([]string{sourcePath, otherSource}, map[string]string{
+		sourceDirectory: "/physical",
+		sourcePath:      sourcePath,
+		otherSource:     otherSource,
+	})
+	// An overlay can list virtual leaves beneath a real directory alias while
+	// each leaf retains its own identity. Directory entries do not prove that
+	// the requested physical target and this virtual source are the same file.
+	fsys.entries[sourceDirectory] = vfs.Entries{
+		Files:    []string{"other.ts", "target.ts"},
+		Symlinks: map[string]struct{}{},
+	}
+	program := createBindingIndexTestProgram(t, fsys, sourcePath, otherSource)
+	fsys.resetCalls()
+
+	index := newProgramFileIndex(
+		[]*compiler.Program{program},
+		[]target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetPath, CanonicalPath: targetPath}}},
+		fsys,
+		false,
+	)
+	if sourceFile := index.sourceFile([]int{0}, 0, targetPath); sourceFile != nil {
+		t.Fatalf("directory metadata invented a source for the physical target: %q", sourceFile.FileName())
+	}
+	if calls := fsys.callCount(sourceDirectory); calls != 0 {
+		t.Fatalf("virtual source identity unexpectedly resolved its directory %d time(s)", calls)
+	}
+	for _, source := range []string{sourcePath, otherSource} {
+		if got := index.canonicalBySourcePath[exactPathID(source)]; got != exactPathID(source) {
+			t.Fatalf("virtual source %q identity = %q, want its per-file identity", source, got)
+		}
+		if calls := fsys.callCount(source); calls != 1 {
+			t.Fatalf("virtual source %q resolved %d time(s), want 1", source, calls)
+		}
+	}
+}
+
+func TestProgramFileIndex_UsesPerFileIdentityRegardlessOfDirectoryEntries(t *testing.T) {
 	const (
 		sourceDirectory = "/aliases"
 		sourcePath      = "/aliases/target.ts"
@@ -368,7 +412,7 @@ func TestProgramFileIndex_FallsBackForUncertainFileIdentity(t *testing.T) {
 				t.Fatalf("canonical lookup returned %v", sourceFile)
 			}
 			if calls := fsys.callCount(sourcePath); calls != 1 {
-				t.Fatalf("uncertain source identity resolved %d times, want 1", calls)
+				t.Fatalf("source identity resolved %d times, want 1", calls)
 			}
 		})
 	}
@@ -409,7 +453,7 @@ func TestProgramFileIndex_UsesPerFileIdentityForSingletonDirectory(t *testing.T)
 	}
 }
 
-func TestProgramFileIndex_UsesFilesystemCasingForDirectoryIdentity(t *testing.T) {
+func TestProgramFileIndex_UsesFilesystemCasingForFileIdentity(t *testing.T) {
 	const (
 		sourceDirectory = "C:/repo"
 		sourcePath      = "C:/repo/target.ts"
@@ -419,6 +463,8 @@ func TestProgramFileIndex_UsesFilesystemCasingForDirectoryIdentity(t *testing.T)
 	)
 	fsys := newBindingIndexTestFS([]string{sourcePath, otherSource}, map[string]string{
 		sourceDirectory: "C:/Physical",
+		sourcePath:      targetPath,
+		otherSource:     otherTarget,
 	})
 	fsys.caseSensitive = false
 	fsys.entries[sourceDirectory] = vfs.Entries{
@@ -437,13 +483,18 @@ func TestProgramFileIndex_UsesFilesystemCasingForDirectoryIdentity(t *testing.T)
 		fsys,
 		true,
 	)
-	sourceFile := index.sourceFile([]int{0}, 0, targetPath)
-	if sourceFile == nil || sourceFile.FileName() != sourcePath {
-		t.Fatalf("case-corrected canonical lookup returned %v", sourceFile)
+	for targetPath, sourcePath := range map[string]string{targetPath: sourcePath, otherTarget: otherSource} {
+		sourceFile := index.sourceFile([]int{0}, 0, targetPath)
+		if sourceFile == nil || sourceFile.FileName() != sourcePath {
+			t.Fatalf("case-corrected canonical lookup for %q returned %v", targetPath, sourceFile)
+		}
+	}
+	if calls := fsys.callCount(sourceDirectory); calls != 0 {
+		t.Fatalf("case-corrected source identity unexpectedly resolved its directory %d time(s)", calls)
 	}
 	for _, path := range []string{sourcePath, otherSource} {
-		if calls := fsys.callCount(path); calls != 0 {
-			t.Fatalf("case-corrected regular source %q unexpectedly used per-file Realpath %d time(s)", path, calls)
+		if calls := fsys.callCount(path); calls != 1 {
+			t.Fatalf("case-corrected source %q used per-file Realpath %d time(s), want 1", path, calls)
 		}
 	}
 }
@@ -533,7 +584,11 @@ func TestProgramFileIndex_UsesTspathIdentityAcrossFilesystemRoots(t *testing.T) 
 			otherSource := tspath.CombinePaths(sourceDirectory, "Other.ts")
 			fsys := newBindingIndexTestFS(
 				[]string{test.sourcePath, otherSource},
-				map[string]string{sourceDirectory: targetDirectory},
+				map[string]string{
+					sourceDirectory: targetDirectory,
+					test.sourcePath: test.targetPath,
+					otherSource:     tspath.CombinePaths(targetDirectory, "Other.ts"),
+				},
 			)
 			fsys.entries[sourceDirectory] = vfs.Entries{
 				Files:    []string{"Alias.ts", "Other.ts"},
@@ -552,12 +607,12 @@ func TestProgramFileIndex_UsesTspathIdentityAcrossFilesystemRoots(t *testing.T) 
 			if sourceFile == nil || sourceFile.FileName() != test.sourcePath {
 				t.Fatalf("lookup returned %v, want %q", sourceFile, test.sourcePath)
 			}
-			if calls := fsys.callCount(sourceDirectory); calls != 1 {
-				t.Fatalf("source directory resolved %d times, want 1", calls)
+			if calls := fsys.callCount(sourceDirectory); calls != 0 {
+				t.Fatalf("source identity unexpectedly resolved its directory %d time(s)", calls)
 			}
 			for _, sourcePath := range []string{test.sourcePath, otherSource} {
-				if calls := fsys.callCount(sourcePath); calls != 0 {
-					t.Fatalf("regular source %q unexpectedly used per-file Realpath %d time(s)", sourcePath, calls)
+				if calls := fsys.callCount(sourcePath); calls != 1 {
+					t.Fatalf("source %q used per-file Realpath %d time(s), want 1", sourcePath, calls)
 				}
 			}
 		})

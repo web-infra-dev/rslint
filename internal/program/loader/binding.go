@@ -131,7 +131,6 @@ type programFileIndex struct {
 	sourcesByProgram      []map[string]*ast.SourceFile
 	targetCanonicalIDs    map[string]struct{}
 	canonicalBySourcePath map[string]string
-	directoryIdentities   map[string]programDirectoryIdentity
 }
 
 func newProgramFileIndex(
@@ -208,121 +207,15 @@ type programSourceMembership struct {
 	sourceFile   *ast.SourceFile
 }
 
-type programDirectoryIdentity struct {
-	canonicalPath string
-	entries       vfs.Entries
-}
-
-func regularFileNameFromEntries(entries vfs.Entries, fileName string, useCaseSensitive bool) (string, bool) {
-	if entries.Symlinks == nil {
-		return "", false
-	}
-	canonicalFileName := tspath.GetCanonicalFileName(fileName, useCaseSensitive)
-	match := ""
-	for _, entryName := range entries.Files {
-		if tspath.GetCanonicalFileName(entryName, useCaseSensitive) != canonicalFileName {
-			continue
-		}
-		if match != "" && match != entryName {
-			return "", false
-		}
-		match = entryName
-	}
-	if match == "" {
-		return "", false
-	}
-	if _, isSymlink := entries.Symlinks[match]; isSymlink {
-		return "", false
-	}
-	// GetAccessibleEntries supplies the filesystem's actual casing. Once its
-	// complete metadata proves this entry is regular, realpath(file) is exactly
-	// realpath(parent) joined with this name.
-	return match, true
-}
-
+// canonicalSourcePathIDs consults the VFS for each unknown file identity.
+// Directory entries can include overlay-only files, whose identities cannot be
+// inferred from the parent's realpath. Callers retain the results across all
+// Programs in this request and seed known identities from the target plan.
 func (index *programFileIndex) canonicalSourcePathIDs(sourcePaths []string) []string {
 	canonicalIDs := make([]string, len(sourcePaths))
-	if len(sourcePaths) == 0 {
-		return canonicalIDs
-	}
-	if index.directoryIdentities == nil {
-		index.directoryIdentities = make(map[string]programDirectoryIdentity)
-	}
-
-	sourceIndexesByDirectoryID := make(map[string][]int)
-	directoryPathByID := make(map[string]string)
-	for i, sourcePath := range sourcePaths {
-		directoryPath := tspath.GetDirectoryPath(sourcePath)
-		directoryID := exactPathID(directoryPath)
-		directoryPathByID[directoryID] = directoryPath
-		sourceIndexesByDirectoryID[directoryID] = append(sourceIndexesByDirectoryID[directoryID], i)
-	}
-
-	directoryIDs := make([]string, 0, len(sourceIndexesByDirectoryID))
-	for directoryID := range sourceIndexesByDirectoryID {
-		directoryIDs = append(directoryIDs, directoryID)
-	}
-	sort.Strings(directoryIDs)
-	pendingIdentities := make([]programDirectoryIdentity, len(directoryIDs))
-	hasPendingIdentity := make([]bool, len(directoryIDs))
-	useCaseSensitive := index.fsys.UseCaseSensitiveFileNames()
-	work := core.NewWorkGroup(index.singleThreaded)
-	queueSource := func(sourceIndex int, directory programDirectoryIdentity) {
-		work.Queue(func() {
-			sourcePath := sourcePaths[sourceIndex]
-			fileName, regular := regularFileNameFromEntries(
-				directory.entries,
-				tspath.GetBaseFileName(sourcePath),
-				useCaseSensitive,
-			)
-			if regular {
-				canonicalIDs[sourceIndex] = exactPathID(
-					tspath.CombinePaths(directory.canonicalPath, fileName),
-				)
-			} else {
-				canonicalIDs[sourceIndex] = canonicalPathID(sourcePath, index.fsys)
-			}
-		})
-	}
-	for directoryIndex, directoryID := range directoryIDs {
-		sourceIndexes := sourceIndexesByDirectoryID[directoryID]
-		directory, cached := index.directoryIdentities[directoryID]
-		if len(sourceIndexes) == 1 && !cached {
-			sourceIndex := sourceIndexes[0]
-			work.Queue(func() {
-				canonicalIDs[sourceIndex] = canonicalPathID(sourcePaths[sourceIndex], index.fsys)
-			})
-			continue
-		}
-		if cached {
-			for _, sourceIndex := range sourceIndexes {
-				queueSource(sourceIndex, directory)
-			}
-		} else {
-			work.Queue(func() {
-				directoryPath := directoryPathByID[directoryID]
-				directory = programDirectoryIdentity{
-					canonicalPath: authoritativePath(directoryPath, index.fsys),
-					entries:       index.fsys.GetAccessibleEntries(directoryPath),
-				}
-				pendingIdentities[directoryIndex] = directory
-				hasPendingIdentity[directoryIndex] = true
-				// Queue per-file work before the directory task returns. A
-				// WorkGroup permits nested Queue calls until RunAndWait has
-				// returned, retaining file-level parallelism without a second
-				// directory-to-file barrier.
-				for _, sourceIndex := range sourceIndexes {
-					queueSource(sourceIndex, directory)
-				}
-			})
-		}
-	}
-	work.RunAndWait()
-	for i, resolved := range hasPendingIdentity {
-		if resolved {
-			index.directoryIdentities[directoryIDs[i]] = pendingIdentities[i]
-		}
-	}
+	runProjectRootIdentityWork(index.singleThreaded, len(sourcePaths), func(sourceIndex int) {
+		canonicalIDs[sourceIndex] = canonicalPathID(sourcePaths[sourceIndex], index.fsys)
+	})
 	return canonicalIDs
 }
 

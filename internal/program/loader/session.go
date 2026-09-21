@@ -1,7 +1,6 @@
-// Package loader assembles run-scoped rslint Programs from configured
-// TypeScript projects and target-plan files. Backend selection and
-// target-to-source binding stay private to this package; callers receive only
-// the unified Program sequence and its lint projection.
+// Package loader selects configured project sources and assembles run-scoped
+// rslint Programs. CLI/API use Session for construction and target binding;
+// LSP uses SelectProjectSources with its own Program lifecycle.
 package loader
 
 import (

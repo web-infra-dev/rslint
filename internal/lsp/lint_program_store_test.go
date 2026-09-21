@@ -642,6 +642,75 @@ func TestLintProgramStoreDoesNotRetainNonContainingFallbackProgram(t *testing.T)
 	}
 }
 
+func TestLintProgramStoreUnselectedProbeDoesNotRegisterDependencyWatchers(t *testing.T) {
+	for _, rejectWatch := range []bool{false, true} {
+		t.Run("rejectWatch="+strconv.FormatBool(rejectWatch), func(t *testing.T) {
+			fixture := newLintProgramStoreFixture(t, "export const first = 1;\n")
+			root := tspath.NormalizePath(fixture.server.cwd)
+			external := tspath.ResolvePath(tspath.NormalizePath(t.TempDir()), "dependency.ts")
+			if err := os.WriteFile(external, []byte("export const dependency = 1;\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			importPath, err := filepath.Rel(filepath.Dir(fixture.sourcePath), external)
+			if err != nil {
+				t.Fatal(err)
+			}
+			firstContent := "import { dependency } from " + strconv.Quote(tspath.NormalizePath(importPath)) + ";\nexport const first = dependency;\n"
+			if err := os.WriteFile(fixture.sourcePath, []byte(firstContent), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			fixture.server.documents[fixture.sourceURI] = firstContent
+			// Separate on-disk project/dependency directories exercise actual
+			// resolution watcher coverage rather than mocked source membership.
+			for name, content := range map[string]string{
+				"second.ts":            "export { target } from './target';\n",
+				"target.ts":            "export const target = 1;\n",
+				"tsconfig.second.json": `{"compilerOptions":{"noLib":true},"files":["second.ts"]}`,
+			} {
+				if err := os.WriteFile(tspath.ResolvePath(root, name), []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			secondConfig := tspath.ResolvePath(root, "tsconfig.second.json")
+			secondURI := documentURIFromPath(tspath.ResolvePath(root, "second.ts"))
+			load, _, finalize := fixture.request(secondURI)
+			warm, _, err := load(secondConfig)
+			finalize()
+			if err != nil || warm == nil || len(fixture.store.programs) != 1 {
+				t.Fatalf("warm second project: program=%v residents=%d error=%v", warm != nil, len(fixture.store.programs), err)
+			}
+			targetPath := tspath.ResolvePath(root, "target.ts")
+			file := lspConfigTarget(targetPath, root, fixture.server.fs)
+			unexpectedWatches := 0
+			selected, found, err := func() (selectedLintProject, bool, error) {
+				request := fixture.store.request(context.Background(), documentURIFromPath(targetPath), file, false)
+				defer request.finalize()
+				// Metadata itself needs coverage even for an unselected project.
+				// Establish it before observing Program dependency registrations.
+				if _, err := request.metadata(fixture.configPath); err != nil {
+					t.Fatal(err)
+				}
+				fixture.store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error {
+					unexpectedWatches++
+					if rejectWatch {
+						return errors.New("unselected dependency watcher must not be registered")
+					}
+					return nil
+				}
+				return selectConfiguredLintProject(
+					[]string{fixture.configPath, secondConfig}, "", file, fixture.server.fs, request.loaders(),
+				)
+			}()
+			if err != nil || !found || selected.configPath != secondConfig || selected.sourceFile == nil {
+				t.Fatalf("imported target selection: found=%v selected=%s error=%v", found, selected.configPath, err)
+			}
+			if unexpectedWatches != 0 || !fixture.store.Usable() || selected.program != warm || len(fixture.store.programs) != 1 {
+				t.Fatalf("non-containing probe changed cache: new watches=%d usable=%v reused=%v residents=%d", unexpectedWatches, fixture.store.Usable(), selected.program == warm, len(fixture.store.programs))
+			}
+		})
+	}
+}
+
 func TestLintProgramStoreConfirmsSharedProjectSelection(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "selection"))
 	if err := os.Symlink("script.js", tspath.ResolvePath(dir, "alias.ts")); err != nil {
