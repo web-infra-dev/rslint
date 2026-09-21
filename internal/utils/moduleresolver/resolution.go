@@ -137,7 +137,9 @@ bases:
 		if strings.Contains(name, `\`) && tspath.GetRootLength(base) == 1 && !tspath.IsRootedDiskPath(name) {
 			continue
 		}
-		if modules.IsNodeBuiltin(name) {
+		// Explicit fallbacks replace the default builtin exemption and must
+		// run after ordinary package lookup, like any other fallback.
+		if modules.IsNodeBuiltin(name) && len(options.Fallbacks) == 0 {
 			resolveError = ""
 			continue
 		}
@@ -457,6 +459,7 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 	}
 	if !json.Valid([]byte(text)) {
 		f.unresolved = true
+		f.failure = Result{Error: "Invalid package.json at " + f.physical(name), terminal: true}
 		return "", false
 	}
 	value, err := hujson.Parse([]byte(text))

@@ -114,7 +114,7 @@ entry points and alias redirects retain their normal lookup behavior.
   instead of declaration order. Use arrays to set priority.
 - Package entry paths containing backslashes are unsupported on Linux and macOS.
   On Windows, relative paths containing backslashes can resolve in rslint but fail upstream.
-- Error messages for invalid `package.json#imports` mappings may differ.
+- Error messages for malformed `package.json` files and invalid imports mappings may differ.
 - Module names containing `\uD800` may show `�` in diagnostics.
 - Disabled wildcard aliases only ignore matching modules; upstream may also ignore
   unrelated modules. Use exact alias names for consistent results.

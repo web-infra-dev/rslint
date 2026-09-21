@@ -168,7 +168,7 @@ func resolveImport(p *program.Program, name, fileName string, typeOnly bool, opt
 		return moduleresolver.Result{Path: name}
 	}
 	moduleName, _ := ImportModuleName(name)
-	if moduleName == "" {
+	if moduleName == "" && !modules.IsNodeBuiltin(name) {
 		if options.MainFields == nil {
 			options.MainFields = []moduleresolver.MainField{}
 		}

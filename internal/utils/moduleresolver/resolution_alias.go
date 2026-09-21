@@ -81,7 +81,7 @@ func (resolver *nodeResolver) resolve(name string) (result Result) {
 		}
 	}
 
-	if modules.IsNodeBuiltin(request) && len(resolver.options.AliasFields) == 0 {
+	if modules.IsNodeBuiltin(request) && len(resolver.options.AliasFields) == 0 && len(resolver.options.Fallbacks) == 0 {
 		return Result{}
 	}
 	result = resolver.resolveRequest(name)

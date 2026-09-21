@@ -101,8 +101,8 @@ entry points and alias redirects retain their normal lookup behavior.
 - `resolverConfig` options not listed above, including `symlinks`, are not supported.
 - Overlapping object-form `alias` and `fallback` entries use alphabetical priority
   instead of declaration order. Use arrays to set priority.
-- Error messages for invalid `package.json#imports` mappings and circular aliases
-  may differ.
+- Error messages for malformed `package.json` files, invalid imports mappings,
+  and circular aliases may differ.
 
 ## References
 

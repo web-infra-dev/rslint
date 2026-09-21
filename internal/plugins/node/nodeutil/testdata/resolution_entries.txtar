@@ -7,6 +7,14 @@ require('bare');
 {"name":"entry-app","browser":{"bare":"./src/browser.js","disabled":"./src/browser.js","fs":"./src/browser.js","./src/server.js":"./src/browser.js","src/server.js":"./src/alternate.js","./src/without-extension":"./src/browser.js","./src/disabled.js":false,"./src/identical.js":"./src/identical.js","./src/missing-mapping.js":"./not-found.js","loop-a":"loop-b","loop-b":"loop-a","./src/absent.js":false,"query":"./src/browser.js?mapped","./src/entry.js":"./src/from-root.js"},"alternate":{"./src/server.js":"./src/alternate.js","./src/missing-mapping.js":"./src/alternate.js"},"nested":{"aliases":{"bare":"./src/alternate.js"}},"imports":{"#dir":"./plain","#entry":"./src/server.js","#dep":"pkg-entry"}}
 -- src/server.js --
 module.exports = 1;
+-- node_modules/bad/package.json --
+{broken
+-- node_modules/bad/index.js --
+module.exports = 1;
+-- builtin-package/input.js --
+require('fs');
+-- builtin-package/node_modules/fs/index.js --
+module.exports = 1;
 -- src/no-extension --
 module.exports = 1;
 -- self/input.js --
