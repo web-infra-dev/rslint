@@ -2,7 +2,7 @@
 
 - **Type:** `object`
 
-Configures the JavaScript language environment and TypeScript project information for matching files. Nested language options from matching entries merge recursively; later arrays and scalar values replace earlier values. Ordinary explicit-project loading retains the separate [owner declaration list](#languageoptionsparseroptionsproject) described below.
+Configures the JavaScript language environment and TypeScript project information for matching files. Nested language options from matching entries merge recursively; later arrays and scalar values replace earlier values. Ordinary lint uses the resulting [project value](#languageoptionsparseroptionsproject) described below.
 
 ## languageOptions.ecmaVersion
 
