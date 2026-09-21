@@ -11,6 +11,11 @@ import { recommended as jsRecommended } from './javascript.js';
 import { recommended as reactRecommended } from './react.js';
 import { recommended as reactHooksRecommended } from './react-hooks.js';
 import { recommended as importRecommended } from './import.js';
+import {
+  createRecommended as createNodeRecommended,
+  recommendedModule as nodeRecommendedModule,
+  recommendedScript as nodeRecommendedScript,
+} from './node.js';
 import { recommended as promiseRecommended } from './promise.js';
 import { recommended as jestRecommended, style as jestStyle } from './jest.js';
 import { recommended as rstestRecommended } from './rstest.js';
@@ -43,6 +48,16 @@ export const reactHooksPlugin = {
 
 export const importPlugin = {
   configs: { recommended: importRecommended },
+};
+
+export const nodePlugin = {
+  configs: {
+    get recommended() {
+      return createNodeRecommended();
+    },
+    recommendedModule: nodeRecommendedModule,
+    recommendedScript: nodeRecommendedScript,
+  },
 };
 
 export const promisePlugin = {

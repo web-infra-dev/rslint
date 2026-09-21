@@ -796,6 +796,15 @@ Available presets currently include:
 - `js.configs.recommended`
 - `reactPlugin.configs.recommended`
 - `importPlugin.configs.recommended`
+- `nodePlugin.configs.recommended`, `recommendedModule`, and `recommendedScript`
+
+The Node presets map eslint-plugin-n's rules onto the native `node/*` prefix.
+Their globals are loaded only when the selected entry's language options are
+read. `nodePlugin.configs.recommended` is a getter that selects the default
+module kind from the nearest valid `package.json` above the process working
+directory and returns ordinary flat entries with `.cjs` and `.mjs` overrides.
+Config matching and rule execution continue through the shared Go resolver;
+the preset does not infer module kinds per lint target.
 
 #### Legacy JSON Migration
 
