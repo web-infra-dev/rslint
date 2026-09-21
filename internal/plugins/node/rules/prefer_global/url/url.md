@@ -8,10 +8,15 @@ Enforces consistent use of the global `URL` or the `URL` export from Node.js's
 - `"always"` (default): use the global `URL`.
 - `"never"`: use `URL` from `url` or `node:url`.
 
+Configure Node.js globals when enabling the rule:
+
 ```javascript
+import { globals } from "@rslint/core";
+
 export default [
   {
     plugins: ["node"],
+    languageOptions: { globals: globals.node },
     rules: {
       "node/prefer-global/url": ["error", "always"],
     },
