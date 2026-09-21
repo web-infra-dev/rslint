@@ -1,0 +1,148 @@
+Package metadata from eslint-plugin-n v18.3.0.
+-- package.json --
+{}
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"target":"ESNext","module":"ESNext"},"include":["**/*.js","**/*.ts","**/*.tsx"]}
+-- dev-engines-array-gte-7.5.0/package.json --
+{
+    "name": "test",
+    "devEngines": {
+        "runtime": [
+            {
+                "name": "deno",
+                "version": ">=1.0.0"
+            },
+            {
+                "name": "node",
+                "version": ">=7.5.0"
+            }
+        ]
+    }
+}
+-- dev-engines-gte-7.5.0/package.json --
+{
+    "name": "test",
+    "devEngines": {
+        "runtime": {
+            "name": "node",
+            "version": ">=7.5.0"
+        }
+    }
+}
+-- dev-engines-non-node/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": ">=7.5.0"
+    },
+    "devEngines": {
+        "runtime": {
+            "name": "deno",
+            "version": ">=1.0.0"
+        }
+    }
+}
+-- dev-engines-non-node-only/package.json --
+{
+    "name": "test",
+    "devEngines": {
+        "runtime": {
+            "name": "deno",
+            "version": ">=1.0.0"
+        }
+    }
+}
+-- engines-over-dev-engines/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": ">=4.0.0"
+    },
+    "devEngines": {
+        "runtime": {
+            "name": "node",
+            "version": ">=7.5.0"
+        }
+    }
+}
+-- gte-0.12.8/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": ">=0.12.8"
+    }
+}
+-- gte-4.0.0/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": ">=4.0.0"
+    }
+}
+-- gte-4.4.0-lt-5.0.0/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": ">=4.4.0 <5.0.0"
+    }
+}
+-- gte-7.10.0/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": ">=7.10.0"
+    }
+}
+-- gte-7.5.0/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": ">=7.5.0"
+    }
+}
+-- gte-7.6.0/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": ">=7.6.0"
+    }
+}
+-- hat-4.1.2/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": "^4.1.2"
+    }
+}
+-- invalid/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": "foo-bar"
+    }
+}
+-- lt-6.0.0/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": "<6.0.0"
+    }
+}
+-- nothing/package.json --
+{
+    "name": "test"
+}
+-- star/package.json --
+{
+    "name": "test",
+    "engines": {
+        "node": "*"
+    }
+}
+-- without-node/package.json --
+{
+    "name": "test",
+    "engines": {
+        "vscode": "foo"
+    }
+}
