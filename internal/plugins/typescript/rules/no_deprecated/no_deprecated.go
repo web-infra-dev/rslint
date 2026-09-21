@@ -2019,7 +2019,15 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 					if bindingElement.PropertyName == nil {
 						return false
 					}
-					return bindingElement.PropertyName.Text() != node.Text()
+					// A computed key carries no text of its own. When it folds
+					// to a constant the rename check still applies; when it
+					// does not, the local name cannot be a reference to the
+					// property it came from, so it is a declaration.
+					propertyName, known := utils.GetStaticPropertyName(bindingElement.PropertyName)
+					if !known {
+						return true
+					}
+					return propertyName != node.Text()
 				}
 				return false
 			case ast.KindClassExpression:

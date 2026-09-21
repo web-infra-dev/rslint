@@ -688,6 +688,7 @@ Unregisterations
 Unregistration
 unrepresentable
 unrooted
+unscopables
 unshadowed
 unshift
 unspaced
