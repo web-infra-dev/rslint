@@ -73,7 +73,7 @@ export default [
   An empty array disables extension guessing.
 - `resolverConfig` supports `modules`, `alias`, `fallback`, `fullySpecified`,
   `extensions`, `extensionAlias`, `conditionNames`, `mainFields`, `mainFiles`, and
-  `aliasFields`, as described for [no-missing-import](../no_missing_import/no_missing_import.md).
+  `aliasFields`, as described for [no-missing-import](/rules/node/no-missing-import).
 
 Except for `ignoreTypeImport` and `ignorePrivate`, these options can also be
 supplied through `settings.node`. Rule options take precedence over shared
@@ -103,7 +103,7 @@ Compared with `eslint-plugin-n` v18.3.0:
   failing lint.
 - `resolverConfig` options not listed above, including `symlinks`, are not supported.
 
-See [no-missing-import](../no_missing_import/no_missing_import.md#differences-from-upstream)
+See [no-missing-import](/rules/node/no-missing-import#differences-from-upstream)
 for shared module-resolution differences.
 
 ## References

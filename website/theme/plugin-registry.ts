@@ -120,8 +120,21 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
   {
     prefix: 'node',
     group: 'eslint-plugin-node',
-    importName: '',
-    presets: [],
+    importName: 'nodePlugin',
+    presets: [
+      {
+        name: 'nodePlugin.configs.recommended',
+        description: 'Node.js rules for mixed CommonJS and ES modules',
+      },
+      {
+        name: 'nodePlugin.configs.recommendedModule',
+        description: 'Node.js rules for ES modules',
+      },
+      {
+        name: 'nodePlugin.configs.recommendedScript',
+        description: 'Node.js rules for CommonJS',
+      },
+    ],
   },
   {
     prefix: 'promise',

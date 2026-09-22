@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, test, expect } from 'rstack/test';
 import { normalizeConfig } from '@rslint/core/config-loader';
 import { lint } from '@rslint/core/internal';
@@ -10,9 +11,11 @@ import {
   js,
   reactPlugin,
   importPlugin,
+  nodePlugin,
   rstestPlugin,
   unicornPlugin,
 } from '@rslint/core';
+import { createTempDir, cleanupTempDir, runRslint } from './helpers.js';
 
 describe('defineConfig and config presets', () => {
   test('defineConfig should be importable and return input as-is', () => {
@@ -38,6 +41,9 @@ describe('defineConfig and config presets', () => {
     expect(reactPlugin.configs.recommended).toBeDefined();
     expect(importPlugin).toBeDefined();
     expect(importPlugin.configs.recommended).toBeDefined();
+    expect(nodePlugin.configs.recommended).toBeDefined();
+    expect(nodePlugin.configs.recommendedModule).toBeDefined();
+    expect(nodePlugin.configs.recommendedScript).toBeDefined();
     expect(rstestPlugin).toBeDefined();
     expect(rstestPlugin.configs.recommended).toBeDefined();
     expect(unicornPlugin).toBeDefined();
@@ -50,6 +56,7 @@ describe('defineConfig and config presets', () => {
       js,
       reactPlugin,
       importPlugin,
+      nodePlugin,
       rstestPlugin,
       unicornPlugin,
     ]) {
@@ -235,4 +242,321 @@ describe('defineConfig and config presets', () => {
     expect(result.fileCount).toBe(1);
     expect(result.diagnostics).toEqual([]);
   });
+});
+
+describe('Node presets', () => {
+  interface Diagnostic {
+    ruleName: string;
+    filePath: string;
+    message: string;
+  }
+
+  // Temporary projects have no installed dependencies. Resolve the public
+  // entry from this workspace before loading it in the CLI subprocess.
+  const coreEntry = JSON.stringify(
+    pathToFileURL(require.resolve('@rslint/core')).href,
+  );
+  const nodeConfig = `
+    import { defineConfig, nodePlugin } from ${coreEntry};
+    export default defineConfig([
+      nodePlugin.configs.recommended,
+      { rules: { 'no-undef': 'error' } },
+    ]);
+  `;
+
+  function diagnostics(stdout: string): Diagnostic[] {
+    return stdout
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Diagnostic);
+  }
+
+  test.each(['module', 'commonjs'])(
+    'recommended runs every ported upstream rule in a %s package',
+    async (type) => {
+      const files = {
+        'imports.mjs': `import './missing.js'; import 'extra'; import 'dev';`,
+        'requires.cjs': `require('./missing.js'); require('extra'); require('dev');`,
+        'deprecated.js': 'new Buffer(0);',
+        'exports.cjs': 'exports = {};',
+        'exit.js': 'process.exit();',
+        'syntax.js': 'const value = object?.value;',
+        'builtins.js': 'Object.fromEntries([]);',
+        'node-builtins.js': `process.getBuiltinModule('fs');`,
+        'bin.js': `console.log('ok');`,
+      };
+      const directory = await createTempDir({
+        ...files,
+        'package.json': JSON.stringify({
+          name: 'node-presets-fixture',
+          version: '1.0.0',
+          type,
+          engines: { node: '>=10.0.0' },
+          devDependencies: { dev: '1.0.0' },
+          bin: { fixture: 'bin.js' },
+        }),
+        'node_modules/extra/package.json': '{"name":"extra","main":"index.js"}',
+        'node_modules/extra/index.js': '',
+        'node_modules/dev/package.json': '{"name":"dev","main":"index.js"}',
+        'node_modules/dev/index.js': '',
+        'rslint.config.mjs': `
+          import { defineConfig, nodePlugin } from ${coreEntry};
+          export default defineConfig([nodePlugin.configs.recommended]);
+        `,
+      });
+      try {
+        const result = await runRslint(
+          ['--format', 'jsonline', ...Object.keys(files)],
+          directory,
+        );
+        expect(result.exitCode, result.stderr).toBe(1);
+        expect(result.stdout, result.stderr).not.toBe('');
+        const reports = diagnostics(result.stdout);
+        const expected = {
+          'imports.mjs': [
+            'node/no-extraneous-import',
+            'node/no-missing-import',
+            'node/no-unpublished-import',
+          ],
+          'requires.cjs': [
+            'node/no-extraneous-require',
+            'node/no-missing-require',
+            'node/no-unpublished-require',
+          ],
+          'deprecated.js': ['node/no-deprecated-api'],
+          'exports.cjs': ['node/no-exports-assign'],
+          'exit.js': ['node/no-process-exit'],
+          'syntax.js': ['node/no-unsupported-features/es-syntax'],
+          'builtins.js': [
+            'node/no-unsupported-features/es-builtins',
+            'node/no-unsupported-features/es-syntax',
+          ],
+          'node-builtins.js': ['node/no-unsupported-features/node-builtins'],
+          'bin.js': ['node/hashbang'],
+        };
+        for (const [file, rules] of Object.entries(expected)) {
+          expect(
+            reports
+              .filter((report) => path.basename(report.filePath) === file)
+              .map((report) => report.ruleName)
+              .sort(),
+            file,
+          ).toEqual(rules);
+        }
+        expect(reports).toHaveLength(14);
+        // The diagnostic set covers every enabled rule, including nested names.
+        expect(
+          [...new Set(reports.map((report) => report.ruleName))].sort(),
+        ).toEqual(
+          Object.keys(nodePlugin.configs.recommendedModule.rules ?? {}).sort(),
+        );
+      } finally {
+        await cleanupTempDir(directory);
+      }
+    },
+  );
+
+  test.each(['module', 'commonjs', undefined])(
+    'recommended selects globals and extension overrides with package type %s',
+    async (type) => {
+      const files = [
+        'input.js',
+        'input.mjs',
+        'input.cjs',
+        'nested/.input.mjs',
+        'nested/.input.cjs',
+      ];
+      const directory = await createTempDir({
+        'package.json': JSON.stringify({ type }),
+        'rslint.config.mjs': nodeConfig,
+        ...Object.fromEntries(
+          files.map((file) => [file, `require('./missing.js');`]),
+        ),
+      });
+      try {
+        const result = await runRslint(
+          ['--format', 'jsonline', ...files],
+          directory,
+        );
+        expect(result.exitCode, result.stderr).toBe(1);
+        expect(result.stdout, result.stderr).not.toBe('');
+        const reports = diagnostics(result.stdout);
+        expect(reports).toHaveLength(files.length);
+        for (const file of files) {
+          const isModule =
+            file.endsWith('.mjs') ||
+            (file.endsWith('.js') && type === 'module');
+          expect(
+            reports.find(
+              (report) =>
+                path.normalize(report.filePath) === path.normalize(file),
+            ),
+          ).toMatchObject({
+            ruleName: isModule ? 'no-undef' : 'node/no-missing-require',
+          });
+        }
+      } finally {
+        await cleanupTempDir(directory);
+      }
+    },
+  );
+
+  test.each([
+    {
+      name: 'ancestor module package',
+      parent: '{"type":"module"}',
+      child: undefined,
+      module: true,
+    },
+    {
+      name: 'nearest package without type',
+      parent: '{"type":"module"}',
+      child: '{}',
+      module: false,
+    },
+    {
+      name: 'malformed package',
+      parent: '{"type":"module"}',
+      child: '{',
+      module: true,
+    },
+    {
+      name: 'non-object package',
+      parent: '{"type":"module"}',
+      child: 'null',
+      module: true,
+    },
+    {
+      name: 'array package',
+      parent: '{"type":"module"}',
+      child: '[]',
+      module: true,
+    },
+    {
+      name: 'no project package',
+      parent: undefined,
+      child: undefined,
+      module: false,
+    },
+  ])(
+    'recommended handles $name from the working directory',
+    async ({ parent, child, module }) => {
+      const directory = await createTempDir({
+        // Stop package lookup at the fixture boundary.
+        'package.json': '{"type":"commonjs"}',
+        ...(parent === undefined ? {} : { 'project/package.json': parent }),
+        ...(child === undefined
+          ? {}
+          : { 'project/nested/package.json': child }),
+        'project/rslint.config.mjs': nodeConfig,
+        'project/nested/input.js': `require('./missing.js');`,
+      });
+      try {
+        const result = await runRslint(
+          [
+            '--config',
+            path.join(directory, 'project', 'rslint.config.mjs'),
+            '--format',
+            'jsonline',
+            'input.js',
+          ],
+          path.join(directory, 'project', 'nested'),
+        );
+        expect(result.exitCode, result.stderr).toBe(1);
+        expect(result.stdout, result.stderr).not.toBe('');
+        expect(
+          diagnostics(result.stdout).map((report) => report.ruleName),
+        ).toEqual([module ? 'no-undef' : 'node/no-missing-require']);
+      } finally {
+        await cleanupTempDir(directory);
+      }
+    },
+  );
+
+  test.each([
+    ['recommendedModule', 'input.cjs'],
+    ['recommendedScript', 'input.mjs'],
+  ] as const)(
+    '%s applies globals and scopes even to %s',
+    async (name, filename) => {
+      const directory = import.meta.dirname;
+      const result = await lint({
+        configDirectory: directory,
+        workingDirectory: directory,
+        config: normalizeConfig(
+          defineConfig([
+            { languageOptions: { globals: globals.node } },
+            nodePlugin.configs[name],
+            {
+              rules: {
+                'no-undef': 'error',
+                'no-global-assign': 'error',
+                'no-invalid-this': 'error',
+              },
+            },
+          ]),
+        ),
+        fileContents: {
+          [path.join(directory, filename)]: `
+          console.log(process, Buffer, Promise, WeakRef, __dirname, __filename, require, module, exports);
+          exports = {};
+          require = 1;
+          function receiver() { return this; }
+        `,
+        },
+      });
+      expect(result.fileCount).toBe(1);
+      const ruleNames = result.diagnostics
+        .map((report) => report.ruleName)
+        .sort();
+      expect(ruleNames).toEqual(
+        name === 'recommendedModule'
+          ? [...Array<string>(7).fill('no-undef'), 'no-invalid-this'].sort()
+          : ['no-global-assign', 'node/no-exports-assign'],
+      );
+    },
+  );
+
+  test.each([
+    ['recommendedModule', 1],
+    ['recommendedScript', 2],
+  ] as const)(
+    '%s preserves its syntax ignores through normalization and native option parsing',
+    async (name, count) => {
+      const directory = import.meta.dirname;
+      const result = await lint({
+        configDirectory: directory,
+        workingDirectory: directory,
+        config: normalizeConfig(
+          defineConfig([
+            nodePlugin.configs.recommendedModule,
+            nodePlugin.configs[name],
+            {
+              // Both inputs are modules so this isolates the rule's ignores option.
+              languageOptions: { sourceType: 'module' },
+              settings: { node: { version: '10.0.0' } },
+            },
+          ]),
+        ),
+        fileContents: {
+          [path.join(directory, 'syntax.mjs')]:
+            'export const value = object?.value;',
+        },
+      });
+      expect(result.fileCount).toBe(1);
+      expect(result.diagnostics).toHaveLength(count);
+      expect(
+        result.diagnostics.every(
+          (report) =>
+            report.ruleName === 'node/no-unsupported-features/es-syntax',
+        ),
+      ).toBe(true);
+      expect(
+        result.diagnostics.some((report) =>
+          report.message.includes("'modules'"),
+        ),
+      ).toBe(name === 'recommendedScript');
+    },
+  );
 });

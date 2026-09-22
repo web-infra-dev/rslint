@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'rstack/test';
 import { globals } from '@rslint/core';
+import { pathToFileURL } from 'node:url';
 import {
   runRslint,
   createTempDir,
@@ -92,9 +93,12 @@ async function lintUndefinedWithFlatGlobals({
 }
 
 async function lintWithImportedGlobals(): Promise<string[]> {
+  const coreEntry = JSON.stringify(
+    pathToFileURL(require.resolve('@rslint/core')).href,
+  );
   const tempDir = await createTempDir({
     'rslint.config.mjs': `
-      import { globals } from '@rslint/core';
+      import { globals } from ${coreEntry};
       export default [
         {
           files: ['**/*.js'],
@@ -107,6 +111,7 @@ async function lintWithImportedGlobals(): Promise<string[]> {
   });
   try {
     const result = await runRslint(['--format', 'jsonline'], tempDir);
+    expect(result.exitCode, result.stderr).toBe(0);
     return result.stdout
       .trim()
       .split('\n')
