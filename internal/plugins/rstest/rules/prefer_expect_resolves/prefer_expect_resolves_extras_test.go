@@ -22,6 +22,8 @@ func TestRstestResolvesExtras(t *testing.T) {
 		"expect(await 1).toBe(1);",
 		"declare function fail(): never; expect(await fail()).toBe(1);",
 		"declare const p: Promise<number> | number; expect(await p).toBe(1);",
+		"declare const p: { then?: (resolve: (value: number) => void) => void }; expect(await p).toBeDefined();",
+		"declare const p: { then: ((resolve: (value: number) => void) => void) | undefined }; expect(await p).toBeDefined();",
 		"import { expect } from 'vitest'; expect(await p).toBe(1);",
 		"function run(expect: any) { expect(await p).toBe(1); }",
 		"let { expect } = require('@rstest/core'); expect = replacement; expect(await p).toBe(1);",

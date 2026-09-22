@@ -48,5 +48,29 @@ func TestPreferExpectResolvesExtras(t *testing.T) {
 				{MessageId: "expectResolves", Line: 5, Column: 19, EndColumn: 34},
 			},
 		},
+		{
+			Code: `
+        declare const value: { then?: (resolve: (value: number) => void) => void };
+        async function check() {
+          expect(await value).toBeDefined();
+        }
+      `,
+			TSConfig: "tsconfig.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "expectResolves", Line: 4, Column: 18, EndColumn: 29},
+			},
+		},
+		{
+			Code: `
+        declare const value: { then: ((resolve: (value: number) => void) => void) | undefined };
+        async function check() {
+          expect(await value).toBeDefined();
+        }
+      `,
+			TSConfig: "tsconfig.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "expectResolves", Line: 4, Column: 18, EndColumn: 29},
+			},
+		},
 	})
 }

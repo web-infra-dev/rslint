@@ -11,6 +11,7 @@ var PreferExpectResolvesRule = shared.NewRule(shared.Config{
 	Name:              "rstest/prefer-expect-resolves",
 	Message:           rule.RuleMessage{Id: "expectResolves", Description: "Use `expect().resolves` instead"},
 	RequirePromise:    true,
+	StrictPromise:     true,
 	ConservativeEdits: true,
 	Prepare: func(ctx rule.RuleContext) func(*ast.Node) *shared.ExpectCall {
 		analysis := rstest.GetRstestCallAnalysis(ctx)

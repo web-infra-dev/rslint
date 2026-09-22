@@ -11,8 +11,9 @@ import (
 )
 
 var PreferExpectResolvesRule = shared.NewRule(shared.Config{
-	Name:    "jest/prefer-expect-resolves",
-	Message: rule.RuleMessage{Id: "expectResolves", Description: "Use `await expect(...).resolves instead"},
+	Name:          "jest/prefer-expect-resolves",
+	Message:       rule.RuleMessage{Id: "expectResolves", Description: "Use `await expect(...).resolves instead"},
+	StrictPromise: true,
 	Prepare: func(ctx rule.RuleContext) func(*ast.Node) *shared.ExpectCall {
 		return func(node *ast.Node) *shared.ExpectCall {
 			parsed := jest.ParseJestFnCall(node, ctx)

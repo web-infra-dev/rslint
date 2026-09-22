@@ -22,6 +22,7 @@ type Config struct {
 	Name              string
 	Message           rule.RuleMessage
 	RequirePromise    bool
+	StrictPromise     bool
 	ConservativeEdits bool
 	Prepare           func(rule.RuleContext) func(*ast.Node) *ExpectCall
 }
@@ -48,9 +49,14 @@ func NewRule(config Config) rule.Rule {
 				promise := false
 				if config.RequirePromise {
 					known := false
-					known, promise = promiseType(ctx, subject)
+					known, promise = promiseType(ctx, subject, config.StrictPromise)
 					if known && !promise {
 						return
+					}
+				} else if config.StrictPromise && ctx.TypeChecker != nil {
+					known, strictPromise := promiseType(ctx, subject, true)
+					if known && !strictPromise {
+						call.Editable = false
 					}
 				}
 				build := func() []rule.RuleFix {
@@ -79,7 +85,7 @@ func NewRule(config Config) rule.Rule {
 
 // A union must be entirely thenable. Await accepts scalars, but resolves does
 // not. Unknown/error types retain the syntax diagnostic without an autofix.
-func promiseType(ctx rule.RuleContext, subject *ast.Node) (known, promise bool) {
+func promiseType(ctx rule.RuleContext, subject *ast.Node, strict bool) (known, promise bool) {
 	if ctx.TypeChecker == nil {
 		return false, false
 	}
@@ -102,11 +108,70 @@ func promiseType(ctx rule.RuleContext, subject *ast.Node) (known, promise bool) 
 		}
 	}
 	for _, part := range utils.UnionTypeParts(typ) {
+		if strict {
+			if !strictThenableType(ctx.TypeChecker, subject, part) {
+				return true, false
+			}
+			continue
+		}
 		if !utils.IsThenableType(ctx.TypeChecker, subject, part) {
 			return true, false
 		}
 	}
 	return true, true
+}
+
+func strictThenableType(typeChecker *checker.Checker, node *ast.Node, typ *checker.Type) bool {
+	if utils.IsTypeParameter(typ) {
+		constraint := checker.Checker_getBaseConstraintOfType(typeChecker, typ)
+		return constraint != nil && strictThenableType(typeChecker, node, constraint)
+	}
+	if utils.IsUnionType(typ) {
+		for _, part := range utils.UnionTypeParts(typ) {
+			if !strictThenableType(typeChecker, node, part) {
+				return false
+			}
+		}
+		return true
+	}
+	if utils.IsIntersectionType(typ) {
+		for _, part := range utils.IntersectionTypeParts(typ) {
+			if strictThenableType(typeChecker, node, part) {
+				return true
+			}
+		}
+		return false
+	}
+	apparent := checker.Checker_getApparentType(typeChecker, typ)
+	then := checker.Checker_getPropertyOfType(typeChecker, apparent, "then")
+	if then == nil || then.Flags&ast.SymbolFlagsOptional != 0 {
+		return false
+	}
+	thenType := typeChecker.GetTypeOfSymbolAtLocation(then, node)
+	if thenType == nil {
+		return false
+	}
+	for _, subTypePart := range utils.UnionTypeParts(thenType) {
+		if subTypePart.Flags()&(checker.TypeFlagsUndefined|checker.TypeFlagsNull|checker.TypeFlagsVoid|checker.TypeFlagsNever) != 0 {
+			return false
+		}
+		signatures := checker.Checker_getSignaturesOfType(typeChecker, subTypePart, checker.SignatureKindCall)
+		if len(signatures) == 0 {
+			return false
+		}
+		hasCallbackSignature := false
+		for _, signature := range signatures {
+			parameters := checker.Signature_parameters(signature)
+			if len(parameters) != 0 && utils.IsCallback(typeChecker, parameters[0], node) {
+				hasCallbackSignature = true
+				break
+			}
+		}
+		if !hasCallbackSignature {
+			return false
+		}
+	}
+	return true
 }
 
 // Literal arguments cannot observe the promise settling or execute user code.
