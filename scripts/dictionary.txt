@@ -763,3 +763,4 @@ Swatinem
 CBOR
 allowjs
 projectservice
+vuesfc
