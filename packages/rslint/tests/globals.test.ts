@@ -142,4 +142,43 @@ describe('built-in globals catalog', () => {
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout.trim()).toBe('LAZY_GLOBALS_OK');
   });
+
+  test.each(['recommended', 'recommendedModule', 'recommendedScript'])(
+    'Node preset %s loads only its bundled globals',
+    (name) => {
+      const script = String.raw`
+      import assert from 'node:assert/strict';
+      import { createRequire } from 'node:module';
+      const require = createRequire(import.meta.url);
+      const loaded = () => Object.keys(require.cache)
+        .filter((file) => file.replaceAll('\\', '/').includes('/globals/'))
+        .map((file) => file.replaceAll('\\', '/').split('/').at(-1))
+        .sort();
+
+      const { defineConfig, nodePlugin } = await import(${JSON.stringify(pathToFileURL(DIST_INDEX).href)});
+      assert.deepEqual(loaded(), []);
+      const config = defineConfig([nodePlugin.configs[${JSON.stringify(name)}]]);
+      assert.deepEqual(loaded(), []);
+
+      const { normalizeConfig } = await import(${JSON.stringify(pathToFileURL(path.join(DIST_ROOT, 'config-loader.js')).href)});
+      const serialized = JSON.parse(JSON.stringify(normalizeConfig(config)));
+      assert.equal(serialized.length, ${name === 'recommended' ? 3 : 1});
+      for (const entry of serialized) {
+        assert.equal(entry.languageOptions.globals.process, false);
+        assert.equal(entry.languageOptions.globals.Promise, false);
+        assert.equal(entry.languageOptions.globals.exports,
+          entry.languageOptions.sourceType === 'module' ? 'off' : 'writable');
+      }
+      assert.deepEqual(loaded(), ['es2021.json', 'node.json']);
+      console.log('NODE_PRESET_GLOBALS_OK');
+    `;
+      const result = spawnSync(
+        process.execPath,
+        ['--input-type=module', '-e', script],
+        { cwd: DIST_ROOT, encoding: 'utf8' },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout.trim()).toBe('NODE_PRESET_GLOBALS_OK');
+    },
+  );
 });

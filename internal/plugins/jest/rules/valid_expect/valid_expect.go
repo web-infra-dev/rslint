@@ -28,8 +28,6 @@ type asyncDescriptor struct {
 	promiseWrapped bool
 }
 
-const expectParseReasonMatcherNotCalled = "matcher-not-called"
-
 func pluralSuffix(amount int) string {
 	if amount == 1 {
 		return ""
@@ -167,47 +165,6 @@ func readIntOption(options map[string]interface{}, key string, defaultValue int)
 	}
 }
 
-func resolveExpectName(node *ast.Node, localName string, ctx rule.RuleContext) string {
-	name, _, _ := utils.ResolveJestFunctionReference(node, localName, nil, ctx)
-	if name == "" {
-		return ""
-	}
-	return utils.ApplyGlobalJestAlias(name, ctx.Settings)
-}
-
-func parseExpectCallWithReason(node *ast.Node, ctx rule.RuleContext) (*utils.ParsedJestFnCall, string) {
-	parsed := utils.ParseJestFnCall(node, ctx)
-	if parsed != nil {
-		if parsed.Kind == utils.JestFnTypeExpect {
-			return parsed, utils.ExpectParseReasonNone
-		}
-		return nil, utils.ExpectParseReasonNone
-	}
-
-	if node == nil || node.Kind != ast.KindCallExpression {
-		return nil, utils.ExpectParseReasonNone
-	}
-
-	entries := utils.GetJestFnMemberEntries(node)
-	if len(entries) == 0 {
-		return nil, utils.ExpectParseReasonNone
-	}
-
-	if resolveExpectName(node, entries[0].Name, ctx) != "expect" {
-		return nil, utils.ExpectParseReasonNone
-	}
-
-	_, _, reason := utils.FindExpectModifiersAndMatcher(entries[1:])
-	if reason == utils.ExpectParseReasonMatcherNotFound && utils.IsMemberAccessNode(node.Parent) {
-		reason = expectParseReasonMatcherNotCalled
-	}
-	if reason != utils.ExpectParseReasonNone && utils.FindTopMostCallExpression(node) != node {
-		return nil, utils.ExpectParseReasonNone
-	}
-
-	return nil, reason
-}
-
 func shouldBeAwaited(parsed *utils.ParsedJestFnCall, asyncMatchers []string) bool {
 	for _, modifier := range parsed.Modifiers {
 		if modifier != "not" {
@@ -299,13 +256,14 @@ var ValidExpectRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
+		analysis := utils.GetJestCallAnalysis(ctx)
 		arrayExceptions := map[string]bool{}
 		asyncInserted := map[*ast.Node]bool{}
 		var descriptors []asyncDescriptor
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				parsed, reason := parseExpectCallWithReason(node, ctx)
+				parsed, reason := analysis.ParseExpectCallWithReason(node)
 				if parsed == nil {
 					if reason == "" {
 						return
@@ -322,7 +280,7 @@ var ValidExpectRule = rule.Rule{
 					switch reason {
 					case utils.ExpectParseReasonMatcherNotFound:
 						ctx.ReportNode(reportNode, buildErrorMatcherNotFoundMessage())
-					case expectParseReasonMatcherNotCalled:
+					case utils.ExpectParseReasonMatcherNotCalled:
 						entries := utils.GetJestFnMemberEntries(reportNode)
 						last := entries[len(entries)-1]
 						if utils.EXPECT_MODIFIER_NAMES[last.Name] {

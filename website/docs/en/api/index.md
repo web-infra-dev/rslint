@@ -29,6 +29,7 @@ An upstream mapping describes the compatibility source, not a byte-for-byte copy
 | [`reactPlugin`](/api/presets/react-plugin)            | React                                               |
 | [`reactHooksPlugin`](/api/presets/react-hooks-plugin) | React Hooks                                         |
 | [`importPlugin`](/api/presets/import-plugin)          | Imports                                             |
+| [`nodePlugin`](/api/presets/node-plugin)              | Node.js                                             |
 | [`promisePlugin`](/api/presets/promise-plugin)        | Promises                                            |
 | [`jestPlugin`](/api/presets/jest-plugin)              | Jest                                                |
 | [`rstestPlugin`](/api/presets/rstest-plugin)          | Rstest                                              |

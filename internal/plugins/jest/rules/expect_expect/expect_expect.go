@@ -18,19 +18,20 @@ var ExpectExpectRule = shared.NewRule(shared.Config{
 	Name:                       "jest/expect-expect",
 	DefaultAssertFunctionNames: []string{"expect"},
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			ClassifyTest: func(node *ast.Node) shared.TestClassification {
-				jestFn := utils.ParseJestFnCall(node, ctx)
-				if jestFn == nil || jestFn.Kind != utils.JestFnTypeTest {
+				jestFn := analysis.ParseTestCall(node)
+				if jestFn == nil {
 					return shared.TestClassification{}
 				}
 				return shared.TestClassification{IsTest: true, IsTodo: isTodoTestCall(jestFn)}
 			},
 			ResolveNamedCallback: func(callNode *ast.Node) shared.NamedCallback {
-				info := utils.ResolveTestCallbackFunction(ctx, callNode.AsCallExpression())
+				function, name := analysis.TestCallback(callNode)
 				return shared.NamedCallback{
-					DeclarationNode: info.FunctionNode,
-					Name:            info.Name,
+					DeclarationNode: function,
+					Name:            name,
 				}
 			},
 		}

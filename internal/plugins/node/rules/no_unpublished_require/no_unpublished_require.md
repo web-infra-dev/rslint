@@ -78,7 +78,7 @@ export default defineConfig([
   An empty array disables extension guessing.
 - `resolverConfig` supports `modules`, `alias`, `fallback`, `fullySpecified`,
   `extensions`, `extensionAlias`, `conditionNames`, `mainFields`, `mainFiles`, and
-  `aliasFields`, as described for [no-missing-require](../no_missing_require/no_missing_require.md).
+  `aliasFields`, as described for [no-missing-require](/rules/node/no-missing-require).
 
 Except for `ignorePrivate`, these options can also be supplied through
 `settings.node`. Rule options take precedence; legacy `settings.n` takes

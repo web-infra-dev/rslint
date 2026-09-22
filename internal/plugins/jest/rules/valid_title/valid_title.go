@@ -399,10 +399,11 @@ var ValidTitleRule = rule.Rule{
 			}
 			return rule.RuleListeners{}
 		}
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFn := jestUtils.ParseJestFnCall(node, ctx)
+				jestFn := analysis.ParseFnCall(node)
 				if jestFn == nil {
 					return
 				}

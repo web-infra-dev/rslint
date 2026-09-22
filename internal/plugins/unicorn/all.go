@@ -35,6 +35,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_outside_of_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_flat_depth"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_splice_count"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_slice_end"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_iife"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_new_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
@@ -50,6 +51,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_blob_reading_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_date_now"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_dom_node_append"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_global_number_constants"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_identifier_import_export_specifiers"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
@@ -60,6 +62,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_trim_start_end"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_ternary"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_then_catch"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_type_error"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_array_join_separator"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_number_to_fixed_digits_argument"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_post_message_target_origin"
@@ -104,6 +107,7 @@ func GetAllRules() []rule.Rule {
 		no_this_outside_of_class.NoThisOutsideOfClassRule,
 		no_unnecessary_array_flat_depth.NoUnnecessaryArrayFlatDepthRule,
 		no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule,
+		no_unnecessary_slice_end.NoUnnecessarySliceEndRule,
 		no_unreadable_iife.NoUnreadableIifeRule,
 		no_unreadable_new_expression.NoUnreadableNewExpressionRule,
 		no_unsafe_string_replacement.NoUnsafeStringReplacementRule,
@@ -119,6 +123,7 @@ func GetAllRules() []rule.Rule {
 		prefer_blob_reading_methods.PreferBlobReadingMethodsRule,
 		prefer_date_now.PreferDateNowRule,
 		prefer_dom_node_append.PreferDomNodeAppendRule,
+		prefer_global_number_constants.PreferGlobalNumberConstantsRule,
 		prefer_identifier_import_export_specifiers.PreferIdentifierImportExportSpecifiersRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
@@ -128,6 +133,7 @@ func GetAllRules() []rule.Rule {
 		prefer_string_trim_start_end.PreferStringTrimStartEndRule,
 		prefer_then_catch.PreferThenCatchRule,
 		prefer_ternary.PreferTernaryRule,
+		prefer_type_error.PreferTypeErrorRule,
 		require_array_join_separator.RequireArrayJoinSeparatorRule,
 		require_number_to_fixed_digits_argument.RequireNumberToFixedDigitsArgumentRule,
 		require_post_message_target_origin.RequirePostMessageTargetOriginRule,

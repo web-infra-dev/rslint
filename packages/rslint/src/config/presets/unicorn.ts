@@ -161,7 +161,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-unnecessary-global-this': 'error', // not implemented
     // 'unicorn/no-unnecessary-nested-ternary': 'error', // not implemented
     // 'unicorn/no-unnecessary-polyfills': 'error', // not implemented
-    // 'unicorn/no-unnecessary-slice-end': 'error', // not implemented
+    'unicorn/no-unnecessary-slice-end': 'error',
     // 'unicorn/no-unnecessary-splice': 'error', // not implemented
     // 'unicorn/no-unnecessary-string-trim': 'error', // not implemented
     // 'unicorn/no-unreadable-array-destructuring': 'error', // not implemented
@@ -246,7 +246,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-export-from': 'error', // not implemented
     // 'unicorn/prefer-flat-math-min-max': 'error', // not implemented
     // 'unicorn/prefer-get-or-insert-computed': 'error', // not implemented
-    // 'unicorn/prefer-global-number-constants': 'error', // not implemented
+    'unicorn/prefer-global-number-constants': 'error',
     // 'unicorn/prefer-global-this': 'error', // not implemented
     // 'unicorn/prefer-group-by': 'error', // not implemented
     // 'unicorn/prefer-has-check': 'error', // not implemented
@@ -278,7 +278,11 @@ const recommended: RslintConfigEntry = {
     'unicorn/prefer-node-protocol': 'error',
     // 'unicorn/prefer-number-coercion': 'error', // not implemented
     // 'unicorn/prefer-number-is-safe-integer': 'error', // not implemented
-    'unicorn/prefer-number-properties': 'error',
+    // Avoid reversing the global numeric-constant preference on the next fix pass.
+    'unicorn/prefer-number-properties': [
+      'error',
+      { checkNaN: false, checkInfinity: false },
+    ],
     // 'unicorn/prefer-object-define-properties': 'error', // not implemented
     // 'unicorn/prefer-object-destructuring-defaults': 'error', // not implemented
     // 'unicorn/prefer-object-from-entries': 'error', // not implemented
@@ -326,7 +330,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-then-catch': 'error', // not implemented
     // 'unicorn/prefer-toggle-attribute': 'error', // not implemented
     // 'unicorn/prefer-top-level-await': 'error', // not implemented
-    // 'unicorn/prefer-type-error': 'error', // not implemented
+    'unicorn/prefer-type-error': 'error',
     // 'unicorn/prefer-type-literal-last': 'error', // not implemented
     // 'unicorn/prefer-uint8array-base64': 'off', // not implemented
     // 'unicorn/prefer-unary-minus': 'error', // not implemented

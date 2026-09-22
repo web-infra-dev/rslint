@@ -11,6 +11,11 @@ import { recommended as jsRecommended } from './javascript.js';
 import { recommended as reactRecommended } from './react.js';
 import { recommended as reactHooksRecommended } from './react-hooks.js';
 import { recommended as importRecommended } from './import.js';
+import {
+  createRecommended as createNodeRecommended,
+  recommendedModule as nodeRecommendedModule,
+  recommendedScript as nodeRecommendedScript,
+} from './node.js';
 import { recommended as promiseRecommended } from './promise.js';
 import { recommended as jestRecommended, style as jestStyle } from './jest.js';
 import { recommended as rstestRecommended } from './rstest.js';
@@ -43,6 +48,28 @@ export const reactHooksPlugin = {
 
 export const importPlugin = {
   configs: { recommended: importRecommended },
+};
+
+export const nodePlugin = {
+  configs: {
+    /**
+     * Maps to eslint-plugin-n's `recommended` preset.
+     * @see https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/configs/recommended.js
+     */
+    get recommended() {
+      return createNodeRecommended();
+    },
+    /**
+     * Maps to eslint-plugin-n's `recommended-module` preset.
+     * @see https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/configs/recommended-module.js
+     */
+    recommendedModule: nodeRecommendedModule,
+    /**
+     * Maps to eslint-plugin-n's `recommended-script` preset.
+     * @see https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/configs/recommended-script.js
+     */
+    recommendedScript: nodeRecommendedScript,
+  },
 };
 
 export const promisePlugin = {

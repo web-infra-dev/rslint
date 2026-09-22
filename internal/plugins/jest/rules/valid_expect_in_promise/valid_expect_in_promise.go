@@ -13,21 +13,21 @@ var ValidExpectInPromiseRule = shared.NewRule(shared.Config{
 	Name:               "jest/valid-expect-in-promise",
 	MessageDescription: "This promise should either be returned or awaited to ensure the expects in its chain are called",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
-		callbacks := jestUtils.CollectJestTestCallbacks(ctx)
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
+		callbacks := analysis.Callbacks()
 		return shared.Runtime{
 			TestCallbackFunctions:    callbacks.Functions,
 			IgnoredCallbackFunctions: callbacks.IgnoredDone,
 			IsAssertionCall: func(node *ast.Node) bool {
-				parsed := callbacks.ParseFnCall(node)
-				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeExpect
+				return analysis.ParseExpectCall(node) != nil
 			},
 			IsAsyncAssertionSink: func(callNode, value *ast.Node) bool {
 				if callNode == nil || callNode.Kind != ast.KindCallExpression {
 					return false
 				}
 				top := shared.TopMostCallExpressionOnCallee(callNode)
-				parsed := callbacks.ParseFnCall(top)
-				if parsed == nil || parsed.Kind != jestUtils.JestFnTypeExpect ||
+				parsed := analysis.ParseExpectCall(top)
+				if parsed == nil ||
 					(!slices.Contains(parsed.Modifiers, "resolves") &&
 						!slices.Contains(parsed.Modifiers, "rejects")) {
 					return false

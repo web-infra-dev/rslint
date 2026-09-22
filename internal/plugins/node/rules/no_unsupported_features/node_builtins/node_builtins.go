@@ -16,7 +16,12 @@ import (
 //go:embed node_builtins.schema.json
 var schemaJSON []byte
 
-type builtinFeature struct{ path, supported, experimental string }
+type builtinNode struct{ parent, text uint16 }
+type builtinFeature struct {
+	node, supported, experimental uint16
+	kind                          uint8
+}
+type builtinAlias struct{ parent, text, target uint16 }
 type supportInfo struct {
 	supported, experimental string
 	order                   int
@@ -26,32 +31,42 @@ type builtinAPI struct {
 	properties            map[string]*builtinAPI
 }
 
-func newBuiltinAPIs(features []builtinFeature) *builtinAPI {
-	root := &builtinAPI{}
-	for order, feature := range features {
-		api := root
-		path := strings.TrimSuffix(strings.TrimPrefix(feature.path, "new "), "()")
-		for part := range strings.SplitSeq(path, ".") {
-			if api.properties == nil {
-				api.properties = map[string]*builtinAPI{}
-			}
-			if api.properties[part] == nil {
-				api.properties[part] = &builtinAPI{}
-			}
-			api = api.properties[part]
+func newBuiltinAPIs() (global, module, importMeta *builtinAPI) {
+	apis := make([]*builtinAPI, len(builtinNodes))
+	for i := range apis {
+		apis[i] = &builtinAPI{}
+	}
+	for i := 3; i < len(builtinNodes); i++ {
+		node := builtinNodes[i]
+		parent := apis[node.parent]
+		if parent.properties == nil {
+			parent.properties = make(map[string]*builtinAPI)
 		}
-		info := &supportInfo{feature.supported, feature.experimental, order}
-		switch {
-		case strings.HasPrefix(feature.path, "new "):
-			api.construct = info
-		case strings.HasSuffix(feature.path, "()"):
-			api.call = info
-		default:
+		parent.properties[builtinTexts[node.text]] = apis[i]
+	}
+	for order, feature := range builtinFeatures {
+		info := &supportInfo{builtinVersions[feature.supported], builtinVersions[feature.experimental], order}
+		api := apis[feature.node]
+		switch feature.kind {
+		case 0:
 			api.read = info
+		case 1:
+			api.call = info
+		case 2:
+			api.construct = info
 		}
 	}
-	return root
+	for _, alias := range builtinAliases {
+		parent := apis[alias.parent]
+		if parent.properties == nil {
+			parent.properties = make(map[string]*builtinAPI)
+		}
+		parent.properties[builtinTexts[alias.text]] = apis[alias.target]
+	}
+	return apis[0], apis[1], apis[2]
 }
+
+var globalAPIs, moduleAPIs, importMetaAPIs = newBuiltinAPIs()
 
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/rules/no-unsupported-features/node-builtins.js
 var NodeBuiltinsRule = rule.Rule{

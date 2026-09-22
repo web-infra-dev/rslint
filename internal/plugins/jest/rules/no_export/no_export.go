@@ -64,6 +64,7 @@ var NoExportRule = rule.Rule{
 	Name:   "jest/no-export",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		exportNodes := make([]*ast.Node, 0)
 		hasJestBlock := false
 
@@ -79,7 +80,8 @@ var NoExportRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if utils.IsTypeOfJestFnCall(node, ctx, utils.JestFnTypeDescribe, utils.JestFnTypeTest) {
+				parsed := analysis.ParseFnCall(node)
+				if parsed != nil && (parsed.Kind == utils.JestFnTypeDescribe || parsed.Kind == utils.JestFnTypeTest) {
 					hasJestBlock = true
 				}
 			},
