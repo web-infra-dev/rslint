@@ -330,7 +330,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-then-catch': 'error', // not implemented
     // 'unicorn/prefer-toggle-attribute': 'error', // not implemented
     // 'unicorn/prefer-top-level-await': 'error', // not implemented
-    // 'unicorn/prefer-type-error': 'error', // not implemented
+    'unicorn/prefer-type-error': 'error',
     // 'unicorn/prefer-type-literal-last': 'error', // not implemented
     // 'unicorn/prefer-uint8array-base64': 'off', // not implemented
     // 'unicorn/prefer-unary-minus': 'error', // not implemented

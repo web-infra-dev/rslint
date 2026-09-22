@@ -61,6 +61,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_trim_start_end"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_ternary"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_then_catch"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_type_error"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_array_join_separator"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_number_to_fixed_digits_argument"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_post_message_target_origin"
@@ -130,6 +131,7 @@ func GetAllRules() []rule.Rule {
 		prefer_string_trim_start_end.PreferStringTrimStartEndRule,
 		prefer_then_catch.PreferThenCatchRule,
 		prefer_ternary.PreferTernaryRule,
+		prefer_type_error.PreferTypeErrorRule,
 		require_array_join_separator.RequireArrayJoinSeparatorRule,
 		require_number_to_fixed_digits_argument.RequireNumberToFixedDigitsArgumentRule,
 		require_post_message_target_origin.RequirePostMessageTargetOriginRule,
