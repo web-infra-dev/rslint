@@ -34,6 +34,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_outside_of_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_flat_depth"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_splice_count"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_slice_end"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_iife"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_new_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
@@ -102,6 +103,7 @@ func GetAllRules() []rule.Rule {
 		no_this_outside_of_class.NoThisOutsideOfClassRule,
 		no_unnecessary_array_flat_depth.NoUnnecessaryArrayFlatDepthRule,
 		no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule,
+		no_unnecessary_slice_end.NoUnnecessarySliceEndRule,
 		no_unreadable_iife.NoUnreadableIifeRule,
 		no_unreadable_new_expression.NoUnreadableNewExpressionRule,
 		no_unsafe_string_replacement.NoUnsafeStringReplacementRule,
