@@ -11,7 +11,7 @@ import {
   js,
   reactPlugin,
   importPlugin,
-  node,
+  nodePlugin,
   rstestPlugin,
   unicornPlugin,
 } from '@rslint/core';
@@ -41,9 +41,9 @@ describe('defineConfig and config presets', () => {
     expect(reactPlugin.configs.recommended).toBeDefined();
     expect(importPlugin).toBeDefined();
     expect(importPlugin.configs.recommended).toBeDefined();
-    expect(node.configs.recommended).toBeDefined();
-    expect(node.configs['recommended-module']).toBeDefined();
-    expect(node.configs['recommended-script']).toBeDefined();
+    expect(nodePlugin.configs.recommended).toBeDefined();
+    expect(nodePlugin.configs.recommendedModule).toBeDefined();
+    expect(nodePlugin.configs.recommendedScript).toBeDefined();
     expect(rstestPlugin).toBeDefined();
     expect(rstestPlugin.configs.recommended).toBeDefined();
     expect(unicornPlugin).toBeDefined();
@@ -56,7 +56,7 @@ describe('defineConfig and config presets', () => {
       js,
       reactPlugin,
       importPlugin,
-      node,
+      nodePlugin,
       rstestPlugin,
       unicornPlugin,
     ]) {
@@ -257,9 +257,9 @@ describe('Node presets', () => {
     pathToFileURL(require.resolve('@rslint/core')).href,
   );
   const nodeConfig = `
-    import { defineConfig, node } from ${coreEntry};
+    import { defineConfig, nodePlugin } from ${coreEntry};
     export default defineConfig([
-      node.configs.recommended,
+      nodePlugin.configs.recommended,
       { rules: { 'no-undef': 'error' } },
     ]);
   `;
@@ -301,8 +301,8 @@ describe('Node presets', () => {
         'node_modules/dev/package.json': '{"name":"dev","main":"index.js"}',
         'node_modules/dev/index.js': '',
         'rslint.config.mjs': `
-          import { defineConfig, node } from ${coreEntry};
-          export default defineConfig([node.configs.recommended]);
+          import { defineConfig, nodePlugin } from ${coreEntry};
+          export default defineConfig([nodePlugin.configs.recommended]);
         `,
       });
       try {
@@ -349,7 +349,7 @@ describe('Node presets', () => {
         expect(
           [...new Set(reports.map((report) => report.ruleName))].sort(),
         ).toEqual(
-          Object.keys(node.configs['recommended-module'].rules ?? {}).sort(),
+          Object.keys(nodePlugin.configs.recommendedModule.rules ?? {}).sort(),
         );
       } finally {
         await cleanupTempDir(directory);
@@ -466,8 +466,8 @@ describe('Node presets', () => {
   );
 
   test.each([
-    ['recommended-module', 'input.cjs'],
-    ['recommended-script', 'input.mjs'],
+    ['recommendedModule', 'input.cjs'],
+    ['recommendedScript', 'input.mjs'],
   ] as const)(
     '%s applies globals and scopes even to %s',
     async (name, filename) => {
@@ -478,7 +478,7 @@ describe('Node presets', () => {
         config: normalizeConfig(
           defineConfig([
             { languageOptions: { globals: globals.node } },
-            node.configs[name],
+            nodePlugin.configs[name],
             {
               rules: {
                 'no-undef': 'error',
@@ -502,7 +502,7 @@ describe('Node presets', () => {
         .map((report) => report.ruleName)
         .sort();
       expect(ruleNames).toEqual(
-        name === 'recommended-module'
+        name === 'recommendedModule'
           ? [...Array<string>(7).fill('no-undef'), 'no-invalid-this'].sort()
           : ['no-global-assign', 'node/no-exports-assign'],
       );
@@ -510,8 +510,8 @@ describe('Node presets', () => {
   );
 
   test.each([
-    ['recommended-module', 1],
-    ['recommended-script', 2],
+    ['recommendedModule', 1],
+    ['recommendedScript', 2],
   ] as const)(
     '%s preserves its syntax ignores through normalization and native option parsing',
     async (name, count) => {
@@ -521,8 +521,8 @@ describe('Node presets', () => {
         workingDirectory: directory,
         config: normalizeConfig(
           defineConfig([
-            node.configs['recommended-module'],
-            node.configs[name],
+            nodePlugin.configs.recommendedModule,
+            nodePlugin.configs[name],
             {
               // Both inputs are modules so this isolates the rule's ignores option.
               languageOptions: { sourceType: 'module' },
@@ -547,7 +547,7 @@ describe('Node presets', () => {
         result.diagnostics.some((report) =>
           report.message.includes("'modules'"),
         ),
-      ).toBe(name === 'recommended-script');
+      ).toBe(name === 'recommendedScript');
     },
   );
 });

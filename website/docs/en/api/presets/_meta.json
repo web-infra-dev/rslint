@@ -26,6 +26,11 @@
   },
   {
     "type": "file",
+    "name": "node-plugin",
+    "label": "nodePlugin"
+  },
+  {
+    "type": "file",
     "name": "promise-plugin",
     "label": "promisePlugin"
   },

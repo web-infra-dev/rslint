@@ -143,7 +143,7 @@ describe('built-in globals catalog', () => {
     expect(result.stdout.trim()).toBe('LAZY_GLOBALS_OK');
   });
 
-  test.each(['recommended', 'recommended-module', 'recommended-script'])(
+  test.each(['recommended', 'recommendedModule', 'recommendedScript'])(
     'Node preset %s loads only its bundled globals',
     (name) => {
       const script = String.raw`
@@ -155,9 +155,9 @@ describe('built-in globals catalog', () => {
         .map((file) => file.replaceAll('\\', '/').split('/').at(-1))
         .sort();
 
-      const { defineConfig, node } = await import(${JSON.stringify(pathToFileURL(DIST_INDEX).href)});
+      const { defineConfig, nodePlugin } = await import(${JSON.stringify(pathToFileURL(DIST_INDEX).href)});
       assert.deepEqual(loaded(), []);
-      const config = defineConfig([node.configs[${JSON.stringify(name)}]]);
+      const config = defineConfig([nodePlugin.configs[${JSON.stringify(name)}]]);
       assert.deepEqual(loaded(), []);
 
       const { normalizeConfig } = await import(${JSON.stringify(pathToFileURL(path.join(DIST_ROOT, 'config-loader.js')).href)});

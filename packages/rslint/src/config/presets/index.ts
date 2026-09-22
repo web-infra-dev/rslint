@@ -50,13 +50,25 @@ export const importPlugin = {
   configs: { recommended: importRecommended },
 };
 
-export const node = {
+export const nodePlugin = {
   configs: {
+    /**
+     * Maps to eslint-plugin-n's `recommended` preset.
+     * @see https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/configs/recommended.js
+     */
     get recommended() {
       return createNodeRecommended();
     },
-    'recommended-module': nodeRecommendedModule,
-    'recommended-script': nodeRecommendedScript,
+    /**
+     * Maps to eslint-plugin-n's `recommended-module` preset.
+     * @see https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/configs/recommended-module.js
+     */
+    recommendedModule: nodeRecommendedModule,
+    /**
+     * Maps to eslint-plugin-n's `recommended-script` preset.
+     * @see https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/configs/recommended-script.js
+     */
+    recommendedScript: nodeRecommendedScript,
   },
 };
 
