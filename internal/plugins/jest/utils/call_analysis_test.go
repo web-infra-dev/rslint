@@ -163,6 +163,33 @@ test("case", () => expect(value).toBe(true));
 	if parsed, reason := matcherNotCalledAnalysis.ParseExpectCallWithReason(matcherNotCalled); parsed != nil || reason != ExpectParseReasonMatcherNotCalled {
 		t.Fatalf("uncalled matcher = (%v, %q), want matcher-not-called", parsed, reason)
 	}
+
+	rejectedCases := []struct {
+		source string
+		want   string
+	}{
+		{source: `expect(1).not.not.each();`, want: ExpectParseReasonModifierUnknown},
+		{source: "expect`value`();", want: ExpectParseReasonMatcherNotFound},
+	}
+	for _, test := range rejectedCases {
+		t.Run(test.source, func(t *testing.T) {
+			file := parseJestAnalysisFixture(test.source)
+			analysis := GetJestCallAnalysis(rule.RuleContext{
+				SourceFile: file,
+			}.WithFileCache(rule.NewFileCache()))
+			calls := jestAnalysisCalls(file)
+			if len(calls) == 0 {
+				t.Fatal("fixture contains no call")
+			}
+			call := calls[0]
+			if analysis.ParseFnCall(call) != nil {
+				t.Fatal("rejected syntax parsed as a successful Jest call")
+			}
+			if parsed, reason := analysis.ParseExpectCallWithReason(call); parsed != nil || reason != test.want {
+				t.Fatalf("rejected expect = (%v, %q), want %q", parsed, reason, test.want)
+			}
+		})
+	}
 }
 
 func TestJestCallAnalysisCollectsCallbacksLazily(t *testing.T) {

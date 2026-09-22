@@ -62,7 +62,12 @@ func parseJestFnCallWithReason(node *ast.Node, ctx rule.RuleContext) jestCallPar
 	}
 
 	callExpr := node.AsCallExpression()
-	if isEachFactoryCall(callExpr, members) || isInvalidTaggedTemplateCall(callExpr, members) || isInnerExpectCall(node, localName, members, ctx.Settings) {
+	if isEachFactoryCall(callExpr, members) || isInvalidTaggedTemplateCall(callExpr, members) {
+		return jestCallParseResult{
+			reason: rejectedExpectParseReason(node, localName, memberEntries, ctx),
+		}
+	}
+	if isInnerExpectCall(node, localName, members, ctx.Settings) {
 		return jestCallParseResult{}
 	}
 
@@ -119,6 +124,31 @@ func parseJestFnCallWithReason(node *ast.Node, ctx rule.RuleContext) jestCallPar
 	}
 
 	return jestCallParseResult{parsed: parsed}
+}
+
+// rejectedExpectParseReason preserves valid-expect's diagnostics for syntax
+// shapes that cannot be successful Jest calls. The ordinary parser still
+// returns no parsed call for these shapes; only the reason-aware analysis
+// consumes this result.
+func rejectedExpectParseReason(
+	node *ast.Node,
+	localName string,
+	memberEntries []ParsedJestFnMemberEntry,
+	ctx rule.RuleContext,
+) string {
+	name, _, _ := ResolveJestFunctionReference(node, localName, nil, ctx)
+	if ApplyGlobalJestAlias(name, ctx.Settings) != "expect" {
+		return ExpectParseReasonNone
+	}
+
+	_, _, reason := FindExpectModifiersAndMatcher(memberEntries[1:])
+	if reason == ExpectParseReasonMatcherNotFound && IsMemberAccessNode(node.Parent) {
+		reason = ExpectParseReasonMatcherNotCalled
+	}
+	if reason != ExpectParseReasonNone && FindTopMostCallExpression(node) != node {
+		return ExpectParseReasonNone
+	}
+	return reason
 }
 
 // FindTopMostCallExpression walks up member/call chains to the outermost CallExpression,
