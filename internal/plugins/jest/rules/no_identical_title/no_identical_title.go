@@ -12,9 +12,10 @@ import (
 var NoIdenticalTitleRule = shared.NewRule(shared.Config{
 	Name: "jest/no-identical-title",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			Parse: func(node *ast.Node) *shared.ParsedCall {
-				parsed := jestUtils.ParseJestFnCall(node, ctx)
+				parsed := analysis.ParseFnCall(node)
 				if parsed == nil {
 					return nil
 				}

@@ -226,6 +226,18 @@ func TestValidExpectRule(t *testing.T) {
 				},
 			},
 			{
+				Code: "expect(1).not.not.each();",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "modifierUnknown", Column: 1, EndColumn: 25},
+				},
+			},
+			{
+				Code: "expect`value`();",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matcherNotFound", Column: 1, EndColumn: 16},
+				},
+			},
+			{
 				Code: "expect(true).resolves.not.exactly.toBeDefined();",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "modifierUnknown", Column: 1, EndColumn: 48},

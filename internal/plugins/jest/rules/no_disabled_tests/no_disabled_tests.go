@@ -56,9 +56,10 @@ func isPendingCall(node *ast.Node, ctx rule.RuleContext) bool {
 var NoDisabledTestsRule = shared.NewRule(shared.Config{
 	Name: "jest/no-disabled-tests",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			Parse: func(node *ast.Node) *shared.ParsedCall {
-				parsed := utils.ParseJestFnCall(node, ctx)
+				parsed := analysis.ParseFnCall(node)
 				if parsed == nil {
 					return nil
 				}

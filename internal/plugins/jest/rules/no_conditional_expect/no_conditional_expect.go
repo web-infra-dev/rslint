@@ -10,16 +10,15 @@ import (
 var NoConditionalExpectRule = shared.NewRule(shared.Config{
 	Name: "jest/no-conditional-expect",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
-		callbacks := jestUtils.CollectJestTestCallbacks(ctx)
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
+		callbacks := analysis.Callbacks()
 		return shared.Runtime{
 			TestCallbackFunctions: callbacks.Functions,
 			IsTestCall: func(node *ast.Node) bool {
-				parsed := callbacks.ParseFnCall(node)
-				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest
+				return analysis.ParseTestCall(node) != nil
 			},
 			IsExpectCall: func(node *ast.Node) bool {
-				parsed := callbacks.ParseFnCall(node)
-				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeExpect
+				return analysis.ParseExpectCall(node) != nil
 			},
 		}
 	},
