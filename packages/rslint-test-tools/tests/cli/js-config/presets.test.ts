@@ -433,26 +433,35 @@ describe('Node presets', () => {
       child: '[]',
       module: true,
     },
-    { name: 'no package', parent: undefined, child: undefined, module: false },
+    {
+      name: 'no project package',
+      parent: undefined,
+      child: undefined,
+      module: false,
+    },
   ])(
     'recommended handles $name from the working directory',
     async ({ parent, child, module }) => {
       const directory = await createTempDir({
-        ...(parent === undefined ? {} : { 'package.json': parent }),
-        ...(child === undefined ? {} : { 'nested/package.json': child }),
-        'rslint.config.mjs': nodeConfig,
-        'nested/input.js': `require('./missing.js');`,
+        // Stop package lookup at the fixture boundary.
+        'package.json': '{"type":"commonjs"}',
+        ...(parent === undefined ? {} : { 'project/package.json': parent }),
+        ...(child === undefined
+          ? {}
+          : { 'project/nested/package.json': child }),
+        'project/rslint.config.mjs': nodeConfig,
+        'project/nested/input.js': `require('./missing.js');`,
       });
       try {
         const result = await runRslint(
           [
             '--config',
-            path.join(directory, 'rslint.config.mjs'),
+            path.join(directory, 'project', 'rslint.config.mjs'),
             '--format',
             'jsonline',
             'input.js',
           ],
-          path.join(directory, 'nested'),
+          path.join(directory, 'project', 'nested'),
         );
         expect(result.exitCode, result.stderr).toBe(1);
         expect(result.stdout, result.stderr).not.toBe('');
