@@ -26,6 +26,23 @@ type RootOptions struct {
 	SingleThreaded  bool
 }
 
+// SourceOnlyCompilerOptions returns fresh settings for already-selected gap
+// roots. CLI root parsing and CLI/API/LSP compiler compatibility construction
+// share this syntax and module-resolution policy. Imports may resolve to paths,
+// but neither dependencies nor default libraries extend the root universe.
+// Hosts, root admission, scheduling and generation lifetimes belong to callers;
+// these settings do not decide the Program facade's checker capability.
+func SourceOnlyCompilerOptions() *core.CompilerOptions {
+	return &core.CompilerOptions{
+		Target:    core.ScriptTargetESNext,
+		Module:    core.ModuleKindESNext,
+		Jsx:       core.JsxEmitPreserve,
+		AllowJs:   core.TSTrue,
+		NoLib:     core.TSTrue,
+		NoResolve: core.TSTrue,
+	}
+}
+
 type parsedBackend struct {
 	host                       compiler.CompilerHost
 	fs                         vfs.FS

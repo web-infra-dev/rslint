@@ -1065,6 +1065,51 @@ func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
 	}
 }
 
+func TestStandaloneFallbackProgramKeepsSourceBoundary(t *testing.T) {
+	for _, extension := range []string{"ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs"} {
+		t.Run(extension, func(t *testing.T) {
+			directory := tspath.NormalizePath(t.TempDir())
+			fileName := tspath.ResolvePath(directory, "target."+extension)
+			dependency := tspath.ResolvePath(directory, "dependency.ts")
+			fileTarget := target.File{
+				PathIdentity:    config.PathIdentity{Path: fileName, CanonicalPath: fileName},
+				ConfigDirectory: directory,
+			}
+			content := "/// <reference path=\"./dependency.ts\" />\nimport './dependency';\nexport const value = 1;\n"
+			if extension == "jsx" || extension == "tsx" {
+				content += "export const view = <div />;\n"
+			}
+			fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+				fileName: content, dependency: "export const dependency = 1;\n",
+			})
+			for generation := range 2 {
+				program, source, err := createStandaloneFallbackProgram(fileTarget, fs)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if source == nil || !source.IsBound() || source.Text() != content {
+					t.Fatalf("generation %d lost its bound overlay source", generation)
+				}
+				if len(program.SourceFiles()) != 1 || program.GetSourceFile(dependency) != nil {
+					t.Fatalf("generation %d materialized an import, reference or library outside the gap target", generation)
+				}
+				if diagnostics := program.GetSyntacticDiagnostics(context.Background(), source); len(diagnostics) != 0 {
+					t.Fatalf("generation %d lost syntax support: %v", generation, diagnostics)
+				}
+				specifier := source.Imports()[0]
+				mode := program.GetModeForUsageLocation(source, specifier)
+				resolved := program.GetResolvedModule(source, specifier.Text(), mode)
+				if resolved == nil || !resolved.IsResolved() || resolved.ResolvedFileName != dependency {
+					t.Fatalf("generation %d lost direct import resolution: %+v", generation, resolved)
+				}
+				// One generation's compiler options must not become shared state.
+				program.Options().NoResolve = core.TSFalse
+				program.Options().NoLib = core.TSFalse
+			}
+		})
+	}
+}
+
 func TestProjectServiceLSPGapKeepsDiagnosticsAndFixes(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
 	for _, resident := range []bool{false, true} {

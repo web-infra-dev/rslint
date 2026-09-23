@@ -656,14 +656,7 @@ func sourceFileForTarget(
 // used for project selection and mark this generation as lacking type info.
 func createStandaloneFallbackProgram(target target.File, fs vfs.FS) (*compiler.Program, *ast.SourceFile, error) {
 	host := utils.CreateCompilerHost(target.ConfigDirectory, fs)
-	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
-		Target:    core.ScriptTargetESNext,
-		Module:    core.ModuleKindESNext,
-		Jsx:       core.JsxEmitPreserve,
-		AllowJs:   core.TSTrue,
-		NoLib:     core.TSTrue,
-		NoResolve: core.TSTrue,
-	}, []string{target.Path}, host)
+	program, err := utils.CreateProgramFromOptionsLenient(true, lintprogram.SourceOnlyCompilerOptions(), []string{target.Path}, host)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create fallback lint program: %w", err)
 	}
