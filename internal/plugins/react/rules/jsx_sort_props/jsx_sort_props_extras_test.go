@@ -26,6 +26,14 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		{Code: `<App a /* explanation */ b />`, Tsx: true},
 		// ---- Real-user: issue #1632 gives reserved props precedence over callbacks. ----
 		{Code: `<App key={1} a onClick={fn} />`, Tsx: true, Options: map[string]any{"reservedFirst": true, "callbacksLast": true}},
+		// Roman numerals carry case even though their category is Number, Letter.
+		{Code: `<App Ⅰ ⅰ />`, Tsx: true, Options: map[string]any{"locale": "en-u-kf-upper"}},
+		{Code: `<App Ⅰ ⅰ />`, Tsx: true, Options: map[string]any{"locale": "da"}},
+		{Code: `<App Ⅰ ⅰ />`, Tsx: true, Options: map[string]any{"locale": "mt"}},
+		{Code: `<App ⅰ Ⅰ />`, Tsx: true, Options: map[string]any{"locale": "da-u-kf-lower"}},
+		// Ignoring case keeps either order valid despite the upper-first locale.
+		{Code: `<App Ⅰ ⅰ />`, Tsx: true, Options: map[string]any{"locale": "en-u-kf-upper", "ignoreCase": true}},
+		{Code: `<App ⅰ Ⅰ />`, Tsx: true, Options: map[string]any{"locale": "en-u-kf-upper", "ignoreCase": true}},
 	}, []rule_tester.InvalidTestCase{
 		// A moved line comment carries its exact terminator when the destination
 		// slot would otherwise let it consume the closing tag.
@@ -61,6 +69,9 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		{Code: `<App aa b />`, Tsx: true, Options: map[string]any{"locale": "nb"}, Output: []string{`<App b aa />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
 		{Code: `<App AA aA />`, Tsx: true, Options: map[string]any{"locale": "da"}, Output: []string{`<App aA AA />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
 		{Code: `<App a A />`, Tsx: true, Options: map[string]any{"locale": "mt"}, Output: []string{`<App A a />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
+		{Code: `<App ⅰ Ⅰ />`, Tsx: true, Options: map[string]any{"locale": "en-u-kf-upper"}, Output: []string{`<App Ⅰ ⅰ />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
+		{Code: `<App ⅰ Ⅰ />`, Tsx: true, Options: map[string]any{"locale": "da"}, Output: []string{`<App Ⅰ ⅰ />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
+		{Code: `<App ⅰ Ⅰ />`, Tsx: true, Options: map[string]any{"locale": "mt"}, Output: []string{`<App Ⅰ ⅰ />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
 		// A comment after a spread stays outside the sortable group that follows it.
 		{Code: `<App {...p} /* gap */ d c />`, Tsx: true, Output: []string{`<App {...p} /* gap */ c d />`}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 25)}},
 		{Code: "<App {...p}\n /* gap */\n d c />", Tsx: true, Output: []string{"<App {...p}\n /* gap */\n c d />"}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 3, 4)}},
