@@ -62,8 +62,14 @@ func TestRootProgramsMatchCompatibilityProgram(t *testing.T) {
 		"unselected.js": "export const unselected = 1;\n",
 		"bad.ts":        "export const value: = 1;\n",
 		"view.tsx":      "export const view = <div>;\n",
+		"view.jsx":      "export const view = <div />;\n",
+		"module.mts":    "import './b.js'; export const value: number = 1;\n",
+		"module.mjs":    "import './b.js'; export const value = 1;\n",
+		"common.cts":    "import './b.js'; export const value: number = 1;\n",
+		"common.cjs":    "import './b.js'; export const value = 1;\n",
+		"reference.ts":  "/// <reference path=\"./unselected.js\" />\nexport const value = 1;\n",
 	})
-	plan := rootProgramTestPlan(dir, "a.js", "b.js", "bad.ts", "view.tsx")
+	plan := rootProgramTestPlan(dir, "a.js", "b.js", "bad.ts", "common.cjs", "common.cts", "module.mjs", "module.mts", "reference.ts", "view.jsx", "view.tsx")
 	rootFiles := make([]string, 0, len(plan.Files))
 	for _, target := range plan.Files {
 		rootFiles = append(rootFiles, target.Path)
@@ -545,7 +551,7 @@ func createCompatibilityProgramForTest(
 	program, err := context.createCompatibilityProgram(
 		singleThreaded,
 		currentDirectory,
-		sourceOnlyCompilerOptions(),
+		lintprogram.SourceOnlyCompilerOptions(),
 		rootFileNames,
 	)
 	if err != nil {
