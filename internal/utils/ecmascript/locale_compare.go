@@ -1,9 +1,9 @@
 package ecmascript
 
 import (
+	"unicode"
 	"unicode/utf8"
 
-	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
 )
@@ -115,9 +115,9 @@ func nextCaseWeight(value string, pos int) (weight, next int, ok bool) {
 		r, size := utf8.DecodeRuneInString(value[pos:])
 		pos += size
 		switch {
-		case unicode17.IsUppercase(r), unicode17.IsTitle(r):
+		case unicode.Is(unicode.Upper, r), unicode.IsTitle(r):
 			return 0, pos, true
-		case unicode17.IsLowercase(r):
+		case unicode.Is(unicode.Lower, r):
 			return 1, pos, true
 		}
 	}

@@ -241,7 +241,6 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 	sourceFile := program.GetSourceFile(entryFile)
 	if sourceFile == nil {
 		t.Fatalf("failed to resolve entry file: %s", entryFile)
-		return nil
 	}
 	diagnostics := []rule.RuleDiagnostic{}
 	var diagnosticsMu sync.Mutex

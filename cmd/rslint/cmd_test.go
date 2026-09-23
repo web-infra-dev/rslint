@@ -214,7 +214,6 @@ func TestPrintDiagnosticUTF8(t *testing.T) {
 			}
 			if sourceFile == nil {
 				t.Fatal("Source file not found")
-				return
 			}
 
 			// Create diagnostic at position of variable name
@@ -295,7 +294,6 @@ func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset in
 	}
 	if sourceFile == nil {
 		t.Fatal("Source file not found")
-		return rule.RuleDiagnostic{}, tspath.ComparePathsOptions{}
 	}
 
 	diagnostic := rule.RuleDiagnostic{
@@ -610,7 +608,6 @@ func TestSyntaxErrorFormat(t *testing.T) {
 	_, err := utils.CreateProgram(true, fs, tmpDir, "tsconfig.json", host)
 	if err == nil {
 		t.Fatal("Expected error for file with syntax errors")
-		return
 	}
 
 	errMsg := err.Error()
@@ -649,7 +646,6 @@ func TestSyntaxErrorFormatMultiple(t *testing.T) {
 	_, err := utils.CreateProgram(true, fs, tmpDir, "tsconfig.json", host)
 	if err == nil {
 		t.Fatal("Expected error for file with syntax errors")
-		return
 	}
 
 	errMsg := err.Error()
@@ -2410,7 +2406,6 @@ func TestCLIFinalChangeCommitterValidatesCompleteDeltaBeforeWriting(t *testing.T
 	})
 	if err == nil {
 		t.Fatal("expected a write error")
-		return
 	}
 	if len(result.ConfirmedPaths) != 0 {
 		t.Fatalf("preflight failure confirmed writes: %+v", result)
