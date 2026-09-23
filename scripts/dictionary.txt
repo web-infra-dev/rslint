@@ -490,6 +490,7 @@ promisifying
 propertyassignment
 proptypes
 prototypejs
+proxyquire
 psdifjo
 Ptrs
 pullquote

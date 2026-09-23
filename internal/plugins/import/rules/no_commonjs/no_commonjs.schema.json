@@ -1,0 +1,24 @@
+{
+  "anyOf": [
+    {
+      "type": "array",
+      "items": [{ "enum": ["allow-primitive-modules"] }],
+      "additionalItems": false
+    },
+    {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allowPrimitiveModules": { "type": "boolean" },
+            "allowRequire": { "type": "boolean" },
+            "allowConditionalRequire": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "additionalItems": false
+    }
+  ]
+}
