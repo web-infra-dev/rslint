@@ -44,16 +44,10 @@ const ruleTester = {
     }
     const supported = (item: ValidTestCase) =>
       !/^export \w+ from/.test(item.code);
-    const adapt = <T extends ValidTestCase>(input: T): T => {
-      const replace = (text: string): string =>
-        text
-          .replaceAll(path.join(process.cwd(), 'tests', 'files'), root)
-          .replaceAll(path.join('tests', 'files'), root);
-      return {
-        ...JSON.parse(replace(JSON.stringify(input))),
-        filename: path.join(root, 'input.ts'),
-      };
-    };
+    const adapt = <T extends ValidTestCase>(input: T): T => ({
+      ...input,
+      filename: path.join(root, 'input.ts'),
+    });
     describe(name, () => {
       // Babel's export-default-from proposal remains below as skipped source.
       for (const item of [...cases.valid, ...cases.invalid].filter(
@@ -496,7 +490,7 @@ ruleTester.run('no-unresolved (import/resolve legacy)', rule, {
       code: "import { DEEP } from 'in-alternate-root';",
       settings: {
         'import/resolve': {
-          paths: [path.join(process.cwd(), 'tests', 'files', 'alternate-root')],
+          paths: [path.join(root, 'alternate-root')],
         },
       },
     }),
@@ -506,8 +500,8 @@ ruleTester.run('no-unresolved (import/resolve legacy)', rule, {
       settings: {
         'import/resolve': {
           paths: [
-            path.join('tests', 'files', 'src-root'),
-            path.join('tests', 'files', 'alternate-root'),
+            path.relative(process.cwd(), path.join(root, 'src-root')),
+            path.relative(process.cwd(), path.join(root, 'alternate-root')),
           ],
         },
       },
