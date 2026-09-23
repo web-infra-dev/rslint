@@ -204,7 +204,10 @@ async function findBaseRun(headPath) {
       });
       return { baseSha: sha, runId: result.runId };
     }
-    if (result.status !== 'skipped' || skippedShas.length === MAX_SKIPPED_BASE_COMMITS) {
+    if (
+      result.status !== 'skipped' ||
+      skippedShas.length === MAX_SKIPPED_BASE_COMMITS
+    ) {
       break;
     }
     skippedShas.push(sha);
@@ -231,8 +234,12 @@ async function mainMeasurement(sha) {
     .sort((a, b) => b.run_number - a.run_number)[0];
   if (!run || run.status !== 'completed') return { status: 'unavailable' };
 
-  const jobs = await api(`/repos/${repository}/actions/runs/${run.id}/jobs?per_page=100`);
-  const changed = (jobs.jobs || []).find((job) => job.name === 'Detect changes');
+  const jobs = await api(
+    `/repos/${repository}/actions/runs/${run.id}/jobs?per_page=100`,
+  );
+  const changed = (jobs.jobs || []).find(
+    (job) => job.name === 'Detect changes',
+  );
   const ubuntu = (jobs.jobs || []).find(
     (job) =>
       job.name === 'Test npm packages' ||
@@ -346,7 +353,8 @@ function report(headPath, basePath) {
     downloadedBase?.sha === (baseOn.measuredSha || baseOn.sha)
       ? downloadedBase
       : undefined;
-  const skippedShas = base && Array.isArray(baseOn.skippedShas) ? baseOn.skippedShas : [];
+  const skippedShas =
+    base && Array.isArray(baseOn.skippedShas) ? baseOn.skippedShas : [];
   const skippedNote = skippedShas.length
     ? `Base size was measured at main commit ${commitLink(baseOn.measuredSha)}. The Ubuntu measurement job was skipped for the following ${skippedShas.length === 1 ? 'main commit' : `${skippedShas.length} main commits`}: ${skippedShas.map(commitLink).join(', ')}.`
     : '';
