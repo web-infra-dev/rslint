@@ -44,4 +44,22 @@ module.exports = {
       addWords: true,
     },
   ],
+  overrides: [
+    {
+      filename: [
+        'cspell.config.cjs',
+        'internal/plugins/import/rules/no_unresolved/**',
+      ],
+      // Preserve intentional misspellings and arbitrary module names from upstream tests.
+      ignoreRegExpList: [
+        /\b(?:doesnt-exist|fnuction|giffy|reallyfake|does-not-exist-l0w9ssmcqy9)\b/g,
+        /\b(?:jsnext:main)\b/g,
+      ],
+    },
+    {
+      filename: 'internal/plugins/import/utils/resolve.go',
+      // This is the literal package.json field name.
+      ignoreRegExpList: [/\b(?:jsnext:main)\b/g],
+    },
+  ],
 };
