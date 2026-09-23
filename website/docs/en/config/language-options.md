@@ -2,7 +2,7 @@
 
 - **Type:** `object`
 
-Configures the JavaScript language environment and TypeScript project information for matching files. Nested language options from matching entries merge recursively; later arrays and scalar values replace earlier values. Ordinary explicit-project loading retains the separate [owner declaration list](#languageoptionsparseroptionsproject) described below.
+Configures the JavaScript language environment and TypeScript project information for matching files. Nested language options from matching entries merge recursively; later arrays and scalar values replace earlier values.
 
 ## languageOptions.ecmaVersion
 
@@ -45,11 +45,11 @@ Set `sourceType` directly on `languageOptions`; the legacy `languageOptions.pars
 
 - **Type:** `boolean`
 
-Discovers a TypeScript config that directly includes each selected file through `files` or `include`. Enable it explicitly; TypeScript presets do not set this option, matching typescript-eslint presets. Discovery starts beside the source file, checking `tsconfig.json`, then `jsconfig.json`, and continues through ancestors when a config does not own the file. Project references can lead to custom config names such as `tsconfig.app.json`.
+Automatically finds a TypeScript project for each linted file so type-aware rules can run. Enable this option explicitly; TypeScript presets do not enable it.
 
-The nearest owning project wins over a different tsconfig beside the Rslint config or in the current working directory. Reference ownership follows TypeScript's source redirects and reference order. Each selected project keeps its complete root files and dependencies; selecting one lint file limits lint execution, not the type context.
+Rslint checks `tsconfig.json`, then `jsconfig.json`, beside the file and in parent directories until it finds a project that includes the file through its `files` or `include` settings. It also follows project references, including references to custom config names such as `tsconfig.app.json`. The file's nearest matching project takes precedence over a different tsconfig beside the Rslint config or in the current working directory.
 
-JavaScript files use the same discovery. A JS file explicitly listed in `files` can receive types even with `allowJs: false`; that option still controls JS glob inclusion. Files reached only through imports or triple-slash references are not configured lint roots and use gap linting, whether they are JS or TS.
+JavaScript files use the same discovery. A JS file explicitly listed in `files` can receive type information even with `allowJs: false`; `allowJs` still controls whether `include` patterns select JS files.
 
 ```ts
 {
@@ -61,45 +61,38 @@ JavaScript files use the same discovery. A JS file explicitly listed in `files` 
 }
 ```
 
-`projectService: true` cannot be combined with an effective `project` string, array or `[]`, including values inherited from different matching entries. A final matching `project: false` or `project: null` clears that conflict and disables explicit binding for the target; service can still select a project. A final matching `projectService: false` disables automatic discovery and the implicit default project, but preserves the owner's explicit declarations described below. JavaScript configurations and legacy JSON migration also accept `projectService: null` as a runtime reset, outside the public TypeScript type.
+`projectService: true` cannot be combined with a `project` string or array, including `[]`. This also applies when the options come from different matching entries. To replace an earlier `project` setting with automatic discovery, set `project: false` alongside `projectService: true`.
 
-A selected file that does not belong to a discovered project uses Rslint's existing [source-only gap fallback](/guide/type-checking#gap-files). Syntax diagnostics and rules that do not require types still run; type-aware rules are skipped. Other files in the same lint request keep their own project context. Config and Program failures are still errors.
+Set `projectService: false` to disable automatic discovery and use an explicit `project` instead. To disable type-aware linting for matching files, set both `projectService: false` and `project: false`. JavaScript configurations also accept `projectService: null` as a reset, although the public TypeScript type is `boolean`.
 
-This differs from typescript-eslint, which can admit imported-only files and rejects unowned files unless `allowDefaultProject` permits them. Rslint does not create a typed default project. To force source-only linting even when a file has an owning project, set both `projectService: false` and `project: false` for that file scope.
+Files outside the discovered projects still receive syntax diagnostics and lint rules and fixes that do not require types. Type-aware rules are skipped. This also applies to files that a project only imports or references without including them through `files` or `include`; see [gap files](/guide/type-checking#gap-files). Invalid project configuration still reports an error.
 
-Object options such as `allowDefaultProject`, `defaultProject`, and `loadTypeScriptPlugins`, as well as `extraFileExtensions`, are not implemented. `project: true` is also unsupported; use `projectService: true` for automatic discovery.
+Unlike typescript-eslint, Rslint skips type-aware rules for files outside configured projects instead of rejecting those files. The typescript-eslint options `allowDefaultProject`, `defaultProject`, `loadTypeScriptPlugins`, and `extraFileExtensions` are not supported. `project: true` is also unsupported; use `projectService: true` for automatic discovery.
 
-When a tsconfig sets `disableReferencedProjectLoad`, Rslint stops discovering projects through those references. This is independent of earlier linted files. Upstream can still use previously loaded referenced projects; Rslint does not reproduce that history-dependent exception. `disableSolutionSearching` stops further ancestor search.
+In tsconfig, `disableReferencedProjectLoad` prevents discovery through project references, and `disableSolutionSearching` stops further searches in parent directories.
 
 ## languageOptions.parserOptions.tsconfigRootDir
 
 - **Type:** `string`
-- **Default:** the directory of the governing Rslint config file; API `cwd` for inline-only configuration
+- **Default:** the directory containing the Rslint config file; API `cwd` for inline-only configuration
 
-An absolute directory for the host operating system that stops upward project discovery when the search reaches it. Trailing separators and dot segments are normalized before comparing the boundary. It does not select a tsconfig by itself. If the target is outside this directory's ancestor chain, it can still discover its own ancestors. Project references and `extends` may point outside the boundary. The final value after matching and merging must be absolute; a relative or empty string in an unmatched or overridden entry does not fail the request.
+Sets the directory where `projectService` stops searching parent directories. It must be an absolute path. It also sets the base directory for relative [`project`](#languageoptionsparseroptionsproject) paths.
 
-JavaScript configurations and legacy JSON migration also accept `null` to reset an inherited boundary to the default. This is runtime compatibility, outside the public TypeScript type. JavaScript configurations checked with `checkJs` and `strictNullChecks` are still subject to that type. A later `undefined` preserves an inherited value.
+This option does not select a tsconfig by itself or limit which files a project can import. Project references and `extends` can point outside this directory. Files outside this directory can still find projects in their own parent directories.
 
-Go resolves the default from the config file selected for each target. An explicitly selected config uses that file's directory, including custom filenames. Imported presets, helper modules, object or rules spread, and `basePath` do not change it. With API `overrideConfigFile: true`, the inline configuration uses API `cwd`; an inline override appended to a loaded config retains that config's default directory.
+The default comes from the Rslint config used for the file, including a custom config selected with `--config` or API `overrideConfigFile`. Imported presets and `basePath` do not change that default.
 
-This follows typescript-eslint's documented config-directory default. Its implementation instead infers candidates from preset access on the JavaScript call stack: missing candidates fall back to process cwd, and multiple candidates can produce an ambiguity error. Rslint uses its known config owner directly. These heuristic edge cases differ; no preset access or process-global candidate state is involved.
+| Configuration                              | Default discovery boundary       |
+| ------------------------------------------ | -------------------------------- |
+| Root config used from a package directory  | Root config directory            |
+| Nested config used for the file            | Nested config directory          |
+| Explicit `--config` / `overrideConfigFile` | Selected config file's directory |
+| Inline-only API config                     | API `cwd`                        |
+| Loaded config plus inline overrides        | Loaded config file's directory   |
 
-Validation applies to the final matched value. Invalid types, relative paths and empty strings in unmatched entries or replaced by a later value do not fail a lint request.
+Set an explicit package directory if discovery should stop there instead of continuing to the repository's root tsconfig.
 
-An explicitly set `tsconfigRootDir` also anchors every relative `project` declaration for that target, preserving declaration order. Without it, or after a null reset, each declaration retains its own authored path origin described below. It does not move Rslint's implicit governing-directory `tsconfig.json` fallback when no project paths are declared.
-
-| Configuration                                          | Default discovery boundary                       |
-| ------------------------------------------------------ | ------------------------------------------------ |
-| Root config used from a package cwd                    | Root config directory                            |
-| Nested config owns the target                          | Nested config directory                          |
-| Explicit `--config` / `overrideConfigFile`             | Selected config file's directory                 |
-| Imported or transformed presets, including JSON copies | Governing config directory                       |
-| Inline-only API config                                 | API `cwd`                                        |
-| Loaded config plus inline overrides or `basePath`      | Governing config directory                       |
-| Explicit absolute `tsconfigRootDir`                    | That directory                                   |
-| Later `null` / `undefined`                             | Restore the default / retain the inherited value |
-
-A root config can therefore allow ancestor discovery into a large root TypeScript project even when linting a single package. Set an explicit package boundary if that is the intended scope; selected Programs retain their complete files and dependencies.
+JavaScript configurations also accept `null` to reset an inherited value to the default, although the public TypeScript type is `string`. This also restores the usual base for relative `project` paths, including any `basePath`. A later `undefined` leaves the inherited value unchanged.
 
 ## languageOptions.parserOptions.project
 
@@ -120,23 +113,19 @@ Files outside all tsconfigs are still linted, but only rules that do not require
 }
 ```
 
-Ordinary lint uses the target file's final merged `project` value. Only matching entries contribute settings; a later value replaces the earlier list. The first project in that effective list whose parsed `files`/`include` set contains the target wins. Files absent from every applicable root set use source-only gap linting, even if one of those projects imports them. No extra projects are constructed to search for import-only type information.
+For linting, only configuration entries matching the file contribute settings. A later `project` value replaces the earlier list. Rslint uses the first tsconfig in that list that includes the file through its `files` or `include` settings. A file that is only imported by a project still skips type-aware rules; add it to the tsconfig's `files` or `include` to enable them.
 
-| Matching entries in order                                                   | Ordinary target binding                                            |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `project: 'a.json'`, then `project: 'b.json'`                               | Search b                                                           |
-| `project: 'a.json'`, then `project: []`                                     | Use source-only linting                                            |
-| Final matching `project: false` or `null`                                   | Clear explicit binding; enabled service may still select a project |
-| `project: 'a.json'`, then false, then `project: 'b.json'`                   | Search b                                                           |
-| Matching `projectService: false`, with `project` only in an unmatched entry | Use source-only linting                                            |
+| Matching settings in order                    | Result for lint rules                                              |
+| --------------------------------------------- | ------------------------------------------------------------------ |
+| `project: 'a.json'`, then `project: 'b.json'` | Use `b.json` if it includes the file                               |
+| `project: 'a.json'`, then `project: []`       | Skip type-aware rules                                              |
+| Final `project: false` or `null`              | Clear explicit projects; `projectService: true` can still find one |
 
-When an entry has `basePath`, its explicit project literals and globs resolve from that directory unless the target has an explicit `tsconfigRootDir`. The directory remains literal even if its name contains glob characters. A later null root reset restores the winning declaration's authored base. Targets with different effective settings keep separate eligible project lists even if their Programs contain overlapping files.
+Relative project paths and glob patterns resolve from the configuration entry's [`basePath`](/config/base-path), when set, or its usual configuration directory. An explicit `tsconfigRootDir` overrides that base. The `basePath` reference also covers API inline configuration and custom config path rules.
 
-When neither project option is enabled, ordinary lint uses source-only gap linting without searching for a default `tsconfig.json`. See [`basePath`](/config/base-path) for path origins. A file must also satisfy its selected project's compiler admission settings; root membership and JavaScript `allowJs`/`checkJs` eligibility are separate requirements.
+When neither `project` nor `projectService` is enabled, lint still runs rules that do not require types. It does not automatically use a nearby `tsconfig.json`.
 
-Whole-directory CLI lint validates every effective project candidate, even when it does not need to construct that project. Focused CLI/API requests retain their ordered root search. CLI and API share target binding, and editor diagnostics and fixes apply the same parsed-root requirement.
-
-`--type-check` and `--type-check-only` retain [program-wide explicit checking](/guide/type-checking#what-gets-type-checked), including complete declaration lists and their historical default-project behavior. These modes also check complete service-selected Programs. A per-target clear or gap changes lint type information; it does not erase the owner's program-wide declarations or remove imported dependencies from a checked Program.
+The `--type-check` and `--type-check-only` commands check entire configured projects, including imported files. Disabling type-aware lint rules for a file does not exclude it from these TypeScript checks. See [what gets type-checked](/guide/type-checking#what-gets-type-checked).
 
 ## languageOptions.globals
 
