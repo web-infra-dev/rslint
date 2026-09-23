@@ -41,11 +41,17 @@ f();
 - `classes` (boolean, default `true`) - Whether to check class declarations
 - `variables` (boolean, default `true`) - Whether to check variable declarations
 - `enums` (boolean, default `true`) - Whether to check enum declarations
-- `typedefs` (boolean, default `true`) - Whether to check type/interface declarations
+- `typedefs` (boolean, default `true`) - Whether to check type/interface declarations and type parameters
 - `ignoreTypeReferences` (boolean, default `true`) - Whether to ignore references in type annotations
 - `allowNamedExports` (boolean, default `false`) - Whether to allow references in named exports
 
 Also accepts `"nofunc"` as a shorthand for `{ functions: false }`.
+
+With `allowNamedExports: true`, named exports follow the other options. The
+default `ignoreTypeReferences: true` ignores them, but setting it to `false`
+checks them according to the referenced declaration. For example,
+`export { value }; const value = 1;` is reported with
+`{ allowNamedExports: true, ignoreTypeReferences: false }`.
 
 ## Differences from ESLint
 
@@ -74,4 +80,4 @@ core rule:
 ## Original Documentation
 
 - [typescript-eslint: no-use-before-define](https://typescript-eslint.io/rules/no-use-before-define)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-use-before-define.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.70.1/packages/eslint-plugin/src/rules/no-use-before-define.ts)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
 	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
@@ -96,62 +97,62 @@ var NoUseBeforeDefineRule = rule.CreateRule(rule.Rule{
 
 		manager := scopeAnalysis.Get(ctx, scope.Options{CollectReferences: true})
 
-		// Upstream walks the scope tree depth-first; ordering the flat
-		// reference list by source position gives the same sequence for every
-		// input the rule can report on, without depending on scope-creation
-		// order.
-		references := slices.Clone(manager.References)
-		slices.SortStableFunc(references, func(a, b *scope.Reference) int {
-			return cmp.Compare(a.Identifier.Pos(), b.Identifier.Pos())
+		// Scope traversal need not follow source order. Sort only diagnostics,
+		// avoiding a reference-list copy and sort when nothing is forbidden.
+		var forbidden []*ast.Node
+		for _, ref := range manager.References {
+			if shouldReport(opts, ref) {
+				if forbidden == nil {
+					forbidden = make([]*ast.Node, 0, len(manager.References))
+				}
+				forbidden = append(forbidden, ref.Identifier)
+			}
+		}
+		slices.SortStableFunc(forbidden, func(a, b *ast.Node) int {
+			return cmp.Compare(a.Pos(), b.Pos())
 		})
 
-		for _, ref := range references {
-			check(ctx, opts, ref)
+		for _, identifier := range forbidden {
+			report(ctx, identifier, manager.PatternTargets[identifier])
 		}
 
 		return rule.RuleListeners{}
 	},
 })
 
-func check(ctx rule.RuleContext, opts options, ref *scope.Reference) {
+func shouldReport(opts options, ref *scope.Reference) bool {
 	declaration := ref.Resolved()
 	definitionIdentifier := ref.ResolvedIdentifier()
 
-	// A named export gets its own option and a plain positional check — none
-	// of the option chain below applies to it.
-	if isNamedExport(ref.Identifier) {
-		if opts.allowNamedExports {
-			return
-		}
-		if declaration == nil || definitionIdentifier == nil ||
-			!isDefinedBeforeUse(declaration, definitionIdentifier, ref) {
-			report(ctx, ref.Identifier)
-		}
-		return
+	// Disallowed named exports bypass the ordinary option chain. Allowed
+	// exports still pass through it, including ignoreTypeReferences.
+	if !opts.allowNamedExports && isNamedExport(ref.Identifier) {
+		return declaration == nil || definitionIdentifier == nil ||
+			!isDefinedBeforeUse(declaration, definitionIdentifier, ref)
 	}
 
 	// Definitions without identifiers — string-literal enum members, for
 	// example — still participate in resolution. Upstream skips the binding
 	// only when none of its merged definitions supplies an identifier.
 	if declaration == nil || definitionIdentifier == nil {
-		return
+		return false
 	}
 	if isDefinedBeforeUse(declaration, definitionIdentifier, ref) {
-		return
+		return false
 	}
 	if !isForbidden(opts, declaration, ref) {
-		return
+		return false
 	}
 	if isClassRefInClassDecorator(declaration, ref) {
-		return
+		return false
 	}
 	// A function type's parameter list has no runtime evaluation order, so a
 	// reference from inside one is never "before" anything.
 	if isFunctionTypeScope(ref.From) {
-		return
+		return false
 	}
 
-	report(ctx, ref.Identifier)
+	return true
 }
 
 // isDefinedBeforeUse reports whether the declaration is already in place when
@@ -199,7 +200,7 @@ func isForbidden(opts options, declaration *scope.Variable, ref *scope.Reference
 		return opts.variables
 	case declaration.Kind == scope.DefEnumName && isFromOuterVariableScope(declaration, ref):
 		return opts.enums
-	case declaration.Kind == scope.DefType:
+	case declaration.Kind == scope.DefType || declaration.Kind == scope.DefTypeParameter:
 		return opts.typedefs
 	}
 
@@ -264,9 +265,39 @@ func isClassRefInClassDecorator(declaration *scope.Variable, ref *scope.Referenc
 	return false
 }
 
-func report(ctx rule.RuleContext, node *ast.Node) {
-	ctx.ReportNode(node, rule.RuleMessage{
+func report(ctx rule.RuleContext, node *ast.Node, patternTarget *ast.Node) {
+	message := rule.RuleMessage{
 		Id:          "noUseBeforeDefine",
 		Description: "'" + node.Text() + "' was used before it was defined.",
-	})
+	}
+	ctx.ReportNode(node, message)
+
+	// The shared scope model stores one reference per identifier. Upstream
+	// also records a write for every enclosing destructuring default, so
+	// `[a = 0] = values` reports a twice and `[{a = 0} = {}] = values`
+	// reports it three times. Declaration initialization writes stay skipped.
+	current := node
+	if patternTarget != nil {
+		current = patternTarget
+	}
+	for current.Parent != nil {
+		parent := current.Parent
+		if ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions) && parent.Expression() == current {
+			current = parent
+			continue
+		}
+		target := ast.GetAssignmentTarget(current)
+		if target == nil {
+			return
+		}
+		if parent.Kind == ast.KindShorthandPropertyAssignment &&
+			parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer != nil {
+			ctx.ReportNode(node, message)
+		}
+		if !utils.IsDefaultValueInDestructuringAssignment(target) {
+			return
+		}
+		ctx.ReportNode(node, message)
+		current = target
+	}
 }

@@ -583,6 +583,77 @@ func TestBuildKeepsTheFirstFunctionOverloadAsTheBindingAnchor(t *testing.T) {
 	}
 }
 
+func TestBuildInferBindingsCrossFunctionAndMappedTypes(t *testing.T) {
+	for _, pattern := range []string{
+		`() => infer U`,
+		`new () => infer U`,
+		`(x: infer U) => void`,
+		`{ method(): infer U }`,
+		`{ [K in keyof X]: infer U }`,
+		`() => { [K in keyof X]: () => infer U }`,
+		`(X extends string ? never : infer U)`,
+	} {
+		t.Run(pattern, func(t *testing.T) {
+			m := buildWithReferences(t, `type Result<X> = X extends `+pattern+` ? U : U; type U = string;`)
+			var references []*Reference
+			for _, ref := range m.References {
+				if ref.Identifier.Text() == "U" {
+					references = append(references, ref)
+				}
+			}
+			if len(references) != 2 {
+				t.Fatalf("got %d U references, want true and false branches", len(references))
+			}
+			inferred := references[0].Resolved()
+			if inferred == nil || inferred.Kind != DefTypeParameter || inferred.Scope.Block.Kind != ast.KindConditionalType {
+				t.Fatal("true branch should resolve U in the enclosing conditional type")
+			}
+			if references[1].Resolved() != m.Global.Declarations("U")[0] {
+				t.Fatal("false branch should resolve the outer U")
+			}
+		})
+	}
+
+	t.Run("nested conditional owns its bindings", func(t *testing.T) {
+		m := buildWithReferences(t, `type Result<X> = X extends (X extends () => infer U ? U : never) ? U : never; type U = string;`)
+		var owners []DefKind
+		for _, ref := range m.References {
+			if ref.Identifier.Text() == "U" {
+				if ref.Resolved() == nil {
+					t.Fatal("U should resolve")
+				}
+				owners = append(owners, ref.Resolved().Kind)
+			}
+		}
+		if len(owners) != 2 || owners[0] != DefTypeParameter || owners[1] != DefType {
+			t.Fatalf("got U declaration kinds %v, want inner inference then outer alias", owners)
+		}
+	})
+}
+
+func TestBuildAssignmentPatternAssertionReferences(t *testing.T) {
+	for _, tc := range []struct {
+		code    string
+		pattern bool
+	}{
+		{`let a; ([(a as U) = a] = []); class U {}`, true},
+		{`let a; for ([a as U] of []) {} class U {}`, true},
+		{`let a; (a as U) = a; class U {}`, false},
+		{`let a; ([a = value as U] = []); class U {}`, false},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			m := buildWithReferences(t, tc.code)
+			ref := findReference(t, m, "U")
+			if ref.IsValueReference() != tc.pattern || ref.IsTypeReference() == tc.pattern {
+				t.Fatal("assertion reference has the wrong value/type space")
+			}
+			if (m.PatternTargets[ref.Identifier] != nil) != tc.pattern {
+				t.Fatal("only pattern assertions should retain their assignment target")
+			}
+		})
+	}
+}
+
 func TestBuildMarksBodylessFunctionsInAmbientContexts(t *testing.T) {
 	m := build(t, `declare namespace N { function f(): void }`)
 	for _, s := range m.Scopes {
