@@ -253,11 +253,11 @@ function runResolverTests(resolver: string) {
 
     invalid: ([] as ValidTestCase[]).concat(
       rest({
-        code: 'import reallyfake from "./reallyfake/module"',
+        code: 'import missing from "./missing/module"',
         settings: { 'import/ignore': ['^\\./fake/'] },
         errors: [
           {
-            message: "Unable to resolve path to module './reallyfake/module'.",
+            message: "Unable to resolve path to module './missing/module'.",
           },
         ],
       }),
@@ -559,7 +559,7 @@ ruleTester.run('no-unresolved ignore list', rule, {
       options: [{ ignore: ['.png$', '.gif$'] }],
     }),
     test({
-      code: 'import "./test.giffy"',
+      code: 'import "./test.gif.extra"',
       options: [{ ignore: ['.png$', '.gif$'] }],
     }),
 
@@ -596,9 +596,9 @@ ruleTester.run('no-unresolved unknown resolver', rule, {
     // logs resolver load error
     test({
       code: 'import "./malformed.js"',
-      settings: { 'import/resolver': 'doesnt-exist' },
+      settings: { 'import/resolver': 'does-not-exist' },
       errors: [
-        `Resolve error: unable to load resolver "doesnt-exist".`,
+        `Resolve error: unable to load resolver "does-not-exist".`,
         `Unable to resolve path to module './malformed.js'.`,
       ],
     }),
@@ -606,9 +606,9 @@ ruleTester.run('no-unresolved unknown resolver', rule, {
     // only logs resolver message once
     test({
       code: 'import "./malformed.js"; import "./fake.js"',
-      settings: { 'import/resolver': 'doesnt-exist' },
+      settings: { 'import/resolver': 'does-not-exist' },
       errors: [
-        `Resolve error: unable to load resolver "doesnt-exist".`,
+        `Resolve error: unable to load resolver "does-not-exist".`,
         `Unable to resolve path to module './malformed.js'.`,
         `Unable to resolve path to module './fake.js'.`,
       ],
@@ -646,11 +646,9 @@ ruleTester.run('import() with built-in parser', rule, {
   ),
   invalid: ([] as ValidTestCase[]).concat(
     testVersion('>=7', () => ({
-      code: 'import("./does-not-exist-l0w9ssmcqy9").then(() => {})',
+      code: 'import("./does-not-exist-dynamic").then(() => {})',
       parserOptions: { ecmaVersion: 2021 },
-      errors: [
-        "Unable to resolve path to module './does-not-exist-l0w9ssmcqy9'.",
-      ],
+      errors: ["Unable to resolve path to module './does-not-exist-dynamic'."],
     })) || [],
   ),
 });

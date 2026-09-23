@@ -50,7 +50,7 @@ func TestNoUnresolvedUpstream(t *testing.T) {
 				{Code: "require(foo)", Options: []any{map[string]any{"commonjs": true}}, Settings: map[string]any{"import/resolver": "node", "import/cache": map[string]any{"lifetime": 0}}},
 			},
 			[]rule_tester.InvalidTestCase{
-				{Code: "import reallyfake from \"./reallyfake/module\"", Settings: map[string]any{"import/ignore": []any{"^\\./fake/"}, "import/resolver": "node", "import/cache": map[string]any{"lifetime": 0}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module './reallyfake/module'.", Line: 1, Column: 24, EndLine: 1, EndColumn: 45}}},
+				{Code: "import missing from \"./missing/module\"", Settings: map[string]any{"import/ignore": []any{"^\\./fake/"}, "import/resolver": "node", "import/cache": map[string]any{"lifetime": 0}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module './missing/module'.", Line: 1, Column: 21, EndLine: 1, EndColumn: 39}}},
 				{Code: "import bar from './baz';", Settings: map[string]any{"import/resolver": "node", "import/cache": map[string]any{"lifetime": 0}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module './baz'.", Line: 1, Column: 17, EndLine: 1, EndColumn: 24}}},
 				{Code: "import bar from './empty-folder';", Settings: map[string]any{"import/resolver": "node", "import/cache": map[string]any{"lifetime": 0}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module './empty-folder'.", Line: 1, Column: 17, EndLine: 1, EndColumn: 33}}},
 				{Code: "import { DEEP } from 'in-alternate-root';", Settings: map[string]any{"import/resolver": "node", "import/cache": map[string]any{"lifetime": 0}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module 'in-alternate-root'.", Line: 1, Column: 22, EndLine: 1, EndColumn: 41}}},
@@ -141,7 +141,7 @@ func TestNoUnresolvedUpstream(t *testing.T) {
 				{Code: "require(foo)", Options: []any{map[string]any{"commonjs": true}}, Settings: map[string]any{"import/resolver": "webpack", "import/cache": map[string]any{"lifetime": 0}}},
 			},
 			[]rule_tester.InvalidTestCase{
-				{Code: "import reallyfake from \"./reallyfake/module\"", Settings: map[string]any{"import/ignore": []any{"^\\./fake/"}, "import/resolver": "webpack", "import/cache": map[string]any{"lifetime": 0}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module './reallyfake/module'.", Line: 1, Column: 24, EndLine: 1, EndColumn: 45}}},
+				{Code: "import missing from \"./missing/module\"", Settings: map[string]any{"import/ignore": []any{"^\\./fake/"}, "import/resolver": "webpack", "import/cache": map[string]any{"lifetime": 0}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module './missing/module'.", Line: 1, Column: 21, EndLine: 1, EndColumn: 39}}},
 				{Code: "import bar from './baz';", Settings: map[string]any{"import/resolver": "webpack", "import/cache": map[string]any{"lifetime": 0}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module './baz'.", Line: 1, Column: 17, EndLine: 1, EndColumn: 24}}},
 				{Code: "import bar from './empty-folder';", Settings: map[string]any{"import/resolver": "webpack", "import/cache": map[string]any{"lifetime": 0}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module './empty-folder'.", Line: 1, Column: 17, EndLine: 1, EndColumn: 33}}},
 				{Code: "import { DEEP } from 'in-alternate-root';", Settings: map[string]any{"import/resolver": "webpack", "import/cache": map[string]any{"lifetime": 0}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module 'in-alternate-root'.", Line: 1, Column: 22, EndLine: 1, EndColumn: 41}}},
@@ -226,7 +226,7 @@ func TestNoUnresolvedUpstream(t *testing.T) {
 		rule_tester.RunRuleTester(root, "tsconfig.json", t, &no_unresolved.NoUnresolvedRule,
 			[]rule_tester.ValidTestCase{
 				{Code: "import \"./malformed.js\"", Options: []any{map[string]any{"ignore": []any{".png$", ".gif$"}}}},
-				{Code: "import \"./test.giffy\"", Options: []any{map[string]any{"ignore": []any{".png$", ".gif$"}}}},
+				{Code: "import \"./test.gif.extra\"", Options: []any{map[string]any{"ignore": []any{".png$", ".gif$"}}}},
 				{Code: "import \"./test.gif\"", Options: []any{map[string]any{"ignore": []any{".png$", ".gif$"}}}},
 				{Code: "import \"./test.png\"", Options: []any{map[string]any{"ignore": []any{".png$", ".gif$"}}}},
 			},
@@ -240,8 +240,8 @@ func TestNoUnresolvedUpstream(t *testing.T) {
 		rule_tester.RunRuleTester(root, "tsconfig.json", t, &no_unresolved.NoUnresolvedRule,
 			[]rule_tester.ValidTestCase{},
 			[]rule_tester.InvalidTestCase{
-				{Code: "import \"./malformed.js\"", Settings: map[string]any{"import/resolver": "doesnt-exist"}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Resolve error: unable to load resolver \"doesnt-exist\".", Line: 1, Column: 1, EndLine: 1, EndColumn: 1}, {Message: "Unable to resolve path to module './malformed.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 24}}},
-				{Code: "import \"./malformed.js\"; import \"./fake.js\"", Settings: map[string]any{"import/resolver": "doesnt-exist"}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Resolve error: unable to load resolver \"doesnt-exist\".", Line: 1, Column: 1, EndLine: 1, EndColumn: 1}, {Message: "Unable to resolve path to module './malformed.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 24}, {Message: "Unable to resolve path to module './fake.js'.", Line: 1, Column: 33, EndLine: 1, EndColumn: 44}}},
+				{Code: "import \"./malformed.js\"", Settings: map[string]any{"import/resolver": "does-not-exist"}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Resolve error: unable to load resolver \"does-not-exist\".", Line: 1, Column: 1, EndLine: 1, EndColumn: 1}, {Message: "Unable to resolve path to module './malformed.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 24}}},
+				{Code: "import \"./malformed.js\"; import \"./fake.js\"", Settings: map[string]any{"import/resolver": "does-not-exist"}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Resolve error: unable to load resolver \"does-not-exist\".", Line: 1, Column: 1, EndLine: 1, EndColumn: 1}, {Message: "Unable to resolve path to module './malformed.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 24}, {Message: "Unable to resolve path to module './fake.js'.", Line: 1, Column: 33, EndLine: 1, EndColumn: 44}}},
 			})
 	})
 	t.Run("no-unresolved electron", func(t *testing.T) {
@@ -286,7 +286,7 @@ func TestNoUnresolvedUpstream(t *testing.T) {
 				{Code: "import('fs');"},
 			},
 			[]rule_tester.InvalidTestCase{
-				{Code: "import(\"./does-not-exist-l0w9ssmcqy9\").then(() => {})", Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module './does-not-exist-l0w9ssmcqy9'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 38}}},
+				{Code: "import(\"./does-not-exist-dynamic\").then(() => {})", Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module './does-not-exist-dynamic'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 34}}},
 			})
 	})
 	t.Run("typescript: no-unresolved ignore type-only", func(t *testing.T) {

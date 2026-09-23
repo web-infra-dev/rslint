@@ -1,3 +1,5 @@
+// cspell:ignore jsnext
+
 -- only-types.d.ts --
 export declare const value: number;
 -- node_modules/only-types-package/package.json --

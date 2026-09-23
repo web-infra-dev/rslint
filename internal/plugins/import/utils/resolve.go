@@ -121,6 +121,7 @@ func nodeResolveOptions(ctx rule.RuleContext, config map[string]any) moduleresol
 		IgnoreExports: true, LiteralPaths: true, PreserveSymlinks: true,
 		MainFields: []moduleresolver.MainField{
 			{Name: []string{"module"}, ForceRelative: true},
+			// cspell:ignore jsnext
 			{Name: []string{"jsnext:main"}, ForceRelative: true},
 			{Name: []string{"main"}, ForceRelative: true},
 		},

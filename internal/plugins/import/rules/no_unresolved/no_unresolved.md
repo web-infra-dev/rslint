@@ -55,10 +55,10 @@ export default [
 ## Resolution settings
 
 The default `node` resolver checks runtime files, including JSON and native
-modules. It tries `.mjs`, `.js`, `.json`, and `.node` extensions and package
-`module`, `jsnext:main`, and `main` entries. It does not treat an installed
-`@types` package as a runtime module. `import/core-modules` exempts exact module
-names, such as `electron`.
+modules. It tries `.mjs`, `.js`, `.json`, and `.node` extensions. For packages,
+it checks ES module entry points before `main`, then falls back to index files.
+It does not treat an installed `@types` package as a runtime module.
+`import/core-modules` exempts exact module names, such as `electron`.
 
 `import/resolver` accepts `node`, an object containing Node options, or an array
 of resolvers tried in order. Node options include `extensions`, `paths`,

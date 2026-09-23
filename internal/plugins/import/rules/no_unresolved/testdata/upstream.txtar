@@ -41,7 +41,7 @@ export default class MyCoolComponent extends React.Component {
 	}
 }
 -- malformed.js --
-return foo from fnuction () {
+return foo from function () {
 
 export {}
 -- node_modules/a/index.js --
@@ -62,5 +62,5 @@ export const bar = 'BAR'
 export const DEEP = 'RISING'
 -- test-module/index.js --
 export function someThing() {}
--- test.giffy --
+-- test.gif.extra --
 boo!
