@@ -114,10 +114,12 @@ func nextCaseWeight(value string, pos int) (weight, next int, ok bool) {
 	for pos < len(value) {
 		r, size := utf8.DecodeRuneInString(value[pos:])
 		pos += size
+		// Uppercase and Lowercase include non-letter characters such as
+		// Roman numerals and circled letters, beyond the Lu/Ll categories.
 		switch {
-		case unicode.Is(unicode.Upper, r), unicode.IsTitle(r):
+		case unicode.In(r, unicode.Lu, unicode.Lt, unicode.Other_Uppercase):
 			return 0, pos, true
-		case unicode.Is(unicode.Lower, r):
+		case unicode.In(r, unicode.Ll, unicode.Other_Lowercase):
 			return 1, pos, true
 		}
 	}
