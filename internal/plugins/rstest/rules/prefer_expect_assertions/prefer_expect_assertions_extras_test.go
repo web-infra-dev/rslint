@@ -61,6 +61,12 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 	shadowedHookContext := rstestImport + "beforeEach((ctx) => { const other = { expect }; other.expect.hasAssertions(); }); test('t', () => {});"
 	argumentInHook := rstestImport + "beforeEach(() => expect.hasAssertions(1)); test('t', () => {});"
 	disallowInHook := rstestImport + "beforeEach(() => { expect.hasAssertions(); }); test('t', () => {});"
+	// A declaration the hook does not make on every run leaves the test
+	// unprotected.
+	branchInHook := rstestImport + "beforeEach(() => { if (strict) { expect.hasAssertions(); } }); test('t', () => {});"
+	logicalInHook := rstestImport + "beforeEach(() => strict && expect.hasAssertions()); test('t', () => {});"
+	returnBeforeHookDeclaration := rstestImport + "beforeEach(() => { if (skip) return; expect.hasAssertions(); }); test('t', () => {});"
+	tryInHook := rstestImport + "beforeEach(() => { try { expect.hasAssertions(); } catch {} }); test('t', () => {});"
 
 	// ---- Provenance ----
 	renamed := "import { expect as check, test as scenario } from '@rstest/core';\nscenario('t', () => { run(); });"
@@ -83,6 +89,9 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 	nestedBranch := rstestImport + "test('t', () => { if (ready) { expect.assertions(1); } run(); });"
 	directive := rstestImport + "test('t', function () { 'use strict'; run(); });"
 	matcherNamedAssertions := rstestImport + "test('t', () => { expect(value).assertions(1); });"
+	logicalFirst := rstestImport + "test('t', () => { strict && expect.hasAssertions(); run(); });"
+	conditionalFirst := rstestImport + "test('t', () => { strict ? expect.assertions(1) : null; run(); });"
+	parameterDefault := rstestImport + "test('t', (context = expect.hasAssertions()) => { run(); });"
 
 	// ---- Arguments ----
 	bracketDisallowed := rstestImport + "test('t', () => { expect['hasAssertions'](); });"
@@ -112,6 +121,8 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 			{Code: rstestImport + "beforeEach((context) => { context.expect.hasAssertions(); }); test('t', () => {});"},
 			{Code: rstestImport + "describe.each([1])('s %s', () => { beforeEach(() => expect.hasAssertions()); test('t', () => {}); });"},
 			{Code: rstestImport + "beforeEach(((() => { expect.hasAssertions(); }) as () => void)); test('t', () => {});"},
+			{Code: rstestImport + "beforeEach(() => { const server = start(); expect.hasAssertions(); }); test('t', () => {});"},
+			{Code: rstestImport + "beforeEach(() => void expect.hasAssertions()); test('t', () => {});"},
 
 			// ---- Provenance ----
 			{Code: "import { expect as check, test as scenario } from '@rstest/core';\nscenario('t', () => { check.assertions(1); });"},
@@ -158,6 +169,10 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 			invalid(reassignedHook, missing(reassignedHook, "test('t', () => {})", "test('t', () => {", "expect")),
 			invalid(foreignHook, missing(foreignHook, "test('t', () => {})", "test('t', () => {", "expect")),
 			invalid(shadowedHookContext, missing(shadowedHookContext, "test('t', () => {})", "test('t', () => {", "expect")),
+			invalid(branchInHook, missing(branchInHook, "test('t', () => {})", "test('t', () => {", "expect")),
+			invalid(logicalInHook, missing(logicalInHook, "test('t', () => {})", "test('t', () => {", "expect")),
+			invalid(returnBeforeHookDeclaration, missing(returnBeforeHookDeclaration, "test('t', () => {})", "test('t', () => {", "expect")),
+			invalid(tryInHook, missing(tryInHook, "test('t', () => {})", "test('t', () => {", "expect")),
 			{
 				Code: argumentInHook,
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -210,6 +225,9 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 				},
 			}),
 			invalid(matcherNamedAssertions, missing(matcherNamedAssertions, "test('t', () => { expect(value).assertions(1); })", "() => {", "expect")),
+			invalid(logicalFirst, missing(logicalFirst, "test('t', () => { strict && expect.hasAssertions(); run(); })", "() => {", "expect")),
+			invalid(conditionalFirst, missing(conditionalFirst, "test('t', () => { strict ? expect.assertions(1) : null; run(); })", "() => {", "expect")),
+			invalid(parameterDefault, missing(parameterDefault, "test('t', (context = expect.hasAssertions()) => { run(); })", "=> {", "expect")),
 
 			// ---- Arguments ----
 			{

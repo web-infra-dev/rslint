@@ -259,6 +259,9 @@ func NewRule(config Config) rule.Rule {
 						}
 						test.satisfied = true
 					} else if suites, ok := hookCallbacks[entry.owner]; ok {
+						if !runsOnEveryHookCall(entry.static.Call, entry.owner) {
+							continue
+						}
 						for _, suite := range suites {
 							coverSuite(suite)
 						}
@@ -398,33 +401,123 @@ func enclosingFunction(node *ast.Node) *ast.Node {
 // isFirstStatement reports whether call is the test callback's first
 // expression: the concise body of an arrow function, or an expression inside
 // the first statement of the callback's own block after its directive
-// prologue. A call nested in an inner statement, such as the branch of an
-// `if`, only runs on some paths and does not count.
+// prologue. The call must run whenever that statement runs, so a call nested in
+// an inner statement or on one side of `&&` or `?:` does not count.
 func isFirstStatement(call *ast.Node, function *ast.Node) bool {
-	body := function.Body()
-	if body == nil {
+	statement, ok := declarationStatement(call, function)
+	if !ok {
 		return false
 	}
-	if body.Kind != ast.KindBlock {
+	if statement == nil {
 		return true
 	}
-	statement := call
-	for statement.Parent != body {
-		statement = statement.Parent
-		if statement == nil || statement.Kind == ast.KindBlock {
-			return false
-		}
-		if statement.Parent != body && ast.IsStatement(statement) {
-			return false
-		}
-	}
-	for _, candidate := range body.AsBlock().Statements.Nodes {
+	for _, candidate := range function.Body().AsBlock().Statements.Nodes {
 		if ast.IsPrologueDirective(candidate) {
 			continue
 		}
 		return candidate == statement
 	}
 	return false
+}
+
+// runsOnEveryHookCall reports whether a hook callback makes call each time it
+// runs. The call may follow other statements, since setup before the
+// declaration still leaves it on every normal path, but it must be a
+// top-level statement that runs unconditionally, and no earlier statement may
+// return or throw.
+func runsOnEveryHookCall(call *ast.Node, function *ast.Node) bool {
+	statement, ok := declarationStatement(call, function)
+	if !ok {
+		return false
+	}
+	if statement == nil {
+		return true
+	}
+	for _, candidate := range function.Body().AsBlock().Statements.Nodes {
+		if candidate == statement {
+			return true
+		}
+		if mayExit(candidate) {
+			return false
+		}
+	}
+	return false
+}
+
+// declarationStatement returns the statement of function's block body that
+// contains call, or nil for a concise arrow body. ok is false when call sits in
+// a nested statement or block, or on a path its statement does not always
+// evaluate.
+func declarationStatement(call *ast.Node, function *ast.Node) (statement *ast.Node, ok bool) {
+	body := function.Body()
+	if body == nil {
+		return nil, false
+	}
+	child := call
+	for current := call.Parent; current != nil; child, current = current, current.Parent {
+		if current == body && body.Kind == ast.KindBlock {
+			return child, true
+		}
+		if current == function {
+			// Reached from the concise body, not from a parameter default.
+			return nil, child == body
+		}
+		if current.Kind == ast.KindBlock || ast.IsStatement(current) && current.Parent != body {
+			return nil, false
+		}
+		if !evaluatesChild(current, child) {
+			return nil, false
+		}
+	}
+	return nil, false
+}
+
+// evaluatesChild reports whether evaluating parent always evaluates child. The
+// right operand of a short-circuiting operator and the branches of a
+// conditional expression may be skipped.
+func evaluatesChild(parent *ast.Node, child *ast.Node) bool {
+	switch parent.Kind {
+	case ast.KindBinaryExpression:
+		binary := parent.AsBinaryExpression()
+		switch binary.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken,
+			ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+			return child == binary.Left
+		}
+	case ast.KindConditionalExpression:
+		return child == parent.AsConditionalExpression().Condition
+	case ast.KindIfStatement:
+		return child == parent.AsIfStatement().Expression
+	case ast.KindSwitchStatement:
+		return child == parent.AsSwitchStatement().Expression
+	case ast.KindExpressionStatement, ast.KindVariableStatement, ast.KindReturnStatement, ast.KindThrowStatement:
+		return true
+	}
+	// Any other statement, such as a loop, may run its expressions zero times
+	// or only after its body.
+	return !ast.IsStatement(parent)
+}
+
+// mayExit reports whether statement contains a return or throw of the
+// enclosing function, which could leave a later declaration unexecuted.
+func mayExit(statement *ast.Node) bool {
+	found := false
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if found {
+			return true
+		}
+		switch {
+		case node.Kind == ast.KindReturnStatement || node.Kind == ast.KindThrowStatement:
+			found = true
+			return true
+		case isFunctionBoundary(node) || ast.IsClassLike(node):
+			return false
+		}
+		return node.ForEachChild(visit)
+	}
+	visit(statement)
+	return found
 }
 
 func checkStaticCall(ctx *rule.RuleContext, static *StaticCall, opts options) []pendingReport {

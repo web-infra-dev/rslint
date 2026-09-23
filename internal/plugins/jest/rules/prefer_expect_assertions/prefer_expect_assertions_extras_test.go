@@ -50,11 +50,17 @@ func option(name string) []interface{} {
 func TestPreferExpectAssertionsExtras(t *testing.T) {
 	matcherNamedAssertions := `it('t', () => { expect(value).assertions(1); });`
 	nestedBranch := `it('t', () => { if (ready) { expect.assertions(1); } run(); });`
+	logicalFirst := `it('t', () => { strict && expect.hasAssertions(); run(); });`
 	directive := `it('t', function () { 'use strict'; run(); });`
 	reassignedHook := `let setup = () => expect.hasAssertions(); setup = () => {}; beforeEach(setup); it('t', () => {});`
 	foreignReference := `beforeEach(helpers.hasAssertions); it('t', () => {});`
 	shadowedReference := `function run(expect) { beforeEach(expect.hasAssertions); it('t', () => {}); }`
 	beforeAllOnly := `beforeAll(() => { expect.hasAssertions(); }); it('t', () => {});`
+	// A declaration the hook does not make on every run leaves the test
+	// unprotected.
+	branchInHook := `afterEach(() => { if (strict) { expect.hasAssertions(); } }); it('t', () => {});`
+	logicalInHook := `beforeEach(() => strict && expect.hasAssertions()); it('t', () => {});`
+	returnBeforeHookDeclaration := `beforeEach(() => { if (skip) return; expect.hasAssertions(); }); it('t', () => {});`
 	whileLoop := `it('t', () => { while (next()) { expect(current()).toBe(1); } });`
 	methodCallback := `it('t', () => { register({ handle() { expect(1).toBe(1); } }); });`
 	leak := "it('a', () => { expect.assertions(1); expect(1).toBe(1); });\nit('b', async () => { await run(); });"
@@ -90,6 +96,7 @@ it("returns numbers that are greater than five", () => {
 			{Code: `it('t', () => {}); const setup = () => expect.assertions(1); beforeEach(setup);`},
 			{Code: `import { beforeEach as setup, expect as check, it } from '@jest/globals'; setup(() => check.hasAssertions()); it('t', () => {});`},
 			{Code: `import { expect as check, it } from '@jest/globals'; beforeEach(check.hasAssertions); it('t', () => {});`},
+			{Code: `beforeEach(() => { const server = start(); expect.hasAssertions(); }); it('t', () => {});`},
 
 			// ---- First statement ----
 			{Code: `it('t', function () { 'use strict'; expect.hasAssertions(); });`},
@@ -112,6 +119,9 @@ it("returns numbers that are greater than five", () => {
 			invalid(foreignReference, nil, missing(foreignReference, "it('t', () => {})", "() => {")),
 			invalid(shadowedReference, nil, missing(shadowedReference, "it('t', () => {})", "() => {")),
 			invalid(beforeAllOnly, nil, missing(beforeAllOnly, "it('t', () => {})", "() => {")),
+			invalid(branchInHook, nil, missing(branchInHook, "it('t', () => {})", "it('t', () => {")),
+			invalid(logicalInHook, nil, missing(logicalInHook, "it('t', () => {})", "it('t', () => {")),
+			invalid(returnBeforeHookDeclaration, nil, missing(returnBeforeHookDeclaration, "it('t', () => {})", "it('t', () => {")),
 
 			// ---- First statement ----
 			// A matcher named assertions reads it off expect's result and declares
@@ -119,6 +129,8 @@ it("returns numbers that are greater than five", () => {
 			invalid(matcherNamedAssertions, nil, missing(matcherNamedAssertions, matcherNamedAssertions[:len(matcherNamedAssertions)-1], "() => {")),
 			// A call inside a branch only declares a count on some paths.
 			invalid(nestedBranch, nil, missing(nestedBranch, nestedBranch[:len(nestedBranch)-1], "() => {")),
+			// So does one on the right of a short-circuiting operator.
+			invalid(logicalFirst, nil, missing(logicalFirst, logicalFirst[:len(logicalFirst)-1], "() => {")),
 			invalid(directive, nil, rule_tester.InvalidTestCaseError{
 				MessageId: "haveExpectAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 46,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
