@@ -47,6 +47,8 @@ import type { Foo } from 'module';
 ## Differences from ESLint
 
 - **Flow `typeof` imports are unsupported.** This rule supports TypeScript type imports, but not Flow's `import typeof Foo from 'foo'` or `import { typeof Foo } from 'foo'` forms.
+- **Imports with attributes are not autofixed.** Imports with `with { ... }`, including `import type` declarations with a `"resolution-mode"` attribute, are reported without an automatic fix to preserve their module resolution and avoid invalid TypeScript.
+- **Autofixes do not delete comments.** For example, `import { type /*A*/ Foo /*B*/ as /*C*/ Bar } from 'm';` is reported without a fix under `"prefer-top-level"`. Fixes remain available when the comments can stay in place.
 - **Autofixes preserve quoted import names.** With `"prefer-top-level"`, rslint keeps the original name and its quotes. eslint-plugin-import v2.32.0 replaces `'a-b'` with `undefined` in this case, which changes the imported name:
 
   ```typescript

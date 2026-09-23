@@ -53,6 +53,10 @@ var ConsistentTypeSpecifierStyleRule = rule.Rule{
 				if preferInline {
 					if clause.IsTypeOnly() {
 						ctx.ReportNodeWithDeferredFixes(node, preferInlineMessage(), func() []rule.RuleFix {
+							// Type import attributes such as resolution-mode require import type.
+							if declaration.Attributes != nil {
+								return nil
+							}
 							return inlineFixes(ctx.SourceFile, clause, specifiers)
 						})
 					}
@@ -78,9 +82,11 @@ var ConsistentTypeSpecifierStyleRule = rule.Rule{
 				// Every specifier diagnostic carries the same combined fix. Build it
 				// once, and only when the consumer requests autofixes.
 				var fixes []rule.RuleFix
+				fixesBuilt := false
 				buildFixes := func() []rule.RuleFix {
-					if fixes == nil {
+					if !fixesBuilt {
 						fixes = topLevelFixes(ctx.SourceFile, node, typeSpecifiers, lastValueSpecifier)
+						fixesBuilt = true
 					}
 					return fixes
 				}
@@ -112,6 +118,13 @@ func inlineFixes(sourceFile *ast.SourceFile, clause *ast.ImportClause, specifier
 
 func topLevelFixes(sourceFile *ast.SourceFile, node *ast.Node, typeSpecifiers []*ast.Node, lastValueSpecifier *ast.Node) []rule.RuleFix {
 	declaration := node.AsImportDeclaration()
+	// Dropping attributes can change resolution, and copying value-import
+	// attributes onto import type can produce invalid TypeScript.
+	if declaration.Attributes != nil {
+		return nil
+	}
+	text := utils.TrimmedNodeText(sourceFile, node)
+	mayHaveComments := strings.Contains(text, "//") || strings.Contains(text, "/*")
 	clause := declaration.ImportClause.AsImportClause()
 	names := make([]string, 0, len(typeSpecifiers))
 	for _, node := range typeSpecifiers {
@@ -129,6 +142,9 @@ func topLevelFixes(sourceFile *ast.SourceFile, node *ast.Node, typeSpecifiers []
 	}
 	newImport := "import type {" + strings.Join(names, ", ") + "} from " + utils.TrimmedNodeText(sourceFile, declaration.ModuleSpecifier) + ";"
 	if lastValueSpecifier == nil && clause.Name() == nil {
+		if mayHaveComments && utils.HasCommentInsideNode(sourceFile, node) {
+			return nil
+		}
 		return []rule.RuleFix{rule.RuleFixReplace(sourceFile, node, newImport)}
 	}
 
@@ -139,6 +155,9 @@ func topLevelFixes(sourceFile *ast.SourceFile, node *ast.Node, typeSpecifiers []
 	fixes := make([]rule.RuleFix, 0, capacity)
 	if lastValueSpecifier != nil {
 		for _, specifier := range typeSpecifiers {
+			if mayHaveComments && utils.HasCommentInsideNode(sourceFile, specifier) {
+				return nil
+			}
 			if comma, ok := utils.TokenAtOrAfter(sourceFile, specifier.End()); ok && comma.Kind == ast.KindCommaToken {
 				fixes = append(fixes, rule.RuleFixRemoveRange(comma.Range()))
 			}
@@ -148,6 +167,10 @@ func topLevelFixes(sourceFile *ast.SourceFile, node *ast.Node, typeSpecifiers []
 			fixes = append(fixes, rule.RuleFixRemoveRange(comma.Range()))
 		}
 	} else if comma, ok := utils.TokenAtOrAfter(sourceFile, clause.Name().End()); ok {
+		if mayHaveComments && (utils.HasCommentsInRange(sourceFile, core.NewTextRange(comma.End, clause.NamedBindings.End())) ||
+			utils.HasCommentInsideNode(sourceFile, clause.NamedBindings)) {
+			return nil
+		}
 		fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(comma.Start, clause.NamedBindings.End())))
 	}
 	return append(fixes, rule.RuleFixInsertAfter(node, "\n"+newImport))

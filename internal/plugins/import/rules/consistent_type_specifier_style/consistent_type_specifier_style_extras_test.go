@@ -18,11 +18,15 @@ func TestConsistentTypeSpecifierStyleEditDemand(t *testing.T) {
 	for _, tc := range []struct {
 		name, code, option string
 		count              int
+		noFix              bool
 	}{
-		{"inline", `import type {Foo, Bar} from 'module';`, "prefer-inline", 1},
-		{"all type", `import {type Foo, type Bar} from 'module';`, "prefer-top-level", 1},
-		{"mixed", `import {Value, type Foo, type Bar} from 'module';`, "prefer-top-level", 2},
-		{"default", `import Value, {type Foo, type Bar} from 'module';`, "prefer-top-level", 2},
+		{"inline", `import type {Foo, Bar} from 'module';`, "prefer-inline", 1, false},
+		{"all type", `import {type Foo, type Bar} from 'module';`, "prefer-top-level", 1, false},
+		{"mixed", `import {Value, type Foo, type Bar} from 'module';`, "prefer-top-level", 2, false},
+		{"default", `import Value, {type Foo, type Bar} from 'module';`, "prefer-top-level", 2, false},
+		{"attributes", `import {Value, type Foo, type Bar} from 'module' with {type: 'json'};`, "prefer-top-level", 2, true},
+		{"resolution mode", `import type {Foo} from 'module' with {'resolution-mode': 'import'};`, "prefer-inline", 1, true},
+		{"comments", `import {Value, type /*keep*/ Foo, type Bar} from 'module';`, "prefer-top-level", 2, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/edit-demand.ts", Path: "/edit-demand.ts"}, tc.code, core.ScriptKindTS)
@@ -45,7 +49,7 @@ func TestConsistentTypeSpecifierStyleEditDemand(t *testing.T) {
 					if got.Suggestions != nil {
 						t.Fatalf("demand %d: unexpected suggestions", demand)
 					}
-					if demand == rule.EditDemandAll || demand == rule.EditDemandAutofix {
+					if !tc.noFix && (demand == rule.EditDemandAll || demand == rule.EditDemandAutofix) {
 						if got.FixesPtr == nil || len(*got.FixesPtr) == 0 || !reflect.DeepEqual(got.FixesPtr, all[i].FixesPtr) {
 							t.Fatalf("demand %d: autofixes missing or differ from all edits", demand)
 						}
@@ -63,7 +67,7 @@ func TestConsistentTypeSpecifierStyleEditDemand(t *testing.T) {
 	}
 }
 
-// Expected messages, ranges and fixes checked against eslint-plugin-import v2.32.0.
+// Messages and ranges follow eslint-plugin-import v2.32.0. Unsafe fixes are withheld.
 
 func TestConsistentTypeSpecifierStyleExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &consistent_type_specifier_style.ConsistentTypeSpecifierStyleRule,
@@ -185,9 +189,8 @@ import type {Bar, Baz as Local} from 'Foo';`},
 				},
 			},
 			{
-				Code: `import Foo /*before comma*/, /*brace*/ {type Bar, /*tail*/} /*after*/ from 'Foo';`,
-				Output: []string{`import Foo /*before comma*/ /*after*/ from 'Foo';
-import type {Bar} from 'Foo';`},
+				Code:   `import Foo /*before comma*/, /*brace*/ {type Bar, /*tail*/} /*after*/ from 'Foo';`,
+				Output: nil,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 41, EndLine: 1, EndColumn: 49},
 				},
@@ -219,7 +222,7 @@ import type {Foo} from 'Foo';`},
 			},
 			{
 				Code:   `import {type Foo, type Bar /*removed*/} from 'Foo';`,
-				Output: []string{`import type {Foo, Bar} from 'Foo';`},
+				Output: nil,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 1, EndLine: 1, EndColumn: 52},
 				},
@@ -260,15 +263,14 @@ import type {类型 as 别名} from '模块';`},
 			},
 			{
 				Code:   `import {type Foo} from 'Foo' with { type: 'json' };`,
-				Output: []string{`import type {Foo} from 'Foo';`},
+				Output: nil,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 1, EndLine: 1, EndColumn: 52},
 				},
 			},
 			{
-				Code: `import Foo, {type Bar} from 'Foo' with { type: 'json' };`,
-				Output: []string{`import Foo from 'Foo' with { type: 'json' };
-import type {Bar} from 'Foo';`},
+				Code:   `import Foo, {type Bar} from 'Foo' with { type: 'json' };`,
+				Output: nil,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 14, EndLine: 1, EndColumn: 22},
 				},
@@ -309,6 +311,124 @@ import type {Bar} from 'Bar';`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
 					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 2, Column: 16, EndLine: 2, EndColumn: 24},
+				},
+			},
+			{
+				// all-type import attributes.
+				Code:    "import { type Style } from \"plain.style\" with { type: \"css\" };",
+				Options: []any{"prefer-top-level"},
+				Output:  nil,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 1, EndLine: 1, EndColumn: 63},
+				},
+			},
+			{
+				// mixed import attributes.
+				Code:    "import { Value, type Style } from \"plain.style\" with { type: \"css\" };",
+				Options: []any{"prefer-top-level"},
+				Output:  nil,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 17, EndLine: 1, EndColumn: 27},
+				},
+			},
+			{
+				// inline import resolution.
+				Code:    "import type { Foo } from \"pkg\" with { \"resolution-mode\": \"import\" };",
+				Options: []any{"prefer-inline"},
+				Output:  nil,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferInline", Message: "Prefer using inline type specifiers instead of a top-level type-only import.", Line: 1, Column: 1, EndLine: 1, EndColumn: 69},
+				},
+			},
+			{
+				// inline require resolution.
+				Code:    "import type { Foo } from \"pkg\" with { \"resolution-mode\": \"require\" };",
+				Options: []any{"prefer-inline"},
+				Output:  nil,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferInline", Message: "Prefer using inline type specifiers instead of a top-level type-only import.", Line: 1, Column: 1, EndLine: 1, EndColumn: 70},
+				},
+			},
+			{
+				// comments within all-type specifier.
+				Code:    "import { type /*A*/ Foo /*B*/ as /*C*/ Bar } from \"m\";",
+				Options: []any{"prefer-top-level"},
+				Output:  nil,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 1, EndLine: 1, EndColumn: 55},
+				},
+			},
+			{
+				// comments outside all-type specifiers.
+				Code:    "import /*keep*/ { type Foo } from /*module*/ \"m\";",
+				Options: []any{"prefer-top-level"},
+				Output:  nil,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 1, EndLine: 1, EndColumn: 50},
+				},
+			},
+			{
+				// comment before named bindings.
+				Code:    "import Default, /*keep*/ {type Foo} from \"m\";",
+				Options: []any{"prefer-top-level"},
+				Output:  nil,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 27, EndLine: 1, EndColumn: 35},
+				},
+			},
+			{
+				// line comment inside a removed specifier.
+				Code:    "import { Value, type // keep\nFoo } from \"m\";",
+				Options: []any{"prefer-top-level"},
+				Output:  nil,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 17, EndLine: 2, EndColumn: 4},
+				},
+			},
+			{
+				// multiple diagnostics share a withheld fix.
+				Code:    "import { Value, type /*keep*/ Foo, type Bar } from \"m\";",
+				Options: []any{"prefer-top-level"},
+				Output:  nil,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 17, EndLine: 1, EndColumn: 34},
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 36, EndLine: 1, EndColumn: 44},
+				},
+			},
+			{
+				// comments outside the removed default-import span.
+				Code:    "import Default /*keep*/, {type Foo} /*also keep*/ from \"m\";",
+				Options: []any{"prefer-top-level"},
+				Output:  []string{"import Default /*keep*/ /*also keep*/ from \"m\";\nimport type {Foo} from \"m\";"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 27, EndLine: 1, EndColumn: 35},
+				},
+			},
+			{
+				// comment-like string contents.
+				Code:    "import { Value, type \"/*Foo*/\" as Foo } from \"https://m\";",
+				Options: []any{"prefer-top-level"},
+				Output:  []string{"import { Value  } from \"https://m\";\nimport type {\"/*Foo*/\" as Foo} from \"https://m\";"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 17, EndLine: 1, EndColumn: 38},
+				},
+			},
+			{
+				// comments outside an all-type import.
+				Code:    "/*keep*/ import { type Foo } from \"m\"; // keep",
+				Options: []any{"prefer-top-level"},
+				Output:  []string{"/*keep*/ import type {Foo} from \"m\"; // keep"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 10, EndLine: 1, EndColumn: 39},
+				},
+			},
+			{
+				// comment-like text in an all-type import.
+				Code:    "import { type \"/*Foo*/\" as Foo } from \"https://m\";",
+				Options: []any{"prefer-top-level"},
+				Output:  []string{"import type {\"/*Foo*/\" as Foo} from \"https://m\";"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 1, EndLine: 1, EndColumn: 51},
 				},
 			},
 		},
@@ -358,7 +478,7 @@ func TestConsistentTypeSpecifierStyleASTEdges(t *testing.T) {
 			},
 			{
 				Code:   "import { type /*between*/ Foo /*alias*/ as /*name*/ Bar, Value /*last*/, } from 'foo';",
-				Output: []string{"import {  Value /*last*/ } from 'foo';\nimport type {Foo as Bar} from 'foo';"},
+				Output: nil,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferTopLevel", Message: "Prefer using a top-level type-only import instead of inline type specifiers.", Line: 1, Column: 10, EndLine: 1, EndColumn: 56},
 				},
