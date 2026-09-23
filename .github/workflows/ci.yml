@@ -118,9 +118,9 @@ jobs:
           $memoryLimitGiB = 0
           if ([int]::TryParse($env:memory_Limit, [ref]$memoryLimitGiB) -and $memoryLimitGiB -gt 0) {
             # memory_Limit is the runner's total memory quota in GiB.
-            # Reserve 20% for the OS and other overhead, and share the budget
+            # Reserve 10% for the OS and other overhead, and share the budget
             # across the full CPU-quota package parallelism.
-            $memoryBudgetMiB = [Math]::Floor($memoryLimitGiB * 1024 * 0.8)
+            $memoryBudgetMiB = [Math]::Floor($memoryLimitGiB * 1024 * 0.9)
 
             # GOMEMLIMIT is a soft limit for each Go process, not the whole job.
             $processMemoryMiB = [Math]::Floor($memoryBudgetMiB / $packageParallelism)
