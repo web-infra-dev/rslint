@@ -238,6 +238,10 @@ type Manager struct {
 	// References lists every reference in the file, in the order the builder
 	// discovered them. Populated only when [Options.CollectReferences] is set.
 	References []*Reference
+	// PatternTargets maps identifiers in assignment-pattern assertion types to
+	// the assertion. scope-manager treats these as writes to the pattern,
+	// including its default assignments. Allocated only for that syntax.
+	PatternTargets map[*ast.Node]*ast.Node
 	// byBlock is the lazy index used by Acquire.
 	byBlock map[*ast.Node]*Scope
 }

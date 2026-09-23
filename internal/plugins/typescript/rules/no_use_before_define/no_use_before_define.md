@@ -41,37 +41,19 @@ f();
 - `classes` (boolean, default `true`) - Whether to check class declarations
 - `variables` (boolean, default `true`) - Whether to check variable declarations
 - `enums` (boolean, default `true`) - Whether to check enum declarations
-- `typedefs` (boolean, default `true`) - Whether to check type/interface declarations
+- `typedefs` (boolean, default `true`) - Whether to check type/interface declarations and type parameters
 - `ignoreTypeReferences` (boolean, default `true`) - Whether to ignore references in type annotations
 - `allowNamedExports` (boolean, default `false`) - Whether to allow references in named exports
 
 Also accepts `"nofunc"` as a shorthand for `{ functions: false }`.
 
-## Differences from ESLint
-
-rslint also ships the core `no-use-before-define` rule, which gained TypeScript
-support in ESLint 10 and takes the same options. Enable one or the other — the
-two disagree in a few places, because this rule extends an older version of the
-core rule:
-
-- Code that reads a class binding while the class itself is still being defined
-  — `class C extends C {}`, `class C { [C](){} }`, `const C = class { static x = C }` —
-  is reported by the core rule and not by this one.
-- A class field initializer or static block is an ordinary separate scope here,
-  so `classes`, `variables`, and `enums` exempt references from inside one. The
-  core rule treats static initializers as part of the surrounding code, and
-  still reports them.
-- `ignoreTypeReferences` covers every type position here — including
-  `implements` clauses, qualified type names, and the exported name of
-  `export = X` / `export default X`. The core rule only exempts direct type
-  references and `typeof` queries.
-- References from a function/constructor type or call/construct/method signature
-  are never reported here, including its parameter and return types.
-- A reference that resolves to a string-literal enum member (`enum E { b = a, "a" = 1 }`)
-  is not reported here, because such a member declares no identifier. The core
-  rule measures it from the literal and reports it.
+With `allowNamedExports: true`, named exports follow the other options. The
+default `ignoreTypeReferences: true` ignores them, but setting it to `false`
+checks them according to the referenced declaration. For example,
+`export { value }; const value = 1;` is reported with
+`{ allowNamedExports: true, ignoreTypeReferences: false }`.
 
 ## Original Documentation
 
 - [typescript-eslint: no-use-before-define](https://typescript-eslint.io/rules/no-use-before-define)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-use-before-define.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.70.1/packages/eslint-plugin/src/rules/no-use-before-define.ts)
