@@ -764,3 +764,9 @@ Swatinem
 CBOR
 allowjs
 projectservice
+doesnt
+fnuction
+giffy
+jsnext
+reallyfake
+ssmcqy

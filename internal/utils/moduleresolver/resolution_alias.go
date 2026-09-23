@@ -31,7 +31,7 @@ type nodeResolver struct {
 func (resolver *nodeResolver) resolve(name string) (result Result) {
 	// A target independently overrides query and fragment. Keep both separate
 	// from the filesystem path used by dependency and existence checks.
-	if index := strings.IndexAny(name, "?#"); index > 0 && !resolver.mainTarget {
+	if index := strings.IndexAny(name, "?#"); index > 0 && !resolver.mainTarget && !resolver.options.LiteralPaths {
 		defer func() {
 			if result.Path != "" {
 				query, fragment, hasFragment := strings.Cut(result.ResourceSuffix, "#")
@@ -65,7 +65,7 @@ func (resolver *nodeResolver) resolve(name string) (result Result) {
 	resolver.active[key] = true
 	defer delete(resolver.active, key)
 	request := name
-	if index := strings.IndexAny(request, "?#"); index > 0 && !resolver.mainTarget {
+	if index := strings.IndexAny(request, "?#"); index > 0 && !resolver.mainTarget && !resolver.options.LiteralPaths {
 		request = request[:index]
 	}
 	if !resolver.mainTarget {

@@ -1,0 +1,22 @@
+-- only-types.d.ts --
+export declare const value: number;
+-- node_modules/only-types-package/package.json --
+{"types":"index.d.ts"}
+-- node_modules/only-types-package/index.d.ts --
+export declare const value: number;
+-- node_modules/entry-fallback/package.json --
+{"module":"./missing.js","jsnext:main":"./next.js","main":"./missing-main.js"}
+-- node_modules/entry-fallback/next.js --
+export const value = 1;
+-- node_modules/legacy-exports/package.json --
+{"main":"./index.js","exports":{}}
+-- node_modules/legacy-exports/index.js --
+module.exports = 1;
+-- runtime.node --
+Existence-only fixture for a native module.
+-- unparsed.css --
+.example { color: red; }
+-- symlink/real/package/input.js --
+import 'dependency';
+-- symlink/real/node_modules/dependency/index.js --
+module.exports = 1;

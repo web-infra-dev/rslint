@@ -160,7 +160,7 @@ func appendCallSpecifiers(specifiers *[]Source, call *ast.CallExpression, kinds 
 		return
 	}
 
-	callee := ast.SkipParentheses(call.Expression)
+	callee := moduleExpression(call.Expression)
 	if callee == nil {
 		return
 	}
@@ -178,7 +178,7 @@ func appendCallSpecifiers(specifiers *[]Source, call *ast.CallExpression, kinds 
 	}
 
 	calleeName := callee.AsIdentifier().Text
-	if kinds.includes(ModuleReferenceRequire) && ast.IsRequireCall(call.AsNode(), false) {
+	if kinds.includes(ModuleReferenceRequire) && calleeName == "require" && len(call.Arguments.Nodes) == 1 {
 		appendSpecifier(specifiers, call.Arguments.Nodes[0], call.AsNode(), ModuleReferenceRequire, false)
 		return
 	}
@@ -187,7 +187,7 @@ func appendCallSpecifiers(specifiers *[]Source, call *ast.CallExpression, kinds 
 		if len(call.Arguments.Nodes) == 0 {
 			return
 		}
-		arg := ast.SkipParentheses(call.Arguments.Nodes[0])
+		arg := moduleExpression(call.Arguments.Nodes[0])
 		if arg == nil || arg.Kind != ast.KindArrayLiteralExpression {
 			return
 		}
@@ -195,6 +195,15 @@ func appendCallSpecifiers(specifiers *[]Source, call *ast.CallExpression, kinds 
 			appendSpecifier(specifiers, element, call.AsNode(), ModuleReferenceAMD, false)
 		}
 	}
+}
+
+func moduleExpression(node *ast.Node) *ast.Node {
+	if node != nil && ast.IsInJSFile(node) {
+		// JavaScript assertions here are synthesized from JSDoc comments;
+		// authored TypeScript wrappers remain visible in TypeScript files.
+		return ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKTypeAssertions|ast.OEKSatisfies)
+	}
+	return ast.SkipParentheses(node)
 }
 
 func appendSpecifier(specifiers *[]Source, specifier *ast.Node, declaration *ast.Node, kind ReferenceKind, typeOnly bool) {
