@@ -696,33 +696,52 @@ func TestOrderHostAbsolutePaths(t *testing.T) {
 }
 
 func TestOrderWorkspacePackages(t *testing.T) {
-	root := txtarfs.MustParseFile(t, "testdata/workspace_packages.txtar").Materialize(t, "")
-	// Model a package manager's workspace link. The compiler resolves its real
-	// path, but upstream still classifies the installed name as external.
-	if err := os.Symlink(filepath.Join(root, "packages", "shared"), filepath.Join(root, "node_modules", "linked")); err != nil {
-		if runtime.GOOS == "windows" {
-			t.Skipf("symlink unavailable: %v", err)
-		}
-		t.Fatal(err)
-	}
-	directory := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
-	fs := bundled.WrapFS(osvfs.FS())
-	host := utils.CreateCompilerHost(directory, fs)
-	program, err := utils.CreateProgram(true, fs, directory, "tsconfig.json", host)
+	const fixture = "testdata/workspace_packages.txtar"
+	data, err := os.ReadFile(fixture)
 	if err != nil {
 		t.Fatal(err)
 	}
-	source := program.GetSourceFile(tspath.ResolvePath(directory, "input.ts"))
-	if source == nil {
-		t.Fatal("missing input.ts")
-	}
-	diagnostics := lintOrderWithDemand(program, source, rule.EditDemandAll, []any{map[string]any{"groups": []any{"external", "internal"}}})
-	if len(diagnostics) != 1 || diagnostics[0].Message.Description != "`alias` import should occur after import of `hoisted`" {
-		t.Fatalf("unexpected diagnostics: %+v", diagnostics)
-	}
-	fixes := diagnostics[0].Fixes()
-	want := "import linked from 'linked';\nimport hoisted from 'hoisted';\nimport alias from 'alias';\n"
-	if len(fixes) != 1 || fixes[0].Range.Pos() != 0 || fixes[0].Range.End() != len(source.Text()) || fixes[0].Text != want {
-		t.Fatalf("unexpected fixes: %+v", fixes)
+	// Cover both checkout line endings on every host, and require fixes to
+	// preserve the original line endings rather than normalizing their output.
+	content := strings.ReplaceAll(string(data), "\r\n", "\n")
+	for _, tc := range []struct{ name, newline string }{
+		{"LF", "\n"},
+		{"CRLF", "\r\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			archive, err := txtarfs.Parse(fixture, []byte(strings.ReplaceAll(content, "\n", tc.newline)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			root := archive.Materialize(t, "")
+			// Model a package manager's workspace link. The compiler resolves its real
+			// path, but upstream still classifies the installed name as external.
+			if err := os.Symlink(filepath.Join(root, "packages", "shared"), filepath.Join(root, "node_modules", "linked")); err != nil {
+				if runtime.GOOS == "windows" {
+					t.Skipf("symlink unavailable: %v", err)
+				}
+				t.Fatal(err)
+			}
+			directory := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
+			fs := bundled.WrapFS(osvfs.FS())
+			host := utils.CreateCompilerHost(directory, fs)
+			program, err := utils.CreateProgram(true, fs, directory, "tsconfig.json", host)
+			if err != nil {
+				t.Fatal(err)
+			}
+			source := program.GetSourceFile(tspath.ResolvePath(directory, "input.ts"))
+			if source == nil {
+				t.Fatal("missing input.ts")
+			}
+			diagnostics := lintOrderWithDemand(program, source, rule.EditDemandAll, []any{map[string]any{"groups": []any{"external", "internal"}}})
+			if len(diagnostics) != 1 || diagnostics[0].Message.Description != "`alias` import should occur after import of `hoisted`" {
+				t.Fatalf("unexpected diagnostics: %+v", diagnostics)
+			}
+			fixes := diagnostics[0].Fixes()
+			want := strings.ReplaceAll("import linked from 'linked';\nimport hoisted from 'hoisted';\nimport alias from 'alias';\n", "\n", tc.newline)
+			if len(fixes) != 1 || fixes[0].Range.Pos() != 0 || fixes[0].Range.End() != len(source.Text()) || fixes[0].Text != want {
+				t.Fatalf("unexpected fixes: %#v; want text %q", fixes, want)
+			}
+		})
 	}
 }
