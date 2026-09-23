@@ -211,6 +211,7 @@ define.test({
     './tests/eslint-plugin-node/rules/prefer-promises/fs.test.ts',
 
     // eslint-plugin-import
+    './tests/eslint-plugin-import/rules/consistent-type-specifier-style.test.ts',
     './tests/eslint-plugin-import/rules/default.test.ts',
     './tests/eslint-plugin-import/rules/first.test.ts',
     './tests/eslint-plugin-import/rules/namespace.test.ts',

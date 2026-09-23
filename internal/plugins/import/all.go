@@ -1,6 +1,7 @@
 package import_plugin
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/consistent_type_specifier_style"
 	default_rule "github.com/web-infra-dev/rslint/internal/plugins/import/rules/default"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/first"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/namespace"
@@ -19,6 +20,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		consistent_type_specifier_style.ConsistentTypeSpecifierStyleRule,
 		default_rule.DefaultRule,
 		first.FirstRule,
 		namespace.NamespaceRule,
