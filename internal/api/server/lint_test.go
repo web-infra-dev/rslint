@@ -2720,3 +2720,71 @@ func TestHandleLint_NoEslintPluginMetadataDoesNotDispatchStalePlaceholder(t *tes
 		t.Fatalf("stale placeholder leaked into metadata-free request: rules=%d diagnostics=%+v", response.RuleCount, response.Diagnostics)
 	}
 }
+
+func TestHandleLint_ImportOnlyGapKeepsOverlayAndFixes(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_membership.txtar").Materialize(t, ""))
+	gap := tspath.ResolvePath(dir, "gap.ts")
+	content := "declare const opaque: any;\nexport const result = (() => { var value = opaque.member; return value; })();\n"
+	config := json.RawMessage(`[{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}},"rules":{"no-var":"error","@typescript-eslint/no-unsafe-member-access":"error"}}]`)
+	for _, withRoot := range []bool{false, true} {
+		for _, fix := range []bool{false, true} {
+			files := []string{gap}
+			wantTyped := 0
+			if withRoot {
+				files = append(files, tspath.ResolvePath(dir, "main.ts"))
+				wantTyped = 1
+			}
+			response, err := (&Handler{}).HandleLint(api.LintRequest{
+				Config: config, ConfigDirectory: dir, WorkingDirectory: dir, Files: files,
+				FileContents: map[string]string{gap: content}, Fix: fix,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			counts := make(map[string]int)
+			for _, diagnostic := range response.Diagnostics {
+				counts[diagnostic.RuleName]++
+				if diagnostic.RuleName == "@typescript-eslint/no-unsafe-member-access" && diagnostic.FilePath == "gap.ts" {
+					t.Fatal("gap borrowed a retained Program")
+				}
+			}
+			wantSyntax := 1
+			if fix {
+				wantSyntax = 0
+			}
+			if response.FileCount != len(files) || len(response.Diagnostics) != wantTyped+wantSyntax || counts["no-var"] != wantSyntax || counts["@typescript-eslint/no-unsafe-member-access"] != wantTyped {
+				t.Fatalf("withRoot=%v fix=%v: %+v", withRoot, fix, response)
+			}
+			if fix && response.Output["gap.ts"] != strings.Replace(content, "var value", "let value", 1) {
+				t.Fatalf("lost gap fix: %v", response.Output)
+			}
+		}
+	}
+	data, err := os.ReadFile(gap)
+	if err != nil || string(data) != "export const disk = 1;\n" {
+		t.Fatalf("API changed disk source: %q, %v", data, err)
+	}
+}
+
+func TestHandleLint_ExplicitRootMembershipTracksConfigChanges(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_membership.txtar").Materialize(t, ""))
+	config := json.RawMessage(`[{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}},"rules":{"no-debugger":"error","@typescript-eslint/no-unnecessary-condition":"error"}}]`)
+	handler := &Handler{}
+	for _, roots := range []string{`["main.ts"]`, `["main.ts","gap.ts"]`, `["main.ts"]`} {
+		writeProgramTestFiles(t, dir, map[string]string{"tsconfig.json": `{"compilerOptions":{"strict":true},"files":` + roots + `}`})
+		gap := tspath.ResolvePath(dir, "gap.ts")
+		response, err := handler.HandleLint(api.LintRequest{Config: config, ConfigDirectory: dir, WorkingDirectory: dir, Files: []string{gap},
+			FileContents: map[string]string{gap: "export const value = true; if (value) {} debugger;"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := 1
+		if strings.Contains(roots, "gap.ts") {
+			want = 2
+		}
+		if response.FileCount != 1 || len(response.Diagnostics) != want {
+			t.Fatalf("roots=%s stale membership: %+v", roots, response)
+		}
+	}
+}

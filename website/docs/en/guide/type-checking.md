@@ -56,7 +56,7 @@ parserOptions: {
 }
 ```
 
-For linting, Rslint uses each target file's final merged `parserOptions`. Only entries matching that file contribute settings. A later `project` replaces the earlier list; `[]`, `false`, or JavaScript `null` clears it. Relative project paths keep the authored base of the entry supplying that value, unless an effective absolute `tsconfigRootDir` overrides it. Resetting `tsconfigRootDir` to JavaScript `null` restores that authored base. Target binding prefers direct roots across the effective list, then import membership.
+For linting, Rslint uses each target file's final merged `parserOptions`. Only entries matching that file contribute settings. A later `project` replaces the earlier list; `[]`, `false`, or JavaScript `null` clears it. Relative project paths keep the authored base of the entry supplying that value, unless an effective absolute `tsconfigRootDir` overrides it. Resetting `tsconfigRootDir` to JavaScript `null` restores that authored base. The first project in the effective list whose parsed `files`/`include` set contains the target provides its lint type information. A file absent from every such set uses source-only gap linting, even if a selected project imports it.
 
 If neither `project` nor `projectService` is enabled for a target, ordinary lint uses source-only gap linting, even when a `tsconfig.json` exists beside the Rslint config. Enable `projectService: true` to discover projects automatically, or set `project` explicitly. These options provide type information; they do not select additional lint files.
 
@@ -67,14 +67,14 @@ The construction scope depends on the operation:
 | Operation                                      | Project scope                                                             |
 | ---------------------------------------------- | ------------------------------------------------------------------------- |
 | Plain CLI lint of the whole cwd                | Validate effective candidates and select projects using target membership |
-| Focused file/subdirectory CLI lint or API lint | Select needed projects using root and import membership                   |
+| Focused file/subdirectory CLI lint or API lint | Select needed projects using parsed tsconfig root membership              |
 | `--type-check` or `--type-check-only`          | Check complete explicit declaration lists, plus service-selected Programs |
 
 When service/root/clear options require target discovery, all actual targets contribute their effective `tsconfigRootDir` contexts to program-wide explicit checking, including service and clear targets. Each context checks the whole declaration list. Without an explicit root, the declarations keep their authored bases. A per-target clear changes lint binding; it does not remove these type-check projects.
 
 For program-wide type checking only, when there are no explicit paths, targets whose effective service/clear settings allow the historical default can request `tsconfig.json` in the governing config directory. A declaration of `project: []` suppresses this default when no paths were declared; it does not remove earlier explicit declarations. Neither `basePath` nor `tsconfigRootDir` moves this default lookup. If an owner has no selected targets at all, program-wide checking retains its original declaration/default lookup without guessing effective scoped options. An empty service-only scope therefore builds no Programs in plain lint, but type-check-only can still check the owner's default tsconfig. These scope rules belong to Rslint; ESLint has no corresponding type-check flags.
 
-Shared explicit projects are constructed once per invocation. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Explicit and service modes can require separate Programs for the same tsconfig because reference source and declaration-output behavior differs. Ordinary explicit-project ownership probes may construct complete candidates to inspect import membership even when the target ultimately uses gap linting.
+Shared explicit projects are constructed once per invocation. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Explicit and service modes can require separate Programs for the same tsconfig because reference source and declaration-output behavior differs. Ordinary lint does not construct extra projects to search for import-only type information. Selected projects still resolve their complete dependencies.
 
 **Every checked Program includes its tsconfig root files and dependencies loaded through imports and references.** These filters affect lint targets and service/root context discovery, but do not trim a checked Program or the owner's program-wide type-check declaration list:
 
@@ -86,6 +86,8 @@ Shared explicit projects are constructed once per invocation. File-symlink decla
 If a file is included by tsconfig but matched by rslint `ignores`, lint rules do not run on it, but **type errors for it are still reported**. The tsconfig's `exclude` filters `include` discovery; imports and references can still bring an excluded file into the Program. `// @ts-nocheck` disables semantic checking of that file.
 
 ### Gap files
+
+For example, with `files: ["main.ts"]` in tsconfig and `main.ts` importing `helper.ts`, linting `helper.ts` uses gap rules unless another applicable tsconfig lists it in its parsed root set. Adding an import does not grant lint type information. Adding the file to the applicable tsconfig does. With `--type-check`, TypeScript can still report errors in `helper.ts` as a dependency of the checked project.
 
 Selected files without a project under their applicable binding settings (root-level scripts, ad-hoc config files, etc.) are called _gap files_. This includes JavaScript, TypeScript, and the other supported script extensions. The lint loader parses and binds them without providing a TypeChecker, so rules that do not require type information still run while type-aware rules are skipped. The source-only fallback itself does not participate in program-wide type checking. If the same file also belongs to a checked explicit or service Program, `--type-check` can still report TypeScript diagnostics for it through that Program. This fallback does not create a tsconfig for automatic project discovery.
 

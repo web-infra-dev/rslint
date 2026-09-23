@@ -198,20 +198,6 @@ func (execution *targetedProjectExecution) containsTarget(
 	return slot.lookup.SourceFileForTarget(target.Path, target.CanonicalPath) != nil
 }
 
-func (execution *targetedProjectExecution) supportsTarget(
-	index int,
-	target target.File,
-) (bool, error) {
-	parsed, err := execution.parse(index)
-	if err != nil {
-		return false, err
-	}
-	return lintprogram.CompilerOptionsSupportFileName(
-		parsed.config.CompilerOptions(),
-		target.Path,
-	), nil
-}
-
 func (execution *targetedProjectExecution) parseConcurrent(indexes []int) {
 	if len(indexes) == 0 {
 		return
@@ -394,9 +380,9 @@ func orderedProjectIndexesForConfig(plan projectPlan, configDir string) []int {
 	return indexes
 }
 
-// executeTargetProjectPlan retains the existing direct-root and import
-// selection tiers over each target's ordered candidates. All contexts share
-// one execution and one slot per declared tsconfig.
+// executeTargetProjectPlan selects parsed roots over each target's ordered
+// candidates. Unmatched targets never construct projects to probe imports.
+// All contexts share one execution and one slot per declared tsconfig.
 func (s *Session) executeTargetProjectPlan(
 	plan projectPlan,
 	request ProjectBuildRequest,
@@ -446,6 +432,16 @@ func (s *Session) executeTargetProjectPlan(
 	}
 
 	err := runTargetProjectTasks(groups, singleThreaded, func(group projectTargetGroup) error {
+		// Service discovery already selected one owner from parsed roots.
+		// Reuse that result in every construction scope instead of making a
+		// second ownership decision with the ordinary batch identity policy.
+		if len(group.projectIndexes) == 1 && plan.specs[group.projectIndexes[0]].sourceReferences {
+			projectIndex := group.projectIndexes[0]
+			for _, targetIndex := range group.targetIndexes {
+				directProjectByTarget[targetIndex] = projectIndex
+			}
+			return directBuilds.enqueue(projectIndex)
+		}
 		if request.Scope == ActiveOwners {
 			for _, targetIndex := range group.targetIndexes {
 				if index := directProjectByTarget[targetIndex]; index >= 0 {
@@ -568,12 +564,17 @@ func (s *Session) executeTargetProjectPlan(
 		validatedDirectBuilds[projectIndex] = struct{}{}
 	}
 
+	var rejectedRoots map[int]bool
 	for targetIndex, projectIndex := range directProjectByTarget {
 		if projectIndex >= 0 && !execution.containsTarget(projectIndex, targetPlan.Files[targetIndex]) {
 			if request.Scope == ActiveOwners && !plan.specs[projectIndex].sourceReferences {
-				// Ordinary broad lint has always tried ordered source membership
-				// when its first metadata root was not admitted by the compiler.
-				directProjectByTarget[targetIndex] = -1
+				// A listed root rejected by the compiler keeps the broad mode's
+				// compatibility fallback. Retain its root owner so binding can
+				// distinguish this case from a genuinely unmatched target.
+				if rejectedRoots == nil {
+					rejectedRoots = make(map[int]bool)
+				}
+				rejectedRoots[targetIndex] = true
 				continue
 			}
 			return ProjectSet{}, fmt.Errorf(
@@ -589,15 +590,13 @@ func (s *Session) executeTargetProjectPlan(
 			keep[projectIndex] = true
 		}
 	}
-	if request.Scope == ActiveOwners {
-		// Canonical source aliases can have another extension, so broad lint
-		// cannot exclude import candidates using the target's name alone.
-		// Preserve parallel construction for the unresolved groups, sharing
-		// the same slots with direct builds and other owners.
+	if len(rejectedRoots) > 0 {
+		// Only matched-but-rejected roots retain ordered source compatibility.
+		// Unmatched targets do not expand this construction range.
 		fallbackBuilds := newTargetedProjectBuildQueue(execution)
 		for _, group := range groups {
 			for _, targetIndex := range group.targetIndexes {
-				if directProjectByTarget[targetIndex] >= 0 {
+				if !rejectedRoots[targetIndex] {
 					continue
 				}
 				for _, projectIndex := range group.projectIndexes {
@@ -616,67 +615,6 @@ func (s *Session) executeTargetProjectPlan(
 			}
 			keep[index] = execution.slots[index].program != nil
 		}
-		// Every unresolved group's candidates are already built. Let binding
-		// perform their ordered source lookup once, using its shared identity
-		// index, instead of scanning the same sources during construction.
-		return execution.projectSet(keep, directProjectByTarget, targetPlan.Files), nil
-	}
-
-	// Direct ownership has been decided for every target before this fallback
-	// starts. A project built for another target cannot steal a direct target
-	// merely because it imports that file.
-	if !singleThreaded && len(groups) > 1 {
-		s.context.enableConcurrentProgramQueries()
-	}
-	var keepMu sync.Mutex
-	err = runTargetProjectTasks(groups, singleThreaded, func(group projectTargetGroup) error {
-		pending := make(map[int]struct{})
-		for _, targetIndex := range group.targetIndexes {
-			if directProjectByTarget[targetIndex] < 0 {
-				pending[targetIndex] = struct{}{}
-			}
-		}
-		orderedProjectIndexes := group.projectIndexes
-		fallbackProjectIndexes := make([]int, 0, len(orderedProjectIndexes))
-		for _, projectIndex := range orderedProjectIndexes {
-			for targetIndex := range pending {
-				supported, supportErr := execution.supportsTarget(
-					projectIndex,
-					targetPlan.Files[targetIndex],
-				)
-				if supportErr != nil {
-					return supportErr
-				}
-				if supported {
-					fallbackProjectIndexes = append(fallbackProjectIndexes, projectIndex)
-					break
-				}
-			}
-		}
-		for _, projectIndex := range fallbackProjectIndexes {
-			if len(pending) == 0 {
-				break
-			}
-			if err := execution.build(projectIndex); err != nil {
-				return err
-			}
-			selected := false
-			for targetIndex := range pending {
-				if execution.containsTarget(projectIndex, targetPlan.Files[targetIndex]) {
-					delete(pending, targetIndex)
-					selected = true
-				}
-			}
-			if selected {
-				keepMu.Lock()
-				keep[projectIndex] = true
-				keepMu.Unlock()
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return ProjectSet{}, err
 	}
 
 	return execution.projectSet(keep, directProjectByTarget, targetPlan.Files), nil

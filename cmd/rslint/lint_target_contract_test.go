@@ -12,6 +12,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
 
 type lintTargetContractDiagnostic struct {
@@ -225,5 +226,69 @@ func TestCLIFixOnlyWritesSelectedTargets(t *testing.T) {
 	}
 	if string(unselectedContent) != "var unselected = 1;\nexport { unselected };\n" {
 		t.Fatalf("--fix changed an unselected file: %q", unselectedContent)
+	}
+}
+
+func TestCLIImportOnlyGapKeepsTypeCheckScope(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_membership.txtar").Materialize(t, ""))
+	for _, service := range []bool{false, true} {
+		options := &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"./tsconfig.json"}}
+		if service {
+			options = &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}
+		}
+		config := rslintconfig.RslintConfig{{
+			Files: []string{"**/*.ts"}, Plugins: []string{"@typescript-eslint"},
+			LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: options},
+			Rules:           rslintconfig.Rules{"no-debugger": "error", "@typescript-eslint/no-unnecessary-condition": "error"},
+		}}
+		for _, mode := range []string{"plain", "type-check", "type-check-only"} {
+			for _, scope := range []string{"default", "directory", "file", "overlap"} {
+				name := "explicit/"
+				if service {
+					name = "service/"
+				}
+				t.Run(name+mode+"/"+scope, func(t *testing.T) {
+					args := lintArgs{ConfigCatalog: explicitConfigCatalogForTest(dir, config),
+						TypeCheck: mode != "plain", TypeCheckOnly: mode == "type-check-only", Format: "jsonline", NoColor: true,
+					}
+					wantSyntax, wantTyped, wantTS := 2, 1, 0
+					if mode != "plain" {
+						wantTS = 1
+					}
+					switch scope {
+					case "directory":
+						args.AllowDirs = []string{dir}
+					case "file":
+						args.AllowFiles = []string{tspath.ResolvePath(dir, "gap.ts")}
+						wantSyntax, wantTyped = 1, 0
+						if service {
+							wantTS = 0
+						}
+					case "overlap":
+						args.AllowDirs = []string{dir}
+						args.AllowFiles = []string{tspath.ResolvePath(dir, "gap.ts")}
+					}
+					if mode == "type-check-only" {
+						wantSyntax, wantTyped = 0, 0
+					}
+					code, stdout, stderr := runLintCommandForTest(t, dir, args)
+					diagnostics := parseLintTargetContractDiagnostics(t, stdout)
+					counts := make(map[string]int)
+					for _, diagnostic := range diagnostics {
+						counts[diagnostic.RuleName]++
+						if diagnostic.RuleName == "@typescript-eslint/no-unnecessary-condition" && strings.HasSuffix(diagnostic.FilePath, "gap.ts") {
+							t.Fatal("import-only gap ran a type-aware lint rule")
+						}
+					}
+					wantExit := 1
+					if wantSyntax+wantTyped+wantTS == 0 {
+						wantExit = 0
+					}
+					if code != wantExit || len(diagnostics) != wantSyntax+wantTyped+wantTS || counts["no-debugger"] != wantSyntax || counts["@typescript-eslint/no-unnecessary-condition"] != wantTyped || counts["TypeScript(TS2322)"] != wantTS {
+						t.Fatalf("exit=%d diagnostics=%+v stderr=%q; want syntax=%d typed=%d TS=%d", code, diagnostics, stderr, wantSyntax, wantTyped, wantTS)
+					}
+				})
+			}
+		}
 	}
 }

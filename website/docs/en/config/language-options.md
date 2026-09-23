@@ -120,23 +120,23 @@ Files outside all tsconfigs are still linted, but only rules that do not require
 }
 ```
 
-Rslint collects explicit project strings and arrays from the governing config in declaration order. The list includes entries whose `files`, `ignores` or `basePath` do not match the target; a missing declaration can therefore fail the load. The first project listing the target as a root wins. Only when no project lists it as a root does Rslint try import membership in declaration order. Adding `projectService` or `tsconfigRootDir` does not change this ordinary project order.
+Ordinary lint uses the target file's final merged `project` value. Only matching entries contribute settings; a later value replaces the earlier list. The first project in that effective list whose parsed `files`/`include` set contains the target wins. Files absent from every applicable root set use source-only gap linting, even if one of those projects imports them. No extra projects are constructed to search for import-only type information.
 
-This declaration list differs from typescript-eslint's final matching `project` value. Matching and merging still determine the effective service/root options, project/service conflicts and the new `false`/`null` clear values.
+| Matching entries in order                                                   | Ordinary target binding                                            |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `project: 'a.json'`, then `project: 'b.json'`                               | Search b                                                           |
+| `project: 'a.json'`, then `project: []`                                     | Use source-only linting                                            |
+| Final matching `project: false` or `null`                                   | Clear explicit binding; enabled service may still select a project |
+| `project: 'a.json'`, then false, then `project: 'b.json'`                   | Search b                                                           |
+| Matching `projectService: false`, with `project` only in an unmatched entry | Use source-only linting                                            |
 
-| Entries in order                                                                     | Ordinary target binding                                                        |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| `project: 'a.json'`, then `project: 'b.json'`                                        | Search a, then b, with direct-root priority                                    |
-| `project: 'a.json'`, then `project: []`                                              | Keep a; [] does not erase earlier declarations                                 |
-| Final matching `project: false` or `null`                                            | Use no explicit/default project for that target; enabled service may still run |
-| `project: 'a.json'`, then false, then `project: 'b.json'`                            | Final clear is canceled; search the original a, b list again                   |
-| Matching `projectService: false`, with an explicit declaration in an unmatched entry | Disable automatic/default discovery but keep that explicit declaration         |
+When an entry has `basePath`, its explicit project literals and globs resolve from that directory unless the target has an explicit `tsconfigRootDir`. The directory remains literal even if its name contains glob characters. A later null root reset restores the winning declaration's authored base. Targets with different effective settings keep separate eligible project lists even if their Programs contain overlapping files.
 
-When an entry has `basePath`, its explicit project literals and globs resolve from that directory unless the target has an explicit `tsconfigRootDir`. The directory remains literal even if its name contains glob characters. A later null root reset restores each declaration's original base. Targets with different roots keep separate eligible project lists even if their Programs contain overlapping files.
+When neither project option is enabled, ordinary lint uses source-only gap linting without searching for a default `tsconfig.json`. See [`basePath`](/config/base-path) for path origins. A file must also satisfy its selected project's compiler admission settings; root membership and JavaScript `allowJs`/`checkJs` eligibility are separate requirements.
 
-When both project settings are omitted, Rslint retains the governing config directory's default `tsconfig.json` fallback; neither `basePath` nor `tsconfigRootDir` moves this implicit lookup. A declaration of `project: []` suppresses fallback when no paths were declared. A final matching false/null or `projectService: false` disables default binding for that target. Unmatched false/null does not disable another target's fallback. See [`basePath`](/config/base-path) for path origins.
+Whole-directory CLI lint validates every effective project candidate, even when it does not need to construct that project. Focused CLI/API requests retain their ordered root search. CLI and API share target binding, and editor diagnostics and fixes apply the same parsed-root requirement.
 
-Plain CLI/API lint selects projects from target membership. Whole-directory CLI lint still validates every explicit declaration of its active ordinary owners, even when a project does not need to be built. Files without a direct project may require building additional projects to check import membership. `--type-check` and `--type-check-only` retain [program-wide explicit checking](/guide/type-checking#what-gets-type-checked), including declarations outside the lint target scope. These modes also check complete service-selected Programs. A per-target clear does not erase the owner's program-wide declarations.
+`--type-check` and `--type-check-only` retain [program-wide explicit checking](/guide/type-checking#what-gets-type-checked), including complete declaration lists and their historical default-project behavior. These modes also check complete service-selected Programs. A per-target clear or gap changes lint type information; it does not erase the owner's program-wide declarations or remove imported dependencies from a checked Program.
 
 ## languageOptions.globals
 
