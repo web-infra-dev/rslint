@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // LoadResult is the complete Program input for one lint generation. It carries
@@ -95,15 +96,10 @@ func storeSourceTargetMapping(
 }
 
 func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.SourceFile {
-	if program == nil || targetPath == "" {
-		return nil
-	}
-	targetPath = tspath.NormalizePath(targetPath)
-	sourceFile := program.GetSourceFile(targetPath)
-	if sourceFile == nil || exactPathID(sourceFile.FileName()) != exactPathID(targetPath) {
-		return nil
-	}
-	return sourceFile
+	// Keep canonical fallback in the target-aware batch index below. This
+	// shared lookup accepts only the exact lexical source, including when the
+	// compiler itself indexes sources case-insensitively.
+	return utils.NewProgramSourceLookup(program, nil).SourceFileForCandidate(targetPath, "")
 }
 
 // programFileIndex joins lint targets to Program sources by exact physical

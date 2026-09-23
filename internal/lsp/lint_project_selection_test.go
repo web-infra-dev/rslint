@@ -3,8 +3,10 @@ package lsp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -82,6 +84,77 @@ func TestSelectConfiguredLintProjectDirectRootOutranksEarlierImport(t *testing.T
 	}
 	if len(programCalls) != 1 || programCalls[0] != secondConfig {
 		t.Fatalf("Program calls = %v, want only direct winner", programCalls)
+	}
+}
+
+func TestSelectConfiguredLintProjectMetadataBoundaries(t *testing.T) {
+	const first = "/repo/first.json"
+	const second = "/repo/second.json"
+	const targetPath = "/repo/target.js"
+	for _, test := range []struct {
+		name          string
+		firstMetadata *lintProjectMetadata
+		available     bool
+		metadataError bool
+		missingSource bool
+		wantConfig    string
+		wantError     string
+		wantMetadata  []string
+		wantPrograms  []string
+	}{
+		{name: "unavailable metadata cannot select", wantConfig: second, wantMetadata: []string{first, second}, wantPrograms: []string{second}},
+		{name: "nil metadata cannot select", available: true, wantConfig: second, wantMetadata: []string{first, second}, wantPrograms: []string{second}},
+		{name: "missing root index cannot select", available: true,
+			firstMetadata: &lintProjectMetadata{configPath: first}, wantConfig: second,
+			wantMetadata: []string{first, second}, wantPrograms: []string{second}},
+		{name: "metadata error retains precedence", metadataError: true, wantError: "metadata failed",
+			wantMetadata: []string{first}},
+		{name: "direct JS root skips extension guard and later error", available: true,
+			firstMetadata: lintProjectMetadataForTest(first, []string{targetPath}, &core.CompilerOptions{AllowJs: core.TSFalse}, nil),
+			wantConfig:    first, wantMetadata: []string{first}, wantPrograms: []string{first}},
+		{name: "missing direct source cannot fall through", available: true, missingSource: true,
+			firstMetadata: lintProjectMetadataForTest(first, []string{targetPath}, nil, nil),
+			wantError:     "configured project root", wantMetadata: []string{first}, wantPrograms: []string{first}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var metadataCalls, programCalls []string
+			selected, found, err := selectConfiguredLintProject(
+				[]string{first, second}, "",
+				target.File{PathIdentity: config.PathIdentity{Path: targetPath, CanonicalPath: targetPath}}, nil,
+				lintProjectLoaders{
+					metadata: func(path string) (*lintProjectMetadata, bool, error) {
+						metadataCalls = append(metadataCalls, path)
+						if path == first {
+							if test.metadataError {
+								return nil, false, errors.New("metadata failed")
+							}
+							return test.firstMetadata, test.available, nil
+						}
+						if test.wantConfig == first || test.missingSource {
+							return nil, false, errors.New("unreached config must stay unobserved")
+						}
+						return lintProjectMetadataForTest(second, []string{targetPath}, nil, nil), true, nil
+					},
+					program: func(metadata *lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
+						programCalls = append(programCalls, metadata.configPath)
+						if test.missingSource {
+							return new(compiler.Program), nil, nil
+						}
+						return new(compiler.Program), new(ast.SourceFile), nil
+					},
+				},
+			)
+			if test.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantError) || found {
+					t.Fatalf("found=%v, error=%v, want %q", found, err, test.wantError)
+				}
+			} else if err != nil || !found || selected.configPath != test.wantConfig || !selected.directRoot {
+				t.Fatalf("selected=%+v, found=%v, error=%v", selected, found, err)
+			}
+			if !slices.Equal(metadataCalls, test.wantMetadata) || !slices.Equal(programCalls, test.wantPrograms) {
+				t.Fatalf("metadata=%v, Programs=%v; want %v, %v", metadataCalls, programCalls, test.wantMetadata, test.wantPrograms)
+			}
+		})
 	}
 }
 

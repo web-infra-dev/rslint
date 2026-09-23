@@ -292,6 +292,20 @@ and cannot observe which construction path supplied it.
 
    `program/loader.Session` assembles one project plan. Broad plain lint and focused CLI/API requests share construction slots and use target membership to select direct owners. Broad lint still validates every effective candidate and ranks direct roots by exact and physical identity before construction; focused requests retain their existing incremental root search and validation range. Unresolved broad targets retain parallel construction of all ordered import candidates; the existing binder resolves their source membership once. An unsupported target extension cannot exclude a project whose differently named source alias has the same physical identity. Program-wide type checking uses `config.ResolveTsConfigPathsWithPolicy` to retain the complete raw declaration/default range. In combined mode, that full Program set remains available for checking while every lint target receives its own effective candidate list. A pure explicit-project `--type-check-only` run does not scan lint targets. Per-file service/root/reset settings require target discovery to determine their effective values. For type checking, every selected target's root context contributes the owner's complete explicit declaration list, even when its lint binding is disabled or uses service. Service and disabled targets do not trigger an implicit default project. An owner with no selected targets retains the original program-wide declaration/default behavior; there is no file against which to apply scoped overrides.
 
+   Shared predicates do not choose project order or construction scope.
+   `program.CompilerOptionsSupportFileName` supplies normal source-extension
+   eligibility, and `program.RootFileIndex` supplies focused explicit-project
+   root membership to both loader and LSP. Each selector owns the ordered
+   candidates and selected result. Broad loader binding keeps its batch root
+   ranking and source indexes. `utils.ExactPathID`, also exposed through
+   `config.ExactPathID`, gives source lookup and target binding the same exact
+   path key: absolute Windows drive spelling is normalized while directory
+   and file casing is retained. Both entries use `utils.ProgramSourceLookup`
+   to validate exact Program hits; the loader requests only lexical matching
+   before its own batch physical fallback. Root membership's VFS case policy
+   remains distinct from exact source identity. These helpers own no build
+   queue, declaration ordering, Session, watcher, or cross-request cache.
+
    `utils.TypeScriptProjectDiscovery` searches ancestor and reference configs using parsed `files`/`include` roots. It receives only a filesystem and config parser; it cannot construct or return a Program. Imported-only targets are not admitted. Metadata identifies source-reference overlap and reference order without loading source files. `disableReferencedProjectLoad` stops reference discovery independently of previous selections; no TypeScript server warm-project lifecycle is reproduced.
 
    The loader appends selected config metadata to its existing project plan before construction. Config parsing uses a metadata-only host; source snapshots are bound only when Program construction has chosen its serial or parallel filesystem view. Ordinary and service modes share scheduling, source snapshots and one target-binding pass. Complete service Programs use source references and remain distinct from explicit Programs with different construction options. Every lint target has an explicit candidate list, including an empty list for gaps. Constructed projects retained for other targets or type checking cannot supply types outside that list. A sole explicit candidate still requires root/import membership checks. Service candidates never leak into another target's list.

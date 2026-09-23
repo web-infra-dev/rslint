@@ -106,6 +106,45 @@ func createBindingIndexTestProgram(t *testing.T, fsys vfs.FS, rootFiles ...strin
 	return program
 }
 
+func TestExactProgramSourceFileKeepsLexicalBoundary(t *testing.T) {
+	for _, test := range []struct {
+		name, source, candidate string
+		want, caseFolded        bool
+	}{
+		{name: "exact", source: "/repo/Source.ts", candidate: "/repo/Source.ts", want: true},
+		{name: "normalized", source: "/repo/Source.ts", candidate: `/repo/src/../Source.ts`, want: true},
+		{name: "different file casing", source: "/repo/Source.ts", candidate: "/repo/source.ts", caseFolded: true},
+		{name: "different directory casing", source: "/Repo/Source.ts", candidate: "/repo/Source.ts", caseFolded: true},
+		{name: "physical alias needs later binding", source: "/repo/Source.ts", candidate: "/alias/Source.ts"},
+		{name: "Windows drive", source: "C:/Repo/Source.ts", candidate: `c:\Repo\Source.ts`, want: true},
+		{name: "Windows file casing", source: "C:/Repo/Source.ts", candidate: "c:/Repo/source.ts", caseFolded: true},
+		{name: "different Windows drive", source: "C:/Repo/Source.ts", candidate: "D:/Repo/Source.ts"},
+		{name: "empty candidate", source: "/repo/Source.ts"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fsys := newBindingIndexTestFS([]string{test.source, test.candidate}, map[string]string{
+				test.candidate: test.source,
+			})
+			fsys.caseSensitive = false
+			program := createBindingIndexTestProgram(t, fsys, test.source)
+			if test.caseFolded && program.GetSourceFile(test.candidate) == nil {
+				t.Fatal("fixture did not exercise a case-folded compiler hit")
+			}
+			fsys.resetCalls()
+			source := exactProgramSourceFile(program, test.candidate)
+			if (source != nil) != test.want {
+				t.Fatalf("exact lookup = %v, want source=%v", source, test.want)
+			}
+			if len(fsys.calls) != 0 {
+				t.Fatalf("exact lookup resolved physical identities: %v", fsys.calls)
+			}
+		})
+	}
+	if source := exactProgramSourceFile(nil, "/repo/Source.ts"); source != nil {
+		t.Fatal("nil Program returned a source")
+	}
+}
+
 func TestLoadProgramsPreservesExactAndProjectOrder(t *testing.T) {
 	const (
 		configDir  = "/repo"

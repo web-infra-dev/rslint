@@ -203,8 +203,7 @@ func selectConfiguredLintProject(
 				continue
 			}
 			metadataByProject[index] = metadata
-			if metadata == nil || metadata.rootFiles == nil ||
-				!metadata.rootFiles.Contains(target.Path, target.CanonicalPath) {
+			if !metadata.Contains(target.Path, target.CanonicalPath) {
 				continue
 			}
 			return loadDirectLintProject(metadata, target, loaders.program)
@@ -216,7 +215,7 @@ func selectConfiguredLintProject(
 	}
 	for index, tsConfigPath := range tsConfigPaths {
 		metadata := metadataByProject[index]
-		if metadata == nil || !metadata.supportsFileName(target.Path) {
+		if !metadata.supportsFileName(target.Path) {
 			continue
 		}
 		program, sourceFile, err := loaders.program(metadata)
