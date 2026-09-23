@@ -144,15 +144,6 @@ var edgeValid = []rule_tester.ValidTestCase{
 		}
 	`, Tsx: true},
 
-	// K4: useEffect(fn, undefined as any) — `as any` wrapper around
-	// undefined identifier is peeled by analyzePropertyChainText / our
-	// stripAsExpression on the deps argument.
-	{Code: `
-		function MyComponent() {
-			useEffect(() => {}, undefined as any);
-		}
-	`, Tsx: true},
-
 	// K8: useImperativeHandle ref param itself is NOT a dep — ref is
 	// the first argument, callback is the second, deps is the third.
 	{Code: `
@@ -185,10 +176,14 @@ var edgeValid = []rule_tester.ValidTestCase{
 			void setState;
 		}
 	`, Tsx: true},
-
 }
 
 var edgeInvalid = []rule_tester.InvalidTestCase{
+	{Code: `
+		function MyComponent() {
+			useEffect(() => {}, undefined as any);
+		}
+	`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{Message: "React Hook useEffect was passed a dependency list that is not an array literal. This means we can't statically verify whether you've passed the correct dependencies."}}},
 	// L1: imported function referenced but missing in deps — should
 	// remain external so NO diagnostic. (Negative — confirms imports
 	// are external.) For a true invalid, capture a local that wraps

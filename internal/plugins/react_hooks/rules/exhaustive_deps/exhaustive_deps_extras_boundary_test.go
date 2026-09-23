@@ -22,6 +22,20 @@ func TestExhaustiveDepsRule_Boundary(t *testing.T) {
 }
 
 var boundaryValid = []rule_tester.ValidTestCase{
+	// Upstream only checks setter writes for useState, and does not invalidate capture-free functions on reassignment.
+	{Code: `
+			function MyComponent() {
+				const [state, dispatch] = useReducer((s: number) => s + 1, 0);
+				useEffect(() => { dispatch(); });
+			}
+		`, Tsx: true},
+	{Code: `
+			function MyComponent({ flag }: { flag: boolean }) {
+				let handler = () => 1;
+				if (flag) handler = () => 2;
+				useEffect(() => { handler(); }, []);
+			}
+		`, Tsx: true},
 	// IIFE async inside sync effect — the outer effect is sync, so the
 	// async-effect diagnostic must NOT fire. The inner async function's
 	// captures still count as effect deps.
@@ -241,30 +255,6 @@ var boundaryInvalid = []rule_tester.InvalidTestCase{
 		},
 	},
 
-	// useReducer dispatch is registered in setStateCallSites so that
-	// `setState-without-deps` detection fires for `dispatch()` inside
-	// an effect with no deps array. Lock-in for F1.
-	{
-		Code: `
-			function MyComponent() {
-				const [state, dispatch] = useReducer((s: number) => s + 1, 0);
-				useEffect(() => { dispatch(); });
-			}
-		`,
-		Tsx: true,
-		Errors: []rule_tester.InvalidTestCaseError{
-			{
-				Message: "React Hook useEffect contains a call to 'dispatch'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [] as a second argument to the useEffect Hook.",
-				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
-			function MyComponent() {
-				const [state, dispatch] = useReducer((s: number) => s + 1, 0);
-				useEffect(() => { dispatch(); }, []);
-			}
-		`}},
-			},
-		},
-	},
-
 	// Compound assignment to setter (F7 — `setX += 1`) — flags it as
 	// extra write, so setter is no longer stable, missing dep emitted.
 	{
@@ -308,32 +298,6 @@ var boundaryInvalid = []rule_tester.InvalidTestCase{
 				let [count, setCount] = useState(0);
 				(setCount as any)++;
 				useEffect(() => { setCount(c => c + 1); }, [setCount]);
-			}
-		`}},
-			},
-		},
-	},
-
-	// Function reassignment (F8) — handler is reassigned, so its
-	// `isFunctionWithoutCapturedValues` stability is invalidated and
-	// it must be listed as a dep.
-	{
-		Code: `
-			function MyComponent({ flag }: { flag: boolean }) {
-				let handler = () => 1;
-				if (flag) handler = () => 2;
-				useEffect(() => { handler(); }, []);
-			}
-		`,
-		Tsx: true,
-		Errors: []rule_tester.InvalidTestCaseError{
-			{
-				Message: "React Hook useEffect has a missing dependency: 'handler'. Either include it or remove the dependency array.",
-				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
-			function MyComponent({ flag }: { flag: boolean }) {
-				let handler = () => 1;
-				if (flag) handler = () => 2;
-				useEffect(() => { handler(); }, [handler]);
 			}
 		`}},
 			},

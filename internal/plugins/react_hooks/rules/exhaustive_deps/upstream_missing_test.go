@@ -1219,9 +1219,10 @@ function MyComponent(props) {
 	},
 },
 
-// SKIP: unsupported settings shape
 {
-	Skip: true,
+	Settings: map[string]interface{}{
+		"react-hooks": map[string]interface{}{"additionalEffectHooks": "useCustomEffect"},
+	},
 	Code: `
 function MyComponent(props) {
   useCustomEffect(() => {

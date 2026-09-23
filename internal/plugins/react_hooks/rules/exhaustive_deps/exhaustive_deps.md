@@ -3,9 +3,10 @@
 ## Rule Details
 
 Verifies the list of dependencies for Hooks like `useEffect`, `useCallback`,
-`useMemo`, `useImperativeHandle`, `useLayoutEffect` and `useInsertionEffect`.
-Reports missing, unnecessary or duplicate entries in the second argument
-of these Hooks, and offers a suggested fix.
+`useMemo`, `useImperativeHandle` and `useLayoutEffect`.
+Reports missing, unnecessary or duplicate entries in the dependency array
+of these Hooks, and offers a suggested fix. `useInsertionEffect` is checked
+only when configured through `additionalHooks` or the shared settings below.
 
 Examples of **incorrect** code for this rule:
 
@@ -99,8 +100,9 @@ The rule accepts a single options object:
 }
 ```
 
-- **`additionalHooks`** (string regex, default empty): Treat the named
-  custom hooks as effect-style Hooks (callback at index 0). Only matches
+- **`additionalHooks`** (string regex, default empty): Check the named
+  custom hooks with the callback at index 0 and dependencies at index 1.
+  Names matching `Effect($|[^a-z])` use effect-specific checks. Only matches
   bare-identifier callees — `Foo.useBar` and `React.useBar` are NOT
   matched even if the identifier suffix is in the regex (mirrors
   upstream's `node === calleeNode` gate). Falls back to
@@ -109,22 +111,26 @@ The rule accepts a single options object:
   { "react-hooks/exhaustive-deps": ["error", { "additionalHooks": "(useMyEffect|useAsync)" }] }
   ```
 - **`enableDangerousAutofixThisMayCauseInfiniteLoops`** (boolean, default
-  `false`): Promote the first suggestion's first fix into a top-level
+  `false`): Promote all edits from the first suggestion into a top-level
   autofix while keeping the suggestion array. Off by default because
   applying it without code review can introduce render loops.
 - **`requireExplicitEffectDeps`** (boolean, default `false`): Require
-  effect-style Hooks to be passed an explicit deps array (or
-  `undefined`). Useful in codebases that disable the deps-array fallback
-  to make every effect's reactive surface explicit.
+  effect-style Hooks to receive a dependencies argument. An explicit
+  `undefined` satisfies this requirement; omitting the argument does not.
 - **`experimental_autoDependenciesHooks`** (string array, default `[]`):
-  Skip dependency analysis entirely for the named custom hooks when their
-  deps argument is `null` or absent (the hook is expected to infer deps
-  itself). Used by tooling that does its own dep auto-injection.
+  Skip dependency-array and missing-array state-update checks for the named
+  Hooks when their deps argument is `null`, `undefined` or absent.
+  Async callbacks, stale assignments and cleanup ref accesses are still checked.
+  The Hook must already be recognized as a built-in or through `additionalHooks`
+  or shared settings. `useMemo` and `useCallback` still warn without an array.
   ```json
   {
     "react-hooks/exhaustive-deps": [
       "error",
-      { "experimental_autoDependenciesHooks": ["useAutoEffect"] }
+      {
+        "additionalHooks": "useAutoEffect",
+        "experimental_autoDependenciesHooks": ["useAutoEffect"]
+      }
     ]
   }
   ```
@@ -134,11 +140,14 @@ The rule accepts a single options object:
 - Components written in Flow syntax (`component MyComp() { ... }` or
   `hook useFoo() { ... }`) are not analyzed; the rule produces no
   diagnostics on them.
-- When multiple diagnostics are emitted for the same source line, the
-  order in the diagnostics list may differ from ESLint. The set of
-  diagnostics, their messages, and their fix outputs are identical;
-  only the position of each entry within the array can vary. IDEs and
-  CLI reporters that sort by source position display them identically.
+- The order of diagnostics in the returned list may differ from ESLint.
+  Diagnostics retain their source locations and associated fixes.
+- For a state name beginning with a non-BMP character, the functional-update
+  hint preserves the complete first character. For example,
+  `const [𐀀, setX] = useState(0); useEffect(() => setX(𐀀 + 1), []);`
+  suggests `setX(𐀀 => ...)`. ESLint truncates that character to one UTF-16
+  code unit, producing an unpaired surrogate. Dependency analysis and fixes
+  are unaffected.
 
 ## Original Documentation
 

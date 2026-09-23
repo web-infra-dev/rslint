@@ -1,64 +1,31 @@
-// Package exhaustive_deps implements the rslint port of upstream
-// `react-hooks/exhaustive-deps`.
-//
-// The upstream rule (facebook/react/packages/eslint-plugin-react-hooks)
-// leans heavily on ESLint's scope manager: every Identifier reference
-// is preresolved to a Variable, references inside a callback can be
-// enumerated by walking the callback's Scope.references, and references
-// across the entire file get a `from` Scope and `resolved` Variable.
-// rslint has no scope manager. Instead we resolve identifiers via the
-// TypeChecker (`GetSymbolAtLocation`), then look at the symbol's
-// declaration to infer scope membership. When the TypeChecker is
-// unavailable (gap files, parse errors), we fall back to a name-based
-// best-effort: scan the call's enclosing function for declarations
-// matching the identifier text, and treat anything else as external.
-//
-// The diagnostics intentionally mirror upstream's wording so consumers
-// of the JS rule can switch over without rewriting message assertions.
-// The autofix and suggestion shapes also mirror upstream — replacing
-// the deps-array text wholesale, or inserting a deps array after the
-// callback when none was provided.
+// Package exhaustive_deps checks reactive Hook dependency arrays using rslint's shared lexical scopes.
 package exhaustive_deps
 
 import (
 	"fmt"
-	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/collections"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
+
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/react_hooksutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
-var _ = fmt.Sprintf // ensure fmt referenced
-var _ core.TextRange
-
-// All hook-name / namespace / function-like queries are delegated to
-// `react_hooksutil`. This file deliberately keeps zero local copies of
-// those predicates so that any semantic change is made once and picked
-// up by every rule in the plugin.
-
-// getReactiveHookCallbackIndex returns the index of the callback argument
-// for a known reactive hook. Mirrors upstream's same-named helper.
-//   - 0 for useEffect / useLayoutEffect / useInsertionEffect / useCallback / useMemo
-//   - 1 for useImperativeHandle
-//   - 0 for additionalHooks-matching custom hooks
-//   - -1 otherwise
+// getReactiveHookCallbackIndex matches the built-in hooks and bare custom names.
 func getReactiveHookCallbackIndex(callee *ast.Node, additionalHooks *esregexp.RegExp) int {
 	n := react_hooksutil.StripReactNamespace(callee)
 	if n == nil || n.Kind != ast.KindIdentifier {
-		// `additionalHooks` is matched against the full path (e.g. `useFoo` or `Namespace.useFoo`);
-		// only top-level Identifier callees pass this fast path. Member expressions
-		// other than `React.<x>` skip additionalHooks entirely (matches upstream).
+		// Only bare names and built-in React.<name> calls are recognized.
 		return -1
 	}
 	name := n.AsIdentifier().Text
 	switch name {
-	case "useEffect", "useLayoutEffect", "useInsertionEffect", "useCallback", "useMemo":
+	case "useEffect", "useLayoutEffect", "useCallback", "useMemo":
 		return 0
 	case "useImperativeHandle":
 		return 1
@@ -67,56 +34,24 @@ func getReactiveHookCallbackIndex(callee *ast.Node, additionalHooks *esregexp.Re
 	// upstream's `node === calleeNode` gate. `React.useCustomEffect` is
 	// intentionally NOT treated as a reactive hook by the additionalHooks
 	// path — only the unqualified `useCustomEffect` is.
-	if additionalHooks != nil && n == callee && additionalHooks.Test(name) {
+	if additionalHooks != nil && n == utils.ESTreeRuntimeExpression(callee) && additionalHooks.Test(name) {
 		return 0
 	}
 	return -1
 }
 
-// Hook-name / namespace / function-like queries are imported from
-// `react_hooksutil` — the local helpers below are aliases so that
-// the rest of this file reads naturally without sprinkling the
-// package name everywhere.
-var (
-	stripReactNamespace     = react_hooksutil.StripReactNamespace
-	isFunctionLikeContainer = react_hooksutil.IsFunctionLikeContainer
-	findEnclosingFunction   = react_hooksutil.FindEnclosingFunction
-	hasAsyncModifier        = react_hooksutil.HasAsyncModifier
-)
-
-// effectNameRegex mirrors upstream's `/Effect($|[^a-z])/g` — see also
-// `react_hooksutil.IsEffectStyleHookName`. We keep a local handle so
-// the existing call sites can stay terse.
-var effectNameRegex = regexp.MustCompile(`Effect($|[^a-z])`)
-
-// stripAsExpression unwraps any `as X` / `<X>...` / `satisfies X` wrapper.
+// stripAsExpression unwraps only the TypeScript `as` casts supported upstream.
 func stripAsExpression(node *ast.Node) *ast.Node {
 	for node != nil {
-		switch node.Kind {
-		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
-		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
-		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
-		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
-		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
-		default:
+		node = utils.ESTreeRuntimeExpression(node)
+		if node.Kind != ast.KindAsExpression {
 			return node
 		}
+		node = node.AsAsExpression().Expression
 	}
-	return node
+	return nil
 }
 
-// containsNode reports whether `descendant` is inside `ancestor` by node range.
-// Returns false when either is nil. Inclusive on both ends. Requires both
-// nodes to live in the same SourceFile: positions are per-file offsets, so
-// a raw integer comparison across files would false-positive any time the
-// per-file ranges happen to overlap numerically (issue #962). The SourceFile
-// check runs only after the cheap position comparison so we don't pay the
-// parent-chain walk on the common "obviously outside" path.
 func containsNode(ancestor, descendant *ast.Node) bool {
 	return react_hooksutil.ContainsNode(ancestor, descendant)
 }
@@ -129,36 +64,10 @@ func nodeText(sf *ast.SourceFile, node *ast.Node) string {
 	return utils.TrimmedNodeText(sf, node)
 }
 
-// analyzePropertyChainText converts a property chain into a dotted string.
-// Returns "" + ok=false on shapes upstream's `analyzePropertyChain` would
-// reject (which becomes a "complex expression" / "literal not a valid
-// dependency" diagnostic at the call site).
-//
-// Side effect: when `optionalChains` is non-nil, the returned key is
-// recorded as either optional (when the path was first seen via `?.`) or
-// required (regular `.`). Mirrors upstream's `analyzePropertyChain` +
-// `markNode`.
-//
-// tsgo-specific: peel ParenthesizedExpression and `as` / `satisfies`
-// (mirrors upstream's outer-level `while (init.type === 'TSAsExpression'
-// || init.type === 'AsExpression')` loop in visitCallExpression). We do
-// NOT peel `NonNullExpression` (`x!`) or `TypeAssertionExpression`
-// (`<T>x`) — upstream's `analyzePropertyChain` rejects those, so the
-// rule reports them as "complex expression" rather than treating them as
-// transparent.
 func analyzePropertyChainText(node *ast.Node, optionalChains map[string]bool) (string, bool) {
 	return analyzePropertyChain(node, optionalChains, false)
 }
 
-// analyzeDepsArrayElement applies upstream's STRICT `analyzePropertyChain`
-// semantics for elements of the dependency array. Upstream has no case for
-// type assertions (`as` / `satisfies`) or non-null assertions (`!`), so any
-// of them makes the element a "complex expression". Non-optional computed
-// access (`foo[bar]`) is also complex, while optional computed access
-// (`foo?.[bar]`) with an analyzable (non-literal) key is a valid chain — a
-// quirk of upstream's `ChainExpression` branch, which doesn't re-check
-// `computed`. The callback-collection path stays lenient (it strips `as`),
-// so the strict behavior is confined to this entry point.
 func analyzeDepsArrayElement(node *ast.Node, optionalChains map[string]bool) (string, bool) {
 	return analyzePropertyChain(node, optionalChains, true)
 }
@@ -167,7 +76,7 @@ func analyzePropertyChain(node *ast.Node, optionalChains map[string]bool, strict
 	if node == nil {
 		return "", false
 	}
-	n := ast.SkipParentheses(node)
+	n := utils.ESTreeRuntimeExpression(node)
 	if strict {
 		// Upstream throws on these node kinds -> "complex expression".
 		switch n.Kind {
@@ -179,10 +88,10 @@ func analyzePropertyChain(node *ast.Node, optionalChains map[string]bool, strict
 		for {
 			switch n.Kind {
 			case ast.KindAsExpression:
-				n = ast.SkipParentheses(n.AsAsExpression().Expression)
+				n = utils.ESTreeRuntimeExpression(n.AsAsExpression().Expression)
 				continue
 			case ast.KindSatisfiesExpression:
-				n = ast.SkipParentheses(n.AsSatisfiesExpression().Expression)
+				n = utils.ESTreeRuntimeExpression(n.AsSatisfiesExpression().Expression)
 				continue
 			}
 			break
@@ -217,18 +126,13 @@ func analyzePropertyChain(node *ast.Node, optionalChains map[string]bool, strict
 		}
 		return result, true
 	case ast.KindElementAccessExpression:
-		// Computed access. Upstream only accepts it as part of an optional
-		// chain (`foo?.[bar]`) whose key is itself an analyzable chain
-		// (Identifier / member access, never a literal). Non-optional
-		// `foo[bar]` and literal keys are "complex". The callback path never
-		// reaches here (it resolves computed reads via scope analysis).
-		if !strict {
+		// Upstream accepts computed access only through the enclosing
+		// ESTree ChainExpression, never as an interior chain link. Unlike
+		// tsgo's IsOutermostOptionalChain, another ?. does not end that wrapper.
+		if !strict || !ast.IsOptionalChain(n) || n.Parent != nil && ast.IsOptionalChain(n.Parent) && n.Parent.Expression() == n {
 			return "", false
 		}
 		eae := n.AsElementAccessExpression()
-		if eae.QuestionDotToken == nil {
-			return "", false
-		}
 		object, ok := analyzePropertyChain(eae.Expression, optionalChains, strict)
 		if !ok {
 			return "", false
@@ -239,7 +143,7 @@ func analyzePropertyChain(node *ast.Node, optionalChains map[string]bool, strict
 		}
 		result := object + "." + property
 		if optionalChains != nil {
-			markOptionalChain(optionalChains, result, true)
+			markOptionalChain(optionalChains, result, eae.QuestionDotToken != nil)
 		}
 		return result, true
 	}
@@ -259,105 +163,38 @@ func markOptionalChain(m map[string]bool, key string, optional bool) {
 	}
 }
 
-// getDependencyNode walks up from `node` through enclosing
-// PropertyAccessExpression chains, stopping at the deepest receiver still
-// useful as a dependency key. Mirrors upstream's `getDependency` exactly:
-//
-//   - `props` -> `props`
-//   - `props.foo` (read) -> `props.foo`
-//   - `props.foo.bar` -> `props.foo.bar`
-//   - `props.foo.current` -> `props.foo.current` (special: `.current` ends the walk)
-//   - `props.foo()` -> `props` (method call: don't recurse, return receiver)
-//   - `props.foo.bar()` -> `props.foo` (same)
-//   - `props.foo = ...` (LHS) -> `props` (the assignment makes the receiver the dep)
+// getDependencyNode stops at method receivers, mutable current, and assertions.
 func getDependencyNode(node *ast.Node) *ast.Node {
-	cur := node
-	for cur != nil && cur.Parent != nil {
-		p := cur.Parent
-		// `(x).y` — peel ParenthesizedExpression transparently (ESTree
-		// flattens this; tsgo preserves it).
-		if p.Kind == ast.KindParenthesizedExpression {
-			cur = p
-			continue
-		}
-		// NOTE: We deliberately do NOT peel `as`/`satisfies`/`!` here.
-		// Upstream's `getDependency` / `analyzePropertyChain` reject
-		// these wrappers, so a body reference of `user!.name` resolves
-		// to dep key `user` (the receiver walk stops at the NonNull
-		// wrapper because parent kind != MemberExpression).
-		if p.Kind != ast.KindPropertyAccessExpression {
+	cur := utils.ESTreeRuntimeExpression(node)
+	for cur != nil {
+		p := utils.ESTreeParent(cur)
+		if p == nil || p.Kind != ast.KindPropertyAccessExpression {
 			break
 		}
-		pae := p.AsPropertyAccessExpression()
-		if pae.Expression != cur {
+		member := p.AsPropertyAccessExpression()
+		if utils.ESTreeCallCallee(member.Expression) != cur || member.Name().Kind != ast.KindIdentifier || member.Name().Text() == "current" {
 			break
 		}
-		// `.current` terminates the upward walk — upstream stops here so
-		// `.current` is reported, not the parent reference.
-		propName := pae.Name()
-		if propName == nil || propName.Kind != ast.KindIdentifier {
+		caller := utils.ESTreeParent(p)
+		if caller != nil && caller.Kind == ast.KindCallExpression && utils.ESTreeCallCallee(caller.AsCallExpression().Expression) == p {
 			break
-		}
-		if propName.AsIdentifier().Text == "current" {
-			break
-		}
-		// `.foo()` method call: upstream's condition is
-		// `!(parent.parent.type === 'CallExpression' && parent.parent.callee === parent)`.
-		// When parent IS the callee of a CallExpression, we DON'T recurse
-		// — we drop out of the loop and fall through to the else branch
-		// which returns `cur` (the current node, the receiver).
-		if p.Parent != nil && p.Parent.Kind == ast.KindCallExpression {
-			callExpr := p.Parent.AsCallExpression()
-			if callExpr.Expression == p {
-				break
-			}
 		}
 		cur = p
 	}
-	// Assignment LHS: `obj.prop = ...` and `obj['prop'] = ...` both make
-	// `obj` the dependency. Mirrors upstream's same branch — the LHS
-	// member access doesn't represent a stable read of the property,
-	// it's a write through the receiver.
-	if cur != nil && cur.Parent != nil {
-		switch cur.Kind {
-		case ast.KindPropertyAccessExpression:
-			if be, ok := getAssignmentBinaryExpr(cur.Parent); ok && be.Left == cur {
-				return cur.AsPropertyAccessExpression().Expression
-			}
-		case ast.KindElementAccessExpression:
-			if be, ok := getAssignmentBinaryExpr(cur.Parent); ok && be.Left == cur {
-				return cur.AsElementAccessExpression().Expression
-			}
+	if cur != nil && cur.Kind == ast.KindPropertyAccessExpression {
+		if assignment, ok := getAssignmentBinaryExpr(utils.ESTreeParent(cur)); ok && utils.ESTreeRuntimeExpression(assignment.Left) == cur {
+			return utils.ESTreeRuntimeExpression(cur.AsPropertyAccessExpression().Expression)
 		}
 	}
 	return cur
 }
 
-// getAssignmentBinaryExpr returns the BinaryExpression iff `node` is one
-// with an assignment-shape operator. Mirrors ESTree's AssignmentExpression
-// flag in tsgo's collapsed BinaryExpression model.
 func getAssignmentBinaryExpr(node *ast.Node) (*ast.BinaryExpression, bool) {
 	if node == nil || node.Kind != ast.KindBinaryExpression {
 		return nil, false
 	}
-	be := node.AsBinaryExpression()
-	if be.OperatorToken == nil {
-		return nil, false
-	}
-	switch be.OperatorToken.Kind {
-	case ast.KindEqualsToken,
-		ast.KindPlusEqualsToken, ast.KindMinusEqualsToken,
-		ast.KindAsteriskEqualsToken, ast.KindAsteriskAsteriskEqualsToken,
-		ast.KindSlashEqualsToken, ast.KindPercentEqualsToken,
-		ast.KindLessThanLessThanEqualsToken, ast.KindGreaterThanGreaterThanEqualsToken,
-		ast.KindGreaterThanGreaterThanGreaterThanEqualsToken,
-		ast.KindAmpersandEqualsToken, ast.KindBarEqualsToken,
-		ast.KindCaretEqualsToken,
-		ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken,
-		ast.KindQuestionQuestionEqualsToken:
-		return be, true
-	}
-	return nil, false
+	expression := node.AsBinaryExpression()
+	return expression, expression.OperatorToken != nil && ast.IsAssignmentOperator(expression.OperatorToken.Kind)
 }
 
 // Options holds the parsed rule options.
@@ -405,20 +242,16 @@ type declaredDependency struct {
 }
 
 // dependency is a used reference observed inside the callback body.
+type dependencyMap = collections.OrderedMap[string, *dependency]
+
 type dependency struct {
 	IsStable bool
-	IsRef    bool // true if it's `<x>.current` reference
-	Refs     []*depReference
-	First    *ast.Node // first observed reference identifier (for diagnostics)
+	Refs     []depReference
 }
 
-// depReference is a single observed reference inside the callback body —
-// the identifier node and the symbol it resolved to (or nil for fallback).
 type depReference struct {
-	Identifier  *ast.Node
-	Symbol      *ast.Symbol
-	WriteExpr   *ast.Node // BinaryExpression representing assignment, when this reference is written
-	InCleanup   bool
+	*scope.Reference
+	WriteExpr   *ast.Node
 	DepNodeRoot *ast.Node
 }
 
@@ -427,22 +260,21 @@ type dependencyTreeNode struct {
 	IsUsed                 bool
 	IsSatisfiedRecursively bool
 	IsSubtreeUsed          bool
-	Children               map[string]*dependencyTreeNode
+	Children               collections.OrderedMap[string, *dependencyTreeNode]
 }
 
 func newDepTreeNode() *dependencyTreeNode {
-	return &dependencyTreeNode{Children: map[string]*dependencyTreeNode{}}
+	return &dependencyTreeNode{}
 }
 
 // getOrCreateNodeByPath mirrors upstream's same-named helper.
 func getOrCreateNodeByPath(root *dependencyTreeNode, path string) *dependencyTreeNode {
-	keys := strings.Split(path, ".")
 	node := root
-	for _, key := range keys {
-		child, ok := node.Children[key]
+	for key := range strings.SplitSeq(path, ".") {
+		child, ok := node.Children.Get(key)
 		if !ok {
 			child = newDepTreeNode()
-			node.Children[key] = child
+			node.Children.Set(key, child)
 		}
 		node = child
 	}
@@ -451,10 +283,9 @@ func getOrCreateNodeByPath(root *dependencyTreeNode, path string) *dependencyTre
 
 // markAllParentsByPath mirrors upstream's same-named helper.
 func markAllParentsByPath(root *dependencyTreeNode, path string, fn func(*dependencyTreeNode)) {
-	keys := strings.Split(path, ".")
 	node := root
-	for _, key := range keys {
-		child, ok := node.Children[key]
+	for key := range strings.SplitSeq(path, ".") {
+		child, ok := node.Children.Get(key)
 		if !ok {
 			return
 		}
@@ -465,27 +296,27 @@ func markAllParentsByPath(root *dependencyTreeNode, path string, fn func(*depend
 
 // recommendations is the result returned by collectRecommendations.
 type recommendations struct {
-	Suggested   []string
-	Unnecessary map[string]bool
-	Duplicate   map[string]bool
-	Missing     map[string]bool
+	Suggested    []string
+	Unnecessary  map[string]bool
+	Duplicate    map[string]bool
+	Missing      map[string]bool
+	MissingOrder []string
 }
 
 // collectRecommendations mirrors upstream's same-named helper. It walks the
 // dependency tree to compute missing / unnecessary / duplicate sets and a
 // suggested deps array preserving the original declaration order.
 //
-// Missing-dep ordering inside the suggested array uses each dep's first-
-// reference source position (matches upstream's Map-insertion order).
+// Insertion-ordered maps preserve upstream's scope traversal and tree order.
 func collectRecommendations(
-	dependencies map[string]*dependency,
+	dependencies *dependencyMap,
 	declaredDependencies []declaredDependency,
 	stableDependencies map[string]bool,
 	externalDependencies map[string]bool,
 	isEffect bool,
 ) recommendations {
 	depTree := newDepTreeNode()
-	for key := range dependencies {
+	for key := range dependencies.Keys() {
 		node := getOrCreateNodeByPath(depTree, key)
 		node.IsUsed = true
 		markAllParentsByPath(depTree, key, func(parent *dependencyTreeNode) {
@@ -502,19 +333,12 @@ func collectRecommendations(
 	}
 
 	missing := map[string]bool{}
+	missingOrder := []string{}
 	satisfying := map[string]bool{}
-	var scan func(node *dependencyTreeNode, keyToPath func(string) string)
-	scan = func(node *dependencyTreeNode, keyToPath func(string) string) {
-		// Iterate children in deterministic insertion-style order. Map
-		// iteration in Go is non-deterministic, so sort keys.
-		keys := make([]string, 0, len(node.Children))
-		for k := range node.Children {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			child := node.Children[key]
-			path := keyToPath(key)
+	var scan func(node *dependencyTreeNode, prefix string)
+	scan = func(node *dependencyTreeNode, prefix string) {
+		for key, child := range node.Children.Entries() {
+			path := prefix + key
 			if child.IsSatisfiedRecursively {
 				if child.IsSubtreeUsed {
 					satisfying[path] = true
@@ -523,15 +347,13 @@ func collectRecommendations(
 			}
 			if child.IsUsed {
 				missing[path] = true
+				missingOrder = append(missingOrder, path)
 				continue
 			}
-			cur := path
-			scan(child, func(childKey string) string {
-				return cur + "." + childKey
-			})
+			scan(child, path+".")
 		}
 	}
-	scan(depTree, func(k string) string { return k })
+	scan(depTree, "")
 
 	suggested := []string{}
 	unnecessary := map[string]bool{}
@@ -556,37 +378,13 @@ func collectRecommendations(
 			}
 		}
 	}
-	// Append missing in source-reference order (mirrors upstream's
-	// Map-insertion = first-reference order). Falls back to alphabetic
-	// when the dependency record carries no `First` position.
-	missingKeys := make([]string, 0, len(missing))
-	for k := range missing {
-		missingKeys = append(missingKeys, k)
-	}
-	sort.SliceStable(missingKeys, func(i, j int) bool {
-		di, dj := dependencies[missingKeys[i]], dependencies[missingKeys[j]]
-		var pi, pj int
-		if di != nil && di.First != nil {
-			pi = di.First.Pos()
-		} else {
-			pi = -1
-		}
-		if dj != nil && dj.First != nil {
-			pj = dj.First.Pos()
-		} else {
-			pj = -1
-		}
-		if pi != pj {
-			return pi < pj
-		}
-		return missingKeys[i] < missingKeys[j]
-	})
-	suggested = append(suggested, missingKeys...)
+	suggested = append(suggested, missingOrder...)
 	return recommendations{
-		Suggested:   suggested,
-		Unnecessary: unnecessary,
-		Duplicate:   duplicate,
-		Missing:     missing,
+		Suggested:    suggested,
+		Unnecessary:  unnecessary,
+		Duplicate:    duplicate,
+		Missing:      missing,
+		MissingOrder: missingOrder,
 	}
 }
 
@@ -634,7 +432,7 @@ func getWarningMessage(deps map[string]bool, singlePrefix, label, fixVerb string
 	for k := range deps {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.SortFunc(keys, ecmascript.CompareStrings)
 	formatted := make([]string, len(keys))
 	for i, k := range keys {
 		formatted[i] = "'" + formatDependency(k, optionalChains) + "'"
@@ -663,7 +461,7 @@ func getWarningMessage(deps map[string]bool, singlePrefix, label, fixVerb string
 // wrapper, and upstream's diagnostics use the unwrapped text.
 func getCalleeText(sf *ast.SourceFile, callee *ast.Node) string {
 	if callee != nil {
-		callee = ast.SkipParentheses(callee)
+		callee = utils.ESTreeRuntimeExpression(callee)
 	}
 	return nodeText(sf, callee)
 }
@@ -673,269 +471,23 @@ func areDeclaredDepsAlphabetized(declared []declaredDependency) bool {
 	if len(declared) == 0 {
 		return true
 	}
-	keys := make([]string, len(declared))
-	for i, d := range declared {
-		keys[i] = d.Key
-	}
-	sorted := append([]string(nil), keys...)
-	sort.Strings(sorted)
-	return strings.Join(keys, ",") == strings.Join(sorted, ",")
+	return slices.IsSortedFunc(declared, func(a, b declaredDependency) int {
+		return ecmascript.CompareStrings(a.Key, b.Key)
+	})
 }
 
 // hasUndefinedIdentifier reports whether `node` is a literal `undefined`
 // identifier — used to recognize `useEffect(fn, undefined)` as "no deps".
 func hasUndefinedIdentifier(node *ast.Node) bool {
-	n := stripAsExpression(node)
+	n := utils.ESTreeRuntimeExpression(node)
 	return n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == "undefined"
 }
 
-// isObjectLiteralShorthandReference identifies value reads such as `{ value }`.
-// tsgo's TypeChecker can report the shorthand assignment node itself as the
-// declaration, so exhaustive-deps needs an AST fallback to find the outer
-// binding. Destructuring assignment shorthand is a write pattern and must not
-// be treated as a captured Hook dependency.
-func isObjectLiteralShorthandReference(id *ast.Node) bool {
-	if id == nil || id.Parent == nil || id.Parent.Kind != ast.KindShorthandPropertyAssignment {
-		return false
-	}
-	return id.Parent.Name() == id && !utils.IsInDestructuringAssignment(id.Parent)
-}
-
-// resolveValueSymbol resolves an identifier to its value symbol. For
-// object-literal shorthand reads (`{ value }`), tsgo's TypeChecker reports the
-// ShorthandPropertyAssignment's own property symbol instead of the outer
-// binding, so we first ask for the shorthand value symbol and only fall back
-// to the plain lookup. Sharing this across every reference-collection path
-// keeps shorthand reads resolving identically whether they are scanned
-// directly in the effect body or recursively inside a local function (the
-// latter previously missed them, masking captured reactive values).
-func resolveValueSymbol(tc *checker.Checker, id *ast.Node) *ast.Symbol {
-	if tc == nil {
-		return nil
-	}
-	if isObjectLiteralShorthandReference(id) {
-		if sym := tc.GetShorthandAssignmentValueSymbol(id.Parent); sym != nil {
-			return sym
-		}
-	}
-	return tc.GetSymbolAtLocation(id)
-}
-
-// isReferenceIdentifier reports whether the given Identifier appears in a
-// value-reference position (as opposed to a property name, label, declaration
-// name, etc).
-func isReferenceIdentifier(id *ast.Node) bool {
-	p := id.Parent
-	if p == nil {
-		return false
-	}
-	switch p.Kind {
-	case ast.KindPropertyAccessExpression:
-		return p.AsPropertyAccessExpression().Expression == id
-	case ast.KindElementAccessExpression:
-		return p.AsElementAccessExpression().Expression == id ||
-			p.AsElementAccessExpression().ArgumentExpression == id
-	case ast.KindPropertyAssignment:
-		return p.AsPropertyAssignment().Initializer == id
-	case ast.KindShorthandPropertyAssignment:
-		return p.Name() == id
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-		return false
-	case ast.KindJsxAttribute:
-		return false
-	case ast.KindVariableDeclaration:
-		return p.AsVariableDeclaration().Name() != id
-	case ast.KindBindingElement:
-		return p.AsBindingElement().Name() != id
-	case ast.KindParameter:
-		return p.AsParameterDeclaration().Name() != id
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
-		ast.KindClassDeclaration, ast.KindClassExpression:
-		return p.Name() != id
-	case ast.KindLabeledStatement:
-		return p.AsLabeledStatement().Label != id
-	case ast.KindBreakStatement, ast.KindContinueStatement:
-		return false
-	case ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport,
-		ast.KindExportSpecifier:
-		return false
-	case ast.KindTypeReference, ast.KindTypeQuery:
-		return false
-	}
-	return true
-}
-
-// isInsideTypePosition reports whether `node` is inside a TypeReference /
-// TypeQuery / type-only construct. Mirrors upstream's
-// `dependencyNode.parent?.type === 'TSTypeQuery' || 'TSTypeReference'`.
 func isInsideTypePosition(node *ast.Node) bool {
-	cur := node
-	for cur != nil {
-		switch cur.Kind {
-		case ast.KindTypeReference, ast.KindTypeQuery, ast.KindTypePredicate,
-			ast.KindTypeLiteral, ast.KindTypeOperator, ast.KindIndexedAccessType,
-			ast.KindMappedType, ast.KindConditionalType, ast.KindInferType,
-			ast.KindUnionType, ast.KindIntersectionType, ast.KindTupleType,
-			ast.KindArrayType, ast.KindLiteralType, ast.KindFunctionType,
-			ast.KindConstructorType, ast.KindParenthesizedType:
-			return true
-		}
-		// Stop walking when leaving the expression to avoid mistakenly
-		// considering an expression inside a function body as "in a type".
-		if isFunctionLikeContainer(cur) {
-			return false
-		}
-		cur = cur.Parent
-	}
-	return false
+	parent := utils.ESTreeParent(node)
+	return parent != nil && (parent.Kind == ast.KindTypeReference || parent.Kind == ast.KindTypeQuery)
 }
 
-// isInsideEffectCleanup reports whether `idNode` lies inside a function
-// returned from the effect callback (i.e. effect cleanup). Mirrors upstream's
-// `isInsideEffectCleanup`.
-//
-// `callback` is the effect callback function-like (ArrowFunction /
-// FunctionExpression). We walk up from `idNode` looking for an inner
-// function-like whose immediate parent is a ReturnStatement that itself
-// belongs to the effect callback.
-func isInsideEffectCleanup(idNode *ast.Node, callback *ast.Node) bool {
-	cur := idNode
-	for cur != nil {
-		if cur == callback {
-			return false
-		}
-		if isFunctionLikeContainer(cur) && cur != callback && cur.Parent != nil {
-			// `return () => {}` — parent is ReturnStatement.
-			if cur.Parent.Kind == ast.KindReturnStatement {
-				retEnclosing := findEnclosingFunction(cur.Parent)
-				if retEnclosing != nil && retEnclosing == callback {
-					return true
-				}
-			}
-		}
-		cur = cur.Parent
-	}
-	return false
-}
-
-// isStableHookValue inspects a VariableDeclaration whose initializer is a
-// known hook call (or const literal) and reports whether the binding at
-// `bindingId` is one of React's stable identities. Mirrors the union of
-// upstream's `isStableKnownHookValue` cases.
-//
-// `bindingId` is the Identifier of the specific binding being inspected
-// — for `const [a, b] = useState()`, this is either `a` or `b`.
-//
-// The second return value, `isUseEffectEvent`, signals that the binding
-// is a useEffectEvent return — used both as "stable" and as the gate for
-// emitting the "Functions returned from useEffectEvent must not be included"
-// diagnostic on a deps-array entry.
-func isStableHookValue(decl *ast.Node, bindingId *ast.Node) (stable bool, isUseEffectEvent bool) {
-	if decl == nil || decl.Kind != ast.KindVariableDeclaration {
-		return false, false
-	}
-	vd := decl.AsVariableDeclaration()
-	init := vd.Initializer
-	if init == nil {
-		return false, false
-	}
-	init = stripAsExpression(init)
-	// `const foo = 42` / `'str'` / `null` — primitive const is stable.
-	parentDeclList := decl.Parent
-	if parentDeclList != nil && parentDeclList.Kind == ast.KindVariableDeclarationList {
-		dl := parentDeclList.AsVariableDeclarationList()
-		// `const` keyword check. NodeFlagsConst / NodeFlagsLet apply to
-		// the declaration list.
-		if dl.Flags&ast.NodeFlagsConst != 0 {
-			switch init.Kind {
-			case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindNullKeyword:
-				return true, false
-			case ast.KindNoSubstitutionTemplateLiteral:
-				return true, false
-			}
-		}
-	}
-	if init.Kind != ast.KindCallExpression {
-		return false, false
-	}
-	callee := stripReactNamespace(init.AsCallExpression().Expression)
-	if callee == nil || callee.Kind != ast.KindIdentifier {
-		return false, false
-	}
-	calleeName := callee.AsIdentifier().Text
-
-	// The binding identifier site dictates which positions are stable.
-	bindingName := vd.Name()
-	switch calleeName {
-	case "useRef":
-		// Only the binding name itself is stable; destructured forms aren't.
-		if bindingName != nil && bindingName == bindingId {
-			return true, false
-		}
-	case "useEffectEvent":
-		if bindingName != nil && bindingName == bindingId {
-			return true, true
-		}
-	case "useState", "useReducer", "useActionState":
-		if bindingName != nil && bindingName.Kind == ast.KindArrayBindingPattern {
-			arr := bindingName.AsBindingPattern()
-			if arr.Elements != nil && len(arr.Elements.Nodes) == 2 {
-				first := arr.Elements.Nodes[0]
-				second := arr.Elements.Nodes[1]
-				// `setX` / `dispatch` is the stable side.
-				if isMatchingBindingElementId(second, bindingId) {
-					return true, false
-				}
-				// state itself (`x`) is dynamic.
-				_ = first
-			}
-		}
-	case "useTransition":
-		if bindingName != nil && bindingName.Kind == ast.KindArrayBindingPattern {
-			arr := bindingName.AsBindingPattern()
-			if arr.Elements != nil && len(arr.Elements.Nodes) == 2 {
-				second := arr.Elements.Nodes[1]
-				if isMatchingBindingElementId(second, bindingId) {
-					return true, false
-				}
-			}
-		}
-	}
-	return false, false
-}
-
-// isMatchingBindingElementId reports whether `binding` is a BindingElement
-// (or OmittedExpression) whose name Identifier equals `id`. Uses Pos/End
-// to compare positions instead of pointer equality, which is fragile when
-// the same Node is reachable through multiple paths.
-func isMatchingBindingElementId(binding *ast.Node, id *ast.Node) bool {
-	if binding == nil || binding.Kind == ast.KindOmittedExpression {
-		return false
-	}
-	if binding.Kind != ast.KindBindingElement {
-		return false
-	}
-	be := binding.AsBindingElement()
-	name := be.Name()
-	if name == nil || name.Kind != ast.KindIdentifier || id == nil || id.Kind != ast.KindIdentifier {
-		return false
-	}
-	if name == id {
-		return true
-	}
-	return name.Pos() == id.Pos() && name.End() == id.End() &&
-		name.AsIdentifier().Text == id.AsIdentifier().Text
-}
-
-// isElidedComma checks for `[, foo]`-style elided elements. tsgo represents
-// them as KindOmittedExpression rather than ESTree's null.
-func isElidedComma(n *ast.Node) bool {
-	return n != nil && n.Kind == ast.KindOmittedExpression
-}
-
-// constructionType returns a human-readable description for a node that
-// would yield a fresh referential identity on every render. Mirrors
-// upstream's `getConstructionExpressionType`.
 func constructionType(node *ast.Node) string {
 	if node == nil {
 		return ""
@@ -959,20 +511,16 @@ func constructionType(node *ast.Node) string {
 	case ast.KindBinaryExpression:
 		be := n.AsBinaryExpression()
 		if be.OperatorToken != nil {
+			if ast.IsAssignmentOperator(be.OperatorToken.Kind) {
+				if constructionType(be.Right) != "" {
+					return "assignment expression"
+				}
+				return ""
+			}
 			switch be.OperatorToken.Kind {
 			case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
 				if constructionType(be.Left) != "" || constructionType(be.Right) != "" {
 					return "logical expression"
-				}
-				return ""
-			case ast.KindEqualsToken,
-				ast.KindPlusEqualsToken, ast.KindMinusEqualsToken,
-				ast.KindAsteriskEqualsToken, ast.KindSlashEqualsToken,
-				ast.KindPercentEqualsToken,
-				ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken,
-				ast.KindQuestionQuestionEqualsToken:
-				if constructionType(be.Right) != "" {
-					return "assignment expression"
 				}
 				return ""
 			}
@@ -990,203 +538,6 @@ func constructionType(node *ast.Node) string {
 	return ""
 }
 
-// classifiedConstruction is one item from `scanForConstructions`.
-type classifiedConstruction struct {
-	Variable          *ast.Node // the declaration name Identifier
-	Decl              *ast.Node // the VariableDeclaration / FunctionDeclaration / ClassDeclaration
-	InitNode          *ast.Node // VariableDeclaration's initializer (nil for fn/class decls)
-	DepType           string
-	IsUsedOutsideHook bool
-}
-
-// scanForConstructions mirrors upstream's same-named helper.
-//
-// For each declared dependency name, find its declaration in the component
-// scope and report it as a construction iff the declaration is one of
-// `function foo() {}` / `class Foo {}` / `const foo = <something construction-shaped>`.
-func scanForConstructions(
-	declared []declaredDependency,
-	declaredDepsNode *ast.Node,
-	componentBody *ast.Node,
-	hookCallback *ast.Node,
-	tc *checker.Checker,
-	sf *ast.SourceFile,
-) []classifiedConstruction {
-	if componentBody == nil {
-		return nil
-	}
-	out := []classifiedConstruction{}
-	for _, dd := range declared {
-		// Only care about plain identifier deps (`foo`, not `foo.bar`).
-		if strings.Contains(dd.Key, ".") {
-			continue
-		}
-		if dd.Node == nil || dd.Node.Kind != ast.KindIdentifier {
-			continue
-		}
-		// Resolve dd.Node via TypeChecker; fall back to a name walk in
-		// the component body.
-		decl := resolveDeclaration(tc, dd.Node, dd.Key, componentBody)
-		if decl == nil {
-			continue
-		}
-		// Mirrors upstream's `componentScope.variables` filter: a global,
-		// import, or module-scope binding can never be a construction that
-		// changes identity per render, and a declaration that lives in
-		// another SourceFile (DOM lib, @types/node, …) must not be reported
-		// against the current file's text (issue #962).
-		if !containsNode(componentBody, decl) {
-			continue
-		}
-		switch decl.Kind {
-		case ast.KindVariableDeclaration:
-			vd := decl.AsVariableDeclaration()
-			name := vd.Name()
-			if name == nil || name.Kind != ast.KindIdentifier {
-				continue
-			}
-			if vd.Initializer == nil {
-				continue
-			}
-			ct := constructionType(vd.Initializer)
-			if ct == "" {
-				continue
-			}
-			out = append(out, classifiedConstruction{
-				Variable:          name,
-				Decl:              decl,
-				InitNode:          vd.Initializer,
-				DepType:           ct,
-				IsUsedOutsideHook: isUsedOutsideHook(name, hookCallback, declaredDepsNode, componentBody),
-			})
-		case ast.KindFunctionDeclaration:
-			out = append(out, classifiedConstruction{
-				Variable:          decl.Name(),
-				Decl:              decl,
-				DepType:           "function",
-				IsUsedOutsideHook: isUsedOutsideHook(decl.Name(), hookCallback, declaredDepsNode, componentBody),
-			})
-		case ast.KindClassDeclaration:
-			out = append(out, classifiedConstruction{
-				Variable:          decl.Name(),
-				Decl:              decl,
-				DepType:           "class",
-				IsUsedOutsideHook: isUsedOutsideHook(decl.Name(), hookCallback, declaredDepsNode, componentBody),
-			})
-		}
-	}
-	return out
-}
-
-// resolveDeclaration finds the declaration corresponding to `id`. Prefers
-// TypeChecker symbol resolution; falls back to a name-based walk over
-// `body`. The fallback walk descends into ObjectBindingPattern /
-// ArrayBindingPattern so destructured bindings (including renamed
-// `{a: b}` form and nested patterns) and parameter destructure are
-// discoverable; it also recognizes BindingElement / Parameter as
-// terminal "declaration" nodes when the name matches.
-func resolveDeclaration(tc *checker.Checker, id *ast.Node, name string, body *ast.Node) *ast.Node {
-	if tc != nil {
-		sym := tc.GetSymbolAtLocation(id)
-		if sym != nil && len(sym.Declarations) > 0 {
-			return sym.Declarations[0]
-		}
-	}
-	if body == nil {
-		return nil
-	}
-	var found *ast.Node
-	var visit func(n *ast.Node) bool
-	visit = func(n *ast.Node) bool {
-		if found != nil {
-			return true
-		}
-		switch n.Kind {
-		case ast.KindVariableDeclaration:
-			vd := n.AsVariableDeclaration()
-			vname := vd.Name()
-			if vname != nil {
-				if vname.Kind == ast.KindIdentifier && vname.AsIdentifier().Text == name {
-					found = n
-					return true
-				}
-				// Destructure pattern — descend into the pattern looking
-				// for BindingElement whose binding name matches.
-			}
-		case ast.KindBindingElement:
-			be := n.AsBindingElement()
-			bn := be.Name()
-			if bn != nil && bn.Kind == ast.KindIdentifier && bn.AsIdentifier().Text == name {
-				found = n
-				return true
-			}
-		case ast.KindParameter:
-			pd := n.AsParameterDeclaration()
-			pn := pd.Name()
-			if pn != nil && pn.Kind == ast.KindIdentifier && pn.AsIdentifier().Text == name {
-				found = n
-				return true
-			}
-		case ast.KindFunctionDeclaration:
-			if fname := n.Name(); fname != nil && fname.Kind == ast.KindIdentifier && fname.AsIdentifier().Text == name {
-				found = n
-				return true
-			}
-		case ast.KindClassDeclaration:
-			if cname := n.Name(); cname != nil && cname.Kind == ast.KindIdentifier && cname.AsIdentifier().Text == name {
-				found = n
-				return true
-			}
-		}
-		if isFunctionLikeContainer(n) && n != body {
-			return false
-		}
-		n.ForEachChild(visit)
-		return false
-	}
-	visit(body)
-	return found
-}
-
-// isUsedOutsideHook reports whether `name` (a declaration's Identifier) has
-// any reference outside of the hook callback that is not inside the deps
-// array. Mirrors upstream's `isUsedOutsideOfHook`.
-//
-// `scope` bounds the walk. Pass `componentFn` whenever possible — the
-// rule only cares about uses inside the surrounding component or hook;
-// fall back to `sf.AsNode()` only when no component scope is available.
-// Limiting the walk avoids the O(file_size) per-construction cost
-// flagged in PR-808 review.
-func isUsedOutsideHook(name *ast.Node, hookCallback *ast.Node, depsNode *ast.Node, scope *ast.Node) bool {
-	if name == nil || name.Kind != ast.KindIdentifier || scope == nil {
-		return false
-	}
-	target := name.AsIdentifier().Text
-	used := false
-	var visit func(n *ast.Node) bool
-	visit = func(n *ast.Node) bool {
-		if used {
-			return true
-		}
-		if n == hookCallback || n == depsNode {
-			// Skip the hook callback and the deps array entirely —
-			// references inside them aren't "outside the hook".
-			return false
-		}
-		if n.Kind == ast.KindIdentifier && n != name {
-			if n.AsIdentifier().Text == target && isReferenceIdentifier(n) {
-				used = true
-				return true
-			}
-		}
-		n.ForEachChild(visit)
-		return false
-	}
-	visit(scope)
-	return used
-}
-
-// getUnknownDependenciesMessage mirrors upstream's same-named helper.
 func getUnknownDependenciesMessage(reactiveHookName string) string {
 	return fmt.Sprintf(
 		"React Hook %s received a function whose dependencies are unknown. Pass an inline function instead.",
