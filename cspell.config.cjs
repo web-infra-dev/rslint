@@ -30,6 +30,7 @@ module.exports = {
     'internal/lsp/*_test.go',
     'internal/config/*_test.go',
     'internal/rules/valid_typeof/valid_typeof.md',
+    'internal/plugins/import/rules/no_unresolved/no_unresolved.md',
     'internal/plugins/jsx_a11y/rules/aria_props/aria_props.md',
     'internal/plugins/jsx_a11y/rules/aria_proptypes/aria_proptypes.md',
     'internal/plugins/react/rules/no_typos/no_typos.md',
