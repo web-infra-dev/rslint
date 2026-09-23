@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
@@ -192,17 +193,15 @@ func (compiled *ModuleSettings) IsExternalPath(specifier string, resolvedPath st
 }
 
 // IsExternalPathFromPackage classifies a resolved target relative to the
-// importing package. A target outside that package is external; a target
-// inside it is external only when it is below a configured external-module
-// folder. Relative folders resolve from packagePath.
+// importing package. Only configured external-module folders make a target
+// external, including hoisted folders above the package. A sibling workspace
+// reached through an alias remains internal.
 func (compiled *ModuleSettings) IsExternalPathFromPackage(packagePath, resolvedPath string, caseSensitive bool) bool {
 	if compiled == nil || resolvedPath == "" {
 		return false
 	}
 	compareOptions := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: caseSensitive}
-	if packagePath != "" && !tspath.ContainsPath(packagePath, resolvedPath, compareOptions) {
-		return true
-	}
+	outsidePackage := packagePath != "" && !tspath.ContainsPath(packagePath, resolvedPath, compareOptions)
 	for _, folder := range compiled.externalFolders {
 		folderPath := folder
 		if !tspath.IsRootedDiskPath(folderPath) {
@@ -217,9 +216,47 @@ func (compiled *ModuleSettings) IsExternalPathFromPackage(packagePath, resolvedP
 		if tspath.ContainsPath(folderPath, resolvedPath, compareOptions) {
 			return true
 		}
+		if outsidePackage && !tspath.IsRootedDiskPath(folder) && pathContainsSegment(resolvedPath, folder) {
+			return true
+		}
 	}
 	return false
 }
+
+// IsExternalModuleInFolder retains external classification for installed
+// packages whose symlink target resolves outside an external-module folder.
+// The caller first checks the resolved path and the written module-name shape.
+func (compiled *ModuleSettings) IsExternalModuleInFolder(sourceProgram *program.Program, packagePath, specifier string) bool {
+	if compiled == nil || sourceProgram == nil || sourceProgram.FS() == nil || packagePath == "" {
+		return false
+	}
+	base := baseModuleName(specifier)
+	// Every subpath of one installed package has the same answer. Share this
+	// filesystem lookup across files, scoped to the immutable Program generation.
+	return program.Cached(sourceProgram, externalModuleKey{compiled.key, packagePath, base}, func() bool {
+		fs := sourceProgram.FS()
+		exists := func(directory string) bool {
+			candidate := tspath.ResolvePath(directory, base)
+			return fs.DirectoryExists(candidate) || fs.FileExists(candidate)
+		}
+		for _, folder := range compiled.externalFolders {
+			if tspath.IsRootedDiskPath(folder) {
+				if exists(folder) {
+					return true
+				}
+				continue
+			}
+			if _, found := tspath.ForEachAncestorDirectory(packagePath, func(directory string) (bool, bool) {
+				return true, exists(tspath.ResolvePath(directory, folder))
+			}); found {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+type externalModuleKey struct{ settings, packagePath, base string }
 
 // externalModuleFolders returns eslint-plugin-import's configured external
 // module folders. The default applies only when the setting is absent or not

@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -395,7 +396,7 @@ type importEntry struct {
 	displayName  string
 	alias        string
 	typ          string // "import", "require", "import:object", "export"
-	importKind   string // "type", "typeof", ""
+	importKind   string // "type", "typeof", "value", or absent; also describes named exports
 	classifyType string
 
 	rank        float64
@@ -425,6 +426,7 @@ type sourceInfo struct {
 	lineStarts     []core.TextPos
 	comments       []*ast.CommentRange
 	commentsLoaded bool
+	namedTokens    map[*ast.Node][]utils.SourceToken
 }
 
 // pendingReport keeps detection separate from emission. import/order gathers
@@ -594,7 +596,7 @@ func (classifier *importClassifier) classify(name string, specifier *ast.Node) s
 	if classifier.settings.IsInternalSpecifier(name) {
 		return "internal"
 	}
-	if tspath.IsRootedDiskPath(name) {
+	if nodeutil.IsAbsolutePath(name) {
 		return "absolute"
 	}
 	if import_utils.IsNodeBuiltinSpecifier(name) {
@@ -627,6 +629,10 @@ func (classifier *importClassifier) classify(name string, specifier *ast.Node) s
 		return "external"
 	}
 	if resolvedPath != "" {
+		if sourceProgram := classifier.ctx.Program(); sourceProgram != nil && isExternalLookingName(name) &&
+			classifier.settings.IsExternalModuleInFolder(sourceProgram, packagePath, name) {
+			return "external"
+		}
 		return "internal"
 	}
 	if isExternalLookingName(name) {
@@ -1404,7 +1410,7 @@ func mutateRanksToAlphabetize(imported []*importEntry, opts alphabetizeOptions) 
 		if opts.caseInsensitive {
 			value = ecmascript.StringToLowerCase(value)
 		}
-		kind := entry.importKind
+		kind := entry.alphabetizeImportKind()
 		if kind == "" {
 			kind = "value"
 		}
@@ -1448,7 +1454,16 @@ type alphabetizedRankKey struct {
 }
 
 func makeAlphabetizedRankKey(entry *importEntry) alphabetizedRankKey {
-	return alphabetizedRankKey{value: entry.value, importKind: entry.importKind}
+	return alphabetizedRankKey{value: entry.value, importKind: entry.alphabetizeImportKind()}
+}
+
+func (entry *importEntry) alphabetizeImportKind() string {
+	// Export specifiers have exportKind, not importKind. Their kind still
+	// controls type grouping and descriptions, but not alphabetize keys.
+	if entry.typ == "export" {
+		return ""
+	}
+	return entry.importKind
 }
 
 type alphabetizeEntry struct {
@@ -1631,19 +1646,20 @@ func makeNamedOutOfOrderReport(reports *reportQueue, first, second *importEntry,
 		),
 	}
 	reports.add(second.node, msg, func() []rule.RuleFix {
-		return buildNamedSwapFix(source.file, source.text, first, second, order)
+		return buildNamedSwapFix(source, first, second, order)
 	})
 }
 
-func buildNamedSwapFix(sourceFile *ast.SourceFile, sourceText string, first, second *importEntry, order string) []rule.RuleFix {
-	if sourceFile == nil || first == nil || second == nil {
+func buildNamedSwapFix(source *sourceInfo, first, second *importEntry, order string) []rule.RuleFix {
+	if source == nil || source.file == nil || first == nil || second == nil {
 		return nil
 	}
-	firstStart, firstEnd, ok := namedSpecifierBounds(sourceFile, first.node)
+	sourceFile, sourceText := source.file, source.text
+	firstStart, firstEnd, ok := namedSpecifierBounds(source, first.node)
 	if !ok {
 		return nil
 	}
-	secondStart, secondEnd, ok := namedSpecifierBounds(sourceFile, second.node)
+	secondStart, secondEnd, ok := namedSpecifierBounds(source, second.node)
 	if !ok {
 		return nil
 	}
@@ -1687,10 +1703,11 @@ func buildNamedSwapFix(sourceFile *ast.SourceFile, sourceText string, first, sec
 	}
 }
 
-func namedSpecifierBounds(sourceFile *ast.SourceFile, node *ast.Node) (int, int, bool) {
-	if sourceFile == nil || node == nil {
+func namedSpecifierBounds(source *sourceInfo, node *ast.Node) (int, int, bool) {
+	if source == nil || source.file == nil || node == nil {
 		return 0, 0, false
 	}
+	sourceFile := source.file
 	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
 	// Prefer tokens from the parsed list that owns this member. A standalone
 	// scanner starting at the beginning of a TSX file can lose JSX context and
@@ -1698,8 +1715,16 @@ func namedSpecifierBounds(sourceFile *ast.SourceFile, node *ast.Node) (int, int,
 	// Parser-backed parent tokens retain the correct context for named imports,
 	// exports, binding patterns, and object literals.
 	if node.Parent != nil {
+		if source.namedTokens == nil {
+			source.namedTokens = make(map[*ast.Node][]utils.SourceToken)
+		}
+		tokens, ok := source.namedTokens[node.Parent]
+		if !ok {
+			tokens = utils.TokensOfNode(sourceFile, node.Parent)
+			source.namedTokens[node.Parent] = tokens
+		}
 		start, end := -1, -1
-		for _, token := range utils.TokensOfNode(sourceFile, node.Parent) {
+		for _, token := range tokens {
 			isDelimiter := token.Kind == ast.KindCommaToken ||
 				token.Kind == ast.KindOpenBraceToken ||
 				token.Kind == ast.KindCloseBraceToken
@@ -1898,7 +1923,10 @@ func collectNamedImports(ni *ast.NamedImports) []*namedEntry {
 			// the require/CommonJS paths and leave the whole list untouched.
 			return nil
 		}
-		kind := ""
+		kind := "value"
+		if ast.IsInJSFile(spec) {
+			kind = ""
+		}
 		if s.IsTypeOnly {
 			kind = "type"
 		}
@@ -1963,7 +1991,7 @@ func handleImportEqualsDeclaration(ctx rule.RuleContext, stmt *ast.Node, opts op
 		typ = "import:object"
 		classify = "object"
 	}
-	kind := ""
+	kind := "value"
 	if eq.IsTypeOnly {
 		kind = "type"
 	}
@@ -2309,21 +2337,22 @@ func isDeclaredInCurrentScope(scopes cjsScopeIndex, ident *ast.Node) bool {
 	return len(current.Declarations(ident.Text())) > 0
 }
 
-// importKindOf returns "type" only for a whole-declaration type import.
+// importKindOf preserves the ESTree distinction between value imports and
+// nodes with no importKind (such as require calls) in alphabetized rank keys.
 // `import { type X } from 'mod'` remains a value import for whole-item ordering;
 // its per-specifier kind is considered only by named sorting.
 func importKindOf(node *ast.Node) string {
-	if node.Kind != ast.KindImportDeclaration {
+	if node.Kind != ast.KindImportDeclaration || ast.IsInJSFile(node) {
 		return ""
 	}
 	clause := node.AsImportDeclaration().ImportClause
 	if clause == nil {
-		return ""
+		return "value"
 	}
 	if ast.IsTypeOnlyImportDeclaration(clause) {
 		return "type"
 	}
-	return ""
+	return "value"
 }
 
 // isMultiline reports whether the node spans more than one logical line.
@@ -2440,7 +2469,7 @@ func finalizeBlock(reports *reportQueue, bs *blockState, opts options, source *s
 	if len(bs.imports) > 1 {
 		imported = bs.imports[:0]
 		for _, e := range bs.imports {
-			if e.specifier != nil {
+			if e.specifier != nil && (e.importKind != "type" || !opts.typeGroupInGroups || opts.isSortingTypesGroup) {
 				e.classifyType = classifier.classify(e.value, e.specifier)
 			}
 			r := computeRank(e, opts)

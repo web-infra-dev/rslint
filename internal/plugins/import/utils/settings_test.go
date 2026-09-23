@@ -1,9 +1,16 @@
 package utils_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
+	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestModuleSettingsIsExternalPath(t *testing.T) {
@@ -260,8 +267,11 @@ func TestModuleSettingsIsExternalPathFromPackage(t *testing.T) {
 	}{
 		{name: "dependency inside package", packagePath: "/repo/app", resolvedPath: "/repo/app/node_modules/pkg/index.js", caseSensitive: true, want: true},
 		{name: "hoisted dependency", packagePath: "/repo/packages/app", resolvedPath: "/repo/node_modules/pkg/index.js", caseSensitive: true, want: true},
-		{name: "target outside package", packagePath: "/repo/packages/app", resolvedPath: "/repo/packages/shared/index.js", caseSensitive: true, want: true},
-		{name: "sibling package prefix is outside", packagePath: "/repo/app", resolvedPath: "/repo/application/index.js", caseSensitive: true, want: true},
+		{name: "hoisted custom folder", settings: map[string]interface{}{"import/external-module-folders": []string{"vendor/"}}, packagePath: "/repo/packages/app", resolvedPath: "/repo/vendor/pkg/index.js", caseSensitive: true, want: true},
+		{name: "hoisted folder prefix is not external", packagePath: "/repo/packages/app", resolvedPath: "/repo/node_modules-extra/pkg/index.js", caseSensitive: true},
+		{name: "absolute external folder excludes siblings", settings: map[string]interface{}{"import/external-module-folders": []string{"/dependencies"}}, packagePath: "/repo/app", resolvedPath: "/repo/shared/index.js", caseSensitive: true},
+		{name: "target outside package", packagePath: "/repo/packages/app", resolvedPath: "/repo/packages/shared/index.js", caseSensitive: true},
+		{name: "sibling package prefix is outside", packagePath: "/repo/app", resolvedPath: "/repo/application/index.js", caseSensitive: true},
 		{name: "package root itself is internal", packagePath: "/repo/app", resolvedPath: "/repo/app", caseSensitive: true},
 		{name: "ordinary source inside package", packagePath: "/repo/app", resolvedPath: "/repo/app/src/index.js", caseSensitive: true},
 		{name: "relative segments are normalized", packagePath: "/repo/app", resolvedPath: "/repo/app/src/../node_modules/pkg/index.js", caseSensitive: true, want: true},
@@ -270,11 +280,11 @@ func TestModuleSettingsIsExternalPathFromPackage(t *testing.T) {
 		{name: "custom folder sibling prefix", settings: map[string]interface{}{"import/external-module-folders": []string{"vendor"}}, packagePath: "/repo/app", resolvedPath: "/repo/app/vendor-extra/pkg/index.js", caseSensitive: true},
 		{name: "empty folder denotes package root", settings: map[string]interface{}{"import/external-module-folders": []string{""}}, packagePath: "/repo", resolvedPath: "/repo/src/local.js", caseSensitive: true, want: true},
 		{name: "explicit empty folders keep package target internal", settings: map[string]interface{}{"import/external-module-folders": []string{}}, packagePath: "/repo", resolvedPath: "/repo/node_modules/pkg/index.js", caseSensitive: true},
-		{name: "explicit empty folders do not change outside target", settings: map[string]interface{}{"import/external-module-folders": []string{}}, packagePath: "/repo/app", resolvedPath: "/repo/shared/index.js", caseSensitive: true, want: true},
+		{name: "explicit empty folders keep outside target internal", settings: map[string]interface{}{"import/external-module-folders": []string{}}, packagePath: "/repo/app", resolvedPath: "/repo/shared/index.js", caseSensitive: true},
 		{name: "case insensitive host", packagePath: "/REPO/APP", resolvedPath: "/repo/app/NODE_MODULES/pkg/index.js", want: true},
-		{name: "case sensitive host treats casing mismatch as outside", packagePath: "/REPO/APP", resolvedPath: "/repo/app/src/index.js", caseSensitive: true, want: true},
+		{name: "case sensitive host treats casing mismatch as outside", packagePath: "/REPO/APP", resolvedPath: "/repo/app/src/index.js", caseSensitive: true},
 		{name: "Windows drive roots are case insensitive", packagePath: "C:/repo/app", resolvedPath: "c:/repo/app/node_modules/pkg/index.js", caseSensitive: true, want: true},
-		{name: "target on another Windows drive is outside", packagePath: "C:/repo/app", resolvedPath: "D:/deps/pkg/index.js", caseSensitive: false, want: true},
+		{name: "target on another Windows drive is internal", packagePath: "C:/repo/app", resolvedPath: "D:/deps/pkg/index.js", caseSensitive: false},
 		{name: "empty resolved path is never external", packagePath: "/repo/app", caseSensitive: true},
 	}
 
@@ -287,5 +297,76 @@ func TestModuleSettingsIsExternalPathFromPackage(t *testing.T) {
 				t.Fatalf("IsExternalPathFromPackage() = %v, want %v", got, test.want)
 			}
 		})
+	}
+}
+
+func TestModuleSettingsIsExternalModuleInFolder(t *testing.T) {
+	t.Parallel()
+	root := tspath.NormalizePath(t.TempDir())
+	packagePath := tspath.ResolvePath(root, "packages/app")
+	for _, directory := range []string{"packages/app", "node_modules/linked", "node_modules/@scope/linked", "vendor/custom", "absolute/installed"} {
+		if err := os.MkdirAll(filepath.FromSlash(tspath.ResolvePath(root, directory)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.FromSlash(tspath.ResolvePath(root, "node_modules/single.js")), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	newProgram := func() *program.Program {
+		t.Helper()
+		p, err := program.NewFromRoots(program.RootOptions{
+			Host:            utils.CreateCompilerHost(packagePath, osvfs.FS()),
+			CompilerOptions: &core.CompilerOptions{AllowJs: core.TSTrue, NoLib: core.TSTrue},
+			RootFileNames:   []string{tspath.ResolvePath(root, "node_modules/single.js")},
+			SingleThreaded:  true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	p := newProgram()
+	for _, tc := range []struct {
+		name      string
+		folders   any
+		specifier string
+		want      bool
+	}{
+		{name: "hoisted package", specifier: "linked/subpath", want: true},
+		{name: "scoped package", specifier: "@scope/linked/subpath", want: true},
+		{name: "missing package", specifier: "missing"},
+		{name: "no prefix match", specifier: "link"},
+		{name: "single file", specifier: "single.js", want: true},
+		{name: "no implicit extension", specifier: "single"},
+		{name: "disabled folders", folders: []string{}, specifier: "linked"},
+		{name: "custom folder", folders: []string{"vendor/"}, specifier: "custom/subpath", want: true},
+		{name: "absolute folder", folders: []string{tspath.ResolvePath(root, "absolute")}, specifier: "installed", want: true},
+		{name: "absolute folder miss", folders: []string{tspath.ResolvePath(root, "absolute")}, specifier: "linked"},
+		{name: "empty folder walks ancestors", folders: []string{""}, specifier: "vendor/custom", want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			settings := map[string]any{}
+			if tc.folders != nil {
+				settings["import/external-module-folders"] = tc.folders
+			}
+			compiled := import_utils.CompileModuleSettings(settings)
+			if got := compiled.IsExternalModuleInFolder(p, packagePath, tc.specifier); got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+	compiled := import_utils.CompileModuleSettings(nil)
+	if compiled.IsExternalModuleInFolder(p, packagePath, "later/subpath") {
+		t.Fatal("missing package was found")
+	}
+	if err := os.MkdirAll(filepath.FromSlash(tspath.ResolvePath(root, "node_modules/later")), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if compiled.IsExternalModuleInFolder(p, packagePath, "later/another-subpath") {
+		t.Fatal("one generation did not share its package lookup")
+	}
+	if !compiled.IsExternalModuleInFolder(newProgram(), packagePath, "later/subpath") {
+		t.Fatal("new generation reused a stale package lookup")
 	}
 }
