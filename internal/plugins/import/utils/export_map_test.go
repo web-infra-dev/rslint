@@ -1,6 +1,7 @@
 package utils_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -183,6 +184,24 @@ func TestExportQueriesSupportSourceOnlyProgram(t *testing.T) {
 
 func TestGetExportMap(t *testing.T) {
 	t.Parallel()
+
+	t.Run("enumeration preserves declared aliases without their target", func(t *testing.T) {
+		t.Parallel()
+		ctx, specifier := contextForImport(t, "./reexport-missing-as-default")
+		exports, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok || !slices.Equal(slices.Collect(exports.Names()), []string{"default"}) || !exports.Has("default") {
+			t.Fatal("an explicit re-export must retain its declared name")
+		}
+	})
+
+	t.Run("enumeration does not invent unresolved star names", func(t *testing.T) {
+		t.Parallel()
+		ctx, specifier := contextForImport(t, "./unresolved-star-export")
+		exports, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok || len(slices.Collect(exports.Names())) != 0 || !exports.Has("unknown") {
+			t.Fatal("unknown exports must remain open for lookups but absent from enumeration")
+		}
+	})
 
 	t.Run("direct exports and export-all namespace alias", func(t *testing.T) {
 		t.Parallel()

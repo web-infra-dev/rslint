@@ -485,6 +485,11 @@ context fields: generic source references come from `Program().ModuleGraph()`,
 while rule-specific derived indexes use `CachedByProgram`. Both remain keyed by
 the same Program generation and can never become a second source identity.
 
+The import plugin's `ModuleIndex` and read-only `ExportMap` own static export
+discovery, including namespace export assignments and enumeration of known names.
+The `import/export` rule owns duplicate reporting and TypeScript declaration
+merging policy; these decisions do not enter the shared module index.
+
 The linter creates one short-lived `CommentStore` per file. `Comments.All()`
 materializes the scanner-backed, source-ordered, deduplicated comment list only
 for the first consumer; later consumers share that list. A source without `//`

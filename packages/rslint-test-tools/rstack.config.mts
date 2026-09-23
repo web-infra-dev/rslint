@@ -212,6 +212,7 @@ define.test({
 
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/default.test.ts',
+    './tests/eslint-plugin-import/rules/export.test.ts',
     './tests/eslint-plugin-import/rules/first.test.ts',
     './tests/eslint-plugin-import/rules/namespace.test.ts',
     './tests/eslint-plugin-import/rules/newline-after-import.test.ts',
