@@ -10,6 +10,7 @@
 package prefer_mock_return_shorthand
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -113,8 +114,10 @@ func singleReturnExpression(fn *ast.Node) *ast.Node {
 //     binding happened to hold at configuration time.
 //
 // Writes are not looked for inside a nested function body, because that body does
-// not run while the expression is evaluated. Reads are, because a closure the
-// expression hands back still observes the binding later.
+// not run while the expression is evaluated — but they are in the parts of a
+// class or method that do, such as a static initializer or a computed name.
+// Reads are looked for everywhere, because a closure the expression hands back
+// still observes the binding later.
 func isEvaluatedOnceSafe(ctx rule.RuleContext, expression *ast.Node) bool {
 	return !containsWrite(expression) && !readsMutableBinding(ctx, expression)
 }
@@ -138,12 +141,14 @@ func isEvaluatedOnceSafe(ctx rule.RuleContext, expression *ast.Node) bool {
 // is `mockRejectedValue`, which builds the promise per call, and that belongs to
 // the promise-shorthand rule rather than this one.
 func buildsRejectedPromise(ctx rule.RuleContext, expression *ast.Node) bool {
-	call := ast.SkipParentheses(expression)
+	// Type assertions are erased at run time, so `Promise.reject(e) as
+	// Promise<never>` and `(Promise as any).reject(e)` build the same promise.
+	call := utils.SkipAssertionsAndParens(expression)
 	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
 	}
 
-	access := ast.SkipParentheses(call.AsCallExpression().Expression)
+	access := utils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
 	if access == nil || !ast.IsAccessExpression(access) {
 		return false
 	}
@@ -155,7 +160,7 @@ func buildsRejectedPromise(ctx rule.RuleContext, expression *ast.Node) bool {
 		return false
 	}
 
-	object := ast.SkipParentheses(access.Expression())
+	object := utils.SkipAssertionsAndParens(access.Expression())
 	if object == nil || object.Kind != ast.KindIdentifier || object.Text() != "Promise" {
 		return false
 	}
@@ -189,6 +194,11 @@ func containsWrite(node *ast.Node) bool {
 	}
 
 	if testFramework.IsFunction(node) || ast.IsClassLike(node) {
+		for _, part := range creationTimeParts(node, true) {
+			if containsWrite(part) {
+				return true
+			}
+		}
 		return false
 	}
 
@@ -337,7 +347,8 @@ func NewRule(config Config) rule.Rule {
 					replacement := withOnce(returnValueMethod, once)
 					ctx.ReportNodeWithDeferredFixes(accessor, useMockShorthandMessage(replacement), func() []rule.RuleFix {
 						accessorRange, accessorText, ok := testFramework.AccessorReplacement(ctx.SourceFile, accessor, replacement)
-						if !ok || dropsComment(ctx, callback, expression) {
+						if !ok || dropsComment(ctx, callback, expression) ||
+							dropsCallbackScope(ctx, callback, expression) {
 							return nil
 						}
 						return []rule.RuleFix{
@@ -395,7 +406,9 @@ func isCollapsibleCallback(callback *ast.Node) bool {
 // An arrow callback is not affected: it has no `this` or `arguments` of its own,
 // so both already name the enclosing scope. Nested arrows inside a `function`
 // callback do inherit its bindings and are therefore searched; a nested
-// `function` rebinds them and is not.
+// `function` rebinds them and is not. A nested method or class rebinds them only
+// in its bodies, so its computed names, decorators and `extends` expression are
+// still searched.
 func readsCallSiteBinding(callback *ast.Node, expression *ast.Node) bool {
 	if callback.Kind != ast.KindFunctionExpression {
 		return false
@@ -412,16 +425,110 @@ func readsCallSiteBinding(callback *ast.Node, expression *ast.Node) bool {
 			// `import.meta` is the other meta property, and it names the module
 			// rather than the call, so it travels with the expression.
 			return node.AsMetaProperty().KeywordToken == ast.KindNewKeyword
-		case ast.KindFunctionExpression, ast.KindFunctionDeclaration,
-			ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		case ast.KindFunctionExpression, ast.KindFunctionDeclaration:
 			return false
 		}
-		if ast.IsClassLike(node) {
+		if ast.IsMethodOrAccessor(node) || ast.IsClassLike(node) {
+			for _, part := range creationTimeParts(node, false) {
+				if visit(part) {
+					return true
+				}
+			}
 			return false
 		}
 		return node.ForEachChild(visit)
 	}
 	return visit(expression)
+}
+
+// creationTimeParts returns the parts of a method or class that run when the node
+// itself is evaluated rather than when the method is called or the class is
+// instantiated: computed member names, decorators and the `extends` expression.
+// Those parts see the enclosing function's `this`, `arguments` and
+// `new.target`.
+//
+// With staticBodies, it also returns static field initializers and static
+// blocks. They run at the same moment, but bind `this` to the class itself, so
+// they matter to a search for writes and not to one for call-site bindings.
+func creationTimeParts(node *ast.Node, staticBodies bool) []*ast.Node {
+	var parts []*ast.Node
+	addEvaluatedHeader := func(member *ast.Node) {
+		if modifiers := member.Modifiers(); modifiers != nil {
+			for _, modifier := range modifiers.Nodes {
+				if ast.IsDecorator(modifier) {
+					parts = append(parts, modifier)
+				}
+			}
+		}
+		if name := member.Name(); name != nil && ast.IsComputedPropertyName(name) {
+			parts = append(parts, name)
+		}
+	}
+
+	switch {
+	case ast.IsMethodOrAccessor(node):
+		addEvaluatedHeader(node)
+	case ast.IsClassLike(node):
+		addEvaluatedHeader(node)
+		if heritage := ast.GetClassExtendsHeritageElement(node); heritage != nil {
+			parts = append(parts, heritage)
+		}
+		for _, member := range node.Members() {
+			addEvaluatedHeader(member)
+			if !staticBodies || !ast.IsStatic(member) {
+				continue
+			}
+			switch member.Kind {
+			case ast.KindClassStaticBlockDeclaration:
+				parts = append(parts, member.AsClassStaticBlockDeclaration().Body)
+			case ast.KindPropertyDeclaration:
+				if initializer := member.Initializer(); initializer != nil {
+					parts = append(parts, initializer)
+				}
+			}
+		}
+	}
+	return parts
+}
+
+// dropsCallbackScope reports whether replacing the callback with its returned
+// expression would delete a declaration the program still relies on.
+//
+// The return statement is the callback's first statement, so the only things
+// the callback declares outside the expression are what follows the return —
+// a hoisted function or `var` the expression may call or read — and, for a
+// named function expression, its own name. Either is gone once the callback is,
+// so `function impl() { return impl; }` would become a reference to an
+// undeclared `impl`. The diagnostic still stands; only the fix is withheld.
+func dropsCallbackScope(ctx rule.RuleContext, callback *ast.Node, expression *ast.Node) bool {
+	if body := callback.Body(); body != nil && body.Kind == ast.KindBlock &&
+		body.AsBlock().Statements != nil && len(body.AsBlock().Statements.Nodes) > 1 {
+		return true
+	}
+
+	name := callback.Name()
+	if name == nil {
+		return false
+	}
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && node.Text() == name.Text() &&
+			scope.IsReferenceIdentifier(node) && resolvesTo(ctx, node, callback) {
+			return true
+		}
+		return node.ForEachChild(visit)
+	}
+	return visit(expression)
+}
+
+// resolvesTo reports whether the identifier names the given declaration. Without
+// a reference index it assumes it does, which only withholds a fix.
+func resolvesTo(ctx rule.RuleContext, identifier *ast.Node, declaration *ast.Node) bool {
+	if ctx.Refs == nil {
+		return true
+	}
+	symbol := ctx.Refs.Resolve(identifier)
+	return symbol != nil && slices.Contains(symbol.Declarations, declaration)
 }
 
 // dropsComment reports whether replacing the callback with its returned

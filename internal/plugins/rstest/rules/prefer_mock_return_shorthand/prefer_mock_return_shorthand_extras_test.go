@@ -58,6 +58,19 @@ aVariable.mockImplementation(() => ({ next: (counter.value += 1) }));`},
 aVariable.mockImplementation(() => delete counter.value);`},
 			{Code: `const counter = { value: 0 };
 aVariable.mockImplementation(() => [counter.value++]);`},
+			// A class or method is evaluated each time the expression is, and so
+			// are its static initializers, static blocks, computed names and
+			// `extends` expression.
+			{Code: `const state = { count: 0 };
+aVariable.mockImplementation(() => class { static value = ++state.count; });`},
+			{Code: `const state = { count: 0 };
+aVariable.mockImplementation(() => class { static { state.count++; } });`},
+			{Code: `const state = { count: 0 };
+aVariable.mockImplementation(() => class { [++state.count]() {} });`},
+			{Code: `const state = { count: 0 };
+aVariable.mockImplementation(() => class extends (state.count++, Base) {});`},
+			{Code: `const state = { count: 0 };
+aVariable.mockImplementation(() => ({ [++state.count]() {} }));`},
 
 			// --- a mutable binding would be frozen at its configuration value ---
 			// Every shape below is a false positive in @vitest/eslint-plugin,
@@ -116,11 +129,29 @@ aVariable.mockImplementation(() => 1 as typeof value);`},
   aVariable.mockImplementation(function () { return new.target; });
 }`},
 			{Code: `aVariable.mockImplementation(function () { return () => new.target; });`},
+			// A nested method or class rebinds `this` only inside its bodies. Its
+			// computed names, decorators and `extends` expression are evaluated
+			// with the callback's bindings.
+			{Code: `aVariable.mockImplementation(function () { return { [this.key]() {} }; });`},
+			{Code: `aVariable.mockImplementation(function () { return { get [this.key]() { return 1; } }; });`},
+			{Code: `aVariable.mockImplementation(function () { return class extends this.Base {}; });`},
+			{Code: `aVariable.mockImplementation(function () { return class { [this.key]() {} }; });`},
+			{Code: `aVariable.mockImplementation(function () { return class { static [arguments[0]] = 1; }; });`},
+			{Code: `aVariable.mockImplementation(function () { return class { @this.decorate method() {} }; });`},
 
 			// --- a rejected promise is guarded in every accessor spelling ---
 			{Code: `aVariable.mockImplementation(() => Promise['reject'](13));`},
 			{Code: "aVariable.mockImplementation(() => Promise[`reject`](13));"},
 			{Code: `aVariable.mockImplementation(() => Promise?.reject(13));`},
+			// Type assertions are erased at run time, so they do not hide the
+			// rejected promise from the guard.
+			{Code: `aVariable.mockImplementation(() => Promise.reject(new Error('nope')) as Promise<never>);`},
+			{Code: `aVariable.mockImplementation(() => Promise.reject(new Error('nope'))!);`},
+			{Code: `aVariable.mockImplementation(() => Promise.reject(new Error('nope')) satisfies Promise<never>);`},
+			{Code: `aVariable.mockImplementation(() => <Promise<never>>Promise.reject(new Error('nope')));`},
+			{Code: `aVariable.mockImplementation(() => (Promise as any).reject(13));`},
+			{Code: `aVariable.mockImplementation(() => Promise!.reject(13));`},
+			{Code: `aVariable.mockImplementation(() => (Promise.reject as any)(13));`},
 
 			// --- a generator returns an iterator, not the value it names ---
 			// Both reference plugins rewrite this to `mockReturnValue(1)`, which
@@ -361,6 +392,51 @@ aVariable.mockReturnValue(Promise['reject'](1));`},
 });`,
 				Output: []string{},
 				Errors: report("mockReturnValue", 1, 11),
+			},
+			// --- a declaration the rewrite would delete withholds the fix ---
+			{
+				Code:   `aVariable.mockImplementation(function impl() { return impl; });`,
+				Output: []string{},
+				Errors: report("mockReturnValue", 1, 11),
+			},
+			{
+				Code:   `aVariable.mockImplementation(function impl() { return () => impl; });`,
+				Output: []string{},
+				Errors: report("mockReturnValue", 1, 11),
+			},
+			{
+				Code: `aVariable.mockImplementation(() => {
+  return getValue();
+  function getValue() { return 42; }
+});`,
+				Output: []string{},
+				Errors: report("mockReturnValue", 1, 11),
+			},
+			// A name that only matches the callback's, but resolves elsewhere,
+			// keeps the fix.
+			{
+				Code:   `aVariable.mockImplementation(function impl() { return function impl() { return impl; }; });`,
+				Output: []string{`aVariable.mockReturnValue(function impl() { return impl; });`},
+				Errors: report("mockReturnValue", 1, 11),
+			},
+			{
+				Code:   `aVariable.mockImplementation(function impl() { return 1; });`,
+				Output: []string{`aVariable.mockReturnValue(1);`},
+				Errors: report("mockReturnValue", 1, 11),
+			},
+			// A method or class body runs later, with its own `this`, so only the
+			// parts evaluated with the class keep the rewrite from happening.
+			{
+				Code:   `aVariable.mockImplementation(function () { return class extends Base { static self = this; method() { return this; } }; });`,
+				Output: []string{`aVariable.mockReturnValue(class extends Base { static self = this; method() { return this; } });`},
+				Errors: report("mockReturnValue", 1, 11),
+			},
+			{
+				Code: `const state = { count: 0 };
+aVariable.mockImplementation(() => class { value = ++state.count; method() { state.count++; } });`,
+				Output: []string{`const state = { count: 0 };
+aVariable.mockReturnValue(class { value = ++state.count; method() { state.count++; } });`},
+				Errors: report("mockReturnValue", 2, 11),
 			},
 			// A comment outside the callback is not touched by the rewrite.
 			{
