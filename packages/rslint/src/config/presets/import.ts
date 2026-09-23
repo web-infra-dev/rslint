@@ -10,7 +10,7 @@ const recommended: RslintConfigEntry = {
     // 'import/named': 'error', // not implemented
     'import/namespace': 'error',
     'import/default': 'error',
-    // 'import/export': 'error', // not implemented
+    'import/export': 'error',
     // warnings
     // 'import/no-named-as-default': 'warn', // not implemented
     // 'import/no-named-as-default-member': 'warn', // not implemented

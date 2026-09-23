@@ -15,6 +15,10 @@ func TestExportExtras(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			// A qualified namespace name has no simple exported identifier.
 			{Code: `export namespace A.B {} export const A = 1;`},
+			{Code: `export namespace A.B {} export const B = 1;`},
+			{Code: `namespace A.B {} export const B = 1;`},
+			{Code: `export namespace A.B.C {} export const B = 1; export const C = 2;`},
+			{Code: `namespace A.B.C {} export const C = 1;`},
 			{Code: `export declare module "foo" {} const value = 1; export {value as "foo"};`},
 			// RuleTester registers the rule as "test" for directive matching.
 			{Code: `/* eslint-disable test */
@@ -48,6 +52,14 @@ export default 1; export default 2;`},
 			{Code: `export * from "./namespace";`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Dotted namespace contents still have their own export scope.
+			{Code: `export namespace A.B.C { export const value = 1; export {value}; }
+export const C = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "multipleNamed", Message: "Multiple exports of name 'value'.", Line: 1, Column: 39, EndLine: 1, EndColumn: 44},
+					{MessageId: "multipleNamed", Message: "Multiple exports of name 'value'.", Line: 1, Column: 58, EndLine: 1, EndColumn: 63},
+				},
+			},
 			// Namespace export assignments include their import aliases.
 			{Code: `export const Value = 1; export * from "./alias-namespace";`,
 				Errors: []rule_tester.InvalidTestCaseError{

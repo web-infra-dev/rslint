@@ -114,9 +114,10 @@ func (c *collector) collectDeclaration(node *ast.Node) {
 	if node.Kind == ast.KindFunctionDeclaration && node.Body() == nil {
 		return
 	}
-	// Qualified namespace names and string module names have no identifier
-	// name upstream. They only merge with each other and cannot conflict.
+	// Qualified names (including their implicit nested declarations) and
+	// string module names have no simple exported identifier upstream.
 	if node.Kind == ast.KindModuleDeclaration && (node.Name().Kind != ast.KindIdentifier ||
+		node.Parent != nil && node.Parent.Kind == ast.KindModuleDeclaration ||
 		node.Body() != nil && node.Body().Kind == ast.KindModuleDeclaration) {
 		return
 	}

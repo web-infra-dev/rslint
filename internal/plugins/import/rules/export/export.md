@@ -4,6 +4,8 @@
 
 Reports duplicate named or default exports, including conflicts introduced by `export *`. Every conflicting occurrence is reported because the rule cannot determine which export was intended.
 
+This rule is enabled in `importPlugin.configs.recommended`.
+
 Examples of **incorrect** code for this rule:
 
 ```javascript
