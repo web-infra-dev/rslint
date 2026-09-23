@@ -51,3 +51,14 @@ func TestCollectNestedAndNonLiteralSources(t *testing.T) {
 		t.Fatal("empty selection returned sources")
 	}
 }
+
+func TestCollectParenthesizedRequire(t *testing.T) {
+	file := parseModuleSpecifierCacheFile(`(require)('parenthesized'); require?.('optional'); require('two', 'args'); (require as any)('asserted');`)
+	var names []string
+	for _, source := range Collect(file, CommonJSReferences) {
+		names = append(names, source.Specifier.Text())
+	}
+	if want := []string{"parenthesized", "optional"}; !reflect.DeepEqual(names, want) {
+		t.Fatalf("require sources = %q, want %q", names, want)
+	}
+}

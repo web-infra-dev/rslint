@@ -36,6 +36,11 @@ type Options struct {
 	MainFiles        []string            `json:"mainFiles"`
 	AliasFields      [][]string          `json:"aliasFields"`
 	FullySpecified   bool                `json:"fullySpecified,omitempty"`
+	// Legacy Node resolvers use literal filenames and main/index entries,
+	// without package exports/imports or resource query handling.
+	IgnoreExports    bool `json:"ignoreExports,omitempty"`
+	LiteralPaths     bool `json:"literalPaths,omitempty"`
+	PreserveSymlinks bool `json:"preserveSymlinks,omitempty"`
 	// Local imports disable directory lookup unless entry options enable it.
 	// Require callers retain the ordinary Node directory lookup.
 	NoDirectory bool `json:"noDirectory"`
@@ -99,7 +104,7 @@ func (resolver *nodeResolver) resolveRequest(name string) Result {
 	p, containingFile, options := resolver.program, resolver.fileName, resolver.options
 	originalName := name
 	// enhanced-resolve separates resource queries/fragments from the path.
-	if index := strings.IndexAny(name, "?#"); index > 0 && !resolver.mainTarget {
+	if index := strings.IndexAny(name, "?#"); index > 0 && !resolver.mainTarget && !options.LiteralPaths {
 		name = name[:index]
 	}
 	folders := options.Modules
@@ -446,10 +451,14 @@ func (f *nodeResolutionFS) DirectoryExists(name string) bool {
 }
 
 func (f *nodeResolutionFS) Realpath(name string) string {
-	if resolved := f.resolved[name]; resolved != "" {
-		return f.FS.Realpath(resolved)
+	resolved := f.resolved[name]
+	if resolved == "" {
+		resolved = f.physical(name)
 	}
-	return f.FS.Realpath(f.physical(name))
+	if f.options.PreserveSymlinks {
+		return resolved
+	}
+	return f.FS.Realpath(resolved)
 }
 
 func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
@@ -467,6 +476,12 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 		return text, true
 	}
 	if object, ok := value.Value.(*hujson.Object); ok {
+		if f.options.IgnoreExports {
+			object.Members = slices.DeleteFunc(object.Members, func(member hujson.ObjectMember) bool {
+				key := nodePackageMemberName(member)
+				return key == "exports" || key == "imports"
+			})
+		}
 		if imports := value.Find("/imports"); imports != nil {
 			filterNodeConditions(imports, f.options.Conditions)
 			markNodeImportTargets(imports, f.options.Conditions)

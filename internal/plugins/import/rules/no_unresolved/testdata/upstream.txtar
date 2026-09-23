@@ -1,0 +1,66 @@
+Fixtures from eslint-plugin-import v2.32.0 tests/files. Only existence is checked.
+
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noResolve":true,"jsx":"preserve","module":"commonjs","resolveJsonModule":true},"include":["filename-*.ts","element.tsx","script.js"]}
+-- bar.js --
+export default 'bar'
+export function foo() { return 'foo' }
+-- bar.json --
+{}
+-- commonjs-namespace/a.js --
+export { default as b } from './b'
+-- data.json --
+{ "foo": "bar" }
+-- foobar.json --
+{
+  "action": "set",
+  "node": {
+    "key": "/foo",
+    "value": "foo",
+    "modifiedIndex": 1438,
+    "createdIndex": 1438
+  },
+  "prevNode": {
+    "key": "/foo",
+    "value": "bar",
+    "modifiedIndex": 1437,
+    "createdIndex": 1437
+  }
+}
+-- ignore.invalid.extension --
+
+-- issue-370-commonjs-namespace/bar.js --
+// bar.js
+export { default as foo } from './foo'
+-- jsx/MyUnCoolComponent.jsx --
+import React from 'react'
+
+export default class MyCoolComponent extends React.Component {
+	render() {
+		return (<div>too cool for school</div>)
+	}
+}
+-- malformed.js --
+return foo from function () {
+
+export {}
+-- node_modules/a/index.js --
+exports.foo = 'bar'
+-- node_modules/a/package.json --
+{
+  "name": "a"
+}
+-- node_modules/jsx-module/foo.jsx --
+export const foo = "bar";
+-- node_modules/jsx-module/package.json --
+{
+  "name": "jsx-module"
+}
+-- src-root/src-bar.js --
+export const bar = 'BAR'
+-- alternate-root/in-alternate-root.js --
+export const DEEP = 'RISING'
+-- test-module/index.js --
+export function someThing() {}
+-- test.gif.extra --
+boo!

@@ -152,10 +152,28 @@ describe('defineConfig and config presets', () => {
     expect(rec.plugins).toContain('react');
   });
 
-  test('import.configs.recommended should declare import plugin', () => {
+  test('import.configs.recommended should declare import plugin and report unresolved imports', async () => {
     const rec = importPlugin.configs.recommended;
     expect(rec.plugins).toBeDefined();
     expect(rec.plugins).toContain('eslint-plugin-import');
+
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig([rec]),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'import-preset.js')]:
+          'import "./missing-import-preset.js";',
+      },
+    });
+    expect(result.fileCount).toBe(1);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]).toMatchObject({
+      ruleName: 'import/no-unresolved',
+      severity: 'error',
+      message: "Unable to resolve path to module './missing-import-preset.js'.",
+    });
   });
 
   test('rstestPlugin.configs.recommended should declare rstest plugin and rule', () => {

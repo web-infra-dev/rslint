@@ -6,7 +6,7 @@ const recommended: RslintConfigEntry = {
   plugins: ['eslint-plugin-import'],
   rules: {
     // errors
-    // 'import/no-unresolved': 'error', // not implemented
+    'import/no-unresolved': 'error',
     // 'import/named': 'error', // not implemented
     'import/namespace': 'error',
     'import/default': 'error',
