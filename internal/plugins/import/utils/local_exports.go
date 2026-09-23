@@ -108,6 +108,7 @@ func (local *localExports) appendStatement(sourceProgram *program.Program, sourc
 	case ast.KindExportAssignment:
 		exportAssignment := stmt.AsExportAssignment()
 		if exportAssignment.IsExportEquals {
+			local.appendNamespaceAssignment(sourceFile, exportAssignment.Expression)
 			return
 		}
 		local.Steps = append(local.Steps, exportStep{Kind: exportStepLocalDefault, Local: referencedIdentifierText(exportAssignment.Expression)})
@@ -117,6 +118,41 @@ func (local *localExports) appendStatement(sourceProgram *program.Program, sourc
 		}
 	case ast.KindExportDeclaration:
 		local.appendExportDeclaration(sourceProgram, sourceFile, settings, stmt.AsExportDeclaration())
+	}
+}
+
+// `export = namespace` exposes the namespace's declared members, including
+// members without an export modifier. Synthetic defaults remain HasExport's
+// responsibility; an ExportMap describes the static named surface.
+func (local *localExports) appendNamespaceAssignment(sourceFile *ast.SourceFile, expression *ast.Node) {
+	name := referencedIdentifierText(expression)
+	if name == "" {
+		return
+	}
+	for _, statement := range sourceFile.Statements.Nodes {
+		if statement.Kind != ast.KindModuleDeclaration || statement.Name().Text() != name ||
+			ast.HasSyntacticModifier(statement, ast.ModifierFlagsExport) {
+			continue
+		}
+		body := statement.AsModuleDeclaration().Body
+		// Modern TS-ESTree represents a dotted namespace with a qualified
+		// identifier, which upstream does not match to `export = identifier`.
+		if body == nil || body.Kind != ast.KindModuleBlock {
+			continue
+		}
+		var names []string
+		for _, member := range body.AsModuleBlock().Statements.Nodes {
+			// Namespace assignments also expose import aliases; ordinary
+			// top-level import aliases are not collected by the upstream map.
+			if member.Kind == ast.KindImportEqualsDeclaration {
+				names = append(names, member.Name().Text())
+				continue
+			}
+			names = append(names, exportedDeclarationNames(member)...)
+		}
+		if len(names) > 0 {
+			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: names})
+		}
 	}
 }
 

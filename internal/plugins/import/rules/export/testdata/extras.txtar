@@ -1,0 +1,33 @@
+Local fixtures for export rule regressions.
+
+-- alias-namespace.ts --
+declare namespace API { export import Value = Other.Value; }
+export = API;
+-- barrel.ts --
+export * from "./named"; export * from "./named";
+-- common.js --
+module.exports = { a: 1 };
+-- cycle-a.ts --
+export const a = 1; export * from "./cycle-b";
+-- cycle-b.ts --
+export const b = 1; export * from "./cycle-a";
+-- dotted.ts --
+declare namespace API.Nested { const value: string; }
+export = API;
+-- empty-name.ts --
+const value = 1; export {value as ""};
+-- empty.ts --
+export {};
+-- missing-name.ts --
+export {missing as alias} from "./named";
+-- named.ts --
+export const z = 1; export const a = 2; export type T = string; export default 0;
+-- namespace.ts --
+declare namespace API { const value: string; export class Item {} namespace Nested { const x: number; } }
+export = API;
+-- return.js --
+return; export {};
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"commonjs","jsx":"preserve"},"include":["**/*"]}
+-- unknown.ts --
+export * from "./not-found";

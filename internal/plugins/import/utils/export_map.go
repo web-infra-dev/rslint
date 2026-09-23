@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"iter"
+	"slices"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -23,6 +26,7 @@ type ExportMeta struct {
 // owns a map until it publishes it, may fill one in.
 type ExportMap struct {
 	exports    map[string]*ExportMeta
+	names      []string
 	hasUnknown bool
 }
 
@@ -60,12 +64,25 @@ func (m *ExportMap) Get(name string) *ExportMeta {
 	return m.exports[name]
 }
 
+// Names enumerates statically known export names, without exposing mutable
+// metadata or inventing names for unresolved star exports. Names retain their
+// discovery order so diagnostics from re-exports are deterministic.
+func (m *ExportMap) Names() iter.Seq[string] {
+	if m == nil {
+		return slices.Values([]string(nil))
+	}
+	return slices.Values(m.names)
+}
+
 func (m *ExportMap) set(name string, meta *ExportMeta) {
-	if m == nil || name == "" {
+	if m == nil {
 		return
 	}
 	if meta == nil {
 		meta = &ExportMeta{}
+	}
+	if _, exists := m.exports[name]; !exists {
+		m.names = append(m.names, name)
 	}
 	m.exports[name] = meta
 }
@@ -80,11 +97,11 @@ func (m *ExportMap) mergeFrom(other *ExportMap, includeDefault bool) {
 	if m == nil || other == nil {
 		return
 	}
-	for name, meta := range other.exports {
+	for name := range other.Names() {
 		if !includeDefault && name == defaultExportName {
 			continue
 		}
-		m.set(name, meta)
+		m.set(name, other.exports[name])
 	}
 	if other.hasUnknown {
 		m.addUnknown()
@@ -252,9 +269,8 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports,
 				exports.set(spec.Exported, nil)
 				continue
 			}
-			if !dependency.Has(spec.Local) {
-				continue
-			}
+			// An explicit re-export declares its public name even when its
+			// target is missing. Resolving the target only supplies metadata.
 			exports.set(spec.Exported, dependency.Get(spec.Local))
 		}
 	}

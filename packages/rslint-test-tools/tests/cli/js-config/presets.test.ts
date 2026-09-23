@@ -176,6 +176,33 @@ describe('defineConfig and config presets', () => {
     });
   });
 
+  test('import.configs.recommended reports duplicate exports', async () => {
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig([importPlugin.configs.recommended]),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'duplicate-exports-preset.ts')]:
+          'export const duplicated = 1; export { duplicated };',
+      },
+    });
+
+    expect(result.fileCount).toBe(1);
+    expect(result.diagnostics).toMatchObject([
+      {
+        ruleName: 'import/export',
+        messageId: 'multipleNamed',
+        severity: 'error',
+      },
+      {
+        ruleName: 'import/export',
+        messageId: 'multipleNamed',
+        severity: 'error',
+      },
+    ]);
+  });
+
   test('rstestPlugin.configs.recommended should declare rstest plugin and rule', () => {
     const rec = rstestPlugin.configs.recommended;
     expect(rec.plugins).toBeDefined();
