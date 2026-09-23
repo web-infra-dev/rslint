@@ -2,12 +2,13 @@ package array_type
 
 import (
 	_ "embed"
-	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	"github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed array_type.schema.json
@@ -35,6 +36,7 @@ func parseOptions(options []any) ArrayTypeOptions {
 
 // Check whatever node can be considered as simple
 func isSimpleType(node *ast.Node) bool {
+	node = ast.SkipTypeParentheses(node)
 	switch node.Kind {
 	case ast.KindIdentifier,
 		ast.KindAnyKeyword,
@@ -53,6 +55,8 @@ func isSimpleType(node *ast.Node) bool {
 		ast.KindThisType,
 		ast.KindQualifiedName:
 		return true
+	case ast.KindLiteralType:
+		return node.AsLiteralTypeNode().Literal.Kind == ast.KindNullKeyword
 	case ast.KindTypeReference:
 		typeRef := node.AsTypeReferenceNode()
 		if typeRef == nil {
@@ -85,6 +89,7 @@ func isSimpleType(node *ast.Node) bool {
 
 // Check if node needs parentheses
 func typeNeedsParentheses(node *ast.Node) bool {
+	node = ast.SkipTypeParentheses(node)
 	switch node.Kind {
 	case ast.KindTypeReference:
 		typeRef := node.AsTypeReferenceNode()
@@ -111,60 +116,36 @@ func typeNeedsParentheses(node *ast.Node) bool {
 	}
 }
 
-func isParenthesized(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
+func buildArrayMessage(id, className, readonlyPrefix, typeStr string) rule.RuleMessage {
+	qualifier := ""
+	if id == "errorStringArraySimple" || id == "errorStringArraySimpleReadonly" {
+		qualifier = " for simple types"
 	}
-
-	// Simple check - if the parent is a parenthesized type expression
-	return ast.IsParenthesizedTypeNode(parent)
-}
-
-func buildErrorStringArrayMessage(className, readonlyPrefix, typeStr string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "errorStringArray",
-		Description: fmt.Sprintf("Array type using '%s<%s>' is forbidden. Use '%s%s[]' instead.", className, typeStr, readonlyPrefix, typeStr),
+	brackets := ""
+	if id == "errorStringArray" || id == "errorStringArraySimple" {
+		brackets = "[]"
 	}
-}
-
-func buildErrorStringArrayReadonlyMessage(className, readonlyPrefix, typeStr string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "errorStringArrayReadonly",
-		Description: fmt.Sprintf("Array type using '%s<%s>' is forbidden. Use '%s%s[]' instead.", className, typeStr, readonlyPrefix, typeStr),
+		Id: id,
+		Description: "Array type using '" + className + "<" + typeStr + ">' is forbidden" +
+			qualifier + ". Use '" + readonlyPrefix + typeStr + brackets + "' instead.",
 	}
 }
 
-func buildErrorStringArraySimpleMessage(className, readonlyPrefix, typeStr string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "errorStringArraySimple",
-		Description: fmt.Sprintf("Array type using '%s<%s>' is forbidden for simple types. Use '%s%s[]' instead.", className, typeStr, readonlyPrefix, typeStr),
+func buildGenericMessage(id, readonlyPrefix, typeStr, className string) rule.RuleMessage {
+	qualifier := ""
+	if id == "errorStringGenericSimple" {
+		qualifier = " for non-simple types"
 	}
-}
-
-func buildErrorStringArraySimpleReadonlyMessage(className, readonlyPrefix, typeStr string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "errorStringArraySimpleReadonly",
-		Description: fmt.Sprintf("Array type using '%s<%s>' is forbidden for simple types. Use '%s%s[]' instead.", className, typeStr, readonlyPrefix, typeStr),
-	}
-}
-
-func buildErrorStringGenericMessage(readonlyPrefix, typeStr, className string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "errorStringGeneric",
-		Description: fmt.Sprintf("Array type using '%s%s[]' is forbidden. Use '%s<%s>' instead.", readonlyPrefix, typeStr, className, typeStr),
-	}
-}
-
-func buildErrorStringGenericSimpleMessage(readonlyPrefix, typeStr, className string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "errorStringGenericSimple",
-		Description: fmt.Sprintf("Array type using '%s%s[]' is forbidden for non-simple types. Use '%s<%s>' instead.", readonlyPrefix, typeStr, className, typeStr),
+		Id: id,
+		Description: "Array type using '" + readonlyPrefix + typeStr + "[]' is forbidden" +
+			qualifier + ". Use '" + className + "<" + typeStr + ">' instead.",
 	}
 }
 
 func nodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
-	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
+	nodeRange := utils.TrimNodeTextRange(sourceFile, ast.SkipTypeParentheses(node))
 	return sourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 }
 
@@ -183,26 +164,8 @@ func buildGenericFixes(
 ) []rule.RuleFix {
 	elementTypeText := nodeText(sourceFile, elementType)
 
-	// When converting T[] -> Array<T>, remove unnecessary parentheses.
-	if ast.IsParenthesizedTypeNode(elementType) {
-		parenType := elementType.AsParenthesizedTypeNode()
-		if parenType != nil && parenType.Type != nil {
-			elementTypeText = nodeText(sourceFile, parenType.Type)
-		}
-	}
-
 	return []rule.RuleFix{
 		rule.RuleFixReplace(sourceFile, errorNode, className+"<"+elementTypeText+">"),
-	}
-}
-
-func buildAnyArrayFixes(
-	sourceFile *ast.SourceFile,
-	node *ast.Node,
-	readonlyPrefix string,
-) []rule.RuleFix {
-	return []rule.RuleFix{
-		rule.RuleFixReplace(sourceFile, node, readonlyPrefix+"any[]"),
 	}
 }
 
@@ -250,16 +213,10 @@ func buildArrayFixes(
 		parentParens = readonlyPrefix != "" &&
 			node.Parent != nil &&
 			node.Parent.Kind == ast.KindArrayType &&
-			!isParenthesized(node.Parent.AsArrayTypeNode().ElementType)
+			!ast.IsParenthesizedTypeNode(node.Parent.AsArrayTypeNode().ElementType)
 	}
 
 	typeParamText := nodeText(sourceFile, typeParam)
-	if currentOption == "array-simple" && ast.IsParenthesizedTypeNode(typeParam) {
-		parenType := typeParam.AsParenthesizedTypeNode()
-		if parenType != nil && parenType.Type != nil {
-			typeParamText = nodeText(sourceFile, parenType.Type)
-		}
-	}
 
 	return []rule.RuleFix{
 		rule.RuleFixReplace(
@@ -288,6 +245,28 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 			readonlyOption = defaultOption
 		}
 
+		// Acquire models scope-manager's declaration sets, including value-only
+		// shadows in type positions. ResolveTypeOrNamespace would miss those.
+		var scopes *scope.Manager
+		isShadowed := func(node *ast.Node, name string) bool {
+			if scopes == nil {
+				scopes = scopeanalysis.Declarations(ctx)
+			}
+			nonGlobalProgram := ctx.LanguageOptions.EffectiveSourceType() == "module"
+			if ctx.Refs != nil {
+				nonGlobalProgram = ctx.Refs.HasNonGlobalProgramScope()
+			}
+			for current := scopes.Acquire(node); current != nil; current = current.Parent {
+				if current == scopes.Global && !nonGlobalProgram {
+					break
+				}
+				if len(current.Declarations(name)) != 0 {
+					return true
+				}
+			}
+			return false
+		}
+
 		return rule.RuleListeners{
 			ast.KindArrayType: func(node *ast.Node) {
 				arrayType := node.AsArrayTypeNode()
@@ -295,9 +274,10 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
+				parent := ast.WalkUpParenthesizedTypes(node.Parent)
 				isReadonly := false
-				if node.Parent != nil && node.Parent.Kind == ast.KindTypeOperator {
-					typeOp := node.Parent.AsTypeOperatorNode()
+				if parent != nil && parent.Kind == ast.KindTypeOperator {
+					typeOp := parent.AsTypeOperatorNode()
 					if typeOp != nil {
 						isReadonly = typeOp.Operator == ast.KindReadonlyKeyword
 					}
@@ -322,7 +302,7 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 
 				errorNode := node
 				if isReadonly {
-					errorNode = node.Parent
+					errorNode = parent
 				}
 
 				typeStr := messageType(ctx.SourceFile, arrayType.ElementType)
@@ -333,12 +313,7 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 					readonlyPrefix = "readonly "
 				}
 
-				var message rule.RuleMessage
-				if messageId == "errorStringGeneric" {
-					message = buildErrorStringGenericMessage(readonlyPrefix, typeStr, className)
-				} else {
-					message = buildErrorStringGenericSimpleMessage(readonlyPrefix, typeStr, className)
-				}
+				message := buildGenericMessage(messageId, readonlyPrefix, typeStr, className)
 
 				ctx.ReportNodeWithDeferredFixes(errorNode, message, func() []rule.RuleFix {
 					return buildGenericFixes(ctx.SourceFile, errorNode, arrayType.ElementType, className)
@@ -370,20 +345,20 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
+				typeParams := typeRef.TypeArguments
+				if typeParams == nil || len(typeParams.Nodes) != 1 {
+					return
+				}
+				typeParam := ast.SkipTypeParentheses(typeParams.Nodes[0])
+
 				// Handle Readonly<T[]> case
 				if typeName == "Readonly" {
-					if typeRef.TypeArguments == nil || len(typeRef.TypeArguments.Nodes) == 0 {
-						return
-					}
-					if typeRef.TypeArguments.Nodes[0].Kind != ast.KindArrayType {
+					if typeParam.Kind != ast.KindArrayType {
 						return
 					}
 				}
 
-				isReadonlyWithGenericArrayType := typeName == "Readonly" &&
-					typeRef.TypeArguments != nil &&
-					len(typeRef.TypeArguments.Nodes) > 0 &&
-					typeRef.TypeArguments.Nodes[0].Kind == ast.KindArrayType
+				isReadonlyWithGenericArrayType := typeName == "Readonly"
 
 				isReadonlyArrayType := typeName == "ReadonlyArray" || isReadonlyWithGenericArrayType
 
@@ -401,7 +376,6 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 					readonlyPrefix = "readonly "
 				}
 
-				typeParams := typeRef.TypeArguments
 				var messageId string
 				switch currentOption {
 				case "array":
@@ -411,13 +385,7 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 						messageId = "errorStringArray"
 					}
 				case "array-simple":
-					// For array-simple mode, determine if we have type parameters to check
-					// 'any' (no type params) is considered simple
-					isSimple := typeParams == nil || len(typeParams.Nodes) == 0 ||
-						(len(typeParams.Nodes) == 1 && isSimpleType(typeParams.Nodes[0]))
-
-					// For array-simple mode, only report errors if the type is simple
-					if !isSimple {
+					if !isSimpleType(typeParam) {
 						return
 					}
 
@@ -428,36 +396,9 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 					}
 				}
 
-				if typeParams == nil || len(typeParams.Nodes) == 0 {
-					// Create an 'any' array
-					className := "Array"
-					if isReadonlyArrayType {
-						className = "ReadonlyArray"
-					}
-
-					var message rule.RuleMessage
-					switch messageId {
-					case "errorStringArray":
-						message = buildErrorStringArrayMessage(className, readonlyPrefix, "any")
-					case "errorStringArrayReadonly":
-						message = buildErrorStringArrayReadonlyMessage(className, readonlyPrefix, "any")
-					case "errorStringArraySimple":
-						message = buildErrorStringArraySimpleMessage(className, readonlyPrefix, "any")
-					case "errorStringArraySimpleReadonly":
-						message = buildErrorStringArraySimpleReadonlyMessage(className, readonlyPrefix, "any")
-					}
-
-					ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
-						return buildAnyArrayFixes(ctx.SourceFile, node, readonlyPrefix)
-					})
+				if isShadowed(node, typeName) {
 					return
 				}
-
-				if len(typeParams.Nodes) != 1 {
-					return
-				}
-
-				typeParam := typeParams.Nodes[0]
 
 				typeStr := messageType(ctx.SourceFile, typeParam)
 				className := typeName
@@ -465,17 +406,7 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 					className = "Array"
 				}
 
-				var message rule.RuleMessage
-				switch messageId {
-				case "errorStringArray":
-					message = buildErrorStringArrayMessage(className, readonlyPrefix, typeStr)
-				case "errorStringArrayReadonly":
-					message = buildErrorStringArrayReadonlyMessage(className, readonlyPrefix, typeStr)
-				case "errorStringArraySimple":
-					message = buildErrorStringArraySimpleMessage(className, readonlyPrefix, typeStr)
-				case "errorStringArraySimpleReadonly":
-					message = buildErrorStringArraySimpleReadonlyMessage(className, readonlyPrefix, typeStr)
-				}
+				message := buildArrayMessage(messageId, className, readonlyPrefix, typeStr)
 
 				ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
 					return buildArrayFixes(
