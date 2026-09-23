@@ -174,10 +174,10 @@ const scenarios = {
   'growth-import-shutdown': async () => {
     const WorkerPool = await loadWorkerPool();
     const enteredFile = markerPath('growth-import-entered');
+    const warmedFile = markerPath('growth-warmed');
     const dir = makeFixtureDir({
-      'config.mjs': `import { workerData } from 'node:worker_threads';
-        import fs from 'node:fs';
-        if (workerData.configFingerprints) {
+      'config.mjs': `import fs from 'node:fs';
+        if (fs.existsSync(${JSON.stringify(warmedFile)})) {
           fs.writeFileSync(${JSON.stringify(enteredFile)}, 'entered');
           await new Promise(() => {});
         }
@@ -192,6 +192,7 @@ const scenarios = {
       warmupWorkerCount: 2,
     });
     await pool.init();
+    fs.writeFileSync(warmedFile, 'ready');
     milestone('init-done');
     const captured = captureTimeout(60_000, () =>
       pool.lintBatch(
@@ -230,9 +231,10 @@ const scenarios = {
   // startup promise must not release ownership of the still-live thread.
   'growth-init-error-shutdown': async () => {
     const WorkerPool = await loadWorkerPool();
+    const warmedFile = markerPath('growth-error-warmed');
     const dir = makeFixtureDir({
-      'config.mjs': `import { workerData } from 'node:worker_threads';
-        if (workerData.configFingerprints) {
+      'config.mjs': `import fs from 'node:fs';
+        if (fs.existsSync(${JSON.stringify(warmedFile)})) {
           setInterval(() => {}, ${FIXTURE_KEEPALIVE_INTERVAL_MS});
           throw new Error('injected growth failure with live interval');
         }
@@ -254,6 +256,7 @@ const scenarios = {
       },
     });
     await pool.init();
+    fs.writeFileSync(warmedFile, 'ready');
     milestone('init-done');
     const batch = pool.lintBatch(
       Array.from({ length: 3 }, (_, i) => ({

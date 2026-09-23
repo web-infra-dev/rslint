@@ -284,7 +284,6 @@ export class WorkerPool {
   private closed = false;
   private initStarted = false;
   private shutdownPromise?: Promise<void>;
-  private configFingerprints?: string[];
   /** A failed expansion keeps the known-good workers, without a retry storm. */
   private growthDisabled = false;
   /** Initial and additional workers that have not yet been adopted or reaped. */
@@ -386,68 +385,33 @@ export class WorkerPool {
    */
   async init(): Promise<void> {
     if (this.closed) throw new Error('WorkerPool: closed');
-    if (this.initStarted || this.workers.length > 0) {
+    if (this.initStarted) {
       throw new Error('WorkerPool: init called twice');
     }
     this.initStarted = true;
     if (this.opts.workerCount === 0) {
       return;
     }
-    // Launch every worker in parallel and push each ready slot into
-    // `this.workers` AS its spawnWorker promise resolves. The previous
-    // shape — `this.workers = fulfilled` AFTER `Promise.allSettled`
-    // — opened a window where a ready worker crashing mid-init had
-    // its respawn handler `findIndex(this.workers, …)` run against
-    // the still-empty array, returning -1; the replacement worker
-    // was then terminated (line ~754 in the exit handler) and the
-    // original slot left dead. By the time `init()` finished, the
-    // pool silently came up with N-1 active workers. Pushing as
-    // ready closes the window: the respawn handler always sees the
-    // original slot in the list.
-    //
-    // If even one fails to init (plugin import error / hung init),
-    // the pool is unusable; allSettled lets us collect every result,
-    // terminate the survivors, then surface the first failure to the
-    // caller.
+    // Adopt ready workers immediately so crash recovery can find their slots.
+    // Wait for all starts before cleaning up a failed warmup.
     const settled = await Promise.allSettled(
       Array.from({ length: this.opts.warmupWorkerCount }, () =>
         this.startWorker(),
       ),
     );
-    let hasFailure = false;
-    let firstFailure: unknown = undefined;
-    for (const r of settled) {
-      if (r.status === 'rejected' && !hasFailure) {
-        // Track failure explicitly — `firstFailure === undefined` was
-        // ambiguous with `reject(undefined)` (a rejection IS a failure
-        // regardless of the reason carried). Pre-fix any spawn that
-        // rejected with undefined silently bypassed the failure path,
-        // leaving the pool under-provisioned with no error surfaced.
-        hasFailure = true;
-        firstFailure = r.reason;
-      }
-    }
-    if (hasFailure) {
-      // Failure and concurrent shutdown share one teardown. close() marks
-      // the pool closed before terminating, preventing new crash respawns,
-      // and owns every starting or exiting thread until it is reaped.
+    const failure = settled.find((result) => result.status === 'rejected');
+    if (failure) {
+      // Init failure and concurrent shutdown must await the same teardown.
       this.shutdownPromise ??= this.close(true);
       await this.shutdownPromise;
-      // Wrap non-Error rejection values into a real Error so the
-      // caller's `.catch(err => err.message)` doesn't crash on
-      // `undefined.message`. The pool's own spawn paths always reject
-      // with Error today; this only matters if a future code path or
-      // a runtime hook produces a non-Error rejection.
-      throw firstFailure instanceof Error
-        ? firstFailure
-        : new Error(`worker spawn rejected: ${String(firstFailure)}`);
+      throw failure.reason instanceof Error
+        ? failure.reason
+        : new Error(`worker spawn rejected: ${String(failure.reason)}`);
     }
     if (this.closed) {
       await this.shutdownPromise;
       throw new Error('WorkerPool: closed during initialization');
     }
-    // `this.workers` was populated incrementally as each spawnWorker
-    // resolved — no need for a final assignment here.
   }
 
   /**
@@ -610,19 +574,16 @@ export class WorkerPool {
 
   /** Reserve capacity synchronously, before worker initialization can yield. */
   private startWorker(): Promise<void> {
-    const start = this.spawnWorker(this.nextWorkerId++).then(async (slot) => {
-      if (this.closed) {
-        await terminateWorker(slot.worker).catch(() => undefined);
-        return;
-      }
-      this.workers.push(slot);
-    });
+    const start = this.spawnWorker(this.nextWorkerId++)
+      .then(async (slot) => {
+        if (this.closed) {
+          await terminateWorker(slot.worker).catch(() => undefined);
+          return;
+        }
+        this.workers.push(slot);
+      })
+      .finally(() => this.startingWorkers.delete(start));
     this.startingWorkers.add(start);
-    // Observe both paths without creating an unhandled rejected finally promise.
-    void start.then(
-      () => this.startingWorkers.delete(start),
-      () => this.startingWorkers.delete(start),
-    );
     return start;
   }
 
@@ -659,12 +620,6 @@ export class WorkerPool {
           this.drainQueueIfAllSlotsDegraded();
         },
       );
-    }
-  }
-
-  private stopInitializingWorkers(): void {
-    for (const worker of this.initializingWorkers) {
-      void terminateWorker(worker).catch(() => undefined);
     }
   }
 
@@ -769,7 +724,9 @@ export class WorkerPool {
     this.pendingQueue = [];
     // No task can use a worker that is still initializing. Do not make a short
     // invocation wait for speculative plugin imports (or their 60s timeout).
-    this.stopInitializingWorkers();
+    for (const worker of this.initializingWorkers) {
+      void terminateWorker(worker).catch(() => undefined);
+    }
     // Init failure terminates survivors immediately; normal shutdown lets
     // ready workers exit cooperatively before using the grace fallback.
     if (!force) {
@@ -832,7 +789,6 @@ export class WorkerPool {
         workerData: {
           cancelSab: this.cancelPool.sharedBuffer,
           configs: this.opts.configs,
-          configFingerprints: this.configFingerprints,
         },
         env: workerEnvWithCompileCache(),
         // Capture worker stdout/stderr instead of letting them inherit
@@ -964,27 +920,6 @@ export class WorkerPool {
         if (msg.kind === 'ready') {
           clearTimeout(initTimer);
           this.initializingWorkers.delete(worker);
-          const fingerprints = msg.configFingerprints;
-          if (
-            !Array.isArray(fingerprints) ||
-            fingerprints.length !== this.opts.configs.length ||
-            !fingerprints.every((value) => typeof value === 'string') ||
-            this.configFingerprints?.some(
-              (expected, index) => expected !== fingerprints[index],
-            )
-          ) {
-            worker.off('message', onMessage);
-            worker.off('exit', onExit);
-            const failure = new Error(
-              'worker loaded inconsistent config fingerprints',
-            );
-            void terminateWorker(worker).then(
-              () => reject(failure),
-              () => reject(failure),
-            );
-            return;
-          }
-          this.configFingerprints ??= fingerprints;
           slot.ready = true;
           worker.off('message', onMessage);
           worker.off('exit', onExit);

@@ -348,10 +348,12 @@ describe('ConfigModuleHost', () => {
         {
           configPath: second.configPath,
           configDirectory: second.configDirectory,
+          sourceFingerprint: summary.configs[0].sourceFingerprint,
         },
         {
           configPath: first.configPath,
           configDirectory: first.configDirectory,
+          sourceFingerprint: summary.configs[1].sourceFingerprint,
         },
       ]);
       expect(summary.eslintPluginEntries).toEqual([
@@ -366,6 +368,7 @@ describe('ConfigModuleHost', () => {
         {
           configPath: first.configPath,
           configDirectory: first.configDirectory,
+          sourceFingerprint: firstOnly.configs[0].sourceFingerprint,
         },
       ]);
       expect(firstOnly.eslintPluginEntries).toEqual([

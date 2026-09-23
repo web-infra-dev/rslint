@@ -1504,37 +1504,10 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      identity set in loader or `Program` state.
 
 7. **JavaScript plugin workers** (`packages/rslint/src/eslint-plugin`)
-   - `createPluginLintHost` is the shared CLI/API/LSP adapter. `WorkerPool`
-     owns task queuing, capacity, crash recovery, and shutdown; adapters retain
-     configuration activation and generation ownership. There is no global
-     worker budget shared between independent hosts or CLI processes.
-   - `workerCount` is the maximum pool capacity (by default at most eight,
-     bounded by logical CPU count). `warmupWorkerCount` defaults to two and is
-     capped by that maximum. Activation awaits only these warm workers;
-     `--singleThreaded` caps both counts at one, and plugin-free hosts create
-     no workers.
-   - Each ready worker accepts one file at a time. Idle workers take queued
-     files in arrival order. Remaining non-cancelled demand starts additional
-     workers, reserving capacity synchronously so concurrent batches cannot
-     exceed the maximum. Starting workers and pending crash replacements count
-     toward demand already being served. Task deadlines start at dispatch.
-     Ready workers remain available until the host shuts down; idle time does
-     not shrink the pool.
-   - Every worker imports the same selected plugin-bearing configurations.
-     Warm workers establish matching entry-module fingerprints; later workers,
-     including crash replacements, verify these before and after imports.
-     Changed entry bytes cannot enter the existing pool generation. This checks
-     the config entry modules, matching the activation contract; it does not
-     snapshot transitive dependencies or arbitrary module side effects.
-   - Warmup failure aborts activation. Expansion failure is logged and disables
-     further growth for that pool while initialized workers continue serving
-     tasks. If no ready, starting, or recovering worker remains, queued tasks
-     receive `pool_degraded`. Shutdown drains queued tasks and joins initial
-     starts, expansions, and crash replacements. Threads still initializing are
-     terminated immediately, so short invocations do not wait for unnecessary
-     imports. Failed imports retain their cooperative exit grace, and shutdown
-     also waits for those threads' actual exit. Repeated shutdown calls share
-     the same completion.
+   CLI, native API, and LSP share `createPluginLintHost`. `WorkerPool` owns
+   bounded, demand-driven scheduling and thread lifetime within each host;
+   adapters own configuration activation and generation lifetimes. Plugin
+   loading uses the config entry versions selected by `ConfigModuleHost`.
 
 Other invariants:
 

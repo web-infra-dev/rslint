@@ -3,6 +3,9 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { NATIVE_PLUGIN_RESERVED_NAMES } from './define-config.js';
 import { selectPluginSource, unwrapPluginModule } from './plugin-source.js';
+import type { PluginConfigDescriptor } from './config-source.js';
+
+export type { PluginConfigDescriptor } from './config-source.js';
 
 let freshConfigLoadNonce = 0;
 
@@ -396,13 +399,6 @@ function validateGlobals(value: unknown, entryIndex: number): void {
   }
 }
 
-/** A worker-pool config descriptor: which config file to import and the
- *  directory key per-file plugin-lint tasks route on. */
-export interface PluginConfigDescriptor {
-  configPath: string;
-  configDirectory: string;
-}
-
 /**
  * Derive, from normalized configs, the ESLint-plugin metadata the Go core
  * needs (`{prefix, ruleNames}` for placeholder rules) and the worker-pool
@@ -421,6 +417,7 @@ export function collectPluginMeta(
     configPath: string;
     configDirectory: string;
     entries: ReadonlyArray<unknown>;
+    sourceFingerprint?: string;
   }>,
 ): {
   eslintPluginEntries: Array<{ prefix: string; ruleNames: string[] }>;
@@ -469,6 +466,9 @@ export function collectPluginMeta(
       pluginConfigs.push({
         configPath: c.configPath,
         configDirectory: c.configDirectory,
+        ...(c.sourceFingerprint !== undefined && {
+          sourceFingerprint: c.sourceFingerprint,
+        }),
       });
     }
   }

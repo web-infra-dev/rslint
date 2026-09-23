@@ -5,6 +5,12 @@ import path from 'node:path';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import type { LintTask } from '../../src/eslint-plugin/worker-pool.js';
+import type { ConfigDescriptor } from '../../src/eslint-plugin/types.js';
+import {
+  ConfigModuleHost,
+  CONFIG_DISCOVERY_PROTOCOL_VERSION,
+} from '../../src/config/config-loader.js';
+import { fingerprintConfigSource } from '../../src/config/config-source.js';
 
 import {
   LOCAL_CONFIG_DIR,
@@ -123,8 +129,27 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       } } } }];`,
       );
       const logs: string[] = [];
+      const configHost = new ConfigModuleHost();
+      await configHost.loadConfigs({
+        protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+        transactionId: 'growth',
+        loadMode: 'fresh',
+        candidates: [{ id: 'root', configPath, configDirectory: dir }],
+      });
+      let configs: ConfigDescriptor[] = [];
+      await configHost.activateConfigs(
+        {
+          protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+          transactionId: 'growth',
+          effectiveConfigIds: ['root'],
+        },
+        undefined,
+        async (plan) => {
+          configs = plan.pluginConfigs;
+        },
+      );
       const pool = new WorkerPool({
-        configs: [{ configPath, configDirectory: dir }],
+        configs,
         workerCount: 3,
         onLog: (record) => logs.push(record.text),
       });
@@ -145,7 +170,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         expect(fs.existsSync(marker)).toBe(false);
         expect(
           logs.some((log) =>
-            log.includes('plugin config changed since worker initialization'),
+            log.includes('plugin config changed since activation'),
           ),
         ).toBe(true);
         expect((pool as any).workers).toHaveLength(2);
@@ -170,12 +195,20 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         export default [];`,
       );
       const pool = new WorkerPool({
-        configs: [{ configPath, configDirectory: dir }],
+        configs: [
+          {
+            configPath,
+            configDirectory: dir,
+            sourceFingerprint: fingerprintConfigSource(
+              fs.readFileSync(configPath),
+            ),
+          },
+        ],
         workerCount: 1,
       });
       try {
         await expect(pool.init()).rejects.toThrow(
-          /plugin config changed since worker initialization/,
+          /plugin config changed since activation/,
         );
       } finally {
         await pool.shutdown();

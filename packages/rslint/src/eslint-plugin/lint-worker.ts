@@ -24,8 +24,6 @@
  */
 
 import { parentPort, workerData } from 'node:worker_threads';
-import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 
 import {
   lintFile,
@@ -51,8 +49,6 @@ interface WorkerInitData {
    * pick the right `LoadedPlugins` per task.
    */
   configs: ConfigDescriptor[];
-  /** Entry-module versions established by the pool's warm workers. */
-  configFingerprints?: string[];
 }
 
 // ─── Messages ──────────────────────────────────────────────────────────
@@ -73,7 +69,6 @@ type InboundMessage = TaskMessage | ShutdownMessage;
 
 interface ReadyMessage {
   kind: 'ready';
-  configFingerprints: string[];
 }
 interface InitErrorMessage {
   kind: 'init-error';
@@ -114,32 +109,6 @@ if (!parentPort) {
 // independent plugin installs per sub-package route correctly.
 let loadedPluginsByDir: Map<string, LoadedPlugins> | null = null;
 
-async function fingerprintConfigs(
-  configs: ConfigDescriptor[],
-): Promise<string[]> {
-  return Promise.all(
-    configs.map(async ({ configPath }) => {
-      const source = await readFile(configPath);
-      return createHash('sha256').update(source).digest('hex');
-    }),
-  );
-}
-
-function assertConfigFingerprints(
-  configs: ConfigDescriptor[],
-  expected: string[] | undefined,
-  actual: string[],
-): void {
-  if (!expected) return;
-  for (let i = 0; i < configs.length; i++) {
-    if (expected[i] !== actual[i]) {
-      throw new Error(
-        `plugin config changed since worker initialization: ${configs[i].configPath}`,
-      );
-    }
-  }
-}
-
 const init = async () => {
   const data = workerData as WorkerInitData;
   if (!data || !Array.isArray(data.configs) || data.configs.length === 0) {
@@ -147,28 +116,13 @@ const init = async () => {
     return;
   }
   try {
-    // Growth and crash recovery happen after config activation. Revalidate
-    // the entry modules on both sides of import so a later worker cannot
-    // publish plugins from newer config bytes into the existing generation.
-    const configFingerprints = await fingerprintConfigs(data.configs);
-    assertConfigFingerprints(
-      data.configs,
-      data.configFingerprints,
-      configFingerprints,
-    );
     loadedPluginsByDir = await loadPluginsFromConfigs(data.configs);
-    assertConfigFingerprints(
-      data.configs,
-      configFingerprints,
-      await fingerprintConfigs(data.configs),
-    );
-    const ready: ReadyMessage = { kind: 'ready', configFingerprints };
-    parentPort!.postMessage(ready);
   } catch (err) {
-    loadedPluginsByDir = null;
     sendInitError((err as Error)?.message ?? String(err));
     return;
   }
+  const ready: ReadyMessage = { kind: 'ready' };
+  parentPort!.postMessage(ready);
 };
 
 function sendInitError(message: string): void {

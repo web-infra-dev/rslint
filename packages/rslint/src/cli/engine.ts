@@ -17,6 +17,7 @@ import type { IpcMessage } from '../ipc/index.js';
 import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
+  type PluginConfigDescriptor,
   type ActivateConfigsRequest,
   type ActivateConfigsResponse,
   type LoadConfigsRequest,
@@ -28,7 +29,7 @@ interface PluginLintHost {
 }
 
 type CreatePluginLintHost = (
-  configs: Array<{ configPath: string; configDirectory: string }>,
+  configs: PluginConfigDescriptor[],
   onLog?: (rec: { level: string; source: string; text: string }) => void,
   singleThreaded?: boolean,
 ) => Promise<PluginLintHost>;
@@ -361,7 +362,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   };
 
   const buildPluginHost = async (
-    pluginConfigs: Array<{ configPath: string; configDirectory: string }>,
+    pluginConfigs: PluginConfigDescriptor[],
   ): Promise<PluginLintHost | null> => {
     const build = (async () => {
       if (pluginConfigs.length === 0 || shuttingDown) return null;

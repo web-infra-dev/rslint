@@ -42,8 +42,7 @@ export async function createPluginLintHost(
   onLog?: WorkerPoolOptions['onLog'],
   singleThreaded?: boolean,
 ): Promise<PluginLintHost> {
-  // --singleThreaded caps both warmup and execution at one worker. Otherwise
-  // the pool warms two workers and grows with demand up to min(cpus, 8).
+  // --singleThreaded caps both warmup and execution at one worker.
   const pool = new WorkerPool({
     configs,
     onLog,
