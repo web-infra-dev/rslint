@@ -1,0 +1,840 @@
+// Rstest Snapshot v1
+
+exports[`consistent-type-exports > invalid 1`] = `
+{
+  "code": "export { Type1 } from './consistent-type-exports';",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "export type { Type1 } from './consistent-type-exports';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 2`] = `
+{
+  "code": "export { Type1 as "🍎" } from './consistent-type-exports';",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "export type { Type1 as "🍎" } from './consistent-type-exports';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 3`] = `
+{
+  "code": "export { Type1, value1 } from './consistent-type-exports';",
+  "diagnostics": [
+    {
+      "message": "Type export Type1 is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "export type { Type1 } from './consistent-type-exports';
+export { value1 } from './consistent-type-exports';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 4`] = `
+{
+  "code": "
+export { Type1, value1, value2 } from './consistent-type-exports';
+      ",
+  "diagnostics": [
+    {
+      "message": "Type export Type1 is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export type { Type1 } from './consistent-type-exports';
+export { value1, value2 } from './consistent-type-exports';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 5`] = `
+{
+  "code": "
+export { Type1, value1, Type2, value2 } from './consistent-type-exports';
+      ",
+  "diagnostics": [
+    {
+      "message": "Type exports Type1 and Type2 are not values and should be exported using \`export type\`.",
+      "messageId": "multipleExportsAreTypes",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export type { Type1, Type2 } from './consistent-type-exports';
+export { value1, value2 } from './consistent-type-exports';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 6`] = `
+{
+  "code": "export { Type2 as Foo } from './consistent-type-exports';",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "export type { Type2 as Foo } from './consistent-type-exports';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 7`] = `
+{
+  "code": "
+export { Type2 as Foo, value1 } from './consistent-type-exports';
+      ",
+  "diagnostics": [
+    {
+      "message": "Type export Type2 is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export type { Type2 as Foo } from './consistent-type-exports';
+export { value1 } from './consistent-type-exports';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 8`] = `
+{
+  "code": "
+export {
+  Type2 as Foo,
+  value1 as BScope,
+  value2 as CScope,
+} from './consistent-type-exports';
+      ",
+  "diagnostics": [
+    {
+      "message": "Type export Type2 is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export type { Type2 as Foo } from './consistent-type-exports';
+export { value1 as BScope, value2 as CScope } from './consistent-type-exports';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 9`] = `
+{
+  "code": "
+import { Type2 } from './consistent-type-exports';
+export { Type2 };
+      ",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+import { Type2 } from './consistent-type-exports';
+export type { Type2 };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 10`] = `
+{
+  "code": "
+import { value2, Type2 } from './consistent-type-exports';
+export { value2, Type2 };
+      ",
+  "diagnostics": [
+    {
+      "message": "Type export Type2 is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+import { value2, Type2 } from './consistent-type-exports';
+export type { Type2 };
+export { value2 };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 11`] = `
+{
+  "code": "
+type Alias = 1;
+interface IFace {}
+namespace TypeNS {
+  export type x = 1;
+  export const f = 1;
+}
+
+export { Alias, IFace, TypeNS };
+      ",
+  "diagnostics": [
+    {
+      "message": "Type exports Alias and IFace are not values and should be exported using \`export type\`.",
+      "messageId": "multipleExportsAreTypes",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 9,
+        },
+        "start": {
+          "column": 1,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Alias = 1;
+interface IFace {}
+namespace TypeNS {
+  export type x = 1;
+  export const f = 1;
+}
+
+export type { Alias, IFace };
+export { TypeNS };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 12`] = `
+{
+  "code": "
+namespace TypeNS {
+  export interface Foo {}
+}
+
+export { TypeNS };
+      ",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+namespace TypeNS {
+  export interface Foo {}
+}
+
+export type { TypeNS };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 13`] = `
+{
+  "code": "
+type T = 1;
+export { type T, T };
+      ",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type T = 1;
+export type { T, T };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 14`] = `
+{
+  "code": "
+type T = 1;
+export { type/* */T, type     /* */T, T };
+      ",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type T = 1;
+export type { /* */T, /* */T, T };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 15`] = `
+{
+  "code": "
+type T = 1;
+const x = 1;
+export { type T, T, x };
+      ",
+  "diagnostics": [
+    {
+      "message": "Type export T is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type T = 1;
+const x = 1;
+export type { T, T };
+export { x };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 16`] = `
+{
+  "code": "
+type T = 1;
+const x = 1;
+export { T, x };
+      ",
+  "diagnostics": [
+    {
+      "message": "Type export T is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type T = 1;
+const x = 1;
+export { type T, x };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 17`] = `
+{
+  "code": "
+type T = 1;
+export { type T, T };
+      ",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type T = 1;
+export type { T, T };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 18`] = `
+{
+  "code": "
+export {
+  Type1,
+  Type2 as Foo,
+  type value1 as BScope,
+  value2 as CScope,
+} from './consistent-type-exports';
+      ",
+  "diagnostics": [
+    {
+      "message": "Type exports Type1 and Type2 are not values and should be exported using \`export type\`.",
+      "messageId": "multipleExportsAreTypes",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export type { Type1, Type2 as Foo, value1 as BScope } from './consistent-type-exports';
+export { value2 as CScope } from './consistent-type-exports';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 19`] = `
+{
+  "code": "
+export {
+  Type1,
+  Type2 as Foo,
+  type value1 as BScope,
+  value2 as CScope,
+} from './consistent-type-exports';
+      ",
+  "diagnostics": [
+    {
+      "message": "Type exports Type1 and Type2 are not values and should be exported using \`export type\`.",
+      "messageId": "multipleExportsAreTypes",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export {
+  type Type1,
+  type Type2 as Foo,
+  type value1 as BScope,
+  value2 as CScope,
+} from './consistent-type-exports';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 20`] = `
+{
+  "code": "
+        export * from './consistent-type-exports/type-only-exports';
+      ",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        export type * from './consistent-type-exports/type-only-exports';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 21`] = `
+{
+  "code": "
+        /* comment 1 */ export
+          /* comment 2 */ *
+            // comment 3
+            from './consistent-type-exports/type-only-exports';
+      ",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 5,
+        },
+        "start": {
+          "column": 25,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        /* comment 1 */ export
+          /* comment 2 */ type *
+            // comment 3
+            from './consistent-type-exports/type-only-exports';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 22`] = `
+{
+  "code": "
+        export * from './consistent-type-exports/type-only-reexport';
+      ",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        export type * from './consistent-type-exports/type-only-reexport';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 23`] = `
+{
+  "code": "
+        export * as foo from './consistent-type-exports/type-only-reexport';
+      ",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 77,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        export type * as foo from './consistent-type-exports/type-only-reexport';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 24`] = `
+{
+  "code": "
+        import type * as Foo from './consistent-type-exports';
+        type Foo = 1;
+        export { Foo };
+      ",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        import type * as Foo from './consistent-type-exports';
+        type Foo = 1;
+        export type { Foo };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 25`] = `
+{
+  "code": "
+        import { type NAME as Foo } from './consistent-type-exports';
+        export { Foo };
+      ",
+  "diagnostics": [
+    {
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        import { type NAME as Foo } from './consistent-type-exports';
+        export type { Foo };
+      ",
+  "ruleCount": 1,
+}
+`;

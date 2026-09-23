@@ -2,9 +2,15 @@ package consistent_type_exports
 
 import (
 	_ "embed"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/collections"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed consistent_type_exports.schema.json
@@ -14,7 +20,7 @@ type ConsistentTypeExportsOptions struct {
 	FixMixedExportsWithInlineTypeSpecifier bool `json:"fixMixedExportsWithInlineTypeSpecifier"`
 }
 
-// ConsistentTypeExportsRule enforces consistent type exports
+// ConsistentTypeExportsRule enforces consistent type exports.
 var ConsistentTypeExportsRule = rule.CreateRule(rule.Rule{
 	Name:             "consistent-type-exports",
 	Schema:           rule.NewSchema(schemaJSON),
@@ -23,185 +29,203 @@ var ConsistentTypeExportsRule = rule.CreateRule(rule.Rule{
 })
 
 func parseOptions(options []any) ConsistentTypeExportsOptions {
-	opts := ConsistentTypeExportsOptions{
-		FixMixedExportsWithInlineTypeSpecifier: false,
-	}
-	if len(options) == 0 {
-		return opts
-	}
-	optMap, _ := options[0].(map[string]interface{})
-	if fixMixed, ok := optMap["fixMixedExportsWithInlineTypeSpecifier"].(bool); ok {
-		opts.FixMixedExportsWithInlineTypeSpecifier = fixMixed
+	opts := ConsistentTypeExportsOptions{}
+	if len(options) != 0 {
+		optMap, _ := options[0].(map[string]any)
+		opts.FixMixedExportsWithInlineTypeSpecifier, _ = optMap["fixMixedExportsWithInlineTypeSpecifier"].(bool)
 	}
 	return opts
 }
 
+func typeOverValueMessage() rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "typeOverValue",
+		Description: "All exports in the declaration are only used as types. Use `export type`.",
+	}
+}
+
+// Resolve one alias at a time: an intermediate type-only import or export can
+// hide a value even when the final symbol is a class or another runtime value.
+func isSymbolTypeBased(typeChecker *checker.Checker, symbol *ast.Symbol) (isType, known bool) {
+	var seen collections.Set[*ast.Symbol]
+	for symbol != nil && !typeChecker.IsUnknownSymbol(symbol) {
+		for _, declaration := range symbol.Declarations {
+			if ast.IsTypeOnlyImportOrExportDeclaration(declaration) {
+				return true, true
+			}
+		}
+		if symbol.Flags&ast.SymbolFlagsValue != 0 {
+			return false, true
+		}
+		if symbol.Flags&ast.SymbolFlagsAlias == 0 {
+			return true, true
+		}
+		// Immediate aliases can form cycles. Resolving the final symbol first
+		// would lose type-only imports whose module cannot be resolved.
+		next := typeChecker.GetImmediateAliasedSymbol(symbol)
+		// A terminal target cannot cycle; avoid allocating a set for the common
+		// single-hop export of a local type or value.
+		if next != nil && next.Flags&ast.SymbolFlagsAlias != 0 && !seen.AddIfAbsent(symbol) {
+			return false, false
+		}
+		symbol = next
+	}
+	return false, false
+}
+
 func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := parseOptions(options)
-
-	// Helper to check if a symbol is type-only
-	// Returns: true = type-only, false = value-based, nil = unknown/unresolved
-	isSymbolTypeBased := func(symbol *ast.Symbol) *bool {
-		if symbol == nil {
-			return nil
-		}
-
-		// Follow alias chain
-		for symbol != nil && (symbol.Flags&ast.SymbolFlagsAlias) != 0 {
-			symbol = ctx.TypeChecker.GetAliasedSymbol(symbol)
-			if symbol == nil {
-				return nil
-			}
-
-			// Check if any declaration in the chain is type-only
-			declarations := symbol.Declarations
-			for _, decl := range declarations {
-				// Use the Node's IsTypeOnly() method which handles all type-only checks
-				if decl.IsTypeOnly() {
-					trueVal := true
-					return &trueVal
-				}
-			}
-		}
-
-		// Check if the symbol is unknown
-		if symbol == nil || ctx.TypeChecker.IsUnknownSymbol(symbol) {
-			return nil
-		}
-
-		// Check if symbol has Value flag - if not, it's type-only
-		hasValue := (symbol.Flags & ast.SymbolFlagsValue) != 0
-		isType := !hasValue
-		return &isType
-	}
-
-	checkExportDeclaration := func(node *ast.Node) {
-		exportDecl := node.AsExportDeclaration()
-		if exportDecl == nil {
-			return
-		}
-
-		// Skip if already marked as type-only
-		if exportDecl.IsTypeOnly {
-			return
-		}
-
-		// Handle export * from 'module'
-		if exportDecl.ExportClause == nil && exportDecl.ModuleSpecifier != nil {
-			// Check if the entire module exports only types
-			moduleSpecifier := exportDecl.ModuleSpecifier
-			moduleSymbol := ctx.TypeChecker.GetSymbolAtLocation(moduleSpecifier)
-
-			if moduleSymbol != nil {
-				// Get the exports of the module symbol
-				if moduleSymbol.Exports != nil {
-					hasValueExport := false
-					hasAnyExport := false
-
-					// Check each export from the module
-					for _, exportSymbol := range moduleSymbol.Exports {
-						hasAnyExport = true
-						// Use our helper function to determine if this export is type-only
-						isType := isSymbolTypeBased(exportSymbol)
-						if isType != nil && !*isType {
-							// This export is a value
-							hasValueExport = true
-							break
-						}
-					}
-
-					// If all exports are type-only, report it
-					if hasAnyExport && !hasValueExport {
-						ctx.ReportNode(node, rule.RuleMessage{
-							Id:          "typeOverValue",
-							Description: "All exports in the declaration are only used as types. Use `export type`.",
-						})
-					}
-				}
-			}
-			return
-		}
-
-		// Handle named exports: export { x, y, z } or export { x, y, z } from 'module'
-		if exportDecl.ExportClause != nil && exportDecl.ExportClause.Kind == ast.KindNamedExports {
-			namedExports := exportDecl.ExportClause.AsNamedExports()
-			if namedExports == nil || len(namedExports.Elements.Nodes) == 0 {
+	return rule.RuleListeners{
+		ast.KindExportDeclaration: func(node *ast.Node) {
+			declaration := node.AsExportDeclaration()
+			if declaration.IsTypeOnly {
 				return
 			}
-
-			var typeSpecifiers []*ast.Node
-			var valueSpecifiers []*ast.Node
-			var inlineTypeSpecifiers []*ast.Node
-
-			for _, element := range namedExports.Elements.Nodes {
-				exportSpecifier := element.AsExportSpecifier()
-				if exportSpecifier == nil {
-					continue
+			if declaration.ExportClause == nil || declaration.ExportClause.Kind == ast.KindNamespaceExport {
+				if declaration.ModuleSpecifier == nil {
+					return
 				}
-
-				// Check if this specifier is already marked as type-only (inline type)
-				if exportSpecifier.IsTypeOnly {
-					inlineTypeSpecifiers = append(inlineTypeSpecifiers, element)
-					continue
+				// Use the Program's resolved source, not a raw exports table: star
+				// exports and type-only star re-exports are resolved by the checker.
+				// Upstream resolves without a usage mode, including in NodeNext
+				// files; the import/require-specific cached resolution can differ.
+				resolved := ctx.Program().ResolveModuleName(declaration.ModuleSpecifier.Text(), ctx.SourceFile.FileName(), core.ResolutionModeNone)
+				if resolved == nil {
+					return
 				}
-
-				// Get the symbol being exported
-				var symbol *ast.Symbol
-				// For local exports, we check the property name (what's being exported)
-				// For re-exports, we check the name (what's being imported from the module)
-				if exportSpecifier.PropertyName != nil {
-					symbol = ctx.TypeChecker.GetSymbolAtLocation(exportSpecifier.PropertyName)
-				} else {
-					symbol = ctx.TypeChecker.GetSymbolAtLocation(exportSpecifier.Name())
+				source := ctx.Program().GetSourceFileForResolvedModule(resolved.ResolvedFileName)
+				if source == nil {
+					return
 				}
-
-				isType := isSymbolTypeBased(symbol)
-				// Skip if we can't determine the type (unknown symbol)
-				if isType == nil {
-					continue
+				symbol := ctx.TypeChecker.GetSymbolAtLocation(source.AsNode())
+				if symbol == nil {
+					return
 				}
-
-				if *isType {
-					typeSpecifiers = append(typeSpecifiers, element)
-				} else {
-					valueSpecifiers = append(valueSpecifiers, element)
+				moduleType := ctx.TypeChecker.GetTypeOfSymbol(symbol)
+				for _, property := range ctx.TypeChecker.GetPropertiesOfType(moduleType) {
+					// GetPropertyOfType excludes values reached through export type *.
+					if ctx.TypeChecker.GetPropertyOfType(moduleType, property.Name) != nil {
+						return
+					}
 				}
-			}
-
-			// All specifiers are type-only
-			if len(typeSpecifiers) > 0 && len(valueSpecifiers) == 0 && len(inlineTypeSpecifiers) == 0 {
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "typeOverValue",
-					Description: "All exports in the declaration are only used as types. Use `export type`.",
+				ctx.ReportNodeWithDeferredFixes(node, typeOverValueMessage(), func() []rule.RuleFix {
+					exportToken, _ := utils.TokenAtOrAfter(ctx.SourceFile, node.Pos())
+					asterisk, _ := utils.TokenAtOrAfter(ctx.SourceFile, exportToken.End)
+					return []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(asterisk.Start, asterisk.Start), "type ")}
 				})
 				return
 			}
 
-			// Mixed: some types, some values
-			if len(typeSpecifiers) > 0 && len(valueSpecifiers) > 0 {
-				// If fixMixedExportsWithInlineTypeSpecifier is enabled and there are already
-				// inline type specifiers, don't report an error (the code is already following
-				// the preferred inline style)
-				if opts.FixMixedExportsWithInlineTypeSpecifier && len(inlineTypeSpecifiers) > 0 {
-					return
+			var typeSpecifiers []*ast.Node
+			hasValue := false
+			for _, specifier := range declaration.ExportClause.AsNamedExports().Elements.Nodes {
+				if specifier.IsTypeOnly() {
+					continue
 				}
-
-				if len(typeSpecifiers) == 1 {
-					ctx.ReportNode(node, rule.RuleMessage{
-						Id:          "singleExportIsType",
-						Description: "Type export should use `export type`.",
-					})
+				isType, known := isSymbolTypeBased(ctx.TypeChecker, ctx.TypeChecker.GetSymbolAtLocation(specifier.Name()))
+				if !known {
+					continue
+				}
+				if isType {
+					typeSpecifiers = append(typeSpecifiers, specifier)
 				} else {
-					ctx.ReportNode(node, rule.RuleMessage{
-						Id:          "multipleExportsAreTypes",
-						Description: "Type exports should use `export type`.",
-					})
+					hasValue = true
 				}
 			}
+			if len(typeSpecifiers) == 0 {
+				return
+			}
+			if !hasValue {
+				ctx.ReportNodeWithDeferredFixes(node, typeOverValueMessage(), func() []rule.RuleFix {
+					return fixExportType(ctx.SourceFile, node)
+				})
+				return
+			}
+
+			names := make([]string, 0, len(typeSpecifiers))
+			for _, specifier := range typeSpecifiers {
+				names = append(names, specifier.PropertyNameOrName().Text())
+			}
+			exportNames := names[0]
+			message := rule.RuleMessage{Id: "singleExportIsType"}
+			if len(names) == 1 {
+				message.Description = "Type export " + exportNames + " is not a value and should be exported using `export type`."
+			} else {
+				exportNames = strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+				message.Id = "multipleExportsAreTypes"
+				message.Description = "Type exports " + exportNames + " are not values and should be exported using `export type`."
+			}
+			message.Data = map[string]string{"exportNames": exportNames}
+			ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
+				if opts.FixMixedExportsWithInlineTypeSpecifier {
+					fixes := make([]rule.RuleFix, 0, len(typeSpecifiers))
+					for _, specifier := range typeSpecifiers {
+						fixes = append(fixes, rule.RuleFixInsertBefore(ctx.SourceFile, specifier, "type "))
+					}
+					return fixes
+				}
+				return fixSeparateExports(ctx, node, typeSpecifiers)
+			})
+		},
+	}
+}
+
+func fixExportType(source *ast.SourceFile, node *ast.Node) []rule.RuleFix {
+	exportToken, _ := utils.TokenAtOrAfter(source, node.Pos())
+	fixes := []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(exportToken.End, exportToken.End), " type")}
+	for _, specifier := range node.AsExportDeclaration().ExportClause.AsNamedExports().Elements.Nodes {
+		if specifier.IsTypeOnly() {
+			typeToken, _ := utils.TokenAtOrAfter(source, specifier.Pos())
+			end := scanner.SkipTriviaEx(source.Text(), typeToken.End, &scanner.SkipTriviaOptions{StopAtComments: true})
+			fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(typeToken.Start, end)))
 		}
 	}
+	return fixes
+}
 
-	return rule.RuleListeners{
-		ast.KindExportDeclaration: checkExportDeclaration,
+func fixSeparateExports(ctx rule.RuleContext, node *ast.Node, typeSpecifiers []*ast.Node) []rule.RuleFix {
+	declaration := node.AsExportDeclaration()
+	typeNames := make([]string, 0, len(typeSpecifiers))
+	for _, specifier := range typeSpecifiers {
+		typeNames = append(typeNames, specifierText(ctx.SourceFile, specifier))
 	}
+	var valueNames []string
+	// Materialize the remaining specifiers only when an autofix is requested.
+	// Upstream puts inferred types before existing inline type specifiers.
+	for _, specifier := range declaration.ExportClause.AsNamedExports().Elements.Nodes {
+		if specifier.IsTypeOnly() {
+			typeNames = append(typeNames, specifierText(ctx.SourceFile, specifier))
+		} else if isType, known := isSymbolTypeBased(ctx.TypeChecker, ctx.TypeChecker.GetSymbolAtLocation(specifier.Name())); known && !isType {
+			valueNames = append(valueNames, specifierText(ctx.SourceFile, specifier))
+		}
+	}
+	exportText := "export type { " + strings.Join(typeNames, ", ") + " }"
+	if declaration.ModuleSpecifier != nil && declaration.ModuleSpecifier.Text() != "" {
+		source := "'" + declaration.ModuleSpecifier.Text() + "'"
+		if strings.ContainsAny(declaration.ModuleSpecifier.Text(), "'\\\r\n") {
+			// Reuse the parsed literal rather than interpreting its escapes again
+			// or introducing an unescaped quote in the new export declaration.
+			source = utils.TrimmedNodeText(ctx.SourceFile, declaration.ModuleSpecifier)
+		}
+		exportText += " from " + source
+	}
+	return []rule.RuleFix{
+		rule.RuleFixReplaceRange(utils.BracedNodeInnerRange(ctx.SourceFile, declaration.ExportClause), " "+strings.Join(valueNames, ", ")+" "),
+		rule.RuleFixInsertBefore(ctx.SourceFile, node, exportText+";\n"),
+	}
+}
+
+func specifierText(source *ast.SourceFile, specifier *ast.Node) string {
+	nameText := func(name *ast.Node) string {
+		if ast.IsStringLiteral(name) {
+			return utils.TrimmedNodeText(source, name)
+		}
+		return name.Text()
+	}
+	local := nameText(specifier.PropertyNameOrName())
+	exported := nameText(specifier.Name())
+	if local != exported {
+		return local + " as " + exported
+	}
+	return local
 }
