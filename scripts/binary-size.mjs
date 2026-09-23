@@ -184,8 +184,8 @@ function measuredCommitSha(headPath) {
  * Locate the run that measured the base commit, walking first parents only
  * when the main CI deliberately skipped the Ubuntu measurement job.
  *
- * A run that measured no artifact, failed, or has not finished stops the
- * search. Such a missing measurement does not imply an unchanged binary.
+ * A missing artifact on a non-skipped commit stops the search. Failed or
+ * unfinished jobs never count as deliberate skips.
  */
 async function findBaseRun(headPath) {
   const base = await resolveBaseCommit(headPath);
@@ -218,22 +218,31 @@ async function findBaseRun(headPath) {
   return { baseSha: base.sha, runId: '' };
 }
 
-/** Inspect the newest main push run for this commit, without skipping a failed measurement. */
+/** Find this commit's artifact first; only a confirmed skip permits walking back. */
 async function mainMeasurement(sha) {
   const runs = await api(
-    `/repos/${repository}/actions/runs?head_sha=${sha}&event=push&per_page=100`,
+    `/repos/${repository}/actions/runs?head_sha=${sha}&per_page=100`,
   );
-  const run = (runs.workflow_runs || [])
-    .filter(
-      (item) =>
-        item.path === '.github/workflows/ci.yml' &&
-        item.head_branch === 'main' &&
-        item.head_sha === sha &&
-        item.event === 'push',
-    )
-    .sort((a, b) => b.run_number - a.run_number)[0];
-  if (!run || run.status !== 'completed') return { status: 'unavailable' };
+  const candidates = (runs.workflow_runs || [])
+    .filter((run) => run.path === '.github/workflows/ci.yml')
+    .sort((a, b) => b.run_number - a.run_number);
+  for (const run of candidates) {
+    const artifacts = await api(
+      `/repos/${repository}/actions/runs/${run.id}/artifacts?per_page=100`,
+    );
+    const artifact = (artifacts.artifacts || []).find(
+      (item) => item.name === 'rslint-binary-size' && !item.expired,
+    );
+    if (artifact) return { status: 'measured', runId: String(run.id) };
+  }
 
+  const run = candidates.find(
+    (item) =>
+      item.head_branch === 'main' &&
+      item.head_sha === sha &&
+      item.event === 'push',
+  );
+  if (!run) return { status: 'unavailable' };
   const jobs = await api(
     `/repos/${repository}/actions/runs/${run.id}/jobs?per_page=100`,
   );
@@ -248,17 +257,7 @@ async function mainMeasurement(sha) {
   if (ubuntu?.conclusion === 'skipped' && changed?.conclusion === 'success') {
     return { status: 'skipped' };
   }
-  if (ubuntu?.conclusion !== 'success') return { status: 'unavailable' };
-
-  const artifacts = await api(
-    `/repos/${repository}/actions/runs/${run.id}/artifacts?per_page=100`,
-  );
-  const artifact = (artifacts.artifacts || []).find(
-    (item) => item.name === 'rslint-binary-size' && !item.expired,
-  );
-  return artifact
-    ? { status: 'measured', runId: String(run.id) }
-    : { status: 'unavailable' };
+  return { status: 'unavailable' };
 }
 
 /** A commit's subject line, or an empty string when it cannot be read. */
