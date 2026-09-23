@@ -273,6 +273,73 @@ func TestSym2sym_ImportAlias(t *testing.T) {
 	}
 }
 
+func TestSideEffectImportScriptSymbol(t *testing.T) {
+	tmpDir := t.TempDir()
+	files := map[string]string{
+		"tsconfig.json": `{"compilerOptions":{"target":"ES2024","module":"ESNext","moduleResolution":"Bundler","strict":true,"verbatimModuleSyntax":true,"isolatedModules":true},"include":["*.ts"]}`,
+		"index.ts":      "// 💀\nimport './script.js';\nimport './module.js';\n",
+		"script.ts":     "const object = { value: 42 };\n(globalThis as any).__rslimIssue = object;\n",
+		"module.ts":     "const object = { value: 42 };\n(globalThis as any).__rslimIssue = object;\nexport {};\n",
+	}
+	for name, contents := range files {
+		if err := os.WriteFile(filepath.Join(tmpDir, name), []byte(contents), 0o644); err != nil {
+			t.Fatalf("failed to write %s: %v", name, err)
+		}
+	}
+
+	t.Chdir(tmpDir)
+	program, err := CreateProgram("tsconfig.json")
+	if err != nil {
+		t.Fatalf("failed to create program: %v", err)
+	}
+
+	var index *ast.SourceFile
+	fileIDs := make(map[string]int)
+	for id, file := range program.GetSourceFiles() {
+		fileIDs[filepath.Base(file.FileName())] = id
+		if filepath.Base(file.FileName()) == "index.ts" {
+			index = file
+		}
+	}
+	if index == nil {
+		t.Fatal("index.ts not found in program")
+	}
+
+	semantic := CollectSemantic(program)
+	tc, done := program.GetTypeChecker(context.Background())
+	defer done()
+	for _, test := range []struct {
+		name       string
+		statement  int
+		wantSymbol bool
+		wantTarget string
+	}{
+		{name: "script without export", statement: 0, wantSymbol: false, wantTarget: "script.ts"},
+		{name: "module with export", statement: 1, wantSymbol: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			specifier := index.Statements.Nodes[test.statement].AsImportDeclaration().ModuleSpecifier
+			if gotSymbol := tc.GetSymbolAtLocation(specifier) != nil; gotSymbol != test.wantSymbol {
+				t.Errorf("GetSymbolAtLocation(%s) returned symbol = %t, want %t", specifier.Text(), gotSymbol, test.wantSymbol)
+			}
+			positionMap := index.GetPositionMap()
+			key := NodeReference{
+				SourceFileId: fileIDs["index.ts"],
+				Start:        positionMap.UTF8ToUTF16(specifier.Pos()),
+				End:          positionMap.UTF8ToUTF16(specifier.End()),
+			}
+			targetID, found := semantic.Node2module[key]
+			if test.wantTarget == "" {
+				if found {
+					t.Errorf("unexpected node2module target %d for %s", targetID, specifier.Text())
+				}
+			} else if wantID, ok := fileIDs[test.wantTarget]; !ok || !found || targetID != wantID {
+				t.Errorf("node2module[%s] = (%d, %t), want %s (%d)", specifier.Text(), targetID, found, test.wantTarget, wantID)
+			}
+		})
+	}
+}
+
 func TestSemanticSnapshot_NonBMPCharPositions(t *testing.T) {
 	// 💀 is U+1F480: 4 bytes in UTF-8, 2 code units in UTF-16.
 	// After the emoji, UTF-8 and UTF-16 offsets diverge.

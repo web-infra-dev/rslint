@@ -256,7 +256,7 @@ func runProject(args []string, stdout, stderr io.Writer) int {
 		})
 		checkResult.SourceFiles = append(checkResult.SourceFiles, encodedSourceFile)
 
-		CollectSemanticInFile(tc, file, &checkResult.Semantic, sourcefileId, sourceFileIds)
+		CollectSemanticInFile(program, tc, file, &checkResult.Semantic, sourcefileId, sourceFileIds)
 		exports := []ast.SymbolId{}
 		if sourceFile.Symbol != nil {
 			for _, symbol := range tc.GetExportsOfModule(sourceFile.Symbol) {
