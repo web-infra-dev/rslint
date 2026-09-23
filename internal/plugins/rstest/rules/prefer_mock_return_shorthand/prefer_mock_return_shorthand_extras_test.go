@@ -152,6 +152,8 @@ aVariable.mockImplementation(() => 1 as typeof value);`},
 			{Code: `aVariable.mockImplementation(() => (Promise as any).reject(13));`},
 			{Code: `aVariable.mockImplementation(() => Promise!.reject(13));`},
 			{Code: `aVariable.mockImplementation(() => (Promise.reject as any)(13));`},
+			{Code: `aVariable.mockImplementation(() => (Promise.reject<never>)(new Error('nope')));`},
+			{Code: `aVariable.mockImplementation(() => (Promise<never>).reject(new Error('nope')));`},
 
 			// --- a generator returns an iterator, not the value it names ---
 			// Both reference plugins rewrite this to `mockReturnValue(1)`, which

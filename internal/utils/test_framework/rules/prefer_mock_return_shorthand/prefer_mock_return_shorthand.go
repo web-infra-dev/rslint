@@ -141,14 +141,15 @@ func isEvaluatedOnceSafe(ctx rule.RuleContext, expression *ast.Node) bool {
 // is `mockRejectedValue`, which builds the promise per call, and that belongs to
 // the promise-shorthand rule rather than this one.
 func buildsRejectedPromise(ctx rule.RuleContext, expression *ast.Node) bool {
-	// Type assertions are erased at run time, so `Promise.reject(e) as
-	// Promise<never>` and `(Promise as any).reject(e)` build the same promise.
-	call := utils.SkipAssertionsAndParens(expression)
+	// Type assertions and instantiation expressions are erased at run time, so
+	// `Promise.reject(e) as Promise<never>`, `(Promise as any).reject(e)` and
+	// `(Promise.reject<never>)(e)` build the same promise.
+	call := ast.SkipOuterExpressions(expression, ast.OEKAll)
 	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
 	}
 
-	access := utils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
+	access := ast.SkipOuterExpressions(call.AsCallExpression().Expression, ast.OEKAll)
 	if access == nil || !ast.IsAccessExpression(access) {
 		return false
 	}
@@ -160,7 +161,7 @@ func buildsRejectedPromise(ctx rule.RuleContext, expression *ast.Node) bool {
 		return false
 	}
 
-	object := utils.SkipAssertionsAndParens(access.Expression())
+	object := ast.SkipOuterExpressions(access.Expression(), ast.OEKAll)
 	if object == nil || object.Kind != ast.KindIdentifier || object.Text() != "Promise" {
 		return false
 	}
