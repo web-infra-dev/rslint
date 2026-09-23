@@ -22,10 +22,6 @@ func NewProgramSourceLookup(program *compiler.Program, fs vfs.FS) *ProgramSource
 	return &ProgramSourceLookup{program: program, fs: fs}
 }
 
-func exactProgramSourcePathID(filePath string) string {
-	return NormalizeAbsoluteDrive(string(tspath.ToPath(filePath, "", true)))
-}
-
 func (lookup *ProgramSourceLookup) canonicalPathID(filePath string) string {
 	filePath = tspath.NormalizePath(filePath)
 	if lookup.fs != nil {
@@ -33,7 +29,7 @@ func (lookup *ProgramSourceLookup) canonicalPathID(filePath string) string {
 			filePath = tspath.NormalizePath(realPath)
 		}
 	}
-	return exactProgramSourcePathID(filePath)
+	return ExactPathID(filePath)
 }
 
 // SourceFileForCandidate validates a Program lookup against the target's exact
@@ -48,7 +44,7 @@ func (lookup *ProgramSourceLookup) SourceFileForCandidate(candidate string, cano
 	if sourceFile == nil {
 		return nil
 	}
-	if exactProgramSourcePathID(sourceFile.FileName()) == exactProgramSourcePathID(candidate) {
+	if ExactPathID(sourceFile.FileName()) == ExactPathID(candidate) {
 		return sourceFile
 	}
 	if canonicalTarget == "" {
@@ -103,12 +99,12 @@ func (lookup *ProgramSourceLookup) SourceFileForTarget(filePath string, canonica
 		return nil
 	}
 	canonicalPath = tspath.NormalizePath(canonicalPath)
-	canonicalID := exactProgramSourcePathID(canonicalPath)
+	canonicalID := ExactPathID(canonicalPath)
 	if sourceFile := lookup.program.GetSourceFile(filePath); sourceFile != nil &&
 		lookup.canonicalPathID(sourceFile.FileName()) == canonicalID {
 		return sourceFile
 	}
-	if exactProgramSourcePathID(canonicalPath) != exactProgramSourcePathID(filePath) {
+	if ExactPathID(canonicalPath) != ExactPathID(filePath) {
 		if sourceFile := lookup.program.GetSourceFile(canonicalPath); sourceFile != nil &&
 			lookup.canonicalPathID(sourceFile.FileName()) == canonicalID {
 			return sourceFile
@@ -137,7 +133,7 @@ func (lookup *ProgramSourceLookup) SourceFileForPath(filePath string) *ast.Sourc
 	if sourceFile := lookup.SourceFileForCandidate(filePath, canonicalPath); sourceFile != nil {
 		return sourceFile
 	}
-	if exactProgramSourcePathID(canonicalPath) != exactProgramSourcePathID(filePath) {
+	if ExactPathID(canonicalPath) != ExactPathID(filePath) {
 		if sourceFile := lookup.SourceFileForCandidate(canonicalPath, canonicalPath); sourceFile != nil {
 			return sourceFile
 		}

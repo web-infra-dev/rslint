@@ -130,7 +130,7 @@ func (snapshot *PathSpaceSnapshot) ResolvePath(
 // canonical-file deduplication. Windows drive letters are case-insensitive;
 // directory and file names retain their exact casing.
 func ExactPathID(filePath string) string {
-	return utils.NormalizeAbsoluteDrive(string(tspath.ToPath(filePath, "", true)))
+	return utils.ExactPathID(filePath)
 }
 
 // PathsEqual compares two paths using TypeScript's cross-platform path rules.
