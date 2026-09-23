@@ -5,7 +5,7 @@ import { createPluginLintHost } from '../../src/eslint-plugin/host.js';
 // Pins the only production wiring of --singleThreaded into the plugin worker
 // pool: createPluginLintHost(_, _, singleThreaded) must construct the WorkerPool
 // with workerCount:1 when singleThreaded is set, and leave it undefined (so the
-// pool keeps its min(cpus, 8) default) otherwise. Spying the constructor avoids
+// pool keeps its fixed default of eight) otherwise. Spying the constructor avoids
 // spawning real worker threads and asserts the exact option handed to the pool.
 describe('createPluginLintHost — singleThreaded → workerCount wiring', () => {
   afterEach(() => {

@@ -1,8 +1,12 @@
-import { describe, test, expect } from 'rstack/test';
+import { describe, test, expect, rs, afterEach } from 'rstack/test';
 import { EventEmitter } from 'node:events';
+import os from 'node:os';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
-import type { LintTask } from '../../src/eslint-plugin/worker-pool.js';
+import type {
+  LintTask,
+  WorkerPoolOptions,
+} from '../../src/eslint-plugin/worker-pool.js';
 
 import {
   LOCAL_CONFIG_DIR,
@@ -37,17 +41,14 @@ class QueueFakeWorker extends EventEmitter {
   }
 }
 
-async function controlledPool(
-  workerCount = 4,
-  warmupWorkerCount = 2,
-  retryCap = 0,
-) {
+async function controlledPool(options: Partial<WorkerPoolOptions> = {}) {
   const logs: string[] = [];
   const pool = new WorkerPool({
     configs: localConfigs,
-    workerCount,
-    warmupWorkerCount,
-    retryCap,
+    workerCount: 4,
+    warmupWorkerCount: 2,
+    retryCap: 0,
+    ...options,
     onLog: (record) => logs.push(record.text),
   });
   const state = pool as any;
@@ -116,13 +117,66 @@ async function controlledPool(
 }
 
 describe('WorkerPool demand-driven capacity', () => {
+  afterEach(() => rs.restoreAllMocks());
+
+  test.each([
+    [1, 1],
+    [2, 2],
+    [16, 2],
+  ])(
+    'available parallelism %i warms %i workers and still allows growth to eight',
+    async (parallelism, warmup) => {
+      rs.spyOn(os, 'availableParallelism').mockReturnValue(parallelism);
+      const h = await controlledPool({
+        workerCount: undefined,
+        warmupWorkerCount: undefined,
+      });
+      try {
+        expect(h.starts).toHaveLength(warmup);
+        const batch = h.pool.lintBatch(
+          Array.from({ length: 8 }, (_, i) => task(`default${i}.ts`, '')),
+        );
+        expect(h.starts).toHaveLength(8);
+        h.starts.forEach((start) => start.ready());
+        await Promise.all([...h.state.startingWorkers]);
+        h.starts.forEach((_, i) => h.finish(i));
+        expect((await batch).every((result) => !result.parseError)).toBe(true);
+      } finally {
+        await h.close();
+      }
+    },
+  );
+
+  test.each([
+    { options: { workerCount: 1 }, expected: 1 },
+    { options: { configs: [] }, expected: 0 },
+  ])(
+    'default warmup respects single-worker and plugin-free pools: %j',
+    async ({ options, expected }) => {
+      rs.spyOn(os, 'availableParallelism').mockReturnValue(16);
+      const h = await controlledPool({
+        workerCount: undefined,
+        warmupWorkerCount: undefined,
+        ...options,
+      });
+      try {
+        expect(h.starts).toHaveLength(expected);
+      } finally {
+        await h.close();
+      }
+    },
+  );
+
   test('warms two workers, reuses idle workers, and caps warmup at the maximum', async () => {
     for (const [maximum, warmup, expected] of [
       [5, 2, 2],
       [5, 4, 4],
       [1, 4, 1],
     ]) {
-      const h = await controlledPool(maximum, warmup);
+      const h = await controlledPool({
+        workerCount: maximum,
+        warmupWorkerCount: warmup,
+      });
       try {
         expect(h.starts).toHaveLength(expected);
         const batch = h.pool.lintBatch([task('one.ts', '')]);
@@ -204,7 +258,7 @@ describe('WorkerPool demand-driven capacity', () => {
   });
 
   test('crash replacements and growth share the capacity limit across concurrent batches', async () => {
-    const h = await controlledPool(4, 2, 1);
+    const h = await controlledPool({ retryCap: 1 });
     try {
       const a = h.pool.lintBatch([0, 1, 2].map((i) => task(`a${i}.ts`, '')));
       h.starts[0].worker.emit('exit', 1);
@@ -328,7 +382,7 @@ describe('WorkerPool demand-driven capacity', () => {
   });
 
   test('pending expansion can serve queued work after every warm worker crashes', async () => {
-    const h = await controlledPool(3);
+    const h = await controlledPool({ workerCount: 3 });
     try {
       const batch = h.pool.lintBatch(
         [0, 1, 2].map((i) => task(`f${i}.ts`, '')),
@@ -354,7 +408,7 @@ describe('WorkerPool demand-driven capacity', () => {
   });
 
   test('failed expansion drains the queue when all warm workers are also dead', async () => {
-    const h = await controlledPool(3);
+    const h = await controlledPool({ workerCount: 3 });
     try {
       const ids: number[] = [];
       const batch = h.pool.lintBatch(
@@ -419,7 +473,7 @@ describe('WorkerPool demand-driven capacity', () => {
   });
 
   test('shutdown from a crash log callback prevents a replacement from starting after close', async () => {
-    const h = await controlledPool(2, 2, 1);
+    const h = await controlledPool({ workerCount: 2, retryCap: 1 });
     try {
       let shutdown: Promise<void> | undefined;
       h.state.opts.onLog = (record: { text: string }) => {

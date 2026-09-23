@@ -36,6 +36,7 @@
 import { Worker, type WorkerOptions } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 import { StringDecoder } from 'node:string_decoder';
+import os from 'node:os';
 import path from 'node:path';
 import nodeModule from 'node:module';
 
@@ -61,9 +62,9 @@ export interface WorkerPoolOptions {
    * empty per-file results.
    */
   configs: ConfigDescriptor[];
-  /** Maximum worker count, including workers starting up. Default min(cpus, 8). */
+  /** Maximum worker count, including workers starting up. Default 8. */
   workerCount?: number;
-  /** Workers initialized before init() resolves. Default 2, capped by workerCount. */
+  /** Initial workers, capped by workerCount. Default min(2, availableParallelism()). */
   warmupWorkerCount?: number;
   /** Per-task soft deadline (ms). Default 30_000. */
   taskTimeoutMs?: number;
@@ -313,18 +314,9 @@ export class WorkerPool {
   private readonly respawns = new Set<Promise<void>>();
 
   constructor(opts: WorkerPoolOptions) {
-    const cpuCount = (() => {
-      try {
-        // rslint-disable-next-line @typescript-eslint/no-var-requires
-        const os = require('node:os') as { cpus(): unknown[] };
-        return Math.max(1, Math.min(8, os.cpus().length));
-      } catch {
-        return 4;
-      }
-    })();
-    const workerCount =
-      opts.configs.length === 0 ? 0 : (opts.workerCount ?? cpuCount);
-    const warmupWorkerCount = opts.warmupWorkerCount ?? 2;
+    const workerCount = opts.configs.length === 0 ? 0 : (opts.workerCount ?? 8);
+    const warmupWorkerCount =
+      opts.warmupWorkerCount ?? Math.min(2, os.availableParallelism());
     if (!Number.isInteger(workerCount) || workerCount < 0) {
       throw new RangeError(
         'WorkerPool: workerCount must be a non-negative integer',
@@ -340,17 +332,6 @@ export class WorkerPool {
     }
     this.opts = {
       configs: opts.configs.map((config) => ({ ...config })),
-      // Empty `configs` ⇒ no plugin work. Force the effective worker
-      // count to 0 so init() / lintBatch() / shutdown() all take their
-      // no-worker fast paths, honoring the `configs` JSDoc contract
-      // ("Empty array means 'no plugin work' — the pool spawns no
-      // workers"). Pre-fix the default `?? cpuCount` ran even for
-      // empty configs, so the pool spawned real workers and each one
-      // failed init (`lint-worker.ts` rejects an empty `configs[]`),
-      // turning the documented no-op into an init crash. An explicit
-      // `workerCount` is intentionally ignored when there's no work —
-      // a worker with zero configs has nothing to load and would
-      // crash on init regardless.
       workerCount,
       warmupWorkerCount: Math.min(workerCount, warmupWorkerCount),
       taskTimeoutMs: opts.taskTimeoutMs ?? 30_000,

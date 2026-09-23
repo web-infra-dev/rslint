@@ -153,6 +153,7 @@ describe('WorkerPool shutdown state machine (no real Worker)', () => {
     const pool = new WorkerPool({
       configs: [{ configPath: 'fake', configDirectory: 'fake' }],
       workerCount: 2,
+      warmupWorkerCount: 2,
     });
     const state = pool as any;
     const workers: FakeWorker[] = [];
@@ -381,6 +382,7 @@ describe('WorkerPool shutdown state machine (no real Worker)', () => {
     const pool = new WorkerPool({
       configs: [{ configPath: 'fake', configDirectory: 'fake' }],
       workerCount: 2,
+      warmupWorkerCount: 2,
     });
     const internals = pool as any;
     const first = new FakeWorker([]);

@@ -41,18 +41,19 @@ import {
 describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
   'WorkerPool end-to-end with a local fixture plugin',
   () => {
-    test('default warmup loads two workers and a larger batch grows to its maximum', async () => {
+    test('default warmup follows available parallelism and a larger batch grows to its maximum', async () => {
+      const warmupCount = Math.min(2, os.availableParallelism());
       const pool = new WorkerPool({ configs: localConfigs, workerCount: 4 });
       const state = pool as any;
       try {
         await pool.init();
-        expect(state.workers).toHaveLength(2);
+        expect(state.workers).toHaveLength(warmupCount);
         const batch = pool.lintBatch(
           Array.from({ length: 20 }, (_, i) =>
             task(`growth${i}.ts`, 'const value = null;'),
           ),
         );
-        expect(state.startingWorkers.size).toBe(2);
+        expect(state.startingWorkers.size).toBe(4 - warmupCount);
         await Promise.all([...state.startingWorkers]);
         expect(state.workers).toHaveLength(4);
         const results = await batch;
@@ -155,6 +156,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       });
       try {
         await pool.init();
+        const warmWorkers = [...(pool as any).workers];
         fs.writeFileSync(
           configPath,
           `import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(marker)}, 'executed'); export default [];`,
@@ -173,7 +175,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
             log.includes('plugin config changed since activation'),
           ),
         ).toBe(true);
-        expect((pool as any).workers).toHaveLength(2);
+        expect((pool as any).workers).toEqual(warmWorkers);
         for (const result of results) {
           expect(result.parseError).toBeUndefined();
           expect(result.diagnostics).toHaveLength(1);
