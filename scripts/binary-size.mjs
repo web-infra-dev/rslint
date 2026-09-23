@@ -28,6 +28,7 @@ const COMMENT_MARKER = '<!-- rslint-binary-size -->';
 // Written by `base-run`, read by `report`, so the base commit can be named
 // whether or not a measurement for it turned up.
 const BASE_COMMIT_FILE = 'base-commit.json';
+const MAX_SKIPPED_BASE_COMMITS = 5;
 
 const apiBase = process.env.GITHUB_API_URL || 'https://api.github.com';
 const repository = process.env.GITHUB_REPOSITORY || '';
@@ -180,27 +181,51 @@ function measuredCommitSha(headPath) {
 }
 
 /**
- * Locate the workflow run that measured the base commit.
+ * Locate the run that measured the base commit, walking first parents only
+ * when the main CI deliberately skipped the Ubuntu measurement job.
  *
- * The base commit is on the base branch, so its own CI run holds its
- * measurement. A miss is not an error: the base may predate this workflow, its
- * run may still be going, or its artifact may have expired. The report then
- * just states the current size.
+ * A missing artifact on a non-skipped commit stops the search. Failed or
+ * unfinished jobs never count as deliberate skips.
  */
 async function findBaseRun(headPath) {
   const base = await resolveBaseCommit(headPath);
-  const baseSha = base.sha;
-  if (!baseSha) return { baseSha: '', runId: '' };
+  if (!base.sha) return { baseSha: '', runId: '' };
 
   writeBaseCommit(base);
+  let sha = base.sha;
+  const skippedShas = [];
+  while (skippedShas.length <= MAX_SKIPPED_BASE_COMMITS) {
+    const result = await mainMeasurement(sha);
+    if (result.status === 'measured') {
+      writeBaseCommit({
+        ...base,
+        measuredSha: sha,
+        skippedShas: [...skippedShas].reverse(),
+      });
+      return { baseSha: sha, runId: result.runId };
+    }
+    if (
+      result.status !== 'skipped' ||
+      skippedShas.length === MAX_SKIPPED_BASE_COMMITS
+    ) {
+      break;
+    }
+    skippedShas.push(sha);
+    const commit = await api(`/repos/${repository}/commits/${sha}`);
+    sha = commit.parents?.[0]?.sha || '';
+    if (!sha) break;
+  }
+  return { baseSha: base.sha, runId: '' };
+}
 
+/** Find this commit's artifact first; only a confirmed skip permits walking back. */
+async function mainMeasurement(sha) {
   const runs = await api(
-    `/repos/${repository}/actions/runs?head_sha=${baseSha}&per_page=100`,
+    `/repos/${repository}/actions/runs?head_sha=${sha}&per_page=100`,
   );
   const candidates = (runs.workflow_runs || [])
     .filter((run) => run.path === '.github/workflows/ci.yml')
     .sort((a, b) => b.run_number - a.run_number);
-
   for (const run of candidates) {
     const artifacts = await api(
       `/repos/${repository}/actions/runs/${run.id}/artifacts?per_page=100`,
@@ -208,10 +233,31 @@ async function findBaseRun(headPath) {
     const artifact = (artifacts.artifacts || []).find(
       (item) => item.name === 'rslint-binary-size' && !item.expired,
     );
-    if (artifact) return { baseSha, runId: String(run.id) };
+    if (artifact) return { status: 'measured', runId: String(run.id) };
   }
 
-  return { baseSha, runId: '' };
+  const run = candidates.find(
+    (item) =>
+      item.head_branch === 'main' &&
+      item.head_sha === sha &&
+      item.event === 'push',
+  );
+  if (!run) return { status: 'unavailable' };
+  const jobs = await api(
+    `/repos/${repository}/actions/runs/${run.id}/jobs?per_page=100`,
+  );
+  const changed = (jobs.jobs || []).find(
+    (job) => job.name === 'Detect changes',
+  );
+  const ubuntu = (jobs.jobs || []).find(
+    (job) =>
+      job.name === 'Test npm packages' ||
+      job.name.startsWith('Test npm packages (rspack-ubuntu-'),
+  );
+  if (ubuntu?.conclusion === 'skipped' && changed?.conclusion === 'success') {
+    return { status: 'skipped' };
+  }
+  return { status: 'unavailable' };
 }
 
 /** A commit's subject line, or an empty string when it cannot be read. */
@@ -230,10 +276,10 @@ async function commitSubject(sha) {
  * Written whether or not a measurement for it turned up, so the report can
  * always name the commit the comparison is against.
  */
-function writeBaseCommit({ sha, subject }) {
+function writeBaseCommit({ sha, subject, measuredSha, skippedShas }) {
   fs.writeFileSync(
     BASE_COMMIT_FILE,
-    `${JSON.stringify({ sha, subject }, null, 2)}\n`,
+    `${JSON.stringify({ sha, subject, measuredSha, skippedShas }, null, 2)}\n`,
   );
 }
 
@@ -297,11 +343,20 @@ function baseCommit() {
 /** Render the Markdown shared by the job summary and the pull request comment. */
 function report(headPath, basePath) {
   const head = JSON.parse(fs.readFileSync(headPath, 'utf8'));
-  const base =
+  const downloadedBase =
     basePath && fs.existsSync(basePath)
       ? JSON.parse(fs.readFileSync(basePath, 'utf8'))
       : undefined;
   const baseOn = baseCommit();
+  const base =
+    downloadedBase?.sha === (baseOn.measuredSha || baseOn.sha)
+      ? downloadedBase
+      : undefined;
+  const skippedShas =
+    base && Array.isArray(baseOn.skippedShas) ? baseOn.skippedShas : [];
+  const skippedNote = skippedShas.length
+    ? `Base size was measured at main commit ${commitLink(baseOn.measuredSha)}. The Ubuntu measurement job was skipped for the following ${skippedShas.length === 1 ? 'main commit' : `${skippedShas.length} main commits`}: ${skippedShas.map(commitLink).join(', ')}.`
+    : '';
 
   // One table either way: an em dash where a missing measurement would go says
   // everything a sentence about it would.
@@ -328,6 +383,7 @@ function report(headPath, basePath) {
     '## 🦀📦 Binary size',
     '',
     `Commit ${commitLink(head.headSha)} merged into base ${commitLink(baseOn.sha)}${formatSubject(baseOn.subject)}.`,
+    ...(skippedNote ? ['', skippedNote] : []),
     '',
     '| Binary | Base | This PR | Change |',
     '| --- | ---: | ---: | ---: |',
