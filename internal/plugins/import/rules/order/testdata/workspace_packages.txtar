@@ -1,0 +1,24 @@
+-- package.json --
+{"private": true}
+-- packages/app/package.json --
+{"name": "app", "private": true}
+-- packages/app/tsconfig.json --
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "paths": { "alias": ["../shared/index.ts"] }
+  },
+  "files": ["input.ts"]
+}
+-- packages/app/input.ts --
+import alias from 'alias';
+import linked from 'linked';
+import hoisted from 'hoisted';
+-- packages/shared/package.json --
+{"name": "linked", "types": "index.ts"}
+-- packages/shared/index.ts --
+export default 1;
+-- node_modules/hoisted/index.d.ts --
+declare const value: number;
+export default value;

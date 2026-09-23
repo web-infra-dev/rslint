@@ -192,7 +192,7 @@ together. Only meaningful with `"always-and-inside-groups"` newline modes.
 | --- | --- |
 | `import/internal-regex` | Specifier matching this regex classifies as `internal`. |
 | `import/core-modules` | Extra names treated as `builtin`. |
-| `import/external-module-folders` | Resolved paths outside the importing package, or under one of these package-relative folders, classify as `external` (default `["node_modules"]`). An explicit `[]` disables the folder check; `""` denotes the package root. |
+| `import/external-module-folders` | Paths under these folders classify as `external` (default `["node_modules"]`), including hoisted dependencies and installed symbolic links. Other resolved paths, including aliases to sibling workspace packages, classify as `internal`. An explicit `[]` disables the folder check; `""` denotes the package root. |
 
 Exact Node.js builtin specifiers take precedence over TypeScript filesystem
 resolution. Non-exact builtin subpath specifiers and names from
@@ -200,7 +200,9 @@ resolution. Non-exact builtin subpath specifiers and names from
 
 ## Differences from ESLint
 
-Compared with eslint-plugin-import 2.32.0, users may observe:
+The configuration matches eslint-plugin-import 2.32.0. Ordering and workspace
+classification also incorporate fixes from upstream main at `a60d7154`.
+Remaining differences include:
 
 - **Aliases and workspace packages may be grouped differently.** Rslint can
   classify an import as `internal` where ESLint says `external`, or vice versa.
@@ -208,17 +210,21 @@ Compared with eslint-plugin-import 2.32.0, users may observe:
   `settings["import/resolver"]` may be grouped and ordered differently.
 - **Flow `import typeof` is a parse error.** Rslint produces no `import/order`
   diagnostic for that file.
-- **Messages for `import type Default, { Named }` can differ.** Rslint calls
-  `Named` a `type import`; ESLint may call it an ordinary import.
-- **Mixed `../` and `./` paths sharing a rank have a fixed order.** Ascending
-  puts `../` first; descending reverses it, and repeated `--fix` converges.
+- **Parser recovery for invalid TypeScript can differ.** For example,
+  current TypeScript ESLint parsers reject `import type Default, { Named }`;
+  older parsers accepted it and produced different named-import messages.
 - **A move across an unassigned side-effect import is not autofixed.** The
   ordering diagnostic remains, but rslint leaves the source unchanged.
 - **Named sorting skips `const { name, ...rest } = require('pkg')`.** Rslint
   leaves it unchanged instead of failing as eslint-plugin-import 2.32.0 can.
 
+As with upstream's default parsers, ordinary imports in JavaScript and
+TypeScript carry different import-kind metadata. This can affect alphabetized
+ordering when the same module appears in both an import and a `require`.
+
 ## Upstream References
 
 - [eslint-plugin-import: order](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/order.md)
 - [Source code, including the relative-path comparator fix](https://github.com/import-js/eslint-plugin-import/blob/5ebd8fd2879e033016d7ed7ebe6a9af7f5d5295a/src/rules/order.js)
+- [Latest audited module classification](https://github.com/import-js/eslint-plugin-import/blob/a60d71548b0d12b750f7a7040285774fed25975a/src/core/importType.js)
 - [Relative-path comparator convergence issue](https://github.com/import-js/eslint-plugin-import/issues/3235)

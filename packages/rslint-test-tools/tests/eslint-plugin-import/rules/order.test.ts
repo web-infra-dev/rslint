@@ -1,6 +1,6 @@
-// cspell:ignore asdas barfoo blist chpro Promisable rootverse vtaits xcompose yargs
+// cspell:ignore asdas barfoo blist chpro Promisable rootverse vtaits xcompose yargs ipfs Abi Exection
 // Migrated from eslint-plugin-import v2.32.0 tests/src/rules/order.js.
-// Semantic duplicates across the core, TypeScript, and Babel suites are collapsed: 163 valid + 133 invalid.
+// Semantic duplicates across the core, TypeScript, and Babel suites are collapsed; upstream main regressions are included.
 // Four Flow-only `import typeof` cases are omitted because the TypeScript parser rejects them; the generic Flow-suite case remains below.
 import { RuleTester } from '../rule-tester.js';
 
@@ -8,7 +8,24 @@ const ruleTester = new RuleTester();
 const rule = null as never;
 
 ruleTester.run('order', rule, {
-  valid: [],
+  valid: [
+    // Upstream main regression for import-js/eslint-plugin-import#3235.
+    {
+      code: `
+        import { fromAbi } from '../../.checkpoint/models';
+        import { handleVotingPowerValidationMetadata } from '../common/ipfs';
+        import ExecutionStrategyAbi from './abis/executionStrategy.json';
+        import L1AvatarExecutionStrategyAbi from './abis/l1/L1AvatarExectionStrategy';
+        import { FullConfig } from './config';
+      `,
+      options: [
+        {
+          groups: ['builtin', 'external', 'internal', 'type'],
+          alphabetize: { order: 'asc', caseInsensitive: true },
+        },
+      ],
+    },
+  ],
   invalid: [
     // Upstream regression: https://github.com/import-js/eslint-plugin-import/issues/3235
     {
@@ -842,6 +859,7 @@ ruleTester.run('order', rule, {
     },
     // Upstream case 0:75.
     {
+      filename: 'src/virtual.js',
       code: '\n        var { B, A: R } = require("./Z");\n        import { O as G, D } from "./Z";\n        import { K, L, J } from "./Z";\n        export { Z, X, Y } from "./Z";\n      ',
       options: [{ named: true, alphabetize: { order: 'asc' } }],
       errors: [
@@ -898,6 +916,7 @@ ruleTester.run('order', rule, {
     },
     // Upstream case 0:81.
     {
+      filename: 'src/virtual.js',
       code: '\n        const {\n          F: O,\n          O: B,\n          /* Hello World */\n          A: R\n        } = require("./Z");\n        import {\n          Y,\n          X,\n        } from "./Z";\n        export {\n          Z, A,\n          B\n        } from "./Z";\n        module.exports = {\n          a: A, o: O,\n          b: B\n        };\n      ',
       options: [{ named: { enabled: true }, alphabetize: { order: 'asc' } }],
       errors: [
