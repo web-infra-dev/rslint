@@ -1,5 +1,7 @@
 # no-commonjs
 
+## Rule Details
+
 Disallow CommonJS imports and exports when migrating to ES modules.
 
 The rule reports `require()` calls with one string literal or a template literal
@@ -7,19 +9,17 @@ without substitutions in the module's variable scope. Calls inside functions,
 dynamic arguments, and calls with multiple arguments are allowed. It also reports
 `module.exports` and `exports.*` member access, including reads.
 
-## Examples
+Examples of **incorrect** code for this rule:
 
-Incorrect:
-
-```js
+```javascript
 const path = require('node:path');
 module.exports = { path };
 exports.name = 'example';
 ```
 
-Correct:
+Examples of **correct** code for this rule:
 
-```js
+```javascript
 import path from 'node:path';
 export { path };
 export const name = 'example';
@@ -29,17 +29,17 @@ The rule does not provide automatic fixes or suggestions.
 
 ## Options
 
-| Option                    | Default | Behavior                                                                 |
-| ------------------------- | ------- | ------------------------------------------------------------------------ |
-| `allowRequire`            | `false` | Allow all `require()` calls.                                              |
-| `allowConditionalRequire` | `true`  | Allow calls inside conditionals or `try` statements.                      |
+| Option                    | Default | Behavior                                                                   |
+| ------------------------- | ------- | -------------------------------------------------------------------------- |
+| `allowRequire`            | `false` | Allow all `require()` calls.                                               |
+| `allowConditionalRequire` | `true`  | Allow calls inside conditionals or `try` statements.                       |
 | `allowPrimitiveModules`   | `false` | Allow `module.exports` assignments without an object literal on the right. |
 
 ### `allowRequire`
 
 With `{ "allowRequire": true }`, this is allowed:
 
-```js
+```javascript
 const path = require('node:path');
 ```
 
@@ -50,7 +50,7 @@ CommonJS exports are still reported.
 By default, the following calls are allowed. Set
 `{ "allowConditionalRequire": false }` to report them:
 
-```js
+```javascript
 const optional = enabled && require('optional');
 
 if (enabled) {
@@ -69,21 +69,21 @@ Conditional expressions (`condition ? a : b`) and logical expressions (`&&`,
 
 With `{ "allowPrimitiveModules": true }`, these assignments are allowed:
 
-```js
+```javascript
 module.exports = 'value';
 module.exports = function create() {};
 ```
 
 Object literal assignments and `exports.*` are still reported:
 
-```js
+```javascript
 module.exports = { name: 'example' };
 exports.create = function create() {};
 ```
 
 The legacy string option `"allow-primitive-modules"` enables the same behavior.
 
-## References
+## Original Documentation
 
-- [Upstream documentation](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-commonjs.md)
-- [Upstream source](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-commonjs.js)
+- [eslint-plugin-import: no-commonjs](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-commonjs.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-commonjs.js)
