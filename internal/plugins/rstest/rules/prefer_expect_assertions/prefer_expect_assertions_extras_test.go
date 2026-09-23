@@ -76,6 +76,11 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 	noExpectImport := "import { test } from '@rstest/core';\ntest('t', () => { run(); });"
 	noExpectImportContext := "import { test } from '@rstest/core';\ntest('t', (context) => { run(); });"
 	chaiExpect := "import { expect } from 'chai';\nimport { test } from '@rstest/core';\ntest('t', () => { expect.hasAssertions(); });"
+	// A require binding that is later reassigned no longer holds Rstest's
+	// expect when the test runs.
+	reassignedAlias := "import { test } from '@rstest/core';\nlet { expect: check } = require('@rstest/core');\ncheck = chai.expect;\ntest('t', () => { run(); });"
+	reassignedModule := "const { test } = require('@rstest/core');\nlet rs = require('@rstest/core');\nrs = other;\ntest('t', () => { run(); });"
+	reassignedAliasContext := "import { test } from '@rstest/core';\nlet { expect: check } = require('@rstest/core');\ncheck = chai.expect;\ntest('t', (context) => { run(); });"
 	shadowedByInner := rstestImport + "test('t', () => { run(); function expect() {} });"
 	shadowedByOuter := rstestImport + "describe('s', (expect) => { test('t', () => { run(); }); });"
 
@@ -204,6 +209,9 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 			// not exist at runtime.
 			invalid(noExpectImport, missing(noExpectImport, "test('t', () => { run(); })", "", "")),
 			invalid(noExpectImportContext, missing(noExpectImportContext, "test('t', (context) => { run(); })", "(context) => {", "context.expect")),
+			invalid(reassignedAlias, missing(reassignedAlias, "test('t', () => { run(); })", "", "")),
+			invalid(reassignedModule, missing(reassignedModule, "test('t', () => { run(); })", "", "")),
+			invalid(reassignedAliasContext, missing(reassignedAliasContext, "test('t', (context) => { run(); })", "(context) => {", "context.expect")),
 			invalid(chaiExpect, missing(chaiExpect, "test('t', () => { expect.hasAssertions(); })", "", "")),
 			invalid(shadowedByInner, missing(shadowedByInner, "test('t', () => { run(); function expect() {} })", "", "")),
 			invalid(shadowedByOuter, missing(shadowedByOuter, "test('t', () => { run(); })", "", "")),

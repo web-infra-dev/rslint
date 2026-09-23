@@ -72,7 +72,7 @@ var PreferExpectAssertionsRule = shared.NewRule(shared.Config{
 			IsExpect: analysis.IsExpectCall,
 			ExpectSpelling: func(test *ast.Node, callback *ast.Node) (string, bool) {
 				if spellings == nil {
-					spellings = collectModuleSpellings(ctx.SourceFile)
+					spellings = collectModuleSpellings(ctx)
 				}
 				return expectSpelling(analysis, spellings, test, callback)
 			},
@@ -179,15 +179,15 @@ type moduleSpellings struct {
 	declaresExpect bool
 }
 
-func collectModuleSpellings(sourceFile *ast.SourceFile) *moduleSpellings {
+func collectModuleSpellings(ctx rule.RuleContext) *moduleSpellings {
 	result := &moduleSpellings{}
-	for _, statement := range sourceFile.Statements.Nodes {
+	for _, statement := range ctx.SourceFile.Statements.Nodes {
 		switch statement.Kind {
 		case ast.KindImportDeclaration:
 			collectImportSpelling(result, statement.AsImportDeclaration())
 		case ast.KindVariableStatement:
 			for _, declaration := range statement.AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes {
-				collectRequireSpelling(result, declaration.AsVariableDeclaration())
+				collectRequireSpelling(ctx, result, declaration)
 			}
 		case ast.KindFunctionDeclaration, ast.KindClassDeclaration:
 			if name := statement.Name(); name != nil && name.Text() == "expect" {
@@ -238,13 +238,17 @@ func collectImportSpelling(result *moduleSpellings, declaration *ast.ImportDecla
 	}
 }
 
-func collectRequireSpelling(result *moduleSpellings, declaration *ast.VariableDeclaration) {
+// collectRequireSpelling records the spelling of a require of Rstest. Unlike
+// an import binding, a `let` or `var` binding can be reassigned after the
+// require, so a binding with any write is not used: after
+// `check = chai.expect`, an inserted `check.hasAssertions()` would call Chai.
+func collectRequireSpelling(ctx rule.RuleContext, result *moduleSpellings, declaration *ast.Node) {
 	name := declaration.Name()
-	if _, ok := rstest.RstestCoreModuleFromRequireCall(declaration.Initializer); ok {
+	if _, ok := rstest.RstestCoreModuleFromRequireCall(declaration.AsVariableDeclaration().Initializer); ok {
 		result.importsRstest = true
 		switch name.Kind {
 		case ast.KindIdentifier:
-			if result.expect == "" {
+			if result.expect == "" && !isRebound(ctx, declaration) {
 				result.expect = name.Text() + ".expect"
 			}
 		case ast.KindObjectBindingPattern:
@@ -253,7 +257,7 @@ func collectRequireSpelling(result *moduleSpellings, declaration *ast.VariableDe
 				if local == nil || local.Kind != ast.KindIdentifier {
 					continue
 				}
-				if rstest.RequireBindingImportedName(element) == "expect" && result.expect == "" {
+				if rstest.RequireBindingImportedName(element) == "expect" && result.expect == "" && !isRebound(ctx, element) {
 					result.expect = local.Text()
 				}
 			}
@@ -263,6 +267,22 @@ func collectRequireSpelling(result *moduleSpellings, declaration *ast.VariableDe
 	if name.Kind == ast.KindIdentifier && name.Text() == "expect" {
 		result.declaresExpect = true
 	}
+}
+
+// isRebound reports whether the binding a declaration introduces is ever
+// written. A binding whose symbol cannot be found counts as written, which
+// only withholds a suggestion.
+func isRebound(ctx rule.RuleContext, declaration *ast.Node) bool {
+	symbol := declaration.Symbol()
+	if symbol == nil || ctx.Refs == nil {
+		return true
+	}
+	for _, reference := range ctx.Refs.References(symbol) {
+		if internalUtils.IsWriteReference(reference) {
+			return true
+		}
+	}
+	return false
 }
 
 // expectSpelling picks how an inserted `expect.hasAssertions()` refers to
