@@ -38,6 +38,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_each"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_ending_with_an_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_equality_matcher"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_expect_assertions"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_expect_resolves"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_hooks_on_top"
@@ -101,6 +102,7 @@ func GetAllRules() []rule.Rule {
 		prefer_each.PreferEachRule,
 		prefer_ending_with_an_expect.PreferEndingWithAnExpectRule,
 		prefer_equality_matcher.PreferEqualityMatcherRule,
+		prefer_expect_assertions.PreferExpectAssertionsRule,
 		prefer_expect_resolves.PreferExpectResolvesRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
 		prefer_hooks_on_top.PreferHooksOnTopRule,
