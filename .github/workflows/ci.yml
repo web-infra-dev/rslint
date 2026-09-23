@@ -108,7 +108,7 @@ jobs:
           $packageParallelism = [int]$env:GOMAXPROCS
           $cpuLimit = 0
           if ([int]::TryParse($env:cpu_limit, [ref]$cpuLimit) -and $cpuLimit -gt 0) {
-            $packageParallelism = [Math]::Min($packageParallelism, $cpuLimit)
+            $packageParallelism = $cpuLimit
             $env:GOMAXPROCS = "$packageParallelism"
             $parallelArgs = @("-p=$packageParallelism")
           } elseif ($env:cpu_limit) {
@@ -118,11 +118,9 @@ jobs:
           $memoryLimitGiB = 0
           if ([int]::TryParse($env:memory_Limit, [ref]$memoryLimitGiB) -and $memoryLimitGiB -gt 0) {
             # memory_Limit is the runner's total memory quota in GiB.
-            # Reserve 20% for the OS and other overhead. Use 4 GiB per process
-            # to cap concurrent compilers, linkers, and test binaries.
-            $memoryBudgetMiB = [Math]::Floor($memoryLimitGiB * 1024 * 0.8)
-            $packageParallelism = [int][Math]::Max(1, [Math]::Min($packageParallelism, [Math]::Floor($memoryBudgetMiB / 4096)))
-            $parallelArgs = @("-p=$packageParallelism")
+            # Reserve 10% for the OS and other overhead, and share the budget
+            # across the full CPU-quota package parallelism.
+            $memoryBudgetMiB = [Math]::Floor($memoryLimitGiB * 1024 * 0.9)
 
             # GOMEMLIMIT is a soft limit for each Go process, not the whole job.
             $processMemoryMiB = [Math]::Floor($memoryBudgetMiB / $packageParallelism)
@@ -131,9 +129,12 @@ jobs:
             Write-Warning "Ignoring invalid memory_Limit; keeping the existing memory settings."
           }
 
+          Write-Host ("Runner quotas: " + (@{cpu_limit = $env:cpu_limit; memory_Limit = $env:memory_Limit} | ConvertTo-Json -Compress))
           Write-Host "Go limits: GOMAXPROCS=$env:GOMAXPROCS, package parallelism=$packageParallelism, GOMEMLIMIT=$env:GOMEMLIMIT"
+          $startedAt = [DateTime]::UtcNow
           go build @parallelArgs ./cmd/... ./internal/...
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "Go build completed: elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
 
           $packages = go list @parallelArgs ./cmd/... ./internal/... | Where-Object { $_ -ne "" }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -157,6 +158,7 @@ jobs:
             go test @parallelArgs -count=1 $batch
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+          Write-Host "Go tests completed: packages=$($packages.Count), elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
 
   test-go-darwin:
     name: Test Go (Darwin)
