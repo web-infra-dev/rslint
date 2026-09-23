@@ -1,4 +1,7 @@
 import { describe, test, expect } from 'rstack/test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import type { LintTask } from '../../src/eslint-plugin/worker-pool.js';
@@ -21,7 +24,7 @@ import {
  * batches, and the terminate-fallback shutdown drain.
  *
  * Exercises the full happy path inside the runner package (WorkerPool
- * → worker_threads loading the user's rslint config → round-robin
+ * → worker_threads loading the user's rslint config → queued
  * lintBatch → oxc-parser → normalize → scope → context → listeners →
  * plugin-lint-result-shaped data). The plugin here is the local fixture
  * plugin (`fixtures/local-plugin.mjs`), not an external dependency.
@@ -32,6 +35,154 @@ import {
 describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
   'WorkerPool end-to-end with a local fixture plugin',
   () => {
+    test('default warmup loads two workers and a larger batch grows to its maximum', async () => {
+      const pool = new WorkerPool({ configs: localConfigs, workerCount: 4 });
+      const state = pool as any;
+      try {
+        await pool.init();
+        expect(state.workers).toHaveLength(2);
+        const batch = pool.lintBatch(
+          Array.from({ length: 20 }, (_, i) =>
+            task(`growth${i}.ts`, 'const value = null;'),
+          ),
+        );
+        expect(state.startingWorkers.size).toBe(2);
+        await Promise.all([...state.startingWorkers]);
+        expect(state.workers).toHaveLength(4);
+        const results = await batch;
+        expect(results).toHaveLength(20);
+        for (const result of results) {
+          expect(result.parseError).toBeUndefined();
+          expect(result.diagnostics).toHaveLength(1);
+        }
+      } finally {
+        await pool.shutdown();
+      }
+    });
+
+    test('ten thousand files with cancellation grow once and release every task slot', async () => {
+      const pool = new WorkerPool({ configs: localConfigs, workerCount: 8 });
+      const state = pool as any;
+      try {
+        await pool.init();
+        const files = Array.from({ length: 10_000 }, (_, i) =>
+          task(`large${i}.ts`, 'const value = null;'),
+        );
+        let index = 0;
+        const batch = pool.lintBatch(files, (id) => {
+          if (index++ % 3 === 0) pool.cancelTask(id);
+        });
+        expect(state.workers.length + state.startingWorkers.size).toBe(8);
+        expect(state.cancelPool.size).toBeGreaterThanOrEqual(files.length);
+        const results = await batch;
+        await Promise.all([...state.startingWorkers]);
+        expect(results).toHaveLength(files.length);
+        for (let i = 0; i < results.length; i++) {
+          expect(results[i].filePath).toBe(files[i].filePath);
+          expect(results[i].parseError).toBeUndefined();
+          expect(results[i].cancelled).toBe(i % 3 === 0);
+          expect(results[i].diagnostics).toHaveLength(i % 3 === 0 ? 0 : 1);
+        }
+        expect(state.workers).toHaveLength(8);
+        expect(state.workerExits.size).toBe(8);
+        expect(state.pendingQueue).toEqual([]);
+        expect(
+          state.workers.every((slot: any) => slot.inflight.size === 0),
+        ).toBe(true);
+        expect(state.cancelPool.slotInUse.some((used: number) => used)).toBe(
+          false,
+        );
+        expect(state.cancelPool.freeList).toHaveLength(state.cancelPool.size);
+
+        // Reusing slots after a large cancelled batch must clear old flags.
+        const reused = await pool.lintBatch(
+          Array.from({ length: 32 }, (_, i) => task(`reuse${i}.ts`, 'null;')),
+        );
+        expect(
+          reused.every(
+            (result) => !result.cancelled && result.diagnostics.length === 1,
+          ),
+        ).toBe(true);
+      } finally {
+        await pool.shutdown();
+      }
+      expect(state.workerExits.size).toBe(0);
+      expect(state.initializingWorkers.size).toBe(0);
+    });
+
+    test('expansion rejects changed config before import and keeps the warm generation usable', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-pool-config-'));
+      const configPath = path.join(dir, 'rslint.config.mjs');
+      const marker = path.join(dir, 'changed-config-executed');
+      fs.writeFileSync(
+        configPath,
+        `export default [{ plugins: { local: { rules: {
+        report: { meta: { schema: [] }, create(context) {
+          return { Program(node) { context.report({ node, message: 'original config' }); } };
+        } }
+      } } } }];`,
+      );
+      const logs: string[] = [];
+      const pool = new WorkerPool({
+        configs: [{ configPath, configDirectory: dir }],
+        workerCount: 3,
+        onLog: (record) => logs.push(record.text),
+      });
+      try {
+        await pool.init();
+        fs.writeFileSync(
+          configPath,
+          `import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(marker)}, 'executed'); export default [];`,
+        );
+        const batch = pool.lintBatch(
+          Array.from({ length: 6 }, (_, i) => ({
+            ...task(`changed${i}.ts`, '', 'local/report'),
+            configKey: dir,
+          })),
+        );
+        await Promise.allSettled([...(pool as any).startingWorkers]);
+        const results = await batch;
+        expect(fs.existsSync(marker)).toBe(false);
+        expect(
+          logs.some((log) =>
+            log.includes('plugin config changed since worker initialization'),
+          ),
+        ).toBe(true);
+        expect((pool as any).workers).toHaveLength(2);
+        for (const result of results) {
+          expect(result.parseError).toBeUndefined();
+          expect(result.diagnostics).toHaveLength(1);
+          expect(result.diagnostics[0].message).toBe('original config');
+        }
+      } finally {
+        await pool.shutdown();
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    test('config mutation during worker import fails initialization', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-pool-import-'));
+      const configPath = path.join(dir, 'rslint.config.mjs');
+      fs.writeFileSync(
+        configPath,
+        `import fs from 'node:fs';
+        fs.appendFileSync(new URL(import.meta.url), '\\n// changed during import');
+        export default [];`,
+      );
+      const pool = new WorkerPool({
+        configs: [{ configPath, configDirectory: dir }],
+        workerCount: 1,
+      });
+      try {
+        await expect(pool.init()).rejects.toThrow(
+          /plugin config changed since worker initialization/,
+        );
+      } finally {
+        await pool.shutdown();
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
     test('init + lintBatch + shutdown happy path', async () => {
       const logs: Array<{ level: string; source: string; text: string }> = [];
 
@@ -185,43 +336,64 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     test('U12: WorkerPool reuse across many lintBatch invocations stays stable', async () => {
       const pool = new WorkerPool({
         configs: localConfigs,
-        workerCount: 1,
+        workerCount: 4,
       });
-      await pool.init();
-
-      // Run 5 lint batches in sequence. The same worker handles all of
-      // them; no respawn / re-init expected.
-      const counts: number[] = [];
-      for (let i = 0; i < 5; i++) {
-        const r = await pool.lintBatch([
-          {
-            filePath: `iter${i}.ts`,
-            text: 'const x = null;\n',
-            rules: { 'local/no-null': { options: [] } },
-            collectFixes: false,
-            suggestionsMode: 'off',
-            configKey: LOCAL_CONFIG_DIR,
-          },
-        ]);
-        expect(r).toHaveLength(1);
-        expect(r[0].parseError).toBeUndefined();
-        counts.push(r[0].diagnostics.length);
+      const state = pool as any;
+      let expandedWorkers: unknown[] | undefined;
+      try {
+        await pool.init();
+        // Model repeated editor requests: concurrent batches, cancellation,
+        // empty batches, and reuse of the same worker and cancellation slots.
+        for (let wave = 0; wave < 200; wave++) {
+          const cancelFirst = wave % 2 === 0;
+          const first = pool.lintBatch(
+            Array.from({ length: 8 }, (_, i) =>
+              task(`a${wave}-${i}.ts`, 'const value = null;'),
+            ),
+            (id) => {
+              if (cancelFirst) pool.cancelTask(id);
+            },
+          );
+          const second = pool.lintBatch(
+            Array.from({ length: 8 }, (_, i) =>
+              task(`b${wave}-${i}.ts`, 'const value = null;'),
+            ),
+          );
+          const [a, b, empty] = await Promise.all([
+            first,
+            second,
+            pool.lintBatch([]),
+          ]);
+          expect(empty).toEqual([]);
+          for (const [prefix, results, cancelled] of [
+            ['a', a, cancelFirst],
+            ['b', b, false],
+          ] as const) {
+            expect(results).toHaveLength(8);
+            for (let i = 0; i < results.length; i++) {
+              expect(results[i].filePath).toBe(`${prefix}${wave}-${i}.ts`);
+              expect(results[i].parseError).toBeUndefined();
+              expect(results[i].cancelled).toBe(cancelled);
+              expect(results[i].diagnostics).toHaveLength(cancelled ? 0 : 1);
+            }
+          }
+          await Promise.all([...state.startingWorkers]);
+          const workers = state.workers.map((slot: any) => slot.worker);
+          expandedWorkers ??= workers;
+          expect(workers).toEqual(expandedWorkers);
+          expect(workers).toHaveLength(4);
+          expect(state.respawns.size).toBe(0);
+          expect(state.workerExits.size).toBe(4);
+          expect(state.pendingQueue).toEqual([]);
+          expect(state.cancelPool.slotInUse.some((used: number) => used)).toBe(
+            false,
+          );
+          expect(state.cancelPool.freeList).toHaveLength(state.cancelPool.size);
+        }
+      } finally {
+        await pool.shutdown();
       }
-
-      // Every iteration produced the SAME diagnostic count (1, for the
-      // single `null` literal). If state leaked (e.g. diagnostics
-      // accumulated across batches), counts would grow.
-      for (const c of counts) {
-        expect(c).toBe(1);
-      }
-
-      // Only one worker was used the whole time.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const workers = (pool as any).workers as Array<{ ready: boolean }>;
-      expect(workers).toHaveLength(1);
-      expect(workers[0].ready).toBe(true);
-
-      await pool.shutdown();
+      expect(state.workerExits.size).toBe(0);
     });
 
     // U11: a plugin with a refed top-level `setInterval` keeps the worker event

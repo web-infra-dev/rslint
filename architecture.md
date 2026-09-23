@@ -975,7 +975,7 @@ The transport and target phase differ by surface:
 
 - CLI sends `loadConfigs` and the CLI-only `prepareConfigs` as reverse
   framed-IPC requests during initialization. After final effective-ID selection
-  and the first fingerprint check, Node starts the existing plugin-host build
+  and the first fingerprint check, Node starts the plugin-host warmup
   and returns provisional plugin metadata. Go may use that metadata for
   read-only target planning and Program construction. Before `RunPipeline`,
   `activateConfigs` joins the same activation, including its second fingerprint
@@ -1403,7 +1403,7 @@ and mutation sequencing do not.
 
 ### Concurrency Model
 
-The main Go workload work groups and pools below honor `--singleThreaded`.
+The workload work groups and pools below honor `--singleThreaded`.
 The flag serializes these workload stages, but IPC transport, diagnostic
 collection, and plugin dispatch may still use infrastructure goroutines.
 
@@ -1502,6 +1502,39 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      independent from the partial root set needed to decide target ownership;
      the command immediately reduces it to a scalar and retains neither
      identity set in loader or `Program` state.
+
+7. **JavaScript plugin workers** (`packages/rslint/src/eslint-plugin`)
+   - `createPluginLintHost` is the shared CLI/API/LSP adapter. `WorkerPool`
+     owns task queuing, capacity, crash recovery, and shutdown; adapters retain
+     configuration activation and generation ownership. There is no global
+     worker budget shared between independent hosts or CLI processes.
+   - `workerCount` is the maximum pool capacity (by default at most eight,
+     bounded by logical CPU count). `warmupWorkerCount` defaults to two and is
+     capped by that maximum. Activation awaits only these warm workers;
+     `--singleThreaded` caps both counts at one, and plugin-free hosts create
+     no workers.
+   - Each ready worker accepts one file at a time. Idle workers take queued
+     files in arrival order. Remaining non-cancelled demand starts additional
+     workers, reserving capacity synchronously so concurrent batches cannot
+     exceed the maximum. Starting workers and pending crash replacements count
+     toward demand already being served. Task deadlines start at dispatch.
+     Ready workers remain available until the host shuts down; idle time does
+     not shrink the pool.
+   - Every worker imports the same selected plugin-bearing configurations.
+     Warm workers establish matching entry-module fingerprints; later workers,
+     including crash replacements, verify these before and after imports.
+     Changed entry bytes cannot enter the existing pool generation. This checks
+     the config entry modules, matching the activation contract; it does not
+     snapshot transitive dependencies or arbitrary module side effects.
+   - Warmup failure aborts activation. Expansion failure is logged and disables
+     further growth for that pool while initialized workers continue serving
+     tasks. If no ready, starting, or recovering worker remains, queued tasks
+     receive `pool_degraded`. Shutdown drains queued tasks and joins initial
+     starts, expansions, and crash replacements. Threads still initializing are
+     terminated immediately, so short invocations do not wait for unnecessary
+     imports. Failed imports retain their cooperative exit grace, and shutdown
+     also waits for those threads' actual exit. Repeated shutdown calls share
+     the same completion.
 
 Other invariants:
 

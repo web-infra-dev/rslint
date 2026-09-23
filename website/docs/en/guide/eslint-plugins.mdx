@@ -36,6 +36,12 @@ A few things to know:
   clear error if it does.
 - **Fixes work.** A plugin rule's autofixes and suggestions apply through `--fix`
   and the editor's `source.fixAll`.
+- **Worker concurrency.** rslint initializes up to two JavaScript workers when
+  plugins are configured, then starts more when queued files need them. Each
+  pool is limited to eight workers or the logical CPU count, whichever is
+  smaller, with at least one worker. `--singleThreaded` limits the pool to one.
+  Separate rslint processes have independent pools, so running package lint
+  commands concurrently can multiply the total worker count.
 
 ## Unsupported ESLint APIs
 

@@ -171,6 +171,124 @@ const localTask = (filePath, text, rule = 'local/no-null') => ({
 });
 
 const scenarios = {
+  'growth-import-shutdown': async () => {
+    const WorkerPool = await loadWorkerPool();
+    const enteredFile = markerPath('growth-import-entered');
+    const dir = makeFixtureDir({
+      'config.mjs': `import { workerData } from 'node:worker_threads';
+        import fs from 'node:fs';
+        if (workerData.configFingerprints) {
+          fs.writeFileSync(${JSON.stringify(enteredFile)}, 'entered');
+          await new Promise(() => {});
+        }
+        export default [];
+      `,
+    });
+    const pool = new WorkerPool({
+      configs: [
+        { configPath: path.join(dir, 'config.mjs'), configDirectory: dir },
+      ],
+      workerCount: 3,
+      warmupWorkerCount: 2,
+    });
+    await pool.init();
+    milestone('init-done');
+    const captured = captureTimeout(60_000, () =>
+      pool.lintBatch(
+        Array.from({ length: 3 }, (_, i) => ({
+          ...localTask(`growth${i}.ts`, ''),
+          rules: {},
+          configKey: dir,
+        })),
+      ),
+    );
+    await waitForFile(enteredFile, 'additional worker stuck in config import');
+    milestone('growth-import-entered');
+    check(
+      'initializing-worker-owned',
+      captured.count === 1 && pool.initializingWorkers.size === 1,
+      '',
+    );
+    const results = await captured.value;
+    check(
+      'warm-workers-completed-tasks',
+      results.length === 3 && results.every((result) => !result.parseError),
+      '',
+    );
+    milestone('shutdown-started');
+    await pool.shutdown();
+    check('all-worker-threads-exited', pool.workerExits.size === 0, '');
+    check(
+      'pool-drained',
+      pool.workers.length === 0 &&
+        pool.startingWorkers.size === 0 &&
+        pool.initializingWorkers.size === 0,
+      '',
+    );
+  },
+  // A failed additional worker leaves a refed timer behind. Rejecting its
+  // startup promise must not release ownership of the still-live thread.
+  'growth-init-error-shutdown': async () => {
+    const WorkerPool = await loadWorkerPool();
+    const dir = makeFixtureDir({
+      'config.mjs': `import { workerData } from 'node:worker_threads';
+        if (workerData.configFingerprints) {
+          setInterval(() => {}, ${FIXTURE_KEEPALIVE_INTERVAL_MS});
+          throw new Error('injected growth failure with live interval');
+        }
+        export default [];
+      `,
+    });
+    let markFailure;
+    const failure = new Promise((resolve) => {
+      markFailure = resolve;
+    });
+    const pool = new WorkerPool({
+      configs: [
+        { configPath: path.join(dir, 'config.mjs'), configDirectory: dir },
+      ],
+      workerCount: 3,
+      warmupWorkerCount: 2,
+      onLog: (record) => {
+        if (record.text.includes('injected growth failure')) markFailure();
+      },
+    });
+    await pool.init();
+    milestone('init-done');
+    const batch = pool.lintBatch(
+      Array.from({ length: 3 }, (_, i) => ({
+        ...localTask(`growth${i}.ts`, ''),
+        rules: {},
+        configKey: dir,
+      })),
+    );
+    await failure;
+    milestone('growth-failed');
+    check(
+      'failed-worker-still-owned',
+      pool.workerExits.size === 3,
+      `owned=${pool.workerExits.size}`,
+    );
+    const results = await batch;
+    check(
+      'warm-workers-completed-tasks',
+      results.length === 3 && results.every((result) => !result.parseError),
+      '',
+    );
+    const shutdown = pool.shutdown();
+    milestone('shutdown-started');
+    await shutdown;
+    check(
+      'all-worker-threads-exited',
+      pool.workerExits.size === 0,
+      `owned=${pool.workerExits.size}`,
+    );
+    check(
+      'pool-drained',
+      pool.workers.length === 0 && pool.startingWorkers.size === 0,
+      '',
+    );
+  },
   // A refed top-level interval keeps the worker event loop alive. Shutdown must
   // use its existing grace fallback and leave no live worker/handle behind.
   u11: async () => {
@@ -242,6 +360,7 @@ const scenarios = {
   // and terminate the replacement rather than leaking it.
   'worker-exit-race': async () => {
     const WorkerPool = await loadWorkerPool();
+    const logs = [];
     const countFile = markerPath('respawn-import-count');
     const enteredFile = markerPath('respawn-import-entered');
     const releaseFile = markerPath('respawn-import-release');
@@ -270,6 +389,7 @@ const scenarios = {
         { configPath: path.join(dir, 'config.mjs'), configDirectory: dir },
       ],
       workerCount: 1,
+      onLog: (record) => logs.push(record),
     });
     await pool.init();
     milestone('init-done');
@@ -301,15 +421,20 @@ const scenarios = {
     );
     milestone('respawn-in-flight');
 
+    milestone('shutdown-started');
     const shutdownP = pool.shutdown();
     check('closed-before-respawn-release', pool.closed === true, '');
-    milestone('shutdown-started');
     fs.writeFileSync(releaseFile, 'release');
     await shutdownP;
     check(
       'pool-drained',
       pool.workers.length === 0 && pool.respawns.size === 0,
       `workers=${pool.workers.length} respawns=${pool.respawns.size}`,
+    );
+    check(
+      'shutdown-does-not-log-respawn-failure',
+      !logs.some((record) => record.level === 'error'),
+      JSON.stringify(logs),
     );
 
     let rejectedClosed = false;
