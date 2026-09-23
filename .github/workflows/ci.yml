@@ -375,7 +375,12 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/binary-size.mjs comment binary-size-report.md
+        run: |
+          if ! node scripts/binary-size.mjs comment binary-size-report.md; then
+            echo "Binary size comment failed; report follows:"
+            cat binary-size-report.md
+            exit 1
+          fi
 
   test-node-windows:
     name: Test npm packages (rspack-windows-2022-large)
