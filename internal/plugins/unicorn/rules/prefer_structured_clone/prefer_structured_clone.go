@@ -1,12 +1,193 @@
+// Ported from eslint-plugin-unicorn v75.0.0; see LICENSE.
 package prefer_structured_clone
 
-import "github.com/web-infra-dev/rslint/internal/rule"
+import (
+	_ "embed"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+)
 
-// PreferStructuredCloneRule is intentionally inert while the test-first port is red.
+//go:embed prefer_structured_clone.schema.json
+var schemaJSON []byte
+
+const (
+	messageIDError      = "prefer-structured-clone/error"
+	messageIDSuggestion = "prefer-structured-clone/suggestion"
+)
+
+var suggestionMessage = rule.RuleMessage{
+	Id:          messageIDSuggestion,
+	Description: "Switch to `structuredClone(…)`.",
+}
+
+func errorMessage(description string) rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          messageIDError,
+		Description: "Prefer `structuredClone(…)` over `" + description + "` to create a deep clone.",
+	}
+}
+
 var PreferStructuredCloneRule = rule.Rule{
 	Name:   "unicorn/prefer-structured-clone",
-	Schema: rule.EmptyArraySchema,
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		return rule.RuleListeners{}
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
+		functions := configuredFunctions(rawOptions)
+		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				if outer, inner, ok := matchJSONClone(node); ok {
+					reportJSONClone(ctx, node, outer, inner)
+					return
+				}
+				reportConfiguredClone(ctx, node, functions)
+			},
+		}
 	},
+}
+
+func configuredFunctions(rawOptions []any) []string {
+	functions := []string{"_.cloneDeep", "lodash.cloneDeep"}
+	if len(rawOptions) == 0 {
+		return functions
+	}
+	options, _ := rawOptions[0].(map[string]any)
+	return append(utils.ToStringSlice(options["functions"]), functions...)
+}
+
+func matchJSONClone(node *ast.Node) (unicornutil.DotMethodCall, unicornutil.DotMethodCall, bool) {
+	oneArgument := 1
+	outer, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
+		Method:              "parse",
+		ArgumentsLength:     &oneArgument,
+		RejectSpreadElement: true,
+	})
+	if !ok || !unicornutil.NodeMatchesPath(outer.Object, "JSON") {
+		return unicornutil.DotMethodCall{}, unicornutil.DotMethodCall{}, false
+	}
+
+	// The outer matcher already guarantees exactly one non-spread argument.
+	innerNode := utils.ESTreeRuntimeExpression(node.Arguments()[0])
+	inner, ok := unicornutil.MatchDotMethodCall(innerNode, unicornutil.DotMethodCallOptions{
+		Method:              "stringify",
+		ArgumentsLength:     &oneArgument,
+		RejectSpreadElement: true,
+	})
+	if !ok || !unicornutil.NodeMatchesPath(inner.Object, "JSON") {
+		return unicornutil.DotMethodCall{}, unicornutil.DotMethodCall{}, false
+	}
+
+	return outer, inner, true
+}
+
+func reportJSONClone(ctx rule.RuleContext, outerNode *ast.Node, outer, inner unicornutil.DotMethodCall) {
+	start := utils.TrimNodeTextRange(ctx.SourceFile, outerNode).Pos()
+	end := utils.TrimNodeTextRange(ctx.SourceFile, inner.Callee).End()
+	ctx.ReportRangeWithDeferredSuggestions(
+		core.NewTextRange(start, end),
+		errorMessage("JSON.parse(JSON.stringify(…))"),
+		func() []rule.RuleSuggestion {
+			return []rule.RuleSuggestion{{
+				Message:  suggestionMessage,
+				FixesArr: jsonCloneSuggestionFixes(ctx.SourceFile, outer, inner),
+			}}
+		},
+	)
+}
+
+func jsonCloneSuggestionFixes(
+	sourceFile *ast.SourceFile,
+	outer unicornutil.DotMethodCall,
+	inner unicornutil.DotMethodCall,
+) []rule.RuleFix {
+	opening, closing, trailingComma, hasTrailingComma := callSyntax(sourceFile, inner.Call)
+
+	fixes := []rule.RuleFix{
+		rule.RuleFixReplace(sourceFile, outer.Callee, "structuredClone"),
+		rule.RuleFixRemoveRange(utils.TrimNodeTextRange(sourceFile, inner.RawCallee)),
+		rule.RuleFixRemoveRange(opening),
+	}
+	if hasTrailingComma {
+		fixes = append(fixes, rule.RuleFixRemoveRange(trailingComma))
+	}
+	fixes = append(fixes, rule.RuleFixRemoveRange(closing))
+	return fixes
+}
+
+// callSyntax relies only on invariants established by MatchDotMethodCall: node is
+// a parsed CallExpression with a complete argument list. Walking backward from
+// the call's final ')' finds its matching '(' without caring about parentheses
+// inside the callee or argument.
+func callSyntax(sourceFile *ast.SourceFile, node *ast.Node) (
+	opening core.TextRange,
+	closing core.TextRange,
+	trailingComma core.TextRange,
+	hasTrailingComma bool,
+) {
+	tokens := utils.TokensOfNode(sourceFile, node)
+	closingIndex := len(tokens) - 1
+	closing = tokens[closingIndex].Range()
+
+	depth := 0
+	for index := closingIndex; index >= 0; index-- {
+		switch tokens[index].Kind {
+		case ast.KindCloseParenToken:
+			depth++
+		case ast.KindOpenParenToken:
+			depth--
+			if depth == 0 {
+				opening = tokens[index].Range()
+				index = -1
+			}
+		}
+	}
+
+	if closingIndex > 0 && tokens[closingIndex-1].Kind == ast.KindCommaToken {
+		trailingComma = tokens[closingIndex-1].Range()
+		hasTrailingComma = true
+	}
+	return opening, closing, trailingComma, hasTrailingComma
+}
+
+func reportConfiguredClone(ctx rule.RuleContext, node *ast.Node, functions []string) {
+	call := node.AsCallExpression()
+	if call == nil || ast.IsOptionalChainRoot(node) {
+		return
+	}
+	arguments := node.Arguments()
+	if len(arguments) != 1 || arguments[0] == nil || arguments[0].Kind == ast.KindSpreadElement {
+		return
+	}
+
+	rawCallee := call.Expression
+	callee := utils.ESTreeRuntimeExpression(rawCallee)
+	if callee == nil || unicornutil.HasOptionalChainElement(rawCallee) {
+		return
+	}
+
+	matched := ""
+	for _, function := range functions {
+		if unicornutil.NodeMatchesPath(rawCallee, function) {
+			matched = ecmascript.StringTrim(function)
+			break
+		}
+	}
+	if matched == "" {
+		return
+	}
+
+	ctx.ReportRangeWithDeferredSuggestions(
+		utils.TrimNodeTextRange(ctx.SourceFile, callee),
+		errorMessage(matched+"(…)"),
+		func() []rule.RuleSuggestion {
+			return []rule.RuleSuggestion{{
+				Message: suggestionMessage,
+				FixesArr: []rule.RuleFix{
+					rule.RuleFixReplace(ctx.SourceFile, callee, "structuredClone"),
+				},
+			}}
+		},
+	)
 }

@@ -323,7 +323,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-string-slice': 'error', // not implemented
     // 'unicorn/prefer-string-starts-ends-with': 'error', // not implemented
     'unicorn/prefer-string-trim-start-end': 'error',
-    // 'unicorn/prefer-structured-clone': 'error', // not implemented
+    'unicorn/prefer-structured-clone': 'error',
     // 'unicorn/prefer-switch': 'error', // not implemented
     // 'unicorn/prefer-temporal': 'off', // not implemented
     'unicorn/prefer-ternary': 'error',
