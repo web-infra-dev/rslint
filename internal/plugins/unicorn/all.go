@@ -32,6 +32,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_thenable"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_assignment"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_outside_of_class"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_typeof_undefined"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_flat_depth"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_splice_count"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_slice_end"
@@ -103,6 +104,7 @@ func GetAllRules() []rule.Rule {
 		no_thenable.NoThenableRule,
 		no_this_assignment.NoThisAssignmentRule,
 		no_this_outside_of_class.NoThisOutsideOfClassRule,
+		no_typeof_undefined.NoTypeofUndefinedRule,
 		no_unnecessary_array_flat_depth.NoUnnecessaryArrayFlatDepthRule,
 		no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule,
 		no_unnecessary_slice_end.NoUnnecessarySliceEndRule,
