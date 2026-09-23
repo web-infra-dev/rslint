@@ -2,6 +2,10 @@ import { describe, test, expect } from 'rstack/test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import nodeModule from 'node:module';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { pathToFileURL } from 'node:url';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import type { LintTask } from '../../src/eslint-plugin/worker-pool.js';
@@ -41,6 +45,74 @@ import {
 describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
   'WorkerPool end-to-end with a local fixture plugin',
   () => {
+    test
+      .skipIf(!nodeModule.getCompileCacheDir)
+      .each(['default', 'host-only', 'inherited', 'explicitly-disabled'])(
+      'preserves compile cache ownership: %s',
+      async (mode) => {
+        const dir = fs.mkdtempSync(
+          path.join(os.tmpdir(), 'rslint-pool-cache-'),
+        );
+        const configPath = path.join(dir, 'rslint.config.mjs');
+        fs.writeFileSync(
+          configPath,
+          `import nodeModule from 'node:module';
+console.log(JSON.stringify(nodeModule.getCompileCacheDir() ?? null));
+export default [];`,
+        );
+        const poolUrl = pathToFileURL(
+          path.resolve(__dirname, '../../dist/eslint-plugin/index.js'),
+        ).href;
+        const cacheDir = path.join(dir, 'cache');
+        const runnerPath = path.join(dir, 'runner.mjs');
+        try {
+          // Cache activation is sticky within a Node instance, so each case
+          // needs a fresh process. The config observes the real worker state.
+          fs.writeFileSync(
+            runnerPath,
+            `import nodeModule from 'node:module';
+if (${mode === 'host-only'}) nodeModule.enableCompileCache(${JSON.stringify(cacheDir)});
+const hostBefore = nodeModule.getCompileCacheDir() ?? null;
+const { WorkerPool } = await import(${JSON.stringify(poolUrl)});
+const logs = [];
+const pool = new WorkerPool({
+  configs: [{ configPath: ${JSON.stringify(configPath)}, configDirectory: ${JSON.stringify(dir)} }],
+  workerCount: 1,
+  onLog: record => logs.push(record.text),
+});
+try { await pool.init(); } finally { await pool.shutdown(); }
+console.log(JSON.stringify({ hostBefore, hostAfter: nodeModule.getCompileCacheDir() ?? null, workerCache: JSON.parse(logs.join('')) }));`,
+          );
+          const { stdout } = await promisify(execFile)(
+            process.execPath,
+            [runnerPath],
+            {
+              env: {
+                ...process.env,
+                NODE_COMPILE_CACHE:
+                  mode === 'inherited' || mode === 'explicitly-disabled'
+                    ? cacheDir
+                    : undefined,
+                NODE_DISABLE_COMPILE_CACHE:
+                  mode === 'explicitly-disabled' ? '1' : undefined,
+              },
+              timeout: 60_000,
+            },
+          );
+          const { hostBefore, hostAfter, workerCache } = JSON.parse(stdout);
+          expect(hostBefore).toEqual(
+            mode === 'host-only' || mode === 'inherited'
+              ? expect.any(String)
+              : null,
+          );
+          expect(hostAfter).toBe(hostBefore);
+          expect(workerCache).toBe(mode === 'inherited' ? hostBefore : null);
+        } finally {
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      },
+    );
+
     test('default warmup follows available parallelism and a larger batch grows to its maximum', async () => {
       const warmupCount = Math.min(2, os.availableParallelism());
       const pool = new WorkerPool({ configs: localConfigs, workerCount: 4 });
