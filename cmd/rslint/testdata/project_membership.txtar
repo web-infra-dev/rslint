@@ -1,0 +1,10 @@
+-- tsconfig.json --
+{"files":["main.ts"],"compilerOptions":{"strict":true}}
+-- main.ts --
+import './gap';
+export const main = true; if (main) {}
+debugger;
+-- gap.ts --
+export const gap = true; if (gap) {}
+export const broken: number = 'text';
+debugger;

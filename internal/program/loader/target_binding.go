@@ -343,6 +343,13 @@ func (s *Session) bindTargetsToProjects(
 	programFiles := newProgramFileIndex(set.compilerPrograms, plan.Files, fsys, singleThreaded)
 	directOwners := directRootProgramOwners(set, plan.Files, fsys, singleThreaded)
 	for targetIndex, target := range plan.Files {
+		// Import membership is not lint ownership. This also guards Programs
+		// retained for another target or for program-wide type checking.
+		if directOwners[targetIndex] < 0 {
+			unbound = append(unbound, target)
+			storeSourceTargetMapping(binding.LintTargetBySourcePath, target.Path, target.CanonicalPath, target)
+			continue
+		}
 		programIndexes := projectIndexesForTarget(target, set.targetProjects, programIndexesByConfig, func(owner string) []int {
 			return orderedProgramIndexesForConfig(set, owner)
 		})
@@ -357,6 +364,8 @@ func (s *Session) bindTargetsToProjects(
 			continue
 		}
 
+		// A listed root that the compiler did not admit retains the existing
+		// ordered source fallback. It is distinct from an unmatched gap above.
 		bound := false
 		for _, programIndex := range programIndexes {
 			if bindTargetToProgram(
