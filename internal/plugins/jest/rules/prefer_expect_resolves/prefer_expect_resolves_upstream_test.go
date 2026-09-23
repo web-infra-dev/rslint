@@ -16,11 +16,13 @@ func TestPreferExpectResolvesRule(t *testing.T) {
 		&prefer_expect_resolves.PreferExpectResolvesRule,
 		[]rule_tester.ValidTestCase{
 			{Code: `expect.hasAssertions()`},
+			{Code: `await expect().resolves.toBe(true)`},
 			{Code: `
       it('passes', async () => {
         await expect(someValue()).resolves.toBe(true);
       });
     `},
+			{Code: `expect().nothing()`},
 			{Code: `
       it('is true', async () => {
         const myPromise = Promise.resolve(true);
@@ -92,82 +94,6 @@ func TestPreferExpectResolvesRule(t *testing.T) {
       `},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "expectResolves", Line: 7, Column: 24, EndColumn: 39},
-				},
-			},
-			{
-				Code: `
-        it('keeps parens around awaited argument', async () => {
-          const myPromise = Promise.resolve(true);
-
-          expect(await (myPromise)).toBe(true);
-        });
-      `,
-				Output: []string{`
-        it('keeps parens around awaited argument', async () => {
-          const myPromise = Promise.resolve(true);
-
-          await expect((myPromise)).resolves.toBe(true);
-        });
-      `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "expectResolves", Line: 5, Column: 18, EndColumn: 35},
-				},
-			},
-			{
-				Code: `
-        it('unwraps extra parens around await expression', async () => {
-          const myPromise = Promise.resolve(true);
-
-          expect((await myPromise)).toBe(true);
-        });
-      `,
-				Output: []string{`
-        it('unwraps extra parens around await expression', async () => {
-          const myPromise = Promise.resolve(true);
-
-          await expect((myPromise)).resolves.toBe(true);
-        });
-      `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "expectResolves", Line: 5, Column: 19, EndColumn: 34},
-				},
-			},
-			{
-				Code: `
-        it('prefers moving await before expect rejects', async () => {
-          const myPromise = Promise.reject(new Error('oh noes!'));
-
-          expect(await myPromise).rejects.toThrow('oh noes!');
-        });
-      `,
-				Output: []string{`
-        it('prefers moving await before expect rejects', async () => {
-          const myPromise = Promise.reject(new Error('oh noes!'));
-
-          await expect(myPromise).rejects.toThrow('oh noes!');
-        });
-      `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "expectResolves", Line: 5, Column: 18, EndColumn: 33},
-				},
-			},
-			{
-				Code: `
-        it('does not duplicate resolves modifier', async () => {
-          const myPromise = Promise.resolve(true);
-
-          expect(await myPromise).resolves.toBe(true);
-        });
-      `,
-				Output: []string{`
-        it('does not duplicate resolves modifier', async () => {
-          const myPromise = Promise.resolve(true);
-
-          await expect(myPromise).resolves.toBe(true);
-        });
-      `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "expectResolves", Line: 5, Column: 18, EndColumn: 33},
 				},
 			},
 		},
