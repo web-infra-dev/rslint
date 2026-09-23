@@ -193,15 +193,21 @@ async function findBaseRun(headPath) {
 
   writeBaseCommit(base);
   let sha = base.sha;
-  for (let skippedCommits = 0; skippedCommits <= MAX_SKIPPED_BASE_COMMITS; skippedCommits++) {
+  const skippedShas = [];
+  while (skippedShas.length <= MAX_SKIPPED_BASE_COMMITS) {
     const result = await mainMeasurement(sha);
     if (result.status === 'measured') {
-      writeBaseCommit({ ...base, measuredSha: sha, skippedCommits });
+      writeBaseCommit({
+        ...base,
+        measuredSha: sha,
+        skippedShas: [...skippedShas].reverse(),
+      });
       return { baseSha: sha, runId: result.runId };
     }
-    if (result.status !== 'skipped' || skippedCommits === MAX_SKIPPED_BASE_COMMITS) {
+    if (result.status !== 'skipped' || skippedShas.length === MAX_SKIPPED_BASE_COMMITS) {
       break;
     }
+    skippedShas.push(sha);
     const commit = await api(`/repos/${repository}/commits/${sha}`);
     sha = commit.parents?.[0]?.sha || '';
     if (!sha) break;
@@ -264,10 +270,10 @@ async function commitSubject(sha) {
  * Written whether or not a measurement for it turned up, so the report can
  * always name the commit the comparison is against.
  */
-function writeBaseCommit({ sha, subject, measuredSha, skippedCommits }) {
+function writeBaseCommit({ sha, subject, measuredSha, skippedShas }) {
   fs.writeFileSync(
     BASE_COMMIT_FILE,
-    `${JSON.stringify({ sha, subject, measuredSha, skippedCommits }, null, 2)}\n`,
+    `${JSON.stringify({ sha, subject, measuredSha, skippedShas }, null, 2)}\n`,
   );
 }
 
@@ -340,10 +346,10 @@ function report(headPath, basePath) {
     downloadedBase?.sha === (baseOn.measuredSha || baseOn.sha)
       ? downloadedBase
       : undefined;
-  const skippedNote =
-    base && baseOn.skippedCommits
-      ? `Base size was measured at main commit ${commitLink(baseOn.measuredSha)}. The following ${baseOn.skippedCommits} main commit${baseOn.skippedCommits === 1 ? '' : 's'}, through ${commitLink(baseOn.sha)}, skipped the Ubuntu measurement job.`
-      : '';
+  const skippedShas = base && Array.isArray(baseOn.skippedShas) ? baseOn.skippedShas : [];
+  const skippedNote = skippedShas.length
+    ? `Base size was measured at main commit ${commitLink(baseOn.measuredSha)}. The Ubuntu measurement job was skipped for the following ${skippedShas.length === 1 ? 'main commit' : `${skippedShas.length} main commits`}: ${skippedShas.map(commitLink).join(', ')}.`
+    : '';
 
   // One table either way: an em dash where a missing measurement would go says
   // everything a sentence about it would.
