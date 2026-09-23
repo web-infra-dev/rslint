@@ -271,6 +271,66 @@ func TestNoUnneededAsyncExpectFunctionRule(t *testing.T) {
 					{MessageId: "noAsyncWrapperForExpectedPromise"},
 				},
 			},
+			{
+				// An await inside the awaited call belongs to the wrapper; unwrapping it
+				// into a non-async scope is a syntax error.
+				Code:   `it('keeps nested awaits', () => expect(async () => { await run(await load()); }).rejects.toThrow());`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				// In an async scope the nested await would run before expect() and a
+				// rejection would escape the assertion.
+				Code:   `it('keeps nested awaits', async () => { await expect(async () => { await run(await load()); }).rejects.toThrow(); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				// A function expression binds `new.target`.
+				Code:   `expect(async function () { await run(new.target); }).rejects.toThrow();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				// A function expression binds `this`.
+				Code:   `expect(async function () { await this.run(); }).rejects.toThrow();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				// A function expression binds `arguments`.
+				Code:   `expect(async function () { await run(arguments); }).rejects.toThrow();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				// A parameter would resolve elsewhere once the wrapper is gone.
+				Code:   `expect(async (value) => { await run(value); }).rejects.toThrow();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				// A named function expression binds its own name.
+				Code:   `expect(async function retry() { await retry(); }).rejects.toThrow();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				// The type argument describes the wrapper, not the awaited value.
+				Code:   `expect<() => Promise<void>>(async () => { await run(); }).rejects.toThrow();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				// A comment outside the awaited call would be deleted.
+				Code:   `expect(async () => { /* waits for the queue */ await run(); }).rejects.toThrow();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				// An await inside a nested function belongs to that function and
+				// moves with it.
+				Code:   `expect(async () => { await run(async () => await load()); }).rejects.toThrow();`,
+				Output: []string{`expect(run(async () => await load())).rejects.toThrow();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				// An arrow takes `new.target` from the enclosing scope already.
+				Code:   `function outer() { return expect(async () => { await run(new.target); }).rejects.toThrow(); }`,
+				Output: []string{`function outer() { return expect(run(new.target)).rejects.toThrow(); }`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
 		},
 	)
 }
