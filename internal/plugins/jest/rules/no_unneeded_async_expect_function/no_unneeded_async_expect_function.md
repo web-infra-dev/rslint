@@ -47,6 +47,14 @@ function arguments, such as `expect(async () => await doSomethingAsync())` and
 `expect((async () => { await doSomethingAsync(); }))`. These shapes are handled
 as the same safe unwrap because tsgo preserves them explicitly in the AST.
 
+rslint still reports the wrapper but does not fix it when the unwrapped call
+would not mean the same thing: when the awaited call contains another `await`
+of the wrapper's own, such as `await run(await load())`; when the wrapper has
+parameters, type parameters or a function-expression name; when a function
+expression wrapper reads `this`, `arguments` or `new.target`; when `expect()`
+has an explicit type argument; or when a comment inside the wrapper sits
+outside the awaited call and would be deleted.
+
 ## Original Documentation
 
 - [eslint-plugin-jest: no-unneeded-async-expect-function](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-unneeded-async-expect-function.md)

@@ -249,11 +249,57 @@ expect(run()).rejects.toThrow();
 		`async function () { await run(arguments); }`,
 		"",
 	)
-	// An arrow takes `this` and `arguments` from the enclosing scope already.
+	add(
+		`expect(async function () { await run(new.target); }).rejects.toThrow();`,
+		`async function () { await run(new.target); }`,
+		"",
+	)
+	// An arrow takes `this`, `arguments` and `new.target` from the enclosing
+	// scope already.
 	add(
 		`expect(async () => { await this.run(); }).rejects.toThrow();`,
 		`async () => { await this.run(); }`,
 		`expect(this.run()).rejects.toThrow();`,
+	)
+	add(
+		`function outer() { return expect(async () => { await run(new.target); }).rejects.toThrow(); }`,
+		`async () => { await run(new.target); }`,
+		`function outer() { return expect(run(new.target)).rejects.toThrow(); }`,
+	)
+
+	// An await inside the awaited call belongs to the wrapper, and would move
+	// into the assertion's scope with the call.
+	add(
+		"test('rejects', () =>\n  expect(async () => { await run(await load()); }).rejects.toThrow(),\n);",
+		`async () => { await run(await load()); }`,
+		"",
+	)
+	add(
+		`test('rejects', async () => { await expect(async () => { await run(await load()); }).rejects.toThrow(); });`,
+		`async () => { await run(await load()); }`,
+		"",
+	)
+	add(
+		`expect(async () => await run(await load())).rejects.toThrow();`,
+		`async () => await run(await load())`,
+		"",
+	)
+	add(
+		`expect(async () => { await run({ async [await key()]() {} }); }).rejects.toThrow();`,
+		`async () => { await run({ async [await key()]() {} }); }`,
+		"",
+	)
+	// An await inside a nested function belongs to that function and moves
+	// with it.
+	add(
+		`expect(async () => { await run(async () => await load()); }).rejects.toThrow();`,
+		`async () => { await run(async () => await load()); }`,
+		`expect(run(async () => await load())).rejects.toThrow();`,
+	)
+	add(
+		`expect(async () => { await run({ async load() { await fetch(); } }); }).rejects.toThrow();`,
+		`async () => { await run({ async load() { await fetch(); } }); }`,
+		`expect(run({ async load() { await fetch(); } })).rejects.toThrow();`,
 	)
 	// The type argument describes the wrapper, not the awaited value.
 	add(

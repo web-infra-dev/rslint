@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_unneeded_async_expect_function"
 )
 
@@ -29,84 +28,14 @@ func hasPromiseModifier(parsed *rstestUtils.ParsedRstestExpectCall) bool {
 		slices.Contains(parsed.Modifiers, "rejects")
 }
 
-// keepsWrapperBindings reports whether the wrapper's own bindings survive the
-// unwrap.
-//
-// `rejects` calls the wrapper with no arguments and no receiver, so a
-// parameter is always `undefined` inside it, but the name the awaited call
-// reads disappears with the wrapper and would resolve to something else — or
-// to nothing — at the assertion's own scope. Type parameters, the name of a
-// named function expression, `this` and `arguments` are bound the same way.
-// Arrow functions take `this` and `arguments` from the enclosing scope
-// already, so unwrapping leaves them pointing at the same bindings.
-func keepsWrapperBindings(fn *ast.Node, awaited *ast.Node) bool {
-	if len(fn.Parameters()) != 0 || len(fn.TypeParameters()) != 0 {
-		return false
-	}
-	if fn.Kind != ast.KindFunctionExpression {
-		return true
-	}
-	if fn.Name() != nil {
-		return false
-	}
-	return !referencesCallerBindings(awaited)
-}
-
-// referencesCallerBindings reports whether the expression reads `this` or
-// `arguments`, which a function expression binds and an expression in the
-// assertion's scope does not.
-func referencesCallerBindings(node *ast.Node) bool {
-	found := false
-	var walk func(*ast.Node) bool
-	walk = func(child *ast.Node) bool {
-		if found || child == nil {
-			return true
-		}
-		switch child.Kind {
-		case ast.KindThisKeyword:
-			found = true
-			return true
-		case ast.KindIdentifier:
-			if child.Text() == "arguments" {
-				found = true
-				return true
-			}
-		}
-		return child.ForEachChild(walk)
-	}
-	walk(node)
-	return found
-}
-
-// keepsComments reports whether every comment the wrapper carries survives the
-// unwrap. Only the awaited call's own text is kept, so a comment written
-// anywhere else inside the wrapper would be deleted.
-func keepsComments(ctx rule.RuleContext, wrapper *ast.Node, awaited *ast.Node) bool {
-	wrapperRange := utils.TrimNodeTextRange(ctx.SourceFile, wrapper)
-	awaitedRange := utils.TrimNodeTextRange(ctx.SourceFile, awaited)
-	comments := ctx.Comments.All()
-	return !utils.HasCommentInSpan(comments, wrapperRange.Pos(), awaitedRange.Pos()) &&
-		!utils.HasCommentInSpan(comments, awaitedRange.End(), wrapperRange.End())
-}
-
 func buildSuggestions(ctx rule.RuleContext, match shared.Match) []rule.RuleSuggestion {
-	// expect<T>() pins the asserted value's type, and the wrapper is what T
-	// describes; the unwrapped call has the awaited value's type instead.
-	if match.HeadCall.AsCallExpression().TypeArguments != nil {
+	fix := shared.UnwrapFix(ctx, match)
+	if fix == nil {
 		return nil
 	}
-	fn := ast.SkipParentheses(match.Wrapper)
-	if !keepsWrapperBindings(fn, match.Awaited) || !keepsComments(ctx, match.Wrapper, match.Awaited) {
-		return nil
-	}
-
 	return []rule.RuleSuggestion{{
-		Message: removeWrapperSuggestion,
-		FixesArr: []rule.RuleFix{rule.RuleFixReplace(
-			ctx.SourceFile,
-			match.Wrapper,
-			utils.TrimmedNodeText(ctx.SourceFile, match.Awaited),
-		)},
+		Message:  removeWrapperSuggestion,
+		FixesArr: []rule.RuleFix{*fix},
 	}}
 }
 

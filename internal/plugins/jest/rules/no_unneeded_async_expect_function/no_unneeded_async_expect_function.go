@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_unneeded_async_expect_function"
 )
 
@@ -33,12 +32,18 @@ var NoUnneededAsyncExpectFunctionRule = shared.NewRule(shared.Config{
 			return headCall
 		}}
 	},
+	// The fix is withheld when the unwrapped call would not mean the same
+	// thing; the wrapper is still reported.
 	Report: func(ctx rule.RuleContext, match shared.Match) {
-		replacement := rslintUtils.TrimmedNodeText(ctx.SourceFile, match.Awaited)
-		ctx.ReportNodeWithFixes(
+		ctx.ReportNodeWithDeferredFixes(
 			match.Wrapper,
 			shared.Message,
-			rule.RuleFixReplace(ctx.SourceFile, match.Wrapper, replacement),
+			func() []rule.RuleFix {
+				if fix := shared.UnwrapFix(ctx, match); fix != nil {
+					return []rule.RuleFix{*fix}
+				}
+				return nil
+			},
 		)
 	},
 })

@@ -2,16 +2,18 @@
 // body shared by test-framework rules that report an async function wrapper
 // handed to expect() when the wrapper's only job is to await one call.
 //
-// The package owns the wrapper's shape: which functions qualify and which call
-// the assertion could receive instead. Deciding that an assertion reaches the
-// wrapper at all is framework-specific and belongs to Runtime.ParseExpect, and
-// so is the edit, because the plugins disagree on whether unwrapping is safe
-// enough to apply automatically; Config.Report owns it.
+// The package owns the wrapper's shape: which functions qualify, which call
+// the assertion could receive instead, and whether replacing the wrapper with
+// that call keeps its meaning. Deciding that an assertion reaches the wrapper
+// at all is framework-specific and belongs to Runtime.ParseExpect, and so is
+// how the edit is offered, because the plugins disagree on whether unwrapping
+// is safe enough to apply automatically; Config.Report owns it.
 package no_unneeded_async_expect_function
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Match describes one reportable wrapper.
@@ -122,6 +124,125 @@ func AwaitedCall(fn *ast.Node) *ast.Node {
 	}
 
 	return awaited
+}
+
+// keepsWrapperBindings reports whether the wrapper's own bindings survive the
+// unwrap.
+//
+// `rejects` calls the wrapper with no arguments and no receiver, so a
+// parameter is always `undefined` inside it, but the name the awaited call
+// reads disappears with the wrapper and would resolve to something else — or
+// to nothing — at the assertion's own scope. Type parameters, the name of a
+// named function expression, `this`, `arguments` and `new.target` are bound
+// the same way. Arrow functions take `this`, `arguments` and `new.target` from
+// the enclosing scope already, so unwrapping leaves them pointing at the same
+// bindings.
+func keepsWrapperBindings(fn *ast.Node, awaited *ast.Node) bool {
+	if len(fn.Parameters()) != 0 || len(fn.TypeParameters()) != 0 {
+		return false
+	}
+	if fn.Kind != ast.KindFunctionExpression {
+		return true
+	}
+	if fn.Name() != nil {
+		return false
+	}
+	return !referencesCallerBindings(awaited)
+}
+
+// referencesCallerBindings reports whether the expression reads `this`,
+// `arguments` or `new.target`, which a function expression binds and an
+// expression in the assertion's scope does not.
+func referencesCallerBindings(node *ast.Node) bool {
+	found := false
+	var walk func(*ast.Node) bool
+	walk = func(child *ast.Node) bool {
+		if found || child == nil {
+			return true
+		}
+		switch child.Kind {
+		case ast.KindThisKeyword:
+			found = true
+			return true
+		case ast.KindIdentifier:
+			if child.Text() == "arguments" {
+				found = true
+				return true
+			}
+		case ast.KindMetaProperty:
+			if child.AsMetaProperty().KeywordToken == ast.KindNewKeyword {
+				found = true
+				return true
+			}
+		}
+		return child.ForEachChild(walk)
+	}
+	walk(node)
+	return found
+}
+
+// awaitsInWrapper reports whether the awaited call contains an `await` of its
+// own, such as `run(await load())`. That `await` belongs to the wrapper, so the
+// unwrap would move it into the assertion's scope: a syntax error when that
+// scope is not async, and otherwise an await that runs before expect() is
+// called, so a rejection it produces escapes the assertion instead of reaching
+// `rejects`. An `await` inside a nested function belongs to that function and
+// moves with it; only a computed name of such a function is evaluated in the
+// wrapper.
+func awaitsInWrapper(node *ast.Node) bool {
+	found := false
+	var walk func(*ast.Node) bool
+	walk = func(child *ast.Node) bool {
+		if found || child == nil {
+			return true
+		}
+		if child.Kind == ast.KindAwaitExpression {
+			found = true
+			return true
+		}
+		if ast.IsFunctionLike(child) {
+			if name := child.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+				walk(name)
+			}
+			return false
+		}
+		return child.ForEachChild(walk)
+	}
+	walk(node)
+	return found
+}
+
+// keepsComments reports whether every comment the wrapper carries survives the
+// unwrap. Only the awaited call's own text is kept, so a comment written
+// anywhere else inside the wrapper would be deleted.
+func keepsComments(ctx rule.RuleContext, wrapper *ast.Node, awaited *ast.Node) bool {
+	wrapperRange := utils.TrimNodeTextRange(ctx.SourceFile, wrapper)
+	awaitedRange := utils.TrimNodeTextRange(ctx.SourceFile, awaited)
+	comments := ctx.Comments.All()
+	return !utils.HasCommentInSpan(comments, wrapperRange.Pos(), awaitedRange.Pos()) &&
+		!utils.HasCommentInSpan(comments, awaitedRange.End(), wrapperRange.End())
+}
+
+// UnwrapFix returns the edit that replaces the wrapper with the awaited call,
+// or nil when the unwrapped call would not mean the same thing.
+func UnwrapFix(ctx rule.RuleContext, match Match) *rule.RuleFix {
+	// expect<T>() pins the asserted value's type, and the wrapper is what T
+	// describes; the unwrapped call has the awaited value's type instead.
+	if match.HeadCall.AsCallExpression().TypeArguments != nil {
+		return nil
+	}
+	fn := ast.SkipParentheses(match.Wrapper)
+	if !keepsWrapperBindings(fn, match.Awaited) ||
+		awaitsInWrapper(match.Awaited) ||
+		!keepsComments(ctx, match.Wrapper, match.Awaited) {
+		return nil
+	}
+	fix := rule.RuleFixReplace(
+		ctx.SourceFile,
+		match.Wrapper,
+		utils.TrimmedNodeText(ctx.SourceFile, match.Awaited),
+	)
+	return &fix
 }
 
 // NewRule builds the rule for one plugin.

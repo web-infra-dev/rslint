@@ -38,6 +38,7 @@ The suggestion replaces the whole wrapper with the awaited call, keeping the cal
 
 It is withheld, and the assertion is reported on its own, when the unwrapped call would no longer mean the same thing:
 
-- The wrapper declares parameters or type parameters, is a named function expression, or reads `this` or `arguments` while being a function expression. `rejects` calls the wrapper with no arguments and no receiver, so those names are bound by the wrapper and would resolve elsewhere — or nowhere — in the assertion's own scope. An arrow function takes `this` and `arguments` from the enclosing scope already, so it keeps the suggestion.
+- The wrapper declares parameters or type parameters, is a named function expression, or reads `this`, `arguments` or `new.target` while being a function expression. `rejects` calls the wrapper with no arguments and no receiver, so those names are bound by the wrapper and would resolve elsewhere — or nowhere — in the assertion's own scope. An arrow function takes `this`, `arguments` and `new.target` from the enclosing scope already, so it keeps the suggestion.
+- The awaited call contains another `await`, as in `await run(await load())`. That `await` belongs to the wrapper: without it, the `await` is a syntax error in a function that is not `async`, and otherwise runs before `expect()` is called, so a rejection it produces fails the test instead of reaching `rejects`. An `await` inside a function nested in the call belongs to that function and keeps the suggestion.
 - `expect()` carries an explicit type argument, which describes the wrapper rather than the awaited value.
 - A comment sits inside the wrapper but outside the awaited call, where the rewrite would delete it.
