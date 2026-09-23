@@ -567,6 +567,22 @@ func TestExhaustiveDepsEditDemand(t *testing.T) {
 			fixTexts:          []string{"[missingCallback]"},
 		},
 		{
+			name: "suppression across cached hooks",
+			code: `function Component(value: number) {
+				const [state, setState] = useState(0);
+				const onClick = useEffectEvent(() => console.log(value));
+				// rslint-disable-next-line react-hooks/exhaustive-deps
+				useEffect(() => console.log(value), []);
+				/* rslint-disable react-hooks/exhaustive-deps */
+				useEffect(() => { setState(state); onClick(); }, [onClick]);
+				/* rslint-enable react-hooks/exhaustive-deps */
+				useEffect(() => { setState(state); console.log(value); }, [state]);
+			}`,
+			message:           "React Hook useEffect has a missing dependency: 'value'. Either include it or remove the dependency array.",
+			suggestionMessage: "Update the dependencies array to be: [state, value]",
+			fixTexts:          []string{"[state, value]"},
+		},
+		{
 			name: "setState dependency insertion",
 			code: `function Component(value: number) {
 				const [, setValue] = useState(0);

@@ -32,8 +32,6 @@ func (c *runCaches) scopes() *scope.Manager {
 	}
 	c.manager = scopeanalysis.References(*c.ctx, nil)
 	c.children = make(map[*scope.Scope][]*scope.Scope)
-	c.references = make(map[*scope.Variable][]*scope.Reference)
-	c.byIdentifier = make(map[*ast.Node]*scope.Reference, len(c.manager.References))
 	c.stable = make(map[*scope.Variable]bool)
 	c.functions = make(map[*scope.Variable]bool)
 	c.setStateCallSites = make(map[*ast.Node]*ast.Node)
@@ -42,13 +40,32 @@ func (c *runCaches) scopes() *scope.Manager {
 	for _, s := range c.manager.Scopes {
 		c.children[s.Parent] = append(c.children[s.Parent], s)
 	}
-	for _, ref := range c.manager.References {
-		c.byIdentifier[ref.Identifier] = ref
-		if v := ref.Resolved(); v != nil {
-			c.references[v] = append(c.references[v], ref)
+	return c.manager
+}
+
+// Most callbacks only need their scope's references. Build the file-wide
+// indexes only for stability checks or declared dependency lookups.
+func (c *runCaches) referencesFor(v *scope.Variable) []*scope.Reference {
+	if c.references == nil {
+		c.references = make(map[*scope.Variable][]*scope.Reference)
+		for _, ref := range c.scopes().References {
+			if resolved := ref.Resolved(); resolved != nil {
+				c.references[resolved] = append(c.references[resolved], ref)
+			}
 		}
 	}
-	return c.manager
+	return c.references[v]
+}
+
+func (c *runCaches) referenceAt(id *ast.Node) *scope.Reference {
+	if c.byIdentifier == nil {
+		manager := c.scopes()
+		c.byIdentifier = make(map[*ast.Node]*scope.Reference, len(manager.References))
+		for _, ref := range manager.References {
+			c.byIdentifier[ref.Identifier] = ref
+		}
+	}
+	return c.byIdentifier[id]
 }
 
 func firstVariable(s *scope.Scope, name string) *scope.Variable {
@@ -73,6 +90,9 @@ func variableDeclaration(v *scope.Variable) *ast.Node {
 }
 
 func (c *runCaches) stableValue(v *scope.Variable) bool {
+	if v == nil || v.Kind != scope.DefVariable {
+		return false
+	}
 	if result, ok := c.stable[v]; ok {
 		return result
 	}
@@ -111,7 +131,7 @@ func (c *runCaches) computeStableValue(v *scope.Variable) bool {
 			return true
 		}
 		if name == "useEffectEvent" {
-			for _, ref := range c.references[v] {
+			for _, ref := range c.referencesFor(v) {
 				c.effectEvents[ref.Identifier] = true
 			}
 			return true
@@ -142,7 +162,7 @@ func (c *runCaches) computeStableValue(v *scope.Variable) bool {
 						declarationIndex++
 					}
 				}
-				for _, ref := range c.references[v] {
+				for _, ref := range c.referencesFor(v) {
 					countDeclarations(ref.Identifier.Pos())
 					if utils.IsWriteReference(ref.Identifier) {
 						writes++
@@ -166,7 +186,7 @@ func (c *runCaches) computeStableValue(v *scope.Variable) bool {
 			return true
 		}
 		if name == "useState" && first == v.ID {
-			for _, ref := range c.references[v] {
+			for _, ref := range c.referencesFor(v) {
 				c.stateVariables[ref.Identifier] = true
 			}
 		}
@@ -195,6 +215,9 @@ func withinScope(s, ancestor *scope.Scope) bool {
 }
 
 func (c *runCaches) functionWithoutCaptures(v *scope.Variable, component *scope.Scope, pure map[*scope.Scope]bool) bool {
+	if v.Kind != scope.DefFunctionName && v.Kind != scope.DefVariable {
+		return false
+	}
 	if result, ok := c.functions[v]; ok {
 		return result
 	}
@@ -281,7 +304,7 @@ func (c *runCaches) gather(callback *ast.Node, callbackScope, component *scope.S
 	visit(callbackScope)
 	for key, ref := range cleanups.Entries() {
 		assigned := false
-		for _, candidate := range c.references[ref.Resolved()] {
+		for _, candidate := range c.referencesFor(ref.Resolved()) {
 			member := utils.ESTreeParent(candidate.Identifier)
 			if member != nil && member.Kind == ast.KindPropertyAccessExpression && member.Name().Text() == "current" {
 				if assignment, ok := getAssignmentBinaryExpr(utils.ESTreeParent(member)); ok && utils.ESTreeRuntimeExpression(assignment.Left) == member {
@@ -337,7 +360,7 @@ func writeExpression(id *ast.Node) *ast.Node {
 }
 
 func (c *runCaches) usedOutside(v *scope.Variable, callbackScope *scope.Scope, deps *ast.Node) bool {
-	for _, ref := range c.references[v] {
+	for _, ref := range c.referencesFor(v) {
 		if writeExpression(ref.Identifier) != nil || !withinScope(ref.From, callbackScope) && !containsNode(deps, ref.Identifier) {
 			return true
 		}

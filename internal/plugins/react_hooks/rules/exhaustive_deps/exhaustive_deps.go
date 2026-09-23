@@ -211,7 +211,6 @@ type Options struct {
 // parseOptions parses the rule's options object.
 func parseOptions(options []any, settings map[string]interface{}) Options {
 	opts := Options{
-		AutoDepsHooks:   map[string]bool{},
 		AdditionalHooks: react_hooksutil.AdditionalHooksFromSettings(settings, "additionalEffectHooks"),
 	}
 	if len(options) == 0 {
@@ -220,8 +219,11 @@ func parseOptions(options []any, settings map[string]interface{}) Options {
 	optsMap, _ := options[0].(map[string]interface{})
 	opts.EnableDangerousAutofixThisMayCauseInfiniteLoops, _ = optsMap["enableDangerousAutofixThisMayCauseInfiniteLoops"].(bool)
 	opts.RequireExplicitEffectDeps, _ = optsMap["requireExplicitEffectDeps"].(bool)
-	for _, h := range utils.ToStringSlice(optsMap["experimental_autoDependenciesHooks"]) {
-		opts.AutoDepsHooks[h] = true
+	if hooks := utils.ToStringSlice(optsMap["experimental_autoDependenciesHooks"]); len(hooks) > 0 {
+		opts.AutoDepsHooks = make(map[string]bool, len(hooks))
+		for _, h := range hooks {
+			opts.AutoDepsHooks[h] = true
+		}
 	}
 	// Mirrors upstream's `rawOptions.additionalHooks` truthiness check: a
 	// non-empty rule-level pattern replaces the settings fallback even when

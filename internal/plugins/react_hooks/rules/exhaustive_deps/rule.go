@@ -116,11 +116,11 @@ var ExhaustiveDepsRule = rule.Rule{
 		opts := parseOptions(options, ctx.Settings)
 		caches := &runCaches{ctx: &ctx}
 		reporter := newSuggestionReporter(&ctx, opts.EnableDangerousAutofixThisMayCauseInfiniteLoops)
-		return rule.RuleListeners{ast.KindCallExpression: func(node *ast.Node) { visitCall(ctx, opts, caches, node, reporter) }}
+		return rule.RuleListeners{ast.KindCallExpression: func(node *ast.Node) { visitCall(&ctx, opts, caches, node, reporter) }}
 	},
 }
 
-func visitCall(ctx rule.RuleContext, opts Options, caches *runCaches, node *ast.Node, reports *suggestionReporter) {
+func visitCall(ctx *rule.RuleContext, opts Options, caches *runCaches, node *ast.Node, reports *suggestionReporter) {
 	call := node.AsCallExpression()
 	callee := utils.ESTreeCallCallee(call.Expression)
 	cbIndex := getReactiveHookCallbackIndex(callee, opts.AdditionalHooks)
@@ -198,7 +198,7 @@ func visitCall(ctx rule.RuleContext, opts Options, caches *runCaches, node *ast.
 	}
 }
 
-func visitFunctionWithDependencies(ctx rule.RuleContext, opts Options, caches *runCaches, callback, deps, callee *ast.Node, name string, isEffect bool, reports *suggestionReporter) {
+func visitFunctionWithDependencies(ctx *rule.RuleContext, opts Options, caches *runCaches, callback, deps, callee *ast.Node, name string, isEffect bool, reports *suggestionReporter) {
 	if isEffect && react_hooksutil.HasAsyncModifier(callback) {
 		reports.report(callback, "Effect callbacks are synchronous to prevent race conditions. "+
 			"Put the async function inside:\n\n"+
@@ -274,7 +274,7 @@ func visitFunctionWithDependencies(ctx rule.RuleContext, opts Options, caches *r
 			}
 			break
 		}
-		if ref := caches.byIdentifier[root]; ref != nil {
+		if ref := caches.referenceAt(root); ref != nil {
 			if v := ref.Resolved(); v == nil || !withinScope(v.Scope, component) {
 				external[dd.Key] = true
 			}
@@ -297,7 +297,7 @@ func visitFunctionWithDependencies(ctx rule.RuleContext, opts Options, caches *r
 	flushDeferredDiagnostics(elements, reports)
 }
 
-func buildDepDiagnostic(ctx rule.RuleContext, caches *runCaches, callbackScope, component *scope.Scope, callee *ast.Node, name string, rec recommendations, declared []declaredDependency, external map[string]bool, dependencies *dependencyMap, optional map[string]bool) string {
+func buildDepDiagnostic(ctx *rule.RuleContext, caches *runCaches, callbackScope, component *scope.Scope, callee *ast.Node, name string, rec recommendations, declared []declaredDependency, external map[string]bool, dependencies *dependencyMap, optional map[string]bool) string {
 	body := getWarningMessage(rec.Missing, "a", "missing", "include", optional)
 	if body == "" {
 		body = getWarningMessage(rec.Unnecessary, "an", "unnecessary", "exclude", optional)
@@ -422,7 +422,7 @@ func emitSetStateInsideEffectWarning(caches *runCaches, callback, callee *ast.No
 	}
 }
 
-func emitConstructionWarnings(ctx rule.RuleContext, caches *runCaches, callbackScope, component *scope.Scope, deps *ast.Node, declared []declaredDependency, name string, reports *suggestionReporter) {
+func emitConstructionWarnings(ctx *rule.RuleContext, caches *runCaches, callbackScope, component *scope.Scope, deps *ast.Node, declared []declaredDependency, name string, reports *suggestionReporter) {
 	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(ctx.SourceFile, utils.TrimNodeTextRange(ctx.SourceFile, deps).Pos())
 	for _, dd := range declared {
 		v := firstVariable(component, dd.Key)
@@ -482,7 +482,7 @@ type elementDiagnostic struct {
 // parseDeclaredDeps collects declared paths and per-element diagnostics.
 // Malformed dependency lists still participate in missing-dependency checks.
 func parseDeclaredDeps(
-	ctx rule.RuleContext,
+	ctx *rule.RuleContext,
 	sf *ast.SourceFile,
 	reactiveHook *ast.Node,
 	depsNode *ast.Node,
