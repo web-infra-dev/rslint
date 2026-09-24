@@ -16,8 +16,75 @@ import (
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestGetLocalExportNames(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		source string
+		want   []string
+	}{
+		{"./named-exports", []string{"a", "bar", "foo", "b", "d", "ExportedClass", "deep"}},
+		{"./re-export", nil},
+		{"./default-export", []string{"default", "baz"}},
+		{"./common", nil},
+		{"./missing", nil},
+	} {
+		t.Run(tc.source, func(t *testing.T) {
+			t.Parallel()
+			ctx, specifier, raw := contextForImportWithCompiler(t, tc.source)
+			got := import_utils.GetLocalExportNames(ctx, specifier)
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("GetLocalExportNames(%q) = %v, want %v", tc.source, got, tc.want)
+			}
+			standalone, err := lintprogram.NewFromBoundSources(raw, raw.SourceFiles())
+			if err != nil {
+				t.Fatal(err)
+			}
+			sourceOnlyContext := (rule.RuleContext{SourceFile: ctx.SourceFile}).WithProgram(standalone)
+			if got := import_utils.GetLocalExportNames(sourceOnlyContext, specifier); !slices.Equal(got, tc.want) {
+				t.Fatalf("source-only GetLocalExportNames(%q) = %v, want %v", tc.source, got, tc.want)
+			}
+		})
+	}
+	ctx, specifier := contextForImport(t, "./named-exports")
+	ctx.Settings = map[string]interface{}{"import/ignore": []interface{}{"named-exports"}}
+	if names := import_utils.GetLocalExportNames(ctx, specifier); len(names) != 0 {
+		t.Fatalf("ignored module exposes names: %v", names)
+	}
+	if names := import_utils.GetLocalExportNames(rule.RuleContext{}, nil); len(names) != 0 {
+		t.Fatalf("missing Program exposes names: %v", names)
+	}
+}
+
+func TestExportMapsGlobalNamespace(t *testing.T) {
+	root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/global-namespace.txtar").Materialize(t, ""))
+	for _, interop := range []bool{false, true} {
+		tsconfig := "tsconfig.json"
+		if interop {
+			tsconfig = "tsconfig.interop.json"
+		}
+		t.Run(tsconfig, func(t *testing.T) {
+			raw, err := rslint_utils.CreateProgram(true, osvfs.FS(), root, tsconfig, rslint_utils.CreateCompilerHost(root, osvfs.FS()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			source := raw.GetSourceFile(tspath.ResolvePath(root, "consumer.ts"))
+			ctx := (rule.RuleContext{SourceFile: source}).WithProgram(lintprogram.NewFromCompiler(raw))
+			specifier := source.Statements.Nodes[0].AsImportDeclaration().ModuleSpecifier
+			exports, ok := import_utils.GetExportMap(ctx, specifier)
+			if !ok || exports.Get("Lib") != nil || (exports.Get("foo") != nil) != interop {
+				t.Fatalf("global alias must not be exported; its members require interop: %+v", exports)
+			}
+			names := import_utils.GetLocalExportNames(ctx, specifier)
+			if slices.Contains(names, "Lib") || slices.Contains(names, "foo") != interop {
+				t.Fatalf("unexpected local exports: %v", names)
+			}
+		})
+	}
+}
 
 func TestHasExport(t *testing.T) {
 	t.Parallel()

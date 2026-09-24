@@ -3,8 +3,40 @@ package utils
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
+
+// GetLocalExportNames returns names declared by the resolved module itself,
+// including local export lists and namespace aliases, but not named or star
+// re-exports. It reuses the module index without following export dependencies.
+// Unresolved, ignored and non-ES modules return no names.
+func GetLocalExportNames(ctx rule.RuleContext, moduleSpecifier *ast.Node) []string {
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
+		return nil
+	}
+	index := IndexFor(ctx)
+	link := resolveExportLink(ctx.Program(), ctx.SourceFile, index.settings, moduleSpecifier)
+	if !link.Resolved || !exportExtensionAllowed(ctx.Settings, link.Target.FileName()) {
+		return nil
+	}
+	var names []string
+	for _, step := range index.localExportsOf(ctx.Program(), link.Target).Steps {
+		switch step.Kind {
+		case exportStepNames:
+			names = append(names, step.Names...)
+		case exportStepLocalDefault:
+			names = append(names, defaultExportName)
+		case exportStepNamed:
+			if !step.FromModule {
+				for _, spec := range step.Specs {
+					names = append(names, spec.Exported)
+				}
+			}
+		}
+	}
+	return names
+}
 
 // localExports is everything one file says about its own exports, with every
 // module specifier resolved and none of them followed. It is a function of
@@ -30,7 +62,7 @@ type exportStepKind uint8
 
 const (
 	// exportStepNames declares names outright: an exported declaration, a
-	// namespace export, an `export as namespace` clause.
+	// namespace export, or an exported namespace's members.
 	exportStepNames exportStepKind = iota
 	// exportStepLocalDefault is `export default <expression>`, whose meta
 	// comes from a namespace import when the expression names one.
@@ -118,9 +150,11 @@ func (local *localExports) appendStatement(sourceProgram *program.Program, sourc
 		}
 		local.Steps = append(local.Steps, exportStep{Kind: exportStepLocalDefault, Local: referencedIdentifierText(exportAssignment.Expression)})
 	case ast.KindNamespaceExportDeclaration:
-		local.ImplicitDefault = local.ImplicitDefault || compilerOptionsESModuleInterop(sourceProgram)
-		if name := stmt.Name(); name != nil {
-			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: []string{name.Text()}})
+		// A UMD global alias is not itself a module export. With interop,
+		// upstream exposes the referenced namespace's members instead.
+		if compilerOptionsESModuleInterop(sourceProgram) {
+			local.ImplicitDefault = true
+			local.appendNamespaceAssignment(sourceFile, stmt.Name())
 		}
 	case ast.KindExportDeclaration:
 		local.appendExportDeclaration(sourceProgram, sourceFile, settings, stmt.AsExportDeclaration())

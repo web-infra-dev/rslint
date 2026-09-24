@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_dynamic_require"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_mutable_exports"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_named_as_default"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_named_as_default_member"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_namespace"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_restricted_paths"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_self_import"
@@ -40,6 +41,7 @@ func GetAllRules() []rule.Rule {
 		no_dynamic_require.NoDynamicRequireRule,
 		no_mutable_exports.NoMutableExportsRule,
 		no_named_as_default.NoNamedAsDefaultRule,
+		no_named_as_default_member.NoNamedAsDefaultMemberRule,
 		no_namespace.NoNamespaceRule,
 		no_restricted_paths.NoRestrictedPathsRule,
 		no_self_import.NoSelfImportRule,
