@@ -26,6 +26,7 @@ var EnforceNodeProtocolUsageRule = rule.Rule{
 			mode, _ = options[0].(string)
 		}
 		var version semver.Version
+		var versionErr error
 		versionChecked := false
 		check := func(source *ast.Node) {
 			source = utils.ESTreeRuntimeExpression(source)
@@ -33,22 +34,24 @@ var EnforceNodeProtocolUsageRule = rule.Rule{
 				return
 			}
 			if !versionChecked {
-				var err error
-				version, err = import_utils.NodeVersion(ctx.Settings)
-				if err != nil {
-					panic(err)
-				}
+				version, versionErr = import_utils.NodeVersion(ctx.Settings)
 				versionChecked = true
+				if versionErr != nil {
+					ctx.ReportNode(source, rule.RuleMessage{Description: versionErr.Error()})
+				}
+			}
+			if versionErr != nil {
+				return
 			}
 			name := source.Text()
 			prefixed := strings.HasPrefix(name, "node:")
-			messageID, replacement, removed := "requireNodeProtocol", "node:", 0
+			replacement, removed := "node:", 0
 			if mode == "never" {
 				if !prefixed {
 					return
 				}
 				name = strings.TrimPrefix(name, "node:")
-				messageID, replacement, removed = "forbidNodeProtocol", "", 5
+				replacement, removed = "", 5
 			} else if mode != "always" || prefixed {
 				return
 			}
@@ -63,7 +66,6 @@ var EnforceNodeProtocolUsageRule = rule.Rule{
 				preferred, other = other, preferred
 			}
 			ctx.ReportNodeWithDeferredFixes(source, rule.RuleMessage{
-				Id:          messageID,
 				Description: "Prefer `" + preferred + "` over `" + other + "`.",
 				Data:        map[string]string{"moduleName": name},
 			}, func() []rule.RuleFix {

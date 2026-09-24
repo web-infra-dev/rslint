@@ -74,6 +74,11 @@ export default [
 
 ## Differences from upstream
 
+- **Invalid settings produce a lint diagnostic.** For example,
+  `settings: { 'import/node-version': 'bad' }` reports one diagnostic at the
+  first checked module reference in each file and applies no fixes from this
+  rule. The diagnostic follows the rule's configured severity. Upstream throws
+  an exception instead.
 - **The default Node.js version is `22.0.0`.** ESLint uses the Node.js version
   running it. For example, `import 'fs'` with `"always"` is reported by default
   in rslint, but not by ESLint running on Node 14.17. Set `import/node-version`

@@ -43,6 +43,9 @@ func TestEnforceNodeProtocolUsageEditDemand(t *testing.T) {
 					t.Fatalf("demand %d: got %d diagnostics", demand, len(diagnostics))
 				}
 				got := diagnostics[0]
+				if got.Message.Id != "" {
+					t.Fatalf("unexpected message ID: %q", got.Message.Id)
+				}
 				if demand == rule.EditDemandAll {
 					all = got
 				}
@@ -71,16 +74,21 @@ func TestEnforceNodeProtocolUsageEditDemand(t *testing.T) {
 }
 
 func TestEnforceNodeProtocolUsageInvalidVersion(t *testing.T) {
-	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/version.ts", Path: "/version.ts"}, `import "fs";`, core.ScriptKindTS)
-	defer func() {
-		err, ok := recover().(error)
-		if !ok || err.Error() != "`import/node-version` setting must be a string in the format \"10.23.45\" (a semver version, with no leading zero)" {
-			t.Fatalf("unexpected invalid-version failure: %v", err)
+	var invalid []rule_tester.InvalidTestCase
+	for _, mode := range []string{"always", "never"} {
+		for _, version := range []any{"bad", "16", 16, nil, "4294967296.0.0"} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code:     "require(variable);\nimport 'fs';\nexport { readFile } from 'fs';\nrequire('node:path');\nimport('stream');",
+				Options:  []any{mode},
+				Settings: map[string]any{"import/node-version": version},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					Message: "`import/node-version` setting must be a string in the format \"10.23.45\" (a semver version, with no leading zero)",
+					Line:    2, Column: 8, EndLine: 2, EndColumn: 12,
+				}},
+			})
 		}
-	}()
-	ctx := rule.RuleContext{SourceFile: file, Settings: map[string]any{"import/node-version": "16"}}
-	listeners := target.EnforceNodeProtocolUsageRule.Run(ctx, []any{"always"})
-	listeners[ast.KindImportDeclaration](file.Statements.Nodes[0])
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.allow-js.json", t, &target.EnforceNodeProtocolUsageRule, nil, invalid)
 }
 
 // Expectations checked with eslint-plugin-import v2.32.0 and is-core-module v2.17.0.
