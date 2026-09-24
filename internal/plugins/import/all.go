@@ -4,6 +4,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/consistent_type_specifier_style"
 	default_rule "github.com/web-infra-dev/rslint/internal/plugins/import/rules/default"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/export"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/exports_last"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/first"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/max_dependencies"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/namespace"
@@ -33,6 +34,7 @@ func GetAllRules() []rule.Rule {
 		consistent_type_specifier_style.ConsistentTypeSpecifierStyleRule,
 		default_rule.DefaultRule,
 		export.ExportRule,
+		exports_last.ExportsLastRule,
 		first.FirstRule,
 		max_dependencies.MaxDependenciesRule,
 		namespace.NamespaceRule,
