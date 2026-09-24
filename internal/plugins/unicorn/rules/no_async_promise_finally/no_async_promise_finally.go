@@ -74,10 +74,10 @@ func isAsyncFinallyCallback(ctx rule.RuleContext, node *ast.Node) bool {
 		return true
 	}
 
-	return isAsyncFunctionDeclarationReference(ctx, node)
+	return isAsyncFunctionReference(ctx, node)
 }
 
-func isAsyncFunctionDeclarationReference(ctx rule.RuleContext, node *ast.Node) bool {
+func isAsyncFunctionReference(ctx rule.RuleContext, node *ast.Node) bool {
 	if node == nil || !ast.IsIdentifier(node) || ctx.Refs == nil {
 		return false
 	}
@@ -88,9 +88,12 @@ func isAsyncFunctionDeclarationReference(ctx rule.RuleContext, node *ast.Node) b
 	}
 
 	declaration := symbol.Declarations[0]
-	return declaration != nil &&
-		declaration.Kind == ast.KindFunctionDeclaration &&
-		isAsyncNonGeneratorFunction(declaration)
+	if declaration == nil ||
+		(declaration.Kind != ast.KindFunctionDeclaration &&
+			declaration.Kind != ast.KindFunctionExpression) {
+		return false
+	}
+	return isAsyncNonGeneratorFunction(declaration)
 }
 
 func isAsyncNonGeneratorFunction(node *ast.Node) bool {

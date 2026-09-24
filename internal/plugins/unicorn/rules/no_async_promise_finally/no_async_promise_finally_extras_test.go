@@ -31,6 +31,7 @@ func TestNoAsyncPromiseFinallyExtras(t *testing.T) {
 			valid("const cleanup = object.cleanup; promise.finally(cleanup);"),
 		},
 		[]rule_tester.InvalidTestCase{
+			invalid("const run = async function cleanup() { promise.finally(cleanup); };", "cleanup"),
 			invalidTS("type Callback = () => void; promise.finally((async () => {})!);", "(async () => {})!"),
 			invalidTS("type Callback = () => void; promise.finally(<Callback>(async () => {}));", "<Callback>(async () => {})"),
 			invalidTS("type Callback = () => void; const cleanup = (async () => {}) satisfies Callback; promise.finally(cleanup);", "cleanup"),
@@ -43,10 +44,10 @@ func TestNoAsyncPromiseFinallyExtras(t *testing.T) {
 }
 
 func TestNoAsyncPromiseFinallySourceOnly(t *testing.T) {
-	code := "const method = \"finally\"; const cleanup = async () => {}; promise[method](cleanup); async function declared() {} promise.finally(declared);"
+	code := "const method = \"finally\"; const cleanup = async () => {}; promise[method](cleanup); async function declared() {} promise.finally(declared); const run = async function named() { promise.finally(named); };"
 	diagnostics := lintNoAsyncPromiseFinallySourceOnly(t, code)
-	if len(diagnostics) != 2 {
-		t.Fatalf("project:false diagnostics = %d, want 2: %+v", len(diagnostics), diagnostics)
+	if len(diagnostics) != 3 {
+		t.Fatalf("project:false diagnostics = %d, want 3: %+v", len(diagnostics), diagnostics)
 	}
 	for _, diagnostic := range diagnostics {
 		if diagnostic.Message.Id != "no-async-promise-finally" {
