@@ -3,6 +3,7 @@ package import_plugin
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/consistent_type_specifier_style"
 	default_rule "github.com/web-infra-dev/rslint/internal/plugins/import/rules/default"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/enforce_node_protocol_usage"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/export"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/exports_last"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/first"
@@ -34,6 +35,7 @@ func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		consistent_type_specifier_style.ConsistentTypeSpecifierStyleRule,
 		default_rule.DefaultRule,
+		enforce_node_protocol_usage.EnforceNodeProtocolUsageRule,
 		export.ExportRule,
 		exports_last.ExportsLastRule,
 		first.FirstRule,
