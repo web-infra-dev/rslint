@@ -4,7 +4,7 @@
 
 Ensure every test has either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression. Assertions inside callbacks, loops, and promise handlers may never run, and a test whose assertions are all skipped still passes; declaring the count makes Jest fail it.
 
-The rule also reports `expect.hasAssertions()` called with arguments and `expect.assertions()` called with anything other than a single integer number literal. A declaration that a `beforeEach` or `afterEach` callback makes on every run covers every test of the same `describe` block and its nested blocks: it must be a top-level statement of the callback, outside those same skippable positions, that no earlier `return` or `throw` can skip. Only tests whose callback is a function written at the registration are checked.
+The rule also reports `expect.hasAssertions()` called with arguments and `expect.assertions()` called with anything other than a single integer number literal. A declaration that a `beforeEach` or `afterEach` callback makes on every run covers every test of the same `describe` block and its nested blocks, and a hook registered by a helper function covers the blocks that call the helper: it must be a top-level statement of the callback, outside those same skippable positions, that no earlier `return` or `throw` can skip. Only tests whose callback is a function written at the registration are checked.
 
 Examples of **incorrect** code for this rule:
 

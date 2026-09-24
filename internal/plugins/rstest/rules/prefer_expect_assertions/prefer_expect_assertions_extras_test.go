@@ -67,6 +67,10 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 	logicalInHook := rstestImport + "beforeEach(() => strict && expect.hasAssertions()); test('t', () => {});"
 	returnBeforeHookDeclaration := rstestImport + "beforeEach(() => { if (skip) return; expect.hasAssertions(); }); test('t', () => {});"
 	tryInHook := rstestImport + "beforeEach(() => { try { expect.hasAssertions(); } catch {} }); test('t', () => {});"
+	// A hook written in a helper registers into the suites that call the
+	// helper, not into every suite of the file.
+	helperHook := rstestImport + "function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('A', () => { installAssertions(); test('a', () => {}); });\ndescribe('B', () => { test('b', () => {}); });"
+	helperHookTopLevelTest := rstestImport + "function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('A', () => { installAssertions(); });\ntest('top', () => {});"
 	optionalCallInHook := rstestImport + "beforeEach(() => maybe?.(expect.hasAssertions())); test('t', () => {});"
 	optionalChainInHook := rstestImport + "beforeEach(() => { maybe?.run(expect.hasAssertions()); }); test('t', () => {});"
 	bindingDefaultInHook := rstestImport + "beforeEach(() => { const { x = expect.hasAssertions() } = { x: 1 }; }); test('t', () => {});"
@@ -140,6 +144,17 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 			{Code: rstestImport + "beforeEach(((() => { expect.hasAssertions(); }) as () => void)); test('t', () => {});"},
 			{Code: rstestImport + "beforeEach(() => { const server = start(); expect.hasAssertions(); }); test('t', () => {});"},
 			{Code: rstestImport + "beforeEach(() => void expect.hasAssertions()); test('t', () => {});"},
+			// ---- Hooks registered through functions cover the suites those
+			// functions run in. ----
+			{Code: rstestImport + "describe('A', suiteBody);\nfunction suiteBody() { beforeEach(() => expect.hasAssertions()); test('a', () => {}); }"},
+			{Code: rstestImport + "const suiteBody = () => { test('a', () => {}); };\ndescribe('A', () => { beforeEach(() => expect.hasAssertions()); describe('inner', suiteBody); });"},
+			{Code: rstestImport + "function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('A', () => { installAssertions(); describe('inner', () => { test('a', () => {}); }); });"},
+			{Code: rstestImport + "describe('A', () => { [1].forEach(() => { beforeEach(() => expect.hasAssertions()); }); test('a', () => {}); });"},
+			{Code: rstestImport + "describe('A', () => { (() => { beforeEach(() => expect.hasAssertions()); })(); test('a', () => {}); });"},
+			// Where an exported helper runs is not known, so neither its hooks nor
+			// its tests can be ruled out of coverage.
+			{Code: rstestImport + "export function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('B', () => { test('b', () => {}); });"},
+			{Code: rstestImport + "export function sharedTests() { test('shared', () => {}); }\ndescribe('A', () => { beforeEach(() => expect.hasAssertions()); sharedTests(); });"},
 			{Code: rstestImport + "beforeEach(() => { const x = expect.hasAssertions(); }); test('t', () => {});"},
 
 			// ---- Provenance ----
@@ -190,6 +205,8 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 			invalid(branchInHook, missing(branchInHook, "test('t', () => {})", "test('t', () => {", "expect")),
 			invalid(logicalInHook, missing(logicalInHook, "test('t', () => {})", "test('t', () => {", "expect")),
 			invalid(returnBeforeHookDeclaration, missing(returnBeforeHookDeclaration, "test('t', () => {})", "test('t', () => {", "expect")),
+			invalid(helperHook, missing(helperHook, "test('b', () => {})", "test('b', () => {", "expect")),
+			invalid(helperHookTopLevelTest, missing(helperHookTopLevelTest, "test('top', () => {})", "test('top', () => {", "expect")),
 			invalid(tryInHook, missing(tryInHook, "test('t', () => {})", "test('t', () => {", "expect")),
 			invalid(optionalCallInHook, missing(optionalCallInHook, "test('t', () => {})", "test('t', () => {", "expect")),
 			invalid(optionalChainInHook, missing(optionalChainInHook, "test('t', () => {})", "test('t', () => {", "expect")),

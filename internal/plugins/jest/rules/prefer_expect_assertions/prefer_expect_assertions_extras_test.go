@@ -62,6 +62,9 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 	branchInHook := `afterEach(() => { if (strict) { expect.hasAssertions(); } }); it('t', () => {});`
 	logicalInHook := `beforeEach(() => strict && expect.hasAssertions()); it('t', () => {});`
 	returnBeforeHookDeclaration := `beforeEach(() => { if (skip) return; expect.hasAssertions(); }); it('t', () => {});`
+	// A hook written in a helper registers into the suites that call the
+	// helper, not into every suite of the file.
+	helperHook := "function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('A', () => { installAssertions(); test('a', () => {}); });\ndescribe('B', () => { test('b', () => {}); });"
 	optionalCallInHook := `beforeEach(() => maybe?.(expect.hasAssertions())); it('t', () => {});`
 	bindingDefaultInHook := `afterEach(() => { const { x = expect.hasAssertions() } = { x: 1 }; }); it('t', () => {});`
 	optionalCallFirst := `it('t', () => { maybe?.(expect.hasAssertions()); run(); });`
@@ -101,6 +104,8 @@ it("returns numbers that are greater than five", () => {
 			{Code: `import { beforeEach as setup, expect as check, it } from '@jest/globals'; setup(() => check.hasAssertions()); it('t', () => {});`},
 			{Code: `import { expect as check, it } from '@jest/globals'; beforeEach(check.hasAssertions); it('t', () => {});`},
 			{Code: `beforeEach(() => { const server = start(); expect.hasAssertions(); }); it('t', () => {});`},
+			{Code: "describe('A', suiteBody);\nfunction suiteBody() { afterEach(() => expect.hasAssertions()); it('a', () => {}); }"},
+			{Code: "function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('A', () => { installAssertions(); describe('inner', () => { it('a', () => {}); }); });"},
 
 			// ---- First statement ----
 			{Code: `it('t', function () { 'use strict'; expect.hasAssertions(); });`},
@@ -126,6 +131,7 @@ it("returns numbers that are greater than five", () => {
 			invalid(branchInHook, nil, missing(branchInHook, "it('t', () => {})", "it('t', () => {")),
 			invalid(logicalInHook, nil, missing(logicalInHook, "it('t', () => {})", "it('t', () => {")),
 			invalid(returnBeforeHookDeclaration, nil, missing(returnBeforeHookDeclaration, "it('t', () => {})", "it('t', () => {")),
+			invalid(helperHook, nil, missing(helperHook, "test('b', () => {})", "test('b', () => {")),
 			invalid(optionalCallInHook, nil, missing(optionalCallInHook, "it('t', () => {})", "it('t', () => {")),
 			invalid(bindingDefaultInHook, nil, missing(bindingDefaultInHook, "it('t', () => {})", "it('t', () => {")),
 

@@ -170,11 +170,8 @@ var (
 )
 
 type testEntry struct {
-	call     *ast.Node
-	callback *ast.Node
-	// suite is the innermost describe call the test is registered in, or nil at
-	// file level.
-	suite            *ast.Node
+	call             *ast.Node
+	callback         *ast.Node
 	satisfied        bool
 	hasExpectInLoop  bool
 	hasExpectInCalls bool
@@ -187,7 +184,7 @@ type staticEntry struct {
 
 type namedHook struct {
 	reference *ast.Node
-	suite     *ast.Node
+	call      *ast.Node
 }
 
 // pendingReport keeps diagnostics in source order: argument diagnostics are
@@ -206,24 +203,16 @@ func NewRule(config Config) rule.Rule {
 			runtime := config.Prepare(ctx)
 
 			var (
-				suiteStack    []*ast.Node
-				enteredSuites = map[*ast.Node]bool{}
-				suiteParents  = map[*ast.Node]*ast.Node{}
 				tests         []*testEntry
 				testCallbacks = map[*ast.Node]*testEntry{}
+				// hookCallbacks maps a hook callback to the hook calls that
+				// register it.
 				hookCallbacks = map[*ast.Node][]*ast.Node{}
 				namedHooks    []namedHook
-				coveredSuites = map[*ast.Node]bool{}
-				fileCovered   bool
+				// coveringHooks are hook calls that declare assertions for every
+				// test they run before.
+				coveringHooks []*ast.Node
 				staticCalls   []staticEntry
-				currentSuite  = func() *ast.Node { return lastOrNil(suiteStack) }
-				coverSuite    = func(suite *ast.Node) {
-					if suite == nil {
-						fileCovered = true
-						return
-					}
-					coveredSuites[suite] = true
-				}
 			)
 
 			recordExpect := func(node *ast.Node) {
@@ -247,7 +236,7 @@ func NewRule(config Config) rule.Rule {
 			finish := func() {
 				for _, hook := range namedHooks {
 					if function := resolveLocalFunction(ctx, hook.reference); function != nil {
-						hookCallbacks[function] = append(hookCallbacks[function], hook.suite)
+						hookCallbacks[function] = append(hookCallbacks[function], hook.call)
 					}
 				}
 
@@ -258,25 +247,58 @@ func NewRule(config Config) rule.Rule {
 							continue
 						}
 						test.satisfied = true
-					} else if suites, ok := hookCallbacks[entry.owner]; ok {
+					} else if hookCalls, ok := hookCallbacks[entry.owner]; ok {
 						if !runsOnEveryHookCall(entry.static.Call, entry.owner) {
 							continue
 						}
-						for _, suite := range suites {
-							coverSuite(suite)
-						}
+						coveringHooks = append(coveringHooks, hookCalls...)
 					} else {
 						continue
 					}
 					reports = append(reports, checkStaticCall(&ctx, entry.static, opts)...)
 				}
 
-				isCovered := func(suite *ast.Node) bool {
-					if fileCovered {
+				resolver := newSuiteResolver(ctx, func(call *ast.Node) bool {
+					return runtime.Classify(call).Kind == RegistrationDescribe
+				})
+				covered := map[*ast.Node]bool{}
+				for _, hook := range coveringHooks {
+					for _, suite := range resolver.suitesOf(enclosingFunction(hook)) {
+						covered[suite] = true
+					}
+				}
+				// A suite is covered by a hook of its own or of any suite it is
+				// nested in. An unknown suite could be any of them.
+				suiteCovered := map[*ast.Node]bool{}
+				var isSuiteCovered func(suite *ast.Node) bool
+				isSuiteCovered = func(suite *ast.Node) bool {
+					if suite == unknownSuite {
+						return len(covered) > 0
+					}
+					if covered[suite] {
 						return true
 					}
-					for ; suite != nil; suite = suiteParents[suite] {
-						if coveredSuites[suite] {
+					if suite == nil {
+						return false
+					}
+					if result, ok := suiteCovered[suite]; ok {
+						return result
+					}
+					suiteCovered[suite] = false
+					for _, parent := range resolver.parentSuites(suite) {
+						if isSuiteCovered(parent) {
+							suiteCovered[suite] = true
+							return true
+						}
+					}
+					return false
+				}
+				isCovered := func(test *testEntry) bool {
+					if covered[unknownSuite] {
+						return true
+					}
+					for _, suite := range resolver.suitesOf(enclosingFunction(test.call)) {
+						if isSuiteCovered(suite) {
 							return true
 						}
 					}
@@ -284,7 +306,7 @@ func NewRule(config Config) rule.Rule {
 				}
 
 				for _, test := range tests {
-					if test.satisfied || isCovered(test.suite) || !shouldCheck(test, opts) {
+					if test.satisfied || isCovered(test) || !shouldCheck(test, opts) {
 						continue
 					}
 					reports = append(reports, reportMissingAssertions(&ctx, runtime, test, opts))
@@ -301,15 +323,12 @@ func NewRule(config Config) rule.Rule {
 					registration := runtime.Classify(node)
 					switch registration.Kind {
 					case RegistrationDescribe:
-						suiteParents[node] = currentSuite()
-						suiteStack = append(suiteStack, node)
-						enteredSuites[node] = true
 						return
 					case RegistrationTest:
 						if registration.Callback == nil {
 							return
 						}
-						entry := &testEntry{call: node, callback: registration.Callback, suite: currentSuite()}
+						entry := &testEntry{call: node, callback: registration.Callback}
 						tests = append(tests, entry)
 						testCallbacks[registration.Callback] = entry
 						return
@@ -317,16 +336,15 @@ func NewRule(config Config) rule.Rule {
 						if !slices.Contains(config.CoveringHooks, registration.HookName) || registration.Callback == nil {
 							return
 						}
-						suite := currentSuite()
 						// Type assertions do not change what the hook runs.
 						callback := utils.SkipAssertionsAndParens(registration.Callback)
 						switch {
 						case ast.IsFunctionExpressionOrArrowFunction(callback):
-							hookCallbacks[callback] = append(hookCallbacks[callback], suite)
+							hookCallbacks[callback] = append(hookCallbacks[callback], node)
 						case callback.Kind == ast.KindIdentifier:
-							namedHooks = append(namedHooks, namedHook{reference: callback, suite: suite})
+							namedHooks = append(namedHooks, namedHook{reference: callback, call: node})
 						case runtime.IsHasAssertionsReference != nil && runtime.IsHasAssertionsReference(callback):
-							coverSuite(suite)
+							coveringHooks = append(coveringHooks, node)
 						}
 						return
 					}
@@ -340,26 +358,12 @@ func NewRule(config Config) rule.Rule {
 						recordExpect(node)
 					}
 				},
-				rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
-					if !enteredSuites[node] {
-						return
-					}
-					delete(enteredSuites, node)
-					suiteStack = suiteStack[:len(suiteStack)-1]
-				},
 				rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
 					finish()
 				},
 			}
 		},
 	}
-}
-
-func lastOrNil(nodes []*ast.Node) *ast.Node {
-	if len(nodes) == 0 {
-		return nil
-	}
-	return nodes[len(nodes)-1]
 }
 
 // shouldCheck applies the only* options. They are alternatives: a test is
