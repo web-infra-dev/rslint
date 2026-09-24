@@ -30,7 +30,7 @@ jobs:
     outputs:
       changed: ${{ steps.changes.outputs.changed }}
       go-mode: ${{ steps.changes.outputs.go-mode }}
-      go-changed-packages: ${{ steps.changes.outputs.go-changed-packages }}
+      go-changed-files: ${{ steps.changes.outputs.go-changed-files }}
     steps:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -70,7 +70,7 @@ jobs:
         with:
           go-version: '1.27.0'
           mode: ${{ needs.changes.outputs.go-mode }}
-          changed-packages: ${{ needs.changes.outputs.go-changed-packages }}
+          changed-files: ${{ needs.changes.outputs.go-changed-files }}
 
   lint:
     name: Lint
