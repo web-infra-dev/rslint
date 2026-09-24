@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_default_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_duplicates"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_mutable_exports"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_namespace"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_restricted_paths"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_self_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_unresolved"
@@ -33,6 +34,7 @@ func GetAllRules() []rule.Rule {
 		no_default_export.NoDefaultExportRule,
 		no_duplicates.NoDuplicatesRule,
 		no_mutable_exports.NoMutableExportsRule,
+		no_namespace.NoNamespaceRule,
 		no_restricted_paths.NoRestrictedPathsRule,
 		no_self_import.NoSelfImportRule,
 		no_unresolved.NoUnresolvedRule,
