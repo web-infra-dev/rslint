@@ -4,8 +4,6 @@
 
 Reports a default import whose local name is also a named export of the imported module. This can indicate a missing pair of braces around a named import.
 
-This rule is enabled as a warning in `importPlugin.configs.recommended`.
-
 Given this module:
 
 ```javascript
