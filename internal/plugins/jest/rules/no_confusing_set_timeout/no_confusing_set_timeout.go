@@ -73,12 +73,13 @@ var NoConfusingSetTimeoutRule = rule.Rule{
 	Name:   "jest/no-confusing-set-timeout",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		seenJestTimeout := false
 		shouldEmitOrderSetTimeout := false
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseFnCall(node)
 				if jestFnCall == nil {
 					return
 				}

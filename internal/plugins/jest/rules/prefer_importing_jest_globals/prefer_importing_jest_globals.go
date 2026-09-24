@@ -421,13 +421,14 @@ var PreferImportingJestGlobalsRule = rule.Rule{
 	Name:   "jest/prefer-importing-jest-globals",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		opts := parseOptions(rawOptions)
 		names := newNameSet(4)
 		var reportingNode *ast.Node
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseFnCall(node)
 				if jestFnCall == nil ||
 					jestFnCall.Head.Type == utils.JEST_IMPORT_MODE ||
 					!opts.allows(jestFnCall.Kind) {
