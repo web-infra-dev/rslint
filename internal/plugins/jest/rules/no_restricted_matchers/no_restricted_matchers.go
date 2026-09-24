@@ -11,10 +11,11 @@ var NoRestrictedMatchersRule = shared.NewRule(shared.Config{
 	Name:      "jest/no-restricted-matchers",
 	Modifiers: jestUtils.EXPECT_MODIFIER_NAMES,
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			Parse: func(node *ast.Node) *shared.ExpectChain {
-				parsed := jestUtils.ParseJestFnCall(node, ctx)
-				if parsed == nil || parsed.Kind != jestUtils.JestFnTypeExpect {
+				parsed := analysis.ParseExpectCall(node)
+				if parsed == nil {
 					return nil
 				}
 				return &shared.ExpectChain{Names: parsed.Members, Entries: parsed.MemberEntries}

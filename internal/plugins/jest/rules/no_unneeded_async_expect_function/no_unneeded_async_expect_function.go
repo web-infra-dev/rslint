@@ -17,10 +17,10 @@ func hasPromiseExpectModifier(jestFnCall *jestUtils.ParsedJestFnCall) bool {
 var NoUnneededAsyncExpectFunctionRule = shared.NewRule(shared.Config{
 	Name: "jest/no-unneeded-async-expect-function",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{ParseExpect: func(node *ast.Node) *ast.Node {
-			jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
+			jestFnCall := analysis.ParseExpectCall(node)
 			if jestFnCall == nil ||
-				jestFnCall.Kind != jestUtils.JestFnTypeExpect ||
 				!hasPromiseExpectModifier(jestFnCall) {
 				return nil
 			}
