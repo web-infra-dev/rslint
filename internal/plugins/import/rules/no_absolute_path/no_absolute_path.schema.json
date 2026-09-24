@@ -10,7 +10,7 @@
         "ignore": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string" },
+          "items": { "type": "string", "format": "regex" },
           "uniqueItems": true
         }
       },

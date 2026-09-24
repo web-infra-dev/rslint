@@ -379,6 +379,164 @@ func TestNoAbsolutePathExtras(t *testing.T) {
 		})
 }
 
+func TestNoAbsolutePathIgnoreUTF16(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.allow-js.json", t, &NoAbsolutePathRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:     "import \"/foo/bar/\\ud800\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"\\ud800$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/\\udc00\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"\\udc00$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/�\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"�$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/\\ud800\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"^/foo/bar/.$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"^/foo/bar/..$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"😀$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"\\ud83d\\ude00$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"\\😀$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/\\\\😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"\\\\😀$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/\\\\😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"\\\\\\😀$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"^/foo/bar/[😀]{2}$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"^/foo/bar/😀+$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀\\ude00\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"^/foo/bar/😀+$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀\\ud800\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"😀\\ud800$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/\\ud800😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"\\ud800😀$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"(?<name>😀)\\k<name>$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"(?<𐐀>😀)\\k<𐐀>$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"(😀)\\1$"}}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"^/foo/bar/[A-😀]{2}$"}}},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:     "import \"/foo/bar/\\ud800\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"�$"}}},
+				Output:   []string{"import \"./\\ud800\";"},
+				Errors:   []rule_tester.InvalidTestCaseError{{Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 25}},
+			},
+			{
+				Code:     "import \"/foo/bar/�\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"\\ud800$"}}},
+				Output:   []string{"import \"./�\";"},
+				Errors:   []rule_tester.InvalidTestCaseError{{Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 20}},
+			},
+			{
+				Code:     "import \"/foo/bar/\\ud800\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"[^\\ud800]$"}}},
+				Output:   []string{"import \"./\\ud800\";"},
+				Errors:   []rule_tester.InvalidTestCaseError{{Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 25}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"^/foo/bar/.$"}}},
+				Output:   []string{"import \"./😀\";"},
+				Errors:   []rule_tester.InvalidTestCaseError{{Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 21}},
+			},
+			{
+				Code:     "import \"/foo/bar/😀\";",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{"^/foo/bar/[😀]$"}}},
+				Output:   []string{"import \"./😀\";"},
+				Errors:   []rule_tester.InvalidTestCaseError{{Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 21}},
+			},
+		})
+}
+
+func TestNoAbsolutePathIgnoreSchema(t *testing.T) {
+	for _, pattern := range []string{"[", "(", "*"} {
+		if err := NoAbsolutePathRule.Schema.Validate([]any{map[string]any{"ignore": []any{pattern}}}); err == nil {
+			t.Errorf("invalid ignore pattern %q must fail schema validation", pattern)
+		}
+	}
+	for _, pattern := range []string{`(?<=/)foo$`, `(foo)/\1$`, `\ud800$`, "😀$"} {
+		if err := NoAbsolutePathRule.Schema.Validate([]any{map[string]any{"ignore": []any{pattern}}}); err != nil {
+			t.Errorf("valid JavaScript ignore pattern %q: %v", pattern, err)
+		}
+	}
+	// Documented limitation: spell this range using explicit UTF-16 escapes.
+	if err := NoAbsolutePathRule.Schema.Validate([]any{map[string]any{"ignore": []any{`[😀-\uFFFF]`}}}); err == nil {
+		t.Fatal("expected unsupported supplementary character range to fail validation")
+	}
+	if err := NoAbsolutePathRule.Schema.Validate([]any{map[string]any{"ignore": []any{`[\ud83d\ude00-\uFFFF]`}}}); err != nil {
+		t.Fatalf("explicit surrogate escapes must remain supported: %v", err)
+	}
+}
+
 func TestNoAbsolutePathEditDemand(t *testing.T) {
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/foo/bar/index.js", Path: "/foo/bar/index.js"}, `import value from "/foo/bar/.\ud800";`, core.ScriptKindJS)
 	r := &NoAbsolutePathRule

@@ -64,6 +64,9 @@ least one pattern, without duplicate entries.
   example, importing `/project/.hidden.js` from `/project/index.js` becomes
   `"./.hidden.js"`. Upstream produces `".hidden.js"`, which module loaders can
   interpret as a package name and fail to load.
+- Some `ignore` character ranges containing emoji are rejected. For example,
+  use `"[\\ud83d\\ude00-\\uFFFF]"` instead of `"[😀-\\uFFFF]"`; upstream accepts
+  both with the same matching behavior.
 
 ## Original Documentation
 

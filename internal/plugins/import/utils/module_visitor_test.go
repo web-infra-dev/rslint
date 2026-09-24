@@ -46,10 +46,15 @@ obj.define(["member"], cb);
 }
 
 func TestVisitModulesInvalidIgnore(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("invalid regex must fail instead of silently removing the filter")
-		}
-	}()
-	import_utils.VisitModules(func(_, _ *ast.Node) {}, import_utils.VisitModulesOptions{Ignore: []string{"["}})
+	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/visitor.ts", Path: "/visitor.ts"}, `import "ignored"; import "visited";`, core.ScriptKindTS)
+	var sources []string
+	listeners := import_utils.VisitModules(func(source, _ *ast.Node) {
+		sources = append(sources, source.Text())
+	}, import_utils.VisitModulesOptions{ESModule: true, Ignore: []string{"[", "^ignored$"}})
+	for _, statement := range file.Statements.Nodes {
+		listeners[statement.Kind](statement)
+	}
+	if want := []string{"visited"}; !reflect.DeepEqual(sources, want) {
+		t.Fatalf("sources = %v, want %v", sources, want)
+	}
 }
