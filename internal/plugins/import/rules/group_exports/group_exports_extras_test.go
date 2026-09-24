@@ -7,9 +7,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// Expected messages and ranges were checked against eslint-plugin-import v2.32.0
-// with @typescript-eslint/parser 8.65.0. These cases cover AST adaptation and
-// reachable branches beyond the upstream suite.
+// Cases cover AST adaptation, additional branches, and documented corrections
+// to eslint-plugin-import v2.32.0. Diagnostic ranges follow
+// @typescript-eslint/parser 8.65.0.
 func TestGroupExportsExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.allow-js.json", t, &GroupExportsRule,
 		[]rule_tester.ValidTestCase{
@@ -30,16 +30,86 @@ for ({a: exports.a = 1, b: exports.b = 2} in source) {}`},
 			{Code: "export {a} from \"./m\"; export {b} from \"./m.js\"; export {c} from \"m\";"},
 			// An empty source is distinct from a local export.
 			{Code: "const a = 1; export {a}; export {b} from \"\";"},
-			// Literal and asserted module properties do not have the identifier name exports.
-			{Code: "module[\"exports\"] = {}; module[`exports`] = {}; module[exports as string] = {}; module.exports.deep.x = 1; exports.deep.x = 2; module.exports = {};"},
+			// Dynamic module properties and deeper mutations are not export assignments.
+			{Code: "const exports = \"state\"; module[exports].a = 1; module[(exports)].b = 2; module[exports as string] = {}; module.exports.deep.x = 1; exports.deep.x = 2; module.exports = {};"},
 			// Assertions and non-null expressions on the whole target are not member expressions.
 			{Code: "(module.exports as object) = {}; module.exports! = {}; exports.x = 1;"},
-			// Upstream does not enumerate sources named __proto__.
-			{Code: "export {a} from \"__proto__\"; export {b} from \"__proto__\"; export type {A} from \"__proto__\"; export type {B} from \"__proto__\";"},
+			// Unrelated namespace bodies cannot consolidate their exports.
+			{Code: "namespace A { export const a = 1 } namespace B { export const b = 2 }"},
+			{Code: `export namespace A.B { export const a = 1; }
+namespace C { export const b = 2; }`},
+			// Separate declarations of the same namespace also have separate bodies.
+			{Code: "namespace A { export const a = 1; } namespace A { export const b = 2; }"},
+			// Local values/types and re-exports all respect their containing module body.
+			{Code: `declare module "a" { export {a} from "m"; export type {A} from "m"; }
+declare module "b" { export {b} from "m"; export type {B} from "m"; }
+export {c} from "m"; export type {C} from "m";`},
+			{Code: `namespace A { export const a = 1; export type T = string; }
+namespace B { export const b = 2; export type U = string; }
+export const top = 3; export type V = string;`},
+			// Private members are not public CommonJS exports, at either level.
+			{Code: "class C { #exports; #x; m(module, exports) { module.#exports = {}; module.#exports.a = 1; exports.#x = 2; module.exports.#x = 3; module.exports = {}; } }"},
+			// Calls and optional-chain receivers cannot supply a CommonJS root.
+			{Code: `getBox().exports.a = 1; getBox().exports.b = 2;
+factory().module.exports = {};
+factory().exports.x = 1;
+(factory?.()).exports.y = 2;
+(obj?.value).exports.z = 3;`},
+			// Authored TypeScript wrappers do not create partial CommonJS chains.
+			{Code: `(module as M).exports = {};
+(module as M).exports.x = 1;
+module[exports as string].x = 2;
+exports.y = 3;`},
 			// An export type and an inline type specifier belong to different groups.
 			{Code: "type A = string; type B = number; export type {A}; export {type B};"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// __proto__ is an ordinary source name for both value and type re-exports.
+			{Code: `export {a} from "__proto__";
+export {b} from "__proto__";
+export type {A} from "__proto__";
+export type {B} from "__proto__";`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: namedMessage, Line: 1, Column: 1, EndLine: 1, EndColumn: 29},
+					{MessageId: "", Message: namedMessage, Line: 2, Column: 1, EndLine: 2, EndColumn: 29},
+					{MessageId: "", Message: namedMessage, Line: 3, Column: 1, EndLine: 3, EndColumn: 34},
+					{MessageId: "", Message: namedMessage, Line: 4, Column: 1, EndLine: 4, EndColumn: 34},
+				}},
+			// Exports in one namespace still group together, separately from its declaration.
+			{Code: `export namespace A.B {
+  export const a = 1;
+  export const b = 2;
+}
+export const outside = 0;
+namespace C { export const c = 3; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: namedMessage, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+					{MessageId: "", Message: namedMessage, Line: 2, Column: 3, EndLine: 2, EndColumn: 22},
+					{MessageId: "", Message: namedMessage, Line: 3, Column: 3, EndLine: 3, EndColumn: 22},
+					{MessageId: "", Message: namedMessage, Line: 5, Column: 1, EndLine: 5, EndColumn: 26},
+				}},
+			// Value and type re-exports group by source within their module body.
+			{Code: `declare module "a" {
+  export {a} from "m";
+  export {b} from "m";
+  export type {A} from "m";
+  export type {B} from "m";
+}
+declare module "b" { export {c} from "m"; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: namedMessage, Line: 2, Column: 3, EndLine: 2, EndColumn: 23},
+					{MessageId: "", Message: namedMessage, Line: 3, Column: 3, EndLine: 3, EndColumn: 23},
+					{MessageId: "", Message: namedMessage, Line: 4, Column: 3, EndLine: 4, EndColumn: 28},
+					{MessageId: "", Message: namedMessage, Line: 5, Column: 3, EndLine: 5, EndColumn: 28},
+				}},
+			// Literal exports access is CommonJS; the exported member can be computed.
+			{Code: "module[\"exports\"] = {};\nmodule[(`exports`)].one = 1;\nexports[key] = 2;\nmodule.exports[other] = 3;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 1, EndLine: 1, EndColumn: 23},
+					{MessageId: "", Message: commonJSMessage, Line: 2, Column: 1, EndLine: 2, EndColumn: 28},
+					{MessageId: "", Message: commonJSMessage, Line: 3, Column: 1, EndLine: 3, EndColumn: 17},
+					{MessageId: "", Message: commonJSMessage, Line: 4, Column: 1, EndLine: 4, EndColumn: 26},
+				}},
 			// Computed keys and default-value expressions still contain real assignments.
 			{Code: "({ [exports.key = 1]: exports.x = (exports.y = 2) } = source);",
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -116,14 +186,6 @@ export const value = 1;`,
 					{MessageId: "", Message: namedMessage, Line: 1, Column: 1, EndLine: 1, EndColumn: 32},
 					{MessageId: "", Message: namedMessage, Line: 2, Column: 1, EndLine: 2, EndColumn: 24},
 				}},
-			// Named declarations in namespaces are grouped across the entire file, as upstream.
-			{Code: `export namespace A.B { export const a = 1; }
-namespace C { export const b = 2; }`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "", Message: namedMessage, Line: 1, Column: 1, EndLine: 1, EndColumn: 45},
-					{MessageId: "", Message: namedMessage, Line: 1, Column: 24, EndLine: 1, EndColumn: 43},
-					{MessageId: "", Message: namedMessage, Line: 2, Column: 15, EndLine: 2, EndColumn: 34},
-				}},
 			// Named default aliases, string export names, and empty exports are named declarations.
 			{Code: "const value = 1; export {value as default}; export {value as \"other\"}; export {};",
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -180,13 +242,6 @@ export {b} from "m" with {type: "json"};`,
 					{MessageId: "", Message: namedMessage, Line: 1, Column: 1, EndLine: 1, EndColumn: 41},
 					{MessageId: "", Message: namedMessage, Line: 2, Column: 1, EndLine: 2, EndColumn: 41},
 				}},
-			// Computed identifiers and private names follow upstream property.name checks.
-			{Code: "class C { #exports; m(module) { module.#exports = {}; module[exports].a = 1; exports[\"b\"] = 2; } }",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 33, EndLine: 1, EndColumn: 53},
-					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 55, EndLine: 1, EndColumn: 76},
-					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 78, EndLine: 1, EndColumn: 94},
-				}},
 			// Parentheses are transparent; report the complete assignment, not its statement.
 			{Code: `(module.exports) = {};
 ((module).exports).one = ((1));
@@ -221,26 +276,6 @@ function second(exports) { exports.x = 1; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 26, EndLine: 1, EndColumn: 45},
 					{MessageId: "", Message: commonJSMessage, Line: 2, Column: 28, EndLine: 2, EndColumn: 41},
-				}},
-			// Upstream also accepts partial chains rooted in calls or optional chains.
-			{Code: `factory().module.exports = {};
-factory().exports.x = 1;
-(factory?.()).exports.y = 2;
-(obj?.value).exports.z = 3;`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
-					{MessageId: "", Message: commonJSMessage, Line: 2, Column: 1, EndLine: 2, EndColumn: 24},
-					{MessageId: "", Message: commonJSMessage, Line: 3, Column: 1, EndLine: 3, EndColumn: 28},
-					{MessageId: "", Message: commonJSMessage, Line: 4, Column: 1, EndLine: 4, EndColumn: 27},
-				}},
-			// A TypeScript wrapper ends the accessor chain rather than unwrapping its expression.
-			{Code: `(module as M).exports = {};
-(module as M).exports.x = 1;
-module[exports as string].x = 2;
-exports.y = 3;`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "", Message: commonJSMessage, Line: 2, Column: 1, EndLine: 2, EndColumn: 28},
-					{MessageId: "", Message: commonJSMessage, Line: 4, Column: 1, EndLine: 4, EndColumn: 14},
 				}},
 			// Assignments inside JSX expressions count; JSX tag names and attributes do not.
 			{Code: "const view = <exports.Component prop={exports.a = 1}>{module.exports.b = 2}</exports.Component>;", Tsx: true,

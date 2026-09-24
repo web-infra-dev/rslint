@@ -12,6 +12,7 @@ var GroupExportsRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		type group struct {
+			container *ast.Node
 			source    string
 			hasSource bool
 			typeOnly  bool
@@ -24,6 +25,11 @@ var GroupExportsRule = rule.Rule{
 		counts := make(map[group]int)
 		var exports []entry
 		collect := func(node *ast.Node, key group) {
+			if !key.commonJS {
+				// Unlike upstream, keep each namespace/module body independent.
+				// A nil container represents this source file's top-level exports.
+				key.container = ast.FindAncestorKind(node.Parent, ast.KindModuleBlock)
+			}
 			counts[key]++
 			exports = append(exports, entry{node, key})
 		}
@@ -60,11 +66,7 @@ var GroupExportsRule = rule.Rule{
 				if declaration.ModuleSpecifier != nil {
 					key.hasSource = true
 					key.source = declaration.ModuleSpecifier.Text()
-					// Upstream stores sources in an ordinary object; __proto__ is
-					// never an enumerable own property and is not reported.
-					if key.source == "__proto__" {
-						return
-					}
+					// All source names, including __proto__, are ordinary map keys.
 				}
 				collect(node, key)
 			},
@@ -104,35 +106,23 @@ var GroupExportsRule = rule.Rule{
 }
 
 func isCommonJSExport(node *ast.Node) bool {
-	// Collect property names from right to left, matching upstream's .name
-	// checks even for computed identifiers and partial accessor chains.
-	chain := make([]string, 0, 4)
-	for node = utils.ESTreeRuntimeExpression(node); node != nil && !ast.IsOptionalChain(node); {
-		object, property := utils.MemberExpressionParts(node)
-		if object == nil {
-			break
-		}
-		// Only two or three names can match; one final root identifier may follow.
-		if len(chain) == 3 {
-			return false
-		}
-		name := ""
-		property = utils.ESTreeRuntimeExpression(property)
-		switch property.Kind {
-		case ast.KindIdentifier:
-			name = property.Text()
-		case ast.KindPrivateIdentifier:
-			name = property.Text()[1:]
-		}
-		chain = append(chain, name)
-		object = utils.ESTreeRuntimeExpression(object)
-		if object.Kind == ast.KindIdentifier {
-			chain = append(chain, object.Text())
-			break
-		}
-		node = object
+	node = utils.ESTreeRuntimeExpression(node)
+	object, property := utils.MemberExpressionParts(node)
+	if object == nil || property == nil || ast.IsOptionalChain(node) || property.Kind == ast.KindPrivateIdentifier {
+		return false
 	}
-	length := len(chain)
-	return (length == 2 || length == 3) && chain[length-1] == "module" && chain[length-2] == "exports" ||
-		length == 2 && chain[1] == "exports"
+	object = utils.ESTreeRuntimeExpression(object)
+	// Require a complete public access rooted in an identifier, rather than
+	// upstream's property-name suffix matching on arbitrary receivers.
+	return ast.IsExportsIdentifier(object) || isModuleExports(node) || isModuleExports(object)
+}
+
+func isModuleExports(node *ast.Node) bool {
+	if !ast.IsAccessExpression(node) || ast.IsOptionalChain(node) ||
+		!ast.IsModuleIdentifier(utils.ESTreeRuntimeExpression(node.Expression())) {
+		return false
+	}
+	// tsgo distinguishes static property names from dynamic and private ones.
+	name := ast.GetElementOrPropertyAccessName(node)
+	return name != nil && name.Text() == "exports"
 }
