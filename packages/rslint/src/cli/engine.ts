@@ -3,11 +3,8 @@
  *
  * Spawns the Go binary (which defaults to runCLI / IPC mode), drives the
  * `init` handshake, forwards the Go child's `output` frames to stdout, and
- * acks `shutdown`. The Go child does all the linting; this host just owns the
- * pipe and the protocol.
- *
- * This is the comm host for native lint — it owns the pipe and the protocol
- * while the Go child does all the linting.
+ * acks `shutdown`. Go owns native linting and configuration planning; this
+ * engine also routes reverse plugin-lint requests through a PluginLintHost.
  *
  * Exit codes propagate from the Go child (or 2 on a host-level failure).
  */
@@ -368,7 +365,9 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       if (pluginConfigs.length === 0 || shuttingDown) return null;
       let createPluginLintHost = opts.createPluginLintHost;
       if (!createPluginLintHost) {
-        const pluginEntry: string = './eslint-plugin/index.js';
+        // Resolve the standalone host beside the built CLI chunks. Importing
+        // the public index would also load the worker's lint runtime here.
+        const pluginEntry: string = './eslint-plugin/host.js';
         const mod: unknown = await import(
           /* webpackIgnore: true */ pluginEntry
         );
