@@ -19,13 +19,13 @@ func TestMaxDependenciesExtras(t *testing.T) {
 				Code:    "import \"dep0\";\nimport \"dep1\";\nimport \"dep2\";\nimport \"dep3\";\nimport \"dep4\";\nimport \"dep5\";\nimport \"dep6\";\nimport \"dep7\";\nimport \"dep8\";\nimport \"dep9\";",
 				Options: []any{map[string]any{"max": 10, "ignoreTypeImports": false}},
 			},
-			// An explicit object without max disables the check upstream.
+			// Keep the documented default when max is omitted from an options object.
 			{
-				Code:    "import \"dep0\";\nimport \"dep1\";\nimport \"dep2\";\nimport \"dep3\";\nimport \"dep4\";\nimport \"dep5\";\nimport \"dep6\";\nimport \"dep7\";\nimport \"dep8\";\nimport \"dep9\";\nimport \"dep10\";",
+				Code:    "import \"dep0\";\nimport \"dep1\";\nimport \"dep2\";\nimport \"dep3\";\nimport \"dep4\";\nimport \"dep5\";\nimport \"dep6\";\nimport \"dep7\";\nimport \"dep8\";\nimport \"dep9\";",
 				Options: []any{map[string]any{}},
 			},
 			{
-				Code:    "import \"dep0\";\nimport \"dep1\";\nimport \"dep2\";\nimport \"dep3\";\nimport \"dep4\";\nimport \"dep5\";\nimport \"dep6\";\nimport \"dep7\";\nimport \"dep8\";\nimport \"dep9\";\nimport \"dep10\";",
+				Code:    "import \"dep0\";\nimport \"dep1\";\nimport \"dep2\";\nimport \"dep3\";\nimport \"dep4\";\nimport \"dep5\";\nimport \"dep6\";\nimport \"dep7\";\nimport \"dep8\";\nimport \"dep9\";\nimport type T from \"types\";",
 				Options: []any{map[string]any{"ignoreTypeImports": true}},
 			},
 			{
@@ -95,6 +95,21 @@ func TestMaxDependenciesExtras(t *testing.T) {
 			{
 				Code:   "import \"dep0\";\nimport \"dep1\";\nimport \"dep2\";\nimport \"dep3\";\nimport \"dep4\";\nimport \"dep5\";\nimport \"dep6\";\nimport \"dep7\";\nimport \"dep8\";\nimport \"dep9\";\nimport \"dep10\";",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "", Message: "Maximum number of dependencies (10) exceeded.", Line: 11, Column: 8, EndLine: 11, EndColumn: 15}},
+			},
+			{
+				Code:    "import \"dep0\";\nimport \"dep1\";\nimport \"dep2\";\nimport \"dep3\";\nimport \"dep4\";\nimport \"dep5\";\nimport \"dep6\";\nimport \"dep7\";\nimport \"dep8\";\nimport \"dep9\";\nimport \"dep10\";",
+				Options: []any{map[string]any{}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "", Message: "Maximum number of dependencies (10) exceeded.", Line: 11, Column: 8, EndLine: 11, EndColumn: 15}},
+			},
+			{
+				Code:    "import \"dep0\";\nimport \"dep1\";\nimport \"dep2\";\nimport \"dep3\";\nimport \"dep4\";\nimport \"dep5\";\nimport \"dep6\";\nimport \"dep7\";\nimport \"dep8\";\nimport \"dep9\";\nimport \"dep10\";",
+				Options: []any{map[string]any{"ignoreTypeImports": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "", Message: "Maximum number of dependencies (10) exceeded.", Line: 11, Column: 8, EndLine: 11, EndColumn: 15}},
+			},
+			{
+				Code:    "import \"dep0\";\nimport \"dep1\";\nimport \"dep2\";\nimport \"dep3\";\nimport \"dep4\";\nimport \"dep5\";\nimport \"dep6\";\nimport \"dep7\";\nimport \"dep8\";\nimport \"dep9\";\nimport type T from \"types\";",
+				Options: []any{map[string]any{"ignoreTypeImports": false}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "", Message: "Maximum number of dependencies (10) exceeded.", Line: 11, Column: 20, EndLine: 11, EndColumn: 27}},
 			},
 			{
 				Code:    "require(\"a\");",

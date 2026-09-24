@@ -35,9 +35,8 @@ types (`type T = import('module').T`) do not count either.
 
 ### `max`
 
-The maximum number of distinct dependencies. With no options, the limit is `10`.
-Like eslint-plugin-import 2.32.0, passing an options object without `max` disables
-the check. Specify `max` when configuring `ignoreTypeImports`.
+The maximum number of distinct dependencies. Defaults to `10` when omitted,
+including when only `ignoreTypeImports` is configured.
 
 ### `ignoreTypeImports`
 
@@ -54,6 +53,10 @@ import type c from './c';
 ```
 
 ## Differences from upstream
+
+With `{}` or `{ "ignoreTypeImports": true }`, rslint enforces the default limit
+of `10`. eslint-plugin-import 2.32.0 disables the check when an options object
+does not specify `max`.
 
 Setting `{ "max": -1 }` for a file containing only `export const value = 1;`
 makes eslint-plugin-import stop with an error. rslint reports no problem for

@@ -21,12 +21,7 @@ var MaxDependenciesRule = rule.Rule{
 		ignoreTypeImports := false
 		if len(options) > 0 {
 			if option, ok := options[0].(map[string]any); ok {
-				// Upstream only defaults max when the entire option is omitted.
-				value, hasMax := option["max"]
-				if !hasMax {
-					return nil
-				}
-				switch value := value.(type) {
+				switch value := option["max"].(type) {
 				case float64:
 					limit = value
 				case int:
