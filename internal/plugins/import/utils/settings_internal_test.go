@@ -1,6 +1,9 @@
 package utils
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 // TestModuleSettingsKeySeparatesListElements locks in that the cache key keeps
 // list boundaries: two ignore lists whose elements merely concatenate alike
@@ -61,5 +64,28 @@ func TestModuleSettingsKeySeparatesDefaultAndExplicitEmptyFolders(t *testing.T) 
 	}
 	if emptyStringsKey != emptyInterfacesKey {
 		t.Fatal("equivalent typed empty folder lists produced different cache keys")
+	}
+}
+
+func TestFileExtensions(t *testing.T) {
+	for _, tc := range []struct {
+		settings map[string]any
+		want     []string
+	}{
+		{nil, []string{".js", ".mjs", ".cjs"}},
+		{map[string]any{"import/extensions": []any{}}, nil},
+		{map[string]any{"import/extensions": []any{".js", ".ts", ".js"}}, []string{".js", ".ts"}},
+		{map[string]any{"import/extensions": []any{".tsx"}, "import/parsers": map[string]any{"typescript": []any{".ts", ".tsx"}}}, []string{".tsx", ".ts"}},
+	} {
+		if got := FileExtensions(tc.settings); !slices.Equal(got, tc.want) {
+			t.Fatalf("FileExtensions(%v) = %v, want %v", tc.settings, got, tc.want)
+		}
+	}
+	extensions := make([]string, 1, 2)
+	extensions[0] = ".js"
+	settings := map[string]any{"import/extensions": extensions, "import/parsers": map[string]any{"typescript": []string{".ts"}}}
+	FileExtensions(settings)
+	if extensions[:2][1] != "" {
+		t.Fatal("extension settings were mutated")
 	}
 }

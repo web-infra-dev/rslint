@@ -7,68 +7,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	sharedPreferSpyOn "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_spy_on"
 )
 
 func buildUseJestSpyOnMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "useJestSpyOn",
 		Description: "Use jest.spyOn() instead",
-	}
-}
-
-func findNodeObject(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-
-	if jestUtils.IsMemberAccessNode(node) {
-		return rslintUtils.AccessExpressionObject(node)
-	}
-
-	if node.Kind == ast.KindCallExpression {
-		callee := ast.SkipParentheses(node.AsCallExpression().Expression)
-		if jestUtils.IsMemberAccessNode(callee) {
-			return rslintUtils.AccessExpressionObject(callee)
-		}
-	}
-
-	return nil
-}
-
-func getJestFnCall(node *ast.Node) *ast.Node {
-	node = ast.SkipParentheses(node)
-	if node == nil {
-		return nil
-	}
-
-	if node.Kind != ast.KindCallExpression && !jestUtils.IsMemberAccessNode(node) {
-		return nil
-	}
-
-	obj := findNodeObject(node)
-	if obj == nil {
-		return nil
-	}
-
-	if obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "jest" {
-		if node.Kind == ast.KindCallExpression &&
-			testFramework.CalleeChainName(node.AsCallExpression().Expression) == "jest.fn" {
-			return node
-		}
-		return nil
-	}
-
-	return getJestFnCall(obj)
-}
-
-func accessExpressionPropertyNode(left *ast.Node) *ast.Node {
-	switch left.Kind {
-	case ast.KindPropertyAccessExpression:
-		return left.AsPropertyAccessExpression().Name()
-	case ast.KindElementAccessExpression:
-		return left.AsElementAccessExpression().ArgumentExpression
-	default:
-		return nil
 	}
 }
 
@@ -126,9 +71,11 @@ func wrappedJestFnChainClosingParenFixes(jestFnCall *ast.Node) []rule.RuleFix {
 	return fixes
 }
 
-func buildSpyOnFixes(ctx rule.RuleContext, left *ast.Node, jestFnCall *ast.Node) []rule.RuleFix {
-	obj := rslintUtils.AccessExpressionObject(left)
-	prop := accessExpressionPropertyNode(left)
+func buildSpyOnFixes(ctx rule.RuleContext, target sharedPreferSpyOn.Target) []rule.RuleFix {
+	left := target.Left
+	jestFnCall := target.FnCall
+	obj := target.Object
+	prop := target.Property
 	quote := leftPropQuote(left)
 	mockImplementation := getAutoFixMockImplementation(jestFnCall, ctx)
 	jestFnEnd := jestFnCallFixEnd(jestFnCall)
@@ -148,42 +95,27 @@ func buildSpyOnFixes(ctx rule.RuleContext, left *ast.Node, jestFnCall *ast.Node)
 	return append(fixes, wrappedJestFnChainClosingParenFixes(jestFnCall)...)
 }
 
-var PreferSpyOnRule = rule.Rule{
-	Name:   "jest/prefer-spy-on",
-	Schema: rule.EmptyArraySchema,
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		return rule.RuleListeners{
-			ast.KindBinaryExpression: func(node *ast.Node) {
-				if !ast.IsAssignmentExpression(node, false) {
-					return
-				}
-
-				bin := node.AsBinaryExpression()
-				if bin == nil {
-					return
-				}
-
-				left := ast.SkipParentheses(bin.Left)
-				if !jestUtils.IsMemberAccessNode(left) {
-					return
-				}
-
-				prop := accessExpressionPropertyNode(left)
-				if prop != nil && prop.Kind == ast.KindPrivateIdentifier {
-					return
-				}
-
-				jestFnCall := getJestFnCall(bin.Right)
-				if jestFnCall == nil {
-					return
-				}
-
-				ctx.ReportNodeWithFixes(
-					node,
-					buildUseJestSpyOnMessage(),
-					buildSpyOnFixes(ctx, left, jestFnCall)...,
-				)
-			},
+// isJestFnCall matches `jest.fn()` called directly on the `jest` global.
+func isJestFnCall(_ rule.RuleContext) func(*ast.Node) (*ast.Node, bool) {
+	return func(call *ast.Node) (*ast.Node, bool) {
+		callee := ast.SkipParentheses(call.AsCallExpression().Expression)
+		if !sharedPreferSpyOn.IsMemberAccessNode(callee) {
+			return nil, false
 		}
-	},
+		obj := rslintUtils.AccessExpressionObject(callee)
+		if obj.Kind != ast.KindIdentifier || obj.AsIdentifier().Text != "jest" {
+			return nil, false
+		}
+		if testFramework.CalleeChainName(call.AsCallExpression().Expression) != "jest.fn" {
+			return nil, false
+		}
+		return obj, true
+	}
 }
+
+var PreferSpyOnRule = sharedPreferSpyOn.NewRule(sharedPreferSpyOn.Config{
+	Name:    "jest/prefer-spy-on",
+	Message: buildUseJestSpyOnMessage(),
+	Prepare: isJestFnCall,
+	Fix:     buildSpyOnFixes,
+})

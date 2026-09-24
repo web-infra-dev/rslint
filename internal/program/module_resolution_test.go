@@ -184,25 +184,41 @@ func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
 
 	const consumer = "/condition-fixture/consumer.ts"
 	const requireFile = "/condition-fixture/node_modules/some-package/cjs.d.cts"
-	files := map[string]string{
-		"/condition-fixture/package.json":                           `{"name": "root", "type": "module"}`,
-		"/condition-fixture/node_modules/some-package/package.json": `{"name": "some-package", "exports": {".": {"import": "./esm.d.mts", "require": "./cjs.d.cts"}}}`,
-		"/condition-fixture/node_modules/some-package/esm.d.mts":    "export const value: unknown;\n",
-		requireFile: "declare const value: unknown;\nexport = value;\n",
-		consumer:    `const pkg = (require)("some-package");`,
-	}
+	for _, call := range []string{`(require)("some-package")`, `((require))(("some-package"))`, `require(("some-package"))`} {
+		t.Run(call, func(t *testing.T) {
+			t.Parallel()
 
-	program, sourceFile, specifier := programForRequireRoots(t, files, []string{consumer}, consumer, &core.CompilerOptions{
-		Module:           core.ModuleKindNodeNext,
-		ModuleResolution: core.ModuleResolutionKindNodeNext,
-	})
+			files := map[string]string{
+				"/condition-fixture/package.json":                           `{"name": "root", "type": "module"}`,
+				"/condition-fixture/node_modules/some-package/package.json": `{"name": "some-package", "exports": {".": {"import": "./esm.d.mts", "require": "./cjs.d.cts"}, "./feature": {"import": "./esm.d.mts", "require": "./cjs.d.cts"}}}`,
+				"/condition-fixture/node_modules/some-package/esm.d.mts":    "export const value: unknown;\n",
+				requireFile: "declare const value: unknown;\nexport = value;\n",
+				consumer:    "const pkg = " + call + ";",
+			}
 
-	resolvedPath, _, ok := program.ResolveModule(sourceFile, specifier)
-	if !ok {
-		t.Fatal("ResolveFromSourceFile() did not resolve some-package")
-	}
-	if got := tspath.NormalizeSlashes(resolvedPath); got != requireFile {
-		t.Fatalf("resolvedPath = %q, want %q", got, requireFile)
+			program, sourceFile, specifier := programForRequireRoots(t, files, []string{consumer}, consumer, &core.CompilerOptions{
+				Module:           core.ModuleKindNodeNext,
+				ModuleResolution: core.ModuleResolutionKindNodeNext,
+			})
+			specifier = ast.SkipParentheses(specifier)
+
+			resolvedPath, _, ok := program.ResolveModule(sourceFile, specifier)
+			if !ok {
+				t.Fatal("ResolveFromSourceFile() did not resolve some-package")
+			}
+			if got := tspath.NormalizeSlashes(resolvedPath); got != requireFile {
+				t.Fatalf("resolvedPath = %q, want %q", got, requireFile)
+			}
+			// Candidate paths must retain the CommonJS mode of (require), including
+			// when the containing source file is an ES module.
+			alternative, _, ok := program.ResolveModuleNameAt(sourceFile, "some-package/feature", specifier)
+			if !ok || tspath.NormalizeSlashes(alternative) != requireFile {
+				t.Fatalf("candidate resolved to %q, want %q", alternative, requireFile)
+			}
+			if specifier.Text() != "some-package" {
+				t.Fatal("candidate resolution mutated the source specifier")
+			}
+		})
 	}
 }
 
