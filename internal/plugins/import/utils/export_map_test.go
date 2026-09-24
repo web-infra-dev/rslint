@@ -59,6 +59,41 @@ func TestGetLocalExportNames(t *testing.T) {
 	}
 }
 
+func TestFindExport(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		source, name string
+		found        bool
+		path         []string
+	}{
+		{"./named-exports", "foo", true, []string{"/named-exports.ts"}},
+		{"./named-exports", "missing", false, []string{"/named-exports.ts"}},
+		{"./reexport-missing-as-default", "default", false, []string{"/reexport-missing-as-default.ts", "/named-exports.ts"}},
+		{"./multi-star-reexport", "missing", false, []string{"/multi-star-reexport.ts"}},
+		{"./missing", "missing", false, nil},
+		{"./common", "missing", false, nil},
+	} {
+		t.Run(tc.source+"/"+tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, specifier, raw := contextForImportWithCompiler(t, tc.source)
+			standalone, err := lintprogram.NewFromBoundSources(raw, raw.SourceFiles())
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, sourceProgram := range []*lintprogram.Program{ctx.Program(), standalone} {
+				ctx := (rule.RuleContext{SourceFile: ctx.SourceFile}).WithProgram(sourceProgram)
+				found, path := import_utils.FindExport(ctx, specifier, tc.name)
+				if found != tc.found || !slices.Equal(path, tc.path) {
+					t.Fatalf("FindExport = (%v, %v), want (%v, %v)", found, path, tc.found, tc.path)
+				}
+			}
+		})
+	}
+	if found, path := import_utils.FindExport(rule.RuleContext{}, nil, "missing"); found || path != nil {
+		t.Fatalf("lookup without a Program = (%v, %v)", found, path)
+	}
+}
+
 func TestGetLocalExportNamesWithSyntaxErrors(t *testing.T) {
 	t.Parallel()
 	root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/local-export-syntax-errors.txtar").Materialize(t, ""))
@@ -84,6 +119,9 @@ func TestGetLocalExportNamesWithSyntaxErrors(t *testing.T) {
 			specifier := source.Statements.Nodes[i].AsImportDeclaration().ModuleSpecifier
 			if names := import_utils.GetLocalExportNames(ctx, specifier); len(names) != 0 {
 				t.Errorf("invalid dependency %s exposes names: %v", targetName, names)
+			}
+			if _, path := import_utils.FindExport(ctx, specifier, "missing"); path != nil {
+				t.Errorf("invalid dependency %s produces a named-export lookup: %v", targetName, path)
 			}
 		}
 	}

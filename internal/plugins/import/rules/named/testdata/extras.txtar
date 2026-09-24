@@ -1,0 +1,68 @@
+Named export lookup regressions.
+
+-- tsconfig.json --
+{"compilerOptions": {"target": "esnext", "module": "commonjs", "allowJs": true, "noEmit": true, "esModuleInterop": false}, "include": ["**/*"]}
+-- leaf.js --
+export const present = 1; export const café = 2; const empty = 3; export { empty as "" }; export default 4;
+-- tsconfig.interop.json --
+{"extends":"./tsconfig.json","compilerOptions":{"esModuleInterop":true}}
+-- tsconfig.nodenext.json --
+{"compilerOptions":{"target":"esnext","module":"nodenext","allowJs":true,"noEmit":true},"include":["**/*"],"files":["node_modules/conditional-package/import.d.mts","node_modules/conditional-package/require.d.cts"]}
+-- empty.js --
+export {};
+-- first.js --
+export { missing as renamed } from "./leaf.js";
+-- second.js --
+export { renamed as outer } from "./first.js";
+-- star.js --
+export * from "./first.js";
+-- stars.js --
+export * from "./empty.js"; export * from "./leaf.js";
+-- unknown.js --
+export * from "./unresolved.js";
+-- unknown-named.js --
+export { anything as remote } from "./unresolved.js";
+-- cycle-a.js --
+export * from "./cycle-b.js"; export const present = 1;
+-- cycle-b.js --
+export * from "./cycle-a.js";
+-- cycle-named-a.js --
+export { missing } from "./cycle-named-b.js";
+-- cycle-named-b.js --
+export { missing } from "./cycle-named-a.js";
+-- self.js --
+export { missing } from "./self.js";
+-- self-alias.js --
+export { present as renamed } from './self-alias.js'; export const present = 1;
+-- shared.js --
+export * from './shared-left.js'; export * from './shared-right.js';
+-- shared-left.js --
+export * from './shared-right.js'; export { missing as found } from './leaf.js';
+-- shared-right.js --
+export * from './shared-left.js'; export * from './leaf.js';
+-- shared-alias.js --
+export * from './shared-left.js'; export * from './leaf-alias.js';
+-- leaf-alias.js --
+export { present as found } from './leaf.js';
+-- shared-broken.js --
+export { missing as renamed } from './shared.js';
+-- namespace.js --
+export * as ns from "./leaf.js";
+-- quoted.js --
+export { present as 'quoted' } from './leaf.js';
+-- common.cjs --
+exports.missing = 1;
+-- types.ts --
+export interface Present {}; export type Shape = string;
+-- node_modules/typed-package/package.json --
+{"main":"index.cjs","types":"index.d.ts"}
+-- node_modules/typed-package/index.cjs --
+exports.value = 1;
+-- node_modules/typed-package/index.d.ts --
+export declare const value: number;
+-- node_modules/conditional-package/package.json --
+{"exports":{"import":"./import.d.mts","require":"./require.d.cts"}}
+-- node_modules/conditional-package/import.d.mts --
+export declare const imported: number;
+-- node_modules/conditional-package/require.d.cts --
+export declare const required: number;

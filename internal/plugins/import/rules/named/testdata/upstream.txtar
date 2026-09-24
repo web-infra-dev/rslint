@@ -1,0 +1,315 @@
+Fixtures from eslint-plugin-import v2.32.0 tests/files.
+cspell:ignore extfield flowtypes
+Proposal/Flow syntax is adapted to equivalent supported syntax; package entries are localized.
+
+-- bar.js --
+export default 'bar'
+export function foo() { return 'foo' }
+-- named-exports.js --
+var a = 1
+var b = 2
+
+export {a, b}
+
+var c = 3
+export {c as d}
+
+export class ExportedClass {
+
+}
+
+
+// destructuring exports
+
+export var { destructuredProp, ...restProps } = {}
+         , { destructingAssign = null } = {}
+         , { destructingAssign: destructingRenamedAssign = null } = {}
+         , [ arrayKeyProp, ...arrayRestKeyProps ] = []
+         , [ { deepProp } ] = []
+         , { arr: [ ,, deepSparseElement ] } = {}
+-- qc.js --
+export const ActionTypes = {
+  A: null,
+  B: null,
+  C: null
+}
+-- re-export.js --
+export const c = 'foo'
+
+export * from './named-exports'
+
+// #328: this exports only 'foo', not the default.
+export * from './bar'
+-- re-export-common-star.js --
+export * from './common'
+-- re-export-names.js --
+export { a as foo, b as bar } from './named-exports'
+
+export const baz = 'will it blend?'
+-- default-export.js --
+export default function foo() { return 'bar' }
+-- named-default-export.js --
+const foo = 'foo'
+
+export { foo as default }
+-- re-export-default.js --
+export const baz = "baz? really?"
+
+export { default as bar } from './default-export'
+export { default as foo } from './named-default-export'
+
+// should allow conversion from CJS to ES6 as follows:
+export { default as common } from './common'
+-- narcissist.js --
+export const me = 'awesome'
+export { me as soGreat } from './narcissist'
+-- common.js --
+module.exports = {
+  a: 1,
+  b: 2
+}
+
+var c = 3
+
+exports.d = c
+-- test-module/index.js --
+export function someThing() {}
+-- jsx/AnotherComponent.jsx --
+export * from './named'
+-- jsx/named.jsx --
+export const jsxFoo = 'foo'
+export const jsxBar = 'bar'
+-- export-star/models.js --
+export * as ExtfieldModel from './extfield';
+export * as Extfield2Model from './extfield2';
+-- export-star/extfield.js --
+export default 42;
+-- export-star/extfield2.js --
+export default NaN;
+-- dynamic-import-in-commonjs.js --
+async function doSomething() {
+  await import('./bar.js');
+}
+
+exports.something = 'hello';
+-- export-all.js --
+import { foo } from './sibling-with-names' // ensure importing exported name doesn't block
+export * from './sibling-with-names'
+-- sibling-with-names.js --
+export const foo = 'foo'
+-- typescript.ts --
+export type MyType = string
+export enum MyEnum {
+  Foo,
+  Bar,
+  Baz
+}
+export interface Foo {
+  native: string | number
+  typedef: MyType
+  enum: MyEnum
+}
+
+export abstract class Bar {
+  abstract foo(): Foo
+
+  method() {
+    return "foo"
+  }
+}
+
+export function getFoo() : MyType {
+  return "foo"
+}
+
+export module MyModule {
+  export function ModuleFunction() {}
+}
+
+export namespace MyNamespace {
+  export function NamespaceFunction() {}
+
+  export module NSModule {
+    export function NSModuleFunction() {}
+  }
+}
+
+interface NotExported {}
+-- typescript-declare.d.ts --
+export declare type MyType = string
+export declare enum MyEnum {
+  Foo,
+  Bar,
+  Baz
+}
+export declare interface Foo {
+  native: string | number
+  typedef: MyType
+  enum: MyEnum
+}
+
+export declare abstract class Bar {
+  abstract foo(): Foo
+
+  method();
+}
+
+export declare function getFoo() : MyType;
+
+export declare module MyModule {
+  export function ModuleFunction();
+}
+
+export declare namespace MyNamespace {
+  export function NamespaceFunction();
+
+  export module NSModule {
+    export function NSModuleFunction();
+  }
+}
+
+interface NotExported {}
+-- typescript-export-assign-namespace.d.ts --
+export = AssignedNamespace;
+
+declare namespace AssignedNamespace {
+  type MyType = string
+  enum MyEnum {
+    Foo,
+    Bar,
+    Baz
+  }
+
+  interface Foo {
+    native: string | number
+    typedef: MyType
+    enum: MyEnum
+  }
+
+  abstract class Bar {
+    abstract foo(): Foo
+
+    method();
+  }
+
+  export function getFoo() : MyType;
+
+  export module MyModule {
+    export function ModuleFunction();
+  }
+
+  export namespace MyNamespace {
+    export function NamespaceFunction();
+
+    export module NSModule {
+      export function NSModuleFunction();
+    }
+  }
+
+  // Export-assignment exports all members in the namespace, explicitly exported or not.
+  // interface NotExported {}
+}
+-- typescript-export-assign-namespace-merged.d.ts --
+export = AssignedNamespace;
+
+declare namespace AssignedNamespace {
+  type MyType = string
+  enum MyEnum {
+    Foo,
+    Bar,
+    Baz
+  }
+}
+
+declare namespace AssignedNamespace {
+  interface Foo {
+    native: string | number
+    typedef: MyType
+    enum: MyEnum
+  }
+
+  abstract class Bar {
+    abstract foo(): Foo
+
+    method();
+  }
+
+  export function getFoo() : MyType;
+
+  export module MyModule {
+    export function ModuleFunction();
+  }
+
+  export namespace MyNamespace {
+    export function NamespaceFunction();
+
+    export module NSModule {
+      export function NSModuleFunction();
+    }
+  }
+
+  // Export-assignment exports all members in the namespace, explicitly exported or not.
+  // interface NotExported {}
+}
+-- typescript-export-assign-object/index.ts --
+const someObj = {
+  FooBar: 12,
+};
+
+export = someObj;
+-- issue-370-commonjs-namespace/bar.js --
+// bar.js
+export { default as foo } from './foo'
+-- issue-370-commonjs-namespace/foo.js --
+// foo.js
+module.exports = { foo: 'foo' }
+-- commonjs-namespace/a.js --
+export { default as b } from './b'
+-- commonjs-namespace/b.js --
+module.exports = {}
+-- data.json --
+{ "foo": "bar" }
+-- foobar.json --
+{
+  "action": "set",
+  "node": {
+    "key": "/foo",
+    "value": "foo",
+    "modifiedIndex": 1438,
+    "createdIndex": 1438
+  },
+  "prevNode": {
+    "key": "/foo",
+    "value": "bar",
+    "modifiedIndex": 1437,
+    "createdIndex": 1437
+  }
+}
+-- named-trampoline.js --
+// Upstream export-default-from proposal expressed with standard re-exports.
+export { default as bar } from "./bar";
+export { default as foo } from "./default-export";
+-- broken-trampoline.js --
+// Upstream export-default-from proposal expressed with standard re-exports.
+export { default } from "./named-exports";
+export { default as baz } from "./named-exports";
+-- flowtypes.ts --
+// Flow fixture adapted to TypeScript; exported names are unchanged.
+export type MyType = { id: number; firstName: string; lastName: string };
+export interface MyInterface {}
+export class MyClass {}
+export type MyOpaqueType = string;
+-- redux.js --
+// Localized package entry; module resolution is owned by Program.
+export function createStore() {}
+-- es6-module.js --
+export const foo = 'bar'
+-- eslint.js --
+// Localized eslint package export used by the upstream star-export case.
+export class RuleTester {}
+-- re-export-node_modules.js --
+export * from "./eslint";
+-- foo.js --
+export const foo = "I'm so foo";
+-- tsconfig.json --
+{"compilerOptions": {"allowJs": true, "checkJs": false, "noEmit": true, "target": "esnext", "module": "commonjs", "jsx": "preserve", "esModuleInterop": false}, "include": ["**/*"], "exclude": []}

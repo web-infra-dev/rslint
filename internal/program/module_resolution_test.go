@@ -174,11 +174,8 @@ func TestResolveFromSourceFileUnloadedTarget(t *testing.T) {
 }
 
 // TestResolveFromSourceFileParenthesizedRequireCondition covers a parenthesized
-// `require` in an ES module. TypeScript reads a call as a `require` only through
-// a bare `require` identifier, so it would answer this call with the file's own
-// ESM format and select the package's `import` condition; the call is a
-// `require` either way it is spelled, so the `require` condition is the one that
-// holds.
+// callee and argument in an ES module. Parentheses must not change the package
+// condition from `require` to `import`.
 func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
 	t.Parallel()
 
@@ -268,7 +265,7 @@ func programForRequireRoots(t *testing.T, files map[string]string, rootFiles []s
 			call := node.AsCallExpression()
 			callee := ast.SkipParentheses(call.Expression)
 			if ast.IsIdentifier(callee) && callee.Text() == "require" && len(call.Arguments.Nodes) == 1 {
-				specifier = call.Arguments.Nodes[0]
+				specifier = ast.SkipParentheses(call.Arguments.Nodes[0])
 				return true
 			}
 		}

@@ -98,28 +98,7 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 
 	// for CommonJS `require` calls
 	checkCommon := func(call *ast.CallExpression) {
-		// ESTree has no parenthesized-expression node, so upstream sees a bare
-		// `require` identifier through any number of parentheses.
-		callee := utils.ESTreeCallCallee(call.Expression)
-
-		if callee == nil || !ast.IsIdentifier(callee) {
-			return
-		}
-
-		if callee.AsIdentifier().Text != "require" {
-			return
-		}
-
-		if call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
-			return
-		}
-
-		modulePath := utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0])
-		if modulePath == nil || modulePath.Kind != ast.KindStringLiteral {
-			return
-		}
-
-		checkSourceValue(modulePath, call.AsNode())
+		checkSourceValue(CommonJSRequireSource(call), call.AsNode())
 	}
 
 	checkAMD := func(call *ast.CallExpression) {
@@ -217,4 +196,21 @@ func moduleIgnorePattern(pattern string) string {
 		offset += size
 	}
 	return source.String()
+}
+
+// CommonJSRequireSource returns the string literal in a direct require call.
+// Import rules recognize the call syntactically, including shadowed require,
+// without evaluating arguments or following aliases. Parentheses and JSDoc
+// casts are transparent; TypeScript assertions and template literals are not.
+// Callers decide whether an optional call is eligible in their AST context.
+func CommonJSRequireSource(call *ast.CallExpression) *ast.StringLiteralLike {
+	callee := utils.ESTreeCallCallee(call.Expression)
+	if callee == nil || !ast.IsIdentifier(callee) || callee.Text() != "require" || call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
+		return nil
+	}
+	source := utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0])
+	if source == nil || !ast.IsStringLiteral(source) {
+		return nil
+	}
+	return source
 }

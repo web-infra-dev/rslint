@@ -71,10 +71,10 @@ func (p *Program) ResolveModuleNameAt(sourceFile *ast.SourceFile, specifier stri
 
 // resolutionMode answers with the mode a specifier resolves under. TypeScript
 // reads a call as a `require` only when its callee is written as a bare
-// `require` identifier, and answers `(require)('pkg')` with the format of the
-// file holding it instead. The module accessor reads both spellings as a
-// `require`, so an ES module's parenthesized call resolves as CommonJS here too,
-// and a package's `require` condition stays selected for both.
+// `require` identifier and an unwrapped argument, and answers
+// `(require)(('pkg'))` with the format of the file holding it instead. Skip
+// parentheses around both the callee and argument so a package's `require`
+// condition stays selected for every spelling.
 func resolutionMode(sourceProgram *Program, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) core.ResolutionMode {
 	mode := sourceProgram.GetModeForUsageLocation(sourceFile, moduleSpecifier)
 	if mode == core.ResolutionModeESM && isRequireCall(ast.WalkUpParenthesizedExpressions(moduleSpecifier.Parent)) {
