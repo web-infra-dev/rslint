@@ -1,0 +1,66 @@
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"commonjs","jsx":"preserve"},"include":["**/*"]}
+-- base.js --
+export default {};
+export const foo = 1, other = 2, café = 3, 𐐀 = 4;
+-- named-only.js --
+export const foo = 1;
+-- common.cjs --
+module.exports = { foo: 1 };
+-- empty.js --
+export {};
+-- invalid-return.js --
+return; export {};
+-- reexport.js --
+export { default, foo } from './base.js';
+-- star.js --
+export default {};
+export * from './base.js';
+-- local.js --
+import { foo as local } from './base.js';
+export { local as foo };
+export default {};
+-- namespace.js --
+export default {};
+export * as foo from './base.js';
+-- quoted.js --
+const value = 1;
+export { value as 'foo' };
+-- unresolved.js --
+export * from './missing.js';
+export { foo } from './missing.js';
+export default {};
+-- cycle-a.js --
+export const foo = 1;
+export * from './cycle-b.js';
+-- cycle-b.js --
+export const other = 1;
+export * from './cycle-a.js';
+-- types.ts --
+export default {};
+export interface Shape {}
+export type Alias = string;
+export enum Kind { A }
+-- export-equals.ts --
+declare namespace Lib { const foo: number; }
+export = Lib;
+-- global-alias.ts --
+export as namespace foo; export default {};
+-- global-members.ts --
+declare namespace Lib { const foo: number; } export as namespace Lib; export {};
+-- special-names.js --
+export const __proto__ = 1, constructor = 2, toString = 3;
+-- default-only.js --
+export default {};
+-- null-extension.js --
+export const foo = 1;
+-- namespace-unresolved.js --
+export * as foo from './missing.js';
+-- interop/tsconfig.json --
+{"compilerOptions":{"module":"commonjs","esModuleInterop":true},"include":["**/*"]}
+-- interop/global-members.ts --
+declare namespace Lib { const foo: number; } export as namespace Lib; export {};
+-- implicit/tsconfig.json --
+{"compilerOptions":{"module":"nodenext"},"include":["**/*"]}
+-- implicit/global-members.ts --
+declare namespace Lib { const foo: number; } export as namespace Lib; export {};
