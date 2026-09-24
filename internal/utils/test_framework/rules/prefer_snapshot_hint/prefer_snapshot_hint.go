@@ -18,8 +18,9 @@ type Snapshot struct {
 }
 
 type Runtime struct {
-	IsRegistration func(*ast.Node) bool
-	Snapshots      func(*ast.Node) []Snapshot
+	IsRegistration        func(*ast.Node) bool
+	RegistrationCallbacks map[*ast.Node]bool
+	Snapshots             func(*ast.Node) []Snapshot
 }
 
 type Config struct {
@@ -57,8 +58,12 @@ func NewRule(config Config) rule.Rule {
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			always := len(options) > 0 && options[0] == "always"
 			runtime := config.Prepare(ctx)
+			type groupState struct {
+				snapshots []Snapshot
+				depth     int
+			}
 			var snapshots []Snapshot
-			var depths []int
+			var groups []groupState
 			depth := 0
 			flush := func() {
 				if always || len(snapshots) > 1 {
@@ -73,8 +78,40 @@ func NewRule(config Config) rule.Rule {
 				}
 				snapshots = nil
 			}
-			enter := func(*ast.Node) { depth++ }
-			exit := func(*ast.Node) {
+			enterGroup := func(groupDepth int) {
+				groups = append(groups, groupState{snapshots: snapshots, depth: depth})
+				snapshots = nil
+				depth = groupDepth
+			}
+			exitGroup := func() {
+				flush()
+				last := len(groups) - 1
+				snapshots = groups[last].snapshots
+				depth = groups[last].depth
+				groups = groups[:last]
+			}
+			enter := func(node *ast.Node) {
+				if runtime.RegistrationCallbacks[node] {
+					enterGroup(1)
+					return
+				}
+				depth++
+			}
+			enterRegistered := func(node *ast.Node) {
+				if runtime.RegistrationCallbacks[node] {
+					enterGroup(1)
+				}
+			}
+			exitRegistered := func(node *ast.Node) {
+				if runtime.RegistrationCallbacks[node] {
+					exitGroup()
+				}
+			}
+			exit := func(node *ast.Node) {
+				if runtime.RegistrationCallbacks[node] {
+					exitGroup()
+					return
+				}
 				depth--
 				if always || depth == 0 {
 					flush()
@@ -87,26 +124,26 @@ func NewRule(config Config) rule.Rule {
 				rule.ListenerOnExit(ast.KindArrowFunction):      exit,
 				// ESTree represents method, constructor and accessor bodies as
 				// FunctionExpressions; tsgo gives them their own node kinds.
-				ast.KindMethodDeclaration:                      enter,
-				ast.KindConstructor:                            enter,
-				ast.KindGetAccessor:                            enter,
-				ast.KindSetAccessor:                            enter,
-				rule.ListenerOnExit(ast.KindMethodDeclaration): exit,
-				rule.ListenerOnExit(ast.KindConstructor):       exit,
-				rule.ListenerOnExit(ast.KindGetAccessor):       exit,
-				rule.ListenerOnExit(ast.KindSetAccessor):       exit,
+				ast.KindMethodDeclaration:                        enter,
+				ast.KindConstructor:                              enter,
+				ast.KindGetAccessor:                              enter,
+				ast.KindSetAccessor:                              enter,
+				ast.KindFunctionDeclaration:                      enterRegistered,
+				rule.ListenerOnExit(ast.KindMethodDeclaration):   exit,
+				rule.ListenerOnExit(ast.KindConstructor):         exit,
+				rule.ListenerOnExit(ast.KindGetAccessor):         exit,
+				rule.ListenerOnExit(ast.KindSetAccessor):         exit,
+				rule.ListenerOnExit(ast.KindFunctionDeclaration): exitRegistered,
 				ast.KindCallExpression: func(node *ast.Node) {
 					if runtime.IsRegistration(node) {
-						depths = append(depths, depth)
-						depth = 0
+						enterGroup(0)
 						return
 					}
 					snapshots = append(snapshots, runtime.Snapshots(node)...)
 				},
 				rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
 					if runtime.IsRegistration(node) {
-						depth = depths[len(depths)-1]
-						depths = depths[:len(depths)-1]
+						exitGroup()
 					}
 				},
 				rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) { flush() },

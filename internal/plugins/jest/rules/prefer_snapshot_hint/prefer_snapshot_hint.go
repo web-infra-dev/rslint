@@ -12,6 +12,7 @@ var PreferSnapshotHintRule = shared.NewRule(shared.Config{
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
 		analysis := utils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
+			RegistrationCallbacks: analysis.RegistrationCallbacks(),
 			IsRegistration: func(node *ast.Node) bool {
 				parsed := analysis.ParseFnCall(node)
 				return parsed != nil && (parsed.Kind == utils.JestFnTypeTest || parsed.Kind == utils.JestFnTypeDescribe)
