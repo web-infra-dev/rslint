@@ -68,11 +68,12 @@ This option checks ES module exports consumed through `require`; it does not inf
   `export { value as 'quoted' } from './values.js'` allows
   `import { quoted } from './barrel.js'` in rslint, while upstream v2.32.0 reports
   it as missing. Removing the quotes makes both tools agree.
-- When `esModuleInterop` is omitted from `tsconfig.json`, configurations such as
-  `module: 'nodenext'` can produce fewer reports in rslint. For example,
-  `import { default as value }` from a module with only named exports is allowed.
-  Upstream allows this case only with explicit `esModuleInterop: true`.
-  Set this option explicitly for matching behavior.
+- `esModuleInterop` does not supply a missing ES module default. Given
+  `export const value = 1` in `values.mjs`, rslint reports
+  `import { default as value } from './values.mjs'` even with
+  `esModuleInterop: true`; upstream v2.32.0 allows it. Import `{ value }` or add
+  a default export. With NodeNext, native ES imports of CommonJS modules still
+  receive `module.exports` as their default, regardless of the interop setting.
 
 ## Original Documentation
 

@@ -54,6 +54,26 @@ export { present as 'quoted' } from './leaf.js';
 exports.missing = 1;
 -- types.ts --
 export interface Present {}; export type Shape = string;
+-- named-only.mjs --
+export const present = 1;
+-- typed-only.mts --
+export const present = 1;
+-- real-defaults.mjs --
+export { present as default } from './named-only.mjs';
+-- namespace-default.mjs --
+export * as default from './named-only.mjs';
+-- missing-default.mjs --
+export { default } from './named-only.mjs';
+-- umd-global.d.mts --
+export as namespace Lib;
+export declare const present: number;
+-- export-equals.d.cts --
+declare namespace Lib { const present: number; }
+export = Lib;
+-- compiled.cts --
+export const present = 1;
+-- compiled-barrel.mts --
+export { default } from './compiled.cjs';
 -- node_modules/typed-package/package.json --
 {"main":"index.cjs","types":"index.d.ts"}
 -- node_modules/typed-package/index.cjs --

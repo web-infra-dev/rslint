@@ -94,6 +94,51 @@ func TestFindExport(t *testing.T) {
 	}
 }
 
+func TestDefaultExportsAcrossNodeModuleFormats(t *testing.T) {
+	root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/default-interop.txtar").Materialize(t, ""))
+	for _, config := range []string{"tsconfig.json", "tsconfig.interop.json", "tsconfig.no-interop.json"} {
+		t.Run(config, func(t *testing.T) {
+			raw, err := rslint_utils.CreateProgram(true, osvfs.FS(), root, config, rslint_utils.CreateCompilerHost(root, osvfs.FS()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			standalone, err := lintprogram.NewFromBoundSources(raw, raw.SourceFiles())
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, sourceProgram := range []*lintprogram.Program{lintprogram.NewFromCompiler(raw), standalone} {
+				// Query both consumers in the same Program to catch defaults
+				// leaking through the shared export map cache.
+				for _, tc := range []struct {
+					file string
+					want []bool
+				}{
+					{"consumer.mts", []bool{true, false, true, true, false, true, true, false, false, true, true}},
+					{"consumer.cts", []bool{false, false, config != "tsconfig.no-interop.json", false, false, true, false, false, false, false, false}},
+				} {
+					source := sourceProgram.GetSourceFile(tspath.ResolvePath(root, tc.file))
+					if source == nil || source.Statements == nil || len(source.Statements.Nodes) != len(tc.want) {
+						t.Fatalf("expected %d imports in %s", len(tc.want), tc.file)
+					}
+					ctx := (rule.RuleContext{SourceFile: source}).WithProgram(sourceProgram)
+					for i, stmt := range source.Statements.Nodes {
+						specifier := stmt.AsImportDeclaration().ModuleSpecifier
+						if found, ok := import_utils.HasDefaultExport(ctx, specifier); !ok || found != tc.want[i] {
+							t.Errorf("%s: HasDefaultExport(%s) = (%v, %v), want (%v, true)", tc.file, specifier.Text(), found, ok, tc.want[i])
+						}
+						if exports, ok := import_utils.GetExportMap(ctx, specifier); !ok || exports.HasDefault() != tc.want[i] {
+							t.Errorf("%s: GetExportMap(%s).HasDefault = %v, want %v", tc.file, specifier.Text(), exports.HasDefault(), tc.want[i])
+						}
+						if found, path := import_utils.FindExport(ctx, specifier, "default"); found != tc.want[i] || len(path) == 0 {
+							t.Errorf("%s: FindExport(%s, default) = (%v, %v), want (%v, nonempty path)", tc.file, specifier.Text(), found, path, tc.want[i])
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestGetLocalExportNamesWithSyntaxErrors(t *testing.T) {
 	t.Parallel()
 	root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/local-export-syntax-errors.txtar").Materialize(t, ""))
@@ -640,13 +685,20 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 		name              string
 		source            string
 		esModuleInterop   core.Tristate
+		module            core.ModuleKind
 		wantDefaultExport bool
 	}{
 		{
-			name:              "named TypeScript exports synthesize default when enabled",
+			name:              "named TypeScript exports do not synthesize default when enabled",
 			source:            "./typescript",
 			esModuleInterop:   core.TSTrue,
-			wantDefaultExport: true,
+			wantDefaultExport: false,
+		},
+		{
+			name:              "named TypeScript exports do not synthesize default with inferred interop",
+			source:            "./typescript",
+			module:            core.ModuleKindNodeNext,
+			wantDefaultExport: false,
 		},
 		{
 			name:              "named TypeScript exports do not synthesize default when disabled",
@@ -667,22 +719,34 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 			wantDefaultExport: false,
 		},
 		{
+			name:              "export equals namespace synthesizes default with inferred interop",
+			source:            "./typescript-export-assign-default-namespace",
+			module:            core.ModuleKindNodeNext,
+			wantDefaultExport: true,
+		},
+		{
 			name:              "export equals local variable is default-visible when disabled",
 			source:            "./typescript-export-assign-local",
 			esModuleInterop:   core.TSFalse,
 			wantDefaultExport: true,
 		},
 		{
-			name:              "namespace re-export synthesizes default when enabled",
+			name:              "namespace re-export does not synthesize default when enabled",
 			source:            "./export-namespace-alias-chain/namespace-alias",
 			esModuleInterop:   core.TSTrue,
-			wantDefaultExport: true,
+			wantDefaultExport: false,
 		},
 		{
 			name:              "namespace re-export does not synthesize default when disabled",
 			source:            "./export-namespace-alias-chain/namespace-alias",
 			esModuleInterop:   core.TSFalse,
 			wantDefaultExport: false,
+		},
+		{
+			name:              "CommonJS declaration can supply a default when interop is enabled",
+			source:            "./typescript-export-as-default-namespace",
+			esModuleInterop:   core.TSTrue,
+			wantDefaultExport: true,
 		},
 	}
 
@@ -692,6 +756,7 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 
 			ctx, specifier := contextForImportWithCompilerOptions(t, tc.source, &core.CompilerOptions{
 				ESModuleInterop: tc.esModuleInterop, //nolint:staticcheck
+				Module:          tc.module,
 			})
 			gotDefaultExport, gotOK := import_utils.HasDefaultExport(ctx, specifier)
 			if gotDefaultExport != tc.wantDefaultExport || !gotOK {
@@ -703,6 +768,9 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 			}
 			if slices.Contains(slices.Collect(exports.Names()), "default") {
 				t.Fatal("synthetic defaults must not become authored export names")
+			}
+			if found, path := import_utils.FindExport(ctx, specifier, "default"); found != tc.wantDefaultExport || len(path) == 0 {
+				t.Fatalf("FindExport(default) = (%v, %v), want (%v, nonempty path)", found, path, tc.wantDefaultExport)
 			}
 		})
 	}

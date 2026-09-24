@@ -1,0 +1,59 @@
+Native Node defaults depend on the importing module's format.
+
+-- tsconfig.json --
+{"compilerOptions":{"module":"nodenext","noEmit":true},"include":["**/*"]}
+-- tsconfig.interop.json --
+{"extends":"./tsconfig.json","compilerOptions":{"esModuleInterop":true}}
+-- tsconfig.no-interop.json --
+{"extends":"./tsconfig.json","compilerOptions":{"esModuleInterop":false}}
+-- consumer.mts --
+import first from './named.cjs';
+import second from './named.mjs';
+import third from './declared.cjs';
+import fourth from './commonjs/named.js';
+import fifth from './module/named.js';
+import sixth from './barrel.mjs';
+import seventh from './barrel.cjs';
+import eighth from './declared-esm.mjs';
+import ninth from './module/declared.js';
+import tenth from './marked.cjs';
+import eleventh from './broken.cjs';
+-- consumer.cts --
+import first from './named.cjs';
+import second from './named.mjs';
+import third from './declared.cjs';
+import fourth from './commonjs/named.js';
+import fifth from './module/named.js';
+import sixth from './barrel.mjs';
+import seventh from './barrel.cjs';
+import eighth from './declared-esm.mjs';
+import ninth from './module/declared.js';
+import tenth from './marked.cjs';
+import eleventh from './broken.cjs';
+-- named.cts --
+export const value = 1;
+-- named.mts --
+export const value = 1;
+-- declared.d.cts --
+export declare const value: number;
+-- declared-esm.d.mts --
+export declare const value: number;
+-- marked.d.cts --
+export declare const value: number;
+export declare const __esModule: boolean;
+-- broken.d.cts --
+export { missing as default } from './named.cjs';
+-- commonjs/package.json --
+{"type":"commonjs"}
+-- commonjs/named.ts --
+export const value = 1;
+-- module/package.json --
+{"type":"module"}
+-- module/named.ts --
+export const value = 1;
+-- module/declared.d.ts --
+export declare const value: number;
+-- barrel.mts --
+export { default } from './named.cjs';
+-- barrel.cts --
+export { default } from './named.cjs';

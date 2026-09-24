@@ -29,10 +29,11 @@ func FindExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, name string) (b
 	if !link.Resolved {
 		return false, nil
 	}
-	return newExportBuilder(index, ctx.Program()).findExport(link.Target, name, ctx.Settings)
+	return newExportBuilder(index, ctx.Program()).findExport(link, name, ctx.Settings)
 }
 
-func (builder *exportBuilder) findExport(file *ast.SourceFile, name string, settings map[string]interface{}) (bool, []string) {
+func (builder *exportBuilder) findExport(link exportLink, name string, settings map[string]interface{}) (bool, []string) {
+	file := link.Target
 	// File extensions and moduleDetection can make tsgo mark a CommonJS file
 	// as external. Upstream requires an authored import/export declaration;
 	// neither a forced SourceFile marker nor import.meta establishes that.
@@ -45,6 +46,9 @@ func (builder *exportBuilder) findExport(file *ast.SourceFile, name string, sett
 		return true, nil
 	}
 	path := []string{file.FileName()}
+	if name == defaultExportName && link.NodeDefault {
+		return true, path
+	}
 	key := exportKey{file: file, name: name}
 	if builder.seen[key] {
 		return false, path
@@ -95,7 +99,7 @@ func (builder *exportBuilder) findExport(file *ast.SourceFile, name string, sett
 		if reexport.Link.Target == file && importedName == name {
 			return false, path
 		}
-		found, dependencyPath := builder.findExport(reexport.Link.Target, importedName, settings)
+		found, dependencyPath := builder.findExport(reexport.Link, importedName, settings)
 		return found, append(path, dependencyPath...)
 	}
 	if name != defaultExportName {
@@ -106,7 +110,7 @@ func (builder *exportBuilder) findExport(file *ast.SourceFile, name string, sett
 			if !step.Link.Resolved {
 				return true, path
 			}
-			if found, dependencyPath := builder.findExport(step.Link.Target, name, settings); found {
+			if found, dependencyPath := builder.findExport(step.Link, name, settings); found {
 				return true, append(path, dependencyPath...)
 			}
 		}
@@ -145,6 +149,9 @@ func hasExport(origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName str
 	if link.Target == nil {
 		return false, false
 	}
+	if exportName == defaultExportName && link.NodeDefault {
+		return true, true
+	}
 	return sourceFileHasExport(link.Target, exportName, builder)
 }
 
@@ -156,12 +163,15 @@ func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.Sour
 	if !ok || sourceFile == nil || settings.IsIgnoredPath(sourceFile.FileName()) {
 		return exportLink{}
 	}
-	return exportLink{Target: sourceFile, Resolved: true}
+	return exportLink{Target: sourceFile, Resolved: true, NodeDefault: hasNodeDefault(sourceProgram, origin, moduleSpecifier, sourceFile)}
 }
 
 func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder *exportBuilder) (bool, bool) {
 	if sourceFile == nil || !ast.IsExternalModule(sourceFile) {
 		return false, false
+	}
+	if exportName == defaultExportName && sourceFile.IsDeclarationFile && builder.index.localExportsOf(builder.program(), sourceFile).ImplicitDefault {
+		return true, true
 	}
 
 	key := exportKey{file: sourceFile, name: exportName}
@@ -193,20 +203,12 @@ func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder 
 			if exportName == defaultExportName && exportAssignmentHasDefault(builder.program(), sourceFile, stmt.AsExportAssignment()) {
 				return true, true
 			}
-		case ast.KindNamespaceExportDeclaration:
-			if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.program()) {
-				return true, true
-			}
 		case ast.KindExportDeclaration:
 			found, done := exportDeclarationHasName(sourceFile, stmt.AsExportDeclaration(), exportName, builder)
 			if done {
 				return found, true
 			}
 		}
-	}
-
-	if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.program()) && sourceFileHasDirectNamespaceExport(sourceFile) {
-		return true, true
 	}
 
 	return false, true
@@ -364,55 +366,6 @@ func variableStatementDeclaresName(stmt *ast.Node, name string) bool {
 		if matched {
 			return true
 		}
-	}
-	return false
-}
-
-func sourceFileHasDirectNamespaceExport(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Statements == nil {
-		return false
-	}
-	for _, stmt := range sourceFile.Statements.Nodes {
-		if stmt == nil {
-			continue
-		}
-		if exportedDeclarationAddsNamespaceExport(stmt) {
-			return true
-		}
-		if stmt.Kind == ast.KindExportDeclaration && exportDeclarationAddsNamespaceExport(stmt.AsExportDeclaration()) {
-			return true
-		}
-	}
-	return false
-}
-
-func exportedDeclarationAddsNamespaceExport(stmt *ast.Node) bool {
-	if !ast.HasSyntacticModifier(stmt, ast.ModifierFlagsExport) {
-		return false
-	}
-	switch stmt.Kind {
-	case ast.KindVariableStatement,
-		ast.KindFunctionDeclaration,
-		ast.KindClassDeclaration,
-		ast.KindInterfaceDeclaration,
-		ast.KindTypeAliasDeclaration,
-		ast.KindEnumDeclaration,
-		ast.KindModuleDeclaration:
-		return true
-	}
-	return false
-}
-
-func exportDeclarationAddsNamespaceExport(exportDecl *ast.ExportDeclaration) bool {
-	if exportDecl == nil || exportDecl.ExportClause == nil {
-		return false
-	}
-	switch exportDecl.ExportClause.Kind {
-	case ast.KindNamedExports:
-		namedExports := exportDecl.ExportClause.AsNamedExports()
-		return exportDecl.ModuleSpecifier == nil && namedExports.Elements != nil && len(namedExports.Elements.Nodes) > 0
-	case ast.KindNamespaceExport:
-		return true
 	}
 	return false
 }
