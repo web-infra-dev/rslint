@@ -3,6 +3,9 @@
 // src/rules/__tests__/prefer-mock-promise-shorthand.test.ts. tsgo edit shapes and
 // branch lock-ins live in the Rstest rule's extras suite, which exercises the
 // same shared engine.
+//
+// One upstream case is deliberately reversed: a resolved object literal is
+// reported without a fix. See the rule source for why.
 package prefer_mock_promise_shorthand
 
 import (
@@ -163,15 +166,16 @@ func TestPreferMockPromiseShorthandUpstream(t *testing.T) {
 					{MessageId: "useMockShorthand", Message: "Prefer mockRejectedValueOnce", Line: 1, Column: 11},
 				},
 			},
+			// Reversed: upstream rewrites this to `mockResolvedValue({ ... })`, but a
+			// fresh object literal checked directly against the settled type can fail
+			// an excess-property check the promise passed, so only a primitive
+			// literal is rewritten.
 			{
 				Code: `aVariable.mockReturnValue(Promise.resolve({
   target: 'world',
   message: 'hello'
 }))`,
-				Output: []string{`aVariable.mockResolvedValue({
-  target: 'world',
-  message: 'hello'
-})`},
+				Output: []string{},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useMockShorthand", Message: "Prefer mockResolvedValue", Line: 1, Column: 11},
 				},

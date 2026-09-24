@@ -142,11 +142,8 @@ func NewRule(config Config) rule.Rule {
 //     Promise<T>`, which the rewrite would drop while the shorthand's parameter
 //     is typed from the mock. A rejected promise's error is `unknown` in every
 //     framework, so its assertion carries nothing and it stays fixable;
-//   - a resolved value that may itself be a promise, when type information is
-//     available. `Promise.resolve(p)` adopts `p`, and so does the shorthand at run
-//     time, but the shorthand's parameter is typed as the settled value, so
-//     `mockResolvedValue(p)` no longer type-checks. A value that is not thenable
-//     fits that parameter whenever the promise built from it fit the old one;
+//   - a resolved value that is not a primitive literal; see
+//     isTypeSafeResolvedValue;
 //   - a comment or declaration the rewrite would delete.
 func buildFix(
 	ctx rule.RuleContext,
@@ -168,11 +165,9 @@ func buildFix(
 		if kept.Kind == ast.KindSpreadElement {
 			replaced = argument
 		}
-		// A spread element's type is the type of the values it spreads.
-		if method == "resolve" && ctx.TypeChecker != nil &&
-			utils.IsThenableType(ctx.TypeChecker, kept, nil) {
-			return nil
-		}
+	}
+	if method == "resolve" && kept != nil && !isTypeSafeResolvedValue(kept) {
+		return nil
 	}
 	if mock_shorthand.DropsComment(ctx, replaced, kept) {
 		return nil
@@ -195,4 +190,38 @@ func buildFix(
 		rule.RuleFixReplaceRange(accessorRange, accessorText),
 		rule.RuleFixReplace(ctx.SourceFile, replaced, argumentText),
 	}
+}
+
+// isTypeSafeResolvedValue reports whether moving the value out of
+// `Promise.resolve(value)` and into `mockResolvedValue(value)` keeps the call
+// type-checking.
+//
+// The two check the value differently. `Promise.resolve` infers its own type
+// argument from the value and only the resulting promise is compared with what
+// the mock returns; the shorthand compares the value directly with the settled
+// type. So a value that is itself a promise, one whose type is an unresolved type
+// parameter that may be a promise, and a fresh object literal carrying a property
+// the settled type lacks all type-check before the rewrite and fail after it,
+// while the run-time behavior is the same. A primitive literal can be none of
+// those, so only primitive literals are rewritten; everything else is reported
+// without a fix. A rejected promise's reason is untyped in every framework and
+// needs no such check.
+func isTypeSafeResolvedValue(value *ast.Node) bool {
+	value = ast.SkipParentheses(value)
+	switch value.Kind {
+	case ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindStringLiteral,
+		ast.KindNoSubstitutionTemplateLiteral, ast.KindTrueKeyword,
+		ast.KindFalseKeyword, ast.KindNullKeyword:
+		return true
+	case ast.KindPrefixUnaryExpression:
+		unary := value.AsPrefixUnaryExpression()
+		operand := ast.SkipParentheses(unary.Operand)
+		return (unary.Operator == ast.KindMinusToken || unary.Operator == ast.KindPlusToken) &&
+			(operand.Kind == ast.KindNumericLiteral || operand.Kind == ast.KindBigIntLiteral)
+	case ast.KindVoidExpression:
+		return true
+	case ast.KindIdentifier:
+		return value.Text() == "undefined" && !utils.IsShadowed(value, "undefined")
+	}
+	return false
 }

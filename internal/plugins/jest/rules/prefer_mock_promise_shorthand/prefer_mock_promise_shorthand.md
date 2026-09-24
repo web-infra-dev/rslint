@@ -77,10 +77,16 @@ call was given. Redundant parentheses around the value are dropped, except
 around a comma expression, where they decide which operand the promise settles
 with. No fix is offered when the promise is given more than one argument, when
 the mock call has type arguments, when a type assertion wraps a resolved
-promise, when type information shows that the value passed to
-`Promise.resolve()` may itself be a promise, which `mockResolvedValue()` does
-not accept as its argument type, or when the rewrite would delete a comment
-or a declaration the value relies on.
+promise, or when the rewrite would delete a comment or a declaration the value
+relies on.
+
+A resolved promise is rewritten only when its value is a primitive literal: a
+number, string, boolean, `null` or `undefined`. Any other value is reported
+without a fix, because `Promise.resolve()` checks only the promise it builds
+against what the mock returns, while `mockResolvedValue()` checks the value
+itself against the settled type, so a value that is itself a promise, a generic
+value or an object literal with an extra property can stop type-checking. A
+rejected promise is rewritten whatever its reason.
 
 ## Original Documentation
 

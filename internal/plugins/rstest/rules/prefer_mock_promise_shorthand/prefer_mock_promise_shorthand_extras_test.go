@@ -238,29 +238,30 @@ makeMock().mockResolvedValue(1);`},
 				Errors: report("mockResolvedValue", 1, 11),
 			},
 			{
-				Code:   `aVariable.mockReturnValue(Promise.resolve(({ a: 1 })));`,
-				Output: []string{`aVariable.mockResolvedValue({ a: 1 });`},
-				Errors: report("mockResolvedValue", 1, 11),
+				Code:   `aVariable.mockReturnValue(Promise.reject(({ code: 1 })));`,
+				Output: []string{`aVariable.mockRejectedValue({ code: 1 });`},
+				Errors: report("mockRejectedValue", 1, 11),
 			},
 			// A comma expression keeps the parentheses the rewrite would
 			// otherwise drop. Both reference plugins emit
-			// `mockResolvedValue(0, 1)` here, which resolves to 0 rather than 1.
+			// `mockRejectedValue(0, error)` here, which rejects with 0 rather than
+			// `error`.
 			{
-				Code:   `aVariable.mockReturnValue(Promise.resolve((0, 1)));`,
-				Output: []string{`aVariable.mockResolvedValue((0, 1));`},
-				Errors: report("mockResolvedValue", 1, 11),
+				Code:   `aVariable.mockReturnValue(Promise.reject((0, error)));`,
+				Output: []string{`aVariable.mockRejectedValue((0, error));`},
+				Errors: report("mockRejectedValue", 1, 11),
 			},
 			// `(...values)` is not an expression, so the parentheses around a
 			// spread go with it.
 			{
-				Code:   `aVariable.mockReturnValue((Promise.resolve(...values)));`,
-				Output: []string{`aVariable.mockResolvedValue(...values);`},
-				Errors: report("mockResolvedValue", 1, 11),
+				Code:   `aVariable.mockReturnValue((Promise.reject(...reasons)));`,
+				Output: []string{`aVariable.mockRejectedValue(...reasons);`},
+				Errors: report("mockRejectedValue", 1, 11),
 			},
 			{
-				Code:   `aVariable.mockReturnValue((/* why */ Promise.resolve(...values)));`,
+				Code:   `aVariable.mockReturnValue((/* why */ Promise.reject(...reasons)));`,
 				Output: []string{},
-				Errors: report("mockResolvedValue", 1, 11),
+				Errors: report("mockRejectedValue", 1, 11),
 			},
 			{
 				Code:   `aVariable.mockImplementation(() => Promise.reject());`,
@@ -307,31 +308,31 @@ aVariable.mockResolvedValue(undefined);`},
 			// `mockReturnValue` already evaluates its argument once, so the
 			// binding it reads is frozen before and after the rewrite alike.
 			{
-				Code: `let value = 1;
-aVariable.mockReturnValue(Promise.resolve(value));`,
-				Output: []string{`let value = 1;
-aVariable.mockResolvedValue(value);`},
-				Errors: report("mockResolvedValue", 2, 11),
+				Code: `let reason = new Error('nope');
+aVariable.mockReturnValue(Promise.reject(reason));`,
+				Output: []string{`let reason = new Error('nope');
+aVariable.mockRejectedValue(reason);`},
+				Errors: report("mockRejectedValue", 2, 11),
 			},
 			// For the same reason a spread is iterated once either way.
 			{
-				Code:   `aVariable.mockReturnValue(Promise.resolve(...values));`,
-				Output: []string{`aVariable.mockResolvedValue(...values);`},
-				Errors: report("mockResolvedValue", 1, 11),
+				Code:   `aVariable.mockReturnValue(Promise.reject(...reasons));`,
+				Output: []string{`aVariable.mockRejectedValue(...reasons);`},
+				Errors: report("mockRejectedValue", 1, 11),
 			},
 			{
-				Code: `const value = 1;
-aVariable.mockImplementation(() => Promise.resolve(value));`,
-				Output: []string{`const value = 1;
-aVariable.mockResolvedValue(value);`},
-				Errors: report("mockResolvedValue", 2, 11),
+				Code: `const reason = new Error('nope');
+aVariable.mockImplementation(() => Promise.reject(reason));`,
+				Output: []string{`const reason = new Error('nope');
+aVariable.mockRejectedValue(reason);`},
+				Errors: report("mockRejectedValue", 2, 11),
 			},
 			// An arrow has no `this` of its own, so it already names the
 			// enclosing scope.
 			{
-				Code:   `aVariable.mockImplementation(() => Promise.resolve(this.id));`,
-				Output: []string{`aVariable.mockResolvedValue(this.id);`},
-				Errors: report("mockResolvedValue", 1, 11),
+				Code:   `aVariable.mockImplementation(() => Promise.reject(this.error));`,
+				Output: []string{`aVariable.mockRejectedValue(this.error);`},
+				Errors: report("mockRejectedValue", 1, 11),
 			},
 			// An async function returning a promise settles the way that promise
 			// does.
@@ -348,9 +349,9 @@ aVariable.mockResolvedValue(value);`},
 			// An `await` inside a function the value hands back runs later, in
 			// that function.
 			{
-				Code:   `aVariable.mockImplementation(async () => Promise.resolve(async () => await load()));`,
-				Output: []string{`aVariable.mockResolvedValue(async () => await load());`},
-				Errors: report("mockResolvedValue", 1, 11),
+				Code:   `aVariable.mockImplementation(async () => Promise.reject(async () => await load()));`,
+				Output: []string{`aVariable.mockRejectedValue(async () => await load());`},
+				Errors: report("mockRejectedValue", 1, 11),
 			},
 
 			// --- type arguments on the mock call withhold the fix ---
@@ -398,10 +399,14 @@ aVariable.mockResolvedValue(value);`},
 				Errors: report("mockResolvedValue", 1, 11),
 			},
 
-			// --- a resolved value that may be a promise withholds the fix ---
-			// The shorthand adopts it at run time just as `Promise.resolve` does,
-			// but its parameter is typed as the settled value, so
-			// `mockResolvedValue(p)` would stop type-checking.
+			// --- a resolved value other than a primitive literal withholds the fix ---
+			// `Promise.resolve` infers its type from the value and only the
+			// promise is compared with what the mock returns, while the shorthand
+			// compares the value directly with the settled type. A value that is
+			// itself a promise, an unresolved type parameter that may be one, and
+			// a fresh object literal with a property the settled type lacks all
+			// type-check before the rewrite and fail after it, so only primitive
+			// literals are rewritten, with or without type information.
 			{
 				Code: `const p = Promise.resolve(1);
 const mock = rs.fn<() => Promise<number>>();
@@ -410,57 +415,72 @@ mock.mockReturnValue(Promise.resolve(p));`,
 				Errors: report("mockResolvedValue", 3, 6),
 			},
 			{
+				Code: `const mock = rs.fn<() => Promise<{ id: number }>>();
+mock.mockReturnValue(Promise.resolve({ id: 1, extra: true }));`,
+				Output: []string{},
+				Errors: report("mockResolvedValue", 2, 6),
+			},
+			{
+				Code: `function makeMock<T>(value: T) {
+  const mock = rs.fn<() => Promise<Awaited<T>>>();
+  return mock.mockReturnValue(Promise.resolve(value));
+}`,
+				Output: []string{},
+				Errors: report("mockResolvedValue", 3, 15),
+			},
+			{
 				Code: `const p = Promise.resolve(1);
 aVariable.mockImplementation(() => Promise.resolve(p));`,
 				Output: []string{},
 				Errors: report("mockResolvedValue", 2, 11),
 			},
 			{
-				Code: `declare const value: number | Promise<number>;
-aVariable.mockReturnValue(Promise.resolve(value));`,
+				Code:   `aVariable.mockReturnValue(Promise.resolve(...values));`,
 				Output: []string{},
-				Errors: report("mockResolvedValue", 2, 11),
+				Errors: report("mockResolvedValue", 1, 11),
 			},
 			{
-				Code: `declare const value: PromiseLike<number>;
-aVariable.mockReturnValue(Promise.resolve(value));`,
+				Code:   `aVariable.mockReturnValue(Promise.resolve([1, 2]));`,
 				Output: []string{},
-				Errors: report("mockResolvedValue", 2, 11),
+				Errors: report("mockResolvedValue", 1, 11),
 			},
 			{
-				Code: `function setup<T extends Promise<number>>(value: T) {
-  aVariable.mockReturnValue(Promise.resolve(value));
+				Code: `function setup(undefined: Promise<number>) {
+  aVariable.mockReturnValue(Promise.resolve(undefined));
 }`,
 				Output: []string{},
 				Errors: report("mockResolvedValue", 2, 13),
 			},
+			// A primitive literal cannot be a promise or carry a property, so it
+			// is rewritten.
 			{
-				Code: `declare const values: [Promise<number>];
-aVariable.mockReturnValue(Promise.resolve(...values));`,
-				Output: []string{},
-				Errors: report("mockResolvedValue", 2, 11),
+				Code:   `aVariable.mockReturnValue(Promise.resolve(-1));`,
+				Output: []string{`aVariable.mockResolvedValue(-1);`},
+				Errors: report("mockResolvedValue", 1, 11),
 			},
-			// A rejection reason is not adopted, and the shorthand takes any value.
+			{
+				Code:   "aVariable.mockReturnValueOnce(Promise.resolve(`done`));",
+				Output: []string{"aVariable.mockResolvedValueOnce(`done`);"},
+				Errors: report("mockResolvedValueOnce", 1, 11),
+			},
+			{
+				Code:   `aVariable.mockImplementation(() => Promise.resolve(null));`,
+				Output: []string{`aVariable.mockResolvedValue(null);`},
+				Errors: report("mockResolvedValue", 1, 11),
+			},
+			{
+				Code:   `aVariable.mockReturnValue(Promise.resolve(undefined));`,
+				Output: []string{`aVariable.mockResolvedValue(undefined);`},
+				Errors: report("mockResolvedValue", 1, 11),
+			},
+			// A rejection reason is not typed against the mock, so any value is
+			// rewritten.
 			{
 				Code: `const p = Promise.resolve(1);
 aVariable.mockReturnValue(Promise.reject(p));`,
 				Output: []string{`const p = Promise.resolve(1);
 aVariable.mockRejectedValue(p);`},
 				Errors: report("mockRejectedValue", 2, 11),
-			},
-			{
-				Code: `declare const values: [number];
-aVariable.mockReturnValue(Promise.resolve(...values));`,
-				Output: []string{`declare const values: [number];
-aVariable.mockResolvedValue(...values);`},
-				Errors: report("mockResolvedValue", 2, 11),
-			},
-			{
-				Code: `declare const value: any;
-aVariable.mockReturnValue(Promise.resolve(value));`,
-				Output: []string{`declare const value: any;
-aVariable.mockResolvedValue(value);`},
-				Errors: report("mockResolvedValue", 2, 11),
 			},
 
 			// --- a declaration the rewrite would delete withholds the fix ---
@@ -481,8 +501,8 @@ aVariable.mockResolvedValue(value);`},
 	)
 }
 
-// TestPreferMockPromiseShorthandWithoutTypeInfo locks the source-only path: with
-// no way to tell whether a resolved value is a promise, the fix is kept.
+// TestPreferMockPromiseShorthandWithoutTypeInfo locks the source-only path: the
+// fix does not depend on type information, so it is the same without it.
 func TestPreferMockPromiseShorthandWithoutTypeInfo(t *testing.T) {
 	r := PreferMockPromiseShorthandRule
 	r.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
@@ -502,11 +522,18 @@ aVariable.mockImplementation(() => Promise.resolve(value));`},
 			{
 				Code: `const p = Promise.resolve(1);
 aVariable.mockReturnValue(Promise.resolve(p));`,
-				Output: []string{`const p = Promise.resolve(1);
-aVariable.mockResolvedValue(p);`},
+				Output: []string{},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "useMockShorthand", Message: "Prefer mockResolvedValue",
 					Line: 2, Column: 11,
+				}},
+			},
+			{
+				Code:   `aVariable.mockReturnValue(Promise.resolve(42));`,
+				Output: []string{`aVariable.mockResolvedValue(42);`},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "useMockShorthand", Message: "Prefer mockResolvedValue",
+					Line: 1, Column: 11,
 				}},
 			},
 			{
