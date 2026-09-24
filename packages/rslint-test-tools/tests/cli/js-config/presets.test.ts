@@ -228,6 +228,33 @@ describe('defineConfig and config presets', () => {
     ]);
   });
 
+  test('import.configs.recommended warns on named members of a default import', async () => {
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig([importPlugin.configs.recommended]),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'named-member-preset.js')]:
+          'import obj from "./named-member-preset-dependency.js"; obj.foo; const { foo } = obj;',
+        [path.join(directory, 'named-member-preset-dependency.js')]:
+          'export default {}; export const foo = 1;',
+      },
+    });
+
+    expect(result.fileCount).toBe(2);
+    expect(result.diagnostics).toHaveLength(2);
+    for (const diagnostic of result.diagnostics) {
+      expect(diagnostic).toMatchObject({
+        ruleName: 'import/no-named-as-default-member',
+        messageId: 'noNamedAsDefaultMember',
+        severity: 'warn',
+        message:
+          "Caution: `obj` also has a named export `foo`. Check if you meant to write `import {foo} from './named-member-preset-dependency.js'` instead.",
+      });
+    }
+  });
+
   test('rstestPlugin.configs.recommended should declare rstest plugin and rule', () => {
     const rec = rstestPlugin.configs.recommended;
     expect(rec.plugins).toBeDefined();

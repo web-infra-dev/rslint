@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"context"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -10,7 +12,7 @@ import (
 // GetLocalExportNames returns names declared by the resolved module itself,
 // including local export lists and namespace aliases, but not named or star
 // re-exports. It reuses the module index without following export dependencies.
-// Unresolved, ignored and non-ES modules return no names.
+// Unresolved, ignored, syntactically invalid and non-ES modules return no names.
 func GetLocalExportNames(ctx rule.RuleContext, moduleSpecifier *ast.Node) []string {
 	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
 		return nil
@@ -18,6 +20,9 @@ func GetLocalExportNames(ctx rule.RuleContext, moduleSpecifier *ast.Node) []stri
 	index := IndexFor(ctx)
 	link := resolveExportLink(ctx.Program(), ctx.SourceFile, index.settings, moduleSpecifier)
 	if !link.Resolved || !exportExtensionAllowed(ctx.Settings, link.Target.FileName()) {
+		return nil
+	}
+	if len(ctx.Program().SyntacticDiagnostics(context.Background(), link.Target)) != 0 {
 		return nil
 	}
 	var names []string

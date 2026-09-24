@@ -59,6 +59,36 @@ func TestGetLocalExportNames(t *testing.T) {
 	}
 }
 
+func TestGetLocalExportNamesWithSyntaxErrors(t *testing.T) {
+	t.Parallel()
+	root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/local-export-syntax-errors.txtar").Materialize(t, ""))
+	raw, err := rslint_utils.CreateProgramLenient(true, osvfs.FS(), root, "tsconfig.json", rslint_utils.CreateCompilerHost(root, osvfs.FS()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	standalone, err := lintprogram.NewFromBoundSources(raw, raw.SourceFiles())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceProgram := range []*lintprogram.Program{lintprogram.NewFromCompiler(raw), standalone} {
+		source := sourceProgram.GetSourceFile(tspath.ResolvePath(root, "consumer.ts"))
+		if source == nil || source.Statements == nil || len(source.Statements.Nodes) != 2 {
+			t.Fatal("expected both imports in the consumer")
+		}
+		ctx := (rule.RuleContext{SourceFile: source}).WithProgram(sourceProgram)
+		for i, targetName := range []string{"invalid-js.js", "invalid-ts.ts"} {
+			target := sourceProgram.GetSourceFile(tspath.ResolvePath(root, targetName))
+			if target == nil || len(sourceProgram.SyntacticDiagnostics(t.Context(), target)) == 0 {
+				t.Fatalf("expected a parsed dependency with syntax errors: %s", targetName)
+			}
+			specifier := source.Statements.Nodes[i].AsImportDeclaration().ModuleSpecifier
+			if names := import_utils.GetLocalExportNames(ctx, specifier); len(names) != 0 {
+				t.Errorf("invalid dependency %s exposes names: %v", targetName, names)
+			}
+		}
+	}
+}
+
 func TestExportMapsGlobalNamespace(t *testing.T) {
 	root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/global-namespace.txtar").Materialize(t, ""))
 	for _, interop := range []bool{false, true} {

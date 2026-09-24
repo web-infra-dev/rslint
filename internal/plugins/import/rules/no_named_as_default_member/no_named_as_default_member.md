@@ -6,6 +6,8 @@ Warns when a property accessed on a default import has the same name as a named
 export of that module. Named exports are not automatically properties of the
 default export.
 
+This rule is enabled as a warning in `importPlugin.configs.recommended`.
+
 Given this module:
 
 ```javascript
@@ -49,9 +51,10 @@ This rule has no options. It does not provide automatic fixes or suggestions.
   files in the lint targets too. For example, checking `app.ts` alone will not
   warn about `fruit.pear` from an unselected `fruit.ts`. Keep either project
   option enabled to check dependencies automatically.
-- **Imported-file syntax errors are not reported here.** For example, importing
-  a file containing `return; export {};` produces an upstream parse-error warning,
-  but no warning from this rule. Check that file separately for syntax errors.
+- **Imported-file syntax errors are not reported here.** If an imported file
+  contains `export default {}; export const foo = ;`, upstream reports a parse
+  error. This rule skips that file without warning about `obj.foo`. Check that
+  file separately for syntax errors.
 - **TypeScript imports work without configuring an ESLint parser.** For example,
   named exports from `fruit.ts` are checked without an `import/parsers` setting.
   An explicit `import/extensions` list still restricts which files are checked;
