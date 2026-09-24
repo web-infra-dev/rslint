@@ -9,7 +9,7 @@ imports and exports. Unresolved paths and external packages are ignored.
 Paths are checked after resolution, so `./../main.js` and aliases that resolve
 to a parent file can also be reported.
 
-Examples of **incorrect** code in `lib/example.js`:
+Examples of **incorrect** code for this rule in `lib/example.js`:
 
 ```javascript
 import main from '../main.js';
@@ -17,7 +17,7 @@ export { value } from '../shared.js';
 const shared = import('../shared.js');
 ```
 
-Examples of **correct** code:
+Examples of **correct** code for this rule:
 
 ```javascript
 import sibling from './sibling.js';
@@ -60,25 +60,29 @@ export default [
 
 ## Resolution settings
 
-Resolution uses `import/resolver` settings. The default Node resolver supports
-JavaScript and JSON paths; use the `typescript` resolver for TypeScript paths
-and aliases. `import/core-modules`, `import/internal-regex` and
-`import/external-module-folders` also affect classification.
+Set `import/resolver` to `node` or `typescript`. Their full names,
+`eslint-import-resolver-node` and `eslint-import-resolver-typescript`, are also
+accepted. The default Node resolver supports JavaScript and JSON paths; use
+`typescript` for TypeScript paths and aliases. `import/core-modules`,
+`import/internal-regex` and `import/external-module-folders` also affect which
+imports are reported.
 
 ## Differences from upstream
 
-- Supported resolvers are `node` and `typescript`, including their full names
-  `eslint-import-resolver-node` and `eslint-import-resolver-typescript`.
-  For example, `settings['import/resolver'] = 'webpack'` reports a resolver error.
-  For bundler aliases, use `typescript` with matching `paths` in `tsconfig.json`,
-  or exclude those imports with the `ignore` option.
-- The `typescript` resolver follows the TypeScript project selected by rslint.
-  Resolver-specific options such as `project` and `alwaysTryTypes` have no effect.
-  To select `tsconfig.app.json`, use `languageOptions.parserOptions.project`
-  instead of `{ typescript: { project: 'tsconfig.app.json' } }`.
-- If an `import/resolver` object contains several resolver names, they are tried
-  alphabetically. Use an array, such as `['typescript', 'node']`, to choose the
-  order explicitly.
+- If your ESLint configuration uses `webpack` or another custom resolver,
+  rslint reports a resolver error for imports checked by this rule. Use `node`,
+  or use `typescript` with matching `paths` in `tsconfig.json` for aliases.
+  The rule's `ignore` option can exclude imports you do not want to check.
+- To select a TypeScript project, use `languageOptions.parserOptions.project`.
+  Setting `import/resolver` to
+  `{ typescript: { project: 'tsconfig.app.json' } }` does not select that project
+  in rslint. Other TypeScript resolver options, including `alwaysTryTypes`, also
+  have no effect, so imports may resolve differently from ESLint.
+- When configuring multiple resolvers, use an array such as
+  `['typescript', 'node']` to set their priority. Object configurations are tried
+  alphabetically in rslint: `{ typescript: {}, node: {} }` tries `node` first,
+  whereas ESLint tries `typescript` first. This can change the resolved file
+  and whether the import is reported.
 - Babel's experimental `export value from './module'` syntax is not supported.
   Use `export { default as value } from './module'` instead.
 
