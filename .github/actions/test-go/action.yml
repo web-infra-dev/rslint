@@ -8,8 +8,8 @@ inputs:
   mode:
     description: 'Requested Go test scope: affected or full'
     required: true
-  changed-packages:
-    description: Space-separated directories containing changed Go files
+  changed-files:
+    description: Newline-separated candidate Go input files
     required: false
     default: ''
 
@@ -34,27 +34,23 @@ runs:
       shell: bash
       env:
         GO_TEST_MODE: ${{ inputs.mode }}
-        CHANGED_PACKAGES: ${{ inputs.changed-packages }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
         targets="$RUNNER_TEMP/go-test-packages.txt"
-        changed="$RUNNER_TEMP/go-changed-packages.txt"
-        dependencies="$RUNNER_TEMP/go-test-dependencies.txt"
+        changed="$RUNNER_TEMP/go-changed-inputs.txt"
+        metadata="$RUNNER_TEMP/go-test-metadata.txt"
+        # Keep potentially large file lists out of the process environment.
+        cat > "$changed" <<'GO_CHANGED_FILES'
+        ${{ inputs.changed-files }}
+        GO_CHANGED_FILES
         mode=full
-        if [[ "$GO_TEST_MODE" == affected && -n "$CHANGED_PACKAGES" ]]; then
-          read -r -a packages <<< "$CHANGED_PACKAGES"
-          # Go supplies transitive dependencies, including test imports.
-          # Normalize test variants to their owner and skip synthetic binaries.
-          # Reject seeds outside the suite (for example, Go files under testdata).
-          if go list -f '{{.ImportPath}}' "${packages[@]}" > "$changed" && [[ -s "$changed" ]] &&
-             go list -test -f '{{if .ForTest}}{{.ForTest}}{{else}}{{.ImportPath}}{{end}} {{join .Deps " "}}' ./cmd/... ./internal/... > "$dependencies" &&
-             awk 'NR == FNR { changed[$1] = 1; selected[$1] = 1; next }
-                 $1 in changed { found[$1] = 1 }
-                 $1 !~ /\.test$/ { for (i = 1; i <= NF; i++) if ($i in changed) { selected[$1] = 1; break } }
-                 END { for (package in changed) if (!(package in found)) exit 1
-                       for (package in selected) print package }' "$changed" "$dependencies" | sort -u > "$targets"; then
-            mode=affected
+        if [[ "$GO_TEST_MODE" == affected ]] && [[ -n $(cat "$changed") ]]; then
+          # Keep Go's native package, test dependency and embed metadata intact.
+          if go list -test -json ./cmd/... ./internal/... > "$metadata" &&
+             go run "$ACTION_PATH/select_packages.go" "$changed" "$metadata" > "$targets"; then
+            if [[ -s "$targets" ]]; then mode=affected; else mode=skip; fi
           else
-            echo 'Changed packages could not be mapped to the suite; running the full Go suite.'
+            echo 'Changed files could not be mapped to the suite; running the full Go suite.'
           fi
         fi
         # Windows limits command lines to 32,767 characters; leave room for flags.
@@ -65,7 +61,7 @@ runs:
         if [[ "$mode" == full ]]; then
           printf '%s\n' ./cmd/... ./internal/... > "$targets"
         fi
-        rm -f "$changed" "$dependencies"
+        rm -f "$changed" "$metadata"
         echo "mode=$mode" >> "$GITHUB_OUTPUT"
         echo "Go tests: $mode"
         cat "$targets"
@@ -76,7 +72,7 @@ runs:
       run: go test github.com/microsoft/TypeScript/tsc/shim/checker
 
     - name: Unit Test (Linux / Darwin)
-      if: runner.os != 'Windows'
+      if: runner.os != 'Windows' && steps.selection.outputs.mode != 'skip'
       shell: bash
       run: |
         if [[ "$RUNNER_OS" == Linux ]]; then export GOMAXPROCS=16; fi
@@ -91,20 +87,16 @@ runs:
         go test -count=1 "${packages[@]}"
 
     - name: Unit Test (Windows)
-      if: runner.os == 'Windows'
+      if: runner.os == 'Windows' && steps.selection.outputs.mode != 'skip'
       shell: pwsh
       env:
-        # Use the resolved scope so selection fallbacks retain full-suite limits.
+        # Honor full-suite fallbacks from package selection.
         GO_TEST_MODE: ${{ steps.selection.outputs.mode }}
-        # Keep the existing default concurrency for affected tests and missing quotas.
+        # Keep the existing default concurrency when runner quotas are unavailable.
         GOMAXPROCS: 16
       run: |
         $targets = @(Get-Content (Join-Path $env:RUNNER_TEMP 'go-test-packages.txt'))
         if ($targets.Count -eq 0) { throw 'No Go packages selected for testing.' }
-        if ($env:GO_TEST_MODE -eq 'affected') {
-          go test -count=1 @targets
-          exit $LASTEXITCODE
-        }
 
         $parallelArgs = @()
         $packageParallelism = [int]$env:GOMAXPROCS
@@ -133,6 +125,11 @@ runs:
 
         Write-Host ("Runner quotas: " + (@{cpu_limit = $env:cpu_limit; memory_Limit = $env:memory_Limit} | ConvertTo-Json -Compress))
         Write-Host "Go limits: GOMAXPROCS=$env:GOMAXPROCS, package parallelism=$packageParallelism, GOMEMLIMIT=$env:GOMEMLIMIT"
+        if ($env:GO_TEST_MODE -eq 'affected') {
+          go test @parallelArgs -count=1 @targets
+          exit $LASTEXITCODE
+        }
+
         $startedAt = [DateTime]::UtcNow
         go build @parallelArgs @targets
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
