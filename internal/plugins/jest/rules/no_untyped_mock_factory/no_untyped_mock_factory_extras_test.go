@@ -44,6 +44,9 @@ func TestNoUntypedMockFactoryExtras(t *testing.T) {
 			// Unrelated import
 			{Code: "import { jest } from './helpers'; jest.mock('./service', () => ({}));"},
 		}, []rule_tester.InvalidTestCase{
+			// A CommonJS require binding cannot accept the type argument this
+			// rule would otherwise insert.
+			{Code: "const { jest } = require('@jest/globals'); jest.mock('./service', () => ({}));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
 			// Locks in upstream static accessor handling and spread-factory branch.
 			{Code: "jest[mock]('./service', () => ({}));", Output: []string{"jest[mock]<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
 			{Code: "jest[`mock`]('./service', () => ({}));", Output: []string{"jest[`mock`]<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},

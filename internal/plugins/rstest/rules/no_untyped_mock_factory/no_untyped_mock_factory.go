@@ -5,12 +5,28 @@ import (
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_untyped_mock_factory"
 )
 
 var NoUntypedMockFactoryRule = shared.NewRule(shared.Config{
 	Name:   "rstest/no-untyped-mock-factory",
 	Unwrap: utils.SkipAssertionsAndParens,
+	CanFixWithoutTypeInfo: func(ctx rule.RuleContext, node *ast.Node) bool {
+		utility := rstestUtils.ParseRstestPluginManagedCall(node)
+		if utility == nil || ctx.Refs == nil {
+			return false
+		}
+		symbol := ctx.Refs.Resolve(utility.NamespaceNode)
+		if symbol == nil {
+			return true
+		}
+		return testFramework.IsNamedESMImportSymbolModules(
+			symbol,
+			rstestUtils.RstestCoreImportModules,
+			[]string{"rs", "rstest"},
+		)
+	},
 	Candidates: func(ctx rule.RuleContext) func(*ast.Node) bool {
 		checkedWrites := map[*ast.Symbol]bool{}
 		written := map[*ast.Symbol]bool{}

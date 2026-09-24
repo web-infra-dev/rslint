@@ -2,6 +2,7 @@ package no_untyped_mock_factory
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -12,6 +13,10 @@ type Config struct {
 	Name       string
 	Candidates func(rule.RuleContext) func(*ast.Node) bool
 	Unwrap     func(*ast.Node) *ast.Node
+	// CanFixWithoutTypeInfo proves that the framework callee accepts a type
+	// argument when the checker cannot answer. It runs only when fixes are
+	// requested; nil means diagnostics without source-only fixes.
+	CanFixWithoutTypeInfo func(rule.RuleContext, *ast.Node) bool
 }
 
 func NewRule(config Config) rule.Rule {
@@ -48,7 +53,8 @@ func NewRule(config Config) rule.Rule {
 						Data:        map[string]string{"moduleName": moduleName},
 					}
 					ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
-						if path == nil || path.Kind != ast.KindStringLiteral {
+						if path == nil || path.Kind != ast.KindStringLiteral ||
+							!canInsertTypeArgument(ctx, node, call, config.CanFixWithoutTypeInfo) {
 							return nil
 						}
 						// An optional call places its type arguments AFTER `?.`.
@@ -62,5 +68,49 @@ func NewRule(config Config) rule.Rule {
 				},
 			}
 		},
+	}
+}
+
+func canInsertTypeArgument(
+	ctx rule.RuleContext,
+	node *ast.Node,
+	call *ast.CallExpression,
+	sourceOnly func(rule.RuleContext, *ast.Node) bool,
+) bool {
+	if hasExplicitAnyAssertion(call.Expression) {
+		return false
+	}
+	if ctx.TypeChecker != nil {
+		calleeType := ctx.TypeChecker.GetTypeAtLocation(call.Expression)
+		if !utils.IsIntrinsicErrorType(calleeType) {
+			if utils.IsTypeFlagSet(calleeType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
+				return false
+			}
+			for _, signature := range utils.GetCallSignatures(ctx.TypeChecker, calleeType) {
+				if len(signature.TypeParameters()) > 0 {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	return sourceOnly != nil && sourceOnly(ctx, node)
+}
+
+func hasExplicitAnyAssertion(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	node = ast.SkipParentheses(node)
+	switch node.Kind {
+	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+		return (node.Type() != nil && node.Type().Kind == ast.KindAnyKeyword) ||
+			hasExplicitAnyAssertion(node.Expression())
+	case ast.KindSatisfiesExpression, ast.KindNonNullExpression:
+		return hasExplicitAnyAssertion(node.Expression())
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		return hasExplicitAnyAssertion(node.Expression())
+	default:
+		return false
 	}
 }

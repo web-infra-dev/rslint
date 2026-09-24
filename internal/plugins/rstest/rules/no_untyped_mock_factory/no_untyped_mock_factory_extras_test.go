@@ -3,6 +3,7 @@
 package no_untyped_mock_factory
 
 import (
+	"context"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
@@ -12,6 +13,45 @@ import (
 	"reflect"
 	"testing"
 )
+
+func TestNoUntypedMockFactoryFixedOutputTypeChecks(t *testing.T) {
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	testCases := []struct {
+		name     string
+		code     string
+		want2347 bool
+	}{
+		{
+			name: "generic callee accepts fix",
+			code: `declare const rs: { mock<T>(path: string, factory: () => Partial<T>): void };
+rs.mock<typeof import('./async-mock-factories')>('./async-mock-factories', () => ({}));`,
+		},
+		{
+			name: "any callee rejects fix",
+			code: `declare const rs: any;
+rs.mock<typeof import('./async-mock-factories')>('./async-mock-factories', () => ({}));`,
+			want2347: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			program, file, err := helper.CreateTestProgram(testCase.code, "fixed-output.ts", "tsconfig.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			found2347 := false
+			for _, diagnostic := range program.GetSemanticDiagnostics(context.Background(), file) {
+				if diagnostic.Code() == 2347 {
+					found2347 = true
+				}
+			}
+			if found2347 != testCase.want2347 {
+				t.Fatalf("TS2347 present = %v, want %v", found2347, testCase.want2347)
+			}
+		})
+	}
+}
 
 func TestNoUntypedMockFactoryExtras(t *testing.T) {
 	// N/A: object/class key equivalence, Chai, test modifiers and TestContext
@@ -122,19 +162,21 @@ func TestNoUntypedMockFactoryExtras(t *testing.T) {
 			// Rstest CommonJS, namespace and type wrappers
 			{Code: "rstest.mock('./service', () => ({}));", Output: []string{"rstest.mock<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
 			// Rstest CommonJS, namespace and type wrappers
-			{Code: "(rs as any).mock('./service', () => ({}));", Output: []string{"(rs as any).mock<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
+			{Code: "(rs as any).mock('./service', () => ({}));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
 			// Rstest CommonJS, namespace and type wrappers
 			{Code: "rs!.mock('./service', () => ({}));", Output: []string{"rs!.mock<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
 			// Rstest CommonJS, namespace and type wrappers
-			{Code: "(rs.mock as any)('./service', () => ({}));", Output: []string{"(rs.mock as any)<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
+			{Code: "(rs.mock as any)('./service', () => ({}));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
 			// Rstest literal receiver transformation
 			{Code: "import { rs } from 'rstack/test'; rs.mock('./service', () => ({}));", Output: []string{"import { rs } from 'rstack/test'; rs.mock<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
 			// Rstest literal receiver transformation
-			{Code: "const { rs } = require('@rstest/core'); rs.mock('./service', () => ({}));", Output: []string{"const { rs } = require('@rstest/core'); rs.mock<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
+			{Code: "const { rs } = require('@rstest/core'); rs.mock('./service', () => ({}));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
 			// Rstest literal receiver transformation
 			{Code: "import { rs } from '@rstest/core'; rs.mock('./service', () => ({}));", Output: []string{"import { rs } from '@rstest/core'; rs.mock<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
 			// Rstest literal receiver transformation
-			{Code: "const rs = { mock() {} }; rs.mock('./service', () => ({}));", Output: []string{"const rs = { mock() {} }; rs.mock<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
+			{Code: "const rs = { mock() {} }; rs.mock('./service', () => ({}));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
+			// A locally typed generic callee accepts the inserted type argument.
+			{Code: "declare const rs: { mock<T>(path: string, factory: () => T): void }; rs.mock('./service', () => ({}));", Output: []string{"declare const rs: { mock<T>(path: string, factory: () => T): void }; rs.mock<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
 			// Declared factory
 			{Code: "function factory() { return {}; } rs.doMock('./service', factory);", Output: []string{"function factory() { return {}; } rs.doMock<typeof import('./service')>('./service', factory);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
 			// Callable parameter with type information

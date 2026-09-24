@@ -30,7 +30,7 @@ jest.doMock('./user-service', (): typeof import('./user-service') => ({
 
 ## Autofix
 
-Adds `<typeof import('./module')>` when the first argument is a quoted string, preserving its quotes and escapes. Other module expressions are reported without a fix.
+Adds `<typeof import('./module')>` when the first argument is a quoted string and the callee can accept a type argument, preserving its quotes and escapes. Other module expressions, explicit `any` assertions and CommonJS `require()` bindings are reported without a fix.
 
 ## Differences from ESLint
 

@@ -36,4 +36,4 @@ You can also use `rs.mock(import('./user-service'), factory)` to infer the modul
 
 ## Autofix
 
-Adds `<typeof import('./module')>` using the first argument's quoted module name. Quotes, escapes, comments and parentheses are preserved. If the module name is not a quoted string, the rule reports the call without a fix.
+Adds `<typeof import('./module')>` using the first argument's quoted module name. Quotes, escapes, comments and parentheses are preserved. If the module name is not a quoted string, or the callee cannot be proven to accept a type argument, the rule reports the call without a fix. This includes explicit `any` assertions, CommonJS `require()` bindings and locally declared non-generic utility objects.
