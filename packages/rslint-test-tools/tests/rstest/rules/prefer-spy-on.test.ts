@@ -17,7 +17,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
   invalid: [
     {
       code: 'obj.a = rs.fn(); const test = 10;',
-      output: `rs.spyOn(obj, 'a').mockImplementation(() => undefined); const test = 10;`,
+      output: `rs.spyOn(obj, 'a').mockImplementation(() => {}); const test = 10;`,
       errors: [
         {
           messageId: 'useRsSpyOn',
@@ -30,7 +30,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
     },
     {
       code: `Date['now'] = rs['fn']()`,
-      output: `rs.spyOn(Date, 'now').mockImplementation(() => undefined)`,
+      output: `rs.spyOn(Date, 'now').mockImplementation(() => {})`,
       errors: [
         {
           messageId: 'useRsSpyOn',
@@ -43,7 +43,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
     },
     {
       code: 'window[`${name}`] = rs[`fn`]()',
-      output: 'rs.spyOn(window, `${name}`).mockImplementation(() => undefined)',
+      output: 'rs.spyOn(window, `${name}`).mockImplementation(() => {})',
       errors: [
         {
           messageId: 'useRsSpyOn',
@@ -56,7 +56,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
     },
     {
       code: `obj['prop' + 1] = rs['fn']()`,
-      output: `rs.spyOn(obj, 'prop' + 1).mockImplementation(() => undefined)`,
+      output: `rs.spyOn(obj, 'prop' + 1).mockImplementation(() => {})`,
       errors: [
         {
           messageId: 'useRsSpyOn',
@@ -69,7 +69,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
     },
     {
       code: 'obj.one.two = rs.fn(); const test = 10;',
-      output: `rs.spyOn(obj.one, 'two').mockImplementation(() => undefined); const test = 10;`,
+      output: `rs.spyOn(obj.one, 'two').mockImplementation(() => {}); const test = 10;`,
       errors: [
         {
           messageId: 'useRsSpyOn',
@@ -122,7 +122,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
     {
       code: 'foo[bar] = rs.fn().mockReturnValue(undefined)',
       output:
-        'rs.spyOn(foo, bar).mockImplementation(() => undefined).mockReturnValue(undefined)',
+        'rs.spyOn(foo, bar).mockImplementation(() => {}).mockReturnValue(undefined)',
       errors: [
         {
           messageId: 'useRsSpyOn',

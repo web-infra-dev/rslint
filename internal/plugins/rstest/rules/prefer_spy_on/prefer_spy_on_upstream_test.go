@@ -3,7 +3,7 @@
 // case is carried over.
 //
 // Where the factory is called without an implementation, the expected fix
-// installs `() => undefined` instead of an argument-less
+// installs `() => {}` instead of an argument-less
 // `.mockImplementation()`: an Rstest spy with no implementation calls through
 // to the original method, while `rs.fn()` returned `undefined`.
 package prefer_spy_on
@@ -46,27 +46,27 @@ func TestPreferSpyOnUpstream(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			{
 				Code:   `obj.a = rs.fn(); const test = 10;`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined); const test = 10;`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {}); const test = 10;`},
 				Errors: useSpyOn(1, 1, 16),
 			},
 			{
 				Code:   `Date['now'] = rs['fn']()`,
-				Output: []string{`rs.spyOn(Date, 'now').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(Date, 'now').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 25),
 			},
 			{
 				Code:   "window[`${name}`] = rs[`fn`]()",
-				Output: []string{"rs.spyOn(window, `${name}`).mockImplementation(() => undefined)"},
+				Output: []string{"rs.spyOn(window, `${name}`).mockImplementation(() => {})"},
 				Errors: useSpyOn(1, 1, 31),
 			},
 			{
 				Code:   `obj['prop' + 1] = rs['fn']()`,
-				Output: []string{`rs.spyOn(obj, 'prop' + 1).mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(obj, 'prop' + 1).mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 29),
 			},
 			{
 				Code:   `obj.one.two = rs.fn(); const test = 10;`,
-				Output: []string{`rs.spyOn(obj.one, 'two').mockImplementation(() => undefined); const test = 10;`},
+				Output: []string{`rs.spyOn(obj.one, 'two').mockImplementation(() => {}); const test = 10;`},
 				Errors: useSpyOn(1, 1, 22),
 			},
 			{
@@ -86,7 +86,7 @@ func TestPreferSpyOnUpstream(t *testing.T) {
 			},
 			{
 				Code:   `foo[bar] = rs.fn().mockReturnValue(undefined)`,
-				Output: []string{`rs.spyOn(foo, bar).mockImplementation(() => undefined).mockReturnValue(undefined)`},
+				Output: []string{`rs.spyOn(foo, bar).mockImplementation(() => {}).mockReturnValue(undefined)`},
 				Errors: useSpyOn(1, 1, 46),
 			},
 			{

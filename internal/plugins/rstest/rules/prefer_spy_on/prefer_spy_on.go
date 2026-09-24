@@ -17,8 +17,10 @@ import (
 // to the original method (`implementation || spyState.getOriginal()` in
 // packages/core/src/runtime/api/spy.ts), so an argument-less
 // `.mockImplementation()` would run the real code where `rs.fn()` returned
-// `undefined`. An explicit function keeps the mock returning `undefined`.
-const emptyImplementation = "() => undefined"
+// `undefined`. An explicit function keeps the mock returning `undefined`. It
+// names no identifier, so a local binding called `undefined` cannot change
+// what it returns.
+const emptyImplementation = "() => {}"
 
 func buildUseRsSpyOnMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -139,9 +141,10 @@ func buildSpyOnFixes(ctx rule.RuleContext, target sharedPreferSpyOn.Target) []ru
 	// so it binds at least as tightly as whatever those parentheses grouped.
 	//
 	// The rewritten statement starts with whatever now follows the removed
-	// target. When that is an opening parenthesis on a line of its own, a
-	// preceding statement without a semicolon would take it as a call, so
-	// a semicolon is written in front of it.
+	// target. When that is an opening parenthesis, or the `<` of a type
+	// assertion, on a line of its own, a preceding statement without a
+	// semicolon would take it as a call or a comparison, so a semicolon is
+	// written in front of it.
 	var fixes []rule.RuleFix
 	var removed []core.TextRange
 	if chain == target.FnCall {
@@ -250,7 +253,7 @@ func isCommaExpression(node *ast.Node) bool {
 // expression statement can meet the previous statement: anywhere else the
 // text before it belongs to the same expression.
 func semicolonBefore(ctx rule.RuleContext, assignment *ast.Node, first byte) string {
-	if first != '(' && first != '[' && first != '`' {
+	if first != '(' && first != '[' && first != '`' && first != '<' {
 		return ""
 	}
 	start := utils.TrimNodeTextRange(ctx.SourceFile, assignment).Pos()

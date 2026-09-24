@@ -59,93 +59,93 @@ func TestPreferSpyOnExtras(t *testing.T) {
 			// ---- Provenance: every binding of the utilities object ----
 			{
 				Code:   `obj.a = rstest.fn()`,
-				Output: []string{`rstest.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rstest.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 20),
 			},
 			{
 				Code:   `import { rs } from '@rstest/core'; obj.a = rs.fn()`,
-				Output: []string{`import { rs } from '@rstest/core'; rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`import { rs } from '@rstest/core'; rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 36, 51),
 			},
 			{
 				Code:   `import { rs as mocker } from '@rstest/core'; obj.a = mocker.fn()`,
-				Output: []string{`import { rs as mocker } from '@rstest/core'; mocker.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`import { rs as mocker } from '@rstest/core'; mocker.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 46, 65),
 			},
 			{
 				Code:   `import { rstest } from 'rstack/test'; obj.a = rstest.fn()`,
-				Output: []string{`import { rstest } from 'rstack/test'; rstest.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`import { rstest } from 'rstack/test'; rstest.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 39, 58),
 			},
 			{
 				Code:   `import * as core from '@rstest/core'; obj.a = core.rs.fn()`,
-				Output: []string{`import * as core from '@rstest/core'; core.rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`import * as core from '@rstest/core'; core.rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 39, 59),
 			},
 			{
 				Code:   `const { rs } = require('@rstest/core'); obj.a = rs.fn()`,
-				Output: []string{`const { rs } = require('@rstest/core'); rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`const { rs } = require('@rstest/core'); rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 41, 56),
 			},
 			{
 				Code:   `const core = require('@rstest/core'); obj.a = core['rs'].fn()`,
-				Output: []string{`const core = require('@rstest/core'); core['rs'].spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`const core = require('@rstest/core'); core['rs'].spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 39, 62),
 			},
 			{
 				Code:   `obj.a = import.meta.rstest.rs.fn()`,
-				Output: []string{`import.meta.rstest.rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`import.meta.rstest.rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 35),
 			},
 			{
 				Code:   `obj.a = (rs as any).fn()`,
-				Output: []string{`(rs as any).spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`(rs as any).spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 25),
 			},
 			{
 				Code:   `obj.a = rs?.fn()`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 17),
 			},
 			{
 				Code:   `obj.a = rs.fn?.()`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 18),
 			},
 			// ---- Target forms ----
 			{
 				Code:   `this.a = rs.fn()`,
-				Output: []string{`rs.spyOn(this, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(this, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 17),
 			},
 			{
 				Code:   `(obj.a) = rs.fn()`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 18),
 			},
 			{
 				Code:   `(obj as any).a = rs.fn()`,
-				Output: []string{`rs.spyOn((obj as any), 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn((obj as any), 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 25),
 			},
 			{
 				Code:   `getTarget().a = rs.fn()`,
-				Output: []string{`rs.spyOn(getTarget(), 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(getTarget(), 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 24),
 			},
 			{
 				Code:   `obj[0] = rs.fn()`,
-				Output: []string{`rs.spyOn(obj, 0).mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(obj, 0).mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 17),
 			},
 			{
 				Code:   `const m = (obj.a = rs.fn())`,
-				Output: []string{`const m = (rs.spyOn(obj, 'a').mockImplementation(() => undefined))`},
+				Output: []string{`const m = (rs.spyOn(obj, 'a').mockImplementation(() => {}))`},
 				Errors: useSpyOn(1, 12, 27),
 			},
 			{
 				Code:   `a.b = c.d = rs.fn()`,
-				Output: []string{`a.b = rs.spyOn(c, 'd').mockImplementation(() => undefined)`},
+				Output: []string{`a.b = rs.spyOn(c, 'd').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 7, 20),
 			},
 			// ---- Implementation argument ----
@@ -171,7 +171,7 @@ func TestPreferSpyOnExtras(t *testing.T) {
 			},
 			{
 				Code:   `obj.a = rs.fn().mockImplementationOnce(first)`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined).mockImplementationOnce(first)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {}).mockImplementationOnce(first)`},
 				Errors: useSpyOn(1, 1, 46),
 			},
 			{
@@ -182,12 +182,12 @@ func TestPreferSpyOnExtras(t *testing.T) {
 			// ---- Parentheses and type assertions around the factory ----
 			{
 				Code:   `obj.a = (rs.fn())`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 18),
 			},
 			{
 				Code:   `obj.a = ((rs.fn()))`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 20),
 			},
 			{
@@ -202,37 +202,37 @@ func TestPreferSpyOnExtras(t *testing.T) {
 			},
 			{
 				Code:   `obj.a = (rs.fn().mockReturnValue(1))`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined).mockReturnValue(1)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {}).mockReturnValue(1)`},
 				Errors: useSpyOn(1, 1, 37),
 			},
 			{
 				Code:   `obj.a = (rs.fn()).one.two()`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined).one.two()`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {}).one.two()`},
 				Errors: useSpyOn(1, 1, 28),
 			},
 			{
 				Code:   `obj.a = ((rs.fn()).one).two`,
-				Output: []string{`(rs.spyOn(obj, 'a').mockImplementation(() => undefined).one).two`},
+				Output: []string{`(rs.spyOn(obj, 'a').mockImplementation(() => {}).one).two`},
 				Errors: useSpyOn(1, 1, 28),
 			},
 			{
 				Code:   `obj.a = rs.fn() as any`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined) as any`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {}) as any`},
 				Errors: useSpyOn(1, 1, 23),
 			},
 			{
 				Code:   `obj.a = rs.fn()!`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)!`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {})!`},
 				Errors: useSpyOn(1, 1, 17),
 			},
 			{
 				Code:   `obj.a = (rs.fn() as Mock).mockReturnValue(1)`,
-				Output: []string{`(rs.spyOn(obj, 'a').mockImplementation(() => undefined) as Mock).mockReturnValue(1)`},
+				Output: []string{`(rs.spyOn(obj, 'a').mockImplementation(() => {}) as Mock).mockReturnValue(1)`},
 				Errors: useSpyOn(1, 1, 45),
 			},
 			{
 				Code:   `obj.a = (rs.fn() satisfies Mock)`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined) satisfies Mock`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {}) satisfies Mock`},
 				Errors: useSpyOn(1, 1, 33),
 			},
 			// ---- Comments: kept when copied, otherwise the fix is withheld ----
@@ -286,27 +286,27 @@ func TestPreferSpyOnExtras(t *testing.T) {
 			// `rs.fn(undefined)` is `rs.fn()`: a spy handed `undefined` would call the original method.
 			{
 				Code:   `obj.a = rs.fn(undefined)`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 25),
 			},
 			{
 				Code:   `obj.a = rs.fn(void 0)`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 22),
 			},
 			{
 				Code:   `obj.a = rs.fn((undefined))`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 27),
 			},
 			{
 				Code:   `obj.a = rs.fn(undefined as any)`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(1, 1, 32),
 			},
 			{
 				Code:   `obj.a = rs.fn(undefined).mockReturnValue(1)`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined).mockReturnValue(1)`},
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => {}).mockReturnValue(1)`},
 				Errors: useSpyOn(1, 1, 44),
 			},
 			// A local `undefined` is an ordinary value and is copied.
@@ -361,7 +361,7 @@ obj.a = (rs).fn(() => 1)`,
 				Code: `setup()
 obj.a = (rs.fn() as Mock).mockReturnValue(1)`,
 				Output: []string{`setup()
-;(rs.spyOn(obj, 'a').mockImplementation(() => undefined) as Mock).mockReturnValue(1)`},
+;(rs.spyOn(obj, 'a').mockImplementation(() => {}) as Mock).mockReturnValue(1)`},
 				Errors: useSpyOn(2, 1, 45),
 			},
 			{
@@ -399,7 +399,7 @@ obj.a = (rs).fn(() => 1)
 				Code: `setup()
 obj.a = rs.fn()`,
 				Output: []string{`setup()
-rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+rs.spyOn(obj, 'a').mockImplementation(() => {})`},
 				Errors: useSpyOn(2, 1, 16),
 			},
 			// An assignment inside a larger expression never meets the previous statement.
@@ -427,6 +427,39 @@ obj.a = (rs).fn(() => 1))`,
 				Code:   `obj[(setup(), 'a')] = rs.fn(() => 1)`,
 				Output: []string{`rs.spyOn(obj, (setup(), 'a')).mockImplementation(() => 1)`},
 				Errors: useSpyOn(1, 1, 37),
+			},
+			// ---- The empty implementation does not depend on the name `undefined` ----
+			{
+				Code:   `function install(undefined) { obj.a = rs.fn() }`,
+				Output: []string{`function install(undefined) { rs.spyOn(obj, 'a').mockImplementation(() => {}) }`},
+				Errors: useSpyOn(1, 31, 46),
+			},
+			{
+				Code:   `function install(undefined) { obj.a = rs.fn(void 0) }`,
+				Output: []string{`function install(undefined) { rs.spyOn(obj, 'a').mockImplementation(() => {}) }`},
+				Errors: useSpyOn(1, 31, 52),
+			},
+			// ---- A leading type assertion also meets the previous statement ----
+			{
+				Code: `setup()
+obj.a = <Mock>rs.fn()`,
+				Output: []string{`setup()
+;<Mock>rs.spyOn(obj, 'a').mockImplementation(() => {})`},
+				Errors: useSpyOn(2, 1, 22),
+			},
+			{
+				Code: `setup();
+obj.a = <Mock>rs.fn()`,
+				Output: []string{`setup();
+<Mock>rs.spyOn(obj, 'a').mockImplementation(() => {})`},
+				Errors: useSpyOn(2, 1, 22),
+			},
+			{
+				Code: `setup()
+obj.a = <Mock>(rs.fn()).mockReturnValue(1)`,
+				Output: []string{`setup()
+;<Mock>rs.spyOn(obj, 'a').mockImplementation(() => {}).mockReturnValue(1)`},
+				Errors: useSpyOn(2, 1, 43),
 			},
 		},
 	)
