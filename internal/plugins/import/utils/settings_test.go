@@ -13,6 +13,30 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+func TestNodeVersion(t *testing.T) {
+	for _, tc := range []struct {
+		settings map[string]any
+		want     string
+	}{
+		{nil, "22.0.0"},
+		{map[string]any{"import/node-version": "16.0.0"}, "16.0.0"},
+		{map[string]any{"import/node-version": "014.018.000"}, "14.18.0"},
+		{map[string]any{"import/node-version": "0.0.0"}, "0.0.0"},
+		{map[string]any{"node": map[string]any{"version": "16.0.0"}}, "22.0.0"},
+	} {
+		got, err := import_utils.NodeVersion(tc.settings)
+		if err != nil || got.String() != tc.want {
+			t.Fatalf("settings %v: got %v, %v; want %s", tc.settings, got, err, tc.want)
+		}
+	}
+	for _, invalid := range []any{nil, false, 16, "", "16", "16.0", "v16.0.0", "^16.0.0", "16.0.0-beta.1", "16.0.0+build", "16.0.0\n", "4294967296.0.0"} {
+		_, err := import_utils.NodeVersion(map[string]any{"import/node-version": invalid})
+		if err == nil || err.Error() != "`import/node-version` setting must be a string in the format \"10.23.45\" (a semver version, with no leading zero)" {
+			t.Fatalf("setting %v: got error %v", invalid, err)
+		}
+	}
+}
+
 func TestModuleSettingsIsExternalPath(t *testing.T) {
 	t.Parallel()
 
