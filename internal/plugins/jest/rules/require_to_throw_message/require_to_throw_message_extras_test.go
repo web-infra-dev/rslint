@@ -65,7 +65,7 @@ func TestRequireToThrowMessageExtras(t *testing.T) {
 			},
 			{
 				// Matcher access wrapped in parens: TS AST inserts ParenthesizedExpression;
-				// ESTree does not. Shared ParseJestFnCall must skip those wrappers.
+				// ESTree does not. The shared Jest call parser must skip those wrappers.
 				Code: "(expect(() => { throw new Error('a'); }).toThrow)();",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "addErrorMessage"},
