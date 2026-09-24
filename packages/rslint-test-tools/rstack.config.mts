@@ -221,6 +221,7 @@ define.test({
     './tests/eslint-plugin-import/rules/no-cycle.test.ts',
     './tests/eslint-plugin-import/rules/no-default-export.test.ts',
     './tests/eslint-plugin-import/rules/no-duplicates.test.ts',
+    './tests/eslint-plugin-import/rules/no-named-as-default.test.ts',
     './tests/eslint-plugin-import/rules/no-namespace.test.ts',
     './tests/eslint-plugin-import/rules/no-restricted-paths.test.ts',
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',

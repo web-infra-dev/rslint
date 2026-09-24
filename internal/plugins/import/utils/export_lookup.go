@@ -67,6 +67,9 @@ func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder 
 	if builder.seen[key] {
 		return false, true
 	}
+	if builder.seen == nil {
+		builder.seen = make(map[exportKey]bool)
+	}
 	builder.seen[key] = true
 	defer delete(builder.seen, key)
 
@@ -300,13 +303,13 @@ func exportedDeclarationAddsNamespaceExport(stmt *ast.Node) bool {
 }
 
 func exportDeclarationAddsNamespaceExport(exportDecl *ast.ExportDeclaration) bool {
-	if exportDecl == nil || exportDecl.ModuleSpecifier != nil || exportDecl.ExportClause == nil {
+	if exportDecl == nil || exportDecl.ExportClause == nil {
 		return false
 	}
 	switch exportDecl.ExportClause.Kind {
 	case ast.KindNamedExports:
 		namedExports := exportDecl.ExportClause.AsNamedExports()
-		return namedExports.Elements != nil && len(namedExports.Elements.Nodes) > 0
+		return exportDecl.ModuleSpecifier == nil && namedExports.Elements != nil && len(namedExports.Elements.Nodes) > 0
 	case ast.KindNamespaceExport:
 		return true
 	}

@@ -8,8 +8,8 @@ import (
 
 // localExports is everything one file says about its own exports, with every
 // module specifier resolved and none of them followed. It is a function of
-// that file's syntax alone, which is what makes it safe to compute once per
-// effective source set: what a dependency exports can change with the order
+// that file's syntax and Program options, which makes it safe to compute once
+// per generation: what a dependency exports can change with the order
 // modules are visited in, but what a file itself declares cannot.
 type localExports struct {
 	// Steps replay the file's export statements in source order. Applying
@@ -21,6 +21,9 @@ type localExports struct {
 	// locally re-exported namespace walks all of them, and the order matters
 	// because that walk builds their export maps along the way.
 	Imports []importedModule
+	// ImplicitDefault is available to default-import checks, but is not an
+	// authored name for enumeration or namespace-member checks.
+	ImplicitDefault bool
 }
 
 type exportStepKind uint8
@@ -82,6 +85,7 @@ func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceF
 	if sourceFile == nil || sourceFile.Statements == nil {
 		return local
 	}
+	local.ImplicitDefault = compilerOptionsESModuleInterop(sourceProgram) && sourceFileHasDirectNamespaceExport(sourceFile)
 
 	for _, stmt := range sourceFile.Statements.Nodes {
 		if stmt == nil {
@@ -108,11 +112,13 @@ func (local *localExports) appendStatement(sourceProgram *program.Program, sourc
 	case ast.KindExportAssignment:
 		exportAssignment := stmt.AsExportAssignment()
 		if exportAssignment.IsExportEquals {
+			local.ImplicitDefault = local.ImplicitDefault || exportAssignmentHasDefault(sourceProgram, sourceFile, exportAssignment)
 			local.appendNamespaceAssignment(sourceFile, exportAssignment.Expression)
 			return
 		}
 		local.Steps = append(local.Steps, exportStep{Kind: exportStepLocalDefault, Local: referencedIdentifierText(exportAssignment.Expression)})
 	case ast.KindNamespaceExportDeclaration:
+		local.ImplicitDefault = local.ImplicitDefault || compilerOptionsESModuleInterop(sourceProgram)
 		if name := stmt.Name(); name != nil {
 			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: []string{name.Text()}})
 		}
@@ -122,8 +128,8 @@ func (local *localExports) appendStatement(sourceProgram *program.Program, sourc
 }
 
 // `export = namespace` exposes the namespace's declared members, including
-// members without an export modifier. Synthetic defaults remain HasExport's
-// responsibility; an ExportMap describes the static named surface.
+// members without an export modifier. Synthetic defaults are tracked separately
+// from these authored names.
 func (local *localExports) appendNamespaceAssignment(sourceFile *ast.SourceFile, expression *ast.Node) {
 	name := referencedIdentifierText(expression)
 	if name == "" {
