@@ -214,6 +214,7 @@ define.test({
     './tests/eslint-plugin-import/rules/consistent-type-specifier-style.test.ts',
     './tests/eslint-plugin-import/rules/default.test.ts',
     './tests/eslint-plugin-import/rules/export.test.ts',
+    './tests/eslint-plugin-import/rules/exports-last.test.ts',
     './tests/eslint-plugin-import/rules/first.test.ts',
     './tests/eslint-plugin-import/rules/max-dependencies.test.ts',
     './tests/eslint-plugin-import/rules/namespace.test.ts',
