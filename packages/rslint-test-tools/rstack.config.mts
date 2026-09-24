@@ -218,6 +218,7 @@ define.test({
     './tests/eslint-plugin-import/rules/namespace.test.ts',
     './tests/eslint-plugin-import/rules/newline-after-import.test.ts',
     './tests/eslint-plugin-import/rules/no-amd.test.ts',
+    './tests/eslint-plugin-import/rules/no-anonymous-default-export.test.ts',
     './tests/eslint-plugin-import/rules/no-commonjs.test.ts',
     './tests/eslint-plugin-import/rules/no-cycle.test.ts',
     './tests/eslint-plugin-import/rules/no-default-export.test.ts',
