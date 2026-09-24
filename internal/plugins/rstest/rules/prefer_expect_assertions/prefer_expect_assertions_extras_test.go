@@ -70,6 +70,14 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 	// A hook written in a helper registers into the suites that call the
 	// helper, not into every suite of the file.
 	helperHook := rstestImport + "function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('A', () => { installAssertions(); test('a', () => {}); });\ndescribe('B', () => { test('b', () => {}); });"
+	// A test written once but registered by two suites must be covered in both.
+	sharedTests := rstestImport + "function commonTests() { test('case', () => {}); }\ndescribe('A', () => { beforeEach(() => expect.hasAssertions()); commonTests(); });\ndescribe('B', () => { commonTests(); });"
+	sharedSuiteBody := rstestImport + "const body = () => { test('case', () => {}); };\ndescribe('A', () => { beforeEach(() => expect.hasAssertions()); describe('inner', body); });\ndescribe('B', () => { describe('inner', body); });"
+	// A helper nothing in this file calls registers no hook here, whether it
+	// is local, exported, or only aliased.
+	unusedHelper := rstestImport + "describe('A', () => { function setup() { beforeEach(() => expect.hasAssertions()); } });\ndescribe('B', () => { test('b', () => {}); });"
+	exportedHelper := rstestImport + "export function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('B', () => { test('b', () => {}); });"
+	aliasedHelper := rstestImport + "function setup() { beforeEach(() => expect.hasAssertions()); }\nconst install = setup;\ndescribe('A', () => { install(); });\ndescribe('B', () => { test('b', () => {}); });"
 	helperHookTopLevelTest := rstestImport + "function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('A', () => { installAssertions(); });\ntest('top', () => {});"
 	optionalCallInHook := rstestImport + "beforeEach(() => maybe?.(expect.hasAssertions())); test('t', () => {});"
 	optionalChainInHook := rstestImport + "beforeEach(() => { maybe?.run(expect.hasAssertions()); }); test('t', () => {});"
@@ -151,10 +159,17 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 			{Code: rstestImport + "function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('A', () => { installAssertions(); describe('inner', () => { test('a', () => {}); }); });"},
 			{Code: rstestImport + "describe('A', () => { [1].forEach(() => { beforeEach(() => expect.hasAssertions()); }); test('a', () => {}); });"},
 			{Code: rstestImport + "describe('A', () => { (() => { beforeEach(() => expect.hasAssertions()); })(); test('a', () => {}); });"},
-			// Where an exported helper runs is not known, so neither its hooks nor
-			// its tests can be ruled out of coverage.
-			{Code: rstestImport + "export function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('B', () => { test('b', () => {}); });"},
+			// Other files may call an exported helper inside a covered suite, so its
+			// tests are not reported when a suite of this file covers them.
 			{Code: rstestImport + "export function sharedTests() { test('shared', () => {}); }\ndescribe('A', () => { beforeEach(() => expect.hasAssertions()); sharedTests(); });"},
+			// A shared test is covered when every suite that registers it is.
+			{Code: rstestImport + "function commonTests() { test('case', () => {}); }\ndescribe('A', () => { beforeEach(() => expect.hasAssertions()); commonTests(); });\ndescribe('B', () => { beforeEach(() => expect.assertions(1)); commonTests(); });"},
+			// A helper called through a local alias registers where the alias is
+			// called.
+			{Code: rstestImport + "function setup() { beforeEach(() => expect.hasAssertions()); }\nconst install = setup;\ndescribe('A', () => { install(); test('a', () => {}); });"},
+			// A helper stored where its caller cannot be found may register its
+			// hook in any suite.
+			{Code: rstestImport + "const helpers = { setup() { beforeEach(() => expect.hasAssertions()); } };\ndescribe('A', () => { helpers.setup(); });\ndescribe('B', () => { test('b', () => {}); });"},
 			{Code: rstestImport + "beforeEach(() => { const x = expect.hasAssertions(); }); test('t', () => {});"},
 
 			// ---- Provenance ----
@@ -206,6 +221,11 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 			invalid(logicalInHook, missing(logicalInHook, "test('t', () => {})", "test('t', () => {", "expect")),
 			invalid(returnBeforeHookDeclaration, missing(returnBeforeHookDeclaration, "test('t', () => {})", "test('t', () => {", "expect")),
 			invalid(helperHook, missing(helperHook, "test('b', () => {})", "test('b', () => {", "expect")),
+			invalid(sharedTests, missing(sharedTests, "test('case', () => {})", "test('case', () => {", "expect")),
+			invalid(sharedSuiteBody, missing(sharedSuiteBody, "test('case', () => {})", "test('case', () => {", "expect")),
+			invalid(unusedHelper, missing(unusedHelper, "test('b', () => {})", "test('b', () => {", "expect")),
+			invalid(exportedHelper, missing(exportedHelper, "test('b', () => {})", "test('b', () => {", "expect")),
+			invalid(aliasedHelper, missing(aliasedHelper, "test('b', () => {})", "test('b', () => {", "expect")),
 			invalid(helperHookTopLevelTest, missing(helperHookTopLevelTest, "test('top', () => {})", "test('top', () => {", "expect")),
 			invalid(tryInHook, missing(tryInHook, "test('t', () => {})", "test('t', () => {", "expect")),
 			invalid(optionalCallInHook, missing(optionalCallInHook, "test('t', () => {})", "test('t', () => {", "expect")),

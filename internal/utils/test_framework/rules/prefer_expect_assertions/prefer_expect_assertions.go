@@ -258,18 +258,23 @@ func NewRule(config Config) rule.Rule {
 					reports = append(reports, checkStaticCall(&ctx, entry.static, opts)...)
 				}
 
-				resolver := newSuiteResolver(ctx, func(call *ast.Node) bool {
+				isDescribe := func(call *ast.Node) bool {
 					return runtime.Classify(call).Kind == RegistrationDescribe
-				})
+				}
+				hookSuites := newSuiteResolver(ctx, isDescribe, true)
+				testSuites := newSuiteResolver(ctx, isDescribe, false)
 				covered := map[*ast.Node]bool{}
 				for _, hook := range coveringHooks {
-					for _, suite := range resolver.suitesOf(enclosingFunction(hook)) {
+					for _, suite := range hookSuites.suitesOf(enclosingFunction(hook)) {
 						covered[suite] = true
 					}
 				}
-				// A suite is covered by a hook of its own or of any suite it is
-				// nested in. An unknown suite could be any of them.
+				// A suite is covered by a hook of its own, or when every suite it
+				// is registered in is covered. An unknown suite could be any of
+				// them. A suite reached again while it is being decided adds no
+				// registration of its own, so it does not block the answer.
 				suiteCovered := map[*ast.Node]bool{}
+				deciding := map[*ast.Node]bool{}
 				var isSuiteCovered func(suite *ast.Node) bool
 				isSuiteCovered = func(suite *ast.Node) bool {
 					if suite == unknownSuite {
@@ -284,25 +289,35 @@ func NewRule(config Config) rule.Rule {
 					if result, ok := suiteCovered[suite]; ok {
 						return result
 					}
-					suiteCovered[suite] = false
-					for _, parent := range resolver.parentSuites(suite) {
-						if isSuiteCovered(parent) {
-							suiteCovered[suite] = true
-							return true
+					if deciding[suite] {
+						return true
+					}
+					deciding[suite] = true
+					parents := testSuites.parentSuites(suite)
+					result := len(parents) > 0
+					for _, parent := range parents {
+						if !isSuiteCovered(parent) {
+							result = false
+							break
 						}
 					}
-					return false
+					delete(deciding, suite)
+					suiteCovered[suite] = result
+					return result
 				}
+				// A test written once but registered in several suites, such as
+				// one inside a helper that two suites call, is only protected
+				// when every one of those registrations is.
 				isCovered := func(test *testEntry) bool {
 					if covered[unknownSuite] {
 						return true
 					}
-					for _, suite := range resolver.suitesOf(enclosingFunction(test.call)) {
-						if isSuiteCovered(suite) {
-							return true
+					for _, suite := range testSuites.suitesOf(enclosingFunction(test.call)) {
+						if !isSuiteCovered(suite) {
+							return false
 						}
 					}
-					return false
+					return true
 				}
 
 				for _, test := range tests {

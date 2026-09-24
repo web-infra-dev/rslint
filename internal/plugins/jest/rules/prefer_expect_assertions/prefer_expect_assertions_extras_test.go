@@ -65,6 +65,10 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 	// A hook written in a helper registers into the suites that call the
 	// helper, not into every suite of the file.
 	helperHook := "function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('A', () => { installAssertions(); test('a', () => {}); });\ndescribe('B', () => { test('b', () => {}); });"
+	sharedTests := "function commonTests() { it('case', () => {}); }\ndescribe('A', () => { beforeEach(() => expect.hasAssertions()); commonTests(); });\ndescribe('B', () => { commonTests(); });"
+	sharedSuiteBody := "const body = () => { it('case', () => {}); };\ndescribe('A', () => { afterEach(() => expect.hasAssertions()); describe('inner', body); });\ndescribe('B', () => { describe('inner', body); });"
+	unusedHelper := "describe('A', () => { function setup() { beforeEach(() => expect.hasAssertions()); } });\ndescribe('B', () => { it('b', () => {}); });"
+	aliasedHelper := "function setup() { beforeEach(() => expect.hasAssertions()); }\nconst install = setup;\ndescribe('A', () => { install(); });\ndescribe('B', () => { it('b', () => {}); });"
 	optionalCallInHook := `beforeEach(() => maybe?.(expect.hasAssertions())); it('t', () => {});`
 	bindingDefaultInHook := `afterEach(() => { const { x = expect.hasAssertions() } = { x: 1 }; }); it('t', () => {});`
 	optionalCallFirst := `it('t', () => { maybe?.(expect.hasAssertions()); run(); });`
@@ -106,6 +110,8 @@ it("returns numbers that are greater than five", () => {
 			{Code: `beforeEach(() => { const server = start(); expect.hasAssertions(); }); it('t', () => {});`},
 			{Code: "describe('A', suiteBody);\nfunction suiteBody() { afterEach(() => expect.hasAssertions()); it('a', () => {}); }"},
 			{Code: "function installAssertions() { beforeEach(() => expect.hasAssertions()); }\ndescribe('A', () => { installAssertions(); describe('inner', () => { it('a', () => {}); }); });"},
+			{Code: "function commonTests() { it('case', () => {}); }\ndescribe('A', () => { beforeEach(() => expect.hasAssertions()); commonTests(); });\ndescribe('B', () => { afterEach(() => expect.hasAssertions()); commonTests(); });"},
+			{Code: "function setup() { afterEach(() => expect.hasAssertions()); }\nconst install = setup;\ndescribe('A', () => { install(); it('a', () => {}); });"},
 
 			// ---- First statement ----
 			{Code: `it('t', function () { 'use strict'; expect.hasAssertions(); });`},
@@ -132,6 +138,10 @@ it("returns numbers that are greater than five", () => {
 			invalid(logicalInHook, nil, missing(logicalInHook, "it('t', () => {})", "it('t', () => {")),
 			invalid(returnBeforeHookDeclaration, nil, missing(returnBeforeHookDeclaration, "it('t', () => {})", "it('t', () => {")),
 			invalid(helperHook, nil, missing(helperHook, "test('b', () => {})", "test('b', () => {")),
+			invalid(sharedTests, nil, missing(sharedTests, "it('case', () => {})", "it('case', () => {")),
+			invalid(sharedSuiteBody, nil, missing(sharedSuiteBody, "it('case', () => {})", "it('case', () => {")),
+			invalid(unusedHelper, nil, missing(unusedHelper, "it('b', () => {})", "it('b', () => {")),
+			invalid(aliasedHelper, nil, missing(aliasedHelper, "it('b', () => {})", "it('b', () => {")),
 			invalid(optionalCallInHook, nil, missing(optionalCallInHook, "it('t', () => {})", "it('t', () => {")),
 			invalid(bindingDefaultInHook, nil, missing(bindingDefaultInHook, "it('t', () => {})", "it('t', () => {")),
 

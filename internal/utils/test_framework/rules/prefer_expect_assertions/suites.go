@@ -7,9 +7,10 @@ import (
 )
 
 // unknownSuite stands for a suite the resolver cannot identify, such as the
-// callers of an exported function. A hook registered from an unknown place may
-// cover any test, and a test registered from one may be covered by any hook,
-// so both answers lean towards not reporting.
+// place a function stored in an object is eventually called from. A hook
+// registered from an unknown place may cover any test, and a test registered
+// from one may be covered by any hook, so both answers lean towards not
+// reporting.
 var unknownSuite = &ast.Node{}
 
 type useKind uint8
@@ -32,20 +33,32 @@ type functionUse struct {
 // suiteResolver maps code to the describe blocks it registers hooks and tests
 // in. A suite is identified by the function that is its body; nil is the file.
 // Hooks and tests register into the suite that is running when they are
-// called, so a hook inside a helper belongs to the suites that call the helper,
+// called, so code inside a helper belongs to the suites that call the helper,
 // not to the scope the helper is written in.
+//
+// The two kinds of registration resolve uncertainty in opposite directions,
+// because a wrong answer must only ever cost a missed report:
+//
+//   - For hooks, a function nothing in this file calls registers nothing
+//     here. Exporting it only lets other files register hooks in their own
+//     suites. Such functions contribute no suites.
+//   - For tests, the same functions may still be registered by a caller the
+//     resolver cannot see, possibly inside a covered suite, so they resolve to
+//     unknownSuite.
 type suiteResolver struct {
 	ctx        rule.RuleContext
 	isDescribe func(call *ast.Node) bool
+	forHooks   bool
 	suites     map[*ast.Node][]*ast.Node
 	parents    map[*ast.Node][]*ast.Node
 	inProgress map[*ast.Node]bool
 }
 
-func newSuiteResolver(ctx rule.RuleContext, isDescribe func(call *ast.Node) bool) *suiteResolver {
+func newSuiteResolver(ctx rule.RuleContext, isDescribe func(call *ast.Node) bool, forHooks bool) *suiteResolver {
 	return &suiteResolver{
 		ctx:        ctx,
 		isDescribe: isDescribe,
+		forHooks:   forHooks,
 		suites:     map[*ast.Node][]*ast.Node{},
 		parents:    map[*ast.Node][]*ast.Node{},
 		inProgress: map[*ast.Node]bool{},
@@ -68,9 +81,7 @@ func (r *suiteResolver) suitesOf(scope *ast.Node) []*ast.Node {
 	r.inProgress[scope] = true
 	var suites []*ast.Node
 	uses := r.functionUses(scope)
-	if len(uses) == 0 {
-		// Never referenced in this file: dead code, or reached some way the
-		// resolver does not see.
+	if len(uses) == 0 && !r.forHooks {
 		suites = []*ast.Node{unknownSuite}
 	}
 	for _, use := range uses {
@@ -90,7 +101,7 @@ func (r *suiteResolver) suitesOf(scope *ast.Node) []*ast.Node {
 	return suites
 }
 
-// parentSuites returns the suites a suite body is nested in.
+// parentSuites returns every suite a suite body is registered in.
 func (r *suiteResolver) parentSuites(suite *ast.Node) []*ast.Node {
 	if parents, ok := r.parents[suite]; ok {
 		return parents
@@ -116,28 +127,32 @@ func (r *suiteResolver) functionUses(function *ast.Node) []functionUse {
 	if use, ok := r.classifyUse(expression); ok {
 		return []functionUse{use}
 	}
-
-	var symbol *ast.Symbol
-	exported := false
+	var declaration *ast.Node
 	switch {
 	case function.Kind == ast.KindFunctionDeclaration:
-		symbol = function.Symbol()
-		exported = ast.HasSyntacticModifier(function, ast.ModifierFlagsExport)
-	case expression.Parent != nil && expression.Parent.Kind == ast.KindVariableDeclaration &&
-		expression.Parent.AsVariableDeclaration().Initializer == expression &&
-		expression.Parent.Name().Kind == ast.KindIdentifier:
-		declaration := expression.Parent
-		symbol = declaration.Symbol()
-		if statement := declaration.Parent.Parent; statement != nil && statement.Kind == ast.KindVariableStatement {
-			exported = ast.HasSyntacticModifier(statement, ast.ModifierFlagsExport)
-		}
+		declaration = function
+	case aliasDeclaration(expression) != nil:
+		declaration = expression.Parent
+	default:
+		return []functionUse{{kind: useUnknown}}
 	}
+	return r.declarationUses(declaration, map[*ast.Symbol]bool{})
+}
+
+// declarationUses lists the uses of the binding a function or variable
+// declaration introduces, following `const alias = name` to the alias's uses.
+func (r *suiteResolver) declarationUses(declaration *ast.Node, visited map[*ast.Symbol]bool) []functionUse {
+	symbol := declaration.Symbol()
 	if symbol == nil || r.ctx.Refs == nil {
 		return []functionUse{{kind: useUnknown}}
 	}
+	if visited[symbol] {
+		return nil
+	}
+	visited[symbol] = true
 
 	var uses []functionUse
-	if exported {
+	if isExportedDeclaration(declaration) && !r.forHooks {
 		uses = append(uses, functionUse{kind: useUnknown})
 	}
 	for _, reference := range r.ctx.Refs.References(symbol) {
@@ -145,8 +160,16 @@ func (r *suiteResolver) functionUses(function *ast.Node) []functionUse {
 			uses = append(uses, functionUse{kind: useUnknown})
 			continue
 		}
-		if use, ok := r.classifyUse(outermostWrapper(reference)); ok {
+		expression := outermostWrapper(reference)
+		if use, ok := r.classifyUse(expression); ok {
 			uses = append(uses, use)
+			continue
+		}
+		if alias := aliasDeclaration(expression); alias != nil {
+			uses = append(uses, r.declarationUses(alias, visited)...)
+			continue
+		}
+		if r.forHooks && isExportReference(expression) {
 			continue
 		}
 		uses = append(uses, functionUse{kind: useUnknown})
@@ -167,9 +190,38 @@ func (r *suiteResolver) classifyUse(expression *ast.Node) (functionUse, bool) {
 	if parent.Kind == ast.KindCallExpression && r.isDescribe(parent) {
 		return functionUse{kind: useDescribe, call: parent}, true
 	}
-	// A callback handed to any other call is assumed to run there. That can
-	// only widen what a hook covers, or where a test looks for coverage.
+	// A callback handed to any other call is assumed to run there.
 	return functionUse{kind: useCall, call: parent}, true
+}
+
+// aliasDeclaration returns the variable declaration expression initializes,
+// as in `const install = setup`.
+func aliasDeclaration(expression *ast.Node) *ast.Node {
+	parent := expression.Parent
+	if parent == nil || parent.Kind != ast.KindVariableDeclaration ||
+		parent.AsVariableDeclaration().Initializer != expression || parent.Name().Kind != ast.KindIdentifier {
+		return nil
+	}
+	return parent
+}
+
+func isExportedDeclaration(declaration *ast.Node) bool {
+	if declaration.Kind == ast.KindFunctionDeclaration {
+		return ast.HasSyntacticModifier(declaration, ast.ModifierFlagsExport)
+	}
+	if list := declaration.Parent; list != nil {
+		if statement := list.Parent; statement != nil && statement.Kind == ast.KindVariableStatement {
+			return ast.HasSyntacticModifier(statement, ast.ModifierFlagsExport)
+		}
+	}
+	return false
+}
+
+// isExportReference reports `export { name }` and `export default name`,
+// which hand the function to other files without calling it here.
+func isExportReference(expression *ast.Node) bool {
+	parent := expression.Parent
+	return parent != nil && (parent.Kind == ast.KindExportSpecifier || parent.Kind == ast.KindExportAssignment)
 }
 
 // outermostWrapper climbs from node through parentheses and type assertions,
