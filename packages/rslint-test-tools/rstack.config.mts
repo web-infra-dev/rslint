@@ -215,6 +215,7 @@ define.test({
     './tests/eslint-plugin-import/rules/default.test.ts',
     './tests/eslint-plugin-import/rules/export.test.ts',
     './tests/eslint-plugin-import/rules/first.test.ts',
+    './tests/eslint-plugin-import/rules/max-dependencies.test.ts',
     './tests/eslint-plugin-import/rules/namespace.test.ts',
     './tests/eslint-plugin-import/rules/newline-after-import.test.ts',
     './tests/eslint-plugin-import/rules/no-amd.test.ts',
