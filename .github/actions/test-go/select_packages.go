@@ -49,7 +49,8 @@ func run(args []string, output io.Writer) error {
 		return err
 	}
 	defer metadata.Close()
-	packages, err := selectPackages(strings.Split(string(changed), "\n"), metadata)
+	files := strings.Split(strings.ReplaceAll(string(changed), "\r\n", "\n"), "\n")
+	packages, err := selectPackages(files, metadata)
 	if err != nil {
 		return err
 	}
