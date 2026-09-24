@@ -1,0 +1,72 @@
+Fixtures from eslint-plugin-import v2.32.0 tests/files and rule documentation.
+
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"commonjs","jsx":"preserve"},"include":["**/*"]}
+-- bar.js --
+export default 'bar'
+export function foo() { return 'foo' }
+-- export-default-string-and-named.js --
+const bar = "bar";
+export function foo() {}
+
+export { bar as "default" }
+-- data.json --
+{ "foo": "bar" }
+-- foobar.json --
+{
+  "action": "set",
+  "node": {
+    "key": "/foo",
+    "value": "foo",
+    "modifiedIndex": 1438,
+    "createdIndex": 1438
+  },
+  "prevNode": {
+    "key": "/foo",
+    "value": "bar",
+    "modifiedIndex": 1437,
+    "createdIndex": 1437
+  }
+}
+-- ignore.invalid.extension --
+
+-- commonjs-namespace/a.js --
+export { default as b } from './b'
+-- commonjs-namespace/b.js --
+module.exports = {}
+-- issue-370-commonjs-namespace/bar.js --
+// bar.js
+export { default as foo } from './foo'
+-- issue-370-commonjs-namespace/foo.js --
+// foo.js
+module.exports = { foo: 'foo' }
+-- foo.js --
+export default 'foo';
+export const bar = 'baz';
+-- named-exports.js --
+var a = 1
+var b = 2
+
+export {a, b}
+
+var c = 3
+export {c as d}
+
+export class ExportedClass {
+
+}
+
+
+// destructuring exports
+
+export var { destructuredProp, ...restProps } = {}
+         , { destructingAssign = null } = {}
+         , { destructingAssign: destructingRenamedAssign = null } = {}
+         , [ arrayKeyProp, ...arrayRestKeyProps ] = []
+         , [ { deepProp } ] = []
+         , { arr: [ ,, deepSparseElement ] } = {}
+-- default-export-default-property.js --
+
+export default {
+  default: 'baz'
+}

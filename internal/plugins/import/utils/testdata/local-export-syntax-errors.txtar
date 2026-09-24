@@ -1,0 +1,12 @@
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"module":"commonjs"},"include":["**/*"]}
+-- consumer.ts --
+import js from './invalid-js.js';
+import ts from './invalid-ts';
+-- invalid-js.js --
+export default {};
+export const other = 1;
+export const foo = ;
+-- invalid-ts.ts --
+export default {};
+export const foo: number = ;

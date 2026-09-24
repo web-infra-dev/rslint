@@ -227,6 +227,7 @@ define.test({
     './tests/eslint-plugin-import/rules/no-dynamic-require.test.ts',
     './tests/eslint-plugin-import/rules/no-empty-named-blocks.test.ts',
     './tests/eslint-plugin-import/rules/no-named-as-default.test.ts',
+    './tests/eslint-plugin-import/rules/no-named-as-default-member.test.ts',
     './tests/eslint-plugin-import/rules/no-namespace.test.ts',
     './tests/eslint-plugin-import/rules/no-restricted-paths.test.ts',
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
