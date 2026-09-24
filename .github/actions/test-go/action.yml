@@ -84,6 +84,10 @@ runs:
         while IFS= read -r package; do
           packages+=("$package")
         done < "$RUNNER_TEMP/go-test-packages.txt"
+        if [[ ${#packages[@]} -eq 0 ]]; then
+          echo 'No Go packages selected for testing.' >&2
+          exit 1
+        fi
         go test -count=1 "${packages[@]}"
 
     - name: Unit Test (Windows)
@@ -96,6 +100,7 @@ runs:
         GOMAXPROCS: 16
       run: |
         $targets = @(Get-Content (Join-Path $env:RUNNER_TEMP 'go-test-packages.txt'))
+        if ($targets.Count -eq 0) { throw 'No Go packages selected for testing.' }
         if ($env:GO_TEST_MODE -eq 'affected') {
           go test -count=1 @targets
           exit $LASTEXITCODE
@@ -133,8 +138,9 @@ runs:
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         Write-Host "Go build completed: elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
 
-        $packages = go list @parallelArgs @targets | Where-Object { $_ -ne "" }
+        $packages = @(go list @parallelArgs @targets | Where-Object { $_ -ne "" })
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        if ($packages.Count -eq 0) { throw 'No Go packages found for the full test run.' }
         $batchSize = 32
         $batch = @()
 
