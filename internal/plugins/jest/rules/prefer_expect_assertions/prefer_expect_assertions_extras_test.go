@@ -52,6 +52,7 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 	nestedBranch := `it('t', () => { if (ready) { expect.assertions(1); } run(); });`
 	logicalFirst := `it('t', () => { strict && expect.hasAssertions(); run(); });`
 	directive := `it('t', function () { 'use strict'; run(); });`
+	directiveWithoutSemicolon := "it('t', () => {\n  'use strict'\n  run();\n});"
 	reassignedHook := `let setup = () => expect.hasAssertions(); setup = () => {}; beforeEach(setup); it('t', () => {});`
 	foreignReference := `beforeEach(helpers.hasAssertions); it('t', () => {});`
 	shadowedReference := `function run(expect) { beforeEach(expect.hasAssertions); it('t', () => {}); }`
@@ -136,6 +137,16 @@ it("returns numbers that are greater than five", () => {
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestAddingHasAssertions", Output: strings.Replace(directive, "'use strict';", "'use strict';expect.hasAssertions();", 1)},
 					{MessageId: "suggestAddingAssertions", Output: strings.Replace(directive, "'use strict';", "'use strict';expect.assertions();", 1)},
+				},
+			}),
+
+			// A directive written without a semicolon gets one, or the inserted
+			// statement would run into it.
+			invalid(directiveWithoutSemicolon, nil, rule_tester.InvalidTestCaseError{
+				MessageId: "haveExpectAssertions", Line: 1, Column: 1, EndLine: 4, EndColumn: 3,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "suggestAddingHasAssertions", Output: strings.Replace(directiveWithoutSemicolon, "'use strict'", "'use strict';expect.hasAssertions();", 1)},
+					{MessageId: "suggestAddingAssertions", Output: strings.Replace(directiveWithoutSemicolon, "'use strict'", "'use strict';expect.assertions();", 1)},
 				},
 			}),
 

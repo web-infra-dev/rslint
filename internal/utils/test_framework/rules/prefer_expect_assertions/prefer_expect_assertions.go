@@ -634,10 +634,10 @@ func reportMissingAssertions(ctx *rule.RuleContext, runtime Runtime, test *testE
 			if !ok {
 				return nil
 			}
-			insertAt := insertionPoint(ctx.SourceFile, body)
+			insertAt, separator := insertionPoint(ctx.SourceFile, body)
 			var suggestions []rule.RuleSuggestion
 			add := func(message rule.RuleMessage, member string) {
-				text := spelling + "." + member + "();"
+				text := separator + spelling + "." + member + "();"
 				suggestions = append(suggestions, rule.RuleSuggestion{
 					Message:  message,
 					FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(insertAt, insertAt), text)},
@@ -654,16 +654,22 @@ func reportMissingAssertions(ctx *rule.RuleContext, runtime Runtime, test *testE
 
 // insertionPoint is just inside the opening brace, or after the directive
 // prologue so an inserted statement cannot turn `'use strict'` into an
-// ordinary expression.
-func insertionPoint(sourceFile *ast.SourceFile, body *ast.Node) int {
-	insertAt := utils.TrimNodeTextRange(sourceFile, body).Pos() + 1
+// ordinary expression. separator is the `;` a directive written without one
+// needs before the inserted statement; without it the two would run together
+// as `'use strict'expect.hasAssertions()`, which does not parse.
+func insertionPoint(sourceFile *ast.SourceFile, body *ast.Node) (insertAt int, separator string) {
+	insertAt = utils.TrimNodeTextRange(sourceFile, body).Pos() + 1
 	for _, statement := range body.AsBlock().Statements.Nodes {
 		if !ast.IsPrologueDirective(statement) {
 			break
 		}
 		insertAt = statement.End()
+		separator = ""
+		if sourceFile.Text()[insertAt-1] != ';' {
+			separator = ";"
+		}
 	}
-	return insertAt
+	return insertAt, separator
 }
 
 // resolveLocalFunction returns the function a hook argument names when the
