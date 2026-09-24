@@ -179,8 +179,6 @@ sources. A single syntax cache belongs to each exact immutable SourceFile.
 Node's import adapter applies its own literal coercion, loader-parameter removal,
 builtin filtering and type-only policy to the same collection. The shared
 collector does not depend on Program, rule configuration or a TypeChecker.
-The package's builtin queries expose version-specific availability using tsgo's
-semver matcher; callers select the Node version and prefix policy.
 
 `internal/utils/moduleresolver` provides runtime lookup through the Program's
 filesystem and generation-scoped cache, reusing tsgo's resolver for package
