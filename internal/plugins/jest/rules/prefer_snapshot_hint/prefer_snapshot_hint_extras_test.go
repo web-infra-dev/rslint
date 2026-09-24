@@ -62,6 +62,8 @@ func TestPreferSnapshotHintExtras(t *testing.T) {
 		{Code: "const register = () => { const first = () => expect('first').toMatchSnapshot(); test('first', first); const second = () => expect('second').toMatchSnapshot(); test('second', second); }; describe('suite', register);", Options: []any{"multi"}},
 		{Code: "const callback = () => expect('test').toMatchSnapshot(); test('case', callback); function helper() { expect('helper').toMatchSnapshot(); }", Options: []any{"multi"}},
 		{Code: "test('case', callback); function callback() { expect('test').toMatchSnapshot(); } function helper() { expect('helper').toMatchSnapshot(); }", Options: []any{"multi"}},
+		// A TypeScript overload set resolves to its unique implementation body.
+		{Code: "test('case', callback); function callback(): void; function callback() { expect('test').toMatchSnapshot(); } function helper() { expect('helper').toMatchSnapshot(); }", Options: []any{"multi"}},
 	}, []rule_tester.InvalidTestCase{
 		// The upstream parser treats this static-looking call as an expect matcher.
 		{Code: "expect.toMatchSnapshot();", Options: []any{"always"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingHint", Line: 1, Column: 8, EndLine: 1, EndColumn: 23}}},
@@ -149,6 +151,17 @@ func TestPreferSnapshotHintExtras(t *testing.T) {
 			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 2, Column: 20, EndLine: 2, EndColumn: 35},
 			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 6, Column: 19, EndLine: 6, EndColumn: 34},
 		}},
+		// A reassigned binding does not make its stale initializer a test callback.
+		{Code: "const outer = () => {\n  expect('before').toMatchSnapshot();\n  let callback = () => {\n    expect('stale').toMatchSnapshot();\n  };\n  callback = () => {};\n  test('case', callback);\n  expect('after').toMatchSnapshot();\n};", Options: []any{"multi"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 2, Column: 20, EndLine: 2, EndColumn: 35},
+			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 4, Column: 21, EndLine: 4, EndColumn: 36},
+			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 8, Column: 19, EndLine: 8, EndColumn: 34},
+		}},
+		// Same source name in different blocks resolves by binding identity.
+		{Code: "const outer = () => {\n  expect('before').toMatchSnapshot();\n  { const callback = () => expect('one').toMatchSnapshot(); test('one', callback); }\n  { const callback = () => expect('two').toMatchSnapshot(); test('two', callback); }\n  expect('after').toMatchSnapshot();\n};", Options: []any{"multi"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 2, Column: 20, EndLine: 2, EndColumn: 35},
+			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 5, Column: 19, EndLine: 5, EndColumn: 34},
+		}},
 		// Locks in registration: parameterized tests
 		{Code: "test.each([1, 2])(\"row\", value => { expect(value).toMatchSnapshot(); expect(value).toThrowErrorMatchingSnapshot(); });", Options: []any{"multi"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 1, Column: 51, EndLine: 1, EndColumn: 66},
@@ -198,6 +211,13 @@ describe('suite', register);`, []any{"multi"}, 0)
 	t.Run("hoisted registered callback has its own group", func(t *testing.T) {
 		runPreferSnapshotHintSourceOnly(t, `
 test('case', callback);
+function callback() { expect('test').toMatchSnapshot(); }
+function helper() { expect('helper').toMatchSnapshot(); }`, []any{"multi"}, 0)
+	})
+	t.Run("overloaded registered callback has its own group", func(t *testing.T) {
+		runPreferSnapshotHintSourceOnly(t, `
+test('case', callback);
+function callback(): void;
 function callback() { expect('test').toMatchSnapshot(); }
 function helper() { expect('helper').toMatchSnapshot(); }`, []any{"multi"}, 0)
 	})
