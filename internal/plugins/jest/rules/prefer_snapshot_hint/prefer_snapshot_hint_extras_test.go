@@ -58,6 +58,10 @@ func TestPreferSnapshotHintExtras(t *testing.T) {
 		{Code: "test.todo(\"later\"); test(\"single\", () => { expect(value).toMatchSnapshot(); });", Options: []any{"multi"}},
 		// Renamed registration resets scope
 		{Code: "import { test as check } from \"@jest/globals\"; describe(\"suite\", () => { check(\"one\", () => { expect(value).toMatchSnapshot(); }); check(\"two\", () => { expect(value).toMatchSnapshot(); }); });", Options: []any{"multi"}},
+		// ---- Real-user: named callbacks registered as distinct tests keep distinct groups ----
+		{Code: "const register = () => { const first = () => expect('first').toMatchSnapshot(); test('first', first); const second = () => expect('second').toMatchSnapshot(); test('second', second); }; describe('suite', register);", Options: []any{"multi"}},
+		{Code: "const callback = () => expect('test').toMatchSnapshot(); test('case', callback); function helper() { expect('helper').toMatchSnapshot(); }", Options: []any{"multi"}},
+		{Code: "test('case', callback); function callback() { expect('test').toMatchSnapshot(); } function helper() { expect('helper').toMatchSnapshot(); }", Options: []any{"multi"}},
 	}, []rule_tester.InvalidTestCase{
 		// The upstream parser treats this static-looking call as an expect matcher.
 		{Code: "expect.toMatchSnapshot();", Options: []any{"always"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingHint", Line: 1, Column: 8, EndLine: 1, EndColumn: 23}}},
@@ -140,6 +144,11 @@ func TestPreferSnapshotHintExtras(t *testing.T) {
 			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 1, Column: 34, EndLine: 1, EndColumn: 49},
 			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 1, Column: 89, EndLine: 1, EndColumn: 104},
 		}},
+		// Registration isolation preserves the enclosing function's own group.
+		{Code: "const helper = () => {\n  expect('before').toMatchSnapshot();\n  test('inner', () => {\n    expect('inner').toMatchSnapshot();\n  });\n  expect('after').toMatchSnapshot();\n};", Options: []any{"multi"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 2, Column: 20, EndLine: 2, EndColumn: 35},
+			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 6, Column: 19, EndLine: 6, EndColumn: 34},
+		}},
 		// Locks in registration: parameterized tests
 		{Code: "test.each([1, 2])(\"row\", value => { expect(value).toMatchSnapshot(); expect(value).toThrowErrorMatchingSnapshot(); });", Options: []any{"multi"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 1, Column: 51, EndLine: 1, EndColumn: 66},
@@ -173,38 +182,59 @@ func TestPreferSnapshotHintSourceOnly(t *testing.T) {
 		`expect(value).toMatchSnapshot(); function helper(expect) { expect(other).toMatchSnapshot(); }`,
 	} {
 		t.Run(code, func(t *testing.T) {
-			root := fixtures.GetRootDir()
-			name := tspath.ResolvePath(root.Dir, "snapshot-hint-source-only.ts")
-			host := utils.CreateCompilerHost(root.Dir, utils.NewOverlayVFS(root.FS, map[string]string{name: code}))
-			program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{RootFileNames: []string{name}, Host: host, CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext}, SingleThreaded: true})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if program.CanProvideTypeChecker(program.SourceFiles()[0]) {
-				t.Fatal("expected source-only program")
-			}
-			plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
-				Programs: []*lintprogram.Program{program}, TargetsByProgram: [][]string{{name}}, SingleThreaded: true,
-				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
-					return []rule.ConfiguredRule{{Name: PreferSnapshotHintRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners { return PreferSnapshotHintRule.Run(ctx, []any{"always"}) }}}
-				},
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			count := 0
-			_, err = linter.RunLinter(linter.RunLinterOptions{LintPlan: plan, SingleThreaded: true, Consumer: rule.DiagnosticConsumer{Report: func(d rule.RuleDiagnostic) {
-				count++
-				if got := code[d.Range.Pos():d.Range.End()]; got != "toMatchSnapshot" {
-					t.Errorf("unexpected diagnostic range: %q", got)
-				}
-			}}})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if count != 1 {
-				t.Fatalf("got %d diagnostics, want 1", count)
-			}
+			runPreferSnapshotHintSourceOnly(t, code, []any{"always"}, 1)
 		})
+	}
+	t.Run("registered named callbacks have separate groups", func(t *testing.T) {
+		runPreferSnapshotHintSourceOnly(t, `
+const register = () => {
+  const first = () => expect('first').toMatchSnapshot();
+  test('first', first);
+  const second = () => expect('second').toMatchSnapshot();
+  test('second', second);
+};
+describe('suite', register);`, []any{"multi"}, 0)
+	})
+	t.Run("hoisted registered callback has its own group", func(t *testing.T) {
+		runPreferSnapshotHintSourceOnly(t, `
+test('case', callback);
+function callback() { expect('test').toMatchSnapshot(); }
+function helper() { expect('helper').toMatchSnapshot(); }`, []any{"multi"}, 0)
+	})
+}
+
+func runPreferSnapshotHintSourceOnly(t *testing.T, code string, options []any, want int) {
+	t.Helper()
+	root := fixtures.GetRootDir()
+	name := tspath.ResolvePath(root.Dir, "snapshot-hint-source-only.ts")
+	host := utils.CreateCompilerHost(root.Dir, utils.NewOverlayVFS(root.FS, map[string]string{name: code}))
+	program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{RootFileNames: []string{name}, Host: host, CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext}, SingleThreaded: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if program.CanProvideTypeChecker(program.SourceFiles()[0]) {
+		t.Fatal("expected source-only program")
+	}
+	plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs: []*lintprogram.Program{program}, TargetsByProgram: [][]string{{name}}, SingleThreaded: true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{Name: PreferSnapshotHintRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners { return PreferSnapshotHintRule.Run(ctx, options) }}}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	_, err = linter.RunLinter(linter.RunLinterOptions{LintPlan: plan, SingleThreaded: true, Consumer: rule.DiagnosticConsumer{Report: func(d rule.RuleDiagnostic) {
+		count++
+		if got := code[d.Range.Pos():d.Range.End()]; got != "toMatchSnapshot" {
+			t.Errorf("unexpected diagnostic range: %q", got)
+		}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != want {
+		t.Fatalf("got %d diagnostics, want %d", count, want)
 	}
 }

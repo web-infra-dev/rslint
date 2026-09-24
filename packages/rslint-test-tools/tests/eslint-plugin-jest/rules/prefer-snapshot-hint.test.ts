@@ -250,6 +250,10 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       code: 'const myReusableTestBody = (value, snapshotHint) => {\n  const innerFn = anotherValue => {\n    expect(anotherValue).toMatchSnapshot();\n\n    expect(value).toBe(1);\n  };\n\n  expect(value).toBe(1);\n};\n\nexpect(1).toMatchSnapshot();',
       options: ['multi'],
     },
+    {
+      code: "const register = () => {\n  const first = () => expect('first').toMatchSnapshot();\n  test('first', first);\n  const second = () => expect('second').toMatchSnapshot();\n  test('second', second);\n};\ndescribe('suite', register);",
+      options: ['multi'],
+    },
   ],
   invalid: [
     {

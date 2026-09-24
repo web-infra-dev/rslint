@@ -51,12 +51,14 @@ type RstestCallAnalysis struct {
 	// callbackBindings memoizes the function a same-file callback binding
 	// denotes. Negative results are cached too: checking whether a binding is
 	// written requires asking the per-file reference index for every use.
-	callbackBindings map[*ast.Symbol]rstestCallbackInfo
-	callbacks        RstestTestCallbacks
-	callbacksOK      bool
-	ownership        map[*ast.Node][]rstestCallbackRegistration
-	ownershipOK      bool
-	hasTests         bool
+	callbackBindings        map[*ast.Symbol]rstestCallbackInfo
+	callbacks               RstestTestCallbacks
+	callbacksOK             bool
+	ownership               map[*ast.Node][]rstestCallbackRegistration
+	ownershipOK             bool
+	registrationCallbacks   map[*ast.Node]bool
+	registrationCallbacksOK bool
+	hasTests                bool
 }
 
 type rstestCallAnalysisFileCacheKey struct{}
@@ -422,6 +424,22 @@ func (analysis *RstestCallAnalysis) callbackOwnership() map[*ast.Node][]rstestCa
 		analysis.ownershipOK = true
 	}
 	return analysis.ownership
+}
+
+// RegistrationCallbacks returns every function that a test or describe
+// registration invokes as its callback. The ownership index is already cached
+// by file; callers receive only the function identities they need.
+func (analysis *RstestCallAnalysis) RegistrationCallbacks() map[*ast.Node]bool {
+	if analysis.registrationCallbacksOK {
+		return analysis.registrationCallbacks
+	}
+	callbacks := make(map[*ast.Node]bool, len(analysis.callbackOwnership()))
+	for function := range analysis.callbackOwnership() {
+		callbacks[function] = true
+	}
+	analysis.registrationCallbacks = callbacks
+	analysis.registrationCallbacksOK = true
+	return analysis.registrationCallbacks
 }
 
 // isFnCallCandidate reports whether syntax and local aliases permit any Rstest

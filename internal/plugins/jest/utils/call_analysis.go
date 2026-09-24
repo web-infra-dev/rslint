@@ -17,14 +17,16 @@ type jestCallParseResult struct {
 // larger Rstest analysis has framework-specific provenance and execution-mode
 // responsibilities that do not belong here.
 type JestCallAnalysis struct {
-	ctx           rule.RuleContext
-	fnCalls       map[*ast.Node]jestCallParseResult
-	calls         []*ast.Node
-	functions     map[string]*ast.Node
-	indexed       bool
-	callbackInfos map[*ast.Node]jestCallbackInfo
-	callbacks     JestTestCallbacks
-	callbacksOK   bool
+	ctx                     rule.RuleContext
+	fnCalls                 map[*ast.Node]jestCallParseResult
+	calls                   []*ast.Node
+	functions               map[string]*ast.Node
+	indexed                 bool
+	callbackInfos           map[*ast.Node]jestCallbackInfo
+	callbacks               JestTestCallbacks
+	callbacksOK             bool
+	registrationCallbacks   map[*ast.Node]bool
+	registrationCallbacksOK bool
 }
 
 // GetJestCallAnalysis returns the analysis shared by every migrated Jest rule
@@ -126,6 +128,33 @@ func (analysis *JestCallAnalysis) Callbacks() JestTestCallbacks {
 		analysis.callbacksOK = true
 	}
 	return analysis.callbacks
+}
+
+// RegistrationCallbacks returns every function that a test or describe
+// registration invokes as its callback. It includes inline and named
+// callbacks, and reuses the analysis's cached call and function indexes.
+func (analysis *JestCallAnalysis) RegistrationCallbacks() map[*ast.Node]bool {
+	if analysis.registrationCallbacksOK {
+		return analysis.registrationCallbacks
+	}
+	callbacks := map[*ast.Node]bool{}
+	analysis.indexSourceFile()
+	for _, node := range analysis.calls {
+		parsed := analysis.ParseFnCall(node)
+		if parsed == nil || (parsed.Kind != JestFnTypeTest && parsed.Kind != JestFnTypeDescribe) {
+			continue
+		}
+		info := analysis.testCallbackInfo(node)
+		if info.functionNode == nil {
+			info.functionNode = analysis.fallbackCallbackFunction(info.name)
+		}
+		if info.functionNode != nil {
+			callbacks[info.functionNode] = true
+		}
+	}
+	analysis.registrationCallbacks = callbacks
+	analysis.registrationCallbacksOK = true
+	return analysis.registrationCallbacks
 }
 
 func (analysis *JestCallAnalysis) testCallbackInfo(node *ast.Node) jestCallbackInfo {

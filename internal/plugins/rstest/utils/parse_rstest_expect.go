@@ -74,6 +74,9 @@ type ParsedRstestExpectMatcher struct {
 	Name  string
 	Entry ParsedRstestFnMemberEntry
 	Kind  RstestExpectMatcherKind
+	// Negated reports whether Chai's persistent `not` flag is active when this
+	// matcher runs. Modifiers can appear between matchers in one assertion.
+	Negated bool
 }
 
 // ParsedRstestExpectCall describes one Rstest expect call.
@@ -670,14 +673,16 @@ func findRstestExpectModifiersAndMatchers(
 	}
 
 	matchers := make([]ParsedRstestExpectMatcher, 0, len(chains)-matcherIndex)
+	negated := notCount > 0
 	for i := matcherIndex; i < len(chains); i++ {
 		chain := chains[i]
 		switch chain.Kind {
 		case rstestExpectChainMatcher:
 			matchers = append(matchers, ParsedRstestExpectMatcher{
-				Name:  chain.Entry.Name,
-				Entry: chain.Entry,
-				Kind:  chain.MatcherKind,
+				Name:    chain.Entry.Name,
+				Entry:   chain.Entry,
+				Kind:    chain.MatcherKind,
+				Negated: negated,
 			})
 		case rstestExpectChainLanguage:
 			if chain.Entry.Call != nil {
@@ -686,6 +691,9 @@ func findRstestExpectModifiersAndMatchers(
 		case rstestExpectChainModifier:
 			// Chai permits modifiers between assertions in a multi-matcher
 			// chain, e.g. .a("string").that.does.not.contain("x").
+			if chain.Entry.Name == "not" {
+				negated = true
+			}
 		case rstestExpectChainUnknown:
 			// A member the chain grammar does not recognise ends the
 			// assertion: everything after it reads a property of the
