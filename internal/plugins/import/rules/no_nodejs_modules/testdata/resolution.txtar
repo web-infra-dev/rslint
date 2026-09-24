@@ -1,0 +1,23 @@
+-- tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "virtual/*": ["./src/*"],
+      "fs": ["./src/shim.ts"],
+      "fs/*": ["./src/*"]
+    }
+  }
+}
+-- package.json --
+{ "name": "no-nodejs-modules-fixture", "private": true }
+-- src/shim.ts --
+export const value = 1;
+-- node_modules/virtual/index.js --
+exports.value = 1;
+-- node_modules/virtual/shim.js --
+exports.value = 1;
+-- node_modules/fs/shim.js --
+exports.value = 1;

@@ -209,6 +209,8 @@ func TestModuleSettingsIsCoreModuleSpecifier(t *testing.T) {
 		want      bool
 	}{
 		{specifier: "fs/promises", want: true},
+		{specifier: "_http_agent", want: true},
+		{specifier: "node:_stream_readable/extra", want: true},
 		{specifier: "node:sqlite/database", want: true},
 		{specifier: "virtual/subpath", want: true},
 		{specifier: "@scope/pkg/subpath", want: true},
