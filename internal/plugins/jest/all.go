@@ -44,6 +44,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_importing_jest_globals"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_jest_mocked"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_lowercase_title"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_mock_promise_shorthand"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_mock_return_shorthand"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_spy_on"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_strict_equal"
@@ -108,6 +109,7 @@ func GetAllRules() []rule.Rule {
 		prefer_lowercase_title.PreferLowercaseTitleRule,
 		prefer_importing_jest_globals.PreferImportingJestGlobalsRule,
 		prefer_jest_mocked.PreferJestMockedRule,
+		prefer_mock_promise_shorthand.PreferMockPromiseShorthandRule,
 		prefer_mock_return_shorthand.PreferMockReturnShorthandRule,
 		prefer_spy_on.PreferSpyOnRule,
 		prefer_strict_equal.PreferStrictEqualRule,
