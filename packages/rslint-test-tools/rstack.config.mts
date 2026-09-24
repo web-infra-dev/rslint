@@ -240,6 +240,7 @@ define.test({
     './tests/eslint-plugin-import/rules/no-mutable-exports.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
     './tests/eslint-plugin-import/rules/order.test.ts',
+    './tests/eslint-plugin-import/rules/prefer-default-export.test.ts',
     './tests/eslint-plugin-import/rules/unambiguous.test.ts',
 
     // eslint-plugin-react
