@@ -23,8 +23,10 @@ type projectTargetBinding struct {
 type targetedProjectSlot struct {
 	parseOnce sync.Once
 	config    *tsoptions.ParsedCommandLine
-	rootFiles *lintprogram.RootFileIndex
 	parseErr  error
+
+	rootFilesOnce sync.Once
+	rootFiles     *lintprogram.RootFileIndex
 
 	buildOnce sync.Once
 	program   *compiler.Program
@@ -39,7 +41,6 @@ type targetedProjectExecution struct {
 	session        *Session
 	plan           projectPlan
 	singleThreaded bool
-	skipRootIndex  bool
 	slots          []targetedProjectSlot
 }
 
@@ -148,17 +149,24 @@ func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlo
 		if slot.parseErr == nil && slot.config == nil {
 			slot.parseErr = errors.New("no parsed config returned")
 		}
-		if slot.parseErr == nil && !execution.skipRootIndex {
-			slot.rootFiles = lintprogram.NewRootFileIndex(
-				slot.config.FileNames(),
-				execution.session.FS(),
-			)
-		}
 	})
 	if slot.parseErr != nil {
 		return nil, fmt.Errorf("parse TypeScript config %q: %w", spec.tsconfigPath, slot.parseErr)
 	}
 	return slot, nil
+}
+
+// rootFileIndex constructs membership indexes only when queried. Config
+// validation and program construction do not need this derived lookup.
+func (execution *targetedProjectExecution) rootFileIndex(index int) (*lintprogram.RootFileIndex, error) {
+	slot, err := execution.parse(index)
+	if err != nil {
+		return nil, err
+	}
+	slot.rootFilesOnce.Do(func() {
+		slot.rootFiles = lintprogram.NewRootFileIndex(slot.config.FileNames(), execution.session.FS())
+	})
+	return slot.rootFiles, nil
 }
 
 func (execution *targetedProjectExecution) build(index int) error {
@@ -391,9 +399,6 @@ func (s *Session) executeTargetProjectPlan(
 	targetPlan := request.Targets
 	singleThreaded := request.SingleThreaded
 	execution := newTargetedProjectExecution(s, plan, singleThreaded)
-	// Broad binding ranks parsed roots in one batch and never queries the
-	// per-project membership indexes. Set this before starting parse workers.
-	execution.skipRootIndex = request.Scope == ActiveOwners
 	if request.Scope == ActiveOwners {
 		// Broad lint still validates every active declaration, in plan order,
 		// before reporting a later path-resolution failure. Parsing metadata
@@ -460,7 +465,7 @@ func (s *Session) executeTargetProjectPlan(
 		unresolved := len(targetIndexes)
 		orderedProjectIndexes := group.projectIndexes
 		scanProject := func(projectIndex int) error {
-			parsed, err := execution.parse(projectIndex)
+			rootFiles, err := execution.rootFileIndex(projectIndex)
 			if err != nil {
 				return err
 			}
@@ -470,7 +475,7 @@ func (s *Session) executeTargetProjectPlan(
 					continue
 				}
 				target := targetPlan.Files[targetIndex]
-				if parsed.rootFiles.Contains(target.Path, target.CanonicalPath) {
+				if rootFiles.Contains(target.Path, target.CanonicalPath) {
 					directProjectByTarget[targetIndex] = projectIndex
 					unresolved--
 					selected = true
@@ -513,13 +518,13 @@ func (s *Session) executeTargetProjectPlan(
 				}
 				execution.parseConcurrent(predictedProjects)
 				for _, projectIndex := range predictedProjects {
-					parsed, parseErr := execution.parse(projectIndex)
+					rootFiles, parseErr := execution.rootFileIndex(projectIndex)
 					if parseErr != nil {
 						continue
 					}
 					for _, targetIndex := range predictedTargetsByProject[projectIndex] {
 						target := targetPlan.Files[targetIndex]
-						if parsed.rootFiles.Contains(target.Path, target.CanonicalPath) {
+						if rootFiles.Contains(target.Path, target.CanonicalPath) {
 							if err := directBuilds.enqueue(projectIndex); err != nil {
 								return err
 							}
