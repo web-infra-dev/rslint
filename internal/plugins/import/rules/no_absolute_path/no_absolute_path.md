@@ -67,6 +67,10 @@ least one pattern, without duplicate entries.
 - Some `ignore` character ranges containing emoji are rejected. For example,
   use `"[\\ud83d\\ude00-\\uFFFF]"` instead of `"[😀-\\uFFFF]"`; upstream accepts
   both with the same matching behavior.
+- `ignore` rejects named capture groups reused across separate alternatives.
+  For example, `"(?:(?<x>/foo)|(?<x>/bar))"` is rejected. Use
+  `"(?<x>/foo|/bar)"` to ignore the same paths. Upstream accepts the former
+  when its JavaScript runtime supports duplicate named capture groups.
 
 ## Original Documentation
 

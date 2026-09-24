@@ -46,6 +46,11 @@ func TestNoAbsolutePathExtras(t *testing.T) {
 				Options:  []any{map[string]any{"ignore": []any{"^/(same)/\\1$", "(?<=/)second$"}}},
 			},
 			{
+				Code:     `import "/foo"; import "/bar";`,
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{`(?<x>/foo|/bar)`}}},
+			},
+			{
 				Code:     "require(); require(\"/foo\", 1); require(1); require(null); require(true); require(/foo/); require(`/foo`); require(\"/\" + name); import(`/foo`); import(name);",
 				FileName: "/foo/bar/index.ts",
 			},
@@ -78,6 +83,15 @@ func TestNoAbsolutePathExtras(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:     `import "/baz";`,
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"ignore": []any{`(?<x>/foo|/bar)`}}},
+				Output:   []string{`import "../../baz";`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 14},
+				},
+			},
 			{
 				Code:     "import \"/foo\";",
 				FileName: "/foo/bar/index.ts",
@@ -534,6 +548,13 @@ func TestNoAbsolutePathIgnoreSchema(t *testing.T) {
 	}
 	if err := NoAbsolutePathRule.Schema.Validate([]any{map[string]any{"ignore": []any{`[\ud83d\ude00-\uFFFF]`}}}); err != nil {
 		t.Fatalf("explicit surrogate escapes must remain supported: %v", err)
+	}
+	// Documented limitation: put both alternatives inside one named group.
+	if err := NoAbsolutePathRule.Schema.Validate([]any{map[string]any{"ignore": []any{`(?:(?<x>/foo)|(?<x>/bar))`}}}); err == nil {
+		t.Fatal("expected duplicate capture names in separate alternatives to fail validation")
+	}
+	if err := NoAbsolutePathRule.Schema.Validate([]any{map[string]any{"ignore": []any{`(?<x>/foo|/bar)`}}}); err != nil {
+		t.Fatalf("alternatives in a single named group must remain supported: %v", err)
 	}
 }
 
