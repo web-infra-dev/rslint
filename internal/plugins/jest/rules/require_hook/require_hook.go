@@ -69,8 +69,8 @@ func isNullOrUndefined(node *ast.Node) bool {
 	}
 }
 
-func isJestFnCall(node *ast.Node, ctx rule.RuleContext) bool {
-	if utils.ParseJestFnCall(node, ctx) != nil {
+func isJestFnCall(node *ast.Node, analysis *utils.JestCallAnalysis) bool {
+	if analysis.ParseFnCall(node) != nil {
 		return true
 	}
 	name := testFramework.CalleeChainName(node)
@@ -86,14 +86,14 @@ func containsString(list []string, target string) bool {
 	return false
 }
 
-func shouldBeInHook(node *ast.Node, ctx rule.RuleContext, allowedFunctionCalls []string) bool {
+func shouldBeInHook(node *ast.Node, analysis *utils.JestCallAnalysis, allowedFunctionCalls []string) bool {
 	if node == nil {
 		return false
 	}
 
 	switch node.Kind {
 	case ast.KindExpressionStatement:
-		return shouldBeInHook(ast.SkipParentheses(node.AsExpressionStatement().Expression), ctx, allowedFunctionCalls)
+		return shouldBeInHook(ast.SkipParentheses(node.AsExpressionStatement().Expression), analysis, allowedFunctionCalls)
 	case ast.KindCallExpression:
 		call := node.AsCallExpression()
 		if call.Expression.Kind == ast.KindImportKeyword ||
@@ -101,7 +101,7 @@ func shouldBeInHook(node *ast.Node, ctx rule.RuleContext, allowedFunctionCalls [
 			ast.IsOptionalChain(node) {
 			return false
 		}
-		if isJestFnCall(node, ctx) {
+		if isJestFnCall(node, analysis) {
 			return false
 		}
 		name := testFramework.CalleeChainName(node)
@@ -159,11 +159,14 @@ func hasCallExpressionParent(node *ast.Node) bool {
 	return parent != nil && parent.Kind == ast.KindCallExpression
 }
 
-func describeCallbackBody(call *ast.Node, ctx rule.RuleContext) *ast.Node {
+func describeCallbackBody(call *ast.Node, analysis *utils.JestCallAnalysis) *ast.Node {
 	if call == nil ||
 		call.Kind != ast.KindCallExpression ||
-		hasCallExpressionParent(call) ||
-		!utils.IsTypeOfJestFnCall(call, ctx, utils.JestFnTypeDescribe) {
+		hasCallExpressionParent(call) {
+		return nil
+	}
+	parsed := analysis.ParseFnCall(call)
+	if parsed == nil || parsed.Kind != utils.JestFnTypeDescribe {
 		return nil
 	}
 
@@ -174,9 +177,14 @@ func describeCallbackBody(call *ast.Node, ctx rule.RuleContext) *ast.Node {
 	return getFunctionBodyBlock(args.Nodes[1])
 }
 
-func checkBlockBody(ctx rule.RuleContext, body []*ast.Node, allowedFunctionCalls []string) {
+func checkBlockBody(
+	ctx rule.RuleContext,
+	analysis *utils.JestCallAnalysis,
+	body []*ast.Node,
+	allowedFunctionCalls []string,
+) {
 	for _, statement := range body {
-		if shouldBeInHook(statement, ctx, allowedFunctionCalls) {
+		if shouldBeInHook(statement, analysis, allowedFunctionCalls) {
 			ctx.ReportNode(statement, buildUseHookMessage())
 		}
 	}
@@ -186,19 +194,20 @@ var RequireHookRule = rule.Rule{
 	Name:   "jest/require-hook",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		opts := parseOptions(options)
 
 		if ctx.SourceFile != nil && ctx.SourceFile.Statements != nil {
-			checkBlockBody(ctx, ctx.SourceFile.Statements.Nodes, opts.AllowedFunctionCalls)
+			checkBlockBody(ctx, analysis, ctx.SourceFile.Statements.Nodes, opts.AllowedFunctionCalls)
 		}
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				block := describeCallbackBody(node, ctx)
+				block := describeCallbackBody(node, analysis)
 				if block == nil || block.AsBlock().Statements == nil {
 					return
 				}
-				checkBlockBody(ctx, block.AsBlock().Statements.Nodes, opts.AllowedFunctionCalls)
+				checkBlockBody(ctx, analysis, block.AsBlock().Statements.Nodes, opts.AllowedFunctionCalls)
 			},
 		}
 	},
