@@ -43,19 +43,21 @@ This rule has no options. It does not provide automatic fixes or suggestions.
 - Syntax errors in imported files are not reported by this rule. For example,
   importing a file containing `return; export {};` produces a parse-error report
   upstream, but no report from this rule. Check the imported file's syntax separately.
-- Quoted names in re-exports are checked. For example, given a module with
-  `export default 1; export { foo as 'foo' } from './base'`, rslint reports
-  `import foo from './module'`; upstream v2.32.0 misses that quoted re-export.
-  Quoted `default` names and quoted source names are also recognized.
-- A namespace re-export exposes only its alias. For example, if `module.js`
+- Quoted re-export names can produce reports that upstream misses. For example,
+  given a module with `export default 1; export { foo as 'foo' } from './base'`,
+  rslint reports `import foo from './module'`; upstream v2.32.0 does not.
+  Quoting `default` or the name being re-exported also does not prevent rslint
+  from checking for a name collision.
+- rslint does not report an import just because its name matches a member of
+  a re-exported namespace. For example, if `module.js`
   contains `export default 1; export * as names from './base'`, a named export
   `foo` in `base.js` does not make `import foo from './module'` an error.
-  Upstream v2.32.0 also checks the namespace's members and reports this case.
-- TypeScript's implicit `esModuleInterop` setting is respected. For example,
-  with `module: 'nodenext'` and no explicit `esModuleInterop`, importing `foo`
+  Upstream v2.32.0 reports this case.
+- When `esModuleInterop` is omitted from `tsconfig.json`, configurations such as
+  `module: 'nodenext'` can produce additional reports in rslint. For example, importing `foo`
   as the default from a module containing only `export const foo = 1` is reported.
-  Upstream requires explicit `esModuleInterop: true` for this check. Set it to
-  `false` to disable these implicit defaults.
+  Upstream reports this case only with explicit `esModuleInterop: true`.
+  With explicit `esModuleInterop: false`, neither tool reports this case.
 
 ## Original Documentation
 
