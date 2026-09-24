@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/max_dependencies"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/namespace"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/newline_after_import"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_absolute_path"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_amd"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_anonymous_default_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_commonjs"
@@ -45,6 +46,7 @@ func GetAllRules() []rule.Rule {
 		max_dependencies.MaxDependenciesRule,
 		namespace.NamespaceRule,
 		newline_after_import.NewlineAfterImportRule,
+		no_absolute_path.NoAbsolutePathRule,
 		no_amd.NoAmdRule,
 		no_anonymous_default_export.NoAnonymousDefaultExportRule,
 		no_commonjs.NoCommonjsRule,

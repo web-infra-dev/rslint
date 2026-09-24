@@ -4,25 +4,34 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 type VisitModulesOptions struct {
 	Commonjs bool
 	AMD      bool
 	ESModule bool
-	// Ignore   []string
+	Ignore   []string
 }
 
-// See https://github.com/import-js/eslint-plugin-import/blob/01c9eb04331d2efa8d63f2d7f4bfec3bc44c94f3/utils/moduleVisitor.js
+// See https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/utils/moduleVisitor.js
 func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), options VisitModulesOptions) rule.RuleListeners {
 	visitors := rule.RuleListeners{}
+	ignored := make([]*esregexp.RegExp, 0, len(options.Ignore))
+	for _, pattern := range options.Ignore {
+		ignored = append(ignored, esregexp.MustCompile(pattern, ""))
+	}
 
 	checkSourceValue := func(source *ast.StringLiteralLike, node *ast.Node) {
 		if source == nil {
 			return
 		}
 
-		// TODO: Handle options.Ignore
+		for _, pattern := range ignored {
+			if pattern.TestOrTimeout(source.Text()) {
+				return
+			}
+		}
 
 		visitor(source, node)
 	}
@@ -80,8 +89,25 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 		checkSourceValue(modulePath, call.AsNode())
 	}
 
-	checkAMD := func(node *ast.CallExpression) {
-		// TODO: implement this later
+	checkAMD := func(call *ast.CallExpression) {
+		callee := utils.ESTreeCallCallee(call.Expression)
+		if callee == nil || !ast.IsIdentifier(callee) ||
+			(callee.Text() != "require" && callee.Text() != "define") ||
+			call.Arguments == nil || len(call.Arguments.Nodes) != 2 {
+			return
+		}
+		modules := utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0])
+		if modules == nil || modules.Kind != ast.KindArrayLiteralExpression {
+			return
+		}
+		for _, element := range modules.AsArrayLiteralExpression().Elements.Nodes {
+			source := utils.ESTreeRuntimeExpression(element)
+			if source == nil || source.Kind != ast.KindStringLiteral ||
+				source.Text() == "require" || source.Text() == "exports" {
+				continue
+			}
+			checkSourceValue(source, source)
+		}
 	}
 
 	if options.ESModule {
