@@ -12,11 +12,11 @@ import (
 var PreferEqualityMatcherRule = shared.NewRule(shared.Config{
 	Name: "jest/prefer-equality-matcher",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			Parse: func(node *ast.Node) *shared.ExpectCall {
-				parsed := jestUtils.ParseJestFnCall(node, ctx)
+				parsed := analysis.ParseExpectCall(node)
 				if parsed == nil ||
-					parsed.Kind != jestUtils.JestFnTypeExpect ||
 					parsed.MatcherEntry == nil {
 					return nil
 				}

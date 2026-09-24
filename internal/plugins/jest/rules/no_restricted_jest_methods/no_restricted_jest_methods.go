@@ -96,6 +96,7 @@ var NoRestrictedJestMethodsRule = rule.Rule{
 	Name:   "jest/no-restricted-jest-methods",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		restrictedMethods := parseOptions(options)
 		if len(restrictedMethods) == 0 {
 			return rule.RuleListeners{}
@@ -107,7 +108,7 @@ var NoRestrictedJestMethodsRule = rule.Rule{
 					return
 				}
 
-				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseFnCall(node)
 				if jestFnCall == nil || jestFnCall.Kind != jestUtils.JestFnTypeJest || len(jestFnCall.Members) == 0 {
 					return
 				}

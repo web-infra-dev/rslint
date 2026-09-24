@@ -3,11 +3,10 @@
  * runtime — Worker pool, per-file lint pipeline, scope manager, fixer.
  * (Merged from the former `@rslint/eslint-plugin-runner` package.)
  *
- * Designed to be hosted in-process — the CLI path and the `rslint` VS Code
- * extension each host a WorkerPool here and answer plugin-lint IPC / LSP
- * requests coming back from the Go side; never a separate sidecar process.
- * The actual wiring (engine/extension ↔ this module) lives in the CLI
- * engine and the VS Code PluginLintPool host.
+ * Retains the full public runtime for API and VS Code consumers. The CLI
+ * loads a separate lightweight `host.js` bundle of the same host implementation
+ * so it does not evaluate this entry's per-file lint runtime in its parent.
+ * Both entries start the sibling `lint-worker.js` for plugin execution.
  */
 
 export type { ConfigDescriptor } from './types.js';

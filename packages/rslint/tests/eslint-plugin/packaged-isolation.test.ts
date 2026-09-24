@@ -10,23 +10,20 @@ import { platformTuple } from '../../src/eslint-plugin/native/platform-tuple.js'
 /**
  * Packaged-layout isolation guard.
  *
- * The VS Code extension does NOT ship `@rslint/core`; instead `build.js` stages
- * the built `dist/eslint-plugin/` worker bundle into the vsix together with a
- * nested `node_modules/@rslint/native-<tuple>/` platform package (the napi
- * `.node` + a minimal package.json), so the worker's loader resolves it from
- * THERE rather than from a workspace `node_modules`. The original bug was that
- * this worked in dev (the dev host has the workspace package) but silently
- * produced zero diagnostics once packaged. The normal worker-pool e2e suites
- * can't catch a regression of this because they resolve the platform package
- * from the workspace.
+ * Exercise the CLI's private host entry and the public entry used by API/LSP
+ * consumers outside the repository's dependency resolution paths. The VS Code
+ * extension resolves a project-local `@rslint/core`; it does not bundle a copy
+ * of this runtime. Ordinary worker-pool tests can resolve workspace packages,
+ * which would hide missing runtime dependencies in an installed package.
  *
  * This test reproduces the packaged layout under `os.tmpdir()` — OFF any
  * `@rslint/core` / workspace `node_modules` resolution path — and runs the host
  * in a SUBPROCESS (so it neither inherits this suite's `setWorkerEntryForTests`
  * override nor any in-process module cache). It asserts the worker loads the
- * native parser from the nested platform package and a plugin rule fires; a
- * negative control proves the host entry (`index.js`) itself — when the loader
- * runs at import — can't fall back to a workspace platform package.
+ * native parser from a nested platform package and a plugin rule fires. The
+ * lightweight host imports without that package, but creating workers must
+ * still reject. The full public entry rejects during import instead. Neither
+ * entry may fall back to a workspace platform package.
  *
  * Requires `dist/eslint-plugin/` (built by `pnpm build`, the same prerequisite
  * the worker-pool e2e suites already document) and the host platform package's
@@ -59,6 +56,7 @@ const LOCAL_PLUGIN = `export default {
 const CONFIG = `import lp from './local-plugin.mjs';
 export default [{ plugins: { pkg: lp } }];
 `;
+const HOST_ENTRIES = ['index.js', 'host.js'] as const;
 
 // The runner imports the STAGED host by a path relative to its own location, so
 // the worker's loader resolves the platform package by walking up from the
@@ -69,7 +67,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cfgDir = path.join(here, 'cfg');
 const { createPluginLintHost } = await import(
-  pathToFileURL(path.join(here, 'eslint-plugin', 'index.js')).href
+  pathToFileURL(path.join(here, 'eslint-plugin', process.argv[2] ?? 'index.js')).href
 );
 const host = await createPluginLintHost([
   { configPath: path.join(cfgDir, 'rslint.config.mjs'), configDirectory: cfgDir },
@@ -94,7 +92,11 @@ if (d.length === 1 && d[0].ruleName === 'pkg/no-null') {
 /** Stage a packaged layout under `root`; omit the nested native for the negative control. */
 function stage(root: string, opts: { withNative: boolean }): void {
   const coreEpDir = path.resolve(__dirname, '../../dist/eslint-plugin');
-  if (!fs.existsSync(path.join(coreEpDir, 'index.js'))) {
+  if (
+    [...HOST_ENTRIES, 'lint-worker.js'].some(
+      (entry) => !fs.existsSync(path.join(coreEpDir, entry)),
+    )
+  ) {
     throw new Error(
       `built worker bundle missing at ${coreEpDir} — run \`pnpm build\` (or ` +
         '`pnpm --filter @rslint/core build:js`) before this test',
@@ -144,7 +146,7 @@ function stage(root: string, opts: { withNative: boolean }): void {
 // win32 kill-switch as the worker-pool e2e suites (flag is false → runs on
 // win32 too, validating the napi-teardown mitigation).
 describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
-  'packaged-layout isolation (vsix eslint-plugin worker)',
+  'packaged-layout isolation (plugin host and worker)',
   () => {
     let tmp: string;
     beforeAll(() => {
@@ -154,26 +156,34 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
     });
 
-    test(
-      'worker loads the platform package from the nested node_modules and a plugin rule fires',
-      () => {
-        const root = path.join(tmp, 'ok');
+    test.each(HOST_ENTRIES)(
+      '%s worker loads the nested platform package and a plugin rule fires',
+      (entry) => {
+        const root = path.join(tmp, `ok-${entry}`);
         fs.mkdirSync(root, { recursive: true });
         stage(root, { withNative: true });
+        if (entry === 'host.js') {
+          // Nonempty hosts must also work without the full public runtime.
+          fs.rmSync(path.join(root, 'eslint-plugin', 'index.js'));
+        }
         // timeout + SIGKILL so a worker wedged in native teardown (the win32
         // abort this validates) fails loudly instead of hanging CI forever.
         // Clear NODE_PATH: rstest injects it pointing at the pnpm virtual store
-        // (which holds the workspace platform packages), but a packaged vsix has
-        // none. Clearing it reproduces the real packaged resolution — nested
-        // walk-up only — for this test and the negative control below.
-        const result = spawnSync(process.execPath, ['runner.mjs'], {
-          cwd: root,
-          encoding: 'utf8',
-          timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
-          killSignal: 'SIGKILL',
-          maxBuffer: 16 * 1024 * 1024,
-          env: { ...process.env, NODE_PATH: '' },
-        });
+        // (which holds the workspace platform packages). Clearing it ensures
+        // only the staged dependency tree is available to either entry.
+        const result = spawnSync(
+          process.execPath,
+          [path.join(root, 'runner.mjs'), entry],
+          {
+            // Worker paths follow the entry module, not the caller's directory.
+            cwd: path.join(root, 'cfg'),
+            encoding: 'utf8',
+            timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+            killSignal: 'SIGKILL',
+            maxBuffer: 16 * 1024 * 1024,
+            env: { ...process.env, NODE_PATH: '' },
+          },
+        );
         expect(result.error).toBeUndefined();
         expect(result.signal).toBeNull();
         expect(result.status).toBe(0);
@@ -183,13 +193,46 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
     );
 
-    test(
-      'without the nested platform package the host fails (no workspace fallback)',
-      () => {
-        const root = path.join(tmp, 'no-native');
+    test('lightweight host imports without loading the worker runtime', () => {
+      const root = path.join(tmp, 'host-without-native');
+      fs.mkdirSync(root, { recursive: true });
+      stage(root, { withNative: false });
+      // An empty host needs neither entry. Nonempty configurations load the
+      // worker, while the full public index remains unnecessary.
+      fs.rmSync(path.join(root, 'eslint-plugin', 'index.js'));
+      fs.rmSync(path.join(root, 'eslint-plugin', 'lint-worker.js'));
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import { createPluginLintHost } from './eslint-plugin/host.js';
+const host = await createPluginLintHost([]);
+await host.shutdown();
+console.log('HOST_OK');`,
+        ],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+          killSignal: 'SIGKILL',
+          env: { ...process.env, NODE_PATH: '' },
+        },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.signal).toBeNull();
+      expect(result.status).toBe(0);
+      expect(result.stdout.trim()).toBe('HOST_OK');
+      expect(result.stderr.trim()).toBe('');
+    });
+
+    test.each(HOST_ENTRIES)(
+      '%s rejects without the nested platform package (no workspace fallback)',
+      (entry) => {
+        const root = path.join(tmp, `no-native-${entry}`);
         fs.mkdirSync(root, { recursive: true });
         stage(root, { withNative: false });
-        const result = spawnSync(process.execPath, ['runner.mjs'], {
+        const result = spawnSync(process.execPath, ['runner.mjs', entry], {
           cwd: root,
           encoding: 'utf8',
           timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
@@ -200,8 +243,8 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         expect(result.error).toBeUndefined();
         expect(result.signal).toBeNull();
         expect(result.status).toBe(1);
-        // The core loader throws its own diagnostic naming the missing platform
-        // package — no workspace fallback.
+        // The public entry fails at import; the lightweight host propagates
+        // its worker's initialization error and still drains every worker.
         expect(result.stderr).toContain('failed to load the native parser');
         expect(result.stderr).toContain(`@rslint/${PKG_BASE}`);
         expect(`${result.stdout}\n${result.stderr}`).not.toMatch(

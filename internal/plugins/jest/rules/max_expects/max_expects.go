@@ -45,7 +45,7 @@ func buildExceededMaxAssertionMessage(count, maxAllowed int) rule.RuleMessage {
 	}
 }
 
-func isTestCallbackFunction(fn *ast.Node, ctx rule.RuleContext) bool {
+func isTestCallbackFunction(fn *ast.Node, analysis *utils.JestCallAnalysis) bool {
 	parent := fn.Parent
 	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
 		parent = parent.Parent
@@ -53,7 +53,7 @@ func isTestCallbackFunction(fn *ast.Node, ctx rule.RuleContext) bool {
 	if parent == nil || parent.Kind != ast.KindCallExpression {
 		return true
 	}
-	return utils.IsTypeOfJestFnCall(parent, ctx, utils.JestFnTypeTest)
+	return analysis.ParseTestCall(parent) != nil
 }
 
 func shouldCountExpectCall(jestFnCall *utils.ParsedJestFnCall) bool {
@@ -69,11 +69,11 @@ func shouldCountExpectCall(jestFnCall *utils.ParsedJestFnCall) bool {
 	return true
 }
 
-func maybeResetCountForFunctionLike(node *ast.Node, ctx rule.RuleContext, count *int) {
+func maybeResetCountForFunctionLike(node *ast.Node, analysis *utils.JestCallAnalysis, count *int) {
 	if node.Body() == nil {
 		return
 	}
-	if isTestCallbackFunction(node, ctx) {
+	if isTestCallbackFunction(node, analysis) {
 		*count = 0
 	}
 }
@@ -82,11 +82,12 @@ var MaxExpectsRule = rule.Rule{
 	Name:   "jest/max-expects",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		opts := parseOptions(options)
 		count := 0
 
 		maybeResetCount := func(node *ast.Node) {
-			maybeResetCountForFunctionLike(node, ctx, &count)
+			maybeResetCountForFunctionLike(node, analysis, &count)
 		}
 
 		return rule.RuleListeners{
@@ -103,7 +104,7 @@ var MaxExpectsRule = rule.Rule{
 			ast.KindConstructor:                             maybeResetCount,
 			rule.ListenerOnExit(ast.KindConstructor):        maybeResetCount,
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseFnCall(node)
 				if jestFnCall == nil {
 					return
 				}

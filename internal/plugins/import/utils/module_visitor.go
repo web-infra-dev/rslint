@@ -3,6 +3,7 @@ package utils
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type VisitModulesOptions struct {
@@ -44,8 +45,9 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 			return
 		}
 
-		modulePath := call.Arguments.Nodes[0]
-		if modulePath == nil || !ast.IsStringLiteralLike(modulePath) {
+		modulePath := utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0])
+		// Upstream accepts string Literals, not static TemplateLiterals.
+		if modulePath == nil || modulePath.Kind != ast.KindStringLiteral {
 			return
 		}
 
@@ -56,9 +58,9 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 	checkCommon := func(call *ast.CallExpression) {
 		// ESTree has no parenthesized-expression node, so upstream sees a bare
 		// `require` identifier through any number of parentheses.
-		callee := ast.SkipParentheses(call.Expression)
+		callee := utils.ESTreeCallCallee(call.Expression)
 
-		if !ast.IsIdentifier(callee) {
+		if callee == nil || !ast.IsIdentifier(callee) {
 			return
 		}
 
@@ -70,8 +72,8 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 			return
 		}
 
-		modulePath := call.Arguments.Nodes[0]
-		if modulePath == nil || !ast.IsStringLiteralLike(modulePath) {
+		modulePath := utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0])
+		if modulePath == nil || modulePath.Kind != ast.KindStringLiteral {
 			return
 		}
 

@@ -14,9 +14,10 @@ var RequireTopLevelDescribeRule = shared.NewRule(shared.Config{
 		UnexpectedHook:     "All hooks must be wrapped in a describe block.",
 	},
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			Parse: func(node *ast.Node) *shared.ParsedCall {
-				parsed := utils.ParseJestFnCall(node, ctx)
+				parsed := analysis.ParseFnCall(node)
 				if parsed == nil {
 					return nil
 				}

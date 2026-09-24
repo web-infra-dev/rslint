@@ -10,9 +10,10 @@ import (
 var PreferStrictEqualRule = shared.NewRule(shared.Config{
 	Name: "jest/prefer-strict-equal",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{Parse: func(node *ast.Node) *shared.ExpectCall {
-			parsed := utils.ParseJestFnCall(node, ctx)
-			if parsed == nil || parsed.Kind != utils.JestFnTypeExpect || parsed.MatcherEntry == nil {
+			parsed := analysis.ParseExpectCall(node)
+			if parsed == nil || parsed.MatcherEntry == nil {
 				return nil
 			}
 			return &shared.ExpectCall{
