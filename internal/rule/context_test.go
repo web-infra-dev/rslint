@@ -1,6 +1,7 @@
 package rule
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -17,6 +18,7 @@ func TestRuleContextReportWithoutReporterPanics(t *testing.T) {
 		report func(*RuleContext)
 	}{
 		{name: "range", report: func(ctx *RuleContext) { ctx.ReportRange(textRange, message) }},
+		{name: "configuration error", report: func(ctx *RuleContext) { ctx.FailWithConfigurationError(errors.New("invalid setting")) }},
 		{name: "range fixes", report: func(ctx *RuleContext) { ctx.ReportRangeWithFixes(textRange, message) }},
 		{name: "range suggestions", report: func(ctx *RuleContext) { ctx.ReportRangeWithSuggestions(textRange, message) }},
 		{name: "range combined", report: func(ctx *RuleContext) { ctx.ReportRangeWithFixesAndSuggestions(textRange, message, nil, nil) }},

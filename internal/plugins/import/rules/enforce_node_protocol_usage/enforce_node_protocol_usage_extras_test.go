@@ -43,6 +43,9 @@ func TestEnforceNodeProtocolUsageEditDemand(t *testing.T) {
 					t.Fatalf("demand %d: got %d diagnostics", demand, len(diagnostics))
 				}
 				got := diagnostics[0]
+				if got.Message.Id != "" {
+					t.Fatalf("unexpected message ID: %q", got.Message.Id)
+				}
 				if demand == rule.EditDemandAll {
 					all = got
 				}
@@ -73,12 +76,15 @@ func TestEnforceNodeProtocolUsageEditDemand(t *testing.T) {
 func TestEnforceNodeProtocolUsageInvalidVersion(t *testing.T) {
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/version.ts", Path: "/version.ts"}, `import "fs";`, core.ScriptKindTS)
 	defer func() {
-		err, ok := recover().(error)
-		if !ok || err.Error() != "`import/node-version` setting must be a string in the format \"10.23.45\" (a semver version, with no leading zero)" {
+		err, ok := recover().(*rule.ConfigurationError)
+		if !ok || err.RuleName != target.EnforceNodeProtocolUsageRule.Name || err.FilePath != file.FileName() || err.Err.Error() != "`import/node-version` setting must be a string in the format \"10.23.45\" (a semver version, with no leading zero)" {
 			t.Fatalf("unexpected invalid-version failure: %v", err)
 		}
 	}()
-	ctx := rule.RuleContext{SourceFile: file, Settings: map[string]any{"import/node-version": "16"}}
+	ctx := (rule.RuleContext{SourceFile: file, Settings: map[string]any{"import/node-version": "16"}}).
+		WithReporter(target.EnforceNodeProtocolUsageRule.Name, rule.SeverityError, func(rule.RuleDiagnostic) {
+			t.Fatal("invalid settings must not produce a lint diagnostic")
+		})
 	listeners := target.EnforceNodeProtocolUsageRule.Run(ctx, []any{"always"})
 	listeners[ast.KindImportDeclaration](file.Statements.Nodes[0])
 }

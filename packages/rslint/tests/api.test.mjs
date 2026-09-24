@@ -1,4 +1,5 @@
-import { lint } from '@rslint/core/internal';
+import { lint, NodeRslintService } from '@rslint/core/internal';
+import { RSLintService } from '@rslint/core/service';
 import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 import { RemoteSourceFile } from '@rslint/api';
@@ -17,6 +18,59 @@ const cfg = (project, rule) => [
 
 describe('lint api', async (t) => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
+  test.each(['always', 'never'])(
+    'invalid node version rejects only the current request (%s)',
+    async (mode) => {
+      const service = new RSLintService(new NodeRslintService());
+      const file = path.resolve(cwd, 'src/virtual.ts');
+      const source = mode === 'always' ? 'fs' : 'node:fs';
+      const preferred = mode === 'always' ? 'node:fs' : 'fs';
+      const request = (version, code = `import "${source}";`) => ({
+        config: [
+          {
+            plugins: ['import'],
+            rules: { 'import/enforce-node-protocol-usage': ['error', mode] },
+            settings: { 'import/node-version': version },
+            languageOptions: { parserOptions: { projectService: false } },
+          },
+        ],
+        configDirectory: cwd,
+        workingDirectory: cwd,
+        fileContents: { [file]: code },
+      });
+      try {
+        // Match upstream's lazy validation when no module literal is checked.
+        const unused = await service.lint(
+          request('bad', 'export const n = 1;'),
+        );
+        expect(unused.diagnostics).toEqual([]);
+
+        for (const fix of [false, true]) {
+          await expect(
+            service.lint({ ...request('bad'), fix }),
+          ).rejects.toThrow(
+            '`import/node-version` setting must be a string in the format',
+          );
+        }
+
+        const result = await service.lint(request('22.0.0'));
+        expect(result.diagnostics).toHaveLength(1);
+        expect(result.diagnostics[0]).toMatchObject({
+          ruleName: 'import/enforce-node-protocol-usage',
+          message: `Prefer \`${preferred}\` over \`${source}\`.`,
+          messageId: '',
+        });
+        const fixed = await service.lint({ ...request('22.0.0'), fix: true });
+        expect(fixed.diagnostics).toEqual([]);
+        expect(fixed.output).toEqual({
+          'src/virtual.ts': `import "${preferred}";`,
+        });
+      } finally {
+        await service.close();
+      }
+    },
+  );
+
   test('virtual file support', async (t) => {
     let config = cfg(
       './tsconfig.virtual.json',

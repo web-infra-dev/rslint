@@ -1,10 +1,13 @@
 package linter
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -17,6 +20,81 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestRunLinterConfigurationError(t *testing.T) {
+	raw, paths := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const a = 1;",
+		"b.ts": "const b = 2;",
+	})
+	programs := wrapTestPrograms(raw)
+	cause := errors.New("invalid setting")
+	for _, singleThreaded := range []bool{false, true} {
+		for _, phase := range []string{"initialization", "listener"} {
+			t.Run(fmt.Sprintf("%s/singleThreaded=%t", phase, singleThreaded), func(t *testing.T) {
+				var fail atomic.Bool
+				fail.Store(true)
+				plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+					Programs:         programs,
+					TargetsByProgram: [][]string{{paths["a.ts"], paths["b.ts"]}},
+					SingleThreaded:   singleThreaded,
+					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						return []rule.ConfiguredRule{{
+							Name: "test/configuration-error",
+							Run: func(ctx rule.RuleContext) rule.RuleListeners {
+								check := func() {
+									if fail.Load() {
+										ctx.FailWithConfigurationError(cause)
+									}
+								}
+								if phase == "initialization" {
+									check()
+								}
+								return rule.RuleListeners{ast.KindIdentifier: func(*ast.Node) { check() }}
+							},
+						}}
+					},
+				})
+				opts := RunLinterOptions{LintPlan: plan, SingleThreaded: singleThreaded}
+				result, err := RunLinter(opts)
+				var configError *rule.ConfigurationError
+				if result != nil || !errors.As(err, &configError) || !errors.Is(err, cause) {
+					t.Fatalf("result/error = %v/%v, want configuration error wrapping %v", result, err, cause)
+				}
+				if configError.RuleName != "test/configuration-error" || (configError.FilePath != paths["a.ts"] && configError.FilePath != paths["b.ts"]) {
+					t.Fatalf("configuration error lost rule/file context: %v", err)
+				}
+				// Reusing the Program also verifies the failed pass released its checker.
+				fail.Store(false)
+				result, err = RunLinter(opts)
+				if err != nil || result.LintedFileCount != 2 {
+					t.Fatalf("subsequent run = %v/%v, want both files linted", result, err)
+				}
+			})
+		}
+	}
+}
+
+func TestRunLinterPreservesUnexpectedPanics(t *testing.T) {
+	raw, paths := createTestProgramWithFiles(t, map[string]string{"a.ts": "const a = 1;"})
+	unexpected := errors.New("programming error")
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         wrapTestPrograms(raw),
+		TargetsByProgram: [][]string{{paths["a.ts"]}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{Name: "test/panic", Run: func(rule.RuleContext) rule.RuleListeners {
+				return rule.RuleListeners{ast.KindIdentifier: func(*ast.Node) { panic(unexpected) }}
+			}}}
+		},
+	})
+	defer func() {
+		recovered, ok := recover().(error)
+		if !ok || !errors.Is(recovered, unexpected) {
+			t.Fatalf("panic = %v, want original programming error", recovered)
+		}
+	}()
+	_, _ = RunLinter(RunLinterOptions{LintPlan: plan, SingleThreaded: true})
+}
 
 // noopRule returns a rule that reports on every identifier (for testing file filtering).
 func noopRule() []rule.ConfiguredRule {

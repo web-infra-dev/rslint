@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/web-infra-dev/rslint/internal/program"
@@ -65,6 +66,7 @@ func checkerFreeLintWorkerCount(fileCount int, maxWorkers int) int {
 type programLintResult struct {
 	lintedFileCount int32
 	executedRules   map[string]struct{}
+	err             error
 }
 
 type listenerRegistry struct {
@@ -385,8 +387,18 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	}
 
 	wg := core.NewWorkGroup(opts.SingleThreaded)
+	var errorOnce sync.Once
 	queueFiles := func(chk *checker.Checker, tasks []lintFileTask) {
 		wg.Queue(func() {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					if err, ok := recovered.(*rule.ConfigurationError); ok {
+						errorOnce.Do(func() { result.err = err })
+					} else {
+						panic(recovered)
+					}
+				}
+			}()
 			registeredListeners := newListenerRegistry()
 			if chk != nil {
 				var done func()
@@ -527,6 +539,9 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 			}
 		}
 		for _, programResult := range programResults {
+			if programResult.err != nil {
+				return nil, programResult.err
+			}
 			mergeResult(programResult)
 		}
 	}
@@ -581,12 +596,15 @@ func LintSingleFile(opts LintSingleFileOptions) {
 	if err != nil {
 		panic(err)
 	}
-	runLintRulesInProgram(&plan, programRunOptions{
+	result := runLintRulesInProgram(&plan, programRunOptions{
 		Cwd: opts.Cwd,
 		// A single file is a single shard — run it on the calling goroutine
 		// instead of scheduling a background task.
 		SingleThreaded: true,
 	}, consumer)
+	if result.err != nil {
+		panic(result.err)
+	}
 }
 
 func normalizeDiagnosticConsumer(consumer rule.DiagnosticConsumer) rule.DiagnosticConsumer {
