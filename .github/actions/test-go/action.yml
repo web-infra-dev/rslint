@@ -1,0 +1,151 @@
+name: Test Go
+description: Resolve affected Go packages and run tests on Linux, Windows, and Darwin
+
+inputs:
+  go-version:
+    description: Go version to test
+    required: true
+  mode:
+    description: 'Requested Go test scope: affected or full'
+    required: true
+  changed-packages:
+    description: Space-separated directories containing changed Go files
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Disable CPU hogs (Windows)
+      if: runner.os == 'Windows'
+      continue-on-error: true
+      uses: ./.github/actions/windows-disable-cpu-hogs
+    - name: Setup Node
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      with:
+        node-version: '24'
+    - name: Setup Go
+      uses: ./.github/actions/setup-go
+      with:
+        go-version: ${{ inputs.go-version }}
+        cache-name: ci-test-go
+    - name: Select Go test packages
+      id: selection
+      shell: bash
+      env:
+        GO_TEST_MODE: ${{ inputs.mode }}
+        CHANGED_PACKAGES: ${{ inputs.changed-packages }}
+      run: |
+        targets="$RUNNER_TEMP/go-test-packages.txt"
+        changed="$RUNNER_TEMP/go-changed-packages.txt"
+        dependencies="$RUNNER_TEMP/go-test-dependencies.txt"
+        mode=full
+        if [[ "$GO_TEST_MODE" == affected && -n "$CHANGED_PACKAGES" ]]; then
+          read -r -a packages <<< "$CHANGED_PACKAGES"
+          # Go supplies transitive dependencies, including test imports.
+          # Normalize test variants to their owner and skip synthetic binaries.
+          # Reject seeds outside the suite (for example, Go files under testdata).
+          if go list -f '{{.ImportPath}}' "${packages[@]}" > "$changed" && [[ -s "$changed" ]] &&
+             go list -test -f '{{if .ForTest}}{{.ForTest}}{{else}}{{.ImportPath}}{{end}} {{join .Deps " "}}' ./cmd/... ./internal/... > "$dependencies" &&
+             awk 'NR == FNR { changed[$1] = 1; selected[$1] = 1; next }
+                 $1 in changed { found[$1] = 1 }
+                 $1 !~ /\.test$/ { for (i = 1; i <= NF; i++) if ($i in changed) { selected[$1] = 1; break } }
+                 END { for (package in changed) if (!(package in found)) exit 1
+                       for (package in selected) print package }' "$changed" "$dependencies" | sort -u > "$targets"; then
+            mode=affected
+          else
+            echo 'Changed packages could not be mapped to the suite; running the full Go suite.'
+          fi
+        fi
+        # Windows limits command lines to 32,767 characters; leave room for flags.
+        if [[ "$RUNNER_OS" == Windows && "$mode" == affected && $(wc -c < "$targets") -gt 30000 ]]; then
+          echo 'Selected package list is too long for Windows; running the full Go suite.'
+          mode=full
+        fi
+        if [[ "$mode" == full ]]; then
+          printf '%s\n' ./cmd/... ./internal/... > "$targets"
+        fi
+        rm -f "$changed" "$dependencies"
+        echo "mode=$mode" >> "$GITHUB_OUTPUT"
+        echo "Go tests: $mode"
+        cat "$targets"
+
+    - name: Verify compiler shim layout
+      if: steps.selection.outputs.mode == 'full'
+      shell: bash
+      run: go test github.com/microsoft/TypeScript/tsc/shim/checker
+
+    - name: Unit Test (Linux / Darwin)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" == Linux ]]; then export GOMAXPROCS=16; fi
+        packages=()
+        while IFS= read -r package; do
+          packages+=("$package")
+        done < "$RUNNER_TEMP/go-test-packages.txt"
+        go test -count=1 "${packages[@]}"
+
+    - name: Unit Test (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        # Keep the existing concurrency when the runner has no resource limits.
+        GOMAXPROCS: 16
+      run: |
+        $parallelArgs = @()
+        $packageParallelism = [int]$env:GOMAXPROCS
+        $cpuLimit = 0
+        if ([int]::TryParse($env:cpu_limit, [ref]$cpuLimit) -and $cpuLimit -gt 0) {
+          $packageParallelism = $cpuLimit
+          $env:GOMAXPROCS = "$packageParallelism"
+          $parallelArgs = @("-p=$packageParallelism")
+        } elseif ($env:cpu_limit) {
+          Write-Warning "Ignoring invalid cpu_limit; keeping GOMAXPROCS=$env:GOMAXPROCS."
+        }
+
+        $memoryLimitGiB = 0
+        if ([int]::TryParse($env:memory_Limit, [ref]$memoryLimitGiB) -and $memoryLimitGiB -gt 0) {
+          # memory_Limit is the runner's total memory quota in GiB.
+          # Reserve 10% for the OS and other overhead, and share the budget
+          # across the full CPU-quota package parallelism.
+          $memoryBudgetMiB = [Math]::Floor($memoryLimitGiB * 1024 * 0.9)
+
+          # GOMEMLIMIT is a soft limit for each Go process, not the whole job.
+          $processMemoryMiB = [Math]::Floor($memoryBudgetMiB / $packageParallelism)
+          $env:GOMEMLIMIT = "${processMemoryMiB}MiB"
+        } elseif ($env:memory_Limit) {
+          Write-Warning "Ignoring invalid memory_Limit; keeping the existing memory settings."
+        }
+
+        Write-Host ("Runner quotas: " + (@{cpu_limit = $env:cpu_limit; memory_Limit = $env:memory_Limit} | ConvertTo-Json -Compress))
+        Write-Host "Go limits: GOMAXPROCS=$env:GOMAXPROCS, package parallelism=$packageParallelism, GOMEMLIMIT=$env:GOMEMLIMIT"
+        $startedAt = [DateTime]::UtcNow
+        $targets = @(Get-Content (Join-Path $env:RUNNER_TEMP 'go-test-packages.txt'))
+        go build @parallelArgs @targets
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        Write-Host "Go build completed: elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
+
+        $packages = go list @parallelArgs @targets | Where-Object { $_ -ne "" }
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        $batchSize = 32
+        $batch = @()
+
+        foreach ($pkg in $packages) {
+          $batch += $pkg
+
+          if ($batch.Count -ge $batchSize) {
+            Write-Host "Running batch of $($batch.Count) packages..."
+            go test @parallelArgs -count=1 $batch
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $batch = @()
+          }
+        }
+
+        # Run remaining packages
+        if ($batch.Count -gt 0) {
+          Write-Host "Running final batch of $($batch.Count) packages..."
+          go test @parallelArgs -count=1 $batch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        }
+        Write-Host "Go tests completed: packages=$($packages.Count), elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
