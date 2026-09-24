@@ -155,11 +155,6 @@ func TestPreferSpyOnExtras(t *testing.T) {
 				Errors: useSpyOn(1, 1, 20),
 			},
 			{
-				Code:   `obj.a = rs.fn(...implementations)`,
-				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(...implementations)`},
-				Errors: useSpyOn(1, 1, 34),
-			},
-			{
 				Code:   `obj.a = rs.fn<() => number>(() => 1)`,
 				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => 1)`},
 				Errors: useSpyOn(1, 1, 37),
@@ -286,6 +281,152 @@ func TestPreferSpyOnExtras(t *testing.T) {
 				Code:   `obj.a = rs.fn(impl, extra)`,
 				Output: nil,
 				Errors: useSpyOn(1, 1, 27),
+			},
+			// ---- An implementation that is `undefined` itself ----
+			// `rs.fn(undefined)` is `rs.fn()`: a spy handed `undefined` would call the original method.
+			{
+				Code:   `obj.a = rs.fn(undefined)`,
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Errors: useSpyOn(1, 1, 25),
+			},
+			{
+				Code:   `obj.a = rs.fn(void 0)`,
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Errors: useSpyOn(1, 1, 22),
+			},
+			{
+				Code:   `obj.a = rs.fn((undefined))`,
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Errors: useSpyOn(1, 1, 27),
+			},
+			{
+				Code:   `obj.a = rs.fn(undefined as any)`,
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Errors: useSpyOn(1, 1, 32),
+			},
+			{
+				Code:   `obj.a = rs.fn(undefined).mockReturnValue(1)`,
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(() => undefined).mockReturnValue(1)`},
+				Errors: useSpyOn(1, 1, 44),
+			},
+			// A local `undefined` is an ordinary value and is copied.
+			{
+				Code:   `function setup(undefined) { obj.a = rs.fn(undefined) }`,
+				Output: []string{`function setup(undefined) { rs.spyOn(obj, 'a').mockImplementation(undefined) }`},
+				Errors: useSpyOn(1, 29, 53),
+			},
+			// `void expr` is `undefined` too, but replacing it would skip evaluating `expr`.
+			{
+				Code:   `obj.a = rs.fn(void setup())`,
+				Output: nil,
+				Errors: useSpyOn(1, 1, 28),
+			},
+			// ---- An argument dropped in favor of a chained implementation ----
+			{
+				Code:   `obj.a = rs.fn(function () {}).mockImplementation(other)`,
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(other)`},
+				Errors: useSpyOn(1, 1, 56),
+			},
+			{
+				Code:   `obj.a = rs.fn(void 0).mockImplementation(other)`,
+				Output: []string{`rs.spyOn(obj, 'a').mockImplementation(other)`},
+				Errors: useSpyOn(1, 1, 48),
+			},
+			{
+				Code:   `obj.a = rs.fn(makeImplementation()).mockImplementation(other)`,
+				Output: nil,
+				Errors: useSpyOn(1, 1, 62),
+			},
+			{
+				Code:   `obj.a = rs.fn(void setup()).mockImplementation(other)`,
+				Output: nil,
+				Errors: useSpyOn(1, 1, 54),
+			},
+			// ---- A spread argument may expand to no implementation ----
+			{
+				Code:   `obj.a = rs.fn(...implementations)`,
+				Output: nil,
+				Errors: useSpyOn(1, 1, 34),
+			},
+			// ---- Statement boundaries ----
+			// A rewritten statement that starts with `(` gets a semicolon when the previous statement has none.
+			{
+				Code: `setup()
+obj.a = (rs).fn(() => 1)`,
+				Output: []string{`setup()
+;(rs).spyOn(obj, 'a').mockImplementation(() => 1)`},
+				Errors: useSpyOn(2, 1, 25),
+			},
+			{
+				Code: `setup()
+obj.a = (rs.fn() as Mock).mockReturnValue(1)`,
+				Output: []string{`setup()
+;(rs.spyOn(obj, 'a').mockImplementation(() => undefined) as Mock).mockReturnValue(1)`},
+				Errors: useSpyOn(2, 1, 45),
+			},
+			{
+				Code: `const ready = 1
+obj.a = (rs).fn(() => 1)`,
+				Output: []string{`const ready = 1
+;(rs).spyOn(obj, 'a').mockImplementation(() => 1)`},
+				Errors: useSpyOn(2, 1, 25),
+			},
+			// No semicolon is needed after one, after a block opener or a statement header, or when the statement starts with an identifier.
+			{
+				Code: `setup();
+obj.a = (rs).fn(() => 1)`,
+				Output: []string{`setup();
+(rs).spyOn(obj, 'a').mockImplementation(() => 1)`},
+				Errors: useSpyOn(2, 1, 25),
+			},
+			{
+				Code: `{
+obj.a = (rs).fn(() => 1)
+}`,
+				Output: []string{`{
+(rs).spyOn(obj, 'a').mockImplementation(() => 1)
+}`},
+				Errors: useSpyOn(2, 1, 25),
+			},
+			{
+				Code: `if (ready)
+  obj.a = (rs).fn(() => 1)`,
+				Output: []string{`if (ready)
+  (rs).spyOn(obj, 'a').mockImplementation(() => 1)`},
+				Errors: useSpyOn(2, 3, 27),
+			},
+			{
+				Code: `setup()
+obj.a = rs.fn()`,
+				Output: []string{`setup()
+rs.spyOn(obj, 'a').mockImplementation(() => undefined)`},
+				Errors: useSpyOn(2, 1, 16),
+			},
+			// An assignment inside a larger expression never meets the previous statement.
+			{
+				Code: `setup(),
+obj.a = (rs).fn(() => 1)`,
+				Output: []string{`setup(),
+(rs).spyOn(obj, 'a').mockImplementation(() => 1)`},
+				Errors: useSpyOn(2, 1, 25),
+			},
+			{
+				Code: `run(
+obj.a = (rs).fn(() => 1))`,
+				Output: []string{`run(
+(rs).spyOn(obj, 'a').mockImplementation(() => 1))`},
+				Errors: useSpyOn(2, 1, 25),
+			},
+			// ---- A comma expression as the key ----
+			{
+				Code:   `obj[setup(), 'a'] = rs.fn(() => 1)`,
+				Output: []string{`rs.spyOn(obj, (setup(), 'a')).mockImplementation(() => 1)`},
+				Errors: useSpyOn(1, 1, 35),
+			},
+			{
+				Code:   `obj[(setup(), 'a')] = rs.fn(() => 1)`,
+				Output: []string{`rs.spyOn(obj, (setup(), 'a')).mockImplementation(() => 1)`},
+				Errors: useSpyOn(1, 1, 37),
 			},
 		},
 	)
