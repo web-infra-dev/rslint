@@ -34,6 +34,7 @@ func suggestionMessage(operator ast.Kind) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          messageIDSuggestion,
 		Description: "Switch to `… " + strict + " undefined`.",
+		Data:        map[string]string{"operator": strict},
 	}
 }
 
@@ -61,21 +62,32 @@ var NoTypeofUndefinedRule = rule.Rule{
 				}
 
 				valueNode := typeofNode.AsTypeOfExpression().Expression
-				isGlobal := valueNode != nil && ast.IsIdentifier(valueNode) &&
-					ctx.Refs != nil && ctx.Refs.IsGlobalReference(valueNode)
+				runtimeValue := ast.SkipOuterExpressions(valueNode, ast.OEKParentheses|ast.OEKAssertions)
+				isGlobal := runtimeValue != nil && ast.IsIdentifier(runtimeValue) &&
+					ctx.Refs != nil && ctx.Refs.IsGlobalReference(runtimeValue)
 				if isGlobal && !checkGlobals {
 					return
 				}
+
+				safeReplacement := ctx.Globals.Access("undefined").IsDeclared() &&
+					!utils.IsShadowed(node, "undefined") &&
+					!isGlobalDocumentAll(ctx, runtimeValue)
 
 				// TypeOfExpression always owns the `typeof` token followed by its operand.
 				tokens := utils.TokensOfNode(ctx.SourceFile, typeofNode)
 				typeofToken := tokens[0]
 				fixes := func() []rule.RuleFix {
+					if !safeReplacement {
+						return nil
+					}
 					return buildFixes(ctx.SourceFile, node, typeofNode, undefinedString, binary.OperatorToken, typeofToken, tokens[1])
 				}
 
 				if isGlobal {
 					ctx.ReportRangeWithDeferredSuggestions(typeofToken.Range(), errorMessage, func() []rule.RuleSuggestion {
+						if !safeReplacement {
+							return nil
+						}
 						return []rule.RuleSuggestion{{
 							Message:  suggestionMessage(binary.OperatorToken.Kind),
 							FixesArr: fixes(),
@@ -88,6 +100,16 @@ var NoTypeofUndefinedRule = rule.Rule{
 			},
 		}
 	},
+}
+
+func isGlobalDocumentAll(ctx rule.RuleContext, node *ast.Node) bool {
+	if node == nil || !utils.IsSpecificMemberAccess(node, "", "all") {
+		return false
+	}
+	object := utils.AccessExpressionObject(node)
+	object = ast.SkipOuterExpressions(object, ast.OEKParentheses|ast.OEKAssertions)
+	return object != nil && ast.IsIdentifier(object) && object.Text() == "document" &&
+		ctx.Refs != nil && ctx.Refs.IsGlobalReference(object)
 }
 
 func checkGlobalVariables(rawOptions []any) bool {
@@ -138,12 +160,34 @@ func buildFixes(
 
 	if needsReturnOrThrowParentheses(sourceFile, binaryNode, typeofNode, typeofToken, secondToken) {
 		fixes = append(fixes, returnOrThrowParenthesesFixes(sourceFile, binaryNode.Parent)...)
+	} else if operandNeedsExpressionStatementParentheses(binaryNode, typeofNode) {
+		operand := typeofNode.AsTypeOfExpression().Expression
+		r := utils.TrimNodeTextRange(sourceFile, operand)
+		fixes = append(fixes,
+			rule.RuleFixReplaceRange(core.NewTextRange(r.Pos(), r.Pos()), "("),
+			rule.RuleFixReplaceRange(core.NewTextRange(r.End(), r.End()), ")"),
+		)
 	} else if unicornutil.NeedsSemicolonBefore(sourceFile, binaryNode, secondToken.Text) {
 		start := utils.TrimNodeTextRange(sourceFile, binaryNode).Pos()
 		fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(start, start), ";"))
 	}
 
 	return fixes
+}
+
+func operandNeedsExpressionStatementParentheses(binaryNode, typeofNode *ast.Node) bool {
+	if binaryNode == nil || binaryNode.Parent == nil || !ast.IsExpressionStatement(binaryNode.Parent) ||
+		typeofNode == nil || typeofNode.Kind != ast.KindTypeOfExpression {
+		return false
+	}
+	operand := typeofNode.AsTypeOfExpression().Expression
+	operand = ast.SkipOuterExpressions(operand, ast.OEKAssertions)
+	switch operand.Kind {
+	case ast.KindObjectLiteralExpression, ast.KindFunctionExpression, ast.KindClassExpression:
+		return true
+	default:
+		return false
+	}
 }
 
 func whitespaceAfterToken(source string, start int) core.TextRange {
