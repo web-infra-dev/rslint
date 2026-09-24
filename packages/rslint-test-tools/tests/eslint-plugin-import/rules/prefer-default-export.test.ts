@@ -4,7 +4,7 @@
 import { RuleTester } from '../rule-tester';
 
 const ruleTester = new RuleTester();
-ruleTester.run('prefer-default-export', undefined, {
+ruleTester.run('prefer-default-export', null as never, {
   valid: [
     // Single
     {
