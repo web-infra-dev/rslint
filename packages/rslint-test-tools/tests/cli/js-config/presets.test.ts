@@ -203,6 +203,31 @@ describe('defineConfig and config presets', () => {
     ]);
   });
 
+  test('import.configs.recommended warns when a default import uses a named export', async () => {
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig([importPlugin.configs.recommended]),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'named-default-preset.js')]:
+          'import foo from "./named-default-preset-dependency.js";',
+        [path.join(directory, 'named-default-preset-dependency.js')]:
+          'export default 1; export const foo = 2;',
+      },
+    });
+
+    expect(result.fileCount).toBe(2);
+    expect(result.diagnostics).toMatchObject([
+      {
+        ruleName: 'import/no-named-as-default',
+        messageId: 'noNamedAsDefault',
+        severity: 'warn',
+        message: "Using exported name 'foo' as identifier for default import.",
+      },
+    ]);
+  });
+
   test('rstestPlugin.configs.recommended should declare rstest plugin and rule', () => {
     const rec = rstestPlugin.configs.recommended;
     expect(rec.plugins).toBeDefined();

@@ -12,7 +12,7 @@ const recommended: RslintConfigEntry = {
     'import/default': 'error',
     'import/export': 'error',
     // warnings
-    // 'import/no-named-as-default': 'warn', // not implemented
+    'import/no-named-as-default': 'warn',
     // 'import/no-named-as-default-member': 'warn', // not implemented
     'import/no-duplicates': ['warn', { considerQueryString: true }],
   },

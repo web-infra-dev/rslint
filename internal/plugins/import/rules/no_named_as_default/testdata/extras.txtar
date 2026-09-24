@@ -1,0 +1,129 @@
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"commonjs","jsx":"preserve","esModuleInterop":false},"include":["**/*"]}
+-- tsconfig.interop.json --
+{"extends":"./tsconfig.json","compilerOptions":{"esModuleInterop":true}}
+-- tsconfig.nodenext.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"nodenext","moduleResolution":"nodenext","jsx":"preserve"},"include":["**/*"]}
+-- base.ts --
+export default function main() {}
+export const foo = 1;
+export const café = 2;
+export const 𐐀 = 3;
+export type Shape = { x: number };
+-- named-only.ts --
+export const foo = 1;
+-- star-only.ts --
+export * from './base';
+-- common.cjs --
+exports.foo = 1;
+module.exports = { foo: 1 };
+-- unresolved-star.ts --
+export default 1;
+export * from './missing';
+-- star.ts --
+export default 1;
+export * from './base';
+-- same-source.ts --
+export { default, foo } from './base';
+-- same-binding.ts --
+export { foo as default, foo } from './base';
+-- other.ts --
+export const foo = 2;
+-- different-sources.ts --
+export { default } from './base';
+export { foo } from './other';
+-- star-name.ts --
+export { default } from './base';
+export * from './base';
+-- local-default.ts --
+import value from './base';
+export { value as default };
+export { foo } from './base';
+-- local-named.ts --
+export { default } from './base';
+export const foo = 1;
+-- missing-default.ts --
+export { missing as default } from './base';
+export const foo = 1;
+-- unresolved-default.ts --
+export { default } from './missing';
+export const foo = 1;
+-- chained-missing-default.ts --
+export { default } from './missing-default';
+export const foo = 1;
+-- explicit-missing-name.ts --
+export default 1;
+export { missing as foo } from './base';
+-- unresolved-name.ts --
+export default 1;
+export { foo } from './missing';
+-- through-local.ts --
+import value from './base';
+export default value;
+export { value as foo };
+-- cycle-a.ts --
+export { default } from './cycle-b';
+export const foo = 1;
+-- cycle-b.ts --
+export { default } from './cycle-a';
+-- cycle-star-a.ts --
+export * from './cycle-star-b';
+export default 1;
+-- cycle-star-b.ts --
+export * from './cycle-star-a';
+export const foo = 1;
+-- default-namespace.ts --
+export * as default from './base';
+export const foo = 1;
+-- export-equals.ts --
+declare namespace api { const foo: number; }
+export = api;
+-- invalid-return.js --
+return;
+export {};
+-- interop-default.ts --
+export { default } from './named-only';
+export { foo } from './other';
+-- namespace-only.ts --
+export * as foo from './base';
+-- namespace-types.ts --
+export type * as foo from './base';
+-- namespace-members.ts --
+export default 1;
+export * as names from './base';
+-- quoted-namespace.ts --
+export default 1;
+export * as "foo" from './base';
+-- default-function.ts --
+export default function foo() {}
+-- ambient-module.ts --
+declare module "pkg" { export const foo: 1; }
+export default 1;
+-- local-string.ts --
+const value = 1;
+export { value as "default", value as "foo" };
+-- named-types.ts --
+export default 1;
+export type { foo } from './base';
+-- star-types.ts --
+export default 1;
+export type * from './base';
+-- export-equals-function.ts --
+function fn() {}
+export const foo = 1;
+export = fn;
+-- escaped-export.ts --
+export default 1;
+export const f\u006fo = 1;
+-- destructuring.ts --
+export default 1;
+export const { value: [foo] } = input;
+-- quoted-named.ts --
+export default 1;
+export { foo as "foo" } from './base';
+-- quoted-default.ts --
+export { foo as "default" } from './base';
+export const foo = 1;
+-- quoted-local.ts --
+export { "foo" as default } from './base';
+export const foo = 1;
