@@ -34,6 +34,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_useless_path_segments"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_webpack_loader_syntax"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/order"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/prefer_default_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/unambiguous"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -73,6 +74,7 @@ func GetAllRules() []rule.Rule {
 		no_useless_path_segments.NoUselessPathSegmentsRule,
 		no_webpack_loader_syntax.NoWebpackLoaderSyntax,
 		order.OrderRule,
+		prefer_default_export.PreferDefaultExportRule,
 		unambiguous.UnambiguousRule,
 	}
 }
