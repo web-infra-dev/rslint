@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -14,6 +16,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_absolute_path.schema.json
@@ -53,12 +56,11 @@ var NoAbsolutePathRule = rule.Rule{
 					fromParts = posixPathComponents(tspath.GetDirectoryPath(ctx.SourceFile.FileName()), cwd)
 				}
 				relative := relativeImportPath(fromParts, source.Text(), cwd)
-				// JSON encoding must not replace an unpaired UTF-16 surrogate.
-				if !utf8.ValidString(relative) {
+				text, ok := quoteModulePath(relative)
+				if !ok {
 					return nil
 				}
-				text, _ := json.Marshal(relative)
-				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source, string(text))}
+				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source, text)}
 			})
 		}, import_utils.VisitModulesOptions{
 			ESModule: opts["esmodule"] != false,
@@ -85,8 +87,44 @@ func relativeImportPath(fromParts []string, to, cwd string) string {
 		common++
 	}
 	relative := strings.TrimSuffix(strings.Repeat("../", len(fromParts)-common)+strings.Join(toParts[common:], "/"), "/")
-	if !strings.HasPrefix(relative, ".") {
+	// Without a parent-directory segment, even a name like .hidden needs ./.
+	if common == len(fromParts) {
 		relative = "./" + relative
 	}
 	return relative
+}
+
+// JSON handles ordinary text; preserve lone surrogates as JS Unicode escapes
+// instead of letting the encoder replace their compiler WTF-8 representation.
+func quoteModulePath(value string) (string, bool) {
+	if utf8.ValidString(value) {
+		text, err := json.Marshal(value)
+		return string(text), err == nil
+	}
+	var quoted strings.Builder
+	quoted.WriteByte('"')
+	start := 0
+	for offset := 0; offset < len(value); {
+		r, size := ecmascript.DecodeStringRune(value[offset:])
+		if r == utf8.RuneError && size == 1 {
+			return "", false
+		}
+		if utf16.IsSurrogate(r) {
+			text, err := json.Marshal(value[start:offset])
+			if err != nil {
+				return "", false
+			}
+			quoted.Write(text[1 : len(text)-1])
+			quoted.WriteString(`\u`)
+			quoted.WriteString(strconv.FormatInt(int64(r), 16))
+			start = offset + size
+		}
+		offset += size
+	}
+	text, err := json.Marshal(value[start:])
+	if err != nil {
+		return "", false
+	}
+	quoted.Write(text[1:])
+	return quoted.String(), true
 }

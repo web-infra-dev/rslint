@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -12,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // Options, AST adaptations, and fix boundaries beyond the pinned upstream suite.
@@ -238,7 +240,7 @@ func TestNoAbsolutePathExtras(t *testing.T) {
 			{
 				Code:     "import \"/foo/bar\"; import \"/\"; import \"/foo/bar/.hidden\"; import \"/foo/bar/../bar//baz/\";",
 				FileName: "/foo/bar/index.ts",
-				Output:   []string{"import \"./\"; import \"../..\"; import \".hidden\"; import \"./baz\";"},
+				Output:   []string{"import \"./\"; import \"../..\"; import \"./.hidden\"; import \"./baz\";"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 18},
 					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 27, EndLine: 1, EndColumn: 30},
@@ -287,11 +289,11 @@ func TestNoAbsolutePathExtras(t *testing.T) {
 					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 23},
 				},
 			},
-			// An unpaired surrogate cannot be safely encoded by Go JSON; keep the diagnostic without a fix.
+			// Preserve the original code unit when fixing an unpaired surrogate.
 			{
 				Code:     "import \"/foo/bar/\\ud800\";",
 				FileName: "/foo/bar/index.ts",
-				Output:   nil,
+				Output:   []string{"import \"./\\ud800\";"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 25},
 				},
@@ -316,7 +318,7 @@ func TestNoAbsolutePathExtras(t *testing.T) {
 			{
 				Code:     "import \"/foo/bar/\\udc00\";",
 				FileName: "/foo/bar/index.ts",
-				Output:   nil,
+				Output:   []string{"import \"./\\udc00\";"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 25},
 				},
@@ -329,11 +331,56 @@ func TestNoAbsolutePathExtras(t *testing.T) {
 					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 32},
 				},
 			},
+			// Preserve module values and explicit relative paths in every visitor.
+			{
+				Code:     "require('/foo/bar/.hidden.cjs'); import('/foo/bar/..hidden.cjs'); export * from '/foo/bar/.config/index.js'; define(['/foo/bar/.d.ts'], cb);",
+				FileName: "/foo/bar/index.ts",
+				Options:  []any{map[string]any{"amd": true}},
+				Output:   []string{"require(\"./.hidden.cjs\"); import(\"./..hidden.cjs\"); export * from \"./.config/index.js\"; define([\"./.d.ts\"], cb);"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 9, EndLine: 1, EndColumn: 31},
+					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 41, EndLine: 1, EndColumn: 64},
+					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 81, EndLine: 1, EndColumn: 108},
+					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 118, EndLine: 1, EndColumn: 134},
+				},
+			},
+			{
+				Code:     "require('/foo/bar/a\\ud800\\\\ud800\"c');",
+				FileName: "/foo/bar/index.ts",
+				Output:   []string{"require(\"./a\\ud800\\\\ud800\\\"c\");"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 9, EndLine: 1, EndColumn: 36},
+				},
+			},
+			{
+				Code:     "import \"/foo/bar/\\udc00\\ud800\\ud800\";",
+				FileName: "/foo/bar/index.ts",
+				Output:   []string{"import \"./\\udc00\\ud800\\ud800\";"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 37},
+				},
+			},
+			{
+				Code:     "import \"/foo/bar/.\\ud800\";",
+				FileName: "/foo/bar/index.ts",
+				Output:   []string{"import \"./.\\ud800\";"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 8, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:     "require('/foo/bar/.\\\\file');",
+				FileName: "/foo/bar/index.ts",
+				Output:   []string{"require(\"./.\\\\file\");"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: absolutePathMessage, Line: 1, Column: 9, EndLine: 1, EndColumn: 27},
+				},
+			},
 		})
 }
 
 func TestNoAbsolutePathEditDemand(t *testing.T) {
-	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/foo/bar/index.js", Path: "/foo/bar/index.js"}, `import value from "/foo/bar/baz";`, core.ScriptKindJS)
+	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/foo/bar/index.js", Path: "/foo/bar/index.js"}, `import value from "/foo/bar/.\ud800";`, core.ScriptKindJS)
 	r := &NoAbsolutePathRule
 	var all rule.RuleDiagnostic
 	for _, demand := range []rule.EditDemand{rule.EditDemandAll, rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion} {
@@ -352,7 +399,7 @@ func TestNoAbsolutePathEditDemand(t *testing.T) {
 			all = got
 		}
 		if demand == rule.EditDemandAll || demand == rule.EditDemandAutofix {
-			if got.FixesPtr == nil || len(*got.FixesPtr) != 1 || (*got.FixesPtr)[0].Text != `"./baz"` || !reflect.DeepEqual(got.FixesPtr, all.FixesPtr) {
+			if got.FixesPtr == nil || len(*got.FixesPtr) != 1 || (*got.FixesPtr)[0].Text != `"./.\ud800"` || !reflect.DeepEqual(got.FixesPtr, all.FixesPtr) {
 				t.Fatalf("demand %d: missing or incorrect fix", demand)
 			}
 		} else if got.FixesPtr != nil {
@@ -397,6 +444,10 @@ func TestRelativeImportPath(t *testing.T) {
 		{"/", "/foo", "./foo"},
 		{"/foo/bar", "/foo/bar", "./"},
 		{"/foo/bar", "///foo//bar/baz", "./baz"},
+		{"/foo/bar", "/foo/bar/.hidden", "./.hidden"},
+		{"/foo/bar", "/foo/bar/..hidden/file", "./..hidden/file"},
+		{"/foo/bar", `/foo/bar/.\file`, `./.\file`},
+		{"/foo/bar", "/foo/.hidden", "../.hidden"},
 		{"C:/foo/bar", "C:/foo/baz", "../baz"},
 		{"C:/foo/bar", "D:/foo/baz", "../../../D:/foo/baz"},
 		{"C:/foo/bar", `\foo`, `../../../\foo`},
@@ -405,6 +456,35 @@ func TestRelativeImportPath(t *testing.T) {
 	} {
 		if got := relativeImportPath(posixPathComponents(tc.from, "/work"), tc.to, "/work"); got != tc.want {
 			t.Errorf("relative path from %q to %q = %q, want %q", tc.from, tc.to, got, tc.want)
+		}
+	}
+}
+
+func TestQuoteModulePath(t *testing.T) {
+	for _, units := range [][]uint16{
+		{},
+		{0xD800},
+		{0xDBFF},
+		{0xDC00},
+		{0xDFFF},
+		{0xD83D, 0xDE00},
+		{0xDC00, 0xD800},
+		{0xD800, 0xD800, 0xDC00, 0xDFFF},
+		{0xD800, '\\', 'u', 'd', '8', '0', '0', '"', '\n', 0, 0x2028, '<', '&', 0xDFFF},
+	} {
+		text, ok := quoteModulePath(ecmascript.StringFromCodeUnits(units))
+		if !ok || !utf8.ValidString(text) {
+			t.Fatalf("code units %x produced an invalid source string %q", units, text)
+		}
+		file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/quoted.js", Path: "/quoted.js"}, text, core.ScriptKindJS)
+		value := file.Statements.Nodes[0].AsExpressionStatement().Expression.Text()
+		if got := ecmascript.StringCodeUnits(value); !reflect.DeepEqual(got, units) {
+			t.Errorf("quoted %x as %s, parsed back as %x", units, text, got)
+		}
+	}
+	for _, value := range []string{"\xff", "\xed\xa0", "\xed\xa0\x80\xff"} {
+		if _, ok := quoteModulePath(value); ok {
+			t.Errorf("invalid bytes %x must not produce a lossy fix", value)
 		}
 	}
 }

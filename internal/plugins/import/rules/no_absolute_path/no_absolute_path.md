@@ -60,10 +60,10 @@ least one pattern, without duplicate entries.
 - Automatic fixes escape `<`, `>`, `&`, U+2028, and U+2029. For example, a path
   containing `<a>` becomes `"./\u003ca\u003e"` instead of `"./<a>"`. The fixed
   paths have the same JavaScript value and refer to the same module.
-- If the relative path would contain an unpaired UTF-16 surrogate, such as
-  `"./\ud800"`, rslint reports the absolute path without an automatic fix.
-  Upstream offers a fix that preserves the escaped surrogate. Change these
-  paths manually.
+- Fixes for names beginning with a dot include the relative-path prefix. For
+  example, importing `/project/.hidden.js` from `/project/index.js` becomes
+  `"./.hidden.js"`. Upstream produces `".hidden.js"`, which module loaders can
+  interpret as a package name and fail to load.
 
 ## Original Documentation
 
