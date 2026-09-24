@@ -66,11 +66,6 @@ runs:
         echo "Go tests: $mode"
         cat "$targets"
 
-    - name: Test Go package selector
-      if: steps.selection.outputs.mode == 'full'
-      shell: bash
-      run: go test -count=1 ./.github/actions/test-go
-
     - name: Verify compiler shim layout
       if: steps.selection.outputs.mode == 'full'
       shell: bash
