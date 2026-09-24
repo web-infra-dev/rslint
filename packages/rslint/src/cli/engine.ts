@@ -368,9 +368,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
         // Resolve the standalone host beside the built CLI chunks. Importing
         // the public index would also load the worker's lint runtime here.
         const pluginEntry: string = './eslint-plugin/host.js';
-        const mod: unknown = await import(
-          /* webpackIgnore: true */ pluginEntry
-        );
+        const mod: unknown = await import(pluginEntry);
         if (!isPluginHostFactoryModule(mod)) {
           throw new Error(
             'rslint ESLint-plugin entry does not export createPluginLintHost',
