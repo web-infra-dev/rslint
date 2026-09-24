@@ -180,13 +180,6 @@ Node's import adapter applies its own literal coercion, loader-parameter removal
 builtin filtering and type-only policy to the same collection. The shared
 collector does not depend on Program, rule configuration or a TypeChecker.
 
-Import-specific export queries stay in `internal/plugins/import/utils`, backed
-by the same Program generation. The export map keeps declared names available
-even for unresolved re-exports, while default-import checks distinguish values
-that resolve and include TypeScript interop defaults. Direct re-export sources
-are retained separately from merged star exports; rules apply their own naming
-policy to this metadata without resolving modules or comparing checker symbols.
-
 `internal/utils/moduleresolver` provides runtime lookup through the Program's
 filesystem and generation-scoped cache, reusing tsgo's resolver for package
 traversal and export-path validation. It selects runtime files independently of
