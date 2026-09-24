@@ -4,6 +4,10 @@
  * the native API's config activation, and the VS Code extension's
  * PluginLintPool (LSP `rslint/pluginLint` requests), so the
  * request→tasks→result boundary lives in exactly one place.
+ *
+ * Also built as the CLI's private `dist/eslint-plugin/host.js` entry. Keep
+ * runtime imports limited to worker coordination and protocol conversion;
+ * plugin loading, parsing, and rule execution belong in `lint-worker.js`.
  */
 import { WorkerPool, type WorkerPoolOptions } from './worker-pool.js';
 import {
@@ -34,8 +38,8 @@ export interface PluginLintHost {
  *
  * `configs` empty ⇒ the pool spawns no workers (no-op fast path); a
  * `lint` call then returns empty per-file results. Init rejects if a
- * referenced plugin fails to import — the caller decides how loud to be
- * (CLI fails the run; LSP logs and serves empty).
+ * referenced plugin fails to import. The caller owns failure handling:
+ * CLI/API abort; LSP applies its configuration transaction recovery policy.
  */
 export async function createPluginLintHost(
   configs: ConfigDescriptor[],
