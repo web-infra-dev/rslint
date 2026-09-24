@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -106,14 +107,55 @@ func jsonCloneSuggestionFixes(
 
 	fixes := []rule.RuleFix{
 		rule.RuleFixReplace(sourceFile, outer.Callee, "structuredClone"),
-		rule.RuleFixRemoveRange(utils.TrimNodeTextRange(sourceFile, inner.RawCallee)),
-		rule.RuleFixRemoveRange(opening),
 	}
+	fixes = append(fixes, removeTransparentCalleeFixes(sourceFile, inner.RawCallee, inner.Callee)...)
+	if typeArguments, ok := callTypeArgumentsRange(sourceFile, inner.Call); ok {
+		fixes = append(fixes, rule.RuleFixRemoveRange(typeArguments))
+	}
+	fixes = append(fixes, rule.RuleFixRemoveRange(opening))
 	if hasTrailingComma {
 		fixes = append(fixes, rule.RuleFixRemoveRange(trailingComma))
 	}
 	fixes = append(fixes, rule.RuleFixRemoveRange(closing))
 	return fixes
+}
+
+func removeTransparentCalleeFixes(sourceFile *ast.SourceFile, rawCallee, callee *ast.Node) []rule.RuleFix {
+	fixes := []rule.RuleFix{rule.RuleFixRemoveRange(utils.TrimNodeTextRange(sourceFile, callee))}
+	for current := rawCallee; current != nil && current != callee; {
+		switch current.Kind {
+		case ast.KindParenthesizedExpression:
+			tokens := utils.TokensOfNode(sourceFile, current)
+			if len(tokens) >= 2 && tokens[0].Kind == ast.KindOpenParenToken &&
+				tokens[len(tokens)-1].Kind == ast.KindCloseParenToken {
+				fixes = append(fixes,
+					rule.RuleFixRemoveRange(tokens[0].Range()),
+					rule.RuleFixRemoveRange(tokens[len(tokens)-1].Range()),
+				)
+			}
+			current = current.AsParenthesizedExpression().Expression
+		case ast.KindAsExpression, ast.KindSatisfiesExpression:
+			// MatchDotMethodCall only makes these wrappers transparent when they
+			// are parser-synthesized JSDoc casts, so the inner runtime expression
+			// is guaranteed to exist here.
+			current = utils.JSDocTypeCastExpression(current)
+		}
+	}
+	return fixes
+}
+
+func callTypeArgumentsRange(sourceFile *ast.SourceFile, node *ast.Node) (core.TextRange, bool) {
+	call := node.AsCallExpression()
+	if call == nil || call.Expression == nil || call.TypeArguments == nil ||
+		len(call.TypeArguments.Nodes) == 0 {
+		return core.TextRange{}, false
+	}
+	// matchJSONClone already rejected optional calls and this is a parsed
+	// CallExpression with an explicit type-argument list. The scanner ranges
+	// therefore point at the authored angle brackets.
+	openAngle := scanner.GetRangeOfTokenAtPosition(sourceFile, call.Expression.End())
+	closeAngle := scanner.GetRangeOfTokenAtPosition(sourceFile, call.TypeArguments.End())
+	return core.NewTextRange(openAngle.Pos(), closeAngle.End()), true
 }
 
 // callSyntax relies only on invariants established by MatchDotMethodCall: node is

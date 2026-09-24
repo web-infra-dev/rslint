@@ -21,6 +21,30 @@ func TestPreferStructuredCloneBoundaries(t *testing.T) {
 		"structuredClone(foo)",
 		"  my.cloneDeep  ",
 	)
+	comments := invalidJSON(
+		"JSON.parse((/*a*/JSON.stringify/*b*/)(foo))",
+		"structuredClone(/*a*//*b*/foo)",
+	)
+	jsdocCallee := invalidJSON(
+		"JSON.parse(/** @type {any} */ (JSON.stringify)(foo))",
+		"structuredClone(/** @type {any} */ foo)",
+	)
+	tsxTypeArguments := invalidJSON(
+		"JSON.parse(JSON.stringify<string>(foo))",
+		"structuredClone(foo)",
+	)
+	tsxTypeArguments.FileName = "case.tsx"
+	tsxTypeArguments.Tsx = true
+
+	// Deliberate safety divergence from upstream v75: when JSON.parse is also
+	// configured as a custom clone function, emit only the specialized JSON
+	// diagnostic. Upstream emits a second suggestion that clones the stringify
+	// result string and therefore changes semantics.
+	overlap := invalidJSON(
+		"JSON.parse(JSON.stringify(foo))",
+		"structuredClone(foo)",
+	)
+	overlap.Options = []any{map[string]any{"functions": []any{"JSON.parse"}}}
 
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -39,6 +63,10 @@ func TestPreferStructuredCloneBoundaries(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			parenthesized,
 			spacedConfig,
+			comments,
+			jsdocCallee,
+			tsxTypeArguments,
+			overlap,
 		},
 	)
 }
