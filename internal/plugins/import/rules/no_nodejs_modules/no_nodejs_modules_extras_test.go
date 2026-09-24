@@ -36,6 +36,8 @@ func TestNoNodejsModulesResolution(t *testing.T) {
 				[]rule_tester.ValidTestCase{
 					// A resolved subpath overrides lexical builtin classification.
 					{Code: "import 'virtual/shim'; import 'fs/shim';", Settings: settings},
+					// Removed stream internals may resolve to installed packages.
+					{Code: "import '_stream_readable';", Settings: settings},
 				},
 				[]rule_tester.InvalidTestCase{
 					// Exact core names take precedence over installed packages and TS paths.
@@ -87,6 +89,8 @@ func TestNoNodejsModulesSchema(t *testing.T) {
 func TestNoNodejsModulesExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_nodejs_modules.NoNodejsModulesRule,
 		[]rule_tester.ValidTestCase{
+			// Removed builtins are also allowed when no matching package exists.
+			{Code: "import '_stream_readable'; import 'node:_stream_readable';"},
 			// Initializing the rule without module references must not resolve anything.
 			{Code: "export const value = 1;", Settings: map[string]any{"import/resolver": 17}},
 			// JSDoc imports are comments, not module declarations to check.
@@ -251,7 +255,6 @@ func TestNoNodejsModulesExtras(t *testing.T) {
 					{MessageId: "", Message: "Do not import Node.js builtin module \"fs/not-a-real-subpath\"", Line: 1, Column: 1, EndLine: 1, EndColumn: 32},
 					{MessageId: "", Message: "Do not import Node.js builtin module \"node:fs/extra\"", Line: 1, Column: 33, EndLine: 1, EndColumn: 56},
 					{MessageId: "", Message: "Do not import Node.js builtin module \"_http_agent\"", Line: 1, Column: 57, EndLine: 1, EndColumn: 78},
-					{MessageId: "", Message: "Do not import Node.js builtin module \"node:_stream_readable\"", Line: 1, Column: 79, EndLine: 1, EndColumn: 110},
 					{MessageId: "", Message: "Do not import Node.js builtin module \"node:test/reporters\"", Line: 1, Column: 111, EndLine: 1, EndColumn: 140},
 				},
 			},

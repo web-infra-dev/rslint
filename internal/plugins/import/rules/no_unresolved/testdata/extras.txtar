@@ -22,3 +22,5 @@ Existence-only fixture for a native module.
 import 'dependency';
 -- symlink/real/node_modules/dependency/index.js --
 module.exports = 1;
+-- node_modules/_stream_readable/index.js --
+module.exports = 1;

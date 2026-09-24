@@ -117,6 +117,15 @@ func TestOrderBranchCoverage(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Removed stream internals are external; supported internals stay builtin.
+			{
+				Code:    "import http from '_http_agent';\nimport stream from '_stream_readable';",
+				Options: map[string]any{"groups": []any{"external", "builtin"}},
+				Output:  []string{"import stream from '_stream_readable';\nimport http from '_http_agent';\n"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "order", Message: "`_stream_readable` import should occur before import of `_http_agent`", Line: 2, Column: 1,
+				}},
+			},
 			// Duplicate display names gain aliases as diagnostics are produced;
 			// later diagnostics sharing the first entry retain that disambiguation.
 			{

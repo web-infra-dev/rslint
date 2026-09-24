@@ -6,6 +6,33 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/semver"
 )
 
+func TestIsNodeBuiltin(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		want bool
+	}{
+		{"fs", true},
+		{"_http_agent", true},
+		{"_tls_wrap", true},
+		// Node 26 removed these modules; their names can resolve to packages.
+		{"_stream_duplex", false},
+		{"_stream_passthrough", false},
+		{"_stream_readable", false},
+		{"_stream_transform", false},
+		{"_stream_wrap", false},
+		{"_stream_writable", false},
+	} {
+		for _, prefix := range []string{"", "node:"} {
+			name := prefix + tc.name
+			t.Run(name, func(t *testing.T) {
+				if got := IsNodeBuiltin(name); got != tc.want {
+					t.Errorf("IsNodeBuiltin(%q) = %v, want %v", name, got, tc.want)
+				}
+			})
+		}
+	}
+}
+
 func TestIsNodeBuiltinAtVersion(t *testing.T) {
 	for _, tc := range []struct {
 		name, version string

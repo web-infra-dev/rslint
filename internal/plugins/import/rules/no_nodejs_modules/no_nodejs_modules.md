@@ -61,6 +61,10 @@ For example, use `project: ['./tsconfig.app.json']` there;
 If you use multiple resolvers and need a particular order, list them in an
 array, such as `['typescript', 'node']`.
 
+The `_stream_*` modules removed in Node.js 26, such as `_stream_readable`, are
+not reported unless listed in `import/core-modules`. ESLint running on older
+Node.js versions may still report them as builtins.
+
 ## When Not To Use It
 
 Disable this rule for code that runs in Node.js and may use its builtin modules.
