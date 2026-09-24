@@ -6,6 +6,8 @@ packages:
   - 'npm/tsgo/*'
   - 'website'
 
+autoDedupe: true
+
 allowBuilds:
   '@tailwindcss/oxide': false
   '@vscode/vsce-sign': false
