@@ -39,6 +39,7 @@ type targetedProjectExecution struct {
 	session        *Session
 	plan           projectPlan
 	singleThreaded bool
+	skipRootIndex  bool
 	slots          []targetedProjectSlot
 }
 
@@ -147,7 +148,7 @@ func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlo
 		if slot.parseErr == nil && slot.config == nil {
 			slot.parseErr = errors.New("no parsed config returned")
 		}
-		if slot.parseErr == nil {
+		if slot.parseErr == nil && !execution.skipRootIndex {
 			slot.rootFiles = lintprogram.NewRootFileIndex(
 				slot.config.FileNames(),
 				execution.session.FS(),
@@ -390,6 +391,9 @@ func (s *Session) executeTargetProjectPlan(
 	targetPlan := request.Targets
 	singleThreaded := request.SingleThreaded
 	execution := newTargetedProjectExecution(s, plan, singleThreaded)
+	// Broad binding ranks parsed roots in one batch and never queries the
+	// per-project membership indexes. Set this before starting parse workers.
+	execution.skipRootIndex = request.Scope == ActiveOwners
 	if request.Scope == ActiveOwners {
 		// Broad lint still validates every active declaration, in plan order,
 		// before reporting a later path-resolution failure. Parsing metadata
