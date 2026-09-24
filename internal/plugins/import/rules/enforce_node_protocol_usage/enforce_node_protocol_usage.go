@@ -36,19 +36,19 @@ var EnforceNodeProtocolUsageRule = rule.Rule{
 				var err error
 				version, err = import_utils.NodeVersion(ctx.Settings)
 				if err != nil {
-					ctx.FailWithConfigurationError(err)
+					panic(err)
 				}
 				versionChecked = true
 			}
 			name := source.Text()
 			prefixed := strings.HasPrefix(name, "node:")
-			replacement, removed := "node:", 0
+			messageID, replacement, removed := "requireNodeProtocol", "node:", 0
 			if mode == "never" {
 				if !prefixed {
 					return
 				}
 				name = strings.TrimPrefix(name, "node:")
-				replacement, removed = "", 5
+				messageID, replacement, removed = "forbidNodeProtocol", "", 5
 			} else if mode != "always" || prefixed {
 				return
 			}
@@ -63,6 +63,7 @@ var EnforceNodeProtocolUsageRule = rule.Rule{
 				preferred, other = other, preferred
 			}
 			ctx.ReportNodeWithDeferredFixes(source, rule.RuleMessage{
+				Id:          messageID,
 				Description: "Prefer `" + preferred + "` over `" + other + "`.",
 				Data:        map[string]string{"moduleName": name},
 			}, func() []rule.RuleFix {

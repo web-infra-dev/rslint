@@ -336,12 +336,12 @@ func TestEnforceNodeProtocolUsageDocumentation(t *testing.T) {
 }
 
 func protocolError(mode, name string, line, column, endLine, endColumn int) rule_tester.InvalidTestCaseError {
-	preferred, other := "node:"+name, name
+	id, preferred, other := "requireNodeProtocol", "node:"+name, name
 	if mode == "never" {
-		preferred, other = other, preferred
+		id, preferred, other = "forbidNodeProtocol", other, preferred
 	}
 	return rule_tester.InvalidTestCaseError{
-		Message: "Prefer `" + preferred + "` over `" + other + "`.",
-		Line:    line, Column: column, EndLine: endLine, EndColumn: endColumn,
+		MessageId: id, Message: "Prefer `" + preferred + "` over `" + other + "`.",
+		Line: line, Column: column, EndLine: endLine, EndColumn: endColumn,
 	}
 }

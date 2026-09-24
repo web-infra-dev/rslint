@@ -485,12 +485,6 @@ context fields: generic source references come from `Program().ModuleGraph()`,
 while rule-specific derived indexes use `CachedByProgram`. Both remain keyed by
 the same Program generation and can never become a second source identity.
 
-Rules that discover invalid settings during execution use
-`RuleContext.FailWithConfigurationError`. Since listeners cannot return errors,
-it raises a typed `ConfigurationError`; the native worker boundary catches only
-that type, releases its checker, and returns the error through `RunLinter` and
-the request pipeline. Other panics retain their existing behavior.
-
 The linter creates one short-lived `CommentStore` per file. `Comments.All()`
 materializes the scanner-backed, source-ordered, deduplicated comment list only
 for the first consumer; later consumers share that list. A source without `//`

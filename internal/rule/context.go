@@ -1,8 +1,6 @@
 package rule
 
 import (
-	"fmt"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -37,21 +35,6 @@ type DiagnosticConsumer struct {
 	Demand EditDemand
 	Report func(RuleDiagnostic)
 }
-
-// ConfigurationError is an expected rule failure caused by user configuration.
-// The linter catches only this type at the worker boundary and returns it to
-// the caller; unrelated panics retain their normal behavior.
-type ConfigurationError struct {
-	RuleName string
-	FilePath string
-	Err      error
-}
-
-func (e *ConfigurationError) Error() string {
-	return fmt.Sprintf("invalid configuration for rule %q in %q: %v", e.RuleName, e.FilePath, e.Err)
-}
-
-func (e *ConfigurationError) Unwrap() error { return e.Err }
 
 type RuleContext struct {
 	SourceFile *ast.SourceFile
@@ -195,18 +178,6 @@ func (ctx *RuleContext) requireReporter() {
 	if ctx.reporter.consumer.Report == nil {
 		panic("rule: uninitialized RuleContext reporter")
 	}
-}
-
-// FailWithConfigurationError aborts the native rule pass for invalid settings
-// discovered during rule initialization or traversal. Listeners cannot return
-// errors, so it unwinds to the linter's worker boundary with a typed panic.
-func (ctx *RuleContext) FailWithConfigurationError(err error) {
-	ctx.requireReporter()
-	panic(&ConfigurationError{
-		RuleName: ctx.reporter.ruleName,
-		FilePath: ctx.SourceFile.FileName(),
-		Err:      err,
-	})
 }
 
 // shouldReportRange assumes requireReporter has already run.
