@@ -90,9 +90,17 @@ runs:
       if: runner.os == 'Windows'
       shell: pwsh
       env:
-        # Keep the existing concurrency when the runner has no resource limits.
+        # Use the resolved scope so selection fallbacks retain full-suite limits.
+        GO_TEST_MODE: ${{ steps.selection.outputs.mode }}
+        # Keep the existing default concurrency for affected tests and missing quotas.
         GOMAXPROCS: 16
       run: |
+        $targets = @(Get-Content (Join-Path $env:RUNNER_TEMP 'go-test-packages.txt'))
+        if ($env:GO_TEST_MODE -eq 'affected') {
+          go test -count=1 @targets
+          exit $LASTEXITCODE
+        }
+
         $parallelArgs = @()
         $packageParallelism = [int]$env:GOMAXPROCS
         $cpuLimit = 0
@@ -121,7 +129,6 @@ runs:
         Write-Host ("Runner quotas: " + (@{cpu_limit = $env:cpu_limit; memory_Limit = $env:memory_Limit} | ConvertTo-Json -Compress))
         Write-Host "Go limits: GOMAXPROCS=$env:GOMAXPROCS, package parallelism=$packageParallelism, GOMEMLIMIT=$env:GOMEMLIMIT"
         $startedAt = [DateTime]::UtcNow
-        $targets = @(Get-Content (Join-Path $env:RUNNER_TEMP 'go-test-packages.txt'))
         go build @parallelArgs @targets
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         Write-Host "Go build completed: elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
