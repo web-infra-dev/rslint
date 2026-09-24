@@ -149,6 +149,42 @@ function beginShutdownWithCapturedTimers(pool: WorkerPool): {
 }
 
 describe('WorkerPool shutdown state machine (no real Worker)', () => {
+  test('shutdown racing queued warmup completions cannot publish successful initialization', async () => {
+    const pool = new WorkerPool({
+      configs: [{ configPath: 'fake', configDirectory: 'fake' }],
+      workerCount: 2,
+      warmupWorkerCount: 2,
+    });
+    const state = pool as any;
+    const workers: FakeWorker[] = [];
+    const ready: Array<() => void> = [];
+    state.spawnWorker = (id: number) =>
+      new Promise((resolve) => {
+        const worker = new FakeWorker([]);
+        workers.push(worker);
+        ready.push(() => resolve(makeSlot(worker, id)));
+      });
+    await expect(pool.lintBatch([])).rejects.toThrow(/not initialized/);
+    const init = pool.init().then(
+      () => 'initialized',
+      (error: Error) => error.message,
+    );
+    await expect(pool.init()).rejects.toThrow(/init called twice/);
+    expect(workers).toHaveLength(2);
+    // Both ready messages have resolved their spawn promises, but adoption
+    // is still queued as microtasks when shutdown begins.
+    ready.forEach((resolve) => resolve());
+    const shutdown = pool.shutdown();
+    expect(pool.shutdown()).toBe(shutdown);
+    await shutdown;
+    expect(await init).toMatch(/closed/);
+    expect(workers.map((worker) => worker.terminateCalls)).toEqual([1, 1]);
+    expect(state.workers).toEqual([]);
+    expect(state.startingWorkers.size).toBe(0);
+    await expect(pool.init()).rejects.toThrow(/closed/);
+    await expect(pool.lintBatch([])).rejects.toThrow(/closed/);
+  });
+
   test('worker exit after waiter registration cancels the fallback', async () => {
     const events: string[] = [];
     const worker = new FakeWorker(events);
@@ -346,6 +382,7 @@ describe('WorkerPool shutdown state machine (no real Worker)', () => {
     const pool = new WorkerPool({
       configs: [{ configPath: 'fake', configDirectory: 'fake' }],
       workerCount: 2,
+      warmupWorkerCount: 2,
     });
     const internals = pool as any;
     const first = new FakeWorker([]);

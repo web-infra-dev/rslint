@@ -31,11 +31,5 @@ export type GlobalsConfig = Record<string, GlobalAccess>;
  * into `EslintPluginLintFile.ConfigKey` byte-for-byte; the worker uses
  * it as a Map key for per-file dispatch.
  */
-export interface ConfigDescriptor {
-  /** Absolute filesystem path of the selected JS/TS config file. */
-  configPath: string;
-  /** Go-authoritative absolute matching/routing directory. In explicit mode
-   *  this can differ from the config file's parent and MUST byte-match the
-   *  `ConfigKey` Go emits during plugin-lint dispatch. */
-  configDirectory: string;
-}
+export type ConfigDescriptor =
+  import('../config/config-source.js').PluginConfigDescriptor;

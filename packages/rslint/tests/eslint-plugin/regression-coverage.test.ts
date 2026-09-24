@@ -1548,6 +1548,7 @@ describe('WorkerPool init treats any rejection as fatal (no undefined sentinel)'
     const pool = new WorkerPool({
       configs: [{ configPath: HANG_PATH, configDirectory: HANG_DIR }],
       workerCount: 2,
+      warmupWorkerCount: 2,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const internals = pool as any;

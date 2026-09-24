@@ -4,6 +4,11 @@ import { Worker } from 'node:worker_threads';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
+import {
+  runPoolScenario,
+  formatScenarioFailure,
+  POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
+} from './pool-isolation/harness.js';
 
 /**
  * WorkerPool end-to-end — init-error paths: a failing config surfaces a
@@ -18,6 +23,24 @@ import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
   'WorkerPool end-to-end with a local fixture plugin',
   () => {
+    test(
+      'shutdown stops expansion stuck in config import without waiting for init timeout',
+      async () => {
+        const result = await runPoolScenario('growth-import-shutdown');
+        expect(result.verdict, formatScenarioFailure(result)).toBe('PASS');
+      },
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
+    );
+
+    test(
+      'shutdown owns failed expansion threads until their actual exit',
+      async () => {
+        const result = await runPoolScenario('growth-init-error-shutdown');
+        expect(result.verdict, formatScenarioFailure(result)).toBe('PASS');
+      },
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
+    );
+
     test('init failure surfaces with helpful error', async () => {
       const missingPath = path.resolve(
         __dirname,
@@ -72,6 +95,9 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       // otherwise a later Worker error is re-thrown by Node in the host.
       const originalOnce = Worker.prototype.once;
       let failedWorker: Worker | undefined;
+      let errorListenerCount = 0;
+      let lateErrorHandled = false;
+      let lateErrorThrown: unknown;
       let markWorkerExited!: () => void;
       const workerExited = new Promise<void>((resolve) => {
         markWorkerExited = resolve;
@@ -81,6 +107,22 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
           failedWorker = this;
           originalOnce.call(this, 'exit', () => {
             markWorkerExited();
+          });
+          // The pool's message handler is already registered. Inject the
+          // late error after it rejects the spawn, while the thread is
+          // still exiting. init() now waits for the actual exit, after
+          // which Node removes the Worker's listeners.
+          this.on('message', (message: { kind: string }) => {
+            if (message.kind !== 'init-error') return;
+            errorListenerCount = this.listenerCount('error');
+            try {
+              lateErrorHandled = this.emit(
+                'error',
+                new Error('synthetic late init fault'),
+              );
+            } catch (error) {
+              lateErrorThrown = error;
+            }
           });
         }
         return originalOnce.call(this, event, listener);
@@ -110,15 +152,9 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         /eslint-plugin-this-does-not-exist/,
       );
       expect(failedWorker).toBeDefined();
-      expect(failedWorker!.listenerCount('error')).toBeGreaterThan(0);
-      let handled = false;
-      expect(() => {
-        handled = failedWorker!.emit(
-          'error',
-          new Error('synthetic late init fault'),
-        );
-      }).not.toThrow();
-      expect(handled).toBe(true);
+      expect(errorListenerCount).toBeGreaterThan(0);
+      expect(lateErrorThrown).toBeUndefined();
+      expect(lateErrorHandled).toBe(true);
       await workerExited;
     });
 
@@ -176,8 +212,15 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       // the exact respawn-await boundary; it must remain pending until release.
       await subscribed;
       expect(initSettled).toBe(false);
+      let shutdownSettled = false;
+      const shutdownP = pool.shutdown();
+      void shutdownP.then(() => {
+        shutdownSettled = true;
+      });
+      await Promise.resolve();
+      expect(shutdownSettled).toBe(false);
       releaseRespawn();
-      await initP;
+      await Promise.all([initP, shutdownP]);
 
       expect(initError?.message).toBe('synthetic init failure');
       // Post-conditions of the init-failure branch still hold.

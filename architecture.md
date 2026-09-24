@@ -975,7 +975,7 @@ The transport and target phase differ by surface:
 
 - CLI sends `loadConfigs` and the CLI-only `prepareConfigs` as reverse
   framed-IPC requests during initialization. After final effective-ID selection
-  and the first fingerprint check, Node starts the existing plugin-host build
+  and the first fingerprint check, Node starts the plugin-host warmup
   and returns provisional plugin metadata. Go may use that metadata for
   read-only target planning and Program construction. Before `RunPipeline`,
   `activateConfigs` joins the same activation, including its second fingerprint
@@ -1403,7 +1403,7 @@ and mutation sequencing do not.
 
 ### Concurrency Model
 
-The main Go workload work groups and pools below honor `--singleThreaded`.
+The workload work groups and pools below honor `--singleThreaded`.
 The flag serializes these workload stages, but IPC transport, diagnostic
 collection, and plugin dispatch may still use infrastructure goroutines.
 
@@ -1503,6 +1503,12 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      independent from the partial root set needed to decide target ownership;
      the command immediately reduces it to a scalar and retains neither
      identity set in loader or `Program` state.
+
+7. **JavaScript plugin workers** (`packages/rslint/src/eslint-plugin`)
+   CLI, native API, and LSP share `createPluginLintHost`. `WorkerPool` owns
+   bounded, demand-driven scheduling and thread lifetime within each host;
+   adapters own configuration activation and generation lifetimes. Plugin
+   loading uses the config entry versions selected by `ConfigModuleHost`.
 
 Other invariants:
 
