@@ -57,8 +57,8 @@ module.exports = { first: true, second: true };
 ```
 
 Deeper assignments such as `module.exports.first.enabled = true` modify an
-existing export and do not count as new exports. Like upstream, CommonJS checks
-use syntax and also apply to locally declared `module` or `exports` identifiers.
+existing export and do not count as new exports. Assignments to locally declared
+`module` or `exports` bindings are also ignored.
 
 The rule does not provide automatic fixes or suggestions.
 
@@ -88,6 +88,9 @@ Compared with eslint-plugin-import 2.32.0:
 - Assignments such as `getBox().exports.a = 1` do not count as CommonJS exports.
   Upstream can report them along with other assignments to the returned object.
   CommonJS targets must start at the `module` or `exports` identifier.
+- Local bindings named `module` or `exports` are ignored. For example,
+  `function setup(exports) { exports.a = 1; exports.b = 2; }` does not export from
+  the file and is not reported. Upstream reports both assignments.
 
 ## Original Documentation
 

@@ -71,10 +71,18 @@ var GroupExportsRule = rule.Rule{
 				collect(node, key)
 			},
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if ast.IsAssignmentExpression(node, false) && isCommonJSExport(node.AsBinaryExpression().Left) &&
-					!utils.IsDefaultValueInDestructuringAssignment(node) {
-					collect(node, group{commonJS: true})
+				if !ast.IsAssignmentExpression(node, false) {
+					return
 				}
+				root := commonJSExportRoot(node.AsBinaryExpression().Left)
+				if root == nil || utils.IsDefaultValueInDestructuringAssignment(node) {
+					return
+				}
+				// Ignore authored locals, but retain tsgo's implicit CommonJS bindings.
+				if symbol := ctx.Refs.ResolveInFile(root); symbol != nil && symbol.Flags&ast.SymbolFlagsModuleExports == 0 {
+					return
+				}
+				collect(node, group{commonJS: true})
 			},
 			// The walker visits the file's children, ending with its EOF token.
 			rule.ListenerOnExit(ast.KindEndOfFile): func(_ *ast.Node) {
@@ -105,16 +113,22 @@ var GroupExportsRule = rule.Rule{
 	},
 }
 
-func isCommonJSExport(node *ast.Node) bool {
+func commonJSExportRoot(node *ast.Node) *ast.Node {
 	node = utils.ESTreeRuntimeExpression(node)
 	object, property := utils.MemberExpressionParts(node)
 	if object == nil || property == nil || ast.IsOptionalChain(node) || property.Kind == ast.KindPrivateIdentifier {
-		return false
+		return nil
 	}
 	object = utils.ESTreeRuntimeExpression(object)
 	// Require a complete public access rooted in an identifier, rather than
 	// upstream's property-name suffix matching on arbitrary receivers.
-	return ast.IsExportsIdentifier(object) || isModuleExports(node) || isModuleExports(object)
+	if ast.IsExportsIdentifier(object) || isModuleExports(node) {
+		return object
+	}
+	if isModuleExports(object) {
+		return utils.ESTreeRuntimeExpression(object.Expression())
+	}
+	return nil
 }
 
 func isModuleExports(node *ast.Node) bool {

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -48,7 +49,7 @@ export {c} from "m"; export type {C} from "m";`},
 namespace B { export const b = 2; export type U = string; }
 export const top = 3; export type V = string;`},
 			// Private members are not public CommonJS exports, at either level.
-			{Code: "class C { #exports; #x; m(module, exports) { module.#exports = {}; module.#exports.a = 1; exports.#x = 2; module.exports.#x = 3; module.exports = {}; } }"},
+			{Code: "class C { #exports; #x; m() { module.#exports = {}; module.#exports.a = 1; exports.#x = 2; module.exports.#x = 3; module.exports = {}; } }"},
 			// Calls and optional-chain receivers cannot supply a CommonJS root.
 			{Code: `getBox().exports.a = 1; getBox().exports.b = 2;
 factory().module.exports = {};
@@ -60,6 +61,34 @@ factory().exports.x = 1;
 (module as M).exports.x = 1;
 module[exports as string].x = 2;
 exports.y = 3;`},
+			// Local bindings named module or exports are not CommonJS roots.
+			{Code: `function first(exports) { exports.a = 1; }
+function second(exports) { exports.b = 2; }`},
+			{Code: `function first(module) { module.exports = {}; }
+function second(exports) { exports.x = 1; }`},
+			{Code: `const module = {exports: {}}, exports = {};
+module.exports = {}; module["exports"].a = 1;
+exports.a = 1; (exports).b = 2;`, FileName: "test.cjs"},
+			// Hoisted variables, block bindings, and destructured parameters also shadow.
+			{Code: `function setup() {
+  exports.a = 1; exports.b = 2; var exports;
+}
+{ module.exports.a = 1; module.exports.b = 2; let module; }
+function load({exports}) { exports.a = 1; exports.b = 2; }`, FileName: "test.js"},
+			{Code: `try {} catch (module) { module.exports = {}; module.exports.a = 1; }
+try {} catch ({exports}) { exports.a = 1; exports.b = 2; }
+for (const exports of values) { exports.a = 1; exports.b = 2; }`},
+			{Code: `import module from "m";
+import * as exports from "n";
+module.exports = {}; exports.a = 1; exports.b = 2;`},
+			{Code: `import {value as exports} from "m";
+import module = require("n");
+exports.a = 1; module.exports.a = 1; module.exports.b = 2;`},
+			{Code: `const setup = function exports() { exports.a = 1; exports.b = 2; };
+const Box = class module { static { module.exports = {}; module.exports.a = 1; } };`},
+			// Shadowed writes cannot make a single real CommonJS export fail.
+			{Code: `function setup(module, exports) { module.exports = {}; exports.a = 1; }
+exports.b = 2;`, FileName: "test.cjs"},
 			// An export type and an inline type specifier belong to different groups.
 			{Code: "type A = string; type B = number; export type {A}; export {type B};"},
 		},
@@ -270,12 +299,60 @@ exports.y++;`,
 					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 1, EndLine: 1, EndColumn: 32},
 					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 18, EndLine: 1, EndColumn: 32},
 				}},
-			// Bindings and function scope do not suppress syntactic CommonJS exports.
-			{Code: `function first(module) { module.exports = {}; }
-function second(exports) { exports.x = 1; }`,
+			// Unshadowed CommonJS roots still form one group across function bodies.
+			{Code: `function first() { exports.a = 1; }
+function second() { module.exports.b = 2; }
+function local(exports) { exports.ignored = 3; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 26, EndLine: 1, EndColumn: 45},
-					{MessageId: "", Message: commonJSMessage, Line: 2, Column: 28, EndLine: 2, EndColumn: 41},
+					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 20, EndLine: 1, EndColumn: 33},
+					{MessageId: "", Message: commonJSMessage, Line: 2, Column: 21, EndLine: 2, EndColumn: 41},
+				}},
+			// Body declarations do not shadow references in parameter initializers.
+			{Code: `function load(value = (exports.a = 1)) {
+  var exports = {};
+  exports.ignored = true;
+}
+module.exports.b = 2;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 24, EndLine: 1, EndColumn: 37},
+					{MessageId: "", Message: commonJSMessage, Line: 5, Column: 1, EndLine: 5, EndColumn: 21},
+				}},
+			// An authored module binding does not hide the implicit exports binding.
+			{Code: `const module = {exports: {}};
+module.exports.a = 1;
+module.exports.b = 2;
+exports.a = 1;
+exports.b = 2;`, FileName: "test.cjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: commonJSMessage, Line: 4, Column: 1, EndLine: 4, EndColumn: 14},
+					{MessageId: "", Message: commonJSMessage, Line: 5, Column: 1, EndLine: 5, EndColumn: 14},
+				}},
+			// Binder-supplied JavaScript CommonJS bindings are not authored locals.
+			{Code: "module.exports = {};\nexports.a = 1;", FileName: "test.cjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 1, EndLine: 1, EndColumn: 20},
+					{MessageId: "", Message: commonJSMessage, Line: 2, Column: 1, EndLine: 2, EndColumn: 14},
+				}},
+			{Code: "module.exports = {};\nexports.a = 1;", LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: commonJSMessage, Line: 1, Column: 1, EndLine: 1, EndColumn: 20},
+					{MessageId: "", Message: commonJSMessage, Line: 2, Column: 1, EndLine: 2, EndColumn: 14},
+				}},
+			// Type-only declarations and JSDoc do not shadow CommonJS value roots.
+			{Code: `type module = {};
+interface exports {}
+module.exports = {};
+exports.a = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: commonJSMessage, Line: 3, Column: 1, EndLine: 3, EndColumn: 20},
+					{MessageId: "", Message: commonJSMessage, Line: 4, Column: 1, EndLine: 4, EndColumn: 14},
+				}},
+			{Code: `/** @typedef {{value: number}} exports */
+module.exports = {};
+exports.a = 1;`, FileName: "test.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "", Message: commonJSMessage, Line: 2, Column: 1, EndLine: 2, EndColumn: 20},
+					{MessageId: "", Message: commonJSMessage, Line: 3, Column: 1, EndLine: 3, EndColumn: 14},
 				}},
 			// Assignments inside JSX expressions count; JSX tag names and attributes do not.
 			{Code: "const view = <exports.Component prop={exports.a = 1}>{module.exports.b = 2}</exports.Component>;", Tsx: true,
