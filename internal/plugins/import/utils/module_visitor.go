@@ -10,7 +10,27 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
+
+// LiteralModuleSource applies moduleVisitor's string and AMD filters to the
+// shared syntax collection. Callers choose whether to include type-only imports.
+func LiteralModuleSource(ref modules.Source) *ast.Node {
+	if utils.IsJSDocSyntaxNode(ref.Declaration) {
+		return nil
+	}
+	if ref.Kind == modules.ModuleReferenceAMD && len(ref.Declaration.AsCallExpression().Arguments.Nodes) != 2 {
+		return nil
+	}
+	source := utils.ESTreeRuntimeExpression(ref.Specifier)
+	if source == nil || source.Kind != ast.KindStringLiteral {
+		return nil
+	}
+	if ref.Kind == modules.ModuleReferenceAMD && (source.Text() == "require" || source.Text() == "exports") {
+		return nil
+	}
+	return source
+}
 
 type VisitModulesOptions struct {
 	Commonjs bool

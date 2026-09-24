@@ -1,12 +1,14 @@
 package utils
 
 import (
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -234,6 +236,32 @@ func (compiled *ModuleSettings) IsExternalPath(specifier string, resolvedPath st
 		}
 	}
 	return specifier != "" && !tspath.IsExternalModuleNameRelative(specifier) && resolvedPath == ""
+}
+
+// IsExternalResolvedImport applies upstream importType's external classification
+// to an already resolved import. Absolute/relative spellings and internal-regex
+// take precedence over package boundaries. Unlike the module graph's workspace
+// policy, upstream also treats bare aliases outside the importing package as
+// external. Keep that distinction here, without changing graph classification.
+func (compiled *ModuleSettings) IsExternalResolvedImport(ctx rule.RuleContext, specifier, resolvedPath string) bool {
+	if resolvedPath == "" || compiled.IsInternalSpecifier(specifier) ||
+		tspath.PathIsRelative(specifier) || nodeutil.IsAbsolutePath(specifier) {
+		return false
+	}
+	packagePath := ctx.Program().NearestPackageJSONDirectory(tspath.GetDirectoryPath(ctx.SourceFile.FileName()))
+	if packagePath == "" {
+		packagePath = ctx.Program().CurrentDirectory()
+	}
+	if relative, err := filepath.Rel(packagePath, resolvedPath); err == nil && strings.HasPrefix(relative, "..") {
+		return true
+	}
+	for _, folder := range compiled.externalFolders {
+		folderPath := tspath.ResolvePath(packagePath, folder)
+		if relative, err := filepath.Rel(folderPath, resolvedPath); err == nil && !strings.HasPrefix(relative, "..") {
+			return true
+		}
+	}
+	return false
 }
 
 // IsExternalPathFromPackage classifies a resolved target relative to the

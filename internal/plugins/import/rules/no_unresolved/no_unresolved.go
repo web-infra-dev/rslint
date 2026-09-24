@@ -9,7 +9,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
@@ -88,19 +87,8 @@ func unresolvedSource(ref modules.Source) *ast.Node {
 		if node.AsExportDeclaration().IsTypeOnly {
 			return nil
 		}
-	case modules.ModuleReferenceAMD:
-		if len(node.AsCallExpression().Arguments.Nodes) != 2 {
-			return nil
-		}
 	}
-	source := utils.ESTreeRuntimeExpression(ref.Specifier)
-	if source == nil || source.Kind != ast.KindStringLiteral {
-		return nil
-	}
-	if ref.Kind == modules.ModuleReferenceAMD && (source.Text() == "require" || source.Text() == "exports") {
-		return nil
-	}
-	return source
+	return import_utils.LiteralModuleSource(ref)
 }
 
 type exactCaseKey struct {
