@@ -1,0 +1,38 @@
+Minimal module-resolution trees for v2.32.0 tests and documentation.
+importPath is deliberately absent in the upstream tree.
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"module":"commonjs","target":"esnext","jsx":"preserve"},"include":["**/*"]}
+-- files/foo.js --
+export default 1;
+-- files/bar.js --
+export default 1;
+-- files/bar/index.js --
+export default 1;
+-- files/deep/a.js --
+export default 1;
+-- files/importType/index.js --
+export default 1;
+-- files/index.js --
+export default 1;
+-- files/malformed.js --
+export default 1;
+-- files/test-module/index.js --
+export default 1;
+-- my-project/app.js --
+export default 1;
+-- my-project/footer.js --
+export default 1;
+-- my-project/header.js --
+export default 1;
+-- my-project/helpers.js --
+export default 1;
+-- my-project/helpers/index.js --
+export default 1;
+-- my-project/index.js --
+export default 1;
+-- my-project/pages/about.js --
+export default 1;
+-- my-project/pages/contact.js --
+export default 1;
+-- my-project/pages/index.js --
+export default 1;

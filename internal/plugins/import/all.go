@@ -29,6 +29,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_restricted_paths"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_self_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_unresolved"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_useless_path_segments"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_webpack_loader_syntax"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/order"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/unambiguous"
@@ -65,6 +66,7 @@ func GetAllRules() []rule.Rule {
 		no_restricted_paths.NoRestrictedPathsRule,
 		no_self_import.NoSelfImportRule,
 		no_unresolved.NoUnresolvedRule,
+		no_useless_path_segments.NoUselessPathSegmentsRule,
 		no_webpack_loader_syntax.NoWebpackLoaderSyntax,
 		order.OrderRule,
 		unambiguous.UnambiguousRule,

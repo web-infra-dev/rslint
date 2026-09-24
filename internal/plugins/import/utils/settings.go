@@ -33,6 +33,29 @@ func exportExtensionAllowed(settings map[string]interface{}, fileName string) bo
 	return false
 }
 
+// FileExtensions combines import/extensions with alternate parser extensions.
+// The default is the upstream JavaScript extension set, not resolver extensions.
+func FileExtensions(settings map[string]interface{}) []string {
+	extensions := settingsStringList(settings, "import/extensions")
+	if settings["import/extensions"] == nil {
+		extensions = []string{".js", ".mjs", ".cjs"}
+	}
+	unique := make([]string, 0, len(extensions))
+	add := func(values []string) {
+		for _, extension := range values {
+			if !slices.Contains(unique, extension) {
+				unique = append(unique, extension)
+			}
+		}
+	}
+	add(extensions)
+	parsers, _ := settings["import/parsers"].(map[string]interface{})
+	for parser := range parsers {
+		add(settingsStringList(parsers, parser))
+	}
+	return unique
+}
+
 // ModuleSettings is the `import/` settings block compiled once per Program
 // generation and configuration. The raw settings are re-read for every
 // reference otherwise, which means recompiling the import/ignore patterns and
