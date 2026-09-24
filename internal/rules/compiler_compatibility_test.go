@@ -65,10 +65,14 @@ function unreachableForOf() { for (const value of (() => { throw 1; })()) { cons
 	if len(catalog) == 0 {
 		t.Fatal("rule catalog must not be empty")
 	}
+	// Rules with required options need an explicit fixture configuration.
+	fixtureOptions := map[string]any{
+		"import/enforce-node-protocol-usage": []any{"always"},
+	}
 	configured := make([]rule.ConfiguredRule, 0, len(catalog))
 	initialized := make(map[string]int, len(catalog))
 	for name, impl := range catalog {
-		options := rule_tester.ResolveTestCaseOptions(t, &impl, nil)
+		options := rule_tester.ResolveTestCaseOptions(t, &impl, fixtureOptions[name])
 		configured = append(configured, rule.ConfiguredRule{
 			Name:        name,
 			Environment: &rule.RuleEnvironment{},
