@@ -236,6 +236,7 @@ define.test({
     './tests/eslint-plugin-import/rules/no-namespace.test.ts',
     './tests/eslint-plugin-import/rules/no-restricted-paths.test.ts',
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
+    './tests/eslint-plugin-import/rules/no-unassigned-import.test.ts',
     './tests/eslint-plugin-import/rules/no-unresolved.test.ts',
     './tests/eslint-plugin-import/rules/no-mutable-exports.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
