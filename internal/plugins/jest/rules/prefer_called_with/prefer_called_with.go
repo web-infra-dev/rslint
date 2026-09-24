@@ -15,9 +15,10 @@ var PreferCalledWithRule = shared.NewRule(shared.Config{
 	},
 	Autofix: false,
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{Parse: func(node *ast.Node) *shared.ExpectCall {
-			parsed := jestUtils.ParseJestFnCall(node, ctx)
-			if parsed == nil || parsed.Kind != jestUtils.JestFnTypeExpect {
+			parsed := analysis.ParseExpectCall(node)
+			if parsed == nil {
 				return nil
 			}
 			call := &shared.ExpectCall{Matcher: parsed.Matcher, Modifiers: parsed.Modifiers}

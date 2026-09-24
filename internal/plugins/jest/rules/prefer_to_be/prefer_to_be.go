@@ -120,10 +120,10 @@ var PreferToBeRule = shared.NewRule(shared.Config{
 	AllowFractionalNumbers: true,
 	Message:                message,
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{Parse: func(node *ast.Node) *shared.ExpectCall {
-			parsed := jestUtils.ParseJestFnCall(node, ctx)
+			parsed := analysis.ParseExpectCall(node)
 			if parsed == nil ||
-				parsed.Kind != jestUtils.JestFnTypeExpect ||
 				parsed.MatcherEntry == nil ||
 				hasParenthesizedOptionalChainBoundary(parsed.MemberEntries) {
 				return nil
