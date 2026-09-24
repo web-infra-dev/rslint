@@ -131,9 +131,19 @@ func TestNoUntypedMockFactoryExtras(t *testing.T) {
 // TestNoUntypedMockFactoryEditDemand also exercises the binder-only backend.
 func TestNoUntypedMockFactoryEditDemand(t *testing.T) {
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	// Exercise stable const, let, and var factories in both backends. The
+	// reassigned let binding must remain exempt even though its initializer is
+	// a function, because the value passed to doMock is no longer that factory.
 	compiler, file, err := helper.CreateTestProgram(`rs.mock('./service', () => ({}));
 const factory = () => ({});
 rs.doMock('./service', factory);
+let mutableFactory = () => ({});
+rs.doMock('./mutable-service', mutableFactory);
+var legacyFactory = function () { return {}; };
+rs.doMockRequire('./legacy-service', legacyFactory);
+let reassignedFactory = () => ({});
+reassignedFactory = { spy: true };
+rs.doMock('./reassigned-service', reassignedFactory);
 rs.mock(modulePath, () => ({}));`, "edit-demand.ts", "tsconfig.json")
 	if err != nil {
 		t.Fatal(err)
@@ -164,12 +174,12 @@ rs.mock(modulePath, () => ({}));`, "edit-demand.ts", "tsconfig.json")
 				},
 				Consumer: rule.DiagnosticConsumer{Demand: demand, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},
 			})
-			if len(diagnostics) != 3 {
+			if len(diagnostics) != 5 {
 				t.Fatalf("typed=%v demand=%d: got %d diagnostics", typed, demand, len(diagnostics))
 			}
 			for i := range diagnostics {
 				d := &diagnostics[i]
-				wantFix := i < 2 && demand&rule.EditDemandAutofix != 0
+				wantFix := i < 4 && demand&rule.EditDemandAutofix != 0
 				if (d.FixesPtr != nil && len(*d.FixesPtr) > 0) != wantFix {
 					t.Fatalf("typed=%v demand=%d diagnostic=%d: wrong edits", typed, demand, i)
 				}

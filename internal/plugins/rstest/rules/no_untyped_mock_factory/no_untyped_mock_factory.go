@@ -71,7 +71,7 @@ func declaredFactory(ctx rule.RuleContext, symbol *ast.Symbol) bool {
 	}
 	if declaration.Kind == ast.KindVariableDeclaration {
 		initializer := utils.SkipAssertionsAndParens(declaration.Initializer())
-		return initializer != nil && ast.IsVarConst(declaration) && ast.IsFunctionExpressionOrArrowFunction(initializer)
+		return initializer != nil && ast.IsFunctionExpressionOrArrowFunction(initializer)
 	}
 	return declaration.Kind == ast.KindFunctionDeclaration
 }
