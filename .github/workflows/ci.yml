@@ -28,33 +28,23 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      changed: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.changed == 'true' }}
+      changed: ${{ steps.changes.outputs.changed }}
+      go-mode: ${{ steps.changes.outputs.go-mode }}
+      go-changed-packages: ${{ steps.changes.outputs.go-changed-packages }}
     steps:
       - name: Checkout code
-        if: github.event_name != 'workflow_dispatch'
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
 
-      - name: Filter changes
-        if: github.event_name != 'workflow_dispatch'
-        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-        id: filter
-        with:
-          predicate-quantifier: 'every'
-          filters: |
-            changed:
-              - '!**/*.md'
-              - '!**/*.mdx'
-              - '!**/_meta.json'
-              - '!**/dictionary.txt'
-              - '!.agents/skills/**'
-              - '!skills-lock.json'
+      - name: Detect changes
+        id: changes
+        uses: ./.github/actions/detect-changes
 
   test-go:
     name: Test Go
     needs: changes
-    if: needs.changes.outputs.changed == 'true'
+    if: needs.changes.outputs.go-mode != 'skip'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
@@ -63,7 +53,11 @@ jobs:
         runner:
           - rspack-ubuntu-22.04-large
           - rspack-windows-2022-large
-        go-version: ['1.27.0']
+        include: >-
+          ${{ fromJSON(
+            (github.ref == 'refs/heads/main' || startsWith(github.head_ref || github.ref_name, 'chore/release-')) &&
+            '[{"runner":"rspack-darwin-15.6.1-medium"}]' || '[]'
+          ) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -71,124 +65,12 @@ jobs:
           submodules: true
           fetch-depth: 1
 
-      - name: Disable CPU hogs (Windows)
-        if: runner.os == 'Windows'
-        continue-on-error: true
-        uses: ./.github/actions/windows-disable-cpu-hogs
-
-      - name: Setup Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '24'
-
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ matrix.go-version }}
-          cache-name: ci-test-go
-
-      - name: Verify compiler shim layout
-        run: go test github.com/microsoft/TypeScript/tsc/shim/checker
-
-      - name: Unit Test (Linux)
-        if: matrix.runner == 'rspack-ubuntu-22.04-large'
-        run: go test -count=1 ./cmd/... ./internal/...
-        env:
-          # The pod sees the shared node's 192 cores; that much concurrency only thrashes.
-          GOMAXPROCS: 16
-
-      - name: Unit Test (Windows)
-        if: matrix.runner == 'rspack-windows-2022-large'
-        shell: pwsh
-        env:
-          # Keep the existing concurrency when the runner has no resource limits.
-          GOMAXPROCS: 16
-        run: |
-          $parallelArgs = @()
-          $packageParallelism = [int]$env:GOMAXPROCS
-          $cpuLimit = 0
-          if ([int]::TryParse($env:cpu_limit, [ref]$cpuLimit) -and $cpuLimit -gt 0) {
-            $packageParallelism = $cpuLimit
-            $env:GOMAXPROCS = "$packageParallelism"
-            $parallelArgs = @("-p=$packageParallelism")
-          } elseif ($env:cpu_limit) {
-            Write-Warning "Ignoring invalid cpu_limit; keeping GOMAXPROCS=$env:GOMAXPROCS."
-          }
-
-          $memoryLimitGiB = 0
-          if ([int]::TryParse($env:memory_Limit, [ref]$memoryLimitGiB) -and $memoryLimitGiB -gt 0) {
-            # memory_Limit is the runner's total memory quota in GiB.
-            # Reserve 10% for the OS and other overhead, and share the budget
-            # across the full CPU-quota package parallelism.
-            $memoryBudgetMiB = [Math]::Floor($memoryLimitGiB * 1024 * 0.9)
-
-            # GOMEMLIMIT is a soft limit for each Go process, not the whole job.
-            $processMemoryMiB = [Math]::Floor($memoryBudgetMiB / $packageParallelism)
-            $env:GOMEMLIMIT = "${processMemoryMiB}MiB"
-          } elseif ($env:memory_Limit) {
-            Write-Warning "Ignoring invalid memory_Limit; keeping the existing memory settings."
-          }
-
-          Write-Host ("Runner quotas: " + (@{cpu_limit = $env:cpu_limit; memory_Limit = $env:memory_Limit} | ConvertTo-Json -Compress))
-          Write-Host "Go limits: GOMAXPROCS=$env:GOMAXPROCS, package parallelism=$packageParallelism, GOMEMLIMIT=$env:GOMEMLIMIT"
-          $startedAt = [DateTime]::UtcNow
-          go build @parallelArgs ./cmd/... ./internal/...
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Write-Host "Go build completed: elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
-
-          $packages = go list @parallelArgs ./cmd/... ./internal/... | Where-Object { $_ -ne "" }
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $batchSize = 32
-          $batch = @()
-
-          foreach ($pkg in $packages) {
-            $batch += $pkg
-
-            if ($batch.Count -ge $batchSize) {
-              Write-Host "Running batch of $($batch.Count) packages..."
-              go test @parallelArgs -count=1 $batch
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-              $batch = @()
-            }
-          }
-
-          # Run remaining packages
-          if ($batch.Count -gt 0) {
-            Write-Host "Running final batch of $($batch.Count) packages..."
-            go test @parallelArgs -count=1 $batch
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-          Write-Host "Go tests completed: packages=$($packages.Count), elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
-
-  test-go-darwin:
-    name: Test Go (Darwin)
-    needs: changes
-    if: ${{ needs.changes.outputs.changed == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.head_ref || github.ref_name, 'chore/release-')) }}
-    runs-on: rspack-darwin-15.6.1-medium
-    timeout-minutes: 60
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          submodules: true
-          fetch-depth: 1
-
-      - name: Setup Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '24'
-
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
+      - name: Test Go
+        uses: ./.github/actions/test-go
         with:
           go-version: '1.27.0'
-          cache-name: ci-test-go
-
-      - name: Verify compiler shim layout
-        run: go test github.com/microsoft/TypeScript/tsc/shim/checker
-
-      - name: Unit Test
-        run: go test -count=1 ./cmd/... ./internal/...
+          mode: ${{ needs.changes.outputs.go-mode }}
+          changed-packages: ${{ needs.changes.outputs.go-changed-packages }}
 
   lint:
     name: Lint
@@ -601,7 +483,6 @@ jobs:
     needs:
       - changes
       - test-go
-      - test-go-darwin
       - test-node
       - test-node-windows
       - test-vscode-windows
@@ -613,15 +494,16 @@ jobs:
     name: CI Done
     steps:
       - run: exit 1
-        # Lint must always succeed. Docs and skills may skip tests; otherwise, only Darwin may be skipped.
+        # The Go matrix has its own PR scope and requires every selected platform to pass.
+        # Other test jobs retain the existing documentation filter.
         if: >-
           ${{ always() && (
             contains(needs.*.result, 'failure') ||
             contains(needs.*.result, 'cancelled') ||
             needs.changes.result != 'success' ||
             needs.lint.result != 'success' ||
+            (needs.changes.outputs.go-mode != 'skip' && needs.test-go.result != 'success') ||
             (needs.changes.outputs.changed != 'false' && (
-              needs.test-go.result != 'success' ||
               needs.test-node.result != 'success' ||
               needs.test-node-windows.result != 'success' ||
               needs.test-vscode-windows.result != 'success' ||
