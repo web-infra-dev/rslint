@@ -10,9 +10,10 @@ import (
 var PreferHooksInOrderRule = shared.NewRule(shared.Config{
 	Name: "jest/prefer-hooks-in-order",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			Parse: func(node *ast.Node) *shared.ParsedCall {
-				parsed := jestUtils.ParseJestFnCall(node, ctx)
+				parsed := analysis.ParseFnCall(node)
 				if parsed == nil {
 					return nil
 				}

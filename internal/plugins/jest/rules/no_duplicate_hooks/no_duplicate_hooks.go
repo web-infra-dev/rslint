@@ -10,9 +10,10 @@ import (
 var NoDuplicateHooksRule = shared.NewRule(shared.Config{
 	Name: "jest/no-duplicate-hooks",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			Parse: func(node *ast.Node) *shared.ParsedCall {
-				parsed := utils.ParseJestFnCall(node, ctx)
+				parsed := analysis.ParseFnCall(node)
 				if parsed == nil {
 					return nil
 				}
