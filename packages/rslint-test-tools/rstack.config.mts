@@ -735,6 +735,7 @@ define.test({
     './tests/rstest/rules/prefer-importing-rstest-globals.test.ts',
     './tests/rstest/rules/prefer-mock-return-shorthand.test.ts',
     './tests/rstest/rules/prefer-rs-mocked.test.ts',
+    './tests/rstest/rules/prefer-spy-on.test.ts',
     './tests/rstest/rules/prefer-strict-boolean-matchers.test.ts',
     './tests/rstest/rules/prefer-strict-equal.test.ts',
     './tests/rstest/rules/prefer-to-be.test.ts',
