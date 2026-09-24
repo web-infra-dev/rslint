@@ -108,6 +108,42 @@ func TestNoUselessPathSegmentsExtras(t *testing.T) {
 	item = invalidPath(`import './unknown/index.ts';`, `'./unknown/index.ts'`, "./unknown/index.ts", "./unknown", `import "./unknown";`, both)
 	item.Settings = map[string]any{"import/extensions": []any{`.t(s|sx)`}}
 	invalid = append(invalid, item)
+	// Upstream compiles extension patterns without the Unicode flag: dots,
+	// character classes, and quantifiers operate on UTF-16 code units.
+	for _, tc := range []struct {
+		extension, suffix string
+		report            bool
+	}{
+		{`.(a|aa)+`, "aaa", true},
+		{`.(.)`, "😀", false},
+		{`.(..)`, "😀", true},
+		{`.😀`, "😀", true},
+		{`.[😀]`, "😀", false},
+		{`.(😀)`, "😀", true},
+		{`.😀+`, "😀😀", false},
+		{`.\😀`, "😀", true},
+		{`.\\😀`, "😀", false},
+		{`.\ud83d\ude00`, "😀", true},
+	} {
+		imported := "./x/index." + tc.suffix
+		literal := "'" + imported + "'"
+		code := "import " + literal + ";"
+		settings := map[string]any{"import/extensions": []any{tc.extension}}
+		if tc.report {
+			item := invalidPath(code, literal, imported, "./x", `import "./x";`, both)
+			item.Settings = settings
+			invalid = append(invalid, item)
+		} else {
+			valid = append(valid, rule_tester.ValidTestCase{Code: code, FileName: "files/foo.js", Settings: settings, Options: both})
+		}
+	}
+	item = invalidPath(`import './x/index.\ud800';`, `'./x/index.\ud800'`, "./x/index.\xed\xa0\x80", "./x", `import "./x";`, both)
+	item.Settings = map[string]any{"import/extensions": []any{`.(.)`}}
+	invalid = append(invalid, item)
+	valid = append(valid, rule_tester.ValidTestCase{
+		Code: `import './index.` + strings.Repeat("a", 200) + `b';`, FileName: "files/foo.js", Options: both,
+		Settings: map[string]any{"import/extensions": []any{`.(a|aa)+`}},
+	}) // A regexp timeout must never produce a diagnostic or a fix.
 	// Settings participate in the upstream regex, so a match need not contain
 	// a slash or end at index. Keep dirname safe for those matches too.
 	for _, tc := range []struct{ imported, proposed string }{{".alias", "."}, {"./x/index.js/", "./x"}} {

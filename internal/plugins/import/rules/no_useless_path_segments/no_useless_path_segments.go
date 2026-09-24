@@ -72,10 +72,16 @@ var NoUselessPathSegmentsRule = rule.Rule{
 			if noUselessIndex && !indexPatternInitialized {
 				extensions = import_utils.FileExtensions(ctx.Settings)
 				// Match the upstream pattern, including settings-authored regex syntax.
-				indexPattern, _ = esregexp.Compile(`.*/index(\`+strings.Join(extensions, `|\`)+`)?$`, "")
+				indexPattern, _ = esregexp.Compile(indexPatternSource(extensions), "")
 				indexPatternInitialized = true
 			}
-			if indexPattern != nil && indexPattern.TestOrTimeout(importPath) {
+			unnecessaryIndex := false
+			if indexPattern != nil {
+				matched, err := indexPattern.Unwrap().MatchRunes(ecmascript.StringCodeUnitRunes(importPath))
+				// A timeout cannot justify a diagnostic or an autofix.
+				unnecessaryIndex = err == nil && matched
+			}
+			if unnecessaryIndex {
 				// Split preserves the written ./ and parent segments, as Node's
 				// dirname does; filepath.Dir would clean them first.
 				parent, _ := filepath.Split(strings.TrimRightFunc(importPath, func(r rune) bool {
@@ -115,6 +121,30 @@ var NoUselessPathSegmentsRule = rule.Rule{
 			}
 		}, import_utils.VisitModulesOptions{ESModule: true, Commonjs: commonjs})
 	},
+}
+
+// The upstream regexp has no Unicode flag. Encode literal surrogates in its
+// source too, so character classes and quantifiers see the same UTF-16 units
+// as the subject. Keep escaped characters together when replacing a unit.
+func indexPatternSource(extensions []string) string {
+	units := ecmascript.StringCodeUnitRunes(`.*/index(\` + strings.Join(extensions, `|\`) + `)?$`)
+	var source strings.Builder
+	for i := 0; i < len(units); i++ {
+		unit := units[i]
+		if unit == '\\' && i+1 < len(units) {
+			i++
+			unit = units[i]
+			if unit < 0xD800 || unit > 0xDFFF {
+				source.WriteByte('\\')
+			}
+		}
+		if unit >= 0xD800 && unit <= 0xDFFF {
+			fmt.Fprintf(&source, `\u%04x`, unit)
+		} else {
+			source.WriteRune(unit)
+		}
+	}
+	return source.String()
 }
 
 func toRelativePath(value string) string {
