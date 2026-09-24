@@ -30,6 +30,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_unresolved"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_webpack_loader_syntax"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/order"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/unambiguous"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -64,5 +65,6 @@ func GetAllRules() []rule.Rule {
 		no_unresolved.NoUnresolvedRule,
 		no_webpack_loader_syntax.NoWebpackLoaderSyntax,
 		order.OrderRule,
+		unambiguous.UnambiguousRule,
 	}
 }

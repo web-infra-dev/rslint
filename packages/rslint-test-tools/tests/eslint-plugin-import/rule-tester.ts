@@ -1,6 +1,7 @@
 import path from 'node:path';
 import util from 'node:util';
 
+import type { LanguageOptions } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
 
 import { buildConfigForSettings } from '../src/util/load-test-config';
@@ -12,8 +13,7 @@ export interface ValidTestCase {
   options?: any;
   filename?: string | undefined;
   only?: boolean;
-  // TODO: support `languageOptions` later
-  // languageOptions?: Linter.LanguageOptions | undefined;
+  languageOptions?: LanguageOptions;
   settings?: Record<string, any> | undefined;
 }
 
@@ -87,6 +87,10 @@ export class RuleTester {
             typeof validCase === 'string' ? [] : validCase.options || [];
           const settings =
             typeof validCase === 'string' ? undefined : validCase.settings;
+          const languageOptions =
+            typeof validCase === 'string'
+              ? undefined
+              : validCase.languageOptions;
           const defaultFilename = 'src/virtual.ts';
           const filename =
             typeof validCase === 'string'
@@ -100,6 +104,7 @@ export class RuleTester {
             config: [
               ...resolvedConfig,
               {
+                languageOptions,
                 rules: {
                   [ruleName]:
                     Array.isArray(options) && options.length > 0
@@ -131,7 +136,13 @@ export class RuleTester {
             assert.fail('Invalid cases must have at least one error');
           }
 
-          const { code, only = false, options = [], settings } = item;
+          const {
+            code,
+            only = false,
+            options = [],
+            settings,
+            languageOptions,
+          } = item;
           if (hasOnly && !only) {
             continue;
           }
@@ -147,6 +158,7 @@ export class RuleTester {
             config: [
               ...resolvedConfig,
               {
+                languageOptions,
                 rules: {
                   [ruleName]:
                     Array.isArray(options) && options.length > 0
