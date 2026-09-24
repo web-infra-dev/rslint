@@ -230,7 +230,7 @@ func resolveRstestCallbackBinding(
 	symbol *ast.Symbol,
 	name string,
 ) rstestCallbackInfo {
-	function := testFramework.LocalFunctionBinding(analysis.ctx.SourceFile, analysis.ctx.Refs, symbol)
+	function := testFramework.LocalFunctionImplementation(analysis.ctx.SourceFile, analysis.ctx.Refs, symbol)
 	if function == nil {
 		return rstestCallbackInfo{}
 	}

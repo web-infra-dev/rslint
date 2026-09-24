@@ -82,8 +82,22 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       code: "expect('x').toBe('x').and.not.toMatchSnapshot();",
       options: ['always'],
     },
+    {
+      code: "test('case', callback);\nfunction callback(): void;\nfunction callback() { expect('test').toMatchSnapshot(); }\nfunction helper() { expect('helper').toMatchSnapshot(); }",
+      options: ['multi'],
+    },
   ],
   invalid: [
+    {
+      code: "const outer = () => {\n  expect('before').toMatchSnapshot();\n  let callback = () => { expect('stale').toMatchSnapshot(); };\n  callback = () => {};\n  test('case', callback);\n  expect('after').toMatchSnapshot();\n};",
+      options: ['multi'],
+      errors: 3,
+    },
+    {
+      code: "const outer = () => {\n  expect('before').toMatchSnapshot();\n  { const callback = () => expect('one').toMatchSnapshot(); test('one', callback); }\n  { const callback = () => expect('two').toMatchSnapshot(); test('two', callback); }\n  expect('after').toMatchSnapshot();\n};",
+      options: ['multi'],
+      errors: 2,
+    },
     {
       code: "it('is true', () => {\n      expect(1).toMatchSnapshot();\n      expect(2).toMatchSnapshot();\n       });\n     ",
       options: ['multi'],

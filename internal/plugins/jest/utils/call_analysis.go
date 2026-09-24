@@ -145,7 +145,7 @@ func (analysis *JestCallAnalysis) RegistrationCallbacks() map[*ast.Node]bool {
 			continue
 		}
 		info := analysis.testCallbackInfo(node)
-		if info.functionNode == nil {
+		if info.functionNode == nil && analysis.ctx.Refs == nil {
 			info.functionNode = analysis.fallbackCallbackFunction(info.name)
 		}
 		if info.functionNode != nil {

@@ -395,6 +395,12 @@ func resolveNamedTestCallback(ctx rule.RuleContext, callExpr *ast.CallExpression
 	}
 
 	name := callback.AsIdentifier().Text
+	if ctx.Refs != nil {
+		return jestCallbackInfo{
+			functionNode: testFramework.LocalFunctionImplementation(ctx.SourceFile, ctx.Refs, ctx.Refs.Resolve(callback)),
+			name:         name,
+		}
+	}
 	decl := internalUtils.GetDeclaration(ctx.TypeChecker, callback)
 	if decl == nil {
 		return jestCallbackInfo{name: name}
