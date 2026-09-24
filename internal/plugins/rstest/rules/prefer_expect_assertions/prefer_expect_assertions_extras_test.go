@@ -81,6 +81,12 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 	noExpectImport := "import { test } from '@rstest/core';\ntest('t', () => { run(); });"
 	noExpectImportContext := "import { test } from '@rstest/core';\ntest('t', (context) => { run(); });"
 	chaiExpect := "import { expect } from 'chai';\nimport { test } from '@rstest/core';\ntest('t', () => { expect.hasAssertions(); });"
+	// With globals enabled, a module-level expect bound by destructuring still
+	// hides Rstest's global expect.
+	destructuredChai := "const { expect } = require('chai');\ntest('t', () => {});"
+	nestedDestructuredExpect := "const { assertions: { expect } } = helpers;\ntest('t', () => {});"
+	arrayDestructuredExpect := "const [expect] = libraries;\ntest('t', () => {});"
+	renamedRstestExport := "const { assert: expect, test } = require('@rstest/core');\ntest('t', (context) => {});"
 	// A require binding that is later reassigned no longer holds Rstest's
 	// expect when the test runs.
 	reassignedAlias := "import { test } from '@rstest/core';\nlet { expect: check } = require('@rstest/core');\ncheck = chai.expect;\ntest('t', () => { run(); });"
@@ -224,6 +230,10 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 			invalid(reassignedAlias, missing(reassignedAlias, "test('t', () => { run(); })", "", "")),
 			invalid(reassignedModule, missing(reassignedModule, "test('t', () => { run(); })", "", "")),
 			invalid(reassignedAliasContext, missing(reassignedAliasContext, "test('t', (context) => { run(); })", "(context) => {", "context.expect")),
+			invalid(destructuredChai, missing(destructuredChai, "test('t', () => {})", "", "")),
+			invalid(nestedDestructuredExpect, missing(nestedDestructuredExpect, "test('t', () => {})", "", "")),
+			invalid(arrayDestructuredExpect, missing(arrayDestructuredExpect, "test('t', () => {})", "", "")),
+			invalid(renamedRstestExport, missing(renamedRstestExport, "test('t', (context) => {})", "(context) => {", "context.expect")),
 			invalid(chaiExpect, missing(chaiExpect, "test('t', () => { expect.hasAssertions(); })", "", "")),
 			invalid(shadowedByInner, missing(shadowedByInner, "test('t', () => { run(); function expect() {} })", "", "")),
 			invalid(shadowedByOuter, missing(shadowedByOuter, "test('t', () => { run(); })", "", "")),

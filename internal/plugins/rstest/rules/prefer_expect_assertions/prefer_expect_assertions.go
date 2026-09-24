@@ -251,20 +251,40 @@ func collectRequireSpelling(ctx rule.RuleContext, result *moduleSpellings, decla
 			if result.expect == "" && !isRebound(ctx, declaration) {
 				result.expect = name.Text() + ".expect"
 			}
+			// `const expect = require('@rstest/core')` binds the module, not expect.
+			if name.Text() == "expect" {
+				result.declaresExpect = true
+			}
 		case ast.KindObjectBindingPattern:
 			for _, element := range name.AsBindingPattern().Elements.Nodes {
 				local := element.Name()
 				if local == nil || local.Kind != ast.KindIdentifier {
+					if bindsName(local, "expect") {
+						result.declaresExpect = true
+					}
 					continue
 				}
-				if rstest.RequireBindingImportedName(element) == "expect" && result.expect == "" && !isRebound(ctx, element) {
-					result.expect = local.Text()
+				if rstest.RequireBindingImportedName(element) == "expect" {
+					if result.expect == "" && !isRebound(ctx, element) {
+						result.expect = local.Text()
+					}
+					continue
 				}
+				// `const { assert: expect } = require('@rstest/core')`
+				if local.Text() == "expect" {
+					result.declaresExpect = true
+				}
+			}
+		default:
+			if bindsName(name, "expect") {
+				result.declaresExpect = true
 			}
 		}
 		return
 	}
-	if name.Kind == ast.KindIdentifier && name.Text() == "expect" {
+	// A destructuring pattern binds expect as well as a plain name:
+	// `const { expect } = require('chai')`.
+	if bindsName(name, "expect") {
 		result.declaresExpect = true
 	}
 }
