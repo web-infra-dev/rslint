@@ -186,6 +186,8 @@ func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
 	const requireFile = "/condition-fixture/node_modules/some-package/cjs.d.cts"
 	for _, call := range []string{`(require)("some-package")`, `((require))(("some-package"))`, `require(("some-package"))`} {
 		t.Run(call, func(t *testing.T) {
+			t.Parallel()
+
 			files := map[string]string{
 				"/condition-fixture/package.json":                           `{"name": "root", "type": "module"}`,
 				"/condition-fixture/node_modules/some-package/package.json": `{"name": "some-package", "exports": {".": {"import": "./esm.d.mts", "require": "./cjs.d.cts"}, "./feature": {"import": "./esm.d.mts", "require": "./cjs.d.cts"}}}`,
