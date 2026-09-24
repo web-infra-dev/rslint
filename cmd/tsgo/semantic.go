@@ -117,7 +117,7 @@ func CollectSemantic(program *compiler.Program) Semantic {
 	}
 
 	for id, sourceFile := range sourceFiles {
-		CollectSemanticInFile(tc, sourceFile, &semantic, id, sourceFileIds)
+		CollectSemanticInFile(program, tc, sourceFile, &semantic, id, sourceFileIds)
 	}
 	return semantic
 }
@@ -139,14 +139,16 @@ type PrimTypes struct {
 	Never     checker.TypeId `json:"never"`
 }
 type Semantic struct {
-	Symtab       map[ast.SymbolId]SymbolInfo      `json:"symtab"`
-	Typetab      map[checker.TypeId]TypeInfo      `json:"typetab"`
-	Sym2type     map[ast.SymbolId]checker.TypeId  `json:"sym2type"`
-	AliasSymbols map[ast.SymbolId]ast.SymbolId    `json:"alias_symbols"`
-	Node2sym     map[NodeReference]ast.SymbolId   `json:"node2sym"`
-	Node2type    map[NodeReference]checker.TypeId `json:"node2type"`
-	NodeFlags    map[NodeReference]uint32         `json:"node_flags"`
-	Primtypes    PrimTypes                        `json:"primtypes"`
+	Symtab       map[ast.SymbolId]SymbolInfo     `json:"symtab"`
+	Typetab      map[checker.TypeId]TypeInfo     `json:"typetab"`
+	Sym2type     map[ast.SymbolId]checker.TypeId `json:"sym2type"`
+	AliasSymbols map[ast.SymbolId]ast.SymbolId   `json:"alias_symbols"`
+	Node2sym     map[NodeReference]ast.SymbolId  `json:"node2sym"`
+	// Node2module maps import specifiers without module symbols to resolved source file IDs.
+	Node2module map[NodeReference]SourceFileId   `json:"node2module"`
+	Node2type   map[NodeReference]checker.TypeId `json:"node2type"`
+	NodeFlags   map[NodeReference]uint32         `json:"node_flags"`
+	Primtypes   PrimTypes                        `json:"primtypes"`
 	// ShorthandSymbols maps node reference to the value symbol for shorthand property assignments
 	// (node -> value_symbol_id)
 	ShorthandSymbols map[NodeReference]ast.SymbolId `json:"shorthand_symbols"`
@@ -166,6 +168,7 @@ func NewSemantic() Semantic {
 		Sym2type:                 make(map[ast.SymbolId]checker.TypeId),
 		AliasSymbols:             make(map[ast.SymbolId]ast.SymbolId),
 		Node2sym:                 make(map[NodeReference]ast.SymbolId),
+		Node2module:              make(map[NodeReference]SourceFileId),
 		Node2type:                make(map[NodeReference]checker.TypeId),
 		NodeFlags:                make(map[NodeReference]uint32),
 		ShorthandSymbols:         make(map[NodeReference]ast.SymbolId),
@@ -189,8 +192,8 @@ func initPrimitiveTypes(tc *checker.Checker, semantic *Semantic) {
 		Never:     tc.GetNeverType().Id(),
 	}
 }
-func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *Semantic, sourceFileId int, sourceFileIds map[*ast.SourceFile]SourceFileId) {
-	if tc == nil || file == nil {
+func CollectSemanticInFile(program *compiler.Program, tc *checker.Checker, file *ast.SourceFile, semantic *Semantic, sourceFileId int, sourceFileIds map[*ast.SourceFile]SourceFileId) {
+	if program == nil || tc == nil || file == nil {
 		return
 	}
 
@@ -350,6 +353,17 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				} else if isImportModuleSpecifier(node) {
 					sym_id := recordSymbolInfo(symbol)
 					semantic.Node2sym[key] = sym_id
+				}
+			} else if ast.IsStringLiteralLike(node) && node.Parent != nil &&
+				(node.Parent.Kind == ast.KindImportDeclaration || node.Parent.Kind == ast.KindJSImportDeclaration) &&
+				node.Parent.ModuleSpecifier() == node {
+				resolved := program.GetResolvedModuleFromModuleSpecifier(file, node)
+				if resolved != nil && resolved.IsResolved() {
+					if target := program.GetSourceFileForResolvedModule(resolved.ResolvedFileName); target != nil {
+						if targetID, ok := sourceFileIds[target]; ok {
+							semantic.Node2module[key] = targetID
+						}
+					}
 				}
 			}
 
