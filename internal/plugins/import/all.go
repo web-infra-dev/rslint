@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/first"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/namespace"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/newline_after_import"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_amd"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_commonjs"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_cycle"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_default_export"
@@ -29,6 +30,7 @@ func GetAllRules() []rule.Rule {
 		first.FirstRule,
 		namespace.NamespaceRule,
 		newline_after_import.NewlineAfterImportRule,
+		no_amd.NoAmdRule,
 		no_commonjs.NoCommonjsRule,
 		no_cycle.NoCycleRule,
 		no_default_export.NoDefaultExportRule,
