@@ -74,7 +74,23 @@ func TestNoUntypedMockFactoryExtras(t *testing.T) {
 			{Code: "rs.mock('./service', (((): object => ({})) as Function));"},
 			// No factory on CommonJS API
 			{Code: "rs.mockRequire('./service'); rs.doMockRequire('./service');"},
+			// A non-hoisted API reads a var before its initializer has run, so
+			// the value passed here is undefined rather than a factory.
+			{Code: "rs.doMockRequire('./service', factory); var factory = () => ({});"},
+			// Hoisted APIs run before ordinary variable initializers, whatever
+			// declaration keyword was used and wherever the declaration appears.
+			{Code: "var factory = () => ({}); rs.mock('./service', factory);"},
+			{Code: "const factory = () => ({}); rs.mockRequire('./service', factory);"},
+			// A conditional var initializer may not run before the later call.
+			{Code: "if (enabled) { var factory = () => ({}); } rs.doMock('./service', factory);"},
 		}, []rule_tester.InvalidTestCase{
+			// Function declarations are available to both ordinary and hoisted calls.
+			{Code: "function factory() { return {}; } rs.mock('./service', factory);", Output: []string{"function factory() { return {}; } rs.mock<typeof import('./service')>('./service', factory);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
+			// rs.hoisted is the variable-initializer form that deliberately runs
+			// before a hoisted module mock.
+			{Code: "const factory = rs.hoisted(() => () => ({})); rs.mock('./service', factory);", Output: []string{"const factory = rs.hoisted(() => () => ({})); rs.mock<typeof import('./service')>('./service', factory);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
+			// A dominating declaration also covers calls in a later nested statement.
+			{Code: "let factory = () => ({}); if (enabled) { rs.doMock('./service', factory); }", Output: []string{"let factory = () => ({}); if (enabled) { rs.doMock<typeof import('./service')>('./service', factory); }"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
 			// Dimension 4: parenthesized callee
 			{Code: "(rs.mock)('./service', () => ({}));", Output: []string{"(rs.mock)<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
 			// Dimension 4: nested receiver parentheses
@@ -141,9 +157,17 @@ let mutableFactory = () => ({});
 rs.doMock('./mutable-service', mutableFactory);
 var legacyFactory = function () { return {}; };
 rs.doMockRequire('./legacy-service', legacyFactory);
+function declaredFactory() { return {}; }
+rs.mock('./declared-service', declaredFactory);
+const liftedFactory = rs.hoisted(() => () => ({}));
+rs.mock('./lifted-service', liftedFactory);
 let reassignedFactory = () => ({});
 reassignedFactory = { spy: true };
 rs.doMock('./reassigned-service', reassignedFactory);
+rs.doMockRequire('./early-service', earlyFactory);
+var earlyFactory = () => ({});
+var ordinaryFactory = () => ({});
+rs.mock('./hoisted-service', ordinaryFactory);
 rs.mock(modulePath, () => ({}));`, "edit-demand.ts", "tsconfig.json")
 	if err != nil {
 		t.Fatal(err)
@@ -174,12 +198,12 @@ rs.mock(modulePath, () => ({}));`, "edit-demand.ts", "tsconfig.json")
 				},
 				Consumer: rule.DiagnosticConsumer{Demand: demand, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},
 			})
-			if len(diagnostics) != 5 {
+			if len(diagnostics) != 7 {
 				t.Fatalf("typed=%v demand=%d: got %d diagnostics", typed, demand, len(diagnostics))
 			}
 			for i := range diagnostics {
 				d := &diagnostics[i]
-				wantFix := i < 4 && demand&rule.EditDemandAutofix != 0
+				wantFix := i < 6 && demand&rule.EditDemandAutofix != 0
 				if (d.FixesPtr != nil && len(*d.FixesPtr) > 0) != wantFix {
 					t.Fatalf("typed=%v demand=%d diagnostic=%d: wrong edits", typed, demand, i)
 				}
@@ -195,4 +219,101 @@ rs.mock(modulePath, () => ({}));`, "edit-demand.ts", "tsconfig.json")
 			}
 		}
 	}
+}
+
+func TestNoUntypedMockFactoryDeclarationTiming(t *testing.T) {
+	testCases := []struct {
+		name           string
+		code           string
+		sourceOnlyWant int
+		typedWant      int
+	}{
+		{name: "non-hoisted stable let", code: `let factory = () => ({}); rs.doMock('./service', factory);`, sourceOnlyWant: 1, typedWant: 1},
+		{name: "non-hoisted stable var", code: `var factory = () => ({}); rs.doMockRequire('./service', factory);`, sourceOnlyWant: 1, typedWant: 1},
+		{name: "non-hoisted use before var", code: `rs.doMockRequire('./service', factory); var factory = () => ({});`},
+		{name: "non-hoisted use before let", code: `rs.doMock('./service', factory); let factory = () => ({});`},
+		{name: "non-hoisted use before const", code: `rs.doMock('./service', factory); const factory = () => ({});`},
+		{name: "outer declaration dominates nested block", code: `let factory = () => ({}); if (enabled) { rs.doMock('./service', factory); }`, sourceOnlyWant: 1, typedWant: 1},
+		{name: "conditional initializer does not dominate", code: `if (enabled) { var factory = () => ({}); } rs.doMock('./service', factory);`},
+		{name: "switch case initializer does not dominate", code: `switch (kind) { case 0: var factory = () => ({}); break; default: rs.doMock('./service', factory); }`},
+		{name: "for initializer is conservatively skipped", code: `for (let factory = () => ({}); enabled; ) { rs.doMock('./service', factory); break; }`},
+		{name: "cross-function timing is conservatively skipped", code: `const factory = () => ({}); function install() { rs.doMock('./service', factory); }`},
+		{name: "direct reassignment", code: `let factory = () => ({}); factory = other; rs.doMock('./service', factory);`},
+		{name: "logical reassignment", code: `let factory = () => ({}); factory ||= other; rs.doMock('./service', factory);`},
+		{name: "destructuring reassignment", code: `let factory = () => ({}); ({ factory } = other); rs.doMock('./service', factory);`},
+		{name: "loop reassignment", code: `let factory = () => ({}); for (factory of factories) {} rs.doMock('./service', factory);`},
+		{name: "closure reassignment", code: `let factory = () => ({}); function replace() { factory = other; } rs.doMock('./service', factory);`},
+		{name: "multiple var initializers are conservatively skipped", code: `var factory = () => ({}); var factory = { spy: true }; rs.doMock('./service', factory);`},
+		{name: "callable result after initialization", code: `declare function makeFactory(): () => object; const factory = makeFactory(); rs.doMock('./service', factory);`, typedWant: 1},
+		{name: "non-hoisted imported factory uses type information", code: `import { syncModuleFactory } from './async-mock-factories'; rs.doMock('./service', syncModuleFactory);`, typedWant: 1},
+		{name: "non-hoisted member factory uses type information", code: `const holder = { factory: () => ({}) }; rs.doMock('./service', holder.factory);`, typedWant: 1},
+		{name: "hoisted mock rejects ordinary var", code: `var factory = () => ({}); rs.mock('./service', factory);`},
+		{name: "hoisted mock rejects ordinary const", code: `const factory = () => ({}); rs.mockRequire('./service', factory);`},
+		{name: "hoisted mock rejects nested function declaration", code: `function install() { function factory() { return {}; } rs.mock('./service', factory); }`},
+		{name: "hoisted mock rejects ambient function", code: `declare function factory(): object; rs.mock('./service', factory);`},
+		{name: "hoisted mock rejects callable parameter", code: `function install(factory: () => object) { rs.mock('./service', factory); }`},
+		{name: "hoisted mock rejects imported factory", code: `import { syncModuleFactory } from './async-mock-factories'; rs.mock('./service', syncModuleFactory);`},
+		{name: "hoisted mock rejects local member", code: `const holder = { factory: () => ({}) }; rs.mock('./service', holder.factory);`},
+		{name: "hoisted mock accepts top-level function declaration", code: `function factory() { return {}; } rs.mock('./service', factory);`, sourceOnlyWant: 1, typedWant: 1},
+		{name: "hoisted mock accepts top-level overload implementation", code: `function factory(): object; function factory() { return {}; } rs.mock('./service', factory);`, sourceOnlyWant: 1, typedWant: 1},
+		{name: "hoisted mock accepts direct hoisted binding", code: `const factory = rs.hoisted(() => () => ({})); rs.mock('./service', factory);`, sourceOnlyWant: 1, typedWant: 1},
+		{name: "hoisted mock accepts wrapped rstest hoisted binding", code: `const factory = (rstest as any).hoisted(() => () => ({})); rs.mockRequire('./service', factory);`, sourceOnlyWant: 1, typedWant: 1},
+		{name: "hoisted mock accepts object destructuring", code: `declare const rs: { hoisted<T>(callback: () => T): T }; const { factory } = rs.hoisted(() => ({ factory: () => ({}) })); rs.mock('./service', factory);`, sourceOnlyWant: 1, typedWant: 1},
+		{name: "hoisted mock accepts renamed object destructuring", code: `declare const rs: { hoisted<T>(callback: () => T): T }; const { factory: makeFactory } = rs.hoisted(() => ({ factory: () => ({}) })); rs.mock('./service', makeFactory);`, sourceOnlyWant: 1, typedWant: 1},
+		{name: "hoisted mock accepts array destructuring", code: `declare const rs: { hoisted<T>(callback: () => T): T }; const [factory] = rs.hoisted(() => [() => ({})]); rs.mock('./service', factory);`, sourceOnlyWant: 1, typedWant: 1},
+		{name: "hoisted object spread is conservatively skipped", code: `declare const rs: { hoisted<T>(callback: () => T): T }; declare const other: { factory: { spy: true } }; const { factory } = rs.hoisted(() => ({ factory: () => ({}), ...other })); rs.mock('./service', factory);`},
+		{name: "nested hoisted destructuring does not match a top-level decoy", code: `declare const rs: { hoisted<T>(callback: () => T): T }; const { nested: { factory } } = rs.hoisted(() => ({ factory: () => ({}), nested: { factory: { spy: true as const } } })); rs.mock('./service', factory);`},
+		{name: "computed hoisted property may override the static key", code: `declare const rs: { hoisted<T>(callback: () => T): T }; declare const mockKey: 'factory'; const { factory } = rs.hoisted(() => ({ factory: () => ({}), [mockKey]: { spy: true as const } })); rs.mock('./service', factory);`},
+		{name: "duplicate hoisted property may override the factory", code: `declare const rs: { hoisted<T>(callback: () => T): T }; const { factory } = rs.hoisted(() => ({ factory: () => ({}), factory: { spy: true as const } })); rs.mock('./service', factory);`},
+		{name: "hoisted options remain exempt", code: `const options = rs.hoisted(() => ({ spy: true as const })); rs.mock('./service', options);`},
+		{name: "hoisted callable options union remains exempt", code: `const value = rs.hoisted((): (() => object) | { spy: true } => condition ? () => ({}) : { spy: true }); rs.mock('./service', value);`},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			for _, typed := range []bool{false, true} {
+				want := testCase.sourceOnlyWant
+				if typed {
+					want = testCase.typedWant
+				}
+				if got := lintNoUntypedMockFactory(t, testCase.code, typed); got != want {
+					t.Fatalf("typed=%v: diagnostics = %d, want %d", typed, got, want)
+				}
+			}
+		})
+	}
+}
+
+func lintNoUntypedMockFactory(t *testing.T, code string, typed bool) int {
+	t.Helper()
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	compiler, file, err := helper.CreateTestProgram(code, "declaration-timing.ts", "tsconfig.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	program, err := lintprogram.NewFromBoundSources(compiler, compiler.SourceFiles())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if typed {
+		program = lintprogram.NewFromCompiler(compiler)
+	}
+
+	count := 0
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program:     program,
+		File:        file.FileName(),
+		HasTypeInfo: typed,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:     NoUntypedMockFactoryRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return NoUntypedMockFactoryRule.Run(ctx, nil)
+				},
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{Demand: rule.EditDemandNone, Report: func(rule.RuleDiagnostic) { count++ }},
+	})
+	return count
 }

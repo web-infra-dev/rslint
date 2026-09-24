@@ -8,7 +8,9 @@ The rule checks `rs.mock`, `rs.doMock`, `rs.mockRequire` and `rs.doMockRequire`,
 
 Calls must stand alone as statements and have exactly two arguments without spreads. Parentheses and TypeScript expression wrappers are accepted. Rstest transforms calls spelled `rs` or `rstest`, including imports from `@rstest/core` or `rstack/test`, CommonJS bindings, globals and local declarations with those names. Renamed receivers, namespace members, `import.meta.rstest.rs`, computed methods and optional chains are not checked because Rstest does not transform those mock calls.
 
-Inline functions and directly declared, unchanged local functions can be checked without type information. With type information, other arguments known to be callable are checked too. An argument that cannot be distinguished from an options object is left alone. A return annotation on a separately declared function does not exempt the call; write a type argument on the mock call in that case.
+Inline functions are always checked. For `doMock` and `doMockRequire`, an unchanged local function variable is also checked when its initializer necessarily runs before the call; type information can identify other callable arguments at that point. A declaration in a conditional branch, a declaration after the call, a reassigned binding, or another value that cannot be distinguished from an options object is left alone.
+
+Because `mock` and `mockRequire` are hoisted, their named factories must be available in the same hoisted phase. The rule recognizes top-level function declarations and top-level bindings initialized by `rs.hoisted` or `rstest.hoisted`. Ordinary variables, imports, parameters and nested function declarations are left alone because the lifted call cannot read their runtime values. A return annotation on a separately declared factory does not exempt a reported call; write a type argument on the mock call in that case.
 
 ## Incorrect
 
