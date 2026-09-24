@@ -16,11 +16,9 @@ import (
 //go:embed enforce_node_protocol_usage.schema.json
 var schemaJSON []byte
 
-const ruleName = "import/enforce-node-protocol-usage"
-
 // https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/enforce-node-protocol-usage.js
 var EnforceNodeProtocolUsageRule = rule.Rule{
-	Name:   ruleName,
+	Name:   "import/enforce-node-protocol-usage",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var mode string
@@ -37,16 +35,10 @@ var EnforceNodeProtocolUsageRule = rule.Rule{
 			}
 			if !versionChecked {
 				version, versionErr = import_utils.NodeVersion(ctx.Settings)
-				if versionErr != nil {
-					textRange := utils.TrimNodeTextRange(ctx.SourceFile, source)
-					if ctx.DisableManager.IsRuleDisabled(ruleName, textRange.Pos()) {
-						return
-					}
-					ctx.ReportRange(textRange, rule.RuleMessage{Description: versionErr.Error()})
-				}
 				versionChecked = true
 			}
 			if versionErr != nil {
+				ctx.ReportNode(source, rule.RuleMessage{Description: versionErr.Error()})
 				return
 			}
 			name := source.Text()

@@ -7,7 +7,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	target "github.com/web-infra-dev/rslint/internal/plugins/import/rules/enforce_node_protocol_usage"
@@ -74,6 +73,8 @@ func TestEnforceNodeProtocolUsageEditDemand(t *testing.T) {
 	}
 }
 
+const invalidVersionMessage = "`import/node-version` setting must be a string in the format \"10.23.45\" (a semver version, with no leading zero)"
+
 func TestEnforceNodeProtocolUsageInvalidVersion(t *testing.T) {
 	var invalid []rule_tester.InvalidTestCase
 	for _, mode := range []string{"always", "never"} {
@@ -82,10 +83,12 @@ func TestEnforceNodeProtocolUsageInvalidVersion(t *testing.T) {
 				Code:     "require(variable);\nimport 'fs';\nexport { readFile } from 'fs';\nrequire('node:path');\nimport('stream');",
 				Options:  []any{mode},
 				Settings: map[string]any{"import/node-version": version},
-				Errors: []rule_tester.InvalidTestCaseError{{
-					Message: "`import/node-version` setting must be a string in the format \"10.23.45\" (a semver version, with no leading zero)",
-					Line:    2, Column: 8, EndLine: 2, EndColumn: 12,
-				}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: invalidVersionMessage, Line: 2, Column: 8, EndLine: 2, EndColumn: 12},
+					{Message: invalidVersionMessage, Line: 3, Column: 26, EndLine: 3, EndColumn: 30},
+					{Message: invalidVersionMessage, Line: 4, Column: 9, EndLine: 4, EndColumn: 20},
+					{Message: invalidVersionMessage, Line: 5, Column: 8, EndLine: 5, EndColumn: 16},
+				},
 			})
 		}
 	}
@@ -93,57 +96,41 @@ func TestEnforceNodeProtocolUsageInvalidVersion(t *testing.T) {
 }
 
 func TestEnforceNodeProtocolUsageInvalidVersionWithDirectives(t *testing.T) {
-	r := &target.EnforceNodeProtocolUsageRule
+	var valid []rule_tester.ValidTestCase
+	var invalid []rule_tester.InvalidTestCase
+	// RuleTester registers the rule as "test".
 	for _, mode := range []string{"always", "never"} {
 		for _, tc := range []struct {
-			name, code string
-			line       int
+			code  string
+			lines []int
 		}{
-			{"next line", "// eslint-disable-next-line import/enforce-node-protocol-usage\nimport 'fs';\nimport 'fs';\nimport 'path';", 3},
-			{"same line", "import 'fs'; // eslint-disable-line import/enforce-node-protocol-usage\nimport 'fs';", 2},
-			{"re-enabled", "/* eslint-disable import/enforce-node-protocol-usage */\nimport 'fs';\n/* eslint-enable import/enforce-node-protocol-usage */\nimport 'fs';", 4},
-			{"rslint prefix", "// rslint-disable-next-line import/enforce-node-protocol-usage\nimport 'fs';\nimport 'fs';", 3},
-			{"unrelated rule", "// eslint-disable-next-line no-console\nimport 'fs';\nimport 'path';", 2},
-			{"literal position", "import\n// eslint-disable-next-line import/enforce-node-protocol-usage\n'fs';\nimport 'fs';", 4},
-			{"only disabled reference", "// eslint-disable-next-line import/enforce-node-protocol-usage\nimport 'fs';", 0},
-			{"whole file disabled", "/* eslint-disable */\nimport 'fs';\nimport 'path';", 0},
+			{"// eslint-disable-next-line test\nimport 'fs';\nimport 'fs';\nimport 'fs';", []int{3, 4}},
+			{"import 'fs'; // eslint-disable-line test\nimport 'fs';", []int{2}},
+			{"/* eslint-disable test */\nimport 'fs';\n/* eslint-enable test */\nimport 'fs';", []int{4}},
+			{"// rslint-disable-next-line test\nimport 'fs';\nimport 'fs';", []int{3}},
+			{"// eslint-disable-next-line no-console\nimport 'fs';\nimport 'fs';", []int{2, 3}},
+			{"import\n// eslint-disable-next-line test\n'fs';\nimport 'fs';", []int{4}},
+			{"// eslint-disable-next-line test\nimport 'fs';", nil},
+			{"/* eslint-disable */\nimport 'fs';\nimport 'fs';", nil},
 		} {
-			t.Run(mode+"/"+tc.name, func(t *testing.T) {
-				file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/directives.ts", Path: "/directives.ts"}, tc.code, core.ScriptKindTS)
-				comments := rule.NewCommentStore(file)
-				var diagnostics []rule.RuleDiagnostic
-				// Bind the actual name: RunRuleTester registers its rule as "test".
-				ctx := (rule.RuleContext{
-					SourceFile: file, Settings: map[string]any{"import/node-version": "bad"},
-					DisableManager: rule.NewDisableManager(file, comments),
-				}).WithReporter(r.Name, rule.SeverityError, func(diagnostic rule.RuleDiagnostic) {
-					diagnostics = append(diagnostics, diagnostic)
+			if len(tc.lines) == 0 {
+				valid = append(valid, rule_tester.ValidTestCase{
+					Code: tc.code, Options: []any{mode}, Settings: map[string]any{"import/node-version": "bad"},
 				})
-				listener := r.Run(ctx, []any{mode})[ast.KindImportDeclaration]
-				for _, node := range file.Statements.Nodes {
-					listener(node)
-				}
-				if tc.line == 0 {
-					if len(diagnostics) != 0 {
-						t.Fatalf("disabled references reported %d diagnostics", len(diagnostics))
-					}
-					return
-				}
-				if len(diagnostics) != 1 {
-					t.Fatalf("got %d diagnostics, want one at the first enabled reference", len(diagnostics))
-				}
-				got := diagnostics[0]
-				line, column := scanner.GetECMALineAndUTF16CharacterOfPosition(file, got.Range.Pos())
-				endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(file, got.Range.End())
-				if line+1 != tc.line || column+1 != 8 || endLine+1 != tc.line || endColumn+1 != 12 {
-					t.Fatalf("range = %d:%d-%d:%d, want %d:8-%d:12", line+1, column+1, endLine+1, endColumn+1, tc.line, tc.line)
-				}
-				if got.Message.Id != "" || got.Message.Description != "`import/node-version` setting must be a string in the format \"10.23.45\" (a semver version, with no leading zero)" || got.FixesPtr != nil || got.Suggestions != nil {
-					t.Fatalf("unexpected configuration diagnostic: %+v", got)
-				}
+				continue
+			}
+			var errors []rule_tester.InvalidTestCaseError
+			for _, line := range tc.lines {
+				errors = append(errors, rule_tester.InvalidTestCaseError{
+					Message: invalidVersionMessage, Line: line, Column: 8, EndLine: line, EndColumn: 12,
+				})
+			}
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code: tc.code, Options: []any{mode}, Settings: map[string]any{"import/node-version": "bad"}, Errors: errors,
 			})
 		}
 	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.allow-js.json", t, &target.EnforceNodeProtocolUsageRule, valid, invalid)
 }
 
 // Expectations checked with eslint-plugin-import v2.32.0 and is-core-module v2.17.0.
