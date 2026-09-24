@@ -45,20 +45,9 @@ runs:
         GO_CHANGED_FILES
         mode=full
         if [[ "$GO_TEST_MODE" == affected ]] && [[ -n $(cat "$changed") ]]; then
-          # Go supplies transitive test dependencies and the resolved embed inputs.
-          # Records: P = dependencies, D = package directory, T = testdata owner,
-          # F = embedded file. Paths stay separate from whitespace-delimited imports.
-          if go list -test -f '
-        {{- $owner := .ImportPath}}{{if .ForTest}}{{$owner = .ForTest}}{{end -}}
-        {{printf "P\t%s\t%s\n" $owner (join .Deps " ") -}}
-        {{if and .Module (not .ForTest) -}}
-        {{printf "D\t%s\t%s\t%s\n" .ImportPath .Dir .Module.Dir -}}
-        {{if or .TestGoFiles .XTestGoFiles}}{{printf "T\t%s\n" .ImportPath}}{{end -}}
-        {{range .EmbedFiles}}{{printf "F\t%s\t%s\n" $owner .}}{{end -}}
-        {{range .TestEmbedFiles}}{{printf "F\t%s\t%s\n" $owner .}}{{end -}}
-        {{range .XTestEmbedFiles}}{{printf "F\t%s\t%s\n" $owner .}}{{end -}}
-        {{end}}' ./cmd/... ./internal/... > "$metadata" &&
-             awk -f "$ACTION_PATH/select-packages.awk" "$changed" "$metadata" | sort -u > "$targets"; then
+          # Keep Go's native package, test dependency and embed metadata intact.
+          if go list -test -json ./cmd/... ./internal/... > "$metadata" &&
+             go run "$ACTION_PATH/select_packages.go" "$changed" "$metadata" > "$targets"; then
             if [[ -s "$targets" ]]; then mode=affected; else mode=skip; fi
           else
             echo 'Changed files could not be mapped to the suite; running the full Go suite.'
@@ -76,6 +65,11 @@ runs:
         echo "mode=$mode" >> "$GITHUB_OUTPUT"
         echo "Go tests: $mode"
         cat "$targets"
+
+    - name: Test Go package selector
+      if: steps.selection.outputs.mode == 'full'
+      shell: bash
+      run: go test -count=1 ./.github/actions/test-go
 
     - name: Verify compiler shim layout
       if: steps.selection.outputs.mode == 'full'

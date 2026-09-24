@@ -71,12 +71,6 @@ runs:
             # Preserve file names: test-go resolves source, embed and testdata owners.
             # A restricted alphabet also keeps the multiline output delimiter safe.
             if [[ ! "$file" =~ ^[a-zA-Z0-9_./-]+$ ]]; then mode=full; break; fi
-            # Removed docs may have been embedded; current metadata cannot prove
-            # that the usual documentation exclusions still apply to them.
-            case "$file" in
-              *.md|*.mdx|*/_meta.json|*/dictionary.txt)
-                if [[ ! -f "$file" ]]; then mode=full; break; fi ;;
-            esac
             files+=("$file")
             mode=affected
           done < "$RUNNER_TEMP/go-changed-files.txt"
