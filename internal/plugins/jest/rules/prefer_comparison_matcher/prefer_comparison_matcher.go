@@ -12,9 +12,10 @@ import (
 var PreferComparisonMatcherRule = shared.NewRule(shared.Config{
 	Name: "jest/prefer-comparison-matcher",
 	Prepare: func(ctx rule.RuleContext) func(*ast.Node) *shared.ExpectCall {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return func(node *ast.Node) *shared.ExpectCall {
-			parsed := jestUtils.ParseJestFnCall(node, ctx)
-			if parsed == nil || parsed.Kind != jestUtils.JestFnTypeExpect || parsed.MatcherEntry == nil || parsed.MatcherEntry.Call != node {
+			parsed := analysis.ParseExpectCall(node)
+			if parsed == nil || parsed.MatcherEntry == nil || parsed.MatcherEntry.Call != node {
 				return nil
 			}
 			head := ast.WalkUpParenthesizedExpressions(parsed.Head.Local.Node.Parent)

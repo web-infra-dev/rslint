@@ -29,7 +29,7 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
  *    and stays a runtime dep. One `lib` block with all entries: the surface
  *    modules share a graph, so shared chunks between entries are fine here.
  *
- * 2. eslint-plugin worker → `dist/eslint-plugin/` (`tsconfig.worker.json`,
+ * 2. Plugin host and worker → `dist/eslint-plugin/` (`tsconfig.worker.json`,
  *    which includes `src/eslint-plugin/**`). Each entry is its own `lib` block
  *    so Rspack inlines each output's full module graph with NO shared chunks —
  *    crucial for the worker (`new Worker(...)` spawns a fresh V8 isolate that
@@ -37,8 +37,9 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
  *    reused across isolates). The ESLint-compat libs (`@typescript-eslint/
  *    scope-manager`, `eslint-scope`, `esquery`) are devDependencies imported
  *    statically so they bundle in; consumers need none at runtime. The native
- *    parser loader (`src/eslint-plugin/native/load-binding.ts`) bundles in too,
- *    but the platform `.node` it loads stays external: the loader selects the
+ *    parser loader (`src/eslint-plugin/native/load-binding.ts`) bundles into
+ *    the worker and full public index, but not the lightweight host. The
+ *    platform `.node` it loads stays external: the loader selects the
  *    `@rslint/native-<tuple>` package at runtime via `createRequire`, which
  *    rspack can't statically follow (so the binary is never inlined — intended).
  */
@@ -112,6 +113,16 @@ define.lib(() => {
           entry: { types: './src/eslint-plugin/types.ts' },
         },
         dts: { bundle: true },
+      },
+      {
+        ...workerBase,
+        source: {
+          ...workerBase.source,
+          entry: { host: './src/eslint-plugin/host.ts' },
+        },
+        // The CLI only coordinates workers; keep the parser and rule runtime
+        // out of its parent process while retaining the public index entry.
+        dts: false,
       },
     ],
   };

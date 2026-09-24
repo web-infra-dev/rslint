@@ -1,0 +1,62 @@
+Upstream fixtures from eslint-plugin-import v2.32.0 tests/files.
+
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"commonjs","jsx":"preserve"},"include":["**/*"]}
+-- bar.js --
+export default 'bar'
+export function foo() { return 'foo' }
+-- export-default-string-and-named.js --
+const bar = "bar";
+export function foo() {}
+
+export { bar as "default" }
+-- data.json --
+{ "foo": "bar" }
+-- foobar.json --
+{
+  "action": "set",
+  "node": {
+    "key": "/foo",
+    "value": "foo",
+    "modifiedIndex": 1438,
+    "createdIndex": 1438
+  },
+  "prevNode": {
+    "key": "/foo",
+    "value": "bar",
+    "modifiedIndex": 1437,
+    "createdIndex": 1437
+  }
+}
+-- empty-folder/anchor.txt --
+no js here!
+-- ignore.invalid.extension --
+
+-- commonjs-namespace/a.js --
+export { default as b } from './b'
+-- commonjs-namespace/b.js --
+module.exports = {}
+-- issue-370-commonjs-namespace/bar.js --
+// bar.js
+export { default as foo } from './foo'
+-- issue-370-commonjs-namespace/foo.js --
+// foo.js
+module.exports = { foo: 'foo' }
+-- no-named-as-default/exports.js --
+const variable = 1;
+
+export { variable };
+export default variable;
+-- no-named-as-default/misleading-re-exports.js --
+export { variable as something } from './exports';
+export { something as default } from './something';
+-- no-named-as-default/no-default-export.js --
+export const foobar = 4;
+-- no-named-as-default/re-exports.js --
+export { something as default } from "./something";
+export { something } from "./something";
+-- no-named-as-default/something.js --
+export const something = 42;
+-- foo.js --
+export default 'foo';
+export const bar = 'baz';

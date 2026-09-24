@@ -1509,6 +1509,14 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    bounded, demand-driven scheduling and thread lifetime within each host;
    adapters own configuration activation and generation lifetimes. Plugin
    loading uses the config entry versions selected by `ConfigModuleHost`.
+   The CLI loads the dedicated `dist/eslint-plugin/host.js` bundle for worker
+   coordination and protocol conversion. This entry excludes the per-file lint
+   runtime and native parser, which load inside `lint-worker.js`. The existing
+   `eslint-plugin/index.js` entry retains the full exported runtime for native
+   API and LSP consumers. Both entries bundle the same host implementation and
+   resolve the sibling `lint-worker.js` relative to their module URL. The host
+   is a private CLI asset, not a new package export; `build:js` emits it in a
+   separate library block to keep the worker independent of shared chunks.
 
 Other invariants:
 

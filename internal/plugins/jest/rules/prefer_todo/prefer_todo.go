@@ -129,10 +129,11 @@ var PreferTodoRule = rule.Rule{
 	Name:   "jest/prefer-todo",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node, ctx)
-				if jestFnCall == nil || jestFnCall.Kind != utils.JestFnTypeTest {
+				jestFnCall := analysis.ParseTestCall(node)
+				if jestFnCall == nil {
 					return
 				}
 

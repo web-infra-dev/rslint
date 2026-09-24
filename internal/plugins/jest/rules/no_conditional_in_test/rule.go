@@ -10,10 +10,10 @@ import (
 var NoConditionalInTestRule = shared.NewRule(shared.Config{
 	Name: "jest/no-conditional-in-test",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			IsTestCall: func(node *ast.Node) bool {
-				parsed := jestUtils.ParseJestFnCall(node, ctx)
-				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest
+				return analysis.ParseTestCall(node) != nil
 			},
 		}
 	},

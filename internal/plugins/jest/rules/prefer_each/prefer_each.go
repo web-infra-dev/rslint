@@ -29,6 +29,7 @@ var PreferEachRule = rule.Rule{
 	Name:   "jest/prefer-each",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		jestFnCalls := make([]jestUtils.JestFnType, 0, 4)
 		inTestCaseCall := false
 
@@ -57,7 +58,7 @@ var PreferEachRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindForInStatement): exitForLoop,
 			rule.ListenerOnExit(ast.KindForOfStatement): exitForLoop,
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseFnCall(node)
 				if jestFnCall == nil {
 					return
 				}
@@ -74,8 +75,7 @@ var PreferEachRule = rule.Rule{
 				}
 			},
 			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
-				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
-				if jestFnCall != nil && jestFnCall.Kind == jestUtils.JestFnTypeTest {
+				if analysis.ParseTestCall(node) != nil {
 					inTestCaseCall = false
 				}
 			},

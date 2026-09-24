@@ -28,11 +28,11 @@ var PreferToHaveBeenCalledRule = rule.Rule{
 	Name:   "jest/prefer-to-have-been-called",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
+				jestFnCall := analysis.ParseExpectCall(node)
 				if jestFnCall == nil ||
-					jestFnCall.Kind != jestUtils.JestFnTypeExpect ||
 					(jestFnCall.Matcher != "toBeCalledTimes" && jestFnCall.Matcher != "toHaveBeenCalledTimes") {
 					return
 				}

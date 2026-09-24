@@ -1,3 +1,4 @@
+// cspell:ignore vecmap symtab typetab primtypes
 use serde::{Deserialize, Deserializer};
 use serde_bytes::Bytes;
 #[derive(Debug, Clone, Deserialize)]
@@ -40,6 +41,9 @@ pub struct Semantic {
     pub sym2type: Vec<(u32, u32)>,
     #[serde(deserialize_with = "vecmap")]
     pub node2sym: Vec<(NodeReference, u32)>,
+    // Import specifiers without module symbols (source node -> resolved module ID).
+    #[serde(default, deserialize_with = "vecmap_or_empty")]
+    pub node2module: Vec<(NodeReference, u32)>,
     #[serde(deserialize_with = "vecmap")]
     pub node2type: Vec<(NodeReference, u32)>,
     #[serde(default, deserialize_with = "vecmap_or_empty")]

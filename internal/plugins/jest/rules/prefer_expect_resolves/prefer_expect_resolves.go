@@ -15,9 +15,10 @@ var PreferExpectResolvesRule = shared.NewRule(shared.Config{
 	Message:       rule.RuleMessage{Id: "expectResolves", Description: "Use `await expect(...).resolves instead"},
 	StrictPromise: true,
 	Prepare: func(ctx rule.RuleContext) func(*ast.Node) *shared.ExpectCall {
+		analysis := jest.GetJestCallAnalysis(ctx)
 		return func(node *ast.Node) *shared.ExpectCall {
-			parsed := jest.ParseJestFnCall(node, ctx)
-			if parsed == nil || parsed.Kind != jest.JestFnTypeExpect || parsed.MatcherEntry == nil {
+			parsed := analysis.ParseExpectCall(node)
+			if parsed == nil || parsed.MatcherEntry == nil {
 				return nil
 			}
 			head := parsed.Head.Local.Node.Parent

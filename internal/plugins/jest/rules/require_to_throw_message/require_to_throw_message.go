@@ -10,10 +10,11 @@ import (
 var RequireToThrowMessageRule = shared.NewRule(shared.Config{
 	Name: "jest/require-to-throw-message",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := utils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			ParseExpectCall: func(node *ast.Node) *shared.ExpectCall {
-				parsed := utils.ParseJestFnCall(node, ctx)
-				if parsed == nil || parsed.Kind != utils.JestFnTypeExpect || parsed.MatcherEntry == nil {
+				parsed := analysis.ParseExpectCall(node)
+				if parsed == nil || parsed.MatcherEntry == nil {
 					return nil
 				}
 

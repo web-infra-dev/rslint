@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -11,6 +12,26 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
+
+// An explicit extension list restricts export inspection; alternate parser
+// extensions also count upstream. Without a list, use the Program's native
+// JavaScript/TypeScript support instead of requiring an ESLint parser setting.
+func exportExtensionAllowed(settings map[string]interface{}, fileName string) bool {
+	if settings["import/extensions"] == nil {
+		return true
+	}
+	extension := tspath.GetAnyExtensionFromPath(fileName, nil, false)
+	if slices.Contains(settingsStringList(settings, "import/extensions"), extension) {
+		return true
+	}
+	parsers, _ := settings["import/parsers"].(map[string]interface{})
+	for parser := range parsers {
+		if slices.Contains(settingsStringList(parsers, parser), extension) {
+			return true
+		}
+	}
+	return false
+}
 
 // ModuleSettings is the `import/` settings block compiled once per Program
 // generation and configuration. The raw settings are re-read for every

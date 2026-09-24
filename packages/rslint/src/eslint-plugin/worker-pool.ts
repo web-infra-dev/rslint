@@ -142,9 +142,9 @@ interface PendingTask {
 /**
  * Worker entry (`lint-worker.js`) path.
  *
- * Production: this module is bundled into `dist/eslint-plugin/index.js`, so the
- * sibling `./lint-worker.js` (relative to `import.meta.url`) resolves straight
- * to `dist/eslint-plugin/lint-worker.js` — nothing is read from the environment.
+ * Production: this module is bundled into `dist/eslint-plugin/host.js` and
+ * `dist/eslint-plugin/index.js`. Both resolve the sibling `./lint-worker.js`
+ * relative to `import.meta.url`, independently of the caller's cwd.
  *
  * Tests / dev: this runs from `src/eslint-plugin/*.ts` (rstest transforms it on
  * the fly), but `worker_threads` can't execute TypeScript — it needs the built

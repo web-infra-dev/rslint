@@ -10,9 +10,11 @@ import (
 var MaxNestedDescribeRule = shared.NewRule(shared.Config{
 	Name: "jest/max-nested-describe",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			IsDescribeCall: func(node *ast.Node) bool {
-				return jestUtils.IsTypeOfJestFnCall(node, ctx, jestUtils.JestFnTypeDescribe)
+				parsed := analysis.ParseFnCall(node)
+				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeDescribe
 			},
 		}
 	},

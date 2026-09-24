@@ -16,8 +16,105 @@ import (
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestGetLocalExportNames(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		source string
+		want   []string
+	}{
+		{"./named-exports", []string{"a", "bar", "foo", "b", "d", "ExportedClass", "deep"}},
+		{"./re-export", nil},
+		{"./default-export", []string{"default", "baz"}},
+		{"./common", nil},
+		{"./missing", nil},
+	} {
+		t.Run(tc.source, func(t *testing.T) {
+			t.Parallel()
+			ctx, specifier, raw := contextForImportWithCompiler(t, tc.source)
+			got := import_utils.GetLocalExportNames(ctx, specifier)
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("GetLocalExportNames(%q) = %v, want %v", tc.source, got, tc.want)
+			}
+			standalone, err := lintprogram.NewFromBoundSources(raw, raw.SourceFiles())
+			if err != nil {
+				t.Fatal(err)
+			}
+			sourceOnlyContext := (rule.RuleContext{SourceFile: ctx.SourceFile}).WithProgram(standalone)
+			if got := import_utils.GetLocalExportNames(sourceOnlyContext, specifier); !slices.Equal(got, tc.want) {
+				t.Fatalf("source-only GetLocalExportNames(%q) = %v, want %v", tc.source, got, tc.want)
+			}
+		})
+	}
+	ctx, specifier := contextForImport(t, "./named-exports")
+	ctx.Settings = map[string]interface{}{"import/ignore": []interface{}{"named-exports"}}
+	if names := import_utils.GetLocalExportNames(ctx, specifier); len(names) != 0 {
+		t.Fatalf("ignored module exposes names: %v", names)
+	}
+	if names := import_utils.GetLocalExportNames(rule.RuleContext{}, nil); len(names) != 0 {
+		t.Fatalf("missing Program exposes names: %v", names)
+	}
+}
+
+func TestGetLocalExportNamesWithSyntaxErrors(t *testing.T) {
+	t.Parallel()
+	root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/local-export-syntax-errors.txtar").Materialize(t, ""))
+	raw, err := rslint_utils.CreateProgramLenient(true, osvfs.FS(), root, "tsconfig.json", rslint_utils.CreateCompilerHost(root, osvfs.FS()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	standalone, err := lintprogram.NewFromBoundSources(raw, raw.SourceFiles())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceProgram := range []*lintprogram.Program{lintprogram.NewFromCompiler(raw), standalone} {
+		source := sourceProgram.GetSourceFile(tspath.ResolvePath(root, "consumer.ts"))
+		if source == nil || source.Statements == nil || len(source.Statements.Nodes) != 2 {
+			t.Fatal("expected both imports in the consumer")
+		}
+		ctx := (rule.RuleContext{SourceFile: source}).WithProgram(sourceProgram)
+		for i, targetName := range []string{"invalid-js.js", "invalid-ts.ts"} {
+			target := sourceProgram.GetSourceFile(tspath.ResolvePath(root, targetName))
+			if target == nil || len(sourceProgram.SyntacticDiagnostics(t.Context(), target)) == 0 {
+				t.Fatalf("expected a parsed dependency with syntax errors: %s", targetName)
+			}
+			specifier := source.Statements.Nodes[i].AsImportDeclaration().ModuleSpecifier
+			if names := import_utils.GetLocalExportNames(ctx, specifier); len(names) != 0 {
+				t.Errorf("invalid dependency %s exposes names: %v", targetName, names)
+			}
+		}
+	}
+}
+
+func TestExportMapsGlobalNamespace(t *testing.T) {
+	root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/global-namespace.txtar").Materialize(t, ""))
+	for _, interop := range []bool{false, true} {
+		tsconfig := "tsconfig.json"
+		if interop {
+			tsconfig = "tsconfig.interop.json"
+		}
+		t.Run(tsconfig, func(t *testing.T) {
+			raw, err := rslint_utils.CreateProgram(true, osvfs.FS(), root, tsconfig, rslint_utils.CreateCompilerHost(root, osvfs.FS()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			source := raw.GetSourceFile(tspath.ResolvePath(root, "consumer.ts"))
+			ctx := (rule.RuleContext{SourceFile: source}).WithProgram(lintprogram.NewFromCompiler(raw))
+			specifier := source.Statements.Nodes[0].AsImportDeclaration().ModuleSpecifier
+			exports, ok := import_utils.GetExportMap(ctx, specifier)
+			if !ok || exports.Get("Lib") != nil || (exports.Get("foo") != nil) != interop {
+				t.Fatalf("global alias must not be exported; its members require interop: %+v", exports)
+			}
+			names := import_utils.GetLocalExportNames(ctx, specifier)
+			if slices.Contains(names, "Lib") || slices.Contains(names, "foo") != interop {
+				t.Fatalf("unexpected local exports: %v", names)
+			}
+		})
+	}
+}
 
 func TestHasExport(t *testing.T) {
 	t.Parallel()
@@ -180,10 +277,78 @@ func TestExportQueriesSupportSourceOnlyProgram(t *testing.T) {
 	if !ok || exportMap == nil || !exportMap.Has("baz") {
 		t.Fatalf("standalone GetExportMap = (%v, %v), want map containing baz", exportMap, ok)
 	}
+	projectMap, ok := import_utils.GetExportMap(programContext, specifier)
+	if !ok || exportMap.HasDefault() != projectMap.HasDefault() || exportMap.ReexportSource("baz") != projectMap.ReexportSource("baz") {
+		t.Fatal("default and re-export metadata must agree across Program providers")
+	}
+
+	t.Run("root selection bounds dependency visibility", func(t *testing.T) {
+		root := fixtures.GetRootDir()
+		consumer := tspath.ResolvePath(root.Dir, "source-only-consumer.ts")
+		fs := rslint_utils.NewOverlayVFS(root.FS, map[string]string{
+			consumer: `import foo from "./bar";`,
+		})
+		for _, includeDependency := range []bool{false, true} {
+			roots := []string{consumer}
+			if includeDependency {
+				roots = append(roots, tspath.ResolvePath(root.Dir, "bar.ts"))
+			}
+			sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+				RootFileNames:   roots,
+				Host:            rslint_utils.CreateCompilerHost(root.Dir, fs),
+				CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			file := sourceProgram.GetSourceFile(consumer)
+			ctx := (rule.RuleContext{SourceFile: file}).WithProgram(sourceProgram)
+			exports, ok := import_utils.GetExportMap(ctx, firstImportSpecifier(t, file))
+			if ok != includeDependency {
+				t.Fatalf("export map available = %v, dependency selected = %v", ok, includeDependency)
+			}
+			if includeDependency && (!exports.HasDefault() || exports.Get("foo") == nil) {
+				t.Fatal("selected dependency must expose its default and named exports")
+			}
+		}
+	})
 }
 
 func TestGetExportMap(t *testing.T) {
 	t.Parallel()
+
+	t.Run("default availability follows re-exports without losing declared names", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range []struct {
+			source      string
+			wantDefault bool
+			wantSource  string
+		}{
+			{"./default-export", true, ""},
+			{"./default-export-from", true, "default-export.ts"},
+			{"./default-export-from-named", true, "named-exports.ts"},
+			{"./reexport-missing-as-default", false, "named-exports.ts"},
+			{"./reexport-unresolved-as-default", false, ""},
+			{"./unresolved-star-export", false, ""},
+		} {
+			t.Run(tc.source, func(t *testing.T) {
+				ctx, specifier := contextForImportWithCompilerOptions(t, tc.source, &core.CompilerOptions{
+					ESModuleInterop: core.TSFalse, //nolint:staticcheck
+				})
+				exports, ok := import_utils.GetExportMap(ctx, specifier)
+				if !ok || exports.HasDefault() != tc.wantDefault {
+					t.Fatalf("HasDefault = %v, want %v (map available: %v)", exports.HasDefault(), tc.wantDefault, ok)
+				}
+				wantSource := tc.wantSource
+				if wantSource != "" {
+					wantSource = tspath.ResolvePath(fixtures.GetRootDir().Dir, wantSource)
+				}
+				if got := exports.ReexportSource("default"); got != wantSource {
+					t.Fatalf("ReexportSource(default) = %q, want %q", got, wantSource)
+				}
+			})
+		}
+	})
 
 	t.Run("enumeration preserves declared aliases without their target", func(t *testing.T) {
 		t.Parallel()
@@ -469,6 +634,18 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 			esModuleInterop:   core.TSFalse,
 			wantDefaultExport: true,
 		},
+		{
+			name:              "namespace re-export synthesizes default when enabled",
+			source:            "./export-namespace-alias-chain/namespace-alias",
+			esModuleInterop:   core.TSTrue,
+			wantDefaultExport: true,
+		},
+		{
+			name:              "namespace re-export does not synthesize default when disabled",
+			source:            "./export-namespace-alias-chain/namespace-alias",
+			esModuleInterop:   core.TSFalse,
+			wantDefaultExport: false,
+		},
 	}
 
 	for _, tc := range tests {
@@ -481,6 +658,13 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 			gotDefaultExport, gotOK := import_utils.HasDefaultExport(ctx, specifier)
 			if gotDefaultExport != tc.wantDefaultExport || !gotOK {
 				t.Fatalf("HasDefaultExport with esModuleInterop=%v = (%v, %v), want (%v, true)", tc.esModuleInterop, gotDefaultExport, gotOK, tc.wantDefaultExport)
+			}
+			exports, ok := import_utils.GetExportMap(ctx, specifier)
+			if !ok || exports.HasDefault() != tc.wantDefaultExport {
+				t.Fatalf("export map HasDefault = %v, want %v", exports.HasDefault(), tc.wantDefaultExport)
+			}
+			if slices.Contains(slices.Collect(exports.Names()), "default") {
+				t.Fatal("synthetic defaults must not become authored export names")
 			}
 		})
 	}

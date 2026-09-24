@@ -1,0 +1,10 @@
+-- tsconfig.json --
+{"compilerOptions":{"module":"commonjs","esModuleInterop":false},"include":["*.ts"]}
+-- tsconfig.interop.json --
+{"extends":"./tsconfig.json","compilerOptions":{"esModuleInterop":true}}
+-- consumer.ts --
+import obj from './module';
+-- module.ts --
+declare namespace Lib { const foo: number; }
+export as namespace Lib;
+export {};
