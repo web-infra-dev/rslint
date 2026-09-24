@@ -70,14 +70,17 @@ jest.spyOn(retry, 'run').mockImplementation(() => Promise.resolve(attempt));
 
 The autofix renames the method and replaces the promise, or the callback
 returning it, with the value the promise was built from, or with `undefined`
-when it was built without one. It keeps the accessor's dot, quote or
+when it was built without one, written `void 0` where a local binding named
+`undefined` would be read instead. It keeps the accessor's dot, quote or
 template-literal style, any optional chaining, and any further arguments the
 call was given. Redundant parentheses around the value are dropped, except
 around a comma expression, where they decide which operand the promise settles
 with. No fix is offered when the promise is given more than one argument, when
 the mock call has type arguments, when a type assertion wraps a resolved
-promise, or when the rewrite would delete a comment or a declaration the value
-relies on.
+promise, when type information shows that the value passed to
+`Promise.resolve()` may itself be a promise, which `mockResolvedValue()` does
+not accept as its argument type, or when the rewrite would delete a comment
+or a declaration the value relies on.
 
 ## Original Documentation
 

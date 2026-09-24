@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -249,10 +250,52 @@ makeMock().mockResolvedValue(1);`},
 				Output: []string{`aVariable.mockResolvedValue((0, 1));`},
 				Errors: report("mockResolvedValue", 1, 11),
 			},
+			// `(...values)` is not an expression, so the parentheses around a
+			// spread go with it.
+			{
+				Code:   `aVariable.mockReturnValue((Promise.resolve(...values)));`,
+				Output: []string{`aVariable.mockResolvedValue(...values);`},
+				Errors: report("mockResolvedValue", 1, 11),
+			},
+			{
+				Code:   `aVariable.mockReturnValue((/* why */ Promise.resolve(...values)));`,
+				Output: []string{},
+				Errors: report("mockResolvedValue", 1, 11),
+			},
 			{
 				Code:   `aVariable.mockImplementation(() => Promise.reject());`,
 				Output: []string{`aVariable.mockRejectedValue(undefined);`},
 				Errors: report("mockRejectedValue", 1, 11),
+			},
+			// A local binding named `undefined` would be read by the identifier,
+			// so `void 0` stands in for it.
+			{
+				Code: `function setup(undefined: number) {
+  return rs.fn().mockReturnValue(Promise.resolve());
+}`,
+				Output: []string{`function setup(undefined: number) {
+  return rs.fn().mockResolvedValue(void 0);
+}`},
+				Errors: report("mockResolvedValue", 2, 18),
+			},
+			{
+				Code: `function setup() {
+  const undefined = 'set';
+  return rs.fn().mockImplementation(() => Promise.reject());
+}`,
+				Output: []string{`function setup() {
+  const undefined = 'set';
+  return rs.fn().mockRejectedValue(void 0);
+}`},
+				Errors: report("mockRejectedValue", 3, 18),
+			},
+			// A binding in a scope the call is not in does not shadow it.
+			{
+				Code: `function other(undefined: number) {}
+aVariable.mockReturnValue(Promise.resolve());`,
+				Output: []string{`function other(undefined: number) {}
+aVariable.mockResolvedValue(undefined);`},
+				Errors: report("mockResolvedValue", 2, 11),
 			},
 			{
 				Code:   `aVariable.mockImplementation(function () { return Promise.resolve(1); });`,
@@ -355,6 +398,71 @@ aVariable.mockResolvedValue(value);`},
 				Errors: report("mockResolvedValue", 1, 11),
 			},
 
+			// --- a resolved value that may be a promise withholds the fix ---
+			// The shorthand adopts it at run time just as `Promise.resolve` does,
+			// but its parameter is typed as the settled value, so
+			// `mockResolvedValue(p)` would stop type-checking.
+			{
+				Code: `const p = Promise.resolve(1);
+const mock = rs.fn<() => Promise<number>>();
+mock.mockReturnValue(Promise.resolve(p));`,
+				Output: []string{},
+				Errors: report("mockResolvedValue", 3, 6),
+			},
+			{
+				Code: `const p = Promise.resolve(1);
+aVariable.mockImplementation(() => Promise.resolve(p));`,
+				Output: []string{},
+				Errors: report("mockResolvedValue", 2, 11),
+			},
+			{
+				Code: `declare const value: number | Promise<number>;
+aVariable.mockReturnValue(Promise.resolve(value));`,
+				Output: []string{},
+				Errors: report("mockResolvedValue", 2, 11),
+			},
+			{
+				Code: `declare const value: PromiseLike<number>;
+aVariable.mockReturnValue(Promise.resolve(value));`,
+				Output: []string{},
+				Errors: report("mockResolvedValue", 2, 11),
+			},
+			{
+				Code: `function setup<T extends Promise<number>>(value: T) {
+  aVariable.mockReturnValue(Promise.resolve(value));
+}`,
+				Output: []string{},
+				Errors: report("mockResolvedValue", 2, 13),
+			},
+			{
+				Code: `declare const values: [Promise<number>];
+aVariable.mockReturnValue(Promise.resolve(...values));`,
+				Output: []string{},
+				Errors: report("mockResolvedValue", 2, 11),
+			},
+			// A rejection reason is not adopted, and the shorthand takes any value.
+			{
+				Code: `const p = Promise.resolve(1);
+aVariable.mockReturnValue(Promise.reject(p));`,
+				Output: []string{`const p = Promise.resolve(1);
+aVariable.mockRejectedValue(p);`},
+				Errors: report("mockRejectedValue", 2, 11),
+			},
+			{
+				Code: `declare const values: [number];
+aVariable.mockReturnValue(Promise.resolve(...values));`,
+				Output: []string{`declare const values: [number];
+aVariable.mockResolvedValue(...values);`},
+				Errors: report("mockResolvedValue", 2, 11),
+			},
+			{
+				Code: `declare const value: any;
+aVariable.mockReturnValue(Promise.resolve(value));`,
+				Output: []string{`declare const value: any;
+aVariable.mockResolvedValue(value);`},
+				Errors: report("mockResolvedValue", 2, 11),
+			},
+
 			// --- a declaration the rewrite would delete withholds the fix ---
 			{
 				Code:   `aVariable.mockImplementation(function impl() { return Promise.resolve(impl); });`,
@@ -368,6 +476,50 @@ aVariable.mockResolvedValue(value);`},
 });`,
 				Output: []string{},
 				Errors: report("mockResolvedValue", 1, 11),
+			},
+		},
+	)
+}
+
+// TestPreferMockPromiseShorthandWithoutTypeInfo locks the source-only path: with
+// no way to tell whether a resolved value is a promise, the fix is kept.
+func TestPreferMockPromiseShorthandWithoutTypeInfo(t *testing.T) {
+	r := PreferMockPromiseShorthandRule
+	r.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		ctx.TypeChecker = nil
+		return PreferMockPromiseShorthandRule.Run(ctx, options)
+	}
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&r,
+		[]rule_tester.ValidTestCase{
+			{Code: `let value = 1;
+aVariable.mockImplementation(() => Promise.resolve(value));`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `const p = Promise.resolve(1);
+aVariable.mockReturnValue(Promise.resolve(p));`,
+				Output: []string{`const p = Promise.resolve(1);
+aVariable.mockResolvedValue(p);`},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "useMockShorthand", Message: "Prefer mockResolvedValue",
+					Line: 2, Column: 11,
+				}},
+			},
+			{
+				Code: `function setup(undefined: number) {
+  return rs.fn().mockReturnValue(Promise.resolve());
+}`,
+				Output: []string{`function setup(undefined: number) {
+  return rs.fn().mockResolvedValue(void 0);
+}`},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "useMockShorthand", Message: "Prefer mockResolvedValue",
+					Line: 2, Column: 18,
+				}},
 			},
 		},
 	)

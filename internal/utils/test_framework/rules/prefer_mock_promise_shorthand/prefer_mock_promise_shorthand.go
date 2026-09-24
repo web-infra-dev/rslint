@@ -17,6 +17,7 @@ package prefer_mock_promise_shorthand
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 	"github.com/web-infra-dev/rslint/internal/utils/test_framework/mock_shorthand"
 )
@@ -112,7 +113,7 @@ func NewRule(config Config) rule.Rule {
 						replacement = mock_shorthand.WithOnce(rejectedValueMethod, once)
 					}
 					ctx.ReportNodeWithDeferredFixes(accessor, useMockShorthandMessage(replacement), func() []rule.RuleFix {
-						return buildFix(ctx, node, accessor, replacement, replaced, callback, promiseCall, method, wrapped)
+						return buildFix(ctx, node, accessor, replacement, arguments[0], replaced, callback, promiseCall, method, wrapped)
 					})
 				},
 			}
@@ -122,7 +123,13 @@ func NewRule(config Config) rule.Rule {
 
 // buildFix renames the method and replaces its first argument with the promise's
 // argument, or with `undefined` when the promise was built without one: both
-// Promise methods take the value optionally, the shorthands require it.
+// Promise methods take the value optionally, the shorthands require it. Where a
+// local binding shadows `undefined`, `void 0` stands in for it, since the
+// identifier would read that binding instead.
+//
+// Parentheses around the first argument are kept, as upstream keeps them, except
+// around a spread: `(...values)` is not an expression, so the spread replaces
+// them too.
 //
 // The fix is withheld when the rewrite cannot keep the call's meaning:
 //
@@ -135,12 +142,17 @@ func NewRule(config Config) rule.Rule {
 //     Promise<T>`, which the rewrite would drop while the shorthand's parameter
 //     is typed from the mock. A rejected promise's error is `unknown` in every
 //     framework, so its assertion carries nothing and it stays fixable;
+//   - a resolved value that may itself be a promise, when type information is
+//     available. `Promise.resolve(p)` adopts `p`, and so does the shorthand at run
+//     time, but the shorthand's parameter is typed as the settled value, so
+//     `mockResolvedValue(p)` no longer type-checks. A value that is not thenable
+//     fits that parameter whenever the promise built from it fit the old one;
 //   - a comment or declaration the rewrite would delete.
 func buildFix(
 	ctx rule.RuleContext,
 	call, accessor *ast.Node,
 	replacement string,
-	replaced, callback, promiseCall *ast.Node,
+	argument, replaced, callback, promiseCall *ast.Node,
 	method string,
 	wrapped bool,
 ) []rule.RuleFix {
@@ -153,6 +165,14 @@ func buildFix(
 	var kept *ast.Node
 	if len(promiseArguments) == 1 {
 		kept = promiseArguments[0]
+		if kept.Kind == ast.KindSpreadElement {
+			replaced = argument
+		}
+		// A spread element's type is the type of the values it spreads.
+		if method == "resolve" && ctx.TypeChecker != nil &&
+			utils.IsThenableType(ctx.TypeChecker, kept, nil) {
+			return nil
+		}
 	}
 	if mock_shorthand.DropsComment(ctx, replaced, kept) {
 		return nil
@@ -168,6 +188,8 @@ func buildFix(
 	argumentText := "undefined"
 	if kept != nil {
 		argumentText = mock_shorthand.ArgumentText(ctx, kept)
+	} else if utils.IsShadowed(replaced, argumentText) {
+		argumentText = "void 0"
 	}
 	return []rule.RuleFix{
 		rule.RuleFixReplaceRange(accessorRange, accessorText),
