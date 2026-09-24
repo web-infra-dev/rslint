@@ -473,9 +473,15 @@ func declarationStatement(call *ast.Node, function *ast.Node) (statement *ast.No
 }
 
 // evaluatesChild reports whether evaluating parent always evaluates child. The
-// right operand of a short-circuiting operator and the branches of a
-// conditional expression may be skipped.
+// right operand of a short-circuiting operator, the branches of a conditional
+// expression, anything after `?.` in an optional chain, and a destructuring
+// default may be skipped.
 func evaluatesChild(parent *ast.Node, child *ast.Node) bool {
+	if ast.IsOptionalChain(parent) {
+		// `maybe?.(declare())` and `maybe?.[declare()]` skip everything but the
+		// receiver when it is nullish.
+		return child == parent.Expression()
+	}
 	switch parent.Kind {
 	case ast.KindBinaryExpression:
 		binary := parent.AsBinaryExpression()
@@ -483,7 +489,16 @@ func evaluatesChild(parent *ast.Node, child *ast.Node) bool {
 		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken,
 			ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
 			return child == binary.Left
+		case ast.KindEqualsToken:
+			// `[x = declare()] = values` runs the default only for undefined.
+			return child == binary.Left || !ast.IsAssignmentTarget(parent)
 		}
+	case ast.KindBindingElement:
+		// `const { x = declare() } = value`
+		return child != parent.AsBindingElement().Initializer
+	case ast.KindShorthandPropertyAssignment:
+		// `({ x = declare() } = value)`
+		return child != parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer
 	case ast.KindConditionalExpression:
 		return child == parent.AsConditionalExpression().Condition
 	case ast.KindIfStatement:

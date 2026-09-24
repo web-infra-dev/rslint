@@ -62,6 +62,9 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 	branchInHook := `afterEach(() => { if (strict) { expect.hasAssertions(); } }); it('t', () => {});`
 	logicalInHook := `beforeEach(() => strict && expect.hasAssertions()); it('t', () => {});`
 	returnBeforeHookDeclaration := `beforeEach(() => { if (skip) return; expect.hasAssertions(); }); it('t', () => {});`
+	optionalCallInHook := `beforeEach(() => maybe?.(expect.hasAssertions())); it('t', () => {});`
+	bindingDefaultInHook := `afterEach(() => { const { x = expect.hasAssertions() } = { x: 1 }; }); it('t', () => {});`
+	optionalCallFirst := `it('t', () => { maybe?.(expect.hasAssertions()); run(); });`
 	whileLoop := `it('t', () => { while (next()) { expect(current()).toBe(1); } });`
 	methodCallback := `it('t', () => { register({ handle() { expect(1).toBe(1); } }); });`
 	leak := "it('a', () => { expect.assertions(1); expect(1).toBe(1); });\nit('b', async () => { await run(); });"
@@ -123,6 +126,8 @@ it("returns numbers that are greater than five", () => {
 			invalid(branchInHook, nil, missing(branchInHook, "it('t', () => {})", "it('t', () => {")),
 			invalid(logicalInHook, nil, missing(logicalInHook, "it('t', () => {})", "it('t', () => {")),
 			invalid(returnBeforeHookDeclaration, nil, missing(returnBeforeHookDeclaration, "it('t', () => {})", "it('t', () => {")),
+			invalid(optionalCallInHook, nil, missing(optionalCallInHook, "it('t', () => {})", "it('t', () => {")),
+			invalid(bindingDefaultInHook, nil, missing(bindingDefaultInHook, "it('t', () => {})", "it('t', () => {")),
 
 			// ---- First statement ----
 			// A matcher named assertions reads it off expect's result and declares
@@ -132,6 +137,7 @@ it("returns numbers that are greater than five", () => {
 			invalid(nestedBranch, nil, missing(nestedBranch, nestedBranch[:len(nestedBranch)-1], "() => {")),
 			// So does one on the right of a short-circuiting operator.
 			invalid(logicalFirst, nil, missing(logicalFirst, logicalFirst[:len(logicalFirst)-1], "() => {")),
+			invalid(optionalCallFirst, nil, missing(optionalCallFirst, optionalCallFirst[:len(optionalCallFirst)-1], "() => {")),
 			invalid(directive, nil, rule_tester.InvalidTestCaseError{
 				MessageId: "haveExpectAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 46,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{

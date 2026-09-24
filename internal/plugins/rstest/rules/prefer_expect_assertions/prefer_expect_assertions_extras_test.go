@@ -67,6 +67,11 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 	logicalInHook := rstestImport + "beforeEach(() => strict && expect.hasAssertions()); test('t', () => {});"
 	returnBeforeHookDeclaration := rstestImport + "beforeEach(() => { if (skip) return; expect.hasAssertions(); }); test('t', () => {});"
 	tryInHook := rstestImport + "beforeEach(() => { try { expect.hasAssertions(); } catch {} }); test('t', () => {});"
+	optionalCallInHook := rstestImport + "beforeEach(() => maybe?.(expect.hasAssertions())); test('t', () => {});"
+	optionalChainInHook := rstestImport + "beforeEach(() => { maybe?.run(expect.hasAssertions()); }); test('t', () => {});"
+	bindingDefaultInHook := rstestImport + "beforeEach(() => { const { x = expect.hasAssertions() } = { x: 1 }; }); test('t', () => {});"
+	assignmentDefaultInHook := rstestImport + "beforeEach(() => { let x; [x = expect.hasAssertions()] = [1]; }); test('t', () => {});"
+	shorthandDefaultInHook := rstestImport + "beforeEach(() => { let x; ({ x = expect.hasAssertions() } = { x: 1 }); }); test('t', () => {});"
 
 	// ---- Provenance ----
 	renamed := "import { expect as check, test as scenario } from '@rstest/core';\nscenario('t', () => { run(); });"
@@ -129,6 +134,7 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 			{Code: rstestImport + "beforeEach(((() => { expect.hasAssertions(); }) as () => void)); test('t', () => {});"},
 			{Code: rstestImport + "beforeEach(() => { const server = start(); expect.hasAssertions(); }); test('t', () => {});"},
 			{Code: rstestImport + "beforeEach(() => void expect.hasAssertions()); test('t', () => {});"},
+			{Code: rstestImport + "beforeEach(() => { const x = expect.hasAssertions(); }); test('t', () => {});"},
 
 			// ---- Provenance ----
 			{Code: "import { expect as check, test as scenario } from '@rstest/core';\nscenario('t', () => { check.assertions(1); });"},
@@ -179,6 +185,11 @@ func TestPreferExpectAssertionsExtras(t *testing.T) {
 			invalid(logicalInHook, missing(logicalInHook, "test('t', () => {})", "test('t', () => {", "expect")),
 			invalid(returnBeforeHookDeclaration, missing(returnBeforeHookDeclaration, "test('t', () => {})", "test('t', () => {", "expect")),
 			invalid(tryInHook, missing(tryInHook, "test('t', () => {})", "test('t', () => {", "expect")),
+			invalid(optionalCallInHook, missing(optionalCallInHook, "test('t', () => {})", "test('t', () => {", "expect")),
+			invalid(optionalChainInHook, missing(optionalChainInHook, "test('t', () => {})", "test('t', () => {", "expect")),
+			invalid(bindingDefaultInHook, missing(bindingDefaultInHook, "test('t', () => {})", "test('t', () => {", "expect")),
+			invalid(assignmentDefaultInHook, missing(assignmentDefaultInHook, "test('t', () => {})", "test('t', () => {", "expect")),
+			invalid(shorthandDefaultInHook, missing(shorthandDefaultInHook, "test('t', () => {})", "test('t', () => {", "expect")),
 			{
 				Code: argumentInHook,
 				Errors: []rule_tester.InvalidTestCaseError{{
