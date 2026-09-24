@@ -1,0 +1,5 @@
+{
+  "type": "array",
+  "items": [{ "type": "string", "enum": ["always", "multi"] }],
+  "maxItems": 1
+}
