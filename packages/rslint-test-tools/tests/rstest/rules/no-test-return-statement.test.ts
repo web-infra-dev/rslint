@@ -4,16 +4,20 @@ const ruleTester = new RuleTester();
 
 ruleTester.run('no-test-return-statement', {} as never, {
   valid: [
-    'it("noop", function () {});',
-    'test("noop", () => {});',
-    'test("one", () => expect(1).toBe(1));',
-    'test("empty")',
-    `it("one", myTest);
+    { code: 'it("noop", function () {});' },
+    { code: 'test("noop", () => {});' },
+    { code: 'test("one", () => expect(1).toBe(1));' },
+    { code: 'test("empty")' },
+    {
+      code: `it("one", myTest);
     function myTest() {
       expect(1).toBe(1);
     }`,
-    `it("one", () => expect(1).toBe(1));
+    },
+    {
+      code: `it("one", () => expect(1).toBe(1));
        function myHelper() {}`,
+    },
   ],
   invalid: [
     {
