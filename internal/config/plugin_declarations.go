@@ -1,5 +1,7 @@
 package config
 
+import "sort"
+
 // bundledPluginDeclaration maps accepted string declarations to the namespace
 // used by that bundled plugin's rules. It contains no rule implementations;
 // callers supply those through a rule catalog.
@@ -30,6 +32,17 @@ var bundledPluginByDeclarationName = func() map[string]bundledPluginDeclaration 
 	}
 	return byName
 }()
+
+// BundledPluginDeclarationNames returns the accepted declaration names for
+// bundled plugins in deterministic order.
+func BundledPluginDeclarationNames() []string {
+	names := make([]string, 0, len(bundledPluginByDeclarationName))
+	for name := range bundledPluginByDeclarationName {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
 
 // NormalizePluginName converts a plugin declaration name to its rule prefix form.
 // Unknown declaration names are returned unchanged.

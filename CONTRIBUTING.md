@@ -16,6 +16,7 @@ git submodule sync -- typescript-go
 git submodule update --init --depth 1
 pnpm install
 go run ./tools/dump_rule_schemas > packages/rslint/rule-schemas.json
+go run ./tools/generate_config_schema
 pnpm build
 ```
 
