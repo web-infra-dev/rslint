@@ -15,7 +15,7 @@ func TestBasePathScopesExistingFilesAndIgnoresMatchers(t *testing.T) {
 	config := ConfigWithResolvedBasePaths(RslintConfig{{
 		BasePath: &basePath,
 		Files:    []string{"**/*.ts"},
-		Ignores:  []string{"**/*.test.ts"},
+		Ignores:  append(literalFileIgnoresForTest(8), "**/*.test.ts"),
 		Rules:    Rules{"no-debugger": "error"},
 	}}, "/repo")
 
@@ -26,6 +26,7 @@ func TestBasePathScopesExistingFilesAndIgnoresMatchers(t *testing.T) {
 	}{
 		{name: "inside", path: "/repo/pkg/src/app.ts", want: true},
 		{name: "local ignore", path: "/repo/pkg/src/app.test.ts", want: false},
+		{name: "indexed local ignore", path: "/repo/pkg/src/generated/file0.ts", want: false},
 		{name: "outside", path: "/repo/other/app.ts", want: false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
