@@ -45,10 +45,8 @@ func parseMax(options []any) int {
 		return defaultMax
 	}
 	config, _ := options[0].(map[string]any)
-	if value, ok := utils.CoerceIntegral(config["max"]); ok {
-		return value
-	}
-	return defaultMax
+	value, _ := utils.CoerceIntegral(config["max"])
+	return value
 }
 
 func nestedCallDepth(node *ast.Node) int {
