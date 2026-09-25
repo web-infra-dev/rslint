@@ -230,7 +230,7 @@ func buildGlobalShouldNotBeModifiedMessage(name string) rule.RuleMessage {
 // readonly, or an ECMAScript built-in, which is readonly unless one of those
 // two sources says otherwise. `writable` lifts the restriction and `off`
 // removes the global entirely, so neither reports.
-func isReadonlyGlobal(ctx rule.RuleContext, name string) bool {
+func isReadonlyGlobal(ctx *rule.RuleContext, name string) bool {
 	return ctx.Globals.Access(name) == utils.GlobalAccessReadonly
 }
 
@@ -248,15 +248,27 @@ var NoGlobalAssignRule = rule.Rule{
 			message      rule.RuleMessage
 			messageBuilt bool
 		}{}
+		var shadows *utils.ShadowCache
+		isShadowed := func(node *ast.Node, name string) bool {
+			if ctx.SourceFile == nil {
+				return utils.IsShadowed(node, name)
+			}
+			if shadows == nil {
+				shadows = utils.NewShadowCache(ctx.SourceFile)
+			}
+			return shadows.IsShadowed(node, name)
+		}
 
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				name := node.Text()
-				if opts.exceptions[name] || !isReadonlyGlobal(ctx, name) {
+				// Most identifiers are reads, declarations, or property names.
+				// Classify writes before consulting the configured global maps.
+				if !utils.IsWriteReference(node) {
 					return
 				}
 
-				if !utils.IsWriteReference(node) {
+				name := node.Text()
+				if opts.exceptions[name] || !isReadonlyGlobal(&ctx, name) {
 					return
 				}
 
@@ -284,22 +296,18 @@ var NoGlobalAssignRule = rule.Rule{
 					}
 				}
 
-				if ctx.Refs == nil || ctx.TypeChecker == nil {
-					if utils.IsShadowed(node, name) {
+				if ctx.Refs == nil || ctx.TypeChecker == nil || cache.globalSymbol == nil {
+					// Keep the syntax fallback's scope semantics, but share its name
+					// and declaration scans across writes in this file.
+					if isShadowed(node, name) {
 						return
 					}
 				} else {
-					if cache.globalSymbol == nil {
-						if utils.IsShadowed(node, name) {
-							return
-						}
-					} else {
-						// Resolve uses the binder's scope walk first, so a local shadow
-						// produces its own symbol; only an unshadowed reference falls back
-						// to the checker global cached above.
-						if ctx.Refs.Resolve(node) != cache.globalSymbol {
-							return
-						}
+					// Resolve uses the binder's scope walk first, so a local shadow
+					// produces its own symbol; only an unshadowed reference falls back
+					// to the checker global cached above.
+					if ctx.Refs.Resolve(node) != cache.globalSymbol {
+						return
 					}
 				}
 
