@@ -15,7 +15,7 @@ func TestBasePathScopesExistingFilesAndIgnoresMatchers(t *testing.T) {
 	config := ConfigWithResolvedBasePaths(RslintConfig{{
 		BasePath: &basePath,
 		Files:    []string{"**/*.ts"},
-		Ignores:  []string{"**/*.test.ts"},
+		Ignores:  append(literalFileIgnoresForTest(8), "**/*.test.ts"),
 		Rules:    Rules{"no-debugger": "error"},
 	}}, "/repo")
 
@@ -26,6 +26,7 @@ func TestBasePathScopesExistingFilesAndIgnoresMatchers(t *testing.T) {
 	}{
 		{name: "inside", path: "/repo/pkg/src/app.ts", want: true},
 		{name: "local ignore", path: "/repo/pkg/src/app.test.ts", want: false},
+		{name: "indexed local ignore", path: "/repo/pkg/src/generated/file0.ts", want: false},
 		{name: "outside", path: "/repo/other/app.ts", want: false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -336,8 +337,8 @@ func TestBasePathGlobalIgnoreKeepsAliasedConfigArrayRootReachable(t *testing.T) 
 
 	for _, file := range []string{lexicalVisible, physicalVisible} {
 		decision := matchFile(file)
-		assert.Assert(t, decision.Selected)
-		assert.Assert(t, !decision.GloballyIgnored)
+		assert.Assert(t, decision.Selected())
+		assert.Assert(t, !decision.GloballyIgnored())
 		assert.Assert(t, !matcher.CanPruneDirectory(DirectoryIdentity{
 			LexicalPath:   tspath.NormalizePath(filepath.Dir(file)),
 			CanonicalPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(file))),
@@ -345,7 +346,7 @@ func TestBasePathGlobalIgnoreKeepsAliasedConfigArrayRootReachable(t *testing.T) 
 	}
 	for _, file := range []string{lexicalBlocked, physicalBlocked} {
 		decision := matchFile(file)
-		assert.Assert(t, decision.GloballyIgnored)
+		assert.Assert(t, decision.GloballyIgnored())
 		assert.Assert(t, matcher.CanPruneDirectory(DirectoryIdentity{
 			LexicalPath:   tspath.NormalizePath(filepath.Dir(file)),
 			CanonicalPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(file))),
@@ -417,8 +418,8 @@ func TestBasePathNegationReopensPhysicalAliasSubtree(t *testing.T) {
 		CanonicalPath:       tspath.NormalizePath(fsys.Realpath(target)),
 		CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(tspath.GetDirectoryPath(target))),
 	})
-	assert.Assert(t, decision.Selected)
-	assert.Assert(t, !decision.GloballyIgnored)
+	assert.Assert(t, decision.Selected())
+	assert.Assert(t, !decision.GloballyIgnored())
 	assert.Assert(t, !matcher.CanPruneDirectory(DirectoryIdentity{
 		LexicalPath:   tspath.NormalizePath(secondAlias),
 		CanonicalPath: physical,

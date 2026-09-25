@@ -40,9 +40,12 @@ type FileConfigResolver struct {
 	configDirectory string
 	catalog         *rule.Catalog
 	targetResolver  *configTargetResolver
+	matchSource     *targetMatchSource
 
 	filePlans  publishOnceCache[configTargetCacheKey, *configTargetResolution]
 	shapePlans publishOnceCache[configMatchKey, *effectiveConfigPlan]
+	// Compatibility is checked once per discovery matcher, never per file.
+	matchSources publishOnceCache[*targetMatchSource, bool]
 }
 
 // NewFileConfigResolver creates a per-run resolver for one config root.
@@ -89,12 +92,14 @@ func NewFileConfigResolverWithPathSpaces(
 	if err != nil {
 		return nil, err
 	}
-	return newFileConfigResolver(
+	resolver := newFileConfigResolver(
 		config,
 		configDirectory,
 		catalog,
 		matcher.resolver,
-	), nil
+	)
+	resolver.matchSource = matcher.source
+	return resolver, nil
 }
 
 func newFileConfigResolver(
@@ -154,7 +159,15 @@ func (r *FileConfigResolver) EnabledRulesForTarget(filePath string, canonicalPat
 func (r *FileConfigResolver) ResolveTarget(
 	target PathIdentity,
 ) ResolvedFileConfig {
-	resolution := r.resolutionForTarget(target)
+	return r.ResolveTargetWithMatch(target, nil)
+}
+
+// ResolveTargetWithMatch reuses a discovery decision only for the same complete
+// target identity, owner and path-space generation with compatible selection
+// inputs. A nil or incompatible match uses ordinary matching. Effective config
+// and rule plans always belong to this resolver's final configuration.
+func (r *FileConfigResolver) ResolveTargetWithMatch(target PathIdentity, match *TargetMatch) ResolvedFileConfig {
+	resolution := r.resolutionForTarget(target, match)
 	if resolution == nil {
 		return ResolvedFileConfig{}
 	}
@@ -174,7 +187,7 @@ func (r *FileConfigResolver) planForTarget(filePath string, canonicalPath string
 	resolution := r.resolutionForTarget(PathIdentity{
 		Path:          filePath,
 		CanonicalPath: canonicalPath,
-	})
+	}, nil)
 	if resolution == nil {
 		return nil
 	}
@@ -183,6 +196,7 @@ func (r *FileConfigResolver) planForTarget(filePath string, canonicalPath string
 
 func (r *FileConfigResolver) resolutionForTarget(
 	target PathIdentity,
+	match *TargetMatch,
 ) *configTargetResolution {
 	key := configTargetCacheKey{
 		path:                tspath.NormalizePath(target.Path),
@@ -190,11 +204,15 @@ func (r *FileConfigResolver) resolutionForTarget(
 		canonicalParentPath: tspath.NormalizePath(target.CanonicalParentPath),
 	}
 	return r.filePlans.getOrInit(key, func() *configTargetResolution {
-		decision := r.targetResolver.resolveTarget(PathIdentity{
+		identity := PathIdentity{
 			Path:                key.path,
 			CanonicalPath:       key.canonicalPath,
 			CanonicalParentPath: key.canonicalParentPath,
-		})
+		}
+		decision, reused := r.reuseTargetMatch(identity, match)
+		if !reused {
+			decision = r.targetResolver.resolveTarget(identity)
+		}
 		resolution := &configTargetResolution{
 			globallyIgnored: decision.globallyIgnored,
 		}

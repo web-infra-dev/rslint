@@ -125,13 +125,13 @@ func (resolver *Resolver) WithSourceMappings(
 // The boolean reports owner availability; a nil merged config is a valid miss.
 func (resolver *Resolver) ResolveTarget(file target.File) (config.ResolvedFileConfig, bool) {
 	if resolver.singleResolver != nil {
-		return resolver.singleResolver.ResolveTarget(file.Identity()), true
+		return resolver.singleResolver.ResolveTargetWithMatch(file.Identity(), file.Match()), true
 	}
 	fileResolver := resolver.resolversByOwnerPath[config.ExactPathID(file.ConfigDirectory)]
 	if fileResolver == nil {
 		return config.ResolvedFileConfig{}, false
 	}
-	return fileResolver.ResolveTarget(file.Identity()), true
+	return fileResolver.ResolveTargetWithMatch(file.Identity(), file.Match()), true
 }
 
 // ProjectPolicies projects the same final config used by lint rules. Every
@@ -282,7 +282,8 @@ func (resolver *Resolver) ResolveSourcePath(
 		}
 		return "", config.ResolvedFileConfig{}, false
 	}
-	return resolver.configDirectory, resolver.singleResolver.ResolveTarget(lintTarget.Identity()), true
+	resolved, ok := resolver.ResolveTarget(lintTarget)
+	return resolver.configDirectory, resolved, ok
 }
 
 // EnabledRulesForSourcePath returns the complete configured rule set. Program

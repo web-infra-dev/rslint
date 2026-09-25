@@ -46,8 +46,15 @@ func (target *explicitLintTarget) selectedBy(
 			scanRoot,
 			useCaseSensitive,
 		)
-		if matcher != nil && matcher.MatchFile(target.target.Identity()).GloballyIgnored {
-			target.ignored = true
+		if matcher != nil {
+			match := matcher.MatchFile(target.target.Identity())
+			if match.GloballyIgnored() {
+				target.ignored = true
+			}
+			if target.supported && target.exists && !target.ignored {
+				target.target.match = new(rslintconfig.TargetMatch)
+				*target.target.match = match
+			}
 		}
 		target.evaluated = true
 	}
