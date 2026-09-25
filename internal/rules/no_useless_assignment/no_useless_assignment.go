@@ -202,13 +202,12 @@ func analyzeRoot(
 	isModule bool,
 	exportedSymbols map[*ast.Symbol]bool,
 ) []*ast.Node {
-	assignByIdent := make(map[*ast.Node]*assignment, len(raws))
 	readNodes := make(map[*ast.Node]int)
 	// Nonnegative indices identify tracked variables in the liveness bit sets;
 	// -1 records a symbol that cannot be tracked in this root.
 	trackedState := make(map[*ast.Symbol]int)
 	variableCount := 0
-	var assignments []*assignment
+	var writes []cfg.VariableWrite
 	var readsScratch []*ast.Node
 
 	for _, raw := range raws {
@@ -247,31 +246,16 @@ func analyzeRoot(
 		if variable < 0 {
 			continue
 		}
-		// An assignment inside a `try` block is never reported — the block may
-		// be abandoned partway through, so the value can still matter — but it
-		// still overwrites the variable for every other assignment's sake.
-		a := &assignment{
-			variable:   variable,
-			identifier: raw.identifier,
-			silent:     inTryBlockOfRoot(raw.identifier, root),
+		if writes == nil {
+			writes = make([]cfg.VariableWrite, 0, len(raws))
 		}
-		assignByIdent[raw.identifier] = a
-		assignments = append(assignments, a)
+		writes = append(writes, cfg.VariableWrite{Node: raw.identifier, Variable: variable})
 	}
 
-	if len(assignments) == 0 {
-		return nil
-	}
-
-	graph := cfg.Build(root, hooks(readNodes, assignByIdent))
-
-	markDeadWrites(graph, variableCount)
-	var reports []*ast.Node
-	for _, a := range assignments {
-		if !a.silent && a.dead {
-			reports = append(reports, a.identifier)
-		}
-	}
+	reports := cfg.DeadWrites(root, readNodes, writes, variableCount)
+	// Try-block writes still overwrite variables, but this rule never reports
+	// them because their values can escape through an exception.
+	reports = slices.DeleteFunc(reports, func(identifier *ast.Node) bool { return inTryBlockOfRoot(identifier, root) })
 	return reports
 }
 

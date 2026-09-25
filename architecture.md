@@ -560,6 +560,21 @@ Every authored alias is normalized to one of ESLint's three access levels —
 Booleans follow the `globals` package: `true` is writable, `false` is read-only.
 The Node plugin scope seeds the same levels into its scope manager for
 ESLint-compatible scope APIs.
+
+Control-flow queries live in `internal/utils/cfg`. `Build` provides evaluation
+order and ESLint-compatible paths; `AnalyzePaths` answers structural path
+questions. `DeadWrites` returns unused assignment nodes using caller-resolved
+identifier references and dense variable indices. Rules retain binding policy,
+including exported variables and reads in other functions, and diagnostic
+reporting. The analysis does not resolve symbols or require a TypeChecker.
+
+`DeadWrites` reuses the existing tsgo binder flow for restricted functions
+with one tracked variable. Unsupported syntax, missing flow data, and multiple
+variables use the common CFG and batched liveness solver. This choice belongs to
+the shared utility, so rules do not maintain compiler adapters or fallback
+logic. Analysis state is local to the query; compiler-owned flow nodes remain
+unchanged.
+
 The linter binds immutable rule name, severity, and diagnostic-sink metadata to
 each context once. The reporting methods use that state directly rather than
 allocating bound callback closures for every reporting variant.

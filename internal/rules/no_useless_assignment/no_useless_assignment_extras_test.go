@@ -2,8 +2,6 @@ package no_useless_assignment
 
 import (
 	"fmt"
-	"math/rand/v2"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -14,7 +12,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
-	"github.com/web-infra-dev/rslint/internal/utils/cfg"
 )
 
 // TestNoUselessAssignmentExtras locks in branches and edge shapes that the
@@ -761,84 +758,4 @@ func TestNoUselessAssignmentReporting(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Compare the dataflow with an independent forward search from each write.
-// Random graphs include back edges, self loops, disconnected blocks, and
-// repeated sites of the same assignment, as emitted for finally clauses.
-func TestNoUselessAssignmentLivenessPaths(t *testing.T) {
-	random := rand.New(rand.NewPCG(42, 123))
-	for _, variables := range []int{1, 2, 63, 64, 65, 127, 128, 129} {
-		t.Run(strconv.Itoa(variables), func(t *testing.T) {
-			for trial := range 100 {
-				source := strings.Repeat("if (c) {}\n", trial%9)
-				sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/graph.ts", Path: "/graph.ts"}, source, core.ScriptKindTS)
-				// Use the builder to create blocks with their proper graph indices,
-				// then replace the edges and events for this dataflow-only test.
-				graph := cfg.Build(sf.AsNode(), cfg.Hooks[event]{})
-				byVariable := make([][]*assignment, variables)
-				want := map[*assignment]bool{new(assignment): false} // no reachable site
-				for _, blk := range graph.Blocks {
-					blk.Reachable = random.IntN(5) != 0
-					blk.Successors = nil
-					for edge := random.IntN(4); edge > 0; edge-- {
-						blk.Successors = append(blk.Successors, graph.Blocks[random.IntN(len(graph.Blocks))])
-					}
-					if !blk.Reachable {
-						continue
-					}
-					for count := random.IntN(12); count > 0; count-- {
-						variable := random.IntN(variables)
-						e := event{variable: variable}
-						if random.IntN(2) == 0 {
-							previous := byVariable[variable]
-							if len(previous) > 0 && random.IntN(3) == 0 {
-								e.assignment = previous[random.IntN(len(previous))]
-							} else {
-								e.assignment = &assignment{variable: variable, dead: true}
-								byVariable[variable] = append(previous, e.assignment)
-							}
-							want[e.assignment] = true
-						}
-						blk.Events = append(blk.Events, e)
-					}
-				}
-				for _, blk := range graph.Blocks {
-					for index, e := range blk.Events {
-						if e.assignment != nil && assignmentReachesRead(blk, index+1, e.variable) {
-							want[e.assignment] = false
-						}
-					}
-				}
-				markDeadWrites(graph, variables)
-				for a, dead := range want {
-					if a.dead != dead {
-						t.Fatalf("trial %d, variable %d: dead = %v, want %v", trial, a.variable, a.dead, dead)
-					}
-				}
-			}
-		})
-	}
-}
-
-func assignmentReachesRead(start *block, nextEvent int, variable int) bool {
-	visited := make(map[*block]bool)
-	var search func(*block, int) bool
-	search = func(blk *block, index int) bool {
-		for _, e := range blk.Events[index:] {
-			if e.variable == variable {
-				return e.assignment == nil
-			}
-		}
-		for _, successor := range blk.Successors {
-			if successor.Reachable && !visited[successor] {
-				visited[successor] = true
-				if search(successor, 0) {
-					return true
-				}
-			}
-		}
-		return false
-	}
-	return search(start, nextEvent)
 }
