@@ -1193,6 +1193,15 @@ single-origin matcher and delegates composed multi-origin arrays to the target
 resolver; both paths feed the same ordered merge policy without retaining a
 plan cache.
 
+The private config-target resolver also prepares one immutable
+`fileIgnoreMatcher` for each entry's local ignores. The matcher retains the
+ordered patterns and indexes sufficiently long consecutive runs of positive
+literal paths. General globs and negations retain their positions; matching
+uses the path space already selected by the resolver. Lists with Git patterns,
+case folding, or separate match directories use the existing ignore evaluator.
+Global ignores and directory blocking keep their own matchers. These indexes
+belong to one resolver and contain no per-file results or filesystem state.
+
 The staged coordinator builds the effective catalog used by
 `target.OwnerIndex` before config's target matcher merges the selected entries.
 CLI/API target plans call ownership once during discovery and carry that owner

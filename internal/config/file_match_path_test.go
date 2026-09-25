@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -111,6 +112,190 @@ func TestFileMatchPathMatchesPreReuseBehavior(t *testing.T) {
 	}
 }
 
+func TestFileIgnoreMatcherMatchesSequentialEvaluation(t *testing.T) {
+	random := rand.New(rand.NewSource(0x51a7))
+	literals := []string{
+		"src/app.ts", "src/other.ts", "src/app.test.ts", "src/nested/app.ts",
+		"", "src/", "src/中文.ts", "src/UPPER.ts", "src/name!.ts", "src/../root.ts",
+	}
+	otherPatterns := []string{
+		"!src/app.ts", "!src/**/*.ts", "src/**", "src/*.{js,ts}",
+		"src/[ab]*.ts", "src/?.ts", "src/[", "src/{", "src/\ufffd.ts", "src/\xff.ts",
+	}
+	targets := []struct{ path, cwd string }{
+		{"/repo/src/app.ts", "/repo"},
+		{"/repo/src/other.ts", "/repo"},
+		{"/repo/src/app.test.ts", "/repo"},
+		{"/repo/src/nested/app.ts", "/repo"},
+		{"/repo/src/中文.ts", "/repo"},
+		{"/repo/src/UPPER.ts", "/repo"},
+		{"/repo/src/upper.ts", "/repo"},
+		{"/repo/src/\xff.ts", "/repo"},
+		{"/repo/root.ts", "/repo"},
+		{"/other/src/app.ts", "/repo"},
+		{"", ""},
+		{`src\app.ts`, ""},
+		{`C:\Repo\src\app.ts`, "C:/Repo"},
+		{"//server/share/src/app.ts", "//server/share"},
+	}
+	for sample := range 300 {
+		var raw []string
+		for range 3 {
+			for range 8 + random.Intn(8) {
+				raw = append(raw, literals[random.Intn(len(literals))])
+			}
+			for range 1 + random.Intn(4) {
+				raw = append(raw, otherPatterns[random.Intn(len(otherPatterns))])
+			}
+		}
+		patterns := ParseIgnorePatterns(raw)
+		matcher := newFileIgnoreMatcher(patterns)
+		if len(matcher.steps) == 0 {
+			t.Fatal("the differential corpus must exercise indexed literals")
+		}
+		for _, target := range targets {
+			legacy := newFileMatchPath(target.path, target.cwd)
+			prepared := newFileMatchPath(target.path, target.cwd)
+			if got, want := matcher.isIgnored(&prepared), legacy.isIgnored(patterns); got != want {
+				t.Fatalf("sample %d target %+v: got %v, want %v; patterns %q", sample, target, got, want, raw)
+			}
+		}
+	}
+
+	for _, unsupported := range []IgnorePattern{
+		{Glob: "src/app.ts", GitPattern: true},
+		{Glob: "src/app.ts", CaseInsensitive: true},
+		{Glob: "src/app.ts", MatchDirectory: "/repo"},
+		{Glob: "src/app.ts", PhysicalMatchDirectory: "/repo"},
+		{Glob: "src/app.ts", LexicalMatchDirectory: "/repo"},
+	} {
+		patterns := append(ParseIgnorePatterns(literals), unsupported)
+		if matcher := newFileIgnoreMatcher(patterns); matcher.steps != nil {
+			t.Fatalf("special path semantics must use the original matcher: %+v", unsupported)
+		}
+	}
+}
+
+func literalFileIgnoresForTest(count int) []string {
+	patterns := make([]string, count)
+	for index := range patterns {
+		patterns[index] = fmt.Sprintf("src/generated/file%d.ts", index)
+	}
+	return patterns
+}
+
+func TestFileIgnoreMatcherOrderedOverrides(t *testing.T) {
+	literals := literalFileIgnoresForTest(8)
+	target := literals[0]
+	for _, test := range []struct {
+		name     string
+		patterns []string
+		path     string
+		cwd      string
+		want     bool
+	}{
+		{"literal hit", literals, target, "", true},
+		{"literal miss", literals, "src/other.ts", "", false},
+		{"literal is not a directory block", literals, target + "/child.ts", "", false},
+		{"trailing separator", literals, target + "/", "", false},
+		{"case remains significant", literals, strings.ToUpper(target), "", false},
+		{"unix fallback", literals, strings.ReplaceAll(target, "/", `\`), "", true},
+		{"relative normalization", literals, "/repo/src/../" + target, "/repo", true},
+		{"later negation", slices.Concat(literals, []string{"!" + target}), target, "", false},
+		{"earlier negation", slices.Concat([]string{"!" + target}, literals), target, "", true},
+		{"later literal segment", slices.Concat(literals, []string{"!**/*.ts"}, literals), target, "", true},
+		{"earlier glob survives literal miss", slices.Concat([]string{"src/**"}, literals), "src/other.ts", "", true},
+		{"later negated glob", slices.Concat(literals, []string{"!src/**"}), target, "", false},
+		{"later positive glob", slices.Concat(literals, []string{"!" + target, "src/**"}), target, "", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			matcher := newFileIgnoreMatcher(ParseIgnorePatterns(test.patterns))
+			path := newFileMatchPath(test.path, test.cwd)
+			if got := matcher.isIgnored(&path); got != test.want {
+				t.Fatalf("isIgnored(%q) = %v, want %v", test.path, got, test.want)
+			}
+		})
+	}
+}
+
+func TestFileIgnoreMatcherFallback(t *testing.T) {
+	for _, count := range []int{0, 1, 7, 8} {
+		matcher := newFileIgnoreMatcher(ParseIgnorePatterns(literalFileIgnoresForTest(count)))
+		if indexed := len(matcher.steps) > 0; indexed != (count == 8) {
+			t.Fatalf("%d literals: indexed = %v", count, indexed)
+		}
+		path := newFileMatchPath("/repo/src/generated/file0.ts", "/repo")
+		if got := matcher.isIgnored(&path); got != (count > 0) {
+			t.Fatalf("%d literals: ignored = %v", count, got)
+		}
+		if count == 0 && path.ready {
+			t.Fatal("empty ignores must not normalize the file path")
+		}
+	}
+	// These patterns cannot use byte equality, even when every pattern in the
+	// list is the same. The glob engine decodes invalid bytes as RuneError.
+	for _, test := range []struct{ glob, path string }{
+		{`src/\*.ts`, "src/*.ts"},
+		{"src/\ufffd.ts", "src/\xff.ts"},
+		{"src/\xfe.ts", "src/\xff.ts"},
+	} {
+		patterns := make([]IgnorePattern, 8)
+		for index := range patterns {
+			patterns[index] = IgnorePattern{Glob: test.glob}
+		}
+		matcher := newFileIgnoreMatcher(patterns)
+		path := newFileMatchPath(test.path, "")
+		if len(matcher.steps) != 0 || !matcher.isIgnored(&path) {
+			t.Fatalf("pattern %q must keep glob semantics for %q", test.glob, test.path)
+		}
+	}
+}
+
+func FuzzFileIgnoreMatcherMatchesSequentialEvaluation(f *testing.F) {
+	f.Add("!src/generated/file0.ts", "src/generated/file0.ts", "")
+	f.Add("src/**\n!src/generated/file0.ts", "/repo/src/generated/file0.ts", "/repo")
+	f.Add("src/\ufffd.ts", "src/\xff.ts", "")
+	f.Add("!**/*.ts\nsrc/*.ts", `src\generated\file0.ts`, "")
+	f.Add("src/[a-z].ts\nsrc/{a,b}.ts", "C:/Repo/src/a.ts", "C:/Repo")
+	f.Fuzz(func(t *testing.T, encodedPatterns, filePath, cwd string) {
+		if len(encodedPatterns) > 512 || len(filePath) > 256 || len(cwd) > 256 {
+			t.Skip()
+		}
+		// Surround arbitrary ordered patterns with literal runs so mutations
+		// exercise transitions into and out of indexed segments as well.
+		raw := slices.Concat(literalFileIgnoresForTest(8), strings.Split(encodedPatterns, "\n"))
+		for index := range 8 {
+			raw = append(raw, fmt.Sprintf("other/file%d.ts", index))
+		}
+		patterns := ParseIgnorePatterns(raw)
+		matcher := newFileIgnoreMatcher(patterns)
+		path := newFileMatchPath(filePath, cwd)
+		legacy := newFileMatchPath(filePath, cwd)
+		if got, want := matcher.isIgnored(&path), legacy.isIgnored(patterns); got != want {
+			t.Fatalf("file=%q cwd=%q patterns=%q: got %v, want %v", filePath, cwd, raw, got, want)
+		}
+	})
+}
+
+func BenchmarkFileIgnoreMatcher(b *testing.B) {
+	for _, count := range []int{0, 4, 8, 512} {
+		matcher := newFileIgnoreMatcher(ParseIgnorePatterns(literalFileIgnoresForTest(count)))
+		for _, target := range []struct{ name, path string }{
+			{"miss_shared_prefix", "/repo/src/generated/not-ignored.ts"},
+			{"miss_other_prefix", "/repo/packages/example/main.ts"},
+			{"hit", "/repo/src/generated/file0.ts"},
+		} {
+			b.Run(fmt.Sprintf("patterns=%d/%s", count, target.name), func(b *testing.B) {
+				b.ReportAllocs()
+				for b.Loop() {
+					path := newFileMatchPath(target.path, "/repo")
+					matcher.isIgnored(&path)
+				}
+			})
+		}
+	}
+}
+
 func TestFileMatchPathPreservesLazyAndNestedSelectorSemantics(t *testing.T) {
 	matchPath := newFileMatchPath("/repo/src/app.ts", "/repo")
 	if matchPath.isIgnored(nil) || matchPath.matchesAny(nil) {
@@ -212,8 +397,10 @@ func TestConfigShapeResolutionMatchesLegacyAlgorithm(t *testing.T) {
 				entry.FilePatternGroups = [][]string{{}}
 			}
 			if random.Intn(4) == 0 {
-				ignores := []string{"**/*.test.ts", "src/generated/**", "!src/generated/keep.ts"}
-				entry.Ignores = ignores[:1+random.Intn(len(ignores))]
+				ignores := slices.Concat(literalFileIgnoresForTest(16), []string{
+					"src/app.ts", "**/*.test.ts", "src/generated/**", "!src/generated/keep.ts",
+				})
+				entry.Ignores = ignores[:len(ignores)-random.Intn(4)]
 			}
 			if random.Intn(3) != 0 {
 				severities := []any{"off", "warn", "error", []any{"error", map[string]any{"allow": []any{"warn"}}}}
@@ -278,7 +465,7 @@ func TestFileConfigResolverMatchesDirectResolutionAcrossShapes(t *testing.T) {
 		},
 		{
 			Files:   []string{"src/**/*.ts"},
-			Ignores: []string{"**/*.test.ts"},
+			Ignores: append(literalFileIgnoresForTest(8), "**/*.test.ts"),
 			Rules: Rules{
 				"eqeqeq": "warn",
 			},
@@ -304,6 +491,8 @@ func TestFileConfigResolverMatchesDirectResolutionAcrossShapes(t *testing.T) {
 		"/repo/src/special.ts",
 		"/repo/src/a.test.ts",
 		"/repo/src/a.js",
+		"/repo/src/generated/file0.ts",
+		"/repo/src/generated/file0.ts/child.ts",
 		"/repo/components/view.vue",
 		"/repo/generated/skip.ts",
 		"/repo/outside.unsupported",
@@ -419,7 +608,8 @@ func TestFileConfigResolverPreservesWindowsPathMatching(t *testing.T) {
 
 func TestFileConfigResolverConcurrentShapePublication(t *testing.T) {
 	config := RslintConfig{{
-		Files: []string{"src/**/*.ts"},
+		Ignores: literalFileIgnoresForTest(16),
+		Files:   []string{"src/**/*.ts"},
 		Rules: Rules{
 			"no-console":  "warn",
 			"no-debugger": "error",
