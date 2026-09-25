@@ -42,6 +42,13 @@ func TestResolveConfigFilePathSpace(t *testing.T) {
 		if resolved.MergedConfig == nil || resolved.MergedConfig.Rules["rule"] == nil {
 			t.Fatalf("drive spelling lost the lexical selector: %#v", resolved)
 		}
+		entries[0].Ignores = append(literalFileIgnoresForTest(8), "workspace/linked-src/a.ts")
+		ignored := NewFileConfigResolverWithFS(entries, "C:/Repo", fs, rules.All()).ResolveTarget(PathIdentity{
+			Path: file, CanonicalPath: "C:/Physical/src/a.ts", CanonicalParentPath: "C:/Physical/src",
+		})
+		if ignored.MergedConfig != nil {
+			t.Fatalf("indexed ignore lost the lexical target path: %#v", ignored)
+		}
 	})
 	t.Run("symlink aliases use the physical config root", func(t *testing.T) {
 		fs := &pathSpaceTestFS{

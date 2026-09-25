@@ -31,7 +31,7 @@ type configTargetBase struct {
 type configTargetEntry struct {
 	baseIndex            int
 	configArrayBaseIndex int
-	ignorePatterns       []IgnorePattern
+	fileIgnores          fileIgnoreMatcher
 	gitScopes            []collectedGitignoreScope
 	ignorePatternGroups  []ignorePatternCoordinateGroup
 }
@@ -243,7 +243,6 @@ func newConfigTargetResolverWithBases(
 		resolver.entries[index] = configTargetEntry{
 			baseIndex:            baseIndex,
 			configArrayBaseIndex: configArrayBaseIndex,
-			ignorePatterns:       patterns,
 		}
 		if entry.collectedGitignore != nil {
 			resolver.entries[index].gitScopes = entry.collectedGitignore.scopes
@@ -251,6 +250,8 @@ func newConfigTargetResolverWithBases(
 		if isGlobalIgnoreEntry(entry) {
 			resolver.entries[index].ignorePatternGroups = buildIgnorePatternCoordinateGroups(patterns)
 			resolver.globalEntryIndexes = append(resolver.globalEntryIndexes, index)
+		} else {
+			resolver.entries[index].fileIgnores = newFileIgnoreMatcher(patterns)
 		}
 	}
 	return resolver
@@ -352,7 +353,7 @@ func (resolver *configTargetResolver) resolveTarget(
 		if hasFileSelectors(entry) && !match.matcher.matchesConfigEntry(entry) {
 			continue
 		}
-		if match.matcher.isIgnored(prepared.ignorePatterns) {
+		if prepared.fileIgnores.isIgnored(&match.matcher) {
 			continue
 		}
 

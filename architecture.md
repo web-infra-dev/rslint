@@ -286,7 +286,7 @@ and cannot observe which construction path supplied it.
 ### Detailed Pipeline Steps
 
 1. **Source and Metadata Loading**: Files come from the real filesystem, an overlay VFS, or LSP document overlays. Each CLI run or API request creates a `program/loader.Session` around its initial immutable VFS view. The session's private compiler hosts keep source snapshots keyed by the exact normalized source path, storing the first successful text read and its xxh3 hash for that generation. The same request scope snapshots successful `package.json` and explicitly registered tsconfig reads by the exact requested path; other JSON, source, ignore, and config-discovery reads remain uncached. When multiple Programs are constructed concurrently, a derived context view coalesces their concurrent cold realpath queries for the same exact path while sharing all parent caches. During autofix, `internal/linter` owns the evolving text in memory and passes only the net changed-file snapshot to the integration's generation provider; CLI/API rebuild request-local Programs over that overlay without changing the base medium. LSP follows document events and its own session/versioned cache lifecycle instead.
-2. **Program Loading**: `internal/config/target` freezes targets, their governing config owners, and path identities without consulting Programs. `config.FileConfigResolver` matches and merges each file's configuration once. `config.ResolveProjectPolicy` projects the effective explicit project declaration and service/root/reset options from that same immutable result; it performs no matching, filesystem lookup, or project construction. CLI/API use `config/lint.Resolver` both before construction and after source binding, sharing its file and matched-shape caches. Before construction, file configuration resolves in parallel with at most `GOMAXPROCS` workers; policy projection and failures retain target input order. `--singleThreaded` keeps this preparation serial. Workers finish before the request proceeds, including when a file fails. LSP consumes its existing document snapshot's resolved config. Node only evaluates and serializes values; presets remain ordinary reusable values.
+2. **Program Loading**: `internal/config/target` freezes targets, their governing config owners, and path identities without consulting Programs. `config.FileConfigResolver` validates and reuses each target's discovery match when compatible, then merges its final configuration once. `config.ResolveProjectPolicy` projects the effective explicit project declaration and service/root/reset options from that same immutable result; it performs no matching, filesystem lookup, or project construction. CLI/API use `config/lint.Resolver` both before construction and after source binding, sharing its file and matched-shape caches. Before construction, file configuration resolves in parallel with at most `GOMAXPROCS` workers; policy projection and failures retain target input order. `--singleThreaded` keeps this preparation serial. Workers finish before the request proceeds, including when a file fails. LSP consumes its existing document snapshot's resolved config. Node only evaluates and serializes values; presets remain ordinary reusable values.
 
    Ordinary lint takes `project` only from each target's final matched configuration. Merging retains the winning declaration's patterns and literal authored base together; later project values replace or clear both. `config.ResolveProjectPaths` expands that effective declaration; an effective absolute `tsconfigRootDir` overrides its base, while omission or a null reset retains the authored base. No effective project or service means source-only lint, without an implicit root tsconfig lookup. The same config projection resolves the service boundary from the selected config module directory, or invocation cwd for inline-only API config. It returns the resolved service root separately from the explicit override used by ordinary project paths. Consumers do not infer defaults. Imports, preset composition and `basePath` do not redefine the module origin.
 
@@ -1180,10 +1180,23 @@ Config merging follows flat-config-style semantics in `GetConfigForFile()`:
 4. later rule values override earlier values; a severity-only override retains earlier rule options
 5. settings and language options recursively merge ordinary objects, while later arrays and scalar values replace earlier values
 
-`FileConfigResolver` applies that policy in two phases: it first matches a file
-to the exact ordered set of contributing entries, then compiles the set into an
-immutable effective config/rule plan. Files with the same set share one plan for
-that resolver's lifetime. Shape identity is collision-free (`uint64` for the
+`TargetMatcher` produces an immutable `TargetMatch` containing the exact ordered
+set of contributing entries and its complete target identity. Target planning
+carries this opaque result with each selected `target.File`; it cannot read or
+change the entry bitset, merge configuration, or prepare rules.
+`FileConfigResolver` reuses the match only for the same complete lexical,
+canonical-file and canonical-parent identity, config owner, path-space generation
+and matching policy. It checks config compatibility once per originating matcher.
+Changes to rules, settings or language options may retain the selection; appended
+unconditional entries contribute their values without widening discovery. Changed
+selectors, ordered ignores, authored bases or Git scopes require ordinary matching.
+Targets without a discovery match, including LSP document snapshots and direct
+config callers, also use ordinary matching. `PathSpaceSnapshot` remains a read-only
+snapshot of authored path bases and stores no file decisions.
+
+The file resolver compiles the matched set into an immutable effective config/rule
+plan using its own final configuration and rule catalog. Files with the same set
+share one plan for that resolver's lifetime. Shape identity is collision-free (`uint64` for the
 first 64 entries plus the complete remaining bitset), resolver-local, and
 independent of path identity. File-cache keys remain the exact caller strings;
 filesystem identity may select the matching space, but it never changes the
@@ -1222,9 +1235,9 @@ one owner directory per config and do not use `ScanRoot` to infer ownership.
 selection. Explicit files and recursive directories form one union; omitted
 CLI targets become the invocation cwd, and multiple files/directories do not
 change one another's config matching. Each planned target retains its
-caller-visible path, file and parent filesystem identities, and established
-config owner. For each literal file request, the plan also carries the
-existence and ignore outcome produced by that same discovery decision; CLI
+caller-visible path, file and parent filesystem identities, established
+config owner, and opaque discovery match. For each literal file request, the plan
+also carries the existence and ignore outcome produced by that same discovery decision; CLI
 warning rendering never re-reads the filesystem or re-resolves ownership. The
 plan exposes the read-only `config.PathSpaceSnapshot` observed during discovery,
 but does not own a rule catalog or execution config. CLI `--rule` and API
@@ -1606,9 +1619,9 @@ lint and fix execution still await full config activation.
   avoiding edit-only analysis. Eager reporting methods remain compatible while
   rules migrate incrementally.
 - **Exact Config-Shape Interning**: a `FileConfigResolver` parses global and
-  entry-local ignores once, maps each exact file path to its complete matched
-  flat-config entry bitset, and merges/prepares enabled rules once per unique
-  bitset. The prepared lint plan references these published immutable rule
+  entry-local ignores once, accepts a compatible discovery match or evaluates
+  the complete flat-config entry bitset, and merges/prepares enabled rules once
+  per unique bitset. The prepared lint plan references these published immutable rule
   slices without moving per-file runtime state into the config cache. LSP keeps
   its existing per-document resolver lifetime.
 

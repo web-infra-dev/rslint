@@ -1,6 +1,8 @@
 package no_unassigned_vars
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -19,8 +21,10 @@ func messageUnassigned(name string) rule.RuleMessage {
 }
 
 type runState struct {
-	ctx                      rule.RuleContext
-	declarationWriteBySymbol map[*ast.Symbol]bool
+	ctx            rule.RuleContext
+	pending        *ast.Node
+	pendingSymbols variableSymbols
+	writesBySymbol map[*ast.Symbol]bool
 }
 
 type variableSymbols struct {
@@ -48,43 +52,86 @@ func (s *runState) checkVariableDeclarator(node *ast.Node) {
 	if s.shouldSkipDeclarator(node) {
 		return
 	}
-
-	nameNode := node.AsVariableDeclaration().Name()
 	symbols := binderVariableDeclarationSymbols(node)
-	if symbols.count == 0 {
+	if symbols.count == 0 || s.symbolsHaveKnownWrite(symbols) {
 		return
 	}
+	s.checkReferences(node, symbols)
+}
 
-	name := nameNode.AsIdentifier().Text
+func (s *runState) checkReferences(node *ast.Node, symbols variableSymbols) {
 	hasRead := false
-	hasWrite := s.symbolsHaveDeclarationWrite(symbols)
 	for _, sym := range symbols.values[:symbols.count] {
 		for _, refNode := range s.ctx.Refs.References(sym) {
 			if utils.IsVariableWriteReference(refNode) {
-				hasWrite = true
-				break
+				return
 			}
 			if utils.IsReadReference(refNode) {
 				hasRead = true
 			}
 		}
-		if hasWrite {
-			break
-		}
 	}
-	if hasWrite || !hasRead {
+	if hasRead {
+		s.ctx.ReportNode(node, messageUnassigned(node.Name().Text()))
+	}
+}
+
+func (s *runState) visitVariableDeclarator(node *ast.Node) {
+	if s.shouldSkipDeclarator(node) {
 		return
 	}
+	symbols := binderVariableDeclarationSymbols(node)
+	if symbols.count == 0 || s.symbolsHaveKnownWrite(symbols) {
+		return
+	}
+	// Keep only one candidate pending. A later candidate falls back to the
+	// shared reference index instead of building another per-file index here.
+	s.finish(nil)
+	s.pending = node
+	s.pendingSymbols = symbols
+}
 
-	s.ctx.ReportNode(node, messageUnassigned(name))
+func (s *runState) visitAssignment(node *ast.Node) {
+	if s.pending == nil {
+		return
+	}
+	binary := node.AsBinaryExpression()
+	if binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Left.Kind != ast.KindIdentifier {
+		return
+	}
+	if binary.Left.Text() != s.pending.Name().Text() {
+		return
+	}
+	// Resolve only obvious writes encountered after a candidate declaration.
+	// Earlier writes and other assignment forms still fall back to References.
+	// The shared resolver keeps same-named bindings in different scopes apart.
+	sym := s.ctx.Refs.ResolveInFile(binary.Left)
+	for _, candidate := range s.pendingSymbols.values[:s.pendingSymbols.count] {
+		if sym == candidate {
+			s.pending = nil
+			// Repeated declarations already have a cache entry. Remember the
+			// write for them without allocating a map for a lone declaration.
+			if s.writesBySymbol != nil {
+				s.writesBySymbol[sym] = true
+			}
+			return
+		}
+	}
+}
+
+func (s *runState) finish(*ast.Node) {
+	if s.pending != nil {
+		s.checkReferences(s.pending, s.pendingSymbols)
+		s.pending = nil
+	}
 }
 
 // binderVariableDeclarationSymbols returns every binder representation that
 // can key ctx.Refs for this variable. A directly exported declaration exposes
-// an export symbol on the declaration and a linked local symbol in the nearest
-// Locals table. A lone exported declaration resolves uses to the export symbol,
-// while merged/repeated declarations resolve them to the local symbol, so the
-// rule must query both identities.
+// an export symbol on the declaration and a linked LocalSymbol. A lone exported
+// declaration resolves uses to the export symbol, while merged/repeated
+// declarations resolve them to the local symbol, so the rule must query both
+// identities. The binder provides these links without another scope walk.
 func binderVariableDeclarationSymbols(node *ast.Node) variableSymbols {
 	var result variableSymbols
 	if node == nil || node.Kind != ast.KindVariableDeclaration {
@@ -94,64 +141,38 @@ func binderVariableDeclarationSymbols(node *ast.Node) variableSymbols {
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
 		return result
 	}
-	result.add(node.Symbol())
-	name := nameNode.Text()
-	for current := node.Parent; current != nil; current = current.Parent {
-		if !ast.IsLocalsContainer(current) {
-			continue
-		}
-		sym := ast.GetLocals(current)[name]
-		if symbolOwnsVariableDeclaration(sym, node) {
+	for _, sym := range [...]*ast.Symbol{node.Symbol(), node.LocalSymbol()} {
+		if sym != nil {
 			result.add(sym)
 			result.add(sym.ExportSymbol)
-			break
 		}
 	}
 	return result
 }
 
-func symbolOwnsVariableDeclaration(sym *ast.Symbol, node *ast.Node) bool {
-	if sym == nil || node == nil {
-		return false
-	}
-	nodeSymbol := node.Symbol()
-	if nodeSymbol != nil &&
-		(sym == nodeSymbol || sym.ExportSymbol == nodeSymbol || nodeSymbol.ExportSymbol == sym) {
-		return true
-	}
-	root := ast.GetRootDeclaration(node)
-	for _, declaration := range sym.Declarations {
-		if declaration == node || declaration == root ||
-			ast.GetRootDeclaration(declaration) == root {
-			return true
-		}
-	}
-	return false
-}
-
-// symbolsHaveDeclarationWrite covers declaration-position writes that RefStore
-// intentionally omits. Inspect every declaration because repeated `var`
-// declarations share one symbol: an initializer or for-in/of binding on any
-// sibling declaration assigns the variable for all of them.
-func (s *runState) symbolsHaveDeclarationWrite(symbols variableSymbols) bool {
+// symbolsHaveKnownWrite covers cached writes and declaration-position writes
+// that RefStore intentionally omits. Inspect every declaration because repeated
+// `var` declarations share one symbol: an initializer or for-in/of binding on
+// any sibling declaration assigns the variable for all of them.
+func (s *runState) symbolsHaveKnownWrite(symbols variableSymbols) bool {
 	for _, sym := range symbols.values[:symbols.count] {
-		if s.symbolHasDeclarationWrite(sym) {
+		if s.symbolHasKnownWrite(sym) {
 			return true
 		}
 	}
 	return false
 }
 
-func (s *runState) symbolHasDeclarationWrite(sym *ast.Symbol) bool {
+func (s *runState) symbolHasKnownWrite(sym *ast.Symbol) bool {
 	if sym == nil {
 		return false
 	}
-	declarations := sym.Declarations
-	if len(declarations) > 1 && s.declarationWriteBySymbol != nil {
-		if hasWrite, ok := s.declarationWriteBySymbol[sym]; ok {
+	if s.writesBySymbol != nil {
+		if hasWrite, ok := s.writesBySymbol[sym]; ok {
 			return hasWrite
 		}
 	}
+	declarations := sym.Declarations
 
 	hasWrite := false
 	for _, declaration := range declarations {
@@ -162,10 +183,10 @@ func (s *runState) symbolHasDeclarationWrite(sym *ast.Symbol) bool {
 		}
 	}
 	if len(declarations) > 1 {
-		if s.declarationWriteBySymbol == nil {
-			s.declarationWriteBySymbol = make(map[*ast.Symbol]bool)
+		if s.writesBySymbol == nil {
+			s.writesBySymbol = make(map[*ast.Symbol]bool)
 		}
-		s.declarationWriteBySymbol[sym] = hasWrite
+		s.writesBySymbol[sym] = hasWrite
 	}
 	return hasWrite
 }
@@ -194,7 +215,10 @@ func (s *runState) shouldSkipDeclarator(node *ast.Node) bool {
 		return true
 	}
 
-	return false
+	// Loop bindings are assigned by iteration. Reject them before querying
+	// references so a file containing only assigned variables never builds
+	// the shared reference index on this rule's behalf.
+	return utils.IsVarDeclInForInOrOf(node)
 }
 
 var NoUnassignedVarsRule = rule.Rule{
@@ -202,7 +226,16 @@ var NoUnassignedVarsRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		s := &runState{ctx: ctx}
+		// A simple assignment always contains a literal '=' token. Files
+		// without one can check declarations directly without buffering them.
+		if !strings.Contains(ctx.SourceFile.Text(), "=") {
+			return rule.RuleListeners{ast.KindVariableDeclaration: s.checkVariableDeclarator}
+		}
 
-		return rule.RuleListeners{ast.KindVariableDeclaration: s.checkVariableDeclarator}
+		return rule.RuleListeners{
+			ast.KindVariableDeclaration: s.visitVariableDeclarator,
+			ast.KindBinaryExpression:    s.visitAssignment,
+			ast.KindEndOfFile:           s.finish,
+		}
 	},
 }
