@@ -1,0 +1,31 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "closingSlash": {
+          "enum": ["always", "never", "allow"]
+        },
+        "beforeSelfClosing": {
+          "enum": ["always", "proportional-always", "never", "allow"]
+        },
+        "afterOpening": {
+          "enum": ["always", "allow-multiline", "never", "allow"]
+        },
+        "beforeClosing": {
+          "enum": ["always", "proportional-always", "never", "allow"]
+        }
+      },
+      "default": {
+        "closingSlash": "never",
+        "beforeSelfClosing": "always",
+        "afterOpening": "never",
+        "beforeClosing": "allow"
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

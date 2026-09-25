@@ -295,6 +295,7 @@ define.test({
     './tests/eslint-plugin-react/rules/jsx-props-no-spreading.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-spread-multi.test.ts',
     './tests/eslint-plugin-react/rules/jsx-sort-props.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-tag-spacing.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-bracket-location.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-tag-location.test.ts',
     './tests/eslint-plugin-react/rules/jsx-curly-brace-presence.test.ts',
