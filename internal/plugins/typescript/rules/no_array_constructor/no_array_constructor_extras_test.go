@@ -1,7 +1,11 @@
 package no_array_constructor
 
+// cspell:ignore rvice rray
+
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -25,7 +29,11 @@ func TestSourceMayUseArrayConstructor(t *testing.T) {
 		want bool
 	}{
 		{name: "ordinary call", code: `service.method()`, want: false},
-		{name: "string only", code: `const value = "Array()"`, want: false},
+		{name: "string is conservative", code: `const value = "Array()"`, want: true},
+		{name: "comment is conservative", code: `// Array\nservice.method()`, want: true},
+		{name: "substring is conservative", code: `TypedArray()`, want: true},
+		{name: "unrelated escape", code: `s\u0065rvice.method()`, want: false},
+		{name: "escaped string", code: `const value = "\u0041rray()"`, want: false},
 		{name: "computed property is conservative", code: `service["Array"]()`, want: true},
 		{name: "array call", code: `Array()`, want: true},
 		{name: "escaped array identifier", code: `Arr\u0061y()`, want: true},
@@ -47,272 +55,6 @@ func TestSourceMayUseArrayConstructor(t *testing.T) {
 	}
 }
 
-func TestNoArrayConstructorRule(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoArrayConstructorRule, []rule_tester.ValidTestCase{
-		// Single argument (creates array with size)
-		{Code: `new Array(x);`},
-		{Code: `Array(x);`},
-		{Code: `new Array(9);`},
-		{Code: `Array(9);`},
-
-		// Namespaced (not global Array)
-		{Code: `new foo.Array();`},
-		{Code: `foo.Array();`},
-		{Code: `new Array.foo();`},
-		{Code: `Array.foo();`},
-
-		// TypeScript with type arguments
-		{Code: `new Array<Foo>(1, 2, 3);`},
-		{Code: `new Array<Foo>();`},
-		{Code: `Array<Foo>(1, 2, 3);`},
-		{Code: `Array<Foo>();`},
-
-		// Optional chaining with single argument
-		{Code: `Array?.(x);`},
-		{Code: `Array?.(9);`},
-		{Code: `foo?.Array();`},
-		{Code: `Array?.foo();`},
-		{Code: `foo.Array?.();`},
-		{Code: `Array.foo?.();`},
-		{Code: `Array?.<Foo>(1, 2, 3);`},
-		{Code: `Array?.<Foo>();`},
-	}, []rule_tester.InvalidTestCase{
-		// new Array (without parentheses)
-		{
-			Code: `new Array;`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 10,
-				},
-			},
-			Output: []string{`[];`},
-		},
-		// new Array()
-		{
-			Code: `new Array();`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 12,
-				},
-			},
-			Output: []string{`[];`},
-		},
-		// Array()
-		{
-			Code: `Array();`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 8,
-				},
-			},
-			Output: []string{`[];`},
-		},
-		// Optional chaining with no args
-		{
-			Code: `Array?.();`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 10,
-				},
-			},
-			Output: []string{`[];`},
-		},
-		// new Array with multiple args
-		{
-			Code: `new Array(x, y);`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 16,
-				},
-			},
-			Output: []string{`[x, y];`},
-		},
-		// Array with multiple args
-		{
-			Code: `Array(x, y);`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 12,
-				},
-			},
-			Output: []string{`[x, y];`},
-		},
-		// Optional chaining with multiple args
-		{
-			Code: `Array?.(x, y);`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 14,
-				},
-			},
-			Output: []string{`[x, y];`},
-		},
-		// new Array with numeric args
-		{
-			Code: `new Array(0, 1, 2);`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 19,
-				},
-			},
-			Output: []string{`[0, 1, 2];`},
-		},
-		// Array with numeric args
-		{
-			Code: `Array(0, 1, 2);`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 15,
-				},
-			},
-			Output: []string{`[0, 1, 2];`},
-		},
-		// Optional chaining with numeric args
-		{
-			Code: `Array?.(0, 1, 2);`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 17,
-				},
-			},
-			Output: []string{`[0, 1, 2];`},
-		},
-		// With comments (no args)
-		{
-			Code: `/* a */ /* b */ Array /* c */ /* d */ /* e */ /* f */?.(); /* g */ /* h */`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    17,
-					EndLine:   1,
-					EndColumn: 58,
-				},
-			},
-			Output: []string{`/* a */ /* b */ []; /* g */ /* h */`},
-		},
-		// With comments (with args)
-		{
-			Code: `/* a */ /* b */ Array /* c */ /* d */ /* e */ /* f */?.(x, y); /* g */ /* h */`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    17,
-					EndLine:   1,
-					EndColumn: 62,
-				},
-			},
-			Output: []string{`/* a */ /* b */ [x, y]; /* g */ /* h */`},
-		},
-		// Multi-line
-		{
-			Code: `
-new Array(0, 1, 2);
-`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      2,
-					Column:    1,
-					EndLine:   2,
-					EndColumn: 19,
-				},
-			},
-			Output: []string{`
-[0, 1, 2];
-`},
-		},
-		// Multi-line with comments
-		{
-			Code: `
-/* a */ /* b */ Array /* c */ /* d */ /* e */ /* f */?.(
-  0,
-  1,
-  2,
-); /* g */ /* h */
-`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      2,
-					Column:    17,
-				},
-			},
-			Output: []string{`
-/* a */ /* b */ [
-  0,
-  1,
-  2,
-]; /* g */ /* h */
-`},
-		},
-		// Nested parentheses - bug test
-		{
-			Code: `Array((x), y);`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-				},
-			},
-			Output: []string{`[(x), y];`},
-		},
-		{
-			Code: `Array(foo(), bar());`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useLiteral",
-					Line:      1,
-					Column:    1,
-				},
-			},
-			Output: []string{`[foo(), bar()];`},
-		},
-	})
-}
-
 func TestNoArrayConstructorExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -320,6 +62,13 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 		t,
 		&NoArrayConstructorRule,
 		[]rule_tester.ValidTestCase{
+			// Text filter hits still require an actual Array callee.
+			{Code: `const value = "Array()"; service.method();`},
+			{Code: `/* Array */ service.method(a, b); new Other();`},
+			{Code: `TypedArray(); new ArrayLike(a, b);`},
+			{Code: `const value = "\u0041rray()"; s\u0065rvice.method();`},
+			{Code: `service["\u0041rray"]();`},
+
 			// One SpreadElement is still exactly one argument upstream.
 			{Code: `Array(...values);`},
 
@@ -334,8 +83,48 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			// exception.
 			{Code: `(Array)(value);`},
 			{Code: `new (Array)(value);`},
+			{Code: `new (Arr\u0061y)(...values);`},
+			{Code: `(Arr\u0061y)?.<string>();`},
+			{Code: `new (Arr\u0061y)<string>(a, b);`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// new Array (without parentheses)
+			{
+				Code: `new Array;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "useLiteral",
+						Line:      1,
+						Column:    1,
+						EndLine:   1,
+						EndColumn: 10,
+					},
+				},
+				Output: []string{`[];`},
+			},
+			// Nested parentheses - bug test
+			{
+				Code: `Array((x), y);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "useLiteral",
+						Line:      1,
+						Column:    1,
+					},
+				},
+				Output: []string{`[(x), y];`},
+			},
+			{
+				Code: `Array(foo(), bar());`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "useLiteral",
+						Line:      1,
+						Column:    1,
+					},
+				},
+				Output: []string{`[foo(), bar()];`},
+			},
 			// SourceFile.HasIdentifier and the AST both normalize identifier
 			// escapes, so the file-level fast path must retain these reports.
 			{
@@ -478,6 +267,50 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 	)
 }
 
+func TestNoArrayConstructorEscapedNames(t *testing.T) {
+	// Every character can be literal, a fixed-width escape, or a braced escape.
+	// Exercise all 243 spellings without adding a separate decoder to the rule.
+	var valid []rule_tester.ValidTestCase
+	var invalid []rule_tester.InvalidTestCase
+	for variant := range 243 {
+		var name strings.Builder
+		remaining := variant
+		for _, char := range "Array" {
+			switch remaining % 3 {
+			case 0:
+				name.WriteRune(char)
+			case 1:
+				fmt.Fprintf(&name, `\u%04x`, char)
+			case 2:
+				fmt.Fprintf(&name, `\u{%x}`, char)
+			}
+			remaining /= 3
+		}
+		identifier := name.String()
+		valid = append(valid, rule_tester.ValidTestCase{
+			Code: identifier + "(value); new " + identifier + "<string>();",
+		})
+		for _, code := range []string{
+			"(" + identifier + ")?.(a, b);",
+			"new ((" + identifier + "))(a, b);",
+		} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code: code,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "useLiteral",
+					Message:   "The array literal notation [] is preferable.",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: len(code),
+				}},
+				Output: []string{"[a, b];"},
+			})
+		}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoArrayConstructorRule, valid, invalid)
+}
+
 func TestBuildArrayConstructorFixesRecoveryAST(t *testing.T) {
 	const source = "Array(a, b"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
@@ -509,7 +342,13 @@ func TestBuildArrayConstructorFixesRecoveryAST(t *testing.T) {
 func TestNoArrayConstructorEditDemand(t *testing.T) {
 	t.Parallel()
 
-	const source = "const first = Array(a, b);\nnew Array;"
+	const suppressed = "// eslint-disable-next-line @typescript-eslint/no-array-constructor\n" +
+		"Array();\n" +
+		"new Array(a, b); // rslint-disable-line @typescript-eslint/no-array-constructor\n" +
+		"/* eslint-disable @typescript-eslint/no-array-constructor */\n" +
+		"Arr\\u0061y();\nnew Array;\n" +
+		"/* eslint-enable @typescript-eslint/no-array-constructor */\n"
+	const source = suppressed + "const first = Array(a, b);\nnew Array;"
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
 	program, sourceFile, err := helper.CreateTestProgram(
 		source,
@@ -620,7 +459,7 @@ func TestNoArrayConstructorEditDemand(t *testing.T) {
 	if !changed || len(unapplied) != 0 {
 		t.Fatalf("ApplyRuleFixes changed=%v unapplied=%d", changed, len(unapplied))
 	}
-	if want := "const first = [a, b];\n[];"; fixed != want {
+	if want := suppressed + "const first = [a, b];\n[];"; fixed != want {
 		t.Fatalf("fixed source = %q, want %q", fixed, want)
 	}
 }

@@ -1,6 +1,8 @@
 package no_array_constructor
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
@@ -15,13 +17,20 @@ func useLiteralMessage() rule.RuleMessage {
 }
 
 func sourceMayUseArrayConstructor(sourceFile *ast.SourceFile) bool {
-	// Parsed identifier names are normalized, including Unicode escapes. Stay
-	// conservative for direct callers that do not provide parser metadata.
+	// Stay conservative for direct callers without a parsed source file.
 	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	ok := sourceFile.HasIdentifier("Array")
-	return ok
+	text := sourceFile.Text()
+	// Leave Unicode decoding to the compiler's normalized-name cache. Check
+	// escapes first so repeated escaped names do not cause a failed substring
+	// search for the literal spelling on every run.
+	if strings.Contains(text, `\u`) {
+		return sourceFile.HasIdentifier("Array")
+	}
+	// Plain spellings need no AST-wide name index. Comments, strings and longer
+	// names can keep the listeners, which still check the actual callee.
+	return strings.Contains(text, "Array")
 }
 
 func buildArrayConstructorFixes(
@@ -76,6 +85,14 @@ func noArrayConstructorListeners(ctx rule.RuleContext) rule.RuleListeners {
 			return
 		}
 
+		// These exceptions do not depend on the callee. Check them before
+		// unwrapping parentheses or inspecting the identifier, including the
+		// upstream exception for a single spread argument.
+		if (args != nil && len(args.Nodes) == 1) ||
+			(typeArgs != nil && len(typeArgs.Nodes) > 0) {
+			return
+		}
+
 		// ESTree does not expose grouping parentheses around a callee. Match
 		// that behavior without unwrapping TypeScript-only outer expressions
 		// such as non-null or `as` expressions.
@@ -92,16 +109,6 @@ func noArrayConstructorListeners(ctx rule.RuleContext) rule.RuleListeners {
 		}
 		identifier := callee.AsIdentifier()
 		if identifier.Text != "Array" {
-			return
-		}
-
-		// Skip if there are type arguments (e.g., Array<Foo>())
-		if typeArgs != nil && len(typeArgs.Nodes) > 0 {
-			return
-		}
-
-		// Skip if there's exactly 1 argument (e.g., Array(5))
-		if args != nil && len(args.Nodes) == 1 {
 			return
 		}
 
