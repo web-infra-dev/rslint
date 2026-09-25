@@ -63,6 +63,14 @@ func TestNoTypeofUndefinedReviewBoundaries(t *testing.T) {
 	documentAllComputed.Output = []string{}
 	documentAllComputed.Globals = map[string]any{"document": "readonly"}
 
+	globalThisDocumentAll := invalidFixed("typeof globalThis.document.all === \"undefined\"", "globalThis.document.all === undefined")
+	globalThisDocumentAll.Output = []string{}
+	globalThisDocumentAll.Globals = map[string]any{"globalThis": "readonly"}
+
+	windowDocumentAll := invalidFixed("typeof window[\"document\"][\"all\"] === \"undefined\"", "window[\"document\"][\"all\"] === undefined")
+	windowDocumentAll.Output = []string{}
+	windowDocumentAll.Globals = map[string]any{"window": "readonly"}
+
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
@@ -83,10 +91,20 @@ func TestNoTypeofUndefinedReviewBoundaries(t *testing.T) {
 			invalidFixed("typeof {} === \"undefined\"", "({}) === undefined"),
 			invalidFixed("typeof function() {} === \"undefined\"", "(function() {}) === undefined"),
 			invalidFixed("typeof class {} === \"undefined\"", "(class {}) === undefined"),
+			invalidFixed("typeof object.all === \"undefined\"", "object.all === undefined"),
+			invalidFixed("typeof getObject().all === \"undefined\"", "getObject().all === undefined"),
+			invalidFixed("typeof getGlobal().document.all === \"undefined\"", "getGlobal().document.all === undefined"),
+			invalidFixed("typeof {} === \"undefined\" && consume()", "({}) === undefined && consume()"),
+			invalidFixed("typeof function() {} === \"undefined\", consume()", "(function() {}) === undefined, consume()"),
+			invalidFixed("typeof class {} === \"undefined\" ? yes() : no()", "(class {}) === undefined ? yes() : no()"),
+			invalidFixed("function f(globalThis) { return typeof globalThis.document.all === \"undefined\"; }", "function f(globalThis) { return globalThis.document.all === undefined; }"),
+			invalidFixed("function f(window) { return typeof window.document.all === \"undefined\"; }", "function f(window) { return window.document.all === undefined; }"),
 			shadowedUndefined,
 			shadowedUndefinedGlobal,
 			documentAll,
 			documentAllComputed,
+			globalThisDocumentAll,
+			windowDocumentAll,
 		},
 	)
 }

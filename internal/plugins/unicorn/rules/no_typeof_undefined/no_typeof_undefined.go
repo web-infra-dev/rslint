@@ -43,6 +43,7 @@ var NoTypeofUndefinedRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		checkGlobals := checkGlobalVariables(rawOptions)
+		shadowCache := utils.NewShadowCache(ctx.SourceFile)
 
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
@@ -69,14 +70,18 @@ var NoTypeofUndefinedRule = rule.Rule{
 					return
 				}
 
-				safeReplacement := ctx.Globals.Access("undefined").IsDeclared() &&
-					!utils.IsShadowed(node, "undefined") &&
-					!isGlobalDocumentAll(ctx, runtimeValue)
-
 				// TypeOfExpression always owns the `typeof` token followed by its operand.
 				tokens := utils.TokensOfNode(ctx.SourceFile, typeofNode)
 				typeofToken := tokens[0]
+				safetyChecked := false
+				safeReplacement := false
 				fixes := func() []rule.RuleFix {
+					if !safetyChecked {
+						safeReplacement = ctx.Globals.Access("undefined").IsDeclared() &&
+							!shadowCache.IsShadowed(node, "undefined") &&
+							!isGlobalDocumentAll(ctx, runtimeValue)
+						safetyChecked = true
+					}
 					if !safeReplacement {
 						return nil
 					}
@@ -85,12 +90,13 @@ var NoTypeofUndefinedRule = rule.Rule{
 
 				if isGlobal {
 					ctx.ReportRangeWithDeferredSuggestions(typeofToken.Range(), errorMessage, func() []rule.RuleSuggestion {
-						if !safeReplacement {
+						fixesArr := fixes()
+						if len(fixesArr) == 0 {
 							return nil
 						}
 						return []rule.RuleSuggestion{{
 							Message:  suggestionMessage(binary.OperatorToken.Kind),
-							FixesArr: fixes(),
+							FixesArr: fixesArr,
 						}}
 					})
 					return
@@ -103,13 +109,30 @@ var NoTypeofUndefinedRule = rule.Rule{
 }
 
 func isGlobalDocumentAll(ctx rule.RuleContext, node *ast.Node) bool {
-	if node == nil || !utils.IsSpecificMemberAccess(node, "", "all") {
+	if node == nil || !utils.IsSpecificMemberAccess(node, "", "all") || ctx.Refs == nil {
 		return false
 	}
-	object := utils.AccessExpressionObject(node)
-	object = ast.SkipOuterExpressions(object, ast.OEKParentheses|ast.OEKAssertions)
-	return object != nil && ast.IsIdentifier(object) && object.Text() == "document" &&
-		ctx.Refs != nil && ctx.Refs.IsGlobalReference(object)
+
+	document := ast.SkipOuterExpressions(
+		utils.AccessExpressionObject(node),
+		ast.OEKParentheses|ast.OEKAssertions,
+	)
+	if ast.IsIdentifier(document) {
+		return document.Text() == "document" && ctx.Refs.IsGlobalReference(document)
+	}
+	if !utils.IsSpecificMemberAccess(document, "", "document") {
+		return false
+	}
+
+	globalObject := ast.SkipOuterExpressions(
+		utils.AccessExpressionObject(document),
+		ast.OEKParentheses|ast.OEKAssertions,
+	)
+	if globalObject == nil || !ast.IsIdentifier(globalObject) {
+		return false
+	}
+	name := globalObject.Text()
+	return (name == "globalThis" || name == "window") && ctx.Refs.IsGlobalReference(globalObject)
 }
 
 func checkGlobalVariables(rawOptions []any) bool {
@@ -160,7 +183,7 @@ func buildFixes(
 
 	if needsReturnOrThrowParentheses(sourceFile, binaryNode, typeofNode, typeofToken, secondToken) {
 		fixes = append(fixes, returnOrThrowParenthesesFixes(sourceFile, binaryNode.Parent)...)
-	} else if operandNeedsExpressionStatementParentheses(binaryNode, typeofNode) {
+	} else if operandNeedsExpressionStatementParentheses(sourceFile, binaryNode, typeofNode) {
 		operand := typeofNode.AsTypeOfExpression().Expression
 		r := utils.TrimNodeTextRange(sourceFile, operand)
 		fixes = append(fixes,
@@ -175,9 +198,9 @@ func buildFixes(
 	return fixes
 }
 
-func operandNeedsExpressionStatementParentheses(binaryNode, typeofNode *ast.Node) bool {
-	if binaryNode == nil || binaryNode.Parent == nil || !ast.IsExpressionStatement(binaryNode.Parent) ||
-		typeofNode == nil || typeofNode.Kind != ast.KindTypeOfExpression {
+func operandNeedsExpressionStatementParentheses(sourceFile *ast.SourceFile, binaryNode, typeofNode *ast.Node) bool {
+	if binaryNode == nil || typeofNode == nil || typeofNode.Kind != ast.KindTypeOfExpression ||
+		!utils.IsStartOfExpressionStatement(sourceFile, binaryNode) {
 		return false
 	}
 	operand := typeofNode.AsTypeOfExpression().Expression
