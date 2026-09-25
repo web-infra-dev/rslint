@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/transformers/jsxtransforms"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -48,10 +49,7 @@ var JsxNewlineRule = rule.Rule{
 					continue
 				}
 				raw := text[spacing.Pos():spacing.End()]
-				value := raw
-				if strings.ContainsRune(value, '&') {
-					value = ecmascript.DecodeJSXEntities(value)
-				}
+				value := jsxtransforms.DecodeEntities(raw)
 				hasBlankLine := containsBlankLine(value)
 				multiline := false
 				if allowMultilines {

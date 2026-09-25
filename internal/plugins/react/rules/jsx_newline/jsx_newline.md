@@ -69,11 +69,17 @@ Disable this rule if you do not want to enforce blank lines between JSX children
 
 ## Differences from Upstream
 
-When migrating from ESLint configured with `@typescript-eslint/parser`, numeric
-character references above U+FFFF in JSX text can produce different diagnostics.
-For example, rslint accepts `<><A/>&#65546;&#65546;<B/></>` with the default options,
-matching ESLint's default parser. With `@typescript-eslint/parser`, upstream
-reports a missing blank line for this example.
+rslint interprets numeric character references in JSX text as Unicode code
+points. Compared with ESLint's default parser, Espree:
+
+- `&#65546;` represents U+1000A, not a line feed. With the default options,
+  rslint reports a missing blank line for `<><A/>&#65546;&#65546;<B/></>`;
+  Espree treats the references as a blank line and accepts it.
+- Leading zeros do not prevent decoding. For example, two adjacent
+  `&#00000000010;` references count as a blank line in rslint, while Espree
+  leaves this spelling as text and reports a missing blank line.
+
+These cases match ESLint configured with `@typescript-eslint/parser`.
 
 ## Original Documentation
 
