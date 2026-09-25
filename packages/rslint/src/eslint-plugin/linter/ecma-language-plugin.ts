@@ -29,7 +29,11 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { parse as nativeParse } from '../native/load-binding.js';
+import {
+  parse as nativeParse,
+  parseSharedSource,
+  type SharedSource,
+} from '../native/load-binding.js';
 
 import {
   buildLineStartOffsets,
@@ -93,19 +97,17 @@ export interface RuleConfig {
 
 /** Per-file lint request input (called by Worker dispatcher per task).
  *
- * The Worker reads source text from disk via `fs.readFileSync(filePath)`
- * when the task has no inline `text`. The initial CLI generation uses that
- * fast path to avoid shipping every file's contents across worker_threads
- * (~60 MB on a 5000-file repo).
- *
- * Overlay-backed hosts and every later in-memory autofix generation carry
- * `text`, so native and plugin rules observe one source generation without
- * mutating disk between rounds. Tests may use the same override directly.
+ * A task carries a complete snapshot as inline text or a native sharedSource
+ * capability. Rust reads shared bytes and supplies both parser output and the
+ * SourceCode string. Hosts that explicitly allow a filesystem read can omit
+ * both inputs; an invalid shared source never falls back to disk.
  */
 export interface LintFileRequest {
   filePath: string;
   /** Complete source override for overlay or in-memory generations. */
   text?: string;
+  /** Complete immutable CLI snapshot; only the native parser consumes it. */
+  sharedSource?: SharedSource;
   /**
    * Forwarded subset of user `languageOptions`. Only the fields the
    * runner actually consumes are typed here; the rest of the user's
@@ -206,21 +208,23 @@ export function lintFile(
     cancelled: false,
   };
 
-  // Worker reads the source from disk by default — text is NOT in the
-  // IPC payload (avoids the ~60MB structuredClone of shipping every file).
-  // See LintFileRequest's doc comment for the multi-pass --fix coherence
-  // rationale. The `req.text` override carries an in-memory frame when the
-  // host has one: the LSP editor overlay (unsaved buffer) and each fixAll
-  // pass's in-progress fixed content — and in-process unit tests.
-  let sourceText: string;
-  if (req.text !== undefined) {
-    sourceText = req.text;
-  } else {
-    try {
-      sourceText = readFileSync(req.filePath, 'utf8');
-    } catch (err) {
-      result.parseError = `worker fs.readFile failed for ${req.filePath}: ${(err as Error)?.message ?? String(err)}`;
-      return result;
+  // Shared snapshots stay in Rust until parsing. Inline and explicit disk
+  // inputs retain their existing BOM and decoding behavior.
+  let sourceText = '';
+  if (req.sharedSource !== undefined && req.text !== undefined) {
+    result.parseError = 'conflicting plugin source inputs';
+    return result;
+  }
+  if (req.sharedSource === undefined) {
+    if (req.text !== undefined) {
+      sourceText = req.text;
+    } else {
+      try {
+        sourceText = readFileSync(req.filePath, 'utf8');
+      } catch (err) {
+        result.parseError = `worker fs.readFile failed for ${req.filePath}: ${(err as Error)?.message ?? String(err)}`;
+        return result;
+      }
     }
   }
 
@@ -231,10 +235,8 @@ export function lintFile(
   // wire diagnostics on BOM-prefixed files would point one column
   // late. `SourceCode.hasBOM` still reflects the original file via
   // the `hasBOM` flag we thread through to createSourceCode below.
-  const hadBOM = sourceText.charCodeAt(0) === 0xfeff;
+  let hadBOM = sourceText.charCodeAt(0) === 0xfeff;
   if (hadBOM) sourceText = sourceText.slice(1);
-
-  const lso = buildLineStartOffsets(sourceText);
 
   // ── 1. parse ─────────────────────────────────────────────────────
   //
@@ -253,13 +255,25 @@ export function lintFile(
   // Tracks the napi `ParseResult` (program JSON + comments + columnar token arrays).
   let parsed: ReturnType<typeof nativeParse>;
   try {
-    parsed = nativeParse(req.filePath, sourceText, sourceTypeRaw, jsxEnabled);
+    if (req.sharedSource !== undefined) {
+      const source = parseSharedSource(
+        req.filePath,
+        req.sharedSource,
+        sourceTypeRaw,
+        jsxEnabled,
+      );
+      parsed = source.parsed;
+      sourceText = source.sourceText;
+      hadBOM = source.hadBom;
+    } else {
+      parsed = nativeParse(req.filePath, sourceText, sourceTypeRaw, jsxEnabled);
+    }
   } catch (err) {
-    // The native parser throws only on its size guard; map it to parseError, the
-    // same contract the old `parseSync` throw had.
+    // Source validation and parser failures use the existing parseError path.
     result.parseError = `parse: ${(err as Error)?.message ?? String(err)}`;
     return result;
   }
+  const lso = buildLineStartOffsets(sourceText);
   // The native parser returns the ESTree as a JSON string (UTF-16 offsets, no `range`).
   const ast = JSON.parse(parsed.program) as ESTreeNode;
 

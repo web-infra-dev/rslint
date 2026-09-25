@@ -7,6 +7,7 @@
 //! (`/` regex-vs-division, templates, JSX, TS `<`) comes from real parser state.
 
 mod parse;
+mod source_transport;
 mod token_map;
 
 use napi_derive::napi;
@@ -37,12 +38,16 @@ pub fn parse(
     source_type: String,
     jsx: bool,
 ) -> napi::Result<ParseResult> {
-    if source.len() > MAX_SOURCE_BYTES {
+    check_source_size(source.len())?;
+    Ok(parse::parse_estree(&filename, &source, &source_type, jsx))
+}
+
+fn check_source_size(size: usize) -> napi::Result<()> {
+    if size > MAX_SOURCE_BYTES {
         return Err(napi::Error::from_reason(format!(
             "source too large ({} bytes > {}-byte JSON-transfer limit)",
-            source.len(),
-            MAX_SOURCE_BYTES
+            size, MAX_SOURCE_BYTES
         )));
     }
-    Ok(parse::parse_estree(&filename, &source, &source_type, jsx))
+    Ok(())
 }

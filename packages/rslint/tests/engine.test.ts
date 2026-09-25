@@ -7,6 +7,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runEngine } from '../src/cli/engine.js';
 import { ConfigModuleHost } from '../src/config/config-loader.js';
+import { resolveRslintBinary } from '../src/internal/resolve-binary.js';
+import { createSourceTransport } from '../src/ipc/source-transport.js';
+import { createPluginLintHost } from '../src/eslint-plugin/host.js';
+import {
+  parse,
+  parseSharedSource,
+} from '../src/eslint-plugin/native/load-binding.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FAKE_BIN = path.resolve(__dirname, './fixtures/fake-ipc-binary.cjs');
@@ -19,6 +26,101 @@ const EXIT_DURING_CONFIG_ACTIVATION_BIN = path.resolve(
   './fixtures/fake-exit-during-config-activation.cjs',
 );
 const CONFIG_ACTIVATION_OUTER_DEADLOCK_SENTINEL_MS = 35 * 60_000;
+
+describe('CLI shared source integration', () => {
+  test.each(['snapshot', 'fix', 'inline'] as const)(
+    'preserves complete source and parser output: %s',
+    async (mode) => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-source-'));
+      const file = path.join(root, 'input.ts');
+      const config = path.join(root, 'rslint.config.mjs');
+      const original = '\ufeffconst oldName = "😀 café";\r\n// \u0000\n';
+      fs.writeFileSync(file, original);
+      fs.writeFileSync(
+        config,
+        `export default [{ files: ['**/*.ts'], plugins: { local: { rules: { rename: {
+      meta: { fixable: 'code' },
+      create(context) { return { Identifier(node) {
+        if (node.name === 'oldName') context.report({ node, message: 'rename identifier', fix: fixer => fixer.replaceText(node, 'newName') });
+      } }; }
+    } } } }, rules: { 'local/rename': 'error' } }];`,
+      );
+      const transport = mode === 'inline' ? undefined : createSourceTransport();
+      const snapshots: string[] = [];
+      const stdout = new PassThrough();
+      let output = '';
+      stdout.on('data', (data: Buffer) => {
+        output += data.toString();
+      });
+      try {
+        const exit = await runEngine({
+          binPath: resolveRslintBinary(),
+          goArgs: [...(mode === 'fix' ? ['--fix'] : []), '--no-color', file],
+          cwd: root,
+          stdout,
+          stderr: new PassThrough(),
+          runtime: { singleThreaded: true },
+          extraInit: { configDiscovery: { explicitConfigPath: config } },
+          createSourceTransport: () => transport,
+          createPluginLintHost: async (configs, log, singleThreaded) => {
+            const host = await createPluginLintHost(
+              configs,
+              log,
+              singleThreaded,
+            );
+            return {
+              shutdown: () => host.shutdown(),
+              lint: async (request: any) => {
+                for (const input of request.files) {
+                  if (transport) {
+                    expect(input.text).toBeUndefined();
+                    expect(input.sharedSource).toBeDefined();
+                    const native = parseSharedSource(
+                      input.path,
+                      input.sharedSource,
+                      'module',
+                      false,
+                    );
+                    expect(native.parsed).toEqual(
+                      parse(input.path, native.sourceText, 'module', false),
+                    );
+                    snapshots.push(native.sourceText);
+                  } else {
+                    expect(input.sharedSource).toBeUndefined();
+                    snapshots.push(input.text);
+                  }
+                }
+                // A concurrent disk edit after Go took its snapshot must never
+                // change what either the native parser or the real worker lints.
+                if (mode === 'snapshot')
+                  fs.writeFileSync(file, 'const changedOnDisk = 1;');
+                return host.lint(request);
+              },
+            };
+          },
+        });
+        expect(exit).toBe(mode === 'fix' ? 0 : 1);
+        expect(snapshots[0]).toBe(
+          mode === 'inline' ? original : original.slice(1),
+        );
+        if (mode === 'fix') {
+          expect(snapshots).toEqual([
+            original.slice(1),
+            original.slice(1).replace('oldName', 'newName'),
+          ]);
+          expect(fs.readFileSync(file, 'utf8')).toBe(
+            original.replace('oldName', 'newName'),
+          );
+        } else {
+          expect(output).toContain('rename identifier');
+        }
+      } finally {
+        transport?.close();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
+});
 
 /**
  * Runs the engine against the fake IPC binary, which echoes the `init`

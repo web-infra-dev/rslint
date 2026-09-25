@@ -20,6 +20,7 @@
 
 import type { LintTask } from '../worker-pool.js';
 import type { LintFileResult } from '../linter/ecma-language-plugin.js';
+import type { SharedSource } from '../native/load-binding.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Inputs
@@ -38,12 +39,13 @@ export interface EslintPluginLintRequest {
   files: ReadonlyArray<{
     path: string;
     /**
-     * Optional file content override. The initial CLI generation leaves it
-     * absent so the worker can read disk without a whole-repository clone.
-     * Overlay-backed hosts and later in-memory autofix generations send it so
-     * the worker observes the same immutable source generation as native lint.
+     * Complete source snapshot. The CLI adapter may replace its wire encoding
+     * with a native sharedSource capability. Hosts that explicitly permit
+     * filesystem reads may omit both; overlays and autofix retain snapshots.
      */
     text?: string;
+    /** Private CLI capability installed by the source transport adapter. */
+    sharedSource?: SharedSource;
     /**
      * Per-file `languageOptions`, computed by Go via `GetConfigForFile`
      * (flat-config files-glob match + deep merge). Opaque here; the
@@ -112,6 +114,11 @@ export function buildPluginLintTasks(
   const collectTiming = input.collectTiming ?? false;
 
   return input.files.map((f) => {
+    // Only the CLI source adapter can resolve wire ranges. In particular, a
+    // missing/older adapter must not turn a shared snapshot into a disk read.
+    if ('sourceRange' in f) {
+      throw new Error('unresolved shared plugin source');
+    }
     const configKey = f.configKey ?? '';
     if (configKey !== '' && !options.configDirSet.has(configKey)) {
       options.onUnknownConfigKey?.(f.path, configKey);
@@ -119,6 +126,7 @@ export function buildPluginLintTasks(
     return {
       filePath: f.path,
       text: f.text,
+      sharedSource: f.sharedSource,
       languageOptions: f.languageOptions as never,
       settings: f.settings,
       rules: sharedRules,

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
-import { platformTuple } from '../../src/eslint-plugin/native/platform-tuple.js';
+import { platformTuple } from '../../src/native/platform-tuple.js';
 
 /**
  * Packaged-layout isolation guard.

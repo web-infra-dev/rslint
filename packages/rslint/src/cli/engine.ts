@@ -12,6 +12,10 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { IpcClient } from '../ipc/index.js';
 import type { IpcMessage } from '../ipc/index.js';
 import {
+  createSourceTransport,
+  type SourceTransport,
+} from '../ipc/source-transport.js';
+import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
   type PluginConfigDescriptor,
@@ -30,6 +34,16 @@ type CreatePluginLintHost = (
   onLog?: (rec: { level: string; source: string; text: string }) => void,
   singleThreaded?: boolean,
 ) => Promise<PluginLintHost>;
+
+function optionalSourceTransport(): SourceTransport | undefined {
+  // Optional optimization: absent/older native addons and restricted hosts keep
+  // the complete-source JSON path. The loader includes no JS lint runtime.
+  try {
+    return createSourceTransport();
+  } catch {
+    return undefined;
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -249,6 +263,8 @@ export interface EngineRunOptions {
   createPluginLintHost?: CreatePluginLintHost;
   /** @internal Dependency seam for post-prepare lifecycle tests. */
   configModuleHost?: ConfigModuleHost;
+  /** @internal Dependency seam for source ownership and fallback tests. */
+  createSourceTransport?: () => SourceTransport | undefined;
 }
 
 export async function runEngine(opts: EngineRunOptions): Promise<number> {
@@ -261,10 +277,22 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const stdoutIsTTY = (stdout as Partial<NodeJS.WriteStream>).isTTY === true;
 
-  const child = spawn(opts.binPath, opts.goArgs, {
-    stdio: ['pipe', 'pipe', 'inherit'],
-    cwd: opts.cwd ?? process.cwd(),
-  });
+  const sources = opts.createSourceTransport
+    ? opts.createSourceTransport()
+    : optionalSourceTransport();
+  let child: ChildProcess;
+  try {
+    child = spawn(opts.binPath, opts.goArgs, {
+      stdio:
+        sources?.fd === undefined
+          ? ['pipe', 'pipe', 'inherit']
+          : ['pipe', 'pipe', 'inherit', sources.fd],
+      cwd: opts.cwd ?? process.cwd(),
+    });
+  } catch (error) {
+    sources?.close();
+    throw error;
+  }
 
   // childExit always RESOLVES (never rejects); awaits race against it so a
   // child that drops out mid-handshake unwinds cleanly instead of hanging.
@@ -306,6 +334,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   // here can't leak listeners on `process` for a long-lived host.
   if (!child.stdin || !child.stdout) {
     safeKillGo(child);
+    sources?.close();
     throw new Error('engine: Go child process missing stdin/stdout');
   }
   const ipc = new IpcClient(child.stdout, child.stdin);
@@ -551,7 +580,9 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
               'engine: pluginLint requested without an activated plugin host',
             );
           }
-          return pluginHost.lint(msg.data);
+          return sources
+            ? sources.lint(msg.data, (request) => pluginHost!.lint(request))
+            : pluginHost.lint(msg.data);
         default:
           throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);
       }
@@ -575,6 +606,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
             runtime: {
               stdoutIsTTY,
               singleThreaded: opts.runtime?.singleThreaded,
+              pluginSources: sources?.descriptor,
             },
           }),
         );
@@ -630,6 +662,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       shutdownPluginHost(pluginHost),
       ...[...stagedPluginHosts].map(shutdownPluginHost),
     ]);
+    sources?.close();
     for (const transactionId of configTransactions) {
       configModuleHost.deleteSession(transactionId);
     }
