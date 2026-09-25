@@ -32,6 +32,8 @@ func TestNoAsyncPromiseFinallyExtras(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			invalid("const run = async function cleanup() { promise.finally(cleanup); };", "cleanup"),
+			invalid("promise.finally((async () => {}));", "async () => {}"),
+			invalid("const cleanup = async () => {}; promise.finally((cleanup));", "cleanup"),
 			invalidTS("type Callback = () => void; promise.finally((async () => {})!);", "(async () => {})!"),
 			invalidTS("type Callback = () => void; promise.finally(<Callback>(async () => {}));", "<Callback>(async () => {})"),
 			invalidTS("type Callback = () => void; const cleanup = (async () => {}) satisfies Callback; promise.finally(cleanup);", "cleanup"),
