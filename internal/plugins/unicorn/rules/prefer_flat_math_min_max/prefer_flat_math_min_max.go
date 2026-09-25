@@ -49,8 +49,8 @@ var PreferFlatMathMinMaxRule = rule.Rule{
 
 func mathMinMaxCall(node *ast.Node, expectedMethod string) (string, unicornutil.DotMethodCall, bool) {
 	node = utils.ESTreeRuntimeExpression(node)
-	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.MatchDotMethodCallOptions{
-		Methods: map[string]struct{}{"min": {}, "max": {}},
+	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
+		Methods: []string{"min", "max"},
 	})
 	if !ok {
 		return "", unicornutil.DotMethodCall{}, false
