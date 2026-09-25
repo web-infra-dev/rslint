@@ -53,8 +53,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_import_in_mock"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_importing_rstest_globals"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_lowercase_title"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_mock_promise_shorthand"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_mock_return_shorthand"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_rs_mocked"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_spy_on"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_boolean_matchers"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be"
@@ -135,8 +137,10 @@ func GetAllRules() []rule.Rule {
 		prefer_lowercase_title.PreferLowercaseTitleRule,
 		prefer_import_in_mock.PreferImportInMockRule,
 		prefer_importing_rstest_globals.PreferImportingRstestGlobalsRule,
+		prefer_mock_promise_shorthand.PreferMockPromiseShorthandRule,
 		prefer_mock_return_shorthand.PreferMockReturnShorthandRule,
 		prefer_rs_mocked.PreferRsMockedRule,
+		prefer_spy_on.PreferSpyOnRule,
 		prefer_strict_boolean_matchers.PreferStrictBooleanMatchersRule,
 		prefer_strict_equal.PreferStrictEqualRule,
 		prefer_to_be.PreferToBeRule,

@@ -82,8 +82,9 @@ type ParsedRstestExpectMatcher struct {
 // Rstest expect call (which includes calls in the middle of a larger chain);
 // once a node is recognized as an expect call the parse always succeeds and
 // broken chains are reported through Reason instead of a nil result. This
-// deliberately improves on jest's ParseJestFnCall, which returns nil for
-// broken chains and forces valid-expect to re-derive the reason.
+// deliberately differs from JestCallAnalysis.ParseExpectCall, which returns nil
+// for broken chains and exposes the reason only through
+// ParseExpectCallWithReason.
 type ParsedRstestExpectCall struct {
 	// Expression is the outermost assertion expression. It is a call for
 	// method-style chains and a member access for property-style Chai

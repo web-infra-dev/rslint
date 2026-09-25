@@ -109,6 +109,7 @@ func TestNoUnresolvedExtras(t *testing.T) {
 		{Code: "require(`missing`); import(`missing`); import(`${name}`); require('missing' as string); require!( 'missing' ); (require as any)('missing');", Options: map[string]any{"commonjs": true}},
 		{Code: `obj.require('missing'); obj?.require('missing'); require.resolve('missing'); new require('missing'); import value = require('missing'); type T = import('missing').T;`, Options: map[string]any{"commonjs": true}},
 		{Code: `export type * from 'missing'; export type * as ns from 'missing'; import type T from 'missing';`},
+		{FileName: "script.js", Code: "/** @import { Value } from 'missing' */\n/** @type {import('missing').Value} */\nlet value;"},
 		{Code: `define('named', ['missing'], callback); define(['missing']); define([...list, 0, , null], callback);`, Options: map[string]any{"amd": true}},
 		{Code: `import 'virtual/generated';`, Options: map[string]any{"ignore": []any{`(?<=virtual/)generated$`}}},
 		{Code: `require('ignored'); define(['ignored'], callback); import('ignored');`, Options: map[string]any{"commonjs": true, "amd": true, "ignore": []any{"^ignored$"}}},

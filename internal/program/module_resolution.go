@@ -26,11 +26,20 @@ import (
 // already in the Program, which covers the extension-substitution cases
 // upstream still treats as edges.
 func (p *Program) ResolveModule(sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
+	if moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+		return "", nil, false
+	}
+	return p.ResolveModuleNameAt(sourceFile, moduleSpecifier.Text(), moduleSpecifier)
+}
+
+// ResolveModuleNameAt resolves a candidate name with an existing reference's
+// resolution mode and the same loaded-file fallback as ResolveModule. Callers
+// can compare alternative spellings without constructing synthetic AST nodes.
+func (p *Program) ResolveModuleNameAt(sourceFile *ast.SourceFile, specifier string, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
 	if !p.IsValid() || !p.OwnsSourceFile(sourceFile) || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return "", nil, false
 	}
 
-	specifier := moduleSpecifier.Text()
 	mode := resolutionMode(p, sourceFile, moduleSpecifier)
 
 	resolvedPath := ""
@@ -68,7 +77,7 @@ func (p *Program) ResolveModule(sourceFile *ast.SourceFile, moduleSpecifier *ast
 // and a package's `require` condition stays selected for both.
 func resolutionMode(sourceProgram *Program, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) core.ResolutionMode {
 	mode := sourceProgram.GetModeForUsageLocation(sourceFile, moduleSpecifier)
-	if mode == core.ResolutionModeESM && isRequireCall(moduleSpecifier.Parent) {
+	if mode == core.ResolutionModeESM && isRequireCall(ast.WalkUpParenthesizedExpressions(moduleSpecifier.Parent)) {
 		return core.ResolutionModeCommonJS
 	}
 	return mode

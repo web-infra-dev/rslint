@@ -29,22 +29,6 @@ const (
 	jestGlobalsModule                 = "@jest/globals"
 )
 
-// IsTypeOfJestFnCall reports whether node parses as a Jest call of one of the
-// given kinds. The kind matching is shared with rstest through
-// testFramework.IsCallOfKind; this owns the parse entry point.
-func IsTypeOfJestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...JestFnType) bool {
-	parsed := ParseJestFnCall(node, ctx)
-	if parsed == nil {
-		return false
-	}
-
-	return testFramework.IsCallOfKind(&parsed.ParsedCall, kinds...)
-}
-
-func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
-	return parseJestFnCallWithReason(node, ctx).parsed
-}
-
 func parseJestFnCallWithReason(node *ast.Node, ctx rule.RuleContext) jestCallParseResult {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return jestCallParseResult{}
@@ -72,7 +56,7 @@ func parseJestFnCallWithReason(node *ast.Node, ctx rule.RuleContext) jestCallPar
 	}
 
 	localNode := resolveHeadLocalNode(callExpr)
-	name, originalNode, headType := ResolveJestFunctionReference(node, localName, localNode, ctx)
+	name, originalNode, headType := resolveJestFunctionReference(node, localName, localNode, ctx)
 	if name == "" {
 		return jestCallParseResult{}
 	}
@@ -136,12 +120,12 @@ func rejectedExpectParseReason(
 	memberEntries []ParsedJestFnMemberEntry,
 	ctx rule.RuleContext,
 ) string {
-	name, _, _ := ResolveJestFunctionReference(node, localName, nil, ctx)
+	name, _, _ := resolveJestFunctionReference(node, localName, nil, ctx)
 	if ApplyGlobalJestAlias(name, ctx.Settings) != "expect" {
 		return ExpectParseReasonNone
 	}
 
-	_, _, reason := FindExpectModifiersAndMatcher(memberEntries[1:])
+	_, _, reason := findExpectModifiersAndMatcher(memberEntries[1:])
 	if reason == ExpectParseReasonMatcherNotFound && IsMemberAccessNode(node.Parent) {
 		reason = ExpectParseReasonMatcherNotCalled
 	}
@@ -185,7 +169,7 @@ func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
 }
 
 func applyParsedExpectCall(parsed *ParsedJestFnCall) string {
-	modifierEntries, matcher, err := FindExpectModifiersAndMatcher(parsed.MemberEntries)
+	modifierEntries, matcher, err := findExpectModifiersAndMatcher(parsed.MemberEntries)
 	if err != "" {
 		return err
 	}
@@ -215,7 +199,7 @@ func isInnerExpectCall(node *ast.Node, localName string, members []string, setti
 	return GetJestKind(name) == JestFnTypeExpect
 }
 
-func FindExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
+func findExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
 	[]ParsedJestFnMemberEntry,
 	*ParsedJestFnMemberEntry,
 	string,
@@ -259,7 +243,7 @@ func FindExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
 	return nil, nil, ExpectParseReasonMatcherNotFound
 }
 
-func ResolveJestFunctionReference(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
+func resolveJestFunctionReference(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
 	return ResolveFunctionReferenceForModule(node, localName, localNode, ctx, jestGlobalsModule)
 }
 
@@ -349,26 +333,6 @@ func isValidJestCall(name string, members []string) bool {
 
 func UnwrapBasicTypeAssertions(node *ast.Node) *ast.Node {
 	return testFramework.FollowTypeAssertionChain(node)
-}
-
-func UnwrapTypeAssertions(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
-		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
-		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
-		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
-		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
-		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
-		default:
-			return node
-		}
-	}
-	return node
 }
 
 func GetAccessorReceiverAndParent(entry *ParsedJestFnMemberEntry) (*ast.Node, *ast.Node) {
