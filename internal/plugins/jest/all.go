@@ -38,12 +38,15 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_each"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_ending_with_an_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_equality_matcher"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_expect_assertions"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_expect_resolves"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_hooks_on_top"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_importing_jest_globals"
-	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_lowercase_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_jest_mocked"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_lowercase_title"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_mock_promise_shorthand"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_mock_return_shorthand"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_spy_on"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_be"
@@ -101,12 +104,15 @@ func GetAllRules() []rule.Rule {
 		prefer_each.PreferEachRule,
 		prefer_ending_with_an_expect.PreferEndingWithAnExpectRule,
 		prefer_equality_matcher.PreferEqualityMatcherRule,
+		prefer_expect_assertions.PreferExpectAssertionsRule,
 		prefer_expect_resolves.PreferExpectResolvesRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
 		prefer_hooks_on_top.PreferHooksOnTopRule,
 		prefer_lowercase_title.PreferLowercaseTitleRule,
 		prefer_importing_jest_globals.PreferImportingJestGlobalsRule,
 		prefer_jest_mocked.PreferJestMockedRule,
+		prefer_mock_promise_shorthand.PreferMockPromiseShorthandRule,
+		prefer_mock_return_shorthand.PreferMockReturnShorthandRule,
 		prefer_spy_on.PreferSpyOnRule,
 		prefer_strict_equal.PreferStrictEqualRule,
 		prefer_to_be.PreferToBeRule,

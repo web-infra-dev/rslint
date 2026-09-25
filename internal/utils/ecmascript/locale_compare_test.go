@@ -23,6 +23,17 @@ func TestLocaleComparer(t *testing.T) {
 		{name: "Norwegian default lower first", locale: "nb", input: []string{"CH", "Ch", "cH", "ch"}, want: []string{"ch", "cH", "Ch", "CH"}},
 		{name: "Norwegian contraction case weights", locale: "nb", input: []string{"AA", "Aa", "aa", "aA"}, want: []string{"aA", "aa", "Aa", "AA"}},
 		{name: "explicit upper first", locale: "nb-u-kf-upper", input: []string{"ch", "cH", "Ch", "CH"}, want: []string{"CH", "Ch", "cH", "ch"}},
+		// Unicode Uppercase/Lowercase include non-letter characters too.
+		{name: "Roman numerals upper first", locale: "en-u-kf-upper", input: []string{"ⅰ", "Ⅰ"}, want: []string{"Ⅰ", "ⅰ"}},
+		{name: "Roman numerals Danish", locale: "da", input: []string{"ⅰ", "Ⅰ"}, want: []string{"Ⅰ", "ⅰ"}},
+		{name: "Roman numerals Maltese", locale: "mt", input: []string{"ⅰ", "Ⅰ"}, want: []string{"Ⅰ", "ⅰ"}},
+		{name: "circled letters upper first", locale: "en-u-kf-upper", input: []string{"ⓐ", "Ⓐ"}, want: []string{"Ⓐ", "ⓐ"}},
+		{name: "Roman numerals and letters", locale: "en-u-kf-upper", input: []string{"Ⅰ", "I", "ⅰ", "i"}, want: []string{"I", "Ⅰ", "i", "ⅰ"}},
+		{name: "circled and ordinary letters", locale: "en-u-kf-upper", input: []string{"Ⓐ", "A", "ⓐ", "a"}, want: []string{"A", "Ⓐ", "a", "ⓐ"}},
+		{name: "Roman numeral case precedes suffix case", locale: "en-u-kf-upper", input: []string{"ⅰA", "Ⅰa"}, want: []string{"Ⅰa", "ⅰA"}},
+		{name: "Roman numerals explicit lower first", locale: "da-u-kf-lower", input: []string{"Ⅰ", "ⅰ"}, want: []string{"ⅰ", "Ⅰ"}},
+		{name: "Roman numerals case first disabled", locale: "en-u-kf-false", input: []string{"Ⅰ", "ⅰ"}, want: []string{"ⅰ", "Ⅰ"}},
+		{name: "title-case letters precede lowercase", locale: "en-u-kf-upper", input: []string{"ǆ", "ǅ"}, want: []string{"ǅ", "ǆ"}},
 		{name: "explicit lower first", locale: "da-u-kf-lower", input: []string{"CH", "Ch", "cH", "ch"}, want: []string{"ch", "cH", "Ch", "CH"}},
 		{name: "unsupported case first uses locale default", locale: "da-u-kf-foobar", input: []string{"a", "A"}, want: []string{"A", "a"}},
 		{name: "valueless case first uses locale default", locale: "da-u-kf", input: []string{"a", "A"}, want: []string{"A", "a"}},
@@ -53,7 +64,7 @@ func TestLocaleComparerUpperFirstIsTransitive(t *testing.T) {
 	t.Parallel()
 
 	comparer := NewLocaleComparer("en-u-kf-upper")
-	values := []string{"A", "Ａ", "a", "ａ"}
+	values := []string{"A", "Ａ", "Ⓐ", "a", "ａ", "ⓐ", "I", "Ⅰ", "i", "ⅰ"}
 	for _, left := range values {
 		for _, middle := range values {
 			for _, right := range values {

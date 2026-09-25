@@ -6,14 +6,14 @@ const recommended: RslintConfigEntry = {
   plugins: ['eslint-plugin-import'],
   rules: {
     // errors
-    // 'import/no-unresolved': 'error', // not implemented
+    'import/no-unresolved': 'error',
     // 'import/named': 'error', // not implemented
     'import/namespace': 'error',
     'import/default': 'error',
-    // 'import/export': 'error', // not implemented
+    'import/export': 'error',
     // warnings
-    // 'import/no-named-as-default': 'warn', // not implemented
-    // 'import/no-named-as-default-member': 'warn', // not implemented
+    'import/no-named-as-default': 'warn',
+    'import/no-named-as-default-member': 'warn',
     'import/no-duplicates': ['warn', { considerQueryString: true }],
   },
 };

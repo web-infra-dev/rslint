@@ -490,6 +490,7 @@ promisifying
 propertyassignment
 proptypes
 prototypejs
+proxyquire
 psdifjo
 Ptrs
 pullquote
@@ -763,3 +764,4 @@ Swatinem
 CBOR
 allowjs
 projectservice
+florp

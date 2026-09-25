@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"iter"
+	"slices"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -11,19 +14,25 @@ const defaultExportName = "default"
 
 type ExportMeta struct {
 	Namespace *ExportMap
+	// unresolved distinguishes a declared re-export from one whose value is
+	// available. Names must retain missing re-exports for import/export.
+	unresolved bool
 }
 
 // ExportMap records the statically visible exports of an ES module. It does
-// not synthesize default exports from compiler interop settings; HasExport
-// keeps that looser existence check for rules that need it.
+// not enumerate synthetic defaults from compiler interop settings; HasDefault
+// includes them when checking whether a default import has a value.
 //
 // A map handed to a rule is read-only and shared: one map answers for its file
 // however many files import it, and files are linted concurrently. That is why
 // nothing here that writes is exported — only the builder in this package, which
 // owns a map until it publishes it, may fill one in.
 type ExportMap struct {
-	exports    map[string]*ExportMeta
-	hasUnknown bool
+	exports         map[string]*ExportMeta
+	names           []string
+	hasUnknown      bool
+	reexports       map[string]string
+	implicitDefault bool
 }
 
 func newExportMap() *ExportMap {
@@ -60,12 +69,45 @@ func (m *ExportMap) Get(name string) *ExportMeta {
 	return m.exports[name]
 }
 
+// HasDefault checks that the default export resolves to a value, including
+// TypeScript interop defaults. Merely declaring a missing re-export does not
+// count, unlike Has, which keeps those names for export validation.
+func (m *ExportMap) HasDefault() bool {
+	if m == nil {
+		return false
+	}
+	meta := m.Get(defaultExportName)
+	return m.implicitDefault || (meta != nil && !meta.unresolved)
+}
+
+// ReexportSource returns the resolved file of an explicit `export { … } from`.
+// Star exports and local exports have no direct re-export source.
+func (m *ExportMap) ReexportSource(name string) string {
+	if m == nil {
+		return ""
+	}
+	return m.reexports[name]
+}
+
+// Names enumerates statically known export names, without exposing mutable
+// metadata or inventing names for unresolved star exports. Names retain their
+// discovery order so diagnostics from re-exports are deterministic.
+func (m *ExportMap) Names() iter.Seq[string] {
+	if m == nil {
+		return slices.Values([]string(nil))
+	}
+	return slices.Values(m.names)
+}
+
 func (m *ExportMap) set(name string, meta *ExportMeta) {
-	if m == nil || name == "" {
+	if m == nil {
 		return
 	}
 	if meta == nil {
 		meta = &ExportMeta{}
+	}
+	if _, exists := m.exports[name]; !exists {
+		m.names = append(m.names, name)
 	}
 	m.exports[name] = meta
 }
@@ -80,11 +122,11 @@ func (m *ExportMap) mergeFrom(other *ExportMap, includeDefault bool) {
 	if m == nil || other == nil {
 		return
 	}
-	for name, meta := range other.exports {
+	for name := range other.Names() {
 		if !includeDefault && name == defaultExportName {
 			continue
 		}
-		m.set(name, meta)
+		m.set(name, other.exports[name])
 	}
 	if other.hasUnknown {
 		m.addUnknown()
@@ -139,10 +181,6 @@ func newExportBuilder(index *ModuleIndex, sourceProgram *program.Program) *expor
 	return &exportBuilder{
 		index:         index,
 		sourceProgram: sourceProgram,
-		building:      make(map[*ast.SourceFile]*ExportMap),
-		seen:          make(map[exportKey]bool),
-		onStack:       make(map[*ast.SourceFile]bool),
-		unstable:      make(map[*ast.SourceFile]bool),
 	}
 }
 
@@ -188,6 +226,12 @@ func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap
 	if cached := builder.index.cachedExportMap(sourceFile); cached != nil {
 		return cached
 	}
+	// Cached queries need no traversal state.
+	if builder.building == nil {
+		builder.building = make(map[*ast.SourceFile]*ExportMap)
+		builder.onStack = make(map[*ast.SourceFile]bool)
+		builder.unstable = make(map[*ast.SourceFile]bool)
+	}
 
 	exports := newExportMap()
 	builder.building[sourceFile] = exports
@@ -196,6 +240,7 @@ func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap
 	builder.sawCycle = false
 
 	local := builder.index.localExportsOf(builder.program(), sourceFile)
+	exports.implicitDefault = local.ImplicitDefault
 	for _, step := range local.Steps {
 		builder.applyStep(exports, local, step)
 	}
@@ -249,13 +294,23 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports,
 				continue
 			}
 			if dependency == nil {
-				exports.set(spec.Exported, nil)
+				exports.set(spec.Exported, &ExportMeta{unresolved: true})
 				continue
 			}
-			if !dependency.Has(spec.Local) {
-				continue
+			if exports.reexports == nil {
+				exports.reexports = make(map[string]string)
 			}
-			exports.set(spec.Exported, dependency.Get(spec.Local))
+			exports.reexports[spec.Exported] = step.Link.Target.FileName()
+			// An explicit re-export declares its public name even when its
+			// target is missing. Resolving the target only supplies metadata.
+			meta := dependency.Get(spec.Local)
+			if spec.Local == defaultExportName && dependency.implicitDefault && (meta == nil || meta.unresolved) {
+				meta = &ExportMeta{}
+			}
+			if meta == nil {
+				meta = &ExportMeta{unresolved: true}
+			}
+			exports.set(spec.Exported, meta)
 		}
 	}
 }

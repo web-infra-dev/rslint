@@ -5,18 +5,25 @@
 package order_test
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/order"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -377,6 +384,16 @@ func TestOrderEditDemand(t *testing.T) {
 			options: []any{map[string]any{"named": true, "alphabetize": map[string]any{"order": "asc"}}},
 		},
 		{
+			name: "named-disable-directives",
+			code: "/* eslint-disable import/order */\nimport { b, a } from './a';\n" +
+				"/* eslint-enable import/order */\n// eslint-disable-next-line import/order\n" +
+				"import { d, c } from './b';\nimport { f, e } from './c';",
+			fixed: "/* eslint-disable import/order */\nimport { b, a } from './a';\n" +
+				"/* eslint-enable import/order */\n// eslint-disable-next-line import/order\n" +
+				"import { d, c } from './b';\nimport { e, f } from './c';",
+			options: []any{map[string]any{"named": true, "alphabetize": map[string]any{"order": "asc"}}},
+		},
+		{
 			name:    "insert-group-newline",
 			code:    "import fs from 'fs';\nimport sibling from './sibling';",
 			fixed:   "import fs from 'fs';\n\nimport sibling from './sibling';",
@@ -538,7 +555,11 @@ func createOrderProgram(t testing.TB, fileName, code string) (*compiler.Program,
 	root := fixtures.GetRootDir()
 	fs := utils.NewOverlayVFS(root.FS, map[string]string{tspath.ResolvePath(root.Dir, fileName): code})
 	host := utils.CreateCompilerHost(root.Dir, fs)
-	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", host)
+	tsconfig := "tsconfig.json"
+	if strings.HasSuffix(fileName, ".js") {
+		tsconfig = "tsconfig.allow-js.json"
+	}
+	program, err := utils.CreateProgram(true, fs, root.Dir, tsconfig, host)
 	if err != nil {
 		t.Fatalf("create program: %v", err)
 	}
@@ -652,5 +673,75 @@ func minimatchPathGroupOptions(pattern string, patternOptions map[string]any) ma
 		"groups":                        []any{"internal", "external"},
 		"pathGroups":                    []any{pathGroup},
 		"pathGroupsExcludedImportTypes": []any{},
+	}
+}
+
+func TestOrderHostAbsolutePaths(t *testing.T) {
+	cases := []rule_tester.InvalidTestCase{
+		{Code: "import sibling from './sibling';\nimport drive from 'C:/absolute';",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "order", Message: "`C:/absolute` import should occur before import of `./sibling`"}},
+			Output: []string{"import drive from 'C:/absolute';\nimport sibling from './sibling';\n"}},
+		{Code: `import root from '\\root';` + "\nimport sibling from './sibling';",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "order", Message: "`./sibling` import should occur before import of `\\root`"}},
+			Output: []string{"import sibling from './sibling';\n" + `import root from '\\root';` + "\n"}},
+	}
+	var valid []rule_tester.ValidTestCase
+	if runtime.GOOS == "windows" {
+		for _, tc := range cases {
+			valid = append(valid, rule_tester.ValidTestCase{Code: tc.Code})
+		}
+		cases = nil
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &order.OrderRule, valid, cases)
+}
+
+func TestOrderWorkspacePackages(t *testing.T) {
+	const fixture = "testdata/workspace_packages.txtar"
+	data, err := os.ReadFile(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Cover both checkout line endings on every host, and require fixes to
+	// preserve the original line endings rather than normalizing their output.
+	content := strings.ReplaceAll(string(data), "\r\n", "\n")
+	for _, tc := range []struct{ name, newline string }{
+		{"LF", "\n"},
+		{"CRLF", "\r\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			archive, err := txtarfs.Parse(fixture, []byte(strings.ReplaceAll(content, "\n", tc.newline)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			root := archive.Materialize(t, "")
+			// Model a package manager's workspace link. The compiler resolves its real
+			// path, but upstream still classifies the installed name as external.
+			if err := os.Symlink(filepath.Join(root, "packages", "shared"), filepath.Join(root, "node_modules", "linked")); err != nil {
+				if runtime.GOOS == "windows" {
+					t.Skipf("symlink unavailable: %v", err)
+				}
+				t.Fatal(err)
+			}
+			directory := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
+			fs := bundled.WrapFS(osvfs.FS())
+			host := utils.CreateCompilerHost(directory, fs)
+			program, err := utils.CreateProgram(true, fs, directory, "tsconfig.json", host)
+			if err != nil {
+				t.Fatal(err)
+			}
+			source := program.GetSourceFile(tspath.ResolvePath(directory, "input.ts"))
+			if source == nil {
+				t.Fatal("missing input.ts")
+			}
+			diagnostics := lintOrderWithDemand(program, source, rule.EditDemandAll, []any{map[string]any{"groups": []any{"external", "internal"}}})
+			if len(diagnostics) != 1 || diagnostics[0].Message.Description != "`alias` import should occur after import of `hoisted`" {
+				t.Fatalf("unexpected diagnostics: %+v", diagnostics)
+			}
+			fixes := diagnostics[0].Fixes()
+			want := strings.ReplaceAll("import linked from 'linked';\nimport hoisted from 'hoisted';\nimport alias from 'alias';\n", "\n", tc.newline)
+			if len(fixes) != 1 || fixes[0].Range.Pos() != 0 || fixes[0].Range.End() != len(source.Text()) || fixes[0].Text != want {
+				t.Fatalf("unexpected fixes: %#v; want text %q", fixes, want)
+			}
+		})
 	}
 }

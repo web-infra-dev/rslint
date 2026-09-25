@@ -25,15 +25,16 @@ var PreferEndingWithAnExpectRule = shared.NewRule(shared.Config{
 	Name:                       "jest/prefer-ending-with-an-expect",
 	DefaultAssertFunctionNames: []string{"expect"},
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{
 			ClassifyTest: func(node *ast.Node) shared.TestBlock {
 				return shared.TestBlock{
-					IsTest: jestUtils.IsTypeOfJestFnCall(node, ctx, jestUtils.JestFnTypeTest),
+					IsTest: analysis.ParseTestCall(node) != nil,
 				}
 			},
 			Callback: jestCallbackArgument,
 			IsAssertion: func(node *ast.Node) bool {
-				return jestUtils.IsTypeOfJestFnCall(node, ctx, jestUtils.JestFnTypeExpect)
+				return analysis.ParseExpectCall(node) != nil
 			},
 		}
 	},

@@ -1,0 +1,93 @@
+name: Detect CI changes
+description: Classify CI changes and report candidate Go input files
+# cspell:ignore esac
+
+outputs:
+  changed:
+    description: Whether non-Go CI jobs should run
+    value: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.changed == 'true' }}
+  go-mode:
+    description: 'Go test scope: skip, affected, or full'
+    value: ${{ steps.scope.outputs.mode }}
+  go-changed-files:
+    description: Newline-separated changed files under cmd and internal
+    value: ${{ steps.scope.outputs.changed-files }}
+
+runs:
+  using: composite
+  steps:
+    - name: Filter changes
+      if: github.event_name != 'workflow_dispatch'
+      uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+      id: filter
+      with:
+        list-files: json
+        predicate-quantifier: 'every'
+        filters: |
+          all:
+            - '**'
+          # Line terminators are not matched by the negative globs below.
+          unsupported:
+            - '(*([\s\S])[\r\n\u2028\u2029]*([\s\S]))'
+          changed:
+            - '!**/*.md'
+            - '!**/*.mdx'
+            - '!**/_meta.json'
+            - '!**/dictionary.txt'
+            - '!.agents/skills/**'
+            - '!skills-lock.json'
+          go:
+            - '!{website,scripts,npm,crates,packages,.agents,.rstack,.vscode,tests}/**'
+    - name: Classify Go changes
+      id: scope
+      shell: bash
+      env:
+        FILE_COUNT: ${{ steps.filter.outputs.all_count }}
+        UNSUPPORTED_FILE_COUNT: ${{ steps.filter.outputs.unsupported_count }}
+      run: |
+        # paths-filter emits one JSON line; the quoted block preserves file names
+        # without putting a potentially large list in the process environment.
+        cat > "$RUNNER_TEMP/go-changed-files.json" <<'GO_FILES_JSON'
+        ${{ steps.filter.outputs.go_files || 'null' }}
+        GO_FILES_JSON
+        mode=full
+        files=()
+        branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+        # Main, release, manual runs, and potentially truncated PR file lists stay full.
+        if [[ "$GITHUB_EVENT_NAME" == pull_request && "$branch" != chore/release-* &&
+              "$UNSUPPORTED_FILE_COUNT" == 0 && "$FILE_COUNT" =~ ^[0-9]+$ && "$FILE_COUNT" -lt 3000 ]] &&
+           jq -r 'if type == "array" and all(.[]; type == "string" and (test("[\r\n]") | not)) then .[] else error("Invalid file list") end' \
+             "$RUNNER_TEMP/go-changed-files.json" > "$RUNNER_TEMP/go-changed-files.txt"; then
+          mode=skip
+          while IFS= read -r file; do
+            if [[ ! "$file" =~ ^(cmd|internal)/ ]]; then
+              case "$file" in
+                *.md|*.mdx|_meta.json|*/_meta.json|dictionary.txt|*/dictionary.txt|skills-lock.json) continue ;;
+              esac
+              echo "Full Go tests required by: $file"
+              mode=full
+              break
+            fi
+            # Preserve file names: test-go resolves source, embed and testdata owners.
+            # A restricted alphabet also keeps the multiline output delimiter safe.
+            if [[ ! "$file" =~ ^[a-zA-Z0-9_./-]+$ ]]; then mode=full; break; fi
+            files+=("$file")
+            mode=affected
+          done < "$RUNNER_TEMP/go-changed-files.txt"
+        fi
+        if [[ "$mode" == affected ]]; then
+          printf '%s\n' "${files[@]}" | sort -u > "$RUNNER_TEMP/go-changed-inputs.txt"
+          # Leave room below GitHub's job output limit, which is measured in UTF-16.
+          if [[ $(wc -c < "$RUNNER_TEMP/go-changed-inputs.txt") -gt 300000 ]]; then
+            echo 'Changed file list is too large; running the full Go suite.'
+            mode=full
+          else
+            {
+              echo 'changed-files<<GO_CHANGED_FILES'
+              cat "$RUNNER_TEMP/go-changed-inputs.txt"
+              echo 'GO_CHANGED_FILES'
+            } >> "$GITHUB_OUTPUT"
+          fi
+        fi
+        echo "mode=$mode" >> "$GITHUB_OUTPUT"
+        echo "Go tests: $mode"

@@ -7,6 +7,7 @@ import { PassThrough, Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { runEngine, type EngineRunOptions } from '../src/cli/engine.js';
 import { ConfigModuleHost } from '../src/config/config-loader.js';
+import { fingerprintConfigSource } from '../src/config/config-source.js';
 
 const FAKE_BIN = fileURLToPath(
   new URL('./fixtures/fake-worker-warmup.cjs', import.meta.url),
@@ -119,12 +120,17 @@ describe.each([false, true])(
         if (event === 'waiters-started') await buildStarted.promise;
       });
       const run = peer.run('concurrent', {
-        createPluginLintHost: async (
-          _configs,
-          _onLog,
-          workerSingleThreaded,
-        ) => {
+        createPluginLintHost: async (configs, _onLog, workerSingleThreaded) => {
           expect(workerSingleThreaded).toBe(singleThreaded);
+          expect(configs).toEqual([
+            {
+              configPath: peer.configPath,
+              configDirectory: path.dirname(peer.configPath),
+              sourceFingerprint: fingerprintConfigSource(
+                fs.readFileSync(peer.configPath),
+              ),
+            },
+          ]);
           createCalls++;
           buildStarted.resolve();
           await build.promise;

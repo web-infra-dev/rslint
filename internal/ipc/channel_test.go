@@ -296,7 +296,6 @@ func TestReadFrame_CapExceeded(t *testing.T) {
 	_, err := ReadFrame(bufio.NewReader(&buf))
 	if err == nil {
 		t.Fatal("expected frame-cap error")
-		return
 	}
 	if !strings.Contains(err.Error(), "exceeds cap") {
 		t.Fatalf("expected cap error, got %v", err)
@@ -685,7 +684,6 @@ func TestChannel_HandlerErrorPanicRecovered(t *testing.T) {
 		_, err := a.SendRequest(ctx, "x", nil)
 		if err == nil {
 			t.Fatal("expected peer error")
-			return
 		}
 		if !strings.Contains(err.Error(), "inbound handler error panicked: error boom") {
 			t.Fatalf("unexpected peer error: %v", err)
@@ -731,7 +729,6 @@ func TestChannel_HandlerPanicRecovered(t *testing.T) {
 	_, err := a.SendRequest(ctx, "x", nil)
 	if err == nil {
 		t.Fatal("expected error from panicking handler")
-		return
 	}
 	if got, want := err.Error(), "inbound handler panicked: handler boom"; got != want {
 		t.Fatalf("handler error = %q, want %q", got, want)

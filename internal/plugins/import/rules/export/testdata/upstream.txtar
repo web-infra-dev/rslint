@@ -1,0 +1,37 @@
+Upstream fixtures from eslint-plugin-import v2.32.0 tests/files.
+
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"commonjs","jsx":"preserve"},"include":["**/*"]}
+-- export-all.js --
+import { foo } from './sibling-with-names' // ensure importing exported name doesn't block
+export * from './sibling-with-names'
+-- sibling-with-names.js --
+export const foo = 'foo'
+-- default-export.js --
+export default function foo() { return 'bar' }
+-- bar.js --
+export default 'bar'
+export function foo() { return 'foo' }
+-- named-export-collision/a.js --
+export const FOO = 'a-foobar';
+-- named-export-collision/b.js --
+export const FOO = 'b-foobar';
+-- typescript-d-ts/file1.ts --
+declare namespace ts {
+  const x: string;
+  export { x };
+}
+
+export = ts;
+-- export-star-4/module/index.ts --
+export * from './feature';
+-- export-star-4/module/feature.jsx --
+export function func() {
+    console.log('Hello world');
+}
+-- issue-370-commonjs-namespace/bar.js --
+// bar.js
+export { default as foo } from './foo'
+-- issue-370-commonjs-namespace/foo.js --
+// foo.js
+module.exports = { foo: 'foo' }

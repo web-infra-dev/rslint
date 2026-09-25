@@ -28,9 +28,11 @@
  */
 
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 import type { ConfigDescriptor } from '../types.js';
+import { fingerprintConfigSource } from '../../config/config-source.js';
 import {
   selectPluginSource,
   unwrapPluginModule,
@@ -317,7 +319,23 @@ export async function loadPluginsFromConfigs(
   // first then iterate `configs` in original order to populate the
   // Map, the map's iteration order matches the input order exactly.
   const loadedList = await Promise.all(
-    configs.map(async (cfg) => loadPluginsFromConfigFile(cfg.configPath)),
+    configs.map(async (cfg) => {
+      // Delayed starts must use the entry version selected at activation.
+      const verifySource = async () => {
+        if (cfg.sourceFingerprint === undefined) return;
+        const source = await readFile(cfg.configPath);
+        if (fingerprintConfigSource(source) !== cfg.sourceFingerprint) {
+          throw new PluginLoaderError(
+            cfg.configPath,
+            `plugin config changed since activation: ${cfg.configPath}`,
+          );
+        }
+      };
+      await verifySource();
+      const loaded = await loadPluginsFromConfigFile(cfg.configPath);
+      await verifySource();
+      return loaded;
+    }),
   );
   const out = new Map<string, LoadedPlugins>();
   for (let i = 0; i < configs.length; i++) {

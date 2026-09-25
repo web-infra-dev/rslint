@@ -4,6 +4,38 @@ const ruleTester = new RuleTester();
 
 ruleTester.run('exhaustive-deps', {} as never, {
   valid: [
+    // Upstream: rule options take precedence over shared settings.
+    {
+      code: `
+        function MyComponent(props) {
+          useCustomEffect(() => {
+            console.log(props.foo);
+          }, []);
+        }
+      `,
+      options: [{ additionalHooks: 'useAnotherEffect' }],
+      settings: {
+        'react-hooks': { additionalEffectHooks: 'useCustomEffect' },
+      },
+    },
+    // Upstream: automatically inferred dependencies allow an omitted array.
+    {
+      code: `
+        function MyComponent() {
+          const [state, setState] = React.useState<number>(0);
+          useSpecialEffect(() => {
+            const someNumber: typeof state = 2;
+            setState(prevState => prevState + someNumber);
+          });
+        }
+      `,
+      options: [
+        {
+          additionalHooks: 'useSpecialEffect',
+          experimental_autoDependenciesHooks: ['useSpecialEffect'],
+        },
+      ],
+    },
     // No captured values, empty deps
     {
       code: `
@@ -109,6 +141,42 @@ ruleTester.run('exhaustive-deps', {} as never, {
     },
   ],
   invalid: [
+    // Upstream: shared settings enable dependency checks for custom effects.
+    {
+      code: `
+        function MyComponent(props) {
+          useCustomEffect(() => {
+            console.log(props.foo);
+          }, []);
+        }
+      `,
+      settings: {
+        'react-hooks': { additionalEffectHooks: 'useCustomEffect' },
+      },
+      errors: [
+        {
+          message:
+            "React Hook useCustomEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.",
+        },
+      ],
+    },
+    // Upstream: requireExplicitEffectDeps rejects an omitted argument.
+    {
+      code: `
+        function MyComponent(props) {
+          useEffect(() => {
+            console.log(props.foo);
+          });
+        }
+      `,
+      options: [{ requireExplicitEffectDeps: true }],
+      errors: [
+        {
+          message:
+            'React Hook useEffect always requires dependencies. Please add a dependency array or an explicit `undefined`',
+        },
+      ],
+    },
     // Missing dep
     {
       code: `

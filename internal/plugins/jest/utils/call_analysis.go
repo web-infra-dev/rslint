@@ -27,7 +27,7 @@ type JestCallAnalysis struct {
 	callbacksOK   bool
 }
 
-// GetJestCallAnalysis returns the analysis shared by every migrated Jest rule
+// GetJestCallAnalysis returns the analysis shared by every Jest rule
 // that lints the same file. Manually constructed contexts without a file cache
 // retain standalone behavior for parser and rule tests.
 func GetJestCallAnalysis(ctx rule.RuleContext) *JestCallAnalysis {

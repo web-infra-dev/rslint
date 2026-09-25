@@ -1,5 +1,6 @@
 import {
   ConfigModuleHost,
+  type PluginConfigDescriptor,
   type ActivateConfigsRequest,
   type ActivateConfigsResponse,
 } from '../config/config-loader.js';
@@ -10,7 +11,7 @@ export interface PluginLintHost {
 }
 
 type CreatePluginLintHost = (
-  configs: Array<{ configPath: string; configDirectory: string }>,
+  configs: PluginConfigDescriptor[],
   onLog?: (record: { level: string; source: string; text: string }) => void,
 ) => Promise<PluginLintHost>;
 

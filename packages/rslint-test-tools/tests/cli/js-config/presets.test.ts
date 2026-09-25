@@ -152,10 +152,107 @@ describe('defineConfig and config presets', () => {
     expect(rec.plugins).toContain('react');
   });
 
-  test('import.configs.recommended should declare import plugin', () => {
+  test('import.configs.recommended should declare import plugin and report unresolved imports', async () => {
     const rec = importPlugin.configs.recommended;
     expect(rec.plugins).toBeDefined();
     expect(rec.plugins).toContain('eslint-plugin-import');
+
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig([rec]),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'import-preset.js')]:
+          'import "./missing-import-preset.js";',
+      },
+    });
+    expect(result.fileCount).toBe(1);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]).toMatchObject({
+      ruleName: 'import/no-unresolved',
+      severity: 'error',
+      message: "Unable to resolve path to module './missing-import-preset.js'.",
+    });
+  });
+
+  test('import.configs.recommended reports duplicate exports', async () => {
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig([importPlugin.configs.recommended]),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'duplicate-exports-preset.ts')]:
+          'export const duplicated = 1; export { duplicated };',
+      },
+    });
+
+    expect(result.fileCount).toBe(1);
+    expect(result.diagnostics).toMatchObject([
+      {
+        ruleName: 'import/export',
+        messageId: 'multipleNamed',
+        severity: 'error',
+      },
+      {
+        ruleName: 'import/export',
+        messageId: 'multipleNamed',
+        severity: 'error',
+      },
+    ]);
+  });
+
+  test('import.configs.recommended warns when a default import uses a named export', async () => {
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig([importPlugin.configs.recommended]),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'named-default-preset.js')]:
+          'import foo from "./named-default-preset-dependency.js";',
+        [path.join(directory, 'named-default-preset-dependency.js')]:
+          'export default 1; export const foo = 2;',
+      },
+    });
+
+    expect(result.fileCount).toBe(2);
+    expect(result.diagnostics).toMatchObject([
+      {
+        ruleName: 'import/no-named-as-default',
+        messageId: 'noNamedAsDefault',
+        severity: 'warn',
+        message: "Using exported name 'foo' as identifier for default import.",
+      },
+    ]);
+  });
+
+  test('import.configs.recommended warns on named members of a default import', async () => {
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig([importPlugin.configs.recommended]),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'named-member-preset.js')]:
+          'import obj from "./named-member-preset-dependency.js"; obj.foo; const { foo } = obj;',
+        [path.join(directory, 'named-member-preset-dependency.js')]:
+          'export default {}; export const foo = 1;',
+      },
+    });
+
+    expect(result.fileCount).toBe(2);
+    expect(result.diagnostics).toHaveLength(2);
+    for (const diagnostic of result.diagnostics) {
+      expect(diagnostic).toMatchObject({
+        ruleName: 'import/no-named-as-default-member',
+        messageId: 'noNamedAsDefaultMember',
+        severity: 'warn',
+        message:
+          "Caution: `obj` also has a named export `foo`. Check if you meant to write `import {foo} from './named-member-preset-dependency.js'` instead.",
+      });
+    }
   });
 
   test('rstestPlugin.configs.recommended should declare rstest plugin and rule', () => {
@@ -174,6 +271,7 @@ describe('defineConfig and config presets', () => {
       'rstest/no-interpolation-in-snapshots': 'error',
       'rstest/no-mocks-import': 'error',
       'rstest/no-standalone-expect': 'error',
+      'rstest/no-unneeded-async-expect-function': 'error',
       'rstest/prefer-called-exactly-once-with': 'error',
       'rstest/require-local-test-context-for-concurrent-snapshots': 'error',
       'rstest/valid-expect': 'error',

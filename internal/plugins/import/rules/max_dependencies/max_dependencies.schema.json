@@ -1,0 +1,15 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "max": { "type": "number" },
+        "ignoreTypeImports": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

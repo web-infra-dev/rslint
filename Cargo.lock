@@ -891,7 +891,7 @@ dependencies = [
 
 [[package]]
 name = "tsgo-client"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "bitflags",
  "cbor4ii",

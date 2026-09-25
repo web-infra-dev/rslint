@@ -635,3 +635,28 @@ func TestOrderDimension4(t *testing.T) {
 		},
 	)
 }
+
+func TestOrderImportKinds(t *testing.T) {
+	alphabetize := map[string]any{"alphabetize": map[string]any{"order": "asc"}}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &order.OrderRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "import fs from 'fs';\nimport sibling from './sibling';\nconst fsAgain = require('fs');", Options: alphabetize},
+			{Code: "import fs = require('fs');\nimport sibling from './sibling';\nconst fsAgain = require('fs');", Options: alphabetize},
+			{Code: "import 'fs';\nimport sibling from './sibling';\nconst fsAgain = require('fs');", Options: map[string]any{"warnOnUnassignedImports": true, "alphabetize": map[string]any{"order": "asc"}}},
+			// exportKind partitions named types, but is not the importKind key used
+			// by upstream's alphabetize pass. Duplicate export names share a rank.
+			{Code: "export { type A as a, A as a } from 'foo';", Options: map[string]any{"named": true, "alphabetize": map[string]any{"order": "asc", "orderImportKind": "desc"}}},
+			{Code: "export { type A as a, A as a } from 'foo';", Options: map[string]any{"named": map[string]any{"types": "types-last", "export": true}, "alphabetize": map[string]any{"order": "asc"}}},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: "const fs = require('fs');\nimport fsAgain from 'fs';", Options: alphabetize,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "order", Message: "`fs` import should occur before import of `fs`", Line: 2, Column: 1, EndLine: 2, EndColumn: 26}},
+				Output: []string{"import fsAgain from 'fs';\nconst fs = require('fs');\n"}},
+			{Code: "import path from 'path';\nconst fs = require('fs');\nimport fsAgain = require('fs');", Options: alphabetize,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "order", Message: "`fs` import should occur before import of `path`", Line: 3, Column: 1, EndLine: 3, EndColumn: 32}},
+				Output: []string{"import fsAgain = require('fs');\nimport path from 'path';\nconst fs = require('fs');\n"}},
+			{Code: "export { A, type B } from 'foo';", Options: map[string]any{"named": map[string]any{"export": true, "types": "types-first"}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "order", Message: "`B` type export should occur before export of `A`"}},
+				Output: []string{"export { type B, A } from 'foo';"}},
+		})
+}

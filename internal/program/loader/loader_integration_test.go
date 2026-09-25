@@ -1027,12 +1027,12 @@ func TestLoadProgramsSingleCandidateRequiresRootMembership(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if name == "outside.ts" {
+			if name != "a.ts" {
 				if len(binding.Programs) != 2 || len(binding.TargetsByProgram[0]) != 0 || !slices.Equal(binding.TargetsByProgram[1], []string{path}) {
 					t.Fatalf("a candidate without the source was treated as an owner: %v", binding.TargetsByProgram)
 				}
 			} else if len(binding.Programs) != 1 || !slices.Equal(binding.TargetsByProgram[0], []string{path}) {
-				t.Fatalf("single root/import candidate did not bind: %v", binding.TargetsByProgram)
+				t.Fatalf("single direct-root candidate did not bind: %v", binding.TargetsByProgram)
 			}
 		})
 	}
@@ -1410,7 +1410,7 @@ export const value: Bad | null = null;
 	}
 }
 
-func TestLoadProgramsBindsImportedNonRootFile(t *testing.T) {
+func TestLoadProgramsKeepsImportedNonRootFileSourceOnly(t *testing.T) {
 	dir := t.TempDir()
 	writeProgramTestFiles(t, dir, map[string]string{
 		"main.ts":       "import { value } from './lib';\nconsole.log(value);\n",
@@ -1454,18 +1454,21 @@ func TestLoadProgramsBindsImportedNonRootFile(t *testing.T) {
 	programs := binding.compilerPrograms
 	targetFiles := []string{plan.Files[0].Path}
 	targetsByProgram := binding.TargetsByProgram
-	if len(programs) != 1 {
-		t.Fatalf("imported non-root target should reuse existing Program, got %d programs", len(programs))
+	if len(programs) != 2 || len(targetsByProgram[0]) != 0 {
+		t.Fatalf("import-only lint target borrowed the checked Program: %v", targetsByProgram)
 	}
-	if len(binding.Programs) != 1 || !binding.Programs[0].CanProvideTypeChecker(binding.Programs[0].GetSourceFile(targetsByProgram[0][0])) {
-		t.Fatal("imported non-root target lost its compiler-capable Program")
+	if binding.Programs[1].CanProvideTypeChecker(binding.Programs[1].GetSourceFile(libPath)) {
+		t.Fatal("import-only target received type information")
+	}
+	if binding.Programs[0].GetSourceFile(libPath) == nil {
+		t.Fatal("gap binding removed an import from the complete checked Program")
 	}
 	if len(targetFiles) != 1 || targetFiles[0] != libPath {
 		t.Fatalf("expected lib.ts as the only target, got %v", targetFiles)
 	}
-	if len(targetsByProgram) != 1 || len(targetsByProgram[0]) != 1 ||
-		canonicalPathID(targetsByProgram[0][0], fs) != canonicalPathID(libPath, fs) {
-		t.Fatalf("expected lib.ts bound to the tsconfig Program, got %v", targetsByProgram)
+	if len(targetsByProgram) != 2 || len(targetsByProgram[1]) != 1 ||
+		canonicalPathID(targetsByProgram[1][0], fs) != canonicalPathID(libPath, fs) {
+		t.Fatalf("expected lib.ts bound to the source-only Program, got %v", targetsByProgram)
 	}
 }
 
@@ -2394,7 +2397,7 @@ func TestBuildProjectsPreservesBroadRootFallback(t *testing.T) {
 	}
 }
 
-func TestBuildProjectsPreservesBroadImportedSourceAliases(t *testing.T) {
+func TestBuildProjectsKeepsImportedSourceAliasesAsGaps(t *testing.T) {
 	for _, aliasTarget := range []bool{false, true} {
 		for _, singleThreaded := range []bool{false, true} {
 			dir := tspath.NormalizePath(t.TempDir())
@@ -2415,7 +2418,7 @@ func TestBuildProjectsPreservesBroadImportedSourceAliases(t *testing.T) {
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 			file := testLintTarget(fsys, dir, tspath.ResolvePath(dir, lintTarget))
 			plan := target.Plan{Files: []target.File{file}}
-			for _, scope := range []ProjectScope{AllDeclared, ActiveOwners} {
+			for _, scope := range []ProjectScope{AllDeclared, ActiveOwners, Targeted} {
 				session := NewSession(fsys)
 				projects, err := session.buildProjectsForTest(t, ProjectBuildRequest{
 					Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig.json")},
@@ -2428,70 +2431,96 @@ func TestBuildProjectsPreservesBroadImportedSourceAliases(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if len(binding.Programs) != 1 || len(binding.TargetsByProgram[0]) != 1 {
-					t.Fatalf("alias became a source-only gap: %v", binding.TargetsByProgram)
+				gapIndex := len(binding.Programs) - 1
+				if len(binding.TargetsByProgram[gapIndex]) != 1 {
+					t.Fatalf("missing alias gap: %v", binding.TargetsByProgram)
 				}
-				name := binding.TargetsByProgram[0][0]
-				if name != tspath.ResolvePath(dir, imported) || !binding.Programs[0].CanProvideTypeChecker(binding.Programs[0].GetSourceFile(name)) {
-					t.Fatalf("wrong imported source/capability: %s", name)
+				name := binding.TargetsByProgram[gapIndex][0]
+				if name != file.Path || binding.Programs[gapIndex].CanProvideTypeChecker(binding.Programs[gapIndex].GetSourceFile(name)) {
+					t.Fatalf("wrong gap source/capability: %s", name)
 				}
 			}
 		}
 	}
 }
 
-func TestBuildTargetProjectFallsBackToFirstImportOnlyAfterRootScan(t *testing.T) {
-	dir := t.TempDir()
-	writeProgramTestFiles(t, dir, map[string]string{
-		"target.ts":           `export const target = 1;`,
-		"first-main.ts":       `import "./target";`,
-		"later-main.ts":       `import "./target";`,
-		"tsconfig-first.json": `{"files":["first-main.ts"]}`,
-		"tsconfig-later.json": `{"files":["later-main.ts"]}`,
-	})
-
-	dir = tspath.NormalizePath(dir)
-	readCounter := &programReadCountingFS{
-		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
-		reads: make(map[string]int),
-	}
-	fsys := vfs.FS(readCounter)
-	context := newBuildContext(fsys)
-	config := projectConfig("./tsconfig-first.json", "./tsconfig-later.json")
-	plan := target.Plan{Files: []target.File{
-		testLintTarget(fsys, dir, filepath.Join(dir, "target.ts")),
-	}}
-
-	set, err := sessionForTest(context).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: config}, Targets: plan, Scope: Targeted, SingleThreaded: true})
-	if err != nil {
-		t.Fatalf("BuildTargetProject: %v", err)
-	}
-	if set.Len() != 1 {
-		t.Fatalf("fallback built %d retained Programs, want first containing project only", set.Len())
-	}
-	wantConfig := tspath.ResolvePath(dir, "tsconfig-first.json")
-	if got := tspath.NormalizePath(set.compilerPrograms[0].Options().ConfigFilePath); got != wantConfig {
-		t.Fatalf("fallback project = %q, want first containing project %q", got, wantConfig)
-	}
-	if got := readCounter.readCount(tspath.ResolvePath(dir, "later-main.ts")); got != 0 {
-		t.Fatalf("fallback built the later project %d time(s) after the first match", got)
-	}
-	binding, err := sessionForTest(context).LoadAPI(set, plan, dir, true)
-	if err != nil {
-		t.Fatalf("LoadAPI: %v", err)
-	}
-	if len(binding.TargetsByProgram) != 1 || len(binding.TargetsByProgram[0]) != 1 {
-		t.Fatalf("imported target lost its configured Program: %v", binding.TargetsByProgram)
+func TestBuildProjectsUnmatchedRootsDoNotBorrowImports(t *testing.T) {
+	for _, scope := range []ProjectScope{ActiveOwners, Targeted, AllDeclared} {
+		for _, serial := range []bool{false, true} {
+			for _, includeRoot := range []bool{false, true} {
+				t.Run(strconv.Itoa(int(scope))+"/serial="+strconv.FormatBool(serial)+"/root="+strconv.FormatBool(includeRoot), func(t *testing.T) {
+					dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_membership.txtar").Materialize(t, ""))
+					fs := &programReadCountingFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS())), reads: make(map[string]int)}
+					gap := testLintTarget(fs, dir, tspath.ResolvePath(dir, "target.ts"))
+					plan := target.Plan{Files: []target.File{gap}}
+					if includeRoot {
+						plan.Files = append(plan.Files, testLintTarget(fs, dir, tspath.ResolvePath(dir, "main.ts")))
+					}
+					session := NewSession(fs)
+					set, err := session.buildProjectsForTest(t, ProjectBuildRequest{
+						Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./first.json", "./later.json")},
+						Targets: plan, Scope: scope, SingleThreaded: serial,
+					})
+					if err != nil {
+						t.Fatal(err)
+					}
+					wantProjects := 0
+					if includeRoot {
+						wantProjects = 1
+					}
+					if scope == AllDeclared {
+						wantProjects = 2
+					}
+					if set.Len() != wantProjects {
+						t.Fatalf("projects=%d, want %d", set.Len(), wantProjects)
+					}
+					if scope != AllDeclared {
+						if fs.readCount(tspath.ResolvePath(dir, "unused.ts")) != 0 {
+							t.Fatal("unmatched target constructed an import candidate")
+						}
+						if !includeRoot && fs.readCount(tspath.ResolvePath(dir, "main.ts")) != 0 {
+							t.Fatal("gap-only request read project sources")
+						}
+					}
+					if set.Len() > 0 && set.Programs()[0].GetSourceFile(gap.Path) == nil {
+						t.Fatal("selected Program lost its imported dependency")
+					}
+					for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadCLI, session.LoadAPI} {
+						binding, err := load(set, plan, dir, serial)
+						if err != nil {
+							t.Fatal(err)
+						}
+						seen := make(map[string]bool)
+						for index, names := range binding.TargetsByProgram {
+							for _, name := range names {
+								if seen[name] {
+									t.Fatalf("duplicate target %s", name)
+								}
+								seen[name] = true
+								program := binding.Programs[index]
+								if program.CanProvideTypeChecker(program.GetSourceFile(name)) != (name != gap.Path) {
+									t.Fatalf("wrong checker capability for %s", name)
+								}
+							}
+						}
+						if len(seen) != len(plan.Files) || !seen[gap.Path] {
+							t.Fatalf("lost lint targets: %v", seen)
+						}
+					}
+				})
+			}
+		}
 	}
 }
 
-func TestBuildTargetProjectSkipsImportFallbackWithUnsupportedExtension(t *testing.T) {
+func TestBuildTargetProjectJSAdmissionDoesNotAdmitImportedRoots(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{
 		"main.ts":                `import "./target.js";`,
 		"target.js":              `export const target = 1;`,
 		"tsconfig-no-js.json":    `{"files":["main.ts"],"compilerOptions":{"noLib":true}}`,
 		"tsconfig-allow-js.json": `{"files":["main.ts"],"compilerOptions":{"allowJs":true,"noLib":true}}`,
+		"tsconfig-check-js.json": `{"files":["main.ts"],"compilerOptions":{"checkJs":true,"noLib":true}}`,
 	})
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	plan := target.Plan{Files: []target.File{
@@ -2504,7 +2533,8 @@ func TestBuildTargetProjectSkipsImportFallbackWithUnsupportedExtension(t *testin
 		wantPrograms int
 	}{
 		{name: "allowJs disabled", project: "./tsconfig-no-js.json", wantPrograms: 0},
-		{name: "allowJs enabled", project: "./tsconfig-allow-js.json", wantPrograms: 1},
+		{name: "allowJs enabled", project: "./tsconfig-allow-js.json", wantPrograms: 0},
+		{name: "checkJs enabled", project: "./tsconfig-check-js.json", wantPrograms: 0},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			context := newBuildContext(fsys)
@@ -2519,7 +2549,7 @@ func TestBuildTargetProjectSkipsImportFallbackWithUnsupportedExtension(t *testin
 	}
 }
 
-func TestBuildTargetProjectKeepsDirectAndImportFallbackTiersPerTarget(t *testing.T) {
+func TestBuildTargetProjectKeepsDirectRootAndGapPerTarget(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{
 		"direct.ts":       `export const direct = 1;`,
@@ -2538,8 +2568,8 @@ func TestBuildTargetProjectKeepsDirectAndImportFallbackTiersPerTarget(t *testing
 	if err != nil {
 		t.Fatalf("BuildTargetProject: %v", err)
 	}
-	if set.Len() != 2 {
-		t.Fatalf("selected Programs = %d, want direct and fallback projects", set.Len())
+	if set.Len() != 1 {
+		t.Fatalf("selected Programs = %d, want only the direct project", set.Len())
 	}
 	binding, err := sessionForTest(context).LoadAPI(set, plan, dir, false)
 	if err != nil {
@@ -2548,8 +2578,8 @@ func TestBuildTargetProjectKeepsDirectAndImportFallbackTiersPerTarget(t *testing
 	if len(binding.TargetsByProgram) != 2 ||
 		len(binding.TargetsByProgram[0]) != 1 ||
 		len(binding.TargetsByProgram[1]) != 1 ||
-		!strings.HasSuffix(binding.TargetsByProgram[0][0], "/fallback.ts") ||
-		!strings.HasSuffix(binding.TargetsByProgram[1][0], "/direct.ts") {
+		!strings.HasSuffix(binding.TargetsByProgram[0][0], "/direct.ts") ||
+		!strings.HasSuffix(binding.TargetsByProgram[1][0], "/fallback.ts") {
 		t.Fatalf("target tiers were reordered by construction timing: %v", binding.TargetsByProgram)
 	}
 }
@@ -2701,7 +2731,7 @@ func TestBuildTargetProjectUsesFrozenTargetIdentityForMembership(t *testing.T) {
 			},
 		},
 		{
-			name: "import fallback membership",
+			name: "unmatched frozen identity stays a gap",
 			files: map[string]string{
 				"main.ts":       `import "./target";`,
 				"target.ts":     `export const target = 1;`,
@@ -2743,6 +2773,12 @@ func TestBuildTargetProjectUsesFrozenTargetIdentityForMembership(t *testing.T) {
 			if err != nil {
 				t.Fatalf("BuildTargetProject: %v", err)
 			}
+			if test.name == "unmatched frozen identity stays a gap" {
+				if set.Len() != 0 || fsys.targetCalls != 0 {
+					t.Fatalf("unmatched identity selected a project or resolved target: %d / %d", set.Len(), fsys.targetCalls)
+				}
+				return
+			}
 			if set.Len() != 1 {
 				t.Fatalf("selected projects = %d, want frozen project", set.Len())
 			}
@@ -2760,7 +2796,7 @@ func TestBuildTargetProjectUsesFrozenTargetIdentityForMembership(t *testing.T) {
 	}
 }
 
-func TestLoadProgramsRecomputesProgramMembershipAfterImportGraphChange(t *testing.T) {
+func TestLoadProgramsKeepsGapAfterImportGraphChange(t *testing.T) {
 	dir := t.TempDir()
 	writeProgramTestFiles(t, dir, map[string]string{
 		"main.ts":       `import "./extra";`,
@@ -2783,8 +2819,8 @@ func TestLoadProgramsRecomputesProgramMembershipAfterImportGraphChange(t *testin
 	if err != nil {
 		t.Fatalf("initial loadAPIForTest: %v", err)
 	}
-	if len(initial.Programs) != 1 || len(initial.TargetsByProgram[0]) != 1 {
-		t.Fatalf("imported target should initially use the configured Program, got targets=%v", initial.TargetsByProgram)
+	if len(initial.Programs) != 2 || len(initial.TargetsByProgram[0]) != 0 || len(initial.TargetsByProgram[1]) != 1 || initial.Programs[1].CanProvideTypeChecker(initial.Programs[1].SourceFiles()[0]) {
+		t.Fatalf("import-only target must start as a gap, got targets=%v", initial.TargetsByProgram)
 	}
 
 	if err := os.WriteFile(filepath.Join(dir, "main.ts"), []byte(`export const main = 1;`), 0644); err != nil {
@@ -2804,11 +2840,11 @@ func TestLoadProgramsRecomputesProgramMembershipAfterImportGraphChange(t *testin
 		t.Fatalf("rebuilt loadAPIForTest: %v", err)
 	}
 	if len(afterFix.Programs) != 2 || len(afterFix.TargetsByProgram[1]) != 1 {
-		t.Fatalf("target must move to a source-only Program after its importing edge is removed, got targets=%v", afterFix.TargetsByProgram)
+		t.Fatalf("target must remain in a source-only Program after its importing edge is removed, got targets=%v", afterFix.TargetsByProgram)
 	}
 }
 
-func TestBuildTargetProjectRecomputesImportFallbackAfterFix(t *testing.T) {
+func TestBuildTargetProjectKeepsGapAfterImportFix(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{
 		"main.ts":       `import "./target";`,
@@ -2831,8 +2867,8 @@ func TestBuildTargetProjectRecomputesImportFallbackAfterFix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("initial LoadAPI: %v", err)
 	}
-	if initialSet.Len() != 1 || len(initial.TargetsByProgram[0]) != 1 {
-		t.Fatalf("import fallback was not selected initially: %v", initial.TargetsByProgram)
+	if initialSet.Len() != 0 || len(initial.TargetsByProgram[0]) != 1 || initial.Programs[0].CanProvideTypeChecker(initial.Programs[0].SourceFiles()[0]) {
+		t.Fatalf("import-only file was not initially a gap: %v", initial.TargetsByProgram)
 	}
 
 	if err := os.WriteFile(filepath.Join(dir, "main.ts"), []byte(`export const main = 1;`), 0o644); err != nil {
@@ -2848,7 +2884,7 @@ func TestBuildTargetProjectRecomputesImportFallbackAfterFix(t *testing.T) {
 		t.Fatalf("post-fix LoadAPI: %v", err)
 	}
 	if afterFixSet.Len() != 0 || len(afterFix.Programs) != 1 || afterFix.Programs[0].CanProvideTypeChecker(afterFix.Programs[0].SourceFiles()[0]) {
-		t.Fatalf("removed import did not move target to source-only fallback: projects=%d targets=%v", afterFixSet.Len(), afterFix.TargetsByProgram)
+		t.Fatalf("removed import did not retain source-only fallback: projects=%d targets=%v", afterFixSet.Len(), afterFix.TargetsByProgram)
 	}
 }
 

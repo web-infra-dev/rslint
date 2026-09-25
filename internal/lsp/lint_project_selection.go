@@ -65,13 +65,6 @@ func newLintProjectMetadata(
 	}
 }
 
-func (metadata *lintProjectMetadata) supportsFileName(fileName string) bool {
-	return metadata != nil && lintprogram.CompilerOptionsSupportFileName(
-		metadata.commandLine.CompilerOptions(),
-		fileName,
-	)
-}
-
 func (metadata *lintProjectMetadata) Contains(
 	fileName string,
 	canonicalFileName string,
@@ -135,7 +128,6 @@ type selectedLintProject struct {
 	program    *compiler.Program
 	sourceFile *ast.SourceFile
 	configPath string
-	directRoot bool
 }
 
 // acquireLintProgram applies the resolved binding policy before either adapter
@@ -188,9 +180,8 @@ func selectConfiguredLintProject(
 		return loadDirectLintProject(metadataByConfig[parsed.ConfigName()], target, loaders.program)
 	}
 
-	metadataByProject := make([]*lintProjectMetadata, len(tsConfigPaths))
 	if loaders.metadata != nil {
-		for index, tsConfigPath := range tsConfigPaths {
+		for _, tsConfigPath := range tsConfigPaths {
 			metadata, available, err := loaders.metadata(tsConfigPath)
 			if err != nil {
 				return selectedLintProject{}, false, fmt.Errorf(
@@ -202,38 +193,15 @@ func selectConfiguredLintProject(
 			if !available {
 				continue
 			}
-			metadataByProject[index] = metadata
-			if metadata == nil || metadata.rootFiles == nil ||
-				!metadata.rootFiles.Contains(target.Path, target.CanonicalPath) {
+			if !metadata.Contains(target.Path, target.CanonicalPath) {
 				continue
 			}
 			return loadDirectLintProject(metadata, target, loaders.program)
 		}
 	}
 
-	if loaders.program == nil {
-		return selectedLintProject{}, false, nil
-	}
-	for index, tsConfigPath := range tsConfigPaths {
-		metadata := metadataByProject[index]
-		if metadata == nil || !metadata.supportsFileName(target.Path) {
-			continue
-		}
-		program, sourceFile, err := loaders.program(metadata)
-		if err != nil {
-			return selectedLintProject{}, false, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
-		}
-		if sourceFile != nil {
-			if program == nil {
-				return selectedLintProject{}, false, fmt.Errorf("configured project %q returned a source without a Program", tsConfigPath)
-			}
-			return selectedLintProject{
-				program:    program,
-				sourceFile: sourceFile,
-				configPath: tsConfigPath,
-			}, true, nil
-		}
-	}
+	// A Program's imported sources cannot supply lint ownership. The caller
+	// creates a source-only generation using the same document overlay.
 	return selectedLintProject{}, false, nil
 }
 
@@ -254,7 +222,7 @@ func loadDirectLintProject(
 		return selectedLintProject{}, false, fmt.Errorf("configured project root %q was absent from %q", target.Path, configPath)
 	}
 	return selectedLintProject{
-		program: program, sourceFile: sourceFile, configPath: configPath, directRoot: true,
+		program: program, sourceFile: sourceFile, configPath: configPath,
 	}, true, nil
 }
 
@@ -657,14 +625,7 @@ func sourceFileForTarget(
 // used for project selection and mark this generation as lacking type info.
 func createStandaloneFallbackProgram(target target.File, fs vfs.FS) (*compiler.Program, *ast.SourceFile, error) {
 	host := utils.CreateCompilerHost(target.ConfigDirectory, fs)
-	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
-		Target:    core.ScriptTargetESNext,
-		Module:    core.ModuleKindESNext,
-		Jsx:       core.JsxEmitPreserve,
-		AllowJs:   core.TSTrue,
-		NoLib:     core.TSTrue,
-		NoResolve: core.TSTrue,
-	}, []string{target.Path}, host)
+	program, err := utils.CreateProgramFromOptionsLenient(true, lintprogram.SourceOnlyCompilerOptions(), []string{target.Path}, host)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create fallback lint program: %w", err)
 	}

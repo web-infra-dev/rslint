@@ -1,10 +1,13 @@
 /**
  * Plugin-lint host: owns a {@link WorkerPool} and answers the reverse
- * `pluginLint` requests Go sends. Shared by BOTH hosts that own a
- * pool — the CLI engine (`packages/rslint/src/cli/engine.ts`, over the IPC
- * channel) and the VS Code extension's PluginLintPool (over the LSP
- * `rslint/pluginLint` request) — so the request→tasks→result
- * boundary lives in exactly one place.
+ * `pluginLint` requests Go sends. Shared by the CLI engine (framed IPC),
+ * the native API's config activation, and the VS Code extension's
+ * PluginLintPool (LSP `rslint/pluginLint` requests), so the
+ * request→tasks→result boundary lives in exactly one place.
+ *
+ * Also built as the CLI's private `dist/eslint-plugin/host.js` entry. Keep
+ * runtime imports limited to worker coordination and protocol conversion;
+ * plugin loading, parsing, and rule execution belong in `lint-worker.js`.
  */
 import { WorkerPool, type WorkerPoolOptions } from './worker-pool.js';
 import {
@@ -35,17 +38,15 @@ export interface PluginLintHost {
  *
  * `configs` empty ⇒ the pool spawns no workers (no-op fast path); a
  * `lint` call then returns empty per-file results. Init rejects if a
- * referenced plugin fails to import — the caller decides how loud to be
- * (CLI fails the run; LSP logs and serves empty).
+ * referenced plugin fails to import. The caller owns failure handling:
+ * CLI/API abort; LSP applies its configuration transaction recovery policy.
  */
 export async function createPluginLintHost(
   configs: ConfigDescriptor[],
   onLog?: WorkerPoolOptions['onLog'],
   singleThreaded?: boolean,
 ): Promise<PluginLintHost> {
-  // --singleThreaded forces a single worker thread (workerCount=1), the JS
-  // analog of the Go pass's no-concurrency mode. Otherwise leave workerCount
-  // undefined so the pool keeps its min(cpus, 8) default.
+  // --singleThreaded caps both warmup and execution at one worker.
   const pool = new WorkerPool({
     configs,
     onLog,

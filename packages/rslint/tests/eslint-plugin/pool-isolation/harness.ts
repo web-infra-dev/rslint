@@ -49,6 +49,36 @@ interface ScenarioContract {
 // One fail-closed contract table prevents allowlist, prerequisite, and
 // assertion requirements from drifting apart when a scenario is added.
 const SCENARIO_CONTRACTS = {
+  'growth-import-shutdown': {
+    requiredProgress: [
+      'started',
+      'init-done',
+      'growth-import-entered',
+      'shutdown-started',
+      'terminate-invoked',
+    ],
+    requiredSuccessAsserts: [
+      'initializing-worker-owned',
+      'warm-workers-completed-tasks',
+      'all-worker-threads-exited',
+      'pool-drained',
+    ],
+  },
+  'growth-init-error-shutdown': {
+    requiredProgress: [
+      'started',
+      'init-done',
+      'growth-failed',
+      'shutdown-started',
+      'terminate-invoked',
+    ],
+    requiredSuccessAsserts: [
+      'failed-worker-still-owned',
+      'warm-workers-completed-tasks',
+      'all-worker-threads-exited',
+      'pool-drained',
+    ],
+  },
   u11: {
     requiredProgress: [
       'started',
@@ -85,6 +115,7 @@ const SCENARIO_CONTRACTS = {
       'worker-hard-exit',
       'respawn-in-flight',
       'closed-before-respawn-release',
+      'shutdown-does-not-log-respawn-failure',
       'pool-drained',
       'lint-batch-rejects-closed',
     ],

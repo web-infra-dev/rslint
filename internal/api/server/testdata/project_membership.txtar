@@ -1,0 +1,7 @@
+-- tsconfig.json --
+{"files":["main.ts"],"compilerOptions":{"strict":true}}
+-- main.ts --
+import './gap';
+declare const root: any; root.member;
+-- gap.ts --
+export const disk = 1;

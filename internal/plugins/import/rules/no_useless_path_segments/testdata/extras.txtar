@@ -1,0 +1,20 @@
+-- files/typed.ts --
+export default 1;
+-- files/typed/index.ts --
+export default 2;
+-- files/typed-only/index.ts --
+export default 3;
+-- files/json.json --
+{}
+-- files/json/index.json --
+{}
+-- files/package/package.json --
+{"main":"entry.js"}
+-- files/package/entry.js --
+export default 1;
+-- files/package/index.js --
+export default 2;
+-- files/node_modules/.alias/index.js --
+export default 1;
+-- tsconfig.nodenext.json --
+{"compilerOptions":{"allowJs":true,"module":"nodenext","moduleResolution":"nodenext","target":"esnext"},"include":["**/*"]}

@@ -7,9 +7,6 @@ run:
 
 linters:
   default: none
-  disable:
-    - errcheck
-    - paralleltest
   enable:
     # Enabled
     - asasalint
@@ -19,7 +16,6 @@ linters:
     - copyloopvar
     - depguard
     - durationcheck
-    - errcheck
     - errchkjson
     - errname
     - errorlint
@@ -42,7 +38,6 @@ linters:
     - nilnesserr
     - nilnil
     # - nolintlint
-    - paralleltest
     - perfsprint
     - predeclared
     - reassign
@@ -79,6 +74,12 @@ linters:
           msg: 'The whitespace a rule trims is what JavaScript trims: ECMAScript WhiteSpace plus LineTerminator. Use ecmascript.StringTrim.'
         - pattern: '^strings\.EqualFold$'
           msg: 'Two strings a rule compares without regard to case are compared the way whatever it is ported from compares them: use ecmascript.EqualsWhenUppercased where upstream writes toUpperCase (jsx-ast-utils looks a prop up that way) and ecmascript.EqualsWhenLowercased where it writes toLowerCase. strings.EqualFold is neither: it folds U+017F ſ onto `s` in both directions, and never folds U+0131 ı onto `i` although uppercasing does.'
+        - pattern: '^unicode\.To(Upper|Lower|Title)?$'
+          msg: 'Use ecmascript.StringToUpperCase or ecmascript.StringToLowerCase instead.'
+        - pattern: '^unicode\.SimpleFold$'
+          msg: 'Use esregexp.Canonicalize or esregexp.CaseEquivalents instead.'
+        - pattern: '^unicode\.IsSpace$'
+          msg: 'Use ecmascript.IsWhiteSpaceOrLineTerminator instead.'
     depguard:
       rules:
         config-rule-boundary:
@@ -94,29 +95,17 @@ linters:
             - pkg: 'github.com/web-infra-dev/rslint/internal/rules'
               desc: 'Configuration depends on internal/rule abstractions; concrete Go rule aggregation belongs to internal/rules.'
         js-semantics:
-          # Lax so that the allow list below reads as an exception to a deny
-          # rather than as the only thing a rule may import.
+          # Lax so that only the listed dependencies are denied.
           list-mode: lax
           files:
             - '**/internal/rules/**'
             - '**/internal/plugins/**'
-            # A helper a rule calls answers the rule's question, so it is held
-            # to the rule's standard. The ports themselves are the exception:
-            # reading Go's tables is how they are built.
+            # Helpers used by rules follow the same boundaries. The ports
+            # themselves may use lower-level packages to implement them.
             - '**/internal/utils/**'
             - '!**/internal/utils/ecmascript/**'
-            - '!**/internal/utils/unicode17/**'
             - '!**/internal/utils/minimatch3/**'
-          allow:
-            # depguard matches an import by prefix, and the deny below would
-            # otherwise take these with it. A UTF-16 code unit is what
-            # JavaScript indexes a string by, so utf16 is as much a rule's
-            # business as utf8 is.
-            - 'unicode/utf8'
-            - 'unicode/utf16'
           deny:
-            - pkg: 'unicode'
-              desc: 'A character a rule reads is read the way JavaScript reads it, not the way Go does. Use "github.com/web-infra-dev/rslint/internal/utils/ecmascript" for case and whitespace, "github.com/web-infra-dev/rslint/internal/utils/unicode17" for a general category, and "github.com/microsoft/TypeScript/tsc/shim/scanner" for an identifier.'
             - pkg: 'github.com/dlclark/regexp2'
               desc: 'A pattern a rule is handed was written as a JavaScript regexp. Use "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp" instead.'
             - pkg: 'github.com/bmatcuk/doublestar'
@@ -124,9 +113,6 @@ linters:
 
   exclusions:
     rules:
-      - path: internal/fourslash/tests/gen/
-        linters:
-          - misspell
       - path: '_test\.go$'
         linters:
           - forcetypeassert
@@ -138,7 +124,7 @@ linters:
           - forbidigo
       # The ports are where a JavaScript answer is assembled out of Go's, so
       # they are the one place the standard library's calls belong.
-      - path: '^internal/utils/(ecmascript|unicode17|minimatch3)/'
+      - path: '^internal/utils/(ecmascript|minimatch3)/'
         linters:
           - forbidigo
       # Test scaffolding builds its own strings rather than reading a source

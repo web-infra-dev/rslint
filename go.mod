@@ -1,6 +1,6 @@
 module github.com/web-infra-dev/rslint
 
-go 1.26.0
+go 1.27.0
 
 replace (
 	github.com/microsoft/TypeScript/tsc/shim/api => ./shim/api

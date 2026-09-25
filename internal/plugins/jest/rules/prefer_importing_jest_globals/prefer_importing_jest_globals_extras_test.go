@@ -30,7 +30,7 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
         describe['skip']("suite", () => {});
       `},
 			// N/A: optional-chain on Jest globals (`describe?.()`) is not a valid Jest call chain upstream.
-			// N/A: type assertion wrappers on the callee are stripped by ParseJestFnCall for member resolution.
+			// N/A: type assertion wrappers on the callee are stripped by the Jest call parser for member resolution.
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Branch lock-in: types=["jest"] with sourceType=commonjs → require autofix ----

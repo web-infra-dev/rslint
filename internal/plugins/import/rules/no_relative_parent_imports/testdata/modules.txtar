@@ -1,0 +1,56 @@
+Upstream layout: eslint-plugin-import v2.32.0 tests/files/internal-modules.
+Only module existence matters to this rule; bodies also support the docs examples.
+
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noResolve":true,"jsx":"preserve","module":"commonjs","baseUrl":".","paths":{"@api/*":["internal-modules/api/*"],"@outside":["outside.js"],"@vendor":["internal-modules/vendor/module.js"],"require":["internal-modules/plugins/plugin.js"],"exports":["internal-modules/plugins/plugin.js"]}},"include":["**/*.ts","**/*.tsx","**/*.js"]}
+-- package.json --
+{"private":true}
+-- internal-modules/package.json --
+{"name":"internal-modules","private":true}
+-- internal-modules/plugins/plugin.js --
+export default 'plugin';
+export const value = 1;
+-- internal-modules/plugins/plugin2/index.js --
+export default 'plugin2';
+-- internal-modules/plugins/plugin2/internal.js --
+export default 'internal';
+-- internal-modules/plugins/plugin2/app/index.js --
+export default 'app';
+-- internal-modules/api/service/index.js --
+export default 'service';
+-- internal-modules/node_modules/package/index.js --
+module.exports = {};
+-- internal-modules/node_modules/@scope/package/index.js --
+module.exports = {};
+
+// Documentation examples.
+
+-- add.js --
+export default function (numbers) {
+  return numbers.reduce((sum, n) => sum + n, 0);
+}
+-- numbers/three.js --
+export default function three(add) { return add([1, 2]); }
+-- main.js --
+export default 'main';
+-- lib/a.js --
+export default 'a';
+-- lib/b.js --
+export default 'b';
+-- math/add.js --
+export { default } from '../add';
+-- node_modules/add/index.js --
+module.exports = function add(numbers) { return numbers.reduce((a, b) => a + b, 0); };
+-- node_modules/foo/index.js --
+module.exports = {};
+
+// Extra resolution targets.
+
+-- outside.js --
+export default 'outside';
+-- internal-modules/vendor/module.js --
+export default 'vendor';
+-- internal-modules/plugins/types.ts --
+export interface Value { value: string }
+-- internal-modules/plugins/😀.js --
+export default 'unicode';

@@ -34,9 +34,10 @@ func buildFixes(ctx rule.RuleContext, matched shared.Match) []rule.RuleFix {
 var PreferToContainRule = shared.NewRule(shared.Config{
 	Name: "jest/prefer-to-contain",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := jestUtils.GetJestCallAnalysis(ctx)
 		return shared.Runtime{Parse: func(node *ast.Node) *shared.ExpectCall {
-			parsed := jestUtils.ParseJestFnCall(node, ctx)
-			if parsed == nil || parsed.Kind != jestUtils.JestFnTypeExpect || parsed.MatcherEntry == nil ||
+			parsed := analysis.ParseExpectCall(node)
+			if parsed == nil || parsed.MatcherEntry == nil ||
 				testFramework.IsComputedIdentifierAccessor(parsed.MatcherEntry.Node) {
 				return nil
 			}

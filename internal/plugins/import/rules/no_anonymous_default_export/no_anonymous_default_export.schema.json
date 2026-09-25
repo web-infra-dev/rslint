@@ -1,0 +1,45 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allowArray": {
+          "description": "If `false`, will report default export of an array",
+          "type": "boolean"
+        },
+        "allowArrowFunction": {
+          "description": "If `false`, will report default export of an arrow function",
+          "type": "boolean"
+        },
+        "allowCallExpression": {
+          "description": "If `false`, will report default export of a function call",
+          "type": "boolean"
+        },
+        "allowAnonymousClass": {
+          "description": "If `false`, will report default export of an anonymous class",
+          "type": "boolean"
+        },
+        "allowAnonymousFunction": {
+          "description": "If `false`, will report default export of an anonymous function",
+          "type": "boolean"
+        },
+        "allowLiteral": {
+          "description": "If `false`, will report default export of a literal",
+          "type": "boolean"
+        },
+        "allowObject": {
+          "description": "If `false`, will report default export of an object expression",
+          "type": "boolean"
+        },
+        "allowNew": {
+          "description": "If `false`, will report default export of a class instantiation",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

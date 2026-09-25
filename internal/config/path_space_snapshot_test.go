@@ -18,6 +18,10 @@ func TestExactPathIDWindowsDrive(t *testing.T) {
 		{"A:leaf", "a:leaf", false},
 		{"C:", "c:", false},
 		{"//Server/share/a.ts", "//server/share/a.ts", false},
+		{`\\Server\share\src\..\a.ts`, "//Server/share/a.ts", true},
+		{"//Server/Share/a.ts", "//Server/share/a.ts", false},
+		{"/Repo/src/../a.ts", "/Repo/a.ts", true},
+		{"/Repo/link.ts", "/Physical/a.ts", false},
 		{"/Repo/a.ts", "/repo/a.ts", false},
 	} {
 		t.Run(test.left+" vs "+test.right, func(t *testing.T) {

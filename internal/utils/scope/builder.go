@@ -27,6 +27,16 @@ func (b *builder) push(kind Kind, block *ast.Node, parent *Scope) *Scope {
 // Declaration names, member names, labels, and other non-reference identifier
 // positions are filtered out by isReferenceIdentifier.
 func (b *builder) reference(id *ast.Node, s *Scope) {
+	if !b.collectReferences {
+		return
+	}
+	if !IsReferenceIdentifier(id) {
+		return
+	}
+	b.addReference(id, s, ESLintReferenceSpace(id), nil)
+}
+
+func (b *builder) addReference(id *ast.Node, s *Scope, space ReferenceSpace, patternTarget *ast.Node) {
 	if !b.collectReferences || id == nil || s == nil {
 		return
 	}
@@ -35,10 +45,6 @@ func (b *builder) reference(id *ast.Node, s *Scope) {
 			return
 		}
 	}
-	if !IsReferenceIdentifier(id) {
-		return
-	}
-	space := ESLintReferenceSpace(id)
 	ref := &Reference{
 		Identifier:       id,
 		From:             s,
@@ -47,6 +53,12 @@ func (b *builder) reference(id *ast.Node, s *Scope) {
 	}
 	s.References = append(s.References, ref)
 	b.manager.References = append(b.manager.References, ref)
+	if patternTarget != nil {
+		if b.manager.PatternTargets == nil {
+			b.manager.PatternTargets = make(map[*ast.Node]*ast.Node)
+		}
+		b.manager.PatternTargets[id] = patternTarget
+	}
 }
 
 func (b *builder) buildProgram(sf *ast.SourceFile) *Scope {
@@ -587,6 +599,23 @@ func (b *builder) visitExpression(expr *ast.Node, parent *Scope) {
 	case ast.KindMappedType:
 		b.visitMappedType(expr, parent)
 		return
+	case ast.KindInferType:
+		b.visitInferType(expr, parent)
+		return
+	case ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindSatisfiesExpression:
+		// A top-level assignment assertion visits its annotation as a type.
+		// Inside a destructuring pattern, scope-manager's PatternVisitor instead
+		// treats identifiers in that annotation as assignment targets.
+		outer := expr
+		for outer.Parent != nil && ast.IsOuterExpression(outer.Parent, ast.OEKParentheses|ast.OEKAssertions) && outer.Parent.Expression() == outer {
+			outer = outer.Parent
+		}
+		if target := ast.GetAssignmentTarget(outer); target != nil &&
+			(ast.IsDestructuringAssignment(target) || ast.IsForInOrOfStatement(target) || utils.IsDefaultValueInDestructuringAssignment(target)) {
+			b.visitExpression(expr.Expression(), parent)
+			b.visitAssignmentPatternType(expr.Type(), parent, expr)
+			return
+		}
 	}
 	if ast.IsFunctionTypeNode(expr) || ast.IsConstructorTypeNode(expr) ||
 		ast.IsCallSignatureDeclaration(expr) || ast.IsConstructSignatureDeclaration(expr) ||
@@ -600,6 +629,45 @@ func (b *builder) visitExpression(expr *ast.Node, parent *Scope) {
 	}
 	expr.ForEachChild(func(child *ast.Node) bool {
 		b.visitExpression(child, parent)
+		return false
+	})
+}
+
+// visitAssignmentPatternType preserves PatternVisitor's value-space traversal
+// of a type assertion nested in an assignment pattern. Type annotations on
+// signatures and properties have ESTree TSTypeAnnotation wrappers, which that
+// visitor skips. These patterns introduce neither type bindings nor scopes.
+func (b *builder) visitAssignmentPatternType(node *ast.Node, s *Scope, target *ast.Node) {
+	if node == nil {
+		return
+	}
+	if node.Kind == ast.KindIdentifier {
+		b.addReference(node, s, ReferenceValue, target)
+		return
+	}
+	var annotation *ast.Node
+	switch node.Kind {
+	case ast.KindParameter, ast.KindPropertySignature, ast.KindMethodSignature,
+		ast.KindFunctionType, ast.KindConstructorType, ast.KindCallSignature,
+		ast.KindConstructSignature, ast.KindIndexSignature, ast.KindTypePredicate:
+		annotation = node.Type()
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		b.visitExpression(node, s)
+		return
+	case ast.KindCallExpression:
+		call := node.AsCallExpression()
+		b.visitAssignmentPatternType(call.Expression, s, target)
+		if call.Arguments != nil {
+			for _, argument := range call.Arguments.Nodes {
+				b.visitExpression(argument, s)
+			}
+		}
+		return
+	}
+	node.ForEachChild(func(child *ast.Node) bool {
+		if child != annotation {
+			b.visitAssignmentPatternType(child, s, target)
+		}
 		return false
 	})
 }
@@ -642,7 +710,6 @@ func (b *builder) visitConditionalType(node *ast.Node, outer *Scope) {
 		return
 	}
 	condScope := b.push(KindType, node, outer)
-	collectInferTypes(cond.ExtendsType, condScope)
 	if cond.CheckType != nil {
 		b.visitExpression(cond.CheckType, condScope)
 	}
@@ -657,36 +724,25 @@ func (b *builder) visitConditionalType(node *ast.Node, outer *Scope) {
 	}
 }
 
-// collectInferTypes walks `extendsType` and adds each `infer X` binding to
-// the conditional-type scope. Nested function/conditional types stop the
-// walk because they introduce their own scopes.
-func collectInferTypes(node *ast.Node, s *Scope) {
-	if node == nil {
+// visitInferType binds an inferred parameter in the current type scope.
+// Function and mapped types nested in a conditional type delegate the binding
+// to that conditional scope, so its true branch can reference the inference.
+// Defining it during the ordinary walk also handles a nested conditional's
+// false branch, which is visited in its enclosing scope.
+func (b *builder) visitInferType(node *ast.Node, current *Scope) {
+	parameter := node.AsInferTypeNode().TypeParameter
+	if parameter == nil {
 		return
 	}
-	switch node.Kind {
-	case ast.KindFunctionType, ast.KindConstructorType, ast.KindConditionalType:
-		return
-	case ast.KindInferType:
-		it := node.AsInferTypeNode()
-		if it != nil && it.TypeParameter != nil {
-			tp := it.TypeParameter.AsTypeParameterDeclaration()
-			if tp != nil && tp.Name() != nil && tp.Name().Kind == ast.KindIdentifier {
-				s.Add(&Variable{
-					Name:           tp.Name().Text(),
-					ID:             tp.Name(),
-					DefNode:        it.TypeParameter,
-					Parent:         it.TypeParameter.Parent,
-					Kind:           DefTypeParameter,
-					IsValueBinding: false,
-				})
-			}
-		}
+	target := current
+	for target != nil && (target.Kind == KindFunctionType || target.Block.Kind == ast.KindMappedType) {
+		target = target.Parent
 	}
-	node.ForEachChild(func(child *ast.Node) bool {
-		collectInferTypes(child, s)
-		return false
-	})
+	if target == nil || target.Block.Kind != ast.KindConditionalType {
+		target = current
+	}
+	b.addNamedDecl(parameter, target, DefTypeParameter, false)
+	b.visitExpression(parameter.AsTypeParameterDeclaration().Constraint, current)
 }
 
 // visitFunctionType handles TS function/construct types and call/construct

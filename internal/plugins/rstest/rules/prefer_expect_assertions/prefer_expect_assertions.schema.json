@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "onlyFunctionsWithAsyncKeyword": {
+          "type": "boolean"
+        },
+        "onlyFunctionsWithExpectInLoop": {
+          "type": "boolean"
+        },
+        "onlyFunctionsWithExpectInCallback": {
+          "type": "boolean"
+        },
+        "disallowHasAssertions": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

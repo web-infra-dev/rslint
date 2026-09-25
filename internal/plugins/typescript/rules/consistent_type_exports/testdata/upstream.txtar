@@ -1,0 +1,56 @@
+-- tsconfig.json --
+{"compilerOptions":{"strict":true,"target":"esnext","module":"commonjs","skipLibCheck":true},"include":["**/*.ts"]}
+-- consistent-type-exports/index.ts --
+export type Type1 = 1;
+export type Type2 = 1;
+export const value1 = 2;
+export const value2 = 2;
+
+export class Class1 {}
+
+export type NAME = 'name';
+export const NAME = 'name';
+
+-- consistent-type-exports/reexport-1.ts --
+export type A = 1;
+
+-- consistent-type-exports/reexport-2-named.ts --
+import { A } from './reexport-1';
+const A = 1;
+export { A };
+
+-- consistent-type-exports/reexport-2-namespace.ts --
+import { A } from './reexport-1';
+namespace A {
+  export const b = 2;
+}
+export { A };
+
+-- consistent-type-exports/type-only-exports.ts --
+export type TypeFoo = 1;
+
+export interface InterfaceFoo {
+  foo: 'bar';
+}
+
+class LocalClass {}
+
+export type { LocalClass };
+
+-- consistent-type-exports/type-only-reexport.ts --
+export * from './type-only-exports';
+
+export type * as typeOnlyExports from './type-only-exports';
+
+export type * from './index';
+
+export type * as indexExports from './index';
+
+export { Type1 as AliasedType1 } from './index';
+
+import { Class1 } from './index';
+
+export { type Class1 as AliasedClass1 };
+
+-- consistent-type-exports/value-reexport.ts --
+export * from './index';

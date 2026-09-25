@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fingerprintConfigSource } from './config-source.js';
 
 import {
   collectPluginMeta,
@@ -589,8 +589,7 @@ export class ConfigModuleHost {
   }
 
   async #fingerprint(configPath: string): Promise<string> {
-    const contents = await this.#readSource(configPath);
-    return `${contents.byteLength}:${createHash('sha256').update(contents).digest('hex')}`;
+    return fingerprintConfigSource(await this.#readSource(configPath));
   }
 
   async #enqueue<T>(

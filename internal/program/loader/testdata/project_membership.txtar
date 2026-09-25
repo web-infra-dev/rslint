@@ -1,0 +1,10 @@
+-- target.ts --
+export const value = 1;
+-- main.ts --
+import "./target";
+-- unused.ts --
+import "./target";
+-- first.json --
+{"files":["main.ts"],"compilerOptions":{"noLib":true}}
+-- later.json --
+{"files":["unused.ts"],"compilerOptions":{"noLib":true}}

@@ -1,0 +1,12 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "string",
+      "enum": ["prefer-inline", "prefer-top-level"],
+      "default": "prefer-inline"
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

@@ -5,6 +5,7 @@ const ruleTester = new RuleTester();
 ruleTester.run('prefer-expect-resolves', {} as never, {
   valid: [
     { code: 'expect.hasAssertions()' },
+    { code: 'await expect().resolves.toBe(true)' },
     {
       code: `
       it('passes', async () => {
@@ -12,6 +13,7 @@ ruleTester.run('prefer-expect-resolves', {} as never, {
       });
     `,
     },
+    { code: 'expect().nothing()' },
     {
       code: `
       it('is true', async () => {

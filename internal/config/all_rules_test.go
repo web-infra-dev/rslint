@@ -459,7 +459,7 @@ func countDiagnosticsForRule(t *testing.T, fileName, source string, impl rule.Ru
 	compilerOptions := &core.CompilerOptions{
 		Target:          core.ScriptTargetESNext,
 		Module:          core.ModuleKindCommonJS,
-		ESModuleInterop: core.TSTrue,
+		ESModuleInterop: core.TSTrue, //nolint:staticcheck
 		SkipLibCheck:    core.TSTrue,
 	}
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -675,7 +675,7 @@ func createGapFileProgram(t *testing.T, sourceFiles map[string]string) *compiler
 		Jsx:             core.JsxEmitPreserve,
 		Target:          core.ScriptTargetESNext,
 		Module:          core.ModuleKindCommonJS,
-		ESModuleInterop: core.TSTrue,
+		ESModuleInterop: core.TSTrue, //nolint:staticcheck
 		SkipLibCheck:    core.TSTrue,
 	}
 

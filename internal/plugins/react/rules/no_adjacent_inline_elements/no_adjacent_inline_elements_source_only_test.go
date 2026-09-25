@@ -30,7 +30,7 @@ function f(createElement) {
 	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
 		Target:          core.ScriptTargetESNext,
 		Module:          core.ModuleKindCommonJS,
-		ESModuleInterop: core.TSTrue,
+		ESModuleInterop: core.TSTrue, //nolint:staticcheck
 		SkipLibCheck:    core.TSTrue,
 	}, []string{filePath}, utils.CreateCompilerHost(tmpDir, bundled.WrapFS(cachedvfs.From(osvfs.FS()))))
 	if err != nil {

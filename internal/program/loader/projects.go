@@ -345,9 +345,9 @@ func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error)
 	if err != nil {
 		return ProjectSet{}, err
 	}
-	if request.Scope != Targeted {
-		// Focused execution already validates every selected direct root. Eager
-		// modes need the same check before publishing service selections, even
+	if request.Scope == AllDeclared {
+		// Target-driven execution validates every selected direct root. The
+		// complete type-check build also validates service selections, even
 		// when type-check-only will never enter the lint binding phase.
 		for _, file := range request.Targets.Files {
 			if request.Policies[file].ServiceRootDirectory == "" {

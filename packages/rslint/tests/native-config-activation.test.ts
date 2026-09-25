@@ -2,6 +2,7 @@ import { describe, expect, test } from 'rstack/test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fingerprintConfigSource } from '../src/config/config-source.js';
 
 import {
   PluginHostLifecycle,
@@ -94,7 +95,16 @@ describe('native API config activation', () => {
         stageNativeConfigActivation(
           configHost,
           request,
-          async () => async () => {
+          async () => async (configs) => {
+            expect(configs).toEqual([
+              {
+                configPath,
+                configDirectory: root,
+                sourceFingerprint: fingerprintConfigSource(
+                  fs.readFileSync(configPath),
+                ),
+              },
+            ]);
             createCalls++;
             fs.writeFileSync(configPath, '// bytes imported by worker\n');
             return {
