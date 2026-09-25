@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -111,6 +112,190 @@ func TestFileMatchPathMatchesPreReuseBehavior(t *testing.T) {
 	}
 }
 
+func TestFileIgnoreMatcherMatchesSequentialEvaluation(t *testing.T) {
+	random := rand.New(rand.NewSource(0x51a7))
+	literals := []string{
+		"src/app.ts", "src/other.ts", "src/app.test.ts", "src/nested/app.ts",
+		"", "src/", "src/中文.ts", "src/UPPER.ts", "src/name!.ts", "src/../root.ts",
+	}
+	otherPatterns := []string{
+		"!src/app.ts", "!src/**/*.ts", "src/**", "src/*.{js,ts}",
+		"src/[ab]*.ts", "src/?.ts", "src/[", "src/{", "src/\ufffd.ts", "src/\xff.ts",
+	}
+	targets := []struct{ path, cwd string }{
+		{"/repo/src/app.ts", "/repo"},
+		{"/repo/src/other.ts", "/repo"},
+		{"/repo/src/app.test.ts", "/repo"},
+		{"/repo/src/nested/app.ts", "/repo"},
+		{"/repo/src/中文.ts", "/repo"},
+		{"/repo/src/UPPER.ts", "/repo"},
+		{"/repo/src/upper.ts", "/repo"},
+		{"/repo/src/\xff.ts", "/repo"},
+		{"/repo/root.ts", "/repo"},
+		{"/other/src/app.ts", "/repo"},
+		{"", ""},
+		{`src\app.ts`, ""},
+		{`C:\Repo\src\app.ts`, "C:/Repo"},
+		{"//server/share/src/app.ts", "//server/share"},
+	}
+	for sample := range 300 {
+		var raw []string
+		for range 3 {
+			for range 8 + random.Intn(8) {
+				raw = append(raw, literals[random.Intn(len(literals))])
+			}
+			for range 1 + random.Intn(4) {
+				raw = append(raw, otherPatterns[random.Intn(len(otherPatterns))])
+			}
+		}
+		patterns := ParseIgnorePatterns(raw)
+		matcher := newFileIgnoreMatcher(patterns)
+		if len(matcher.steps) == 0 {
+			t.Fatal("the differential corpus must exercise indexed literals")
+		}
+		for _, target := range targets {
+			legacy := newFileMatchPath(target.path, target.cwd)
+			prepared := newFileMatchPath(target.path, target.cwd)
+			if got, want := matcher.isIgnored(&prepared), legacy.isIgnored(patterns); got != want {
+				t.Fatalf("sample %d target %+v: got %v, want %v; patterns %q", sample, target, got, want, raw)
+			}
+		}
+	}
+
+	for _, unsupported := range []IgnorePattern{
+		{Glob: "src/app.ts", GitPattern: true},
+		{Glob: "src/app.ts", CaseInsensitive: true},
+		{Glob: "src/app.ts", MatchDirectory: "/repo"},
+		{Glob: "src/app.ts", PhysicalMatchDirectory: "/repo"},
+		{Glob: "src/app.ts", LexicalMatchDirectory: "/repo"},
+	} {
+		patterns := append(ParseIgnorePatterns(literals), unsupported)
+		if matcher := newFileIgnoreMatcher(patterns); matcher.steps != nil {
+			t.Fatalf("special path semantics must use the original matcher: %+v", unsupported)
+		}
+	}
+}
+
+func literalFileIgnoresForTest(count int) []string {
+	patterns := make([]string, count)
+	for index := range patterns {
+		patterns[index] = fmt.Sprintf("src/generated/file%d.ts", index)
+	}
+	return patterns
+}
+
+func TestFileIgnoreMatcherOrderedOverrides(t *testing.T) {
+	literals := literalFileIgnoresForTest(8)
+	target := literals[0]
+	for _, test := range []struct {
+		name     string
+		patterns []string
+		path     string
+		cwd      string
+		want     bool
+	}{
+		{"literal hit", literals, target, "", true},
+		{"literal miss", literals, "src/other.ts", "", false},
+		{"literal is not a directory block", literals, target + "/child.ts", "", false},
+		{"trailing separator", literals, target + "/", "", false},
+		{"case remains significant", literals, strings.ToUpper(target), "", false},
+		{"unix fallback", literals, strings.ReplaceAll(target, "/", `\`), "", true},
+		{"relative normalization", literals, "/repo/src/../" + target, "/repo", true},
+		{"later negation", slices.Concat(literals, []string{"!" + target}), target, "", false},
+		{"earlier negation", slices.Concat([]string{"!" + target}, literals), target, "", true},
+		{"later literal segment", slices.Concat(literals, []string{"!**/*.ts"}, literals), target, "", true},
+		{"earlier glob survives literal miss", slices.Concat([]string{"src/**"}, literals), "src/other.ts", "", true},
+		{"later negated glob", slices.Concat(literals, []string{"!src/**"}), target, "", false},
+		{"later positive glob", slices.Concat(literals, []string{"!" + target, "src/**"}), target, "", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			matcher := newFileIgnoreMatcher(ParseIgnorePatterns(test.patterns))
+			path := newFileMatchPath(test.path, test.cwd)
+			if got := matcher.isIgnored(&path); got != test.want {
+				t.Fatalf("isIgnored(%q) = %v, want %v", test.path, got, test.want)
+			}
+		})
+	}
+}
+
+func TestFileIgnoreMatcherFallback(t *testing.T) {
+	for _, count := range []int{0, 1, 7, 8} {
+		matcher := newFileIgnoreMatcher(ParseIgnorePatterns(literalFileIgnoresForTest(count)))
+		if indexed := len(matcher.steps) > 0; indexed != (count == 8) {
+			t.Fatalf("%d literals: indexed = %v", count, indexed)
+		}
+		path := newFileMatchPath("/repo/src/generated/file0.ts", "/repo")
+		if got := matcher.isIgnored(&path); got != (count > 0) {
+			t.Fatalf("%d literals: ignored = %v", count, got)
+		}
+		if count == 0 && path.ready {
+			t.Fatal("empty ignores must not normalize the file path")
+		}
+	}
+	// These patterns cannot use byte equality, even when every pattern in the
+	// list is the same. The glob engine decodes invalid bytes as RuneError.
+	for _, test := range []struct{ glob, path string }{
+		{`src/\*.ts`, "src/*.ts"},
+		{"src/\ufffd.ts", "src/\xff.ts"},
+		{"src/\xfe.ts", "src/\xff.ts"},
+	} {
+		patterns := make([]IgnorePattern, 8)
+		for index := range patterns {
+			patterns[index] = IgnorePattern{Glob: test.glob}
+		}
+		matcher := newFileIgnoreMatcher(patterns)
+		path := newFileMatchPath(test.path, "")
+		if len(matcher.steps) != 0 || !matcher.isIgnored(&path) {
+			t.Fatalf("pattern %q must keep glob semantics for %q", test.glob, test.path)
+		}
+	}
+}
+
+func FuzzFileIgnoreMatcherMatchesSequentialEvaluation(f *testing.F) {
+	f.Add("!src/generated/file0.ts", "src/generated/file0.ts", "")
+	f.Add("src/**\n!src/generated/file0.ts", "/repo/src/generated/file0.ts", "/repo")
+	f.Add("src/\ufffd.ts", "src/\xff.ts", "")
+	f.Add("!**/*.ts\nsrc/*.ts", `src\generated\file0.ts`, "")
+	f.Add("src/[a-z].ts\nsrc/{a,b}.ts", "C:/Repo/src/a.ts", "C:/Repo")
+	f.Fuzz(func(t *testing.T, encodedPatterns, filePath, cwd string) {
+		if len(encodedPatterns) > 512 || len(filePath) > 256 || len(cwd) > 256 {
+			t.Skip()
+		}
+		// Surround arbitrary ordered patterns with literal runs so mutations
+		// exercise transitions into and out of indexed segments as well.
+		raw := slices.Concat(literalFileIgnoresForTest(8), strings.Split(encodedPatterns, "\n"))
+		for index := range 8 {
+			raw = append(raw, fmt.Sprintf("other/file%d.ts", index))
+		}
+		patterns := ParseIgnorePatterns(raw)
+		matcher := newFileIgnoreMatcher(patterns)
+		path := newFileMatchPath(filePath, cwd)
+		legacy := newFileMatchPath(filePath, cwd)
+		if got, want := matcher.isIgnored(&path), legacy.isIgnored(patterns); got != want {
+			t.Fatalf("file=%q cwd=%q patterns=%q: got %v, want %v", filePath, cwd, raw, got, want)
+		}
+	})
+}
+
+func BenchmarkFileIgnoreMatcher(b *testing.B) {
+	for _, count := range []int{0, 4, 8, 512} {
+		matcher := newFileIgnoreMatcher(ParseIgnorePatterns(literalFileIgnoresForTest(count)))
+		for _, target := range []struct{ name, path string }{
+			{"miss_shared_prefix", "/repo/src/generated/not-ignored.ts"},
+			{"miss_other_prefix", "/repo/packages/example/main.ts"},
+			{"hit", "/repo/src/generated/file0.ts"},
+		} {
+			b.Run(fmt.Sprintf("patterns=%d/%s", count, target.name), func(b *testing.B) {
+				b.ReportAllocs()
+				for b.Loop() {
+					path := newFileMatchPath(target.path, "/repo")
+					matcher.isIgnored(&path)
+				}
+			})
+		}
+	}
+}
+
 func TestFileMatchPathPreservesLazyAndNestedSelectorSemantics(t *testing.T) {
 	matchPath := newFileMatchPath("/repo/src/app.ts", "/repo")
 	if matchPath.isIgnored(nil) || matchPath.matchesAny(nil) {
@@ -212,8 +397,10 @@ func TestConfigShapeResolutionMatchesLegacyAlgorithm(t *testing.T) {
 				entry.FilePatternGroups = [][]string{{}}
 			}
 			if random.Intn(4) == 0 {
-				ignores := []string{"**/*.test.ts", "src/generated/**", "!src/generated/keep.ts"}
-				entry.Ignores = ignores[:1+random.Intn(len(ignores))]
+				ignores := slices.Concat(literalFileIgnoresForTest(16), []string{
+					"src/app.ts", "**/*.test.ts", "src/generated/**", "!src/generated/keep.ts",
+				})
+				entry.Ignores = ignores[:len(ignores)-random.Intn(4)]
 			}
 			if random.Intn(3) != 0 {
 				severities := []any{"off", "warn", "error", []any{"error", map[string]any{"allow": []any{"warn"}}}}
@@ -278,7 +465,7 @@ func TestFileConfigResolverMatchesDirectResolutionAcrossShapes(t *testing.T) {
 		},
 		{
 			Files:   []string{"src/**/*.ts"},
-			Ignores: []string{"**/*.test.ts"},
+			Ignores: append(literalFileIgnoresForTest(8), "**/*.test.ts"),
 			Rules: Rules{
 				"eqeqeq": "warn",
 			},
@@ -304,6 +491,8 @@ func TestFileConfigResolverMatchesDirectResolutionAcrossShapes(t *testing.T) {
 		"/repo/src/special.ts",
 		"/repo/src/a.test.ts",
 		"/repo/src/a.js",
+		"/repo/src/generated/file0.ts",
+		"/repo/src/generated/file0.ts/child.ts",
 		"/repo/components/view.vue",
 		"/repo/generated/skip.ts",
 		"/repo/outside.unsupported",
@@ -419,7 +608,8 @@ func TestFileConfigResolverPreservesWindowsPathMatching(t *testing.T) {
 
 func TestFileConfigResolverConcurrentShapePublication(t *testing.T) {
 	config := RslintConfig{{
-		Files: []string{"src/**/*.ts"},
+		Ignores: literalFileIgnoresForTest(16),
+		Files:   []string{"src/**/*.ts"},
 		Rules: Rules{
 			"no-console":  "warn",
 			"no-debugger": "error",
@@ -570,4 +760,304 @@ func legacyMergedConfigForTest(
 		return nil
 	}
 	return merged
+}
+
+func TestFileConfigResolverTargetMatchCompatibility(t *testing.T) {
+	base := RslintConfig{
+		{Ignores: []string{"generated/**", "!generated/keep.ts"}},
+		{Files: []string{"src/**/*.ts"}, Rules: Rules{"no-console": "warn"}},
+		{FilePatternGroups: [][]string{{"src/**", "**/*.ts"}}, Rules: Rules{"no-debugger": "error"}},
+	}
+	for _, test := range []struct {
+		name   string
+		change func(RslintConfig) RslintConfig
+		reuse  bool
+	}{
+		{"same", func(c RslintConfig) RslintConfig { return c }, true},
+		{"execution values", func(c RslintConfig) RslintConfig {
+			c[1].Rules = Rules{"no-console": "off"}
+			c[1].Settings = Settings{"execution": true}
+			c[1].LanguageOptions = &LanguageOptions{Raw: map[string]any{"globals": map[string]any{"defined": "readonly"}}}
+			return c
+		}, true},
+		{"unconditional overlay", func(c RslintConfig) RslintConfig { return append(c, ConfigEntry{Rules: Rules{"no-console": "error"}}) }, true},
+		{"changed selectors", func(c RslintConfig) RslintConfig { c[1].Files = []string{"**/*.vue"}; return c }, false},
+		{"changed AND group", func(c RslintConfig) RslintConfig {
+			c[2].FilePatternGroups = [][]string{{"other/**", "**/*.ts"}}
+			return c
+		}, false},
+		{"changed local ignores", func(c RslintConfig) RslintConfig { c[1].Ignores = []string{"src/a.ts"}; return c }, false},
+		{"changed ignore order", func(c RslintConfig) RslintConfig {
+			c[0].Ignores = []string{"!generated/keep.ts", "generated/**"}
+			return c
+		}, false},
+		{"global becomes local", func(c RslintConfig) RslintConfig { c[0].Rules = Rules{}; return c }, false},
+		{"authored origin", func(c RslintConfig) RslintConfig { return ConfigWithAuthoredPathBase(c, "/other") }, false},
+		{"scoped base", func(c RslintConfig) RslintConfig { value := "src"; c[1].BasePath = &value; return c }, false},
+		{"collected git scope", func(c RslintConfig) RslintConfig {
+			c[0].collectedGitignore = &collectedGitignoreMetadata{scopes: []collectedGitignoreScope{{lexicalDirectory: "/repo"}}}
+			return c
+		}, false},
+		{"appended selector", func(c RslintConfig) RslintConfig { return append(c, ConfigEntry{Files: []string{"**/*.vue"}}) }, false},
+		{"appended ignore", func(c RslintConfig) RslintConfig { return append(c, ConfigEntry{Ignores: []string{"src/**"}}) }, false},
+		{"appended scoped entry", func(c RslintConfig) RslintConfig {
+			value := "src"
+			return append(c, ConfigEntry{BasePath: &value, Rules: Rules{"no-console": "off"}})
+		}, false},
+		{"shortened array", func(c RslintConfig) RslintConfig { return c[:1] }, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			final := test.change(slices.Clone(base))
+			spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": append(slices.Clone(base), final...)}, nil)
+			matcher, err := NewTargetMatcherWithPathSpaces(base, "/repo", nil, spaces)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resolver, err := NewFileConfigResolverWithPathSpaces(final, "/repo", nil, spaces, baseRuleCatalog())
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, path := range []string{"/repo/src/a.ts", "/repo/src/a.vue", "/repo/generated/a.ts", "/repo/generated/keep.ts", "/other/a.ts"} {
+				identity := PathIdentity{Path: path, CanonicalPath: path, CanonicalParentPath: path[:strings.LastIndex(path, "/")]}
+				match := matcher.MatchFile(identity)
+				decision, reused := resolver.reuseTargetMatch(identity, &match)
+				if reused != test.reuse {
+					t.Fatalf("%s: reuse = %v, want %v", path, reused, test.reuse)
+				}
+				if reused && decision != resolver.targetResolver.resolveTarget(identity) {
+					t.Fatalf("%s: reused decision differs from full matching", path)
+				}
+				assertTargetMatchResolution(t, resolver, identity, &match)
+			}
+		})
+	}
+}
+
+func assertTargetMatchResolution(t testing.TB, resolver *FileConfigResolver, identity PathIdentity, match *TargetMatch) {
+	t.Helper()
+	got := resolver.ResolveTargetWithMatch(identity, match)
+	fresh := newFileConfigResolver(resolver.config, resolver.configDirectory, resolver.catalog, resolver.targetResolver)
+	want := fresh.ResolveTarget(identity)
+	if got.GloballyIgnored != want.GloballyIgnored || !reflect.DeepEqual(got.MergedConfig, want.MergedConfig) ||
+		!reflect.DeepEqual(configuredRuleViews(got.EnabledRules), configuredRuleViews(want.EnabledRules)) {
+		t.Fatalf("%s: discovery match changed resolved configuration", identity.Path)
+	}
+}
+
+func TestFileConfigResolverTargetMatchProvenance(t *testing.T) {
+	entries := RslintConfig{{Files: []string{"src/**"}, Rules: Rules{"no-console": "error"}}}
+	spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": entries, "/other": entries}, nil)
+	matcher, err := NewTargetMatcherWithPathSpaces(entries, "/repo", nil, spaces)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := PathIdentity{Path: "/repo/src/a.ts", CanonicalPath: "/physical/a.ts", CanonicalParentPath: "/physical"}
+	match := matcher.MatchFile(identity)
+	for _, test := range []struct {
+		name     string
+		owner    string
+		spaces   *PathSpaceSnapshot
+		identity PathIdentity
+		match    *TargetMatch
+		reuse    bool
+	}{
+		{"same", "/repo", spaces, identity, &match, true},
+		{"nil match", "/repo", spaces, identity, nil, false},
+		{"zero match", "/repo", spaces, identity, &TargetMatch{}, false},
+		{"lexical alias", "/repo", spaces, PathIdentity{Path: "/repo/other/a.ts", CanonicalPath: identity.CanonicalPath, CanonicalParentPath: identity.CanonicalParentPath}, &match, false},
+		{"canonical file", "/repo", spaces, PathIdentity{Path: identity.Path, CanonicalPath: "/changed/a.ts", CanonicalParentPath: identity.CanonicalParentPath}, &match, false},
+		{"canonical parent", "/repo", spaces, PathIdentity{Path: identity.Path, CanonicalPath: identity.CanonicalPath, CanonicalParentPath: "/changed"}, &match, false},
+		{"incomplete identity", "/repo", spaces, PathIdentity{Path: identity.Path}, &match, false},
+		{"other owner", "/other", spaces, identity, &match, false},
+		{"other generation", "/repo", NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": entries}, nil), identity, &match, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			resolver, err := NewFileConfigResolverWithPathSpaces(entries, test.owner, nil, test.spaces, baseRuleCatalog())
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, reused := resolver.reuseTargetMatch(test.identity, test.match)
+			if reused != test.reuse {
+				t.Fatalf("reuse = %v, want %v", reused, test.reuse)
+			}
+			assertTargetMatchResolution(t, resolver, test.identity, test.match)
+		})
+	}
+	// Matching without a frozen path-space generation cannot consume a match.
+	plain := NewFileConfigResolver(entries, "/repo", baseRuleCatalog())
+	if _, reused := plain.reuseTargetMatch(identity, &match); reused {
+		t.Fatal("reused a match without a generation")
+	}
+	assertTargetMatchResolution(t, plain, identity, &match)
+}
+
+func TestFileConfigResolverTargetMatchOverlayBitsets(t *testing.T) {
+	for _, count := range []int{0, 1, 63, 64, 65, 72, 128, 129} {
+		for _, appended := range []int{0, 1, 8} {
+			t.Run(fmt.Sprintf("entries-%d-overlay-%d", count, appended), func(t *testing.T) {
+				before := make(RslintConfig, count)
+				for index := range before {
+					before[index] = ConfigEntry{Files: []string{"src/**/*.ts"}, Settings: Settings{fmt.Sprintf("entry%d", index): true}}
+				}
+				if count > 0 {
+					before[0] = ConfigEntry{Ignores: []string{"generated/**"}}
+				}
+				after := slices.Clone(before)
+				for index := range appended {
+					after = append(after, ConfigEntry{Rules: Rules{"no-console": "off"}, Settings: Settings{fmt.Sprintf("overlay%d", index): true}})
+				}
+				spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": before}, nil)
+				matcher, err := NewTargetMatcherWithPathSpaces(before, "/repo", nil, spaces)
+				if err != nil {
+					t.Fatal(err)
+				}
+				resolver, err := NewFileConfigResolverWithPathSpaces(after, "/repo", nil, spaces, baseRuleCatalog())
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, path := range []string{"/repo/src/a.ts", "/repo/other/a.ts", "/repo/src/a.vue", "/repo/generated/a.ts"} {
+					identity := PathIdentity{Path: path, CanonicalPath: path, CanonicalParentPath: path[:strings.LastIndex(path, "/")]}
+					match := matcher.MatchFile(identity)
+					decision, reused := resolver.reuseTargetMatch(identity, &match)
+					if !reused || decision != resolver.targetResolver.resolveTarget(identity) {
+						t.Fatalf("%s: bitset or selection changed", path)
+					}
+					assertTargetMatchResolution(t, resolver, identity, &match)
+				}
+			})
+		}
+	}
+}
+
+func TestFileConfigResolverTargetMatchConcurrentPublication(t *testing.T) {
+	entries := RslintConfig{{Files: []string{"**/*.ts"}, Rules: Rules{"no-console": "error"}}}
+	spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": entries}, nil)
+	matcher, err := NewTargetMatcherWithPathSpaces(entries, "/repo", nil, spaces)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolver, err := NewFileConfigResolverWithPathSpaces(entries, "/repo", nil, spaces, baseRuleCatalog())
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := make(chan *MergedConfig, 128)
+	var group sync.WaitGroup
+	for index := range 128 {
+		group.Go(func() {
+			path := fmt.Sprintf("/repo/file%d.ts", index%16)
+			identity := PathIdentity{Path: path, CanonicalPath: path, CanonicalParentPath: "/repo"}
+			match := matcher.MatchFile(identity)
+			results <- resolver.ResolveTargetWithMatch(identity, &match).MergedConfig
+		})
+	}
+	group.Wait()
+	close(results)
+	var first *MergedConfig
+	for merged := range results {
+		if merged == nil {
+			t.Fatal("selected file lost its config")
+		}
+		if first == nil {
+			first = merged
+		} else if merged != first {
+			t.Fatal("concurrent matches published different shape plans")
+		}
+	}
+}
+
+func TestFileConfigResolverTargetMatchFilesystemMode(t *testing.T) {
+	entries := RslintConfig{{Files: []string{"**/*.ts"}}}
+	spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": entries}, nil)
+	matcher, err := NewTargetMatcherWithPathSpaces(entries, "/repo", nil, spaces)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := PathIdentity{Path: "/repo/a.ts", CanonicalPath: "/repo/a.ts", CanonicalParentPath: "/repo"}
+	match := matcher.MatchFile(identity)
+	for _, sensitive := range []bool{false, true} {
+		fsys := &pathSpaceTestFS{caseSensitive: sensitive}
+		resolver, err := NewFileConfigResolverWithPathSpaces(entries, "/repo", fsys, spaces, baseRuleCatalog())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, reused := resolver.reuseTargetMatch(identity, &match); reused {
+			t.Fatal("reused across filesystem matching modes")
+		}
+		assertTargetMatchResolution(t, resolver, identity, &match)
+	}
+}
+
+func FuzzTargetMatchReuse(f *testing.F) {
+	for _, seed := range [][]byte{{0, 0}, {1, 1}, {63, 2, 5}, {64, 2, 3, 4}, {65, 3, 2, 1}, {129, 4, 7}, {72, 5, 6}, {2, 6, 1}, {5, 7, 9}} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) < 2 {
+			return
+		}
+		at := func(index int) byte { return data[index%len(data)] }
+		patterns := []string{"**/*.ts", "src/**", "**/*.vue", "!src/a.ts", "**/*.{js,ts}"}
+		before := make(RslintConfig, int(data[0])%132)
+		for index := range before {
+			value := at(index + 2)
+			entry := ConfigEntry{Rules: Rules{"no-console": "warn"}}
+			if value&1 != 0 {
+				entry.Files = []string{patterns[int(value)%len(patterns)]}
+			}
+			if value&2 != 0 {
+				entry.Ignores = []string{"src/**", "!src/a.ts"}
+			}
+			if value&4 != 0 {
+				entry.Rules = nil
+			}
+			if value&8 != 0 {
+				entry.FilePatternGroups = [][]string{{"src/**", "**/*.ts"}}
+			}
+			before[index] = entry
+		}
+		after := slices.Clone(before)
+		switch data[1] % 8 {
+		case 0:
+		case 1:
+			if len(after) > 0 {
+				after[0].Rules = Rules{"no-console": "error"}
+			}
+		case 2:
+			for range int(at(2)%10) + 1 {
+				after = append(after, ConfigEntry{Rules: Rules{"no-console": "off"}})
+			}
+		case 3:
+			after = append(after, ConfigEntry{Files: []string{"**/*.vue"}})
+		case 4:
+			if len(after) > 0 {
+				after[0].Ignores = []string{"src/**"}
+			}
+		case 5:
+			if len(after) > 0 {
+				after = after[:len(after)-1]
+			}
+		case 6:
+			after = ConfigWithAuthoredPathBase(after, "/other")
+		case 7:
+			value := "src"
+			after = append(after, ConfigEntry{BasePath: &value, Rules: Rules{"no-console": "error"}})
+		}
+		spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": append(slices.Clone(before), after...)}, nil)
+		matcher, err := NewTargetMatcherWithPathSpaces(before, "/repo", nil, spaces)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resolver, err := NewFileConfigResolverWithPathSpaces(after, "/repo", nil, spaces, baseRuleCatalog())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, path := range []string{"/repo/src/a.ts", "/repo/src/a.vue", "/repo/other/b.ts"} {
+			identity := PathIdentity{Path: path, CanonicalPath: path, CanonicalParentPath: path[:strings.LastIndex(path, "/")]}
+			match := matcher.MatchFile(identity)
+			if decision, reused := resolver.reuseTargetMatch(identity, &match); reused && decision != resolver.targetResolver.resolveTarget(identity) {
+				t.Fatalf("%s: reused decision differs from full matching", path)
+			}
+			assertTargetMatchResolution(t, resolver, identity, &match)
+		}
+	})
 }
