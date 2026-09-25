@@ -19,8 +19,8 @@ func TestPreferArrayLastMethodsDocs(t *testing.T) {
 			{Code: "const result = array.reduceRight(reducer, initialValue);"},
 		},
 		[]rule_tester.InvalidTestCase{
-			{Code: "const result = array.reverse().find(isUnicorn);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-array-last-methods", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replace", Output: "const result = array.findLast(isUnicorn);"}}}}},
-			{Code: "const result = array.toReversed().reduce(reducer, initialValue);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-array-last-methods", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replace", Output: "const result = array.reduceRight(reducer, initialValue);"}}}}},
+			{Code: "const result = array.reverse().find(isUnicorn);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-array-last-methods", Message: "Prefer `Array#findLast()` over `Array#reverse().find()`.", Line: 1, Column: 32, EndLine: 1, EndColumn: 36, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replace", Output: "const result = array.findLast(isUnicorn);"}}}}},
+			{Code: "const result = array.toReversed().reduce(reducer, initialValue);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-array-last-methods", Message: "Prefer `Array#reduceRight()` over `Array#toReversed().reduce()`.", Line: 1, Column: 35, EndLine: 1, EndColumn: 41, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replace", Output: "const result = array.reduceRight(reducer, initialValue);"}}}}},
 		},
 	)
 }
