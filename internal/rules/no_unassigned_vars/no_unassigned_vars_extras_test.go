@@ -1,9 +1,16 @@
 package no_unassigned_vars
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -307,6 +314,117 @@ export function Input() {
 	)
 }
 
+func TestNoUnassignedVarsReporting(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		code string
+		want []string
+	}{
+		{
+			name: "escaped name and declaration trivia",
+			code: `export let /* trivia */ /*report*/\u0076\u0061\u006c\u0075\u0065 /* type */: string; consume(value);`,
+			want: []string{`\u0076\u0061\u006c\u0075\u0065 /* type */: string`},
+		},
+		{
+			name: "repeated declarations honor individual suppressions",
+			code: `// eslint-disable-next-line no-unassigned-vars
+export var value;
+var /*report*/value;
+/* eslint-disable no-unassigned-vars */
+var value;
+/* eslint-enable no-unassigned-vars */
+var /*report*/value;
+var value; // eslint-disable-line no-unassigned-vars
+consume(value);`,
+			want: []string{"value", "value"},
+		},
+		{
+			name: "disabled writes still assign the binding",
+			code: `export var value; consume(value);
+// eslint-disable-next-line no-unassigned-vars
+var value = 1;`,
+		},
+		{
+			name: "disabled assignments still assign the binding",
+			code: `let value; consume(value);
+// eslint-disable-next-line no-unassigned-vars
+value = 1;`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/no-unassigned-vars.ts", Path: "/no-unassigned-vars.ts",
+			}, test.code, core.ScriptKindTS)
+			binder.BindSourceFile(sourceFile)
+			_, refsInit, _ := rule.ResolveLanguageDefaults(sourceFile.FileName(), rule.LanguageOptions{})
+			for _, shared := range []bool{false, true} {
+				for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
+					t.Run(fmt.Sprintf("shared=%t/demand=%d", shared, demand), func(t *testing.T) {
+						refs := rule.NewRefStore(sourceFile, &core.CompilerOptions{}, nil, refsInit)
+						comments := rule.NewCommentStore(sourceFile)
+						ctx := rule.RuleContext{
+							SourceFile:     sourceFile,
+							Refs:           refs,
+							DisableManager: rule.NewDisableManager(sourceFile, comments),
+						}
+						var diagnostics []rule.RuleDiagnostic
+						ctx = ctx.WithDiagnosticConsumer(NoUnassignedVarsRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
+							Demand: demand,
+							Report: func(diagnostic rule.RuleDiagnostic) { diagnostics = append(diagnostics, diagnostic) },
+						})
+						var visit func(*ast.Node) bool
+						visit = func(node *ast.Node) bool {
+							if shared && node.Kind == ast.KindVariableDeclaration {
+								refs.References(node.Symbol())
+								refs.References(node.LocalSymbol())
+							}
+							node.ForEachChild(visit)
+							return false
+						}
+						visit(sourceFile.AsNode())
+						listeners := NoUnassignedVarsRule.Run(ctx, nil)
+						visit = func(node *ast.Node) bool {
+							if listener := listeners[node.Kind]; listener != nil {
+								listener(node)
+							}
+							node.ForEachChild(visit)
+							if listener := listeners[rule.ListenerOnExit(node.Kind)]; listener != nil {
+								listener(node)
+							}
+							return false
+						}
+						visit(sourceFile.AsNode())
+						if len(diagnostics) != len(test.want) {
+							t.Fatalf("got %d diagnostics, want %d: %v", len(diagnostics), len(test.want), diagnostics)
+						}
+						position := 0
+						for i, spelling := range test.want {
+							const marker = "/*report*/"
+							offset := strings.Index(test.code[position:], marker)
+							if offset < 0 {
+								t.Fatal("missing expected diagnostic marker")
+							}
+							position += offset + len(marker)
+							diagnostic := diagnostics[i]
+							if diagnostic.Range.Pos() != position || diagnostic.Range.End() != position+len(spelling) {
+								t.Errorf("range = %v, want [%d, %d)", diagnostic.Range, position, position+len(spelling))
+							}
+							if diagnostic.Message.Id != "unassigned" || diagnostic.Message.Data["name"] != "value" ||
+								diagnostic.Message.Description != "'value' is always 'undefined' because it's never assigned." {
+								t.Errorf("unexpected message: %v", diagnostic.Message)
+							}
+							if diagnostic.RuleName != NoUnassignedVarsRule.Name || diagnostic.Severity != rule.SeverityWarning ||
+								diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+								t.Errorf("unexpected rule, severity, or edits: %v", diagnostic)
+							}
+						}
+					})
+				}
+			}
+		})
+	}
+}
+
 // TestNoUnassignedVarsRefStoreEdges targets the semantic boundaries that can
 // regress when reference lookup moves from checker searches to ctx.Refs.
 func TestNoUnassignedVarsRefStoreEdges(t *testing.T) {
@@ -323,6 +441,21 @@ func TestNoUnassignedVarsRefStoreEdges(t *testing.T) {
 			{Code: `var value; if (condition) { var value = 1; } consume(value);`},
 			{Code: `export var value; var value = 1; consume(value);`},
 			{Code: `export var value; for (var value of values) {} consume(value);`},
+			{Code: `var value; export var value = 1; consume(value);`},
+			{Code: `export var value = 1; var value; consume(value);`},
+			{Code: `export var value; export var value = 1; consume(value);`},
+			{Code: `for (var value in object) {} var value; consume(value);`},
+			{Code: `export var value; for (var value in object) {} consume(value);`},
+			{Code: `namespace Runtime { export var value; var value = 1; consume(value); }`},
+			{Code: `namespace Runtime { var value; export var value = 1; consume(value); }`},
+			{Code: `export var value; var value; value = 1; consume(value);`},
+			{Code: `var value; var value; value = 1; var value; consume(value);`},
+			{Code: `consume(value); value = 1; var value;`},
+			{Code: `let value; function f(other = (value = 1)) { var value; } consume(value);`},
+
+			// Each loop declaration is assigned, including captured bindings.
+			{Code: `for (let value of values) { const read = () => value; consume(read); }`},
+			{Code: `async function f() { for await (let value of values) consume(value); }`},
 
 			// Export modifiers do not themselves read a declaration.
 			{Code: `export let value;`},
@@ -367,6 +500,33 @@ func TestNoUnassignedVarsRefStoreEdges(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					unassignedError("value", 1, 12, 1, 17),
 					unassignedError("value", 1, 23, 1, 28),
+				},
+			},
+			{
+				Code: `var value; export var value; consume(value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 5, 1, 10),
+					unassignedError("value", 1, 23, 1, 28),
+				},
+			},
+			{
+				Code: `export var value; export var value; consume(value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 12, 1, 17),
+					unassignedError("value", 1, 30, 1, 35),
+				},
+			},
+			{
+				Code: `let value; for (let value of values) consume(value); consume(value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 5, 1, 10),
+				},
+			},
+			{
+				Code: `namespace Runtime { export var value; var value; consume(value); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 32, 1, 37),
+					unassignedError("value", 1, 43, 1, 48),
 				},
 			},
 			{
