@@ -19,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_document_cookie"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_exports_in_scripts"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_global_object_property_assignment"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_instanceof_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_fetch_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_remove_event_listener"
@@ -91,6 +92,7 @@ func GetAllRules() []rule.Rule {
 		no_await_in_promise_methods.NoAwaitInPromiseMethodsRule,
 		no_document_cookie.NoDocumentCookieRule,
 		no_exports_in_scripts.NoExportsInScriptsRule,
+		no_global_object_property_assignment.NoGlobalObjectPropertyAssignmentRule,
 		no_instanceof_builtins.NoInstanceofBuiltinsRule,
 		no_invalid_fetch_options.NoInvalidFetchOptionsRule,
 		no_invalid_remove_event_listener.NoInvalidRemoveEventListenerRule,
