@@ -19,7 +19,7 @@ Fluent receiver chains such as `query().filter().map().toArray()` do not increas
 
 ### `max`
 
-Type: `integer`  
+Type: `integer`
 Default: `3`
 
 Sets the maximum allowed nested call depth.
