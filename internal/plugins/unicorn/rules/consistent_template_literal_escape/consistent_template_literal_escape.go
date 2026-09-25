@@ -25,10 +25,7 @@ var ConsistentTemplateLiteralEscapeRule = rule.Rule{
 				return
 			}
 
-			raw, contentRange, ok := templateElementRaw(ctx.SourceFile, node)
-			if !ok {
-				return
-			}
+			raw, contentRange := templateElementRaw(ctx.SourceFile, node)
 			fixed, changed := normalizeTemplateEscape(raw)
 			if !changed {
 				return
@@ -48,30 +45,17 @@ var ConsistentTemplateLiteralEscapeRule = rule.Rule{
 	},
 }
 
-func templateElementRaw(sourceFile *ast.SourceFile, node *ast.Node) (string, core.TextRange, bool) {
-	if sourceFile == nil || node == nil {
-		return "", core.TextRange{}, false
-	}
-
+func templateElementRaw(sourceFile *ast.SourceFile, node *ast.Node) (string, core.TextRange) {
 	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
-	startOffset := 1
 	endOffset := 1
-	switch node.Kind {
-	case ast.KindTemplateHead, ast.KindTemplateMiddle:
+	if node.Kind == ast.KindTemplateHead || node.Kind == ast.KindTemplateMiddle {
 		endOffset = 2
-	case ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateTail:
-	default:
-		return "", core.TextRange{}, false
 	}
 
-	start := nodeRange.Pos() + startOffset
+	start := nodeRange.Pos() + 1
 	end := nodeRange.End() - endOffset
-	if start > end {
-		return "", core.TextRange{}, false
-	}
-
 	contentRange := core.NewTextRange(start, end)
-	return sourceFile.Text()[start:end], contentRange, true
+	return sourceFile.Text()[start:end], contentRange
 }
 
 func normalizeTemplateEscape(raw string) (string, bool) {
@@ -80,8 +64,6 @@ func normalizeTemplateEscape(raw string) (string, bool) {
 	}
 
 	output := make([]byte, 0, len(raw))
-	changed := false
-
 	for index := 0; index < len(raw); {
 		if index+2 < len(raw) && raw[index] == '$' && raw[index+1] == '\\' && raw[index+2] == '{' {
 			backslashes := 0
@@ -93,7 +75,6 @@ func normalizeTemplateEscape(raw string) (string, bool) {
 			}
 			output = append(output, '\\', '$', '{')
 			index += 3
-			changed = true
 			continue
 		}
 
@@ -101,29 +82,20 @@ func normalizeTemplateEscape(raw string) (string, bool) {
 		index++
 	}
 
-	if !changed {
-		return raw, false
-	}
 	return string(output), true
 }
 
 func isInsideTaggedTemplate(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindNoSubstitutionTemplateLiteral:
+	if node.Kind == ast.KindNoSubstitutionTemplateLiteral {
 		return node.Parent != nil && node.Parent.Kind == ast.KindTaggedTemplateExpression
-	case ast.KindTemplateHead:
+	}
+	if node.Kind == ast.KindTemplateHead {
 		return node.Parent != nil &&
 			node.Parent.Parent != nil &&
 			node.Parent.Parent.Kind == ast.KindTaggedTemplateExpression
-	case ast.KindTemplateMiddle, ast.KindTemplateTail:
-		return node.Parent != nil &&
-			node.Parent.Parent != nil &&
-			node.Parent.Parent.Parent != nil &&
-			node.Parent.Parent.Parent.Kind == ast.KindTaggedTemplateExpression
-	default:
-		return false
 	}
+	return node.Parent != nil &&
+		node.Parent.Parent != nil &&
+		node.Parent.Parent.Parent != nil &&
+		node.Parent.Parent.Parent.Kind == ast.KindTaggedTemplateExpression
 }
