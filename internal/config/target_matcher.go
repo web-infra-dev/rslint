@@ -7,17 +7,39 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
-// TargetMatch is the config policy result needed by lint-target planning.
-// It intentionally excludes merged config and rule state.
+// TargetMatch is an immutable selection result for one target and config
+// generation. Target planning may carry it to a FileConfigResolver, but cannot
+// inspect or change the matched entries. It carries no effective config or
+// configured rule state.
 type TargetMatch struct {
-	Selected        bool
-	GloballyIgnored bool
+	target   PathIdentity
+	source   *targetMatchSource
+	decision configTargetDecision
 }
+
+// Selected reports whether selectors or the implicit extension baseline select
+// the target. Global ignores take precedence over selection.
+func (match TargetMatch) Selected() bool { return match.decision.selected }
+
+// GloballyIgnored reports whether the target must be skipped entirely.
+func (match TargetMatch) GloballyIgnored() bool { return match.decision.globallyIgnored }
 
 // TargetMatcher evaluates target selection and directory pruning for one
 // immutable config and path-space generation.
 type TargetMatcher struct {
 	resolver *configTargetResolver
+	source   *targetMatchSource
+}
+
+// targetMatchSource binds a config array to its owner and path-space generation.
+// It excludes the matcher itself so carried matches cannot retain the walk's
+// directory caches or filesystem wrappers.
+type targetMatchSource struct {
+	config           RslintConfig
+	configDirectory  string
+	pathSpaces       *PathSpaceSnapshot
+	useCaseSensitive bool
+	hasFS            bool
 }
 
 // NewTargetMatcherWithPathSpaces binds config matching to an existing frozen
@@ -46,7 +68,17 @@ func NewTargetMatcherWithPathSpaces(
 			}
 		}
 	}
-	return TargetMatcher{resolver: newConfigTargetResolverWithBases(config, configDirectory, fsys, pathSpaces.bases)}, nil
+	resolver := newConfigTargetResolverWithBases(config, configDirectory, fsys, pathSpaces.bases)
+	return TargetMatcher{
+		resolver: resolver,
+		source: &targetMatchSource{
+			config:           config,
+			configDirectory:  normalizeAuthoredBase(configDirectory),
+			pathSpaces:       pathSpaces,
+			useCaseSensitive: resolver.useCaseSensitive,
+			hasFS:            fsys != nil,
+		},
+	}, nil
 }
 
 // MatchFile evaluates files, ignores, and the implicit extension baseline.
@@ -54,10 +86,10 @@ func (matcher TargetMatcher) MatchFile(target PathIdentity) TargetMatch {
 	if matcher.resolver == nil {
 		return TargetMatch{}
 	}
-	decision := matcher.resolver.resolveTarget(target)
 	return TargetMatch{
-		Selected:        decision.selected,
-		GloballyIgnored: decision.globallyIgnored,
+		target:   target,
+		source:   matcher.source,
+		decision: matcher.resolver.resolveTarget(target),
 	}
 }
 

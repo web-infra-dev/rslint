@@ -113,7 +113,10 @@ func TestTargetPlanAppliesExecutionConfigOverFrozenPathSpaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolved := resolver.ResolveTarget(plan.Files[0].Identity())
+	if plan.Files[0].Match() == nil {
+		t.Fatal("explicit target lost its discovery match")
+	}
+	resolved := resolver.ResolveTargetWithMatch(plan.Files[0].Identity(), plan.Files[0].Match())
 	if resolved.MergedConfig == nil ||
 		resolved.MergedConfig.Settings["generation"] != "execution" {
 		t.Fatalf("execution config was replaced by discovery config: %+v", resolved.MergedConfig)
@@ -372,4 +375,41 @@ func discoverFilesOutsideProgramsMultiConfigForTest(
 
 	sort.Strings(result)
 	return result
+}
+
+func TestTargetPlanCarriesDiscoveryMatches(t *testing.T) {
+	root, paths := setupDiscoveryFixture(t, []string{"root.ts", "pkg/a.ts", "pkg/explicit.ts"})
+	child := tspath.ResolvePath(root, "pkg")
+	configs := map[string]rslintconfig.RslintConfig{
+		root:  {{Rules: rslintconfig.Rules{"no-console": "error"}}},
+		child: {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+	}
+	plan, err := Resolve(Request{
+		ConfigMap: configs, ConfigDirectory: root, FS: osvfs.FS(),
+		Files: []string{paths["pkg/explicit.ts"]}, Directories: []string{root},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Files) != 3 {
+		t.Fatalf("targets = %v", plan.Files)
+	}
+	for _, file := range plan.Files {
+		match := file.Match()
+		if match == nil || !match.Selected() || match.GloballyIgnored() {
+			t.Fatalf("%s lost its discovery match", file.Path)
+		}
+		resolver, err := rslintconfig.NewFileConfigResolverWithPathSpaces(configs[file.ConfigDirectory], file.ConfigDirectory, osvfs.FS(), plan.PathSpaces(), rules.All())
+		if err != nil {
+			t.Fatal(err)
+		}
+		resolved := resolver.ResolveTargetWithMatch(file.Identity(), match)
+		name := "no-console"
+		if file.ConfigDirectory == child {
+			name = "no-debugger"
+		}
+		if len(resolved.EnabledRules) != 1 || resolved.EnabledRules[0].Name != name {
+			t.Fatalf("%s received another owner's rules", file.Path)
+		}
+	}
 }
