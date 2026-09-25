@@ -841,6 +841,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/no-unreadable-iife.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unreadable-new-expression.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unsafe-string-replacement.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-useless-continue.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-error-capture-stack-trace.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-switch-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-xor-as-exponentiation.test.ts',

@@ -182,7 +182,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-useless-collection-argument': 'error', // not implemented
     // 'unicorn/no-useless-compound-assignment': 'error', // not implemented
     // 'unicorn/no-useless-concat': 'error', // not implemented
-    // 'unicorn/no-useless-continue': 'error', // not implemented
+    'unicorn/no-useless-continue': 'error',
     // 'unicorn/no-useless-delete-check': 'error', // not implemented
     // 'unicorn/no-useless-else': 'error', // not implemented
     'unicorn/no-useless-error-capture-stack-trace': 'error',
