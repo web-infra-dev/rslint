@@ -67,7 +67,7 @@ func nestedCallDepth(node *ast.Node) int {
 }
 
 func isCallOrNewExpression(node *ast.Node) bool {
-	return node != nil && (node.Kind == ast.KindCallExpression || node.Kind == ast.KindNewExpression)
+	return node.Kind == ast.KindCallExpression || node.Kind == ast.KindNewExpression
 }
 
 func hasArgument(node, target *ast.Node) bool {
