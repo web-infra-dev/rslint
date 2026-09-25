@@ -19,6 +19,7 @@ func TestNoGlobalObjectPropertyAssignmentExtras(t *testing.T) {
 			{Code: "const window = {}; window.foo = 1;"},
 			{Code: "delete window.foo;"},
 			{Code: "globalThis[property] = value;"},
+			{Code: "getGlobal().foo = 1;"},
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: "globalThis[\"foo\"]++;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Message: "Do not assign properties on the global object.", Line: 1, Column: 1, EndLine: 1, EndColumn: 18}}},
