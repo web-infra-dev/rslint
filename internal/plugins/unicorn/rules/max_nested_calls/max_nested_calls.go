@@ -8,7 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-//go:embed schema.json
+//go:embed max_nested_calls.schema.json
 var schemaJSON []byte
 
 const (
