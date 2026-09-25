@@ -1,4 +1,4 @@
-package main
+package sharedsource
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func mapPluginSources(descriptor pluginSourceMapping) ([]byte, func() error, error) {
+func mapSources(descriptor Descriptor) ([]byte, func() error, error) {
 	value, err := strconv.ParseUint(descriptor.Handle, 10, 64)
 	if err != nil || value == 0 || uint64(uintptr(value)) != value || descriptor.ProcessID == 0 || descriptor.FD != 0 {
 		return nil, nil, errors.New("invalid shared source descriptor")
@@ -23,10 +23,10 @@ func mapPluginSources(descriptor pluginSourceMapping) ([]byte, func() error, err
 		return nil, nil, err
 	}
 	defer windows.CloseHandle(handle)
-	address, err := windows.MapViewOfFile(handle, windows.FILE_MAP_WRITE, 0, 0, pluginSourceCapacity)
+	address, err := windows.MapViewOfFile(handle, windows.FILE_MAP_WRITE, 0, 0, capacity)
 	if err != nil {
 		return nil, nil, err
 	}
-	data := unsafe.Slice((*byte)(unsafe.Pointer(address)), pluginSourceCapacity)
+	data := unsafe.Slice((*byte)(unsafe.Pointer(address)), capacity)
 	return data, func() error { return windows.UnmapViewOfFile(address) }, nil
 }

@@ -1527,21 +1527,24 @@ anonymous pagefile mapping whose handle Go duplicates. Source transfer never
 uses source paths or process addresses. Mapping failure preserves complete
 inline source text through the existing JSON transport.
 
-The Go CLI adapter copies source bytes into one of sixteen fixed 16 MiB slots
-and publishes a batch generation and per-file ranges over IPC. Logical batches
-larger than a slot become ordered transport requests with the same rule/config
-metadata, so their total source size is not limited by one slot. An aligned
-32-bit publication word per slot supplies the release/acquire memory fence
-between Go and Rust. The Node source adapter validates the ranges, registers a
-native read capability, and forwards
-only that capability to workers. Rust borrows the immutable UTF-8 snapshot for
+On the Go side, `internal/ipc/sharedsource` owns mapping lifetime, byte copies,
+publication and slot reuse. It has no linter or IPC-message dependency and
+never exposes mapped slices; closing waits for an active writer. The CLI plugin
+dispatcher owns request encoding, ordered splitting by source bytes, IPC
+responses and their release acknowledgements. The CLI entry only assembles and
+closes that dispatcher. Logical batches larger than a slot keep the same
+rule/config metadata, so their total source size is not limited by one slot.
+An aligned 32-bit publication word per slot supplies the release/acquire memory
+fence between Go and Rust. The Node source adapter validates the ranges,
+registers a native read capability, and forwards only that capability to
+workers. Rust borrows the immutable UTF-8 snapshot for
 the parser and constructs the required JavaScript SourceCode string directly;
 the ESTree JSON boundary is unchanged. After dispatch, Rust revokes the
 capability before acknowledging reuse. An in-flight native reader pins the
 mapping and permanently retires its slot, so timeout, cancellation, shutdown,
 and late worker results cannot authorize an overlapping write. Pool exhaustion,
 oversized payloads and invalid UTF-8 retain complete inline text. The arena is
-bounded to 256 MiB of payload plus a 4 KiB control page; slots are touched only
+bounded to sixteen 16 MiB slots plus a 4 KiB control page; slots are touched only
 when used.
 
 Other invariants:

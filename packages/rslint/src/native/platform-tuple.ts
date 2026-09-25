@@ -1,7 +1,7 @@
 /**
  * Compute the `@rslint/native-<tuple>` platform package for the host.
  *
- * Shared by the native loader (`load-binding.ts`) and the packaged-isolation
+ * Shared by the native loader (`binding.ts`) and the packaged-isolation
  * test, so they always agree on which platform package to load vs. stage.
  */
 import { execSync } from 'node:child_process';
@@ -20,22 +20,28 @@ function isMuslFromFilesystem(): boolean | null {
 }
 
 function isMuslFromReport(): boolean | null {
-  const report = process.report as unknown as
-    { getReport(): unknown; excludeNetwork?: boolean } | undefined;
+  const report = process.report;
   if (typeof report?.getReport !== 'function') {
     return null;
   }
-  report.excludeNetwork = true;
-  const parsed = report.getReport() as {
-    header?: { glibcVersionRuntime?: string };
-    sharedObjects?: string[];
-  };
-  if (parsed.header?.glibcVersionRuntime) {
-    return false;
+  Object.assign(report, { excludeNetwork: true });
+  const parsed = report.getReport();
+  if ('header' in parsed) {
+    const header = parsed.header;
+    if (
+      header !== null &&
+      typeof header === 'object' &&
+      'glibcVersionRuntime' in header &&
+      header.glibcVersionRuntime
+    ) {
+      return false;
+    }
   }
-  if (Array.isArray(parsed.sharedObjects)) {
+  if ('sharedObjects' in parsed && Array.isArray(parsed.sharedObjects)) {
     return parsed.sharedObjects.some(
-      (f) => f.includes('libc.musl-') || f.includes('ld-musl-'),
+      (f: unknown) =>
+        typeof f === 'string' &&
+        (f.includes('libc.musl-') || f.includes('ld-musl-')),
     );
   }
   return null;

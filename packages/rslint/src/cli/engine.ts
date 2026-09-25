@@ -581,7 +581,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
             );
           }
           return sources
-            ? sources.lint(msg.data, (request) => pluginHost!.lint(request))
+            ? sources.lint(msg.data, pluginHost.lint.bind(pluginHost))
             : pluginHost.lint(msg.data);
         default:
           throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);

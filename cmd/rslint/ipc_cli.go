@@ -51,6 +51,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
+	"github.com/web-infra-dev/rslint/internal/ipc/sharedsource"
 	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -154,9 +155,9 @@ type runtimePayload struct {
 	// observe this itself (its own stdout is the IPC pipe). Absent (false)
 	// when unavailable (for example in the wasm fallback), which degrades to
 	// colorless output.
-	StdoutIsTTY    bool                 `json:"stdoutIsTTY,omitempty"`
-	SingleThreaded bool                 `json:"singleThreaded,omitempty"`
-	PluginSources  *pluginSourceMapping `json:"pluginSources,omitempty"`
+	StdoutIsTTY    bool                     `json:"stdoutIsTTY,omitempty"`
+	SingleThreaded bool                     `json:"singleThreaded,omitempty"`
+	PluginSources  *sharedsource.Descriptor `json:"pluginSources,omitempty"`
 }
 
 // runCLIState carries the init-handshake outcome from the inbound handler
@@ -410,11 +411,8 @@ func runCLI(args []string) int {
 	// Reverse dispatcher: send each plugin-lint batch back to the Node host
 	// over the IPC channel and decode its result. Runs concurrently with the
 	// native lint pass (handleLintCommand awaits it before output / --fix).
-	sources := openPluginSourcePool(delivery.payload.Runtime.PluginSources)
-	if sources != nil {
-		defer sources.close()
-	}
-	dispatch := sources.dispatch(ch)
+	plugins := newPluginLintDispatcher(ch, delivery.payload.Runtime.PluginSources)
+	defer plugins.close()
 
 	// Hold the --timing table until Node confirms that its real stdout sink has
 	// completed every forwarded write. Draining the Go pipe alone is not a
@@ -423,7 +421,7 @@ func runCLI(args []string) int {
 	baseArgs.DeferTimingTable = func(table string) { timingTable = table }
 	baseArgs.StartWriter = acknowledgedOutputWriter{ctx: lintCtx, channel: ch}
 
-	exitCode := handleLintCommand(baseArgs, lintCtx, dispatch)
+	exitCode := handleLintCommand(baseArgs, lintCtx, plugins.dispatch)
 
 	finalizeStdout()
 	// Publish cancellation synchronously before deciding whether to perform the
