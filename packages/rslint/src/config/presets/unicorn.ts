@@ -244,7 +244,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-event-target': 'error', // not implemented
     // 'unicorn/prefer-explicit-viewport-units': 'off', // not implemented
     // 'unicorn/prefer-export-from': 'error', // not implemented
-    // 'unicorn/prefer-flat-math-min-max': 'error', // not implemented
+    'unicorn/prefer-flat-math-min-max': 'error',
     // 'unicorn/prefer-get-or-insert-computed': 'error', // not implemented
     'unicorn/prefer-global-number-constants': 'error',
     // 'unicorn/prefer-global-this': 'error', // not implemented
