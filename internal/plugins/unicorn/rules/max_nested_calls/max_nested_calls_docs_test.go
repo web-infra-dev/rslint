@@ -20,7 +20,7 @@ func TestMaxNestedCallsDocs(t *testing.T) {
 			{Code: "foo(bar(baz(qux())));", Options: []any{map[string]any{"max": 4}}},
 		},
 		[]rule_tester.InvalidTestCase{
-			{Code: "foo(bar(baz(qux())));", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "max-nested-calls"}}},
+			{Code: "foo(bar(baz(qux())));", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "max-nested-calls", Message: "Call is nested too deeply. Maximum allowed is 3.", Line: 1, Column: 13, EndLine: 1, EndColumn: 18}}},
 		},
 	)
 }
