@@ -18,7 +18,7 @@ func TestPreferFlatMathMinMaxExtras(t *testing.T) {
 			{Code: "Math.max(Math.min(a, b), Math.max?.(c, d));"},
 		},
 		[]rule_tester.InvalidTestCase{
-			{Code: "Math.max((Math.max(a, b)), Math.min(c, d));", Output: []string{"Math.max(a, b, Math.min(c, d));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max"}}},
+			{Code: "Math.max((Math.max(a, b)), Math.min(c, d));", Output: []string{"Math.max(a, b, Math.min(c, d));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls.", Line: 1, Column: 1, EndLine: 1, EndColumn: 43}}},
 		},
 	)
 }
