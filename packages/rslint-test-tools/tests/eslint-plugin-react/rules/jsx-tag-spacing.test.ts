@@ -5,7 +5,7 @@ import { RuleTester } from '../rule-tester';
 
 // generate options object that disables checks other than the tested one
 
-function closingSlashOptions(option) {
+function closingSlashOptions(option: string) {
   return [
     {
       closingSlash: option,
@@ -16,7 +16,7 @@ function closingSlashOptions(option) {
   ];
 }
 
-function beforeSelfClosingOptions(option) {
+function beforeSelfClosingOptions(option: string) {
   return [
     {
       closingSlash: 'allow',
@@ -27,7 +27,7 @@ function beforeSelfClosingOptions(option) {
   ];
 }
 
-function afterOpeningOptions(option) {
+function afterOpeningOptions(option: string) {
   return [
     {
       closingSlash: 'allow',
@@ -38,7 +38,7 @@ function afterOpeningOptions(option) {
   ];
 }
 
-function beforeClosingOptions(option) {
+function beforeClosingOptions(option: string) {
   return [
     {
       closingSlash: 'allow',
