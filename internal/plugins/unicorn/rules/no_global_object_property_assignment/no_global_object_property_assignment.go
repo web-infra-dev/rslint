@@ -32,12 +32,8 @@ var NoGlobalObjectPropertyAssignmentRule = rule.Rule{
 		)
 
 		check := func(node *ast.Node) {
-			if node == nil || !ast.IsAccessExpression(node) {
-				return
-			}
-
 			object := utils.SkipAssertionsAndParens(utils.AccessExpressionObject(node))
-			if object == nil || !ast.IsIdentifier(object) {
+			if !ast.IsIdentifier(object) {
 				return
 			}
 			if _, ok := globalObjectNames[object.Text()]; !ok ||
