@@ -22,6 +22,8 @@ import {
   type EslintPluginLintRequest,
 } from '../../../src/eslint-plugin/plugin/plugin-lint-protocol.js';
 import type { LintFileResult } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
+import { createSourceTransport } from '../../../src/ipc/source-transport.js';
+import { parseSharedSource } from '../../../src/eslint-plugin/native/load-binding.js';
 
 function input(
   files: EslintPluginLintRequest['files'],
@@ -36,6 +38,23 @@ function input(
 }
 
 describe('buildPluginLintTasks', () => {
+  test('rejects an unresolved wire range instead of reading disk', () => {
+    const files = [
+      { path: '/missing.ts', sourceRange: { offset: 0, length: 0 } },
+    ];
+    expect(() =>
+      buildPluginLintTasks(input(files), { configDirSet: new Set() }),
+    ).toThrow('unresolved shared plugin source');
+  });
+  test('forwards native source capabilities without decoding or reading files', () => {
+    const sharedSource = { lease: 1, offset: 0, length: 12 };
+    const tasks = buildPluginLintTasks(
+      input([{ path: '/missing.ts', sharedSource }]),
+      { configDirSet: new Set() },
+    );
+    expect(tasks[0].sharedSource).toBe(sharedSource);
+    expect(tasks[0].text).toBeUndefined();
+  });
   test('configKey absent on file → empty string on task', () => {
     const tasks = buildPluginLintTasks(
       input([{ path: '/a.ts', text: 'const x = 1;' }]),
@@ -138,6 +157,100 @@ describe('buildPluginLintTasks', () => {
     );
     expect(tasks[0].languageOptions).toBe(langOpts);
     expect(tasks[0].settings).toBe(settings);
+  });
+});
+
+describe('CLI source capabilities', () => {
+  function emptyBatch() {
+    return {
+      sourceBatch: { slot: 0, generation: 1, length: 0 },
+      files: [{ path: '/missing.ts', sourceRange: { offset: 0, length: 0 } }],
+    };
+  }
+
+  test('revokes reads on success, failure and shutdown; rejects stale generations', async () => {
+    const transport = createSourceTransport();
+    let source!: Parameters<typeof parseSharedSource>[1];
+    try {
+      const input = emptyBatch();
+      const result = await transport.lint(input, async (req: any) => {
+        source = req.files[0].sharedSource;
+        expect(
+          parseSharedSource('/missing.ts', source, 'module', false).sourceText,
+        ).toBe('');
+        return { results: [] };
+      });
+      expect(result).toEqual({
+        results: [],
+        releasedSource: input.sourceBatch,
+      });
+      expect(() =>
+        parseSharedSource('/missing.ts', source, 'module', false),
+      ).toThrow('expired');
+      await expect(
+        transport.lint(input, async () => ({ results: [] })),
+      ).rejects.toThrow('expired');
+      input.sourceBatch.generation++;
+      await expect(
+        transport.lint(input, async (req: any) => {
+          source = req.files[0].sharedSource;
+          throw new Error('dispatch failed');
+        }),
+      ).rejects.toThrow('dispatch failed');
+      expect(() =>
+        parseSharedSource('/missing.ts', source, 'module', false),
+      ).toThrow('expired');
+    } finally {
+      transport.close();
+    }
+    await expect(
+      transport.lint(emptyBatch(), async () => ({ results: [] })),
+    ).rejects.toThrow('expired');
+  });
+
+  test.each([
+    { slot: -1 },
+    { slot: 16 },
+    { slot: 0.5 },
+    { generation: 0 },
+    { generation: 2 ** 32 },
+    { length: NaN },
+    { length: Infinity },
+    { length: 16 * 1024 * 1024 + 1 },
+  ])('rejects malformed batches: %j', async (change) => {
+    const transport = createSourceTransport();
+    try {
+      const input = emptyBatch();
+      Object.assign(input.sourceBatch, change);
+      await expect(
+        transport.lint(input, async () => {
+          throw new Error('must not dispatch');
+        }),
+      ).rejects.toThrow('invalid plugin source batch');
+    } finally {
+      transport.close();
+    }
+  });
+
+  test.each([
+    { offset: -1, length: 0 },
+    { offset: 1, length: 0 },
+    { offset: 0, length: 1 },
+    { offset: 0, length: 0.5 },
+    { offset: 2 ** 32, length: 2 ** 32 },
+  ])('rejects malformed ranges without reading disk: %j', async (range) => {
+    const transport = createSourceTransport();
+    try {
+      const input = emptyBatch();
+      input.files[0].sourceRange = range;
+      await expect(
+        transport.lint(input, async () => {
+          throw new Error('must not dispatch');
+        }),
+      ).rejects.toThrow('invalid plugin source range');
+    } finally {
+      transport.close();
+    }
   });
 });
 

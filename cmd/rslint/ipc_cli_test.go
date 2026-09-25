@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,7 +23,168 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
+	"github.com/web-infra-dev/rslint/internal/linter"
 )
+
+func TestPluginSourceSnapshots(t *testing.T) {
+	pool := &pluginSourcePool{data: make([]byte, pluginSourceCapacity)}
+	texts := []string{"", "\ufeff" + "const café = '😀';\r\n// \x00", string([]byte{0xff}), strings.Repeat("x", pluginSourceSlotSize+1)}
+	files := make([]linter.EslintPluginLintFile, len(texts)+1)
+	for i := range texts {
+		files[i].Text = &texts[i]
+	}
+	req := linter.EslintPluginLintRequest{Files: files}
+	wire, batch := pool.encode(req)
+	encoded := wire.(pluginSourceRequest)
+	if batch == nil || batch.Length != uint32(len(texts[1])) {
+		t.Fatalf("wrong snapshot length: %+v", batch)
+	}
+	for i := range 2 {
+		file := encoded.Files[i]
+		if file.Text != nil || file.SourceRange == nil || req.Files[i].Text == nil {
+			t.Fatalf("source lost or original request mutated: %+v", file)
+		}
+		r := file.SourceRange
+		if got := string(pool.data[pluginSourceHeaderSize+r.Offset : pluginSourceHeaderSize+r.Offset+r.Length]); got != texts[i] {
+			t.Fatalf("source bytes changed: %q", got)
+		}
+	}
+	for i := 2; i < len(files); i++ {
+		if encoded.Files[i].Text != req.Files[i].Text || encoded.Files[i].SourceRange != nil {
+			t.Fatalf("inline fallback changed file %d", i)
+		}
+	}
+	// Occupied slots cannot be overwritten, including after all slots have
+	// become unavailable. Exhaustion must preserve the entire original request.
+	for i := 1; i < pluginSourceSlots; i++ {
+		_, next := pool.encode(req)
+		if next == nil || next.Slot != uint32(i) {
+			t.Fatalf("slot reused before acknowledgement: %+v", next)
+		}
+	}
+	if _, next := pool.encode(req); next != nil {
+		t.Fatal("exhausted pool did not fall back")
+	}
+	pool.release(*batch)
+	_, next := pool.encode(req)
+	if next == nil || next.Slot != batch.Slot || next.Generation <= batch.Generation {
+		t.Fatalf("release did not advance generation: %+v", next)
+	}
+	pool.release(*batch) // stale/duplicate acknowledgement cannot free the new lease
+	if _, next := pool.encode(req); next != nil {
+		t.Fatal("stale acknowledgement released live source")
+	}
+}
+
+func TestPluginSourceReleaseAcknowledgement(t *testing.T) {
+	for _, mode := range []string{"release", "missing", "wrong", "error", "cancel"} {
+		t.Run(mode, func(t *testing.T) {
+			pool := &pluginSourcePool{data: make([]byte, pluginSourceCapacity)}
+			client, peer := newCLIChannelPair(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
+				var req pluginSourceRequest
+				if err := msg.Decode(&req); err != nil {
+					return nil, err
+				}
+				if req.SourceBatch == nil || req.Files[0].Text != nil {
+					return nil, errors.New("source not shared")
+				}
+				res := pluginSourceResponse{}
+				switch mode {
+				case "release":
+					res.ReleasedSource = req.SourceBatch
+				case "wrong":
+					res.ReleasedSource = &pluginSourceBatch{Slot: 999, Generation: 1}
+				case "error":
+					return nil, errors.New("worker failed")
+				case "cancel":
+					cancel()
+					return nil, context.Canceled
+				}
+				return res, nil
+			})
+			client.Start()
+			peer.Start()
+			source := "debugger;"
+			_, err := pool.dispatch(client)(ctx, linter.EslintPluginLintRequest{Files: []linter.EslintPluginLintFile{{Text: &source}}})
+			if (mode == "error" || mode == "cancel") != (err != nil) {
+				t.Fatalf("unexpected dispatch result: %v", err)
+			}
+			if pool.slots[0].busy != (mode != "release") {
+				t.Fatalf("unsafe reuse after %s", mode)
+			}
+		})
+	}
+}
+
+func TestPluginSourceConcurrentReuse(t *testing.T) {
+	pool := &pluginSourcePool{data: make([]byte, pluginSourceCapacity)}
+	var group sync.WaitGroup
+	for worker := range 32 {
+		group.Go(func() {
+			for round := range 100 {
+				text := fmt.Sprintf("snapshot-%d-%d-😀", worker, round)
+				req := linter.EslintPluginLintRequest{Files: []linter.EslintPluginLintFile{{Text: &text}}}
+				_, batch := pool.encode(req)
+				if batch == nil {
+					continue
+				}
+				runtime.Gosched()
+				start := pluginSourceHeaderSize + int(batch.Slot)*pluginSourceSlotSize
+				if got := string(pool.data[start : start+int(batch.Length)]); got != text {
+					t.Errorf("source overwritten before release: %q", got)
+				}
+				pool.release(*batch)
+			}
+		})
+	}
+	group.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := pool.dispatch(nil)(ctx, linter.EslintPluginLintRequest{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled dispatch: %v", err)
+	}
+}
+
+func TestPluginSourceLargeBatch(t *testing.T) {
+	pool := &pluginSourcePool{data: make([]byte, pluginSourceCapacity)}
+	client, peer := newCLIChannelPair(t)
+	requests := 0
+	peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
+		var req pluginSourceRequest
+		if err := msg.Decode(&req); err != nil {
+			return nil, err
+		}
+		requests++
+		if len(req.Files) != 1 || req.Files[0].Text != nil || req.SourceBatch == nil {
+			return nil, errors.New("large batch was not split into shared snapshots")
+		}
+		return pluginSourceResponse{
+			EslintPluginLintResult: linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{FilePath: req.Files[0].Path}}},
+			ReleasedSource:         req.SourceBatch,
+		}, nil
+	})
+	client.Start()
+	peer.Start()
+	text := strings.Repeat("x", pluginSourceSlotSize/2+1)
+	req := linter.EslintPluginLintRequest{Files: []linter.EslintPluginLintFile{
+		{Path: "first.ts", Text: &text}, {Path: "second.ts", Text: &text}, {Path: "third.ts", Text: &text},
+	}}
+	result, err := pool.dispatch(client)(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requests != 3 || len(result.Results) != 3 {
+		t.Fatalf("lost batch results: %+v", result)
+	}
+	for i, file := range req.Files {
+		if result.Results[i].FilePath != file.Path {
+			t.Fatal("changed batch result order")
+		}
+	}
+}
 
 // newCLIChannelPair wires two ipc.Channels back-to-back over two io.Pipes so
 // a test can play the Node peer (b) opposite the CLI side (a). Channels are

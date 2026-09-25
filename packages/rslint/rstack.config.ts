@@ -120,8 +120,8 @@ define.lib(() => {
           ...workerBase.source,
           entry: { host: './src/eslint-plugin/host.ts' },
         },
-        // The CLI only coordinates workers; keep the parser and rule runtime
-        // out of its parent process while retaining the public index entry.
+        // Keep this host bundle limited to worker coordination. The CLI loads
+        // its native source arena separately through the common binding loader.
         dts: false,
       },
     ],

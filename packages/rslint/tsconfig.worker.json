@@ -6,6 +6,7 @@
   },
   "include": [
     "${configDir}/src/eslint-plugin/**/*.ts",
+    "${configDir}/src/native/**/*.ts",
     "${configDir}/src/config/config-source.ts",
     "${configDir}/src/config/plugin-source.ts"
   ],
