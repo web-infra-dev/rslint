@@ -1,8 +1,14 @@
 package no_useless_assignment
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
@@ -15,8 +21,8 @@ import (
 // lock-in. The upstream 1:1 migration lives in
 // no_useless_assignment_upstream_test.go.
 //
-// N/A: Dimension 3 (autofix boundaries) — the rule reports only, so there is no
-// fix or suggestion and therefore no TestNoUselessAssignmentEditDemand either.
+// The rule reports only; TestNoUselessAssignmentReporting checks that no edit
+// demand changes its diagnostics or produces fixes or suggestions.
 func TestNoUselessAssignmentExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -659,4 +665,97 @@ var obj;`,
 			},
 		},
 	)
+}
+
+// Exercise both straight-line and branching code across bitset word boundaries.
+func TestNoUselessAssignmentManyVariables(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, count := range []int{1, 63, 64, 65, 127, 128, 129} {
+		for _, branch := range []bool{false, true} {
+			var source strings.Builder
+			source.WriteString("function f(c, g) {\n")
+			var errors []rule_tester.InvalidTestCaseError
+			for i := range count {
+				name := fmt.Sprintf("v%d", i)
+				fmt.Fprintf(&source, "  let %s = 0;\n", name)
+				errors = append(errors, rule_tester.InvalidTestCaseError{
+					MessageId: "unnecessaryAssignment",
+					Line:      i + 2, Column: 7, EndLine: i + 2, EndColumn: 7 + len(name),
+				})
+			}
+			for i := range count {
+				if branch {
+					fmt.Fprintf(&source, "  if (c) { v%d = 1; } else { v%d = 2; }\n", i, i)
+				} else {
+					fmt.Fprintf(&source, "  v%d = 1;\n", i)
+				}
+			}
+			for i := range count {
+				fmt.Fprintf(&source, "  g(v%d);\n", i)
+			}
+			source.WriteString("}")
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: source.String(), Errors: errors})
+		}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUselessAssignmentRule, nil, invalid)
+}
+
+func TestNoUselessAssignmentReporting(t *testing.T) {
+	const source = `function f(g) {
+  // eslint-disable-next-line no-useless-assignment
+  let a = 0;
+  a = 1; g(a);
+  /* eslint-disable no-useless-assignment */
+  let b = 0;
+  /* eslint-enable no-useless-assignment */
+  b = 1; g(b);
+  let /* 😀 trivia */ value = 0;
+  value = 1; g(value);
+  let c = 0; // rslint-disable-line no-useless-assignment
+  c = 1; g(c);
+}`
+	for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
+		t.Run(fmt.Sprint(demand), func(t *testing.T) {
+			sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/reporting.ts", Path: "/reporting.ts"}, source, core.ScriptKindTS)
+			binder.BindSourceFile(sf)
+			_, init, _ := rule.ResolveLanguageDefaults("/reporting.ts", rule.LanguageOptions{})
+			comments := rule.NewCommentStore(sf)
+			ctx := rule.RuleContext{
+				SourceFile:     sf,
+				Refs:           rule.NewRefStore(sf, &core.CompilerOptions{}, nil, init),
+				DisableManager: rule.NewDisableManager(sf, comments),
+			}
+			var diagnostics []rule.RuleDiagnostic
+			ctx = ctx.WithDiagnosticConsumer(NoUselessAssignmentRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) },
+			})
+			listeners := NoUselessAssignmentRule.Run(ctx, nil)
+			var walk func(*ast.Node)
+			walk = func(node *ast.Node) {
+				if listener := listeners[node.Kind]; listener != nil {
+					listener(node)
+				}
+				node.ForEachChild(func(child *ast.Node) bool { walk(child); return false })
+				if listener := listeners[rule.ListenerOnExit(node.Kind)]; listener != nil {
+					listener(node)
+				}
+			}
+			walk(sf.AsNode())
+			if len(diagnostics) != 1 {
+				t.Fatalf("got %d diagnostics, want 1", len(diagnostics))
+			}
+			diagnostic := diagnostics[0]
+			start := strings.Index(source, "value = 0")
+			if diagnostic.Range != core.NewTextRange(start, start+len("value")) ||
+				diagnostic.Message.Id != "unnecessaryAssignment" ||
+				diagnostic.Message.Description != "The value assigned to 'value' is not used in subsequent statements." ||
+				diagnostic.RuleName != NoUselessAssignmentRule.Name || diagnostic.Severity != rule.SeverityWarning {
+				t.Fatalf("unexpected diagnostic: %+v", diagnostic)
+			}
+			if diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+				t.Fatalf("unexpected edits: %+v", diagnostic)
+			}
+		})
+	}
 }
