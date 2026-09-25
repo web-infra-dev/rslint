@@ -81,7 +81,7 @@ func ExtendsReactComponent(classNode *ast.Node, pragma string) bool {
 	if hc == nil || hc.Expression == nil {
 		return false
 	}
-	expr := ast.SkipParentheses(hc.Expression)
+	expr := utils.ESTreeRuntimeExpression(hc.Expression)
 	// OptionalChain in extends (`extends React?.Component`) is parsed as a
 	// `ChainExpression` upstream, which `componentUtil.isES6Component` does
 	// NOT match (it only inspects `MemberExpression` / `Identifier`). tsgo
@@ -96,19 +96,15 @@ func ExtendsReactComponent(classNode *ast.Node, pragma string) bool {
 		return isComponentName(expr.AsIdentifier().Text)
 	case ast.KindPropertyAccessExpression:
 		pa := expr.AsPropertyAccessExpression()
-		obj := ast.SkipParentheses(pa.Expression)
+		obj := utils.ESTreeRuntimeExpression(pa.Expression)
 		if obj.Kind != ast.KindIdentifier || obj.AsIdentifier().Text != pragma {
 			return false
 		}
-		nameNode := pa.Name()
-		if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
-			return false
-		}
-		return isComponentName(nameNode.AsIdentifier().Text)
+		return isComponentName(IdentifierOrPrivateName(pa.Name()))
 	case ast.KindElementAccessExpression:
 		element := expr.AsElementAccessExpression()
-		object := ast.SkipParentheses(element.Expression)
-		name := ast.SkipParentheses(element.ArgumentExpression)
+		object := utils.ESTreeRuntimeExpression(element.Expression)
+		name := utils.ESTreeRuntimeExpression(element.ArgumentExpression)
 		if object.Kind != ast.KindIdentifier || object.AsIdentifier().Text != pragma || name == nil || name.Kind != ast.KindIdentifier {
 			return false
 		}
