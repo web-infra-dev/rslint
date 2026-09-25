@@ -849,6 +849,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/prefer-add-event-listener-options.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat-map.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-array-last-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-some.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-blob-reading-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-date-now.test.ts',

@@ -216,7 +216,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-array-from-range': 'error', // not implemented
     // 'unicorn/prefer-array-index-of': 'error', // not implemented
     // 'unicorn/prefer-array-iterable-methods': 'error', // not implemented
-    // 'unicorn/prefer-array-last-methods': 'error', // not implemented
+    'unicorn/prefer-array-last-methods': 'error',
     // 'unicorn/prefer-array-slice': 'error', // not implemented
     'unicorn/prefer-array-some': 'error',
     // 'unicorn/prefer-at': 'error', // not implemented
