@@ -127,9 +127,12 @@ func TestJsxNewlineExtras(t *testing.T) {
 		{Code: "<><A/>&#10;&#10;<B/></>", Tsx: true},
 		// Hexadecimal and decimal entities can form the same blank line.
 		{Code: "<><A/>&#xA;\t&#10;<B/></>", Tsx: true},
-		// Numeric entities above U+FFFF follow ESLint's default parser. With
-		// @typescript-eslint/parser, upstream reports this example instead.
-		{Code: "<><A/>&#65546;&#65546;<B/></>", Tsx: true},
+		// Supplementary characters do not count as blank lines in prevent mode.
+		{Code: "<><A/>&#65546;&#65546;<B/></>", Tsx: true,
+			Options: []any{map[string]any{"prevent": true}},
+		},
+		// Leading zeros do not prevent numeric references from decoding to LF.
+		{Code: "<><A/>&#00000000010;&#x000000000A;<B/></>", Tsx: true},
 		// A blank line can occur after non-whitespace text in the same sibling.
 		{Code: "<><A/>\ntext\n\n<B/></>", Tsx: true},
 		// JavaScript whitespace includes the byte order mark and non-breaking spaces.
@@ -140,6 +143,45 @@ func TestJsxNewlineExtras(t *testing.T) {
 <B/></>`, Tsx: true,
 		},
 	}, []rule_tester.InvalidTestCase{
+		// U+1000A is a supplementary character, not a line feed. These entity
+		// cases follow JSX semantics and upstream with @typescript-eslint/parser.
+		{Code: "<><A/>&#65546;&#65546;<B/></>", Tsx: true,
+			Output: slices.Repeat([]string{"<><A/>&#65546;&#65546;<B/></>"}, 10),
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "require", Message: "JSX element should start in a new line", Line: 1, Column: 23, EndLine: 1, EndColumn: 27},
+			},
+		},
+		// Hexadecimal references preserve the same character in multiline mode.
+		{Code: "<><A/>&#x1000A;&#x1000A;<B\n/></>", Tsx: true,
+			Options: []any{map[string]any{"prevent": true, "allowMultilines": true}},
+			Output:  slices.Repeat([]string{"<><A/>&#x1000A;&#x1000A;<B\n/></>"}, 10),
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "allowMultilines", Message: "Multiline JSX elements should start in a new line", Line: 1, Column: 25, EndLine: 2, EndColumn: 3},
+			},
+		},
+		// U+10020 is not whitespace; fixes preserve its original reference.
+		{Code: "<><A/>\n&#x10020;\n<B/></>", Tsx: true,
+			Output: []string{"<><A/>\n&#x10020;\n\n<B/></>"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "require", Message: "JSX element should start in a new line", Line: 3, Column: 1, EndLine: 3, EndColumn: 5},
+			},
+		},
+		// Long references still count as blank lines, but raw-source fixes cannot
+		// remove their decoded line feeds, just as with shorter references.
+		{Code: "<><A/>&#00000000010;&#x000000000A;<B/></>", Tsx: true,
+			Options: []any{map[string]any{"prevent": true}},
+			Output:  slices.Repeat([]string{"<><A/>&#00000000010;&#x000000000A;<B/></>"}, 10),
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "prevent", Message: "JSX element should not start in a new line", Line: 1, Column: 35, EndLine: 1, EndColumn: 39},
+			},
+		},
+		// Invalid digits and missing semicolons leave the reference as text.
+		{Code: "<><A/>&#x1two;&#10<B/></>", Tsx: true,
+			Output: slices.Repeat([]string{"<><A/>&#x1two;&#10<B/></>"}, 10),
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "require", Message: "JSX element should start in a new line", Line: 1, Column: 19, EndLine: 1, EndColumn: 23},
+			},
+		},
 		// Type arguments, namespaced tags and member tags stay within their elements.
 		{Code: "<><List<Value> />\n<svg:path></svg:path>\n<UI.Item /></>", Tsx: true,
 			Output: []string{"<><List<Value> />\n\n<svg:path></svg:path>\n\n<UI.Item /></>"},
