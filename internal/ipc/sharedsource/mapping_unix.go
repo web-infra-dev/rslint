@@ -1,6 +1,6 @@
 //go:build darwin || linux
 
-package main
+package sharedsource
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func mapPluginSources(descriptor pluginSourceMapping) ([]byte, func() error, error) {
+func mapSources(descriptor Descriptor) ([]byte, func() error, error) {
 	// fd 3 is the only extra inherited descriptor in the CLI spawn contract.
 	// Never close an arbitrary descriptor supplied in malformed init data.
 	if descriptor.FD != 3 || descriptor.Handle != "" || descriptor.ProcessID != 0 {
@@ -21,10 +21,10 @@ func mapPluginSources(descriptor pluginSourceMapping) ([]byte, func() error, err
 	}
 	// Darwin rounds POSIX shared objects up to the host page size. Only map
 	// the negotiated capacity, but permit that unused extra tail.
-	if stat.Size < pluginSourceCapacity {
+	if stat.Size < capacity {
 		return nil, nil, errors.New("invalid shared source mapping size")
 	}
-	data, err := unix.Mmap(3, 0, pluginSourceCapacity, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
+	data, err := unix.Mmap(3, 0, capacity, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -91,7 +91,8 @@ export function getNativeBinding(): NativeBinding {
   try {
     // Platform package exports `.` -> `./rslint.<tuple>.node`. A `.node` addon
     // is CommonJS-only, so loading it through this dynamic require is the point.
-    // rslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+    // The platform package implements the N-API ABI described by NativeBinding.
+    // rslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-type-assertion
     binding = require(pkg) as NativeBinding;
     return binding;
   } catch (cause) {

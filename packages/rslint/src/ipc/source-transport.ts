@@ -30,7 +30,9 @@ export function createSourceTransport() {
     // and Node's unsupported Windows descriptor inheritance.
     fd: mapping.fd,
     descriptor: { ...mapping, fd: mapping.fd === undefined ? undefined : 3 },
-    close: () => arena.close(),
+    close() {
+      arena.close();
+    },
     async lint(
       input: unknown,
       dispatch: (request: unknown) => Promise<unknown>,
@@ -87,15 +89,22 @@ export function createSourceTransport() {
       if (count === 0 || end !== batch.length)
         throw new Error('incomplete plugin source batch');
       const lease = arena.register(batch.slot, batch.generation, batch.length);
-      let released = false;
+      let released: boolean;
       let result: unknown;
       try {
         const files = input.files.map((file: Record<string, unknown>) => {
           if (file.sourceRange === undefined) return file;
           const { sourceRange, ...rest } = file;
+          if (!record(sourceRange)) {
+            throw new Error('invalid plugin source range');
+          }
           return {
             ...rest,
-            sharedSource: { ...(sourceRange as object), lease },
+            sharedSource: {
+              offset: sourceRange.offset,
+              length: sourceRange.length,
+              lease,
+            },
           };
         });
         result = await dispatch({ ...input, files });

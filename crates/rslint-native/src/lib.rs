@@ -13,6 +13,7 @@ mod token_map;
 use napi_derive::napi;
 
 pub use parse::{CommentObj, ParseResult};
+pub use source_transport::parse_shared_source;
 
 /// Reject sources whose serialized ESTree JSON would exceed V8's ~512MB single-string
 /// cap (the JSON is ~9-26x the source size). This is the JSON-transfer ceiling
