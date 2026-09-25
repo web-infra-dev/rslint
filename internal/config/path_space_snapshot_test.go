@@ -78,7 +78,7 @@ func TestPathSpaceSnapshotAllowsEmptyConfigAtFrozenOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if decision := matcher.MatchFile(PathIdentity{Path: "/repo/index.ts"}); !decision.Selected || decision.GloballyIgnored {
+	if decision := matcher.MatchFile(PathIdentity{Path: "/repo/index.ts"}); !decision.Selected() || decision.GloballyIgnored() {
 		t.Fatalf("empty config default-baseline match = %+v", decision)
 	}
 }

@@ -9,9 +9,14 @@ import rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 type File struct {
 	rslintconfig.PathIdentity
 	ConfigDirectory string
+	match           *rslintconfig.TargetMatch
 }
 
 // Identity returns the config matching input carried by this lint file.
 func (file File) Identity() rslintconfig.PathIdentity {
 	return file.PathIdentity
 }
+
+// Match returns the immutable config selection observed during discovery.
+// Hand-built targets and document snapshots may have no discovery match.
+func (file File) Match() *rslintconfig.TargetMatch { return file.match }
