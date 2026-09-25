@@ -95,14 +95,6 @@ func isNestedInSameMathMinMaxCall(node *ast.Node, method string) bool {
 		current = current.Parent
 	}
 
-	_, parentCall, ok := mathMinMaxCall(current.Parent, method)
-	if !ok {
-		return false
-	}
-	for _, argument := range parentCall.Call.Arguments() {
-		if argument == current {
-			return true
-		}
-	}
-	return false
+	_, _, ok := mathMinMaxCall(current.Parent, method)
+	return ok
 }
