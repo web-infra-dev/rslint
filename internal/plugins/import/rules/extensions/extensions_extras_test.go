@@ -121,6 +121,30 @@ missing.js');`,
 	rule_tester.RunRuleTester(extensionsRoot(t), "tsconfig.json", t, &extensions.ExtensionsRule, valid, invalid)
 }
 
+func TestExtensionsOptionTruthiness(t *testing.T) {
+	const packageImport = `import 'pkg/subpath';`
+	const typeImport = `import type T from './missing';`
+	valid := []rule_tester.ValidTestCase{
+		{Code: typeImport, Options: []any{"always", map[string]any{"checkTypeImports": false}}},
+	}
+	invalid := []rule_tester.InvalidTestCase{
+		{Code: packageImport, Options: []any{"always", map[string]any{"ignorePackages": false}}, Errors: []rule_tester.InvalidTestCaseError{
+			extensionError(packageImport, `'pkg/subpath'`, `Missing file extension for "pkg/subpath"`),
+		}},
+	}
+	// The legacy extension-map schema admits each mode string for these flags.
+	// Even "never" is truthy; keep boolean true/false as controls.
+	for _, value := range []any{true, "always", "ignorePackages", "never"} {
+		valid = append(valid, rule_tester.ValidTestCase{Code: packageImport, Options: []any{"always", map[string]any{"ignorePackages": value}}})
+		for _, code := range []string{typeImport, `export type { T } from './missing';`} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: []any{"always", map[string]any{"checkTypeImports": value}}, Errors: []rule_tester.InvalidTestCaseError{
+				extensionError(code, `'./missing'`, `Missing file extension for "./missing"`),
+			}})
+		}
+	}
+	rule_tester.RunRuleTester(extensionsRoot(t), "tsconfig.json", t, &extensions.ExtensionsRule, valid, invalid)
+}
+
 func TestExtensionsQueriesAndPaths(t *testing.T) {
 	// Query stripping follows JavaScript's non-dotAll regexp. A query with a
 	// line terminator is part of the extension unless a later '?' can match.

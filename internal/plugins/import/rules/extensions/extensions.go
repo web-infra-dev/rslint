@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/evaluator"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
@@ -44,8 +45,13 @@ func parseOptions(raw []any) options {
 		pattern := object
 		if object["pattern"] != nil || object["ignorePackages"] != nil || object["checkTypeImports"] != nil {
 			pattern, _ = object["pattern"].(map[string]any)
-			opts.ignorePackages, _ = object["ignorePackages"].(bool)
-			opts.checkTypeImports, _ = object["checkTypeImports"].(bool)
+			// The legacy schema also admits mode strings for these boolean flags.
+			if value := object["ignorePackages"]; value != nil {
+				opts.ignorePackages = evaluator.IsTruthy(value)
+			}
+			if value := object["checkTypeImports"]; value != nil {
+				opts.checkTypeImports = evaluator.IsTruthy(value)
+			}
 			if overrides, ok := object["pathGroupOverrides"].([]any); ok {
 				for _, entry := range overrides {
 					group, _ := entry.(map[string]any)
