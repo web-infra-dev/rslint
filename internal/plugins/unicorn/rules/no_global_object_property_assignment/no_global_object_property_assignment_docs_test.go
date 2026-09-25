@@ -20,9 +20,9 @@ func TestNoGlobalObjectPropertyAssignmentDocs(t *testing.T) {
 			{Code: "globalThis.foo;"},
 		},
 		[]rule_tester.InvalidTestCase{
-			{Code: "globalThis.foo = value;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment"}}},
-			{Code: "window.foo += 1;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment"}}},
-			{Code: "self.foo ||= value;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment"}}},
+			{Code: "globalThis.foo = value;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Message: "Do not assign properties on the global object.", Line: 1, Column: 1, EndLine: 1, EndColumn: 15}}},
+			{Code: "window.foo += 1;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Message: "Do not assign properties on the global object.", Line: 1, Column: 1, EndLine: 1, EndColumn: 11}}},
+			{Code: "self.foo ||= value;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Message: "Do not assign properties on the global object.", Line: 1, Column: 1, EndLine: 1, EndColumn: 9}}},
 		},
 	)
 }

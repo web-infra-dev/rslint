@@ -18,10 +18,12 @@ func TestNoGlobalObjectPropertyAssignmentExtras(t *testing.T) {
 			{Code: "function f(globalThis) { globalThis.foo = 1; }"},
 			{Code: "const window = {}; window.foo = 1;"},
 			{Code: "delete window.foo;"},
+			{Code: "globalThis[property] = value;"},
 		},
 		[]rule_tester.InvalidTestCase{
-			{Code: "globalThis[\"foo\"]++;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment"}}},
-			{Code: "for (self.value of values) {}", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment"}}},
+			{Code: "globalThis[\"foo\"]++;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Message: "Do not assign properties on the global object.", Line: 1, Column: 1, EndLine: 1, EndColumn: 18}}},
+			{Code: "for (self.value of values) {}", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Message: "Do not assign properties on the global object.", Line: 1, Column: 6, EndLine: 1, EndColumn: 16}}},
+			{Code: "({target: window.value} = source);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Message: "Do not assign properties on the global object.", Line: 1, Column: 11, EndLine: 1, EndColumn: 23}}},
 		},
 	)
 }
