@@ -16,9 +16,10 @@ func TestConsistentTemplateLiteralEscapeExtras(t *testing.T) {
 		&consistent_template_literal_escape.ConsistentTemplateLiteralEscapeRule,
 		[]rule_tester.ValidTestCase{
 			{Code: "const tagged = tag`$\\{value}`;"},
+			{Code: "const tagged = tag`${expr}$\\{value}`;"},
 		},
 		[]rule_tester.InvalidTestCase{
-			{Code: "const value = `prefix $\\{x} suffix`;", Output: []string{"const value = `prefix \\${x} suffix`;"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistent-template-literal-escape"}}},
+			{Code: "const value = `prefix $\\{x} suffix`;", Output: []string{"const value = `prefix \\${x} suffix`;"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistent-template-literal-escape", Message: "Use `\\${` instead of `$\\{` to escape in template literals.", Line: 1, Column: 15, EndLine: 1, EndColumn: 36}}},
 		},
 	)
 }

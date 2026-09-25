@@ -21,8 +21,8 @@ func TestConsistentTemplateLiteralEscapeDocs(t *testing.T) {
 			{Code: "const name = 'Alice';\nconst greeting = `Hello ${name}, use \\${variable} for templates`;"},
 		},
 		[]rule_tester.InvalidTestCase{
-			{Code: "const template = `$\\{variableName}`;", Output: []string{"const template = `\\${variableName}`;"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistent-template-literal-escape"}}},
-			{Code: "const template = `\\$\\{variableName}`;", Output: []string{"const template = `\\${variableName}`;"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistent-template-literal-escape"}}},
+			{Code: "const template = `$\\{variableName}`;", Output: []string{"const template = `\\${variableName}`;"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistent-template-literal-escape", Message: "Use `\\${` instead of `$\\{` to escape in template literals.", Line: 1, Column: 18, EndLine: 1, EndColumn: 36}}},
+			{Code: "const template = `\\$\\{variableName}`;", Output: []string{"const template = `\\${variableName}`;"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistent-template-literal-escape", Message: "Use `\\${` instead of `$\\{` to escape in template literals.", Line: 1, Column: 18, EndLine: 1, EndColumn: 37}}},
 		},
 	)
 }
