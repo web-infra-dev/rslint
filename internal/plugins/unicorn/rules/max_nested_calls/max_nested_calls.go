@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed max_nested_calls.schema.json
@@ -44,14 +45,10 @@ func parseMax(options []any) int {
 		return defaultMax
 	}
 	config, _ := options[0].(map[string]any)
-	value, ok := config["max"].(float64)
-	if !ok {
-		if integer, ok := config["max"].(int); ok {
-			return integer
-		}
-		return defaultMax
+	if value, ok := utils.CoerceIntegral(config["max"]); ok {
+		return value
 	}
-	return int(value)
+	return defaultMax
 }
 
 func nestedCallDepth(node *ast.Node) int {
@@ -85,13 +82,14 @@ func hasArgument(node, target *ast.Node) bool {
 }
 
 func isNestedCallBoundary(node *ast.Node) bool {
-	if ast.IsFunctionLike(node) {
+	if utils.IsFunctionLikeContainer(node) {
 		return true
 	}
 	switch node.Kind {
 	case ast.KindClassDeclaration,
 		ast.KindClassExpression,
 		ast.KindJsxElement,
+		ast.KindJsxSelfClosingElement,
 		ast.KindJsxFragment,
 		ast.KindClassStaticBlockDeclaration:
 		return true
