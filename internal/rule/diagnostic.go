@@ -79,10 +79,10 @@ type RuleDiagnostic struct {
 	Suggestions *[]RuleSuggestion
 	// SourceFile is the file this diagnostic anchors to. It is the
 	// ast.SourceFileLike interface (Text + ECMALineMap) rather than a
-	// concrete *ast.SourceFile so that ESLint-plugin diagnostics — which
-	// are produced in a Node worker and have no ts-go AST — can supply a
-	// lightweight text-only implementation (internal/linter.textSourceFile)
-	// and still render line/column through the scanner.
+	// concrete *ast.SourceFile so completed pipeline observations and
+	// ESLint-plugin diagnostics can retain only text and still render
+	// line/column through the scanner. During execution, native diagnostics
+	// retain their source identity until fix text has been frozen.
 	SourceFile ast.SourceFileLike
 	// FilePath is the diagnostic's file name. Stored separately because
 	// ast.SourceFileLike exposes no FileName(); native diagnostics set it

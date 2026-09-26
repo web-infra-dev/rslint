@@ -14,7 +14,7 @@ import (
 // a request-local overlay and rebuilds the exact Program and target generation.
 // It never owns fix rounds or mutates disk.
 type cliGenerationProvider struct {
-	initial    loader.LoadResult
+	initial    *loader.LoadResult
 	initialFS  vfs.FS
 	rebuild    func(context.Context, linter.SourceSnapshot) (loader.LoadResult, vfs.FS, error)
 	generation func(loader.LoadResult, vfs.FS) linter.Generation
@@ -30,8 +30,14 @@ func (p *cliGenerationProvider) AcquireGeneration(
 	if p == nil || p.generation == nil {
 		return linter.Generation{}, nil, errors.New("CLI lint generation provider is not configured")
 	}
-	if snapshot.Empty() {
-		return p.generation(p.initial, p.initialFS), nil, nil
+	if snapshot.Empty() && p.initial != nil {
+		generation := p.generation(*p.initial, p.initialFS)
+		return generation, func() {
+			// Drop only the provider's ownership. The published generation and
+			// any requested source artifacts remain immutable and independently live.
+			p.initial = nil
+			p.initialFS = nil
+		}, nil
 	}
 	if p.rebuild == nil {
 		return linter.Generation{}, nil, errors.New("rebuild CLI lint generation: provider is not configured")

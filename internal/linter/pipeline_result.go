@@ -14,7 +14,8 @@ type LintedFile struct {
 }
 
 // NativeObservation is the complete native result for one generation and its
-// requested ArtifactDemand.
+// requested ArtifactDemand. Diagnostic source frames retain text rather than
+// compiler ASTs; explicitly requested Files keep their original source objects.
 type NativeObservation struct {
 	Diagnostics []rule.RuleDiagnostic
 	Lint        *LintResult
@@ -53,6 +54,31 @@ func (r ObservationResult) CompleteDiagnostics() ([]rule.RuleDiagnostic, bool) {
 		diagnostics = append(diagnostics, r.pluginOutcome.Diagnostics...)
 	}
 	return diagnostics, true
+}
+
+// detachDiagnosticSources ends diagnostic ownership of compiler ASTs after
+// source identity validation and fix text freezing. Reuse one text projection
+// per source object, never per path: distinct generations can share a path.
+func (r *ObservationResult) detachDiagnosticSources() {
+	var sources map[*ast.SourceFile]*textSourceFile
+	for _, diagnostics := range [][]rule.RuleDiagnostic{r.Native.Diagnostics, r.pluginOutcome.Diagnostics} {
+		for index := range diagnostics {
+			diagnostic := &diagnostics[index]
+			source, ok := diagnostic.SourceFile.(*ast.SourceFile)
+			if !ok || source == nil {
+				continue
+			}
+			projection := sources[source]
+			if projection == nil {
+				if sources == nil {
+					sources = make(map[*ast.SourceFile]*textSourceFile)
+				}
+				projection = newTextSourceFile(source.Text())
+				sources[source] = projection
+			}
+			diagnostic.SourceFile = projection
+		}
+	}
 }
 
 // JoinedPluginOutcome returns the structured result for joined plugin work.
