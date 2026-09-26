@@ -36,12 +36,16 @@ var NoGlobalObjectPropertyAssignmentRule = rule.Rule{
 			if !ast.IsIdentifier(object) {
 				return
 			}
+			assignmentTarget := node
+			for assignmentTarget.Parent != nil && utils.SkipAssertionsAndParens(assignmentTarget.Parent) == node {
+				assignmentTarget = assignmentTarget.Parent
+			}
 			if _, ok := globalObjectNames[object.Text()]; !ok ||
 				!unicornutil.IsGlobalReference(ctx, object) ||
-				!utils.IsWriteReference(node) {
+				!ast.IsAssignmentTarget(assignmentTarget) {
 				return
 			}
-			if _, ok := propertyNames.EvalAccessExpressionName(node); !ok {
+			if !propertyNames.HasStaticAccessExpressionKey(node) {
 				return
 			}
 
