@@ -65,12 +65,21 @@
             "type": "string",
             "enum": [
               "@typescript-eslint",
+              "eslint-plugin-import",
+              "eslint-plugin-jest",
+              "eslint-plugin-jsx-a11y",
+              "eslint-plugin-node",
+              "eslint-plugin-promise",
+              "eslint-plugin-react-hooks",
+              "eslint-plugin-unicorn",
               "import",
               "jest",
               "jsx-a11y",
+              "node",
               "promise",
               "react",
               "react-hooks",
+              "rstest",
               "unicorn"
             ]
           },
@@ -107,6 +116,11 @@
           "$ref": "#/definitions/ParserOptions",
           "description": "Parser-specific configuration options"
         },
+        "ecmaFeatures": {
+          "type": "object",
+          "description": "Parser feature flags forwarded to the eslint-plugin worker",
+          "additionalProperties": true
+        },
         "globals": {
           "type": "object",
           "description": "Global variables available to rules for matching files. Null is readonly; \"off\" disables a global; all other accepted values declare it as readonly or writable.",
@@ -130,14 +144,14 @@
           }
         }
       },
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "ParserOptions": {
       "type": "object",
       "description": "Parser-specific configuration options",
       "properties": {
         "projectService": {
-          "type": "boolean",
+          "type": ["boolean", "null"],
           "description": "Enable project service for typed linting (runs TypeScript language service behind the scene)",
           "default": false
         },
@@ -154,12 +168,18 @@
                 "type": "string",
                 "description": "Path or glob for a tsconfig file"
               }
-            }
+            },
+            false,
+            null
           ],
           "examples": [
             ["./tsconfig.json"],
             ["./packages/*/tsconfig.json", "./tsconfig.base.json"]
           ]
+        },
+        "tsconfigRootDir": {
+          "type": ["string", "null"],
+          "description": "Root directory used to resolve TypeScript project configuration"
         }
       },
       "additionalProperties": false
