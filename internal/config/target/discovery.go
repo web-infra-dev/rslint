@@ -170,42 +170,25 @@ func discoverLintTargetsWithinRoot(
 
 	targetFiles := []File{}
 	seenTargets := make(map[string]struct{})
-	addTarget := func(
-		filePath string,
-		canonicalPath string,
-		canonicalParentPath string,
-	) {
-		filePath = tspath.NormalizePath(filePath)
-		if canonicalPath == "" {
-			canonicalPath = filePath
+	addTarget := func(target File) {
+		target.Path = tspath.NormalizePath(target.Path)
+		if target.CanonicalPath == "" {
+			target.CanonicalPath = target.Path
 		} else {
-			canonicalPath = tspath.NormalizePath(canonicalPath)
+			target.CanonicalPath = tspath.NormalizePath(target.CanonicalPath)
 		}
-		if canonicalParentPath == "" {
-			canonicalParentPath = tspath.GetDirectoryPath(canonicalPath)
+		if target.CanonicalParentPath == "" {
+			target.CanonicalParentPath = tspath.GetDirectoryPath(target.CanonicalPath)
 		} else {
-			canonicalParentPath = tspath.NormalizePath(canonicalParentPath)
+			target.CanonicalParentPath = tspath.NormalizePath(target.CanonicalParentPath)
 		}
-		key := comparisonKey(filePath)
+		key := comparisonKey(target.Path)
 		if _, seen := seenTargets[key]; seen {
 			return
 		}
 		seenTargets[key] = struct{}{}
-		targetFiles = append(targetFiles, File{
-			PathIdentity: rslintconfig.PathIdentity{
-				Path:                filePath,
-				CanonicalPath:       canonicalPath,
-				CanonicalParentPath: canonicalParentPath,
-			},
-			ConfigDirectory: configDir,
-		})
-	}
-	includeDiscoveredFile := func(target File) bool {
-		if !rslintconfig.IsSupportedLintFile(target.Path) {
-			return false
-		}
-		decision := targetMatcher.MatchFile(target.Identity())
-		return decision.Selected && !decision.GloballyIgnored
+		target.ConfigDirectory = configDir
+		targetFiles = append(targetFiles, target)
 	}
 
 	addExplicitTargets := func() {
@@ -216,11 +199,7 @@ func discoverLintTargetsWithinRoot(
 				useCaseSensitive,
 				&targetMatcher,
 			) {
-				addTarget(
-					explicitFile.target.Path,
-					explicitFile.target.CanonicalPath,
-					explicitFile.target.CanonicalParentPath,
-				)
+				addTarget(explicitFile.target)
 			}
 		}
 	}
@@ -335,12 +314,18 @@ func discoverLintTargetsWithinRoot(
 				},
 				ConfigDirectory: configDir,
 			}
-			if !includeDiscoveredFile(target) {
+			if !rslintconfig.IsSupportedLintFile(target.Path) {
 				continue
 			}
+			match := targetMatcher.MatchFile(target.Identity())
+			if !match.Selected() || match.GloballyIgnored() {
+				continue
+			}
+			target.match = new(rslintconfig.TargetMatch)
+			*target.match = match
 
 			targetMu.Lock()
-			addTarget(projection.Path, canonicalPath, canonicalParentPath)
+			addTarget(target)
 			targetMu.Unlock()
 		}
 	}
