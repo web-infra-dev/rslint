@@ -3,7 +3,7 @@ import { RuleTester } from '../rule-tester';
 
 const ruleTester = new RuleTester();
 
-ruleTester.run('async-server-action', null, {
+ruleTester.run('async-server-action', {} as never, {
   valid: [
     {
       code: `
