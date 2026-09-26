@@ -1,8 +1,10 @@
 package linter
 
 import (
+	"context"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -28,6 +30,50 @@ func TestCheckerFreeLintWorkerCountKeepsSmallSetsSerial(t *testing.T) {
 		if got := checkerFreeLintWorkerCount(test.files, test.procs); got != test.want {
 			t.Fatalf("checkerFreeLintWorkerCount(%d, %d) = %d, want %d", test.files, test.procs, got, test.want)
 		}
+	}
+}
+
+func TestDeferredWorkersTakeNextFileWithoutBatchBarrier(t *testing.T) {
+	previous := runtime.GOMAXPROCS(2)
+	defer runtime.GOMAXPROCS(previous)
+	releaseFirst := make(chan struct{})
+	thirdStarted := make(chan struct{})
+	var active, maximum atomic.Int32
+	configured := []rule.ConfiguredRule{{Name: "native/check", Run: func(ctx rule.RuleContext) rule.RuleListeners {
+		current := active.Add(1)
+		defer active.Add(-1)
+		for observed := maximum.Load(); current > observed; observed = maximum.Load() {
+			if maximum.CompareAndSwap(observed, current) {
+				break
+			}
+		}
+		switch {
+		case strings.HasSuffix(ctx.SourceFile.FileName(), "first.ts"):
+			<-releaseFirst
+		case strings.HasSuffix(ctx.SourceFile.FileName(), "third.ts"):
+			close(thirdStarted)
+		}
+		return nil
+	}}}
+	generation := pipelineDeferredTestGeneration(t, map[string]string{
+		"first.ts": "export {};", "second.ts": "export {};", "third.ts": "export {};",
+	}, func(string) []rule.ConfiguredRule { return configured })
+	generation.Native.SingleThreaded = false
+	done := make(chan error, 1)
+	go func() {
+		_, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, nil))
+		done <- err
+	}()
+	select {
+	case <-thirdStarted:
+		close(releaseFirst)
+	case <-time.After(5 * time.Second):
+		close(releaseFirst)
+		<-done
+		t.Fatal("completed worker waited for an unrelated slow file")
+	}
+	if err := <-done; err != nil || maximum.Load() > 2 {
+		t.Fatalf("error=%v maximum workers=%d", err, maximum.Load())
 	}
 }
 

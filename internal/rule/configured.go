@@ -9,6 +9,7 @@ type ConfiguredRule struct {
 	Environment      *RuleEnvironment
 	Severity         DiagnosticSeverity
 	RequiresTypeInfo bool
+	RequiresProgram  bool
 	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint
 	// worker rather than natively in Go. Run remains a no-op placeholder for
 	// those entries.

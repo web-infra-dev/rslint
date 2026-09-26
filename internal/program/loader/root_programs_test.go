@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
@@ -308,6 +310,9 @@ func TestLoadCLIMatchesCompatibilityRootAdmission(t *testing.T) {
 			direct := runRootProgramBind(func() (LoadResult, error) {
 				return sessionForTest(directContext).LoadCLI(ProjectSet{}, plan, configDir, true)
 			})
+			prepared := runRootProgramBind(func() (LoadResult, error) {
+				return sessionForTest(newContext()).PrepareCLI(ProjectSet{}, plan, configDir, true)
+			})
 
 			legacyError, directError := "", ""
 			if legacy.err != nil {
@@ -320,6 +325,13 @@ func TestLoadCLIMatchesCompatibilityRootAdmission(t *testing.T) {
 				if legacyError != directError || legacy.panicText != direct.panicText ||
 					(legacyError == "" && legacy.panicText == "") {
 					t.Fatalf("unsupported-root behavior differs: legacy=(%q, %q) direct=(%q, %q)", legacyError, legacy.panicText, directError, direct.panicText)
+				}
+				preparedError := ""
+				if prepared.err != nil {
+					preparedError = prepared.err.Error()
+				}
+				if preparedError != legacyError || prepared.panicText != legacy.panicText {
+					t.Fatalf("deferred preparation changed compatibility admission: %+v", prepared)
 				}
 				return
 			}
@@ -342,8 +354,51 @@ func TestLoadCLIMatchesCompatibilityRootAdmission(t *testing.T) {
 				false,
 			)
 			compareProgramSyntaxDiagnostics(t, legacyDiagnostics, directDiagnostics)
+			if prepared.err != nil || prepared.panicText != "" || len(prepared.binding.DeferredSources) != 1 || len(prepared.binding.Programs) != 0 {
+				t.Fatalf("supported root was not deferred: %+v", prepared)
+			}
+			sourceProgram, err := prepared.binding.DeferredSources[0].Build()
+			if err != nil {
+				t.Fatal(err)
+			}
+			compareProgramSyntaxDiagnostics(t, directDiagnostics, collectTargetSyntacticDiagnostics(
+				[]*lintprogram.Program{sourceProgram}, [][]string{{targetPath}}, false, false,
+			))
 		})
 	}
+}
+
+func TestPreparedSourcesShareTextWithoutRetainingASTs(t *testing.T) {
+	const root = "/prepared-sources"
+	path := tspath.ResolvePath(root, "source.ts")
+	fs := newBindingIndexTestFS([]string{path}, nil)
+	fs.files[path] = "export const original = 1;"
+	session := NewSession(fs)
+	binding, err := session.PrepareCLI(ProjectSet{}, rootProgramTestPlan(root, "source.ts"), root, false)
+	if err != nil || len(binding.DeferredSources) != 1 || len(binding.Programs) != 0 {
+		t.Fatalf("prepare: binding=%+v error=%v", binding, err)
+	}
+	var previous weak.Pointer[ast.SourceFile]
+	func() {
+		sourceProgram, err := binding.DeferredSources[0].BuildFile(0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		previous = weak.Make(sourceProgram.SourceFiles()[0])
+	}()
+	fs.files[path] = "export const changed = 2;"
+	sourceProgram, err := binding.DeferredSources[0].BuildFile(0)
+	if err != nil || sourceProgram.SourceFiles()[0].Text() != "export const original = 1;" {
+		t.Fatalf("source snapshot changed: %v", err)
+	}
+	runtime.GC()
+	runtime.GC()
+	if previous.Value() != nil {
+		t.Fatal("loader retained a completed source AST")
+	}
+	runtime.KeepAlive(sourceProgram)
+	runtime.KeepAlive(binding)
+	runtime.KeepAlive(session)
 }
 
 type rootProgramExactCaseFS struct {
@@ -567,7 +622,7 @@ func buildRootProgramsForTest(
 	singleThreaded bool,
 ) ([]*lintprogram.Program, []rule.RuleDiagnostic, error) {
 	result := LoadResult{}
-	if err := sessionForTest(context).appendRootPrograms(&result, groups, currentDirectory, singleThreaded); err != nil {
+	if err := sessionForTest(context).appendRootPrograms(&result, groups, currentDirectory, singleThreaded, false); err != nil {
 		return nil, nil, err
 	}
 	diagnostics := collectTargetSyntacticDiagnostics(result.Programs, result.TargetsByProgram, false, false)

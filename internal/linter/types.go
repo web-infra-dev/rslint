@@ -13,6 +13,9 @@ type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 type LintResult struct {
 	LintedFileCount int32
 	ExecutedRules   map[string]struct{}
+	// HasSyntacticDiagnostics includes syntax failures discovered while
+	// materializing deferred files during execution.
+	HasSyntacticDiagnostics bool
 }
 
 // PrepareLintPlanOptions configures exact lint-plan construction for an ordered

@@ -102,6 +102,47 @@ func TestPipelineReleasesGenerationOnPreparationFailureAndPanic(t *testing.T) {
 }
 
 func TestPipelineRejectsInvalidGenerationPortsBeforeExecution(t *testing.T) {
+	t.Run("invalid deferred source set", func(t *testing.T) {
+		var resolutions, releases int
+		generation := pipelineDeferredTestGeneration(t, map[string]string{"valid.ts": "export {};"}, func(string) []rule.ConfiguredRule {
+			resolutions++
+			return nil
+		})
+		generation.Native.DeferredSources = append(generation.Native.DeferredSources, nil)
+		_, err := RunPipeline(context.Background(), NewLintRequest(
+			pipelineTestProvider(generation, func() { releases++ }), ObservationPolicy{}, nil,
+		))
+		if err == nil || !strings.Contains(err.Error(), "invalid deferred source set") || resolutions != 0 || releases != 1 {
+			t.Fatalf("error/resolutions/releases = %v/%d/%d", err, resolutions, releases)
+		}
+	})
+
+	for _, projection := range []string{"empty", "duplicate"} {
+		t.Run("deferred "+projection+" projection", func(t *testing.T) {
+			var calls, releases atomic.Int32
+			generation := pipelineDeferredTestGeneration(t, map[string]string{
+				"first.ts": "export {};", "second.ts": "export {};",
+			}, func(string) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{Name: "native/check", Run: func(rule.RuleContext) rule.RuleListeners {
+					calls.Add(1)
+					return nil
+				}}}
+			})
+			generation.Target.Path = func(string) string {
+				if projection == "empty" {
+					return ""
+				}
+				return "same.ts"
+			}
+			_, err := RunPipeline(context.Background(), NewLintRequest(
+				pipelineTestProvider(generation, func() { releases.Add(1) }), ObservationPolicy{}, nil,
+			))
+			if err == nil || !strings.Contains(err.Error(), "projected target") || calls.Load() != 0 || releases.Load() != 1 {
+				t.Fatalf("error/calls/releases = %v/%d/%d", err, calls.Load(), releases.Load())
+			}
+		})
+	}
+
 	t.Run("nil provider function", func(t *testing.T) {
 		_, err := RunPipeline(context.Background(), NewLintRequest(
 			GenerationProviderFunc(nil),
@@ -151,6 +192,36 @@ func TestPipelineAcceptsGenerationWithoutLintPlan(t *testing.T) {
 		len(result.Observation.Native.Files) != 0 ||
 		result.Observation.Native.HasTargetSyntaxErrors {
 		t.Fatalf("empty generation observation = %+v", result.Observation.Native)
+	}
+}
+
+func TestPipelineDetachesTypeCheckOnlyDiagnosticSources(t *testing.T) {
+	compiled, paths := createTestProgramWithFiles(t, map[string]string{
+		"source.ts": "const value: number = 'wrong';",
+	})
+	result, err := RunPipeline(context.Background(), NewLintRequest(
+		pipelineTestProvider(Generation{Native: NativeGeneration{
+			Programs: wrapTestPrograms(compiled), TypeCheck: true, SingleThreaded: true,
+		}}, nil),
+		ObservationPolicy{}, nil,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics := result.Observation.Native.Diagnostics
+	if len(diagnostics) == 0 {
+		t.Fatal("type-check-only observation lost its diagnostics")
+	}
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Origin != rule.DiagnosticOriginTypeScript || !diagnostic.PreFormatted || diagnostic.FilePath != paths["source.ts"] {
+			t.Fatalf("type diagnostic metadata changed: %+v", diagnostic)
+		}
+		if _, retainedAST := diagnostic.SourceFile.(*ast.SourceFile); retainedAST {
+			t.Fatal("type-check-only diagnostic retained its AST")
+		}
+		if diagnostic.SourceFile.Text() != "const value: number = 'wrong';" {
+			t.Fatalf("type diagnostic source = %q", diagnostic.SourceFile.Text())
+		}
 	}
 }
 

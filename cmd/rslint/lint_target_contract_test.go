@@ -119,6 +119,27 @@ func TestCLINoArgsUsesDefaultScriptExtensions(t *testing.T) {
 	}
 }
 
+func TestCLIDeferredSourceRootsPreserveCrossFileRules(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/source_roots.txtar").Materialize(t, ""))
+	for _, singleThreaded := range []bool{true, false} {
+		code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+			ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
+				Plugins: []string{"import"}, Files: []string{"**/*.ts"},
+				Rules: rslintconfig.Rules{"import/no-cycle": "error", "import/default": "error"},
+			}}),
+			Format: "jsonline", NoColor: true, SingleThreaded: singleThreaded,
+		})
+		diagnostics := parseLintTargetContractDiagnostics(t, stdout)
+		counts := make(map[string]int)
+		for _, diagnostic := range diagnostics {
+			counts[diagnostic.RuleName]++
+		}
+		if code != 1 || counts["import/no-cycle"] != 2 || counts["import/default"] != 1 || len(diagnostics) != 3 {
+			t.Fatalf("serial=%v exit=%d diagnostics=%+v stderr=%q", singleThreaded, code, diagnostics, stderr)
+		}
+	}
+}
+
 func TestCLITypeCheckKeepsLintTargetsAndChecksWholeProject(t *testing.T) {
 	dir := t.TempDir()
 	writeLintTargetContractFiles(t, dir, map[string]string{
