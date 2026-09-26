@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/error_message"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/explicit_timer_delay"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/max_nested_calls"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_concat_in_loop"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_fill_with_reference_type"
@@ -81,6 +82,7 @@ func GetAllRules() []rule.Rule {
 		error_message.ErrorMessageRule,
 		explicit_timer_delay.ExplicitTimerDelayRule,
 		filename_case.FilenameCaseRule,
+		max_nested_calls.MaxNestedCallsRule,
 		new_for_builtins.NewForBuiltinsRule,
 		no_array_concat_in_loop.NoArrayConcatInLoopRule,
 		no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule,

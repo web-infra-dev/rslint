@@ -1,0 +1,26 @@
+package max_nested_calls_test
+
+import (
+	"testing"
+
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/max_nested_calls"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+)
+
+func TestMaxNestedCallsDocs(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&max_nested_calls.MaxNestedCallsRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "const value = baz(qux());\nfoo(bar(value));"},
+			{Code: "query().filter().map().toArray();"},
+			{Code: "foo(bar(baz(qux())));", Options: []any{map[string]any{"max": 4}}},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: "foo(bar(baz(qux())));", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "max-nested-calls", Message: "Call is nested too deeply. Maximum allowed is 3.", Line: 1, Column: 13, EndLine: 1, EndColumn: 18}}},
+		},
+	)
+}
