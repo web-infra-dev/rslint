@@ -171,7 +171,8 @@ func TestSourceSetDefersParsingAndPreservesPlatformPaths(t *testing.T) {
 		t.Run(root, func(t *testing.T) {
 			first := tspath.ResolvePath(root, "first.ts")
 			second := tspath.ResolvePath(root, "second.ts")
-			fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+			// Virtual drive and UNC paths must never reach the host filesystem.
+			fs := utils.NewOverlayVFS(sourceSetEmptyTestFS{}, map[string]string{
 				first: "import './second'; export const first = 1;", second: "export const second = 2;",
 			})
 			host := &sourceSetTestHost{CompilerHost: utils.CreateCompilerHost(root, fs)}
@@ -237,6 +238,16 @@ type sourceSetTestHost struct {
 	compiler.CompilerHost
 	parses atomic.Int32
 }
+
+// Overlay misses are absent, never reads against a real drive or UNC share.
+// Unused filesystem operations deliberately have no implementation.
+type sourceSetEmptyTestFS struct{ vfs.FS }
+
+func (sourceSetEmptyTestFS) UseCaseSensitiveFileNames() bool { return true }
+func (sourceSetEmptyTestFS) FileExists(string) bool          { return false }
+func (sourceSetEmptyTestFS) ReadFile(string) (string, bool)  { return "", false }
+func (sourceSetEmptyTestFS) DirectoryExists(string) bool     { return false }
+func (sourceSetEmptyTestFS) Realpath(path string) string     { return path }
 
 func (h *sourceSetTestHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
 	h.parses.Add(1)
