@@ -6,6 +6,15 @@ import (
 	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
+// IsDetectedStatelessComponent reports whether Components.detect registers the
+// function itself. Wrapper calls have no parameters and replace their inner
+// function in the upstream component list; async generators are excluded.
+func IsDetectedStatelessComponent(node *ast.Node, pragma string, tc *checker.Checker, wrappers []ComponentWrapperEntry, scopes scopeAnalysis.Provider) bool {
+	return !IsAsyncGeneratorFunction(node) &&
+		OutermostComponentWrapperCall(node, pragma, wrappers, tc, scopes) == nil &&
+		IsStatelessReactComponentWithWrappers(node, pragma, tc, wrappers, scopes)
+}
+
 // IsAsyncGeneratorFunction reports whether `node` is a function expression /
 // declaration / object-literal shorthand method that is BOTH `async` AND a
 // generator (`async function*` or `async *Foo() {}`).
