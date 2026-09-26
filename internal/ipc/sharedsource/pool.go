@@ -36,24 +36,31 @@ type slot struct {
 	busy       bool
 }
 
+// The platform mapping may reserve pages without committing their backing
+// memory. Only Pool calls these operations, under its writer/close mutex.
+type mappedSources struct {
+	data       []byte
+	commitSlot func(int) error
+	unmap      func() error
+}
+
 // Pool owns the mapping and bounded slots. Its mutex also makes Close wait for
 // any writer already copying bytes; no mapped slice escapes this package.
 type Pool struct {
-	mu    sync.Mutex
-	data  []byte
-	unmap func() error
-	slots [slotCount]slot
+	mu      sync.Mutex
+	mapping mappedSources
+	slots   [slotCount]slot
 }
 
 func Open(descriptor Descriptor) (*Pool, error) {
 	if descriptor.Version != 1 {
 		return nil, errors.New("unsupported shared source version")
 	}
-	data, unmap, err := mapSources(descriptor)
+	mapping, err := mapSources(descriptor)
 	if err != nil {
 		return nil, err
 	}
-	return &Pool{data: data, unmap: unmap}, nil
+	return &Pool{mapping: mapping}, nil
 }
 
 // Store copies all parts in order before atomically publishing the generation.
@@ -71,7 +78,7 @@ func (p *Pool) Store(parts []string) (Batch, bool) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.data == nil {
+	if p.mapping.data == nil {
 		return Batch{}, false
 	}
 	for i := range p.slots {
@@ -79,17 +86,22 @@ func (p *Pool) Store(parts []string) (Batch, bool) {
 		if s.busy || s.generation == ^uint32(0) {
 			continue
 		}
+		if s.generation == 0 && p.mapping.commitSlot != nil {
+			if err := p.mapping.commitSlot(i); err != nil {
+				return Batch{}, false
+			}
+		}
 		s.busy = true
 		s.generation++
 		s.length = uint32(size)
 		start := headerSize + i*SlotSize
 		offset := start
 		for _, part := range parts {
-			offset += copy(p.data[offset:start+size], part)
+			offset += copy(p.mapping.data[offset:start+size], part)
 		}
 		// Rust acquires this aligned word before admitting readers. A pipe
 		// notification alone is not used as a cross-language memory fence.
-		atomic.StoreUint32((*uint32)(unsafe.Pointer(&p.data[i*4])), s.generation)
+		atomic.StoreUint32((*uint32)(unsafe.Pointer(&p.mapping.data[i*4])), s.generation)
 		return Batch{Slot: uint32(i), Generation: s.generation, Length: s.length}, true
 	}
 	return Batch{}, false
@@ -112,13 +124,13 @@ func (p *Pool) Release(batch Batch) {
 func (p *Pool) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.data == nil {
+	if p.mapping.data == nil {
 		return nil
 	}
 	var err error
-	if p.unmap != nil {
-		err = p.unmap()
+	if p.mapping.unmap != nil {
+		err = p.mapping.unmap()
 	}
-	p.data = nil
+	p.mapping = mappedSources{}
 	return err
 }

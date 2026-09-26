@@ -299,6 +299,9 @@ jobs:
       - name: Build napi parser (native)
         run: pnpm --filter @rslint/native run build
 
+      - name: Test Windows shared source mapping
+        run: cargo test -p rslint-native --release source_transport
+
       - name: Build rslint.exe
         shell: pwsh
         run: go build -o npm/rslint/win32-x64-msvc/rslint.exe ./cmd/rslint

@@ -4,7 +4,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/web-infra-dev/rslint/internal/ipc"
@@ -43,12 +45,15 @@ type pluginSourceStore interface {
 }
 
 type pluginLintDispatcher struct {
-	channel *ipc.Channel
-	sources pluginSourceStore
+	channel  *ipc.Channel
+	sources  pluginSourceStore
+	inFlight chan struct{}
 }
 
 func newPluginLintDispatcher(channel *ipc.Channel, descriptor *sharedsource.Descriptor) *pluginLintDispatcher {
-	d := &pluginLintDispatcher{channel: channel}
+	// Bound transport requests across ALL logical batches, leaving headroom in
+	// the sixteen-slot arena for slots retained after missing acknowledgements.
+	d := &pluginLintDispatcher{channel: channel, inFlight: make(chan struct{}, 8)}
 	if descriptor != nil {
 		// Sharing is optional. Mapping failures keep complete inline text;
 		// this transport policy belongs here, not in the memory pool.
@@ -69,9 +74,13 @@ func (d *pluginLintDispatcher) dispatch(ctx context.Context, req linter.EslintPl
 	if d.sources == nil || len(req.Files) == 0 {
 		return d.send(ctx, req)
 	}
-	// Split logical batches by source bytes, retaining the original result order
-	// and rules/configuration. Individual oversized files stay on the inline path.
-	var result linter.EslintPluginLintResult
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	// Storage boundaries must not become execution barriers: a slow file in one
+	// part must not prevent later parts from reaching idle plugin workers.
+	// Individual oversized files stay on the inline path.
+	var parts []linter.EslintPluginLintRequest
 	for start := 0; start < len(req.Files); {
 		end, size := start, 0
 		for end < len(req.Files) {
@@ -87,12 +96,64 @@ func (d *pluginLintDispatcher) dispatch(ctx context.Context, req linter.EslintPl
 		}
 		part := req
 		part.Files = req.Files[start:end]
-		response, err := d.send(ctx, part)
-		if err != nil {
-			return nil, err
-		}
-		result.Results = append(result.Results, response.Results...)
+		parts = append(parts, part)
 		start = end
+	}
+	responses := make([]struct {
+		result *linter.EslintPluginLintResult
+		err    error
+	}, len(parts))
+	var group sync.WaitGroup
+	started := 0
+dispatchParts:
+	for i, part := range parts {
+		if ctx.Err() != nil {
+			break
+		}
+		// Acquire before spawning: waiting parts retain no goroutine, and all
+		// logical requests share this limit rather than multiplying concurrency.
+		select {
+		case d.inFlight <- struct{}{}:
+		case <-ctx.Done():
+			break dispatchParts
+		}
+		started++
+		group.Go(func() {
+			defer func() { <-d.inFlight }()
+			defer func() {
+				// Preserve the linter's dispatch panic isolation inside this new
+				// goroutine boundary; a bad request must not crash the process.
+				if recovered := recover(); recovered != nil {
+					responses[i].err = fmt.Errorf("eslint-plugin dispatch panicked: %v", recovered)
+				}
+			}()
+			responses[i].result, responses[i].err = d.send(ctx, part)
+		})
+	}
+	// A cancelled caller still owns its snapshots until every started writer
+	// and request has returned. Join before returning on either errors or cancel.
+	group.Wait()
+	var result linter.EslintPluginLintResult
+	var cancelled error
+	for _, response := range responses[:started] {
+		if response.err != nil {
+			// Match the linter's failure policy: cancellation must not hide a
+			// real failure in a later part. Within each class keep input order.
+			if !errors.Is(response.err, context.Canceled) {
+				return nil, response.err
+			}
+			if cancelled == nil {
+				cancelled = response.err
+			}
+			continue
+		}
+		result.Results = append(result.Results, response.result.Results...)
+	}
+	if cancelled != nil {
+		return nil, cancelled
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return &result, nil
 }

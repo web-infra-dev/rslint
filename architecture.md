@@ -1525,7 +1525,10 @@ descriptor during initialization. Linux uses a sealed anonymous memory file,
 macOS an immediately unlinked POSIX shared-memory object, and Windows an
 anonymous pagefile mapping whose handle Go duplicates. Source transfer never
 uses source paths or process addresses. Mapping failure preserves complete
-inline source text through the existing JSON transport.
+inline source text through the existing JSON transport. Windows reserves the
+arena and commits its control page initially; source slots are committed in
+full only on their first write. A CLI without plugin sources therefore does
+not commit the entire arena. Failed commitment also preserves inline text.
 
 On the Go side, `internal/ipc/sharedsource` owns mapping lifetime, byte copies,
 publication and slot reuse. It has no linter or IPC-message dependency and
@@ -1533,7 +1536,10 @@ never exposes mapped slices; closing waits for an active writer. The CLI plugin
 dispatcher owns request encoding, ordered splitting by source bytes, IPC
 responses and their release acknowledgements. The CLI entry only assembles and
 closes that dispatcher. Logical batches larger than a slot keep the same
-rule/config metadata, so their total source size is not limited by one slot.
+rule/config metadata. Their segments can execute concurrently, with at most
+eight transport requests in flight across the dispatcher and results joined in
+input order. Storage boundaries do not introduce per-segment execution
+barriers, and their total source size is not limited by one slot.
 An aligned 32-bit publication word per slot supplies the release/acquire memory
 fence between Go and Rust. The Node source adapter validates the ranges,
 registers a native read capability, and forwards only that capability to
