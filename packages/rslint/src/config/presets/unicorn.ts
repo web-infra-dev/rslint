@@ -149,7 +149,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-top-level-assignment-in-function': 'error', // not implemented
     // 'unicorn/no-top-level-side-effects': 'error', // not implemented
     // 'unicorn/no-transition-all': 'error', // not implemented
-    // 'unicorn/no-typeof-undefined': 'error', // not implemented
+    'unicorn/no-typeof-undefined': 'error',
     // 'unicorn/no-uncalled-method': 'error', // not implemented
     // 'unicorn/no-undeclared-class-members': 'error', // not implemented
     'unicorn/no-unnecessary-array-flat-depth': 'error',

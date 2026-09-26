@@ -835,6 +835,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/no-thenable.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-this-assignment.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-this-outside-of-class.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-typeof-undefined.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unnecessary-array-splice-count.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unnecessary-slice-end.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unnecessary-array-flat-depth.test.ts',
