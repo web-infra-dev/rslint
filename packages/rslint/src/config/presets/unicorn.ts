@@ -98,7 +98,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-exports-in-scripts': 'error',
     // 'unicorn/no-for-each': 'error', // not implemented
     // 'unicorn/no-for-loop': 'error', // not implemented
-    // 'unicorn/no-global-object-property-assignment': 'error', // not implemented
+    'unicorn/no-global-object-property-assignment': 'error',
     // 'unicorn/no-immediate-mutation': 'error', // not implemented
     // 'unicorn/no-impossible-length-comparison': 'error', // not implemented
     // 'unicorn/no-incorrect-query-selector': 'error', // not implemented
