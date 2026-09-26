@@ -47,6 +47,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_lowercase_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_mock_promise_shorthand"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_mock_return_shorthand"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_snapshot_hint"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_spy_on"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_be"
@@ -115,6 +116,7 @@ func GetAllRules() []rule.Rule {
 		prefer_mock_return_shorthand.PreferMockReturnShorthandRule,
 		prefer_spy_on.PreferSpyOnRule,
 		prefer_strict_equal.PreferStrictEqualRule,
+		prefer_snapshot_hint.PreferSnapshotHintRule,
 		prefer_to_be.PreferToBeRule,
 		prefer_to_contain.PreferToContainRule,
 		prefer_to_have_been_called_times.PreferToHaveBeenCalledTimesRule,
