@@ -38,6 +38,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_spread_multi"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_spreading"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_sort_props"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_tag_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
@@ -136,6 +137,7 @@ func GetAllRules() []rule.Rule {
 		jsx_props_no_spreading.JsxPropsNoSpreadingRule,
 		jsx_props_no_spread_multi.JsxPropsNoSpreadMultiRule,
 		jsx_sort_props.JsxSortPropsRule,
+		jsx_tag_spacing.JsxTagSpacingRule,
 		jsx_uses_react.JsxUsesReactRule,
 		jsx_uses_vars.JsxUsesVarsRule,
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
