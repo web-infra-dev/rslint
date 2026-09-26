@@ -132,7 +132,7 @@ test('applies exact upstream autofixes and preserves comment-only reports', asyn
       fix: true,
     });
     expect(result.output ?? {}).toEqual(
-      testCase.output === null ? {} : { [absoluteFilename]: testCase.output },
+      testCase.output === null ? {} : { [filename]: testCase.output },
     );
     expect(result.diagnostics).toHaveLength(
       testCase.output === null ? testCase.errors.length : 0,
