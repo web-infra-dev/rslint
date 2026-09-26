@@ -1,20 +1,17 @@
 //! OS handles are local implementation details. The wire carries a descriptor,
 //! never a process address or a source-file path. All supported npm targets use
 //! the same fixed-slot protocol above this module.
-// cspell:words munmap syscall memfd CLOEXEC CREAT RDWR fcntl SETFD ftruncate READWRITE
+// cspell:words munmap syscall memfd CLOEXEC CREAT RDWR fcntl SETFD ftruncate READWRITE EFAULT
 
 use super::SourceMapping;
 use std::io;
 
-unsafe fn publication(data: *mut u8, slot: usize) -> u32 {
-    use std::sync::atomic::{fence, AtomicU32, Ordering};
-    // A small relaxed load is guaranteed to work on read-only mappings on our
-    // x64/arm64 targets. Acquire loads do not have that guarantee; pair the
-    // relaxed load with an acquire fence instead.
-    // https://doc.rust-lang.org/std/sync/atomic/#atomic-accesses-to-read-only-memory
-    let generation = AtomicU32::from_ptr(data.add(slot * 4).cast()).load(Ordering::Relaxed);
-    fence(Ordering::Acquire);
-    generation
+unsafe fn publication(control: *mut u8, slot: usize) -> u32 {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    // AtomicU32::from_ptr requires readable and writable memory, even for loads.
+    // The separate control view satisfies that contract; source slices always
+    // use the read-only data view.
+    AtomicU32::from_ptr(control.add(slot * 4).cast()).load(Ordering::Acquire)
 }
 
 #[cfg(unix)]
@@ -25,6 +22,7 @@ mod platform {
 
     pub struct Mapping {
         data: *mut u8,
+        control: *mut u8,
         length: usize,
         fd: OwnedFd,
     }
@@ -33,7 +31,7 @@ mod platform {
         pub fn published(&self, slot: usize) -> u32 {
             // The caller bounds slot to SLOT_COUNT. This control word is never
             // included in an immutable source slice.
-            unsafe { super::publication(self.data, slot) }
+            unsafe { super::publication(self.control, slot) }
         }
 
         #[cfg(test)]
@@ -124,8 +122,27 @@ mod platform {
             if data == libc::MAP_FAILED {
                 return Err(io::Error::last_os_error());
             }
+            // Request only the header. The OS may round this view up to a host
+            // page (for example, 16 KiB on macOS), so never borrow source bytes
+            // through it.
+            let control = unsafe {
+                libc::mmap(
+                    ptr::null_mut(),
+                    super::super::HEADER_SIZE,
+                    libc::PROT_READ | libc::PROT_WRITE,
+                    libc::MAP_SHARED,
+                    raw,
+                    0,
+                )
+            };
+            if control == libc::MAP_FAILED {
+                let error = io::Error::last_os_error();
+                unsafe { libc::munmap(data, length) };
+                return Err(error);
+            }
             Ok(Self {
                 data: data.cast(),
+                control: control.cast(),
                 length,
                 fd,
             })
@@ -148,9 +165,36 @@ mod platform {
     impl Drop for Mapping {
         fn drop(&mut self) {
             unsafe {
+                libc::munmap(self.control.cast(), super::super::HEADER_SIZE);
                 libc::munmap(self.data.cast(), self.length);
             }
         }
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn control_is_writable_and_data_is_read_only() {
+        let mapping = Mapping::new(super::super::CAPACITY).unwrap();
+        let zero = std::fs::File::open("/dev/zero").unwrap();
+        mapping.publish_for_test(0, 1);
+        assert_eq!(mapping.published(0), 1);
+        // Kernel writes report inaccessible destinations as EFAULT instead of
+        // deliberately crashing the test process with a direct write.
+        assert_eq!(
+            unsafe { libc::read(zero.as_raw_fd(), mapping.control.cast(), 4) },
+            4,
+        );
+        assert_eq!(mapping.published(0), 0);
+        let result = unsafe {
+            libc::read(
+                zero.as_raw_fd(),
+                mapping.data.add(super::super::HEADER_SIZE).cast(),
+                1,
+            )
+        };
+        let error = io::Error::last_os_error();
+        assert_eq!(result, -1);
+        assert_eq!(error.raw_os_error(), Some(libc::EFAULT));
     }
 }
 
@@ -168,12 +212,13 @@ mod platform {
 
     pub struct Mapping {
         data: *mut u8,
+        control: *mut u8,
         handle: HANDLE,
     }
 
     impl Mapping {
         pub fn published(&self, slot: usize) -> u32 {
-            unsafe { super::publication(self.data, slot) }
+            unsafe { super::publication(self.control, slot) }
         }
 
         #[cfg(test)]
@@ -229,22 +274,26 @@ mod platform {
                     PAGE_READWRITE,
                 )
             };
-            let error = committed.is_null().then(io::Error::last_os_error);
-            unsafe { UnmapViewOfFile(control) };
-            if let Some(error) = error {
-                unsafe { CloseHandle(handle) };
+            if committed.is_null() {
+                let error = io::Error::last_os_error();
+                unsafe {
+                    UnmapViewOfFile(control);
+                    CloseHandle(handle);
+                }
                 return Err(error);
             }
             let view = unsafe { MapViewOfFile(handle, FILE_MAP_READ, 0, 0, length) };
             if view.Value.is_null() {
                 let error = io::Error::last_os_error();
                 unsafe {
+                    UnmapViewOfFile(control);
                     CloseHandle(handle);
                 }
                 return Err(error);
             }
             Ok(Self {
                 data: view.Value.cast(),
+                control: control.Value.cast(),
                 handle,
             })
         }
@@ -269,6 +318,9 @@ mod platform {
                 UnmapViewOfFile(MEMORY_MAPPED_VIEW_ADDRESS {
                     Value: self.data.cast(),
                 });
+                UnmapViewOfFile(MEMORY_MAPPED_VIEW_ADDRESS {
+                    Value: self.control.cast(),
+                });
                 CloseHandle(self.handle);
             }
         }
@@ -282,12 +334,12 @@ mod platform {
         };
 
         let mapping = Mapping::new(super::super::CAPACITY).unwrap();
-        let page = |offset: usize| {
+        let page = |base: *mut u8, offset: usize| {
             let mut info = MEMORY_BASIC_INFORMATION::default();
             assert_ne!(
                 unsafe {
                     VirtualQuery(
-                        mapping.data.add(offset).cast(),
+                        base.add(offset).cast(),
                         &mut info,
                         std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
                     )
@@ -296,19 +348,22 @@ mod platform {
             );
             info
         };
-        assert_eq!(page(0).State, MEM_COMMIT);
-        assert_eq!(page(0).Protect, PAGE_READONLY);
+        assert_eq!(page(mapping.control, 0).State, MEM_COMMIT);
+        assert_eq!(page(mapping.control, 0).Protect, PAGE_READWRITE);
+        assert_eq!(page(mapping.data, 0).State, MEM_COMMIT);
+        assert_eq!(page(mapping.data, 0).Protect, PAGE_READONLY);
         // Query inside the payload, away from any rounding of the control page.
         let first = super::super::HEADER_SIZE + super::super::SLOT_SIZE / 2;
         let second = first + super::super::SLOT_SIZE;
-        assert_eq!(page(first).State, MEM_RESERVE);
-        assert_eq!(page(second).State, MEM_RESERVE);
+        assert_eq!(page(mapping.data, first).State, MEM_RESERVE);
+        assert_eq!(page(mapping.data, second).State, MEM_RESERVE);
 
         mapping.publish_for_test(0, 1);
 
-        assert_eq!(page(first).State, MEM_COMMIT);
-        assert_eq!(page(first).Protect, PAGE_READONLY);
-        assert_eq!(page(second).State, MEM_RESERVE);
+        assert_eq!(page(mapping.control, 0).Protect, PAGE_READWRITE);
+        assert_eq!(page(mapping.data, first).State, MEM_COMMIT);
+        assert_eq!(page(mapping.data, first).Protect, PAGE_READONLY);
+        assert_eq!(page(mapping.data, second).State, MEM_RESERVE);
         assert_eq!(mapping.published(0), 1);
     }
 }

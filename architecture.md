@@ -1554,7 +1554,9 @@ with at most eight transport requests in flight across the dispatcher and
 results joined in input order. Storage boundaries do not introduce per-segment
 execution barriers, and their total source size is not limited by one slot.
 An aligned 32-bit publication word per slot supplies the release/acquire memory
-fence between Go and Rust. The Node source adapter validates the ranges,
+fence between Go and Rust. The native reader owns a writable control view for
+atomic references and a separate read-only data view for source borrows; both
+views live as long as the mapping. The Node source adapter validates the ranges,
 registers a native read capability, and forwards only that capability to
 workers. Rust borrows the immutable UTF-8 snapshot for
 the parser and constructs the required JavaScript SourceCode string directly;
