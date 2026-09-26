@@ -27,6 +27,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_restricted_matchers"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_restricted_rstest_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_standalone_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_test_return_statement"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_unnecessary_assertion"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_unneeded_async_expect_function"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_after_all_blocks"
@@ -111,6 +112,7 @@ func GetAllRules() []rule.Rule {
 		no_restricted_matchers.NoRestrictedMatchersRule,
 		no_restricted_rstest_methods.NoRestrictedRstestMethodsRule,
 		no_standalone_expect.NoStandaloneExpectRule,
+		no_test_return_statement.NoTestReturnStatementRule,
 		no_unnecessary_assertion.NoUnnecessaryAssertionRule,
 		no_unneeded_async_expect_function.NoUnneededAsyncExpectFunctionRule,
 		padding_around_after_all_blocks.PaddingAroundAfterAllBlocksRule,
