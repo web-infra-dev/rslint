@@ -161,8 +161,8 @@ mod platform {
     use windows_sys::Win32::{
         Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE},
         System::Memory::{
-            CreateFileMappingW, MapViewOfFile, UnmapViewOfFile, FILE_MAP_READ,
-            MEMORY_MAPPED_VIEW_ADDRESS, PAGE_READWRITE,
+            CreateFileMappingW, MapViewOfFile, UnmapViewOfFile, VirtualAlloc, FILE_MAP_READ,
+            FILE_MAP_WRITE, MEMORY_MAPPED_VIEW_ADDRESS, MEM_COMMIT, PAGE_READWRITE, SEC_RESERVE,
         },
     };
 
@@ -179,14 +179,16 @@ mod platform {
         #[cfg(test)]
         pub fn publish_for_test(&self, slot: usize, generation: u32) {
             unsafe {
-                let view = MapViewOfFile(
-                    self.handle,
-                    windows_sys::Win32::System::Memory::FILE_MAP_WRITE,
-                    0,
-                    0,
-                    super::super::CAPACITY,
-                );
+                let view = MapViewOfFile(self.handle, FILE_MAP_WRITE, 0, 0, super::super::CAPACITY);
                 assert!(!view.Value.is_null());
+                let start = super::super::HEADER_SIZE + slot * super::super::SLOT_SIZE;
+                assert!(!VirtualAlloc(
+                    view.Value.cast::<u8>().add(start).cast(),
+                    super::super::SLOT_SIZE,
+                    MEM_COMMIT,
+                    PAGE_READWRITE,
+                )
+                .is_null());
                 let word = (view.Value as *mut u32).add(slot);
                 std::sync::atomic::AtomicU32::from_ptr(word)
                     .store(generation, std::sync::atomic::Ordering::Release);
@@ -199,7 +201,7 @@ mod platform {
                 CreateFileMappingW(
                     INVALID_HANDLE_VALUE,
                     ptr::null(),
-                    PAGE_READWRITE,
+                    PAGE_READWRITE | SEC_RESERVE,
                     0,
                     length as u32,
                     ptr::null(),
@@ -207,6 +209,31 @@ mod platform {
             };
             if handle.is_null() {
                 return Err(io::Error::last_os_error());
+            }
+            // Reserve payload pages until the Go writer needs a slot. Plain
+            // PAGE_READWRITE defaults to SEC_COMMIT and would charge the full
+            // arena even for native-only CLI runs. Only the control page must
+            // be readable before the first producer publication.
+            let control =
+                unsafe { MapViewOfFile(handle, FILE_MAP_WRITE, 0, 0, super::super::HEADER_SIZE) };
+            if control.Value.is_null() {
+                let error = io::Error::last_os_error();
+                unsafe { CloseHandle(handle) };
+                return Err(error);
+            }
+            let committed = unsafe {
+                VirtualAlloc(
+                    control.Value,
+                    super::super::HEADER_SIZE,
+                    MEM_COMMIT,
+                    PAGE_READWRITE,
+                )
+            };
+            let error = committed.is_null().then(io::Error::last_os_error);
+            unsafe { UnmapViewOfFile(control) };
+            if let Some(error) = error {
+                unsafe { CloseHandle(handle) };
+                return Err(error);
             }
             let view = unsafe { MapViewOfFile(handle, FILE_MAP_READ, 0, 0, length) };
             if view.Value.is_null() {
@@ -245,6 +272,44 @@ mod platform {
                 CloseHandle(self.handle);
             }
         }
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn payload_is_committed_only_when_published() {
+        use windows_sys::Win32::System::Memory::{
+            VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_RESERVE, PAGE_READONLY,
+        };
+
+        let mapping = Mapping::new(super::super::CAPACITY).unwrap();
+        let page = |offset: usize| {
+            let mut info = MEMORY_BASIC_INFORMATION::default();
+            assert_ne!(
+                unsafe {
+                    VirtualQuery(
+                        mapping.data.add(offset).cast(),
+                        &mut info,
+                        std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+                    )
+                },
+                0,
+            );
+            info
+        };
+        assert_eq!(page(0).State, MEM_COMMIT);
+        assert_eq!(page(0).Protect, PAGE_READONLY);
+        // Query inside the payload, away from any rounding of the control page.
+        let first = super::super::HEADER_SIZE + super::super::SLOT_SIZE / 2;
+        let second = first + super::super::SLOT_SIZE;
+        assert_eq!(page(first).State, MEM_RESERVE);
+        assert_eq!(page(second).State, MEM_RESERVE);
+
+        mapping.publish_for_test(0, 1);
+
+        assert_eq!(page(first).State, MEM_COMMIT);
+        assert_eq!(page(first).Protect, PAGE_READONLY);
+        assert_eq!(page(second).State, MEM_RESERVE);
+        assert_eq!(mapping.published(0), 1);
     }
 }
 

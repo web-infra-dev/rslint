@@ -25,9 +25,12 @@ import { platformTuple } from '../../src/native/platform-tuple.js';
  * still reject. The full public entry rejects during import instead. Neither
  * entry may fall back to a workspace platform package.
  *
- * Requires `dist/eslint-plugin/` (built by `pnpm build`, the same prerequisite
- * the worker-pool e2e suites already document) and the host platform package's
- * `.node` (built by `pnpm --filter @rslint/native build`).
+ * The complete CLI case additionally proves that its arena and worker parser
+ * share the staged native registry, preserving Go's snapshot after a disk edit.
+ * It does not exercise termination during a native read.
+ *
+ * Requires `dist/`, the host Go binary (built by `pnpm build`) and the host
+ * platform package's `.node` (built by `pnpm --filter @rslint/native build`).
  */
 
 const require = createRequire(import.meta.url);
@@ -89,6 +92,70 @@ if (d.length === 1 && d[0].ruleName === 'pkg/no-null') {
 }
 `;
 
+const SHARED_RUNNER = `import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
+const parentRequire = createRequire(path.join(here, 'dist', 'cli.js'));
+const workerRequire = createRequire(path.join(here, 'dist', 'eslint-plugin', 'lint-worker.js'));
+const nativePackage = ${JSON.stringify(`@rslint/${PKG_BASE}`)};
+const resolved = parentRequire.resolve(nativePackage);
+assert.equal(resolved, workerRequire.resolve(nativePackage));
+assert.ok(resolved.startsWith(here + path.sep));
+const native = parentRequire(nativePackage);
+const file = path.join(here, 'cfg', 'input.ts');
+const original = fs.readFileSync(file, 'utf8');
+const changed = 'const changedOnDisk = false;';
+let registered = 0;
+const register = native.SourceArena.prototype.register;
+native.SourceArena.prototype.register = function(slot, generation, length) {
+  const lease = register.call(this, slot, generation, length);
+  const source = native.parseSharedSource(file, { lease, offset: 0, length }, 'module', false);
+  assert.equal(source.sourceText, original.slice(1));
+  assert.equal(source.hadBom, true);
+  registered++;
+  // Observe the real CLI registration after Go published its snapshot, before
+  // the adapter sends the capability to the real worker. No transport is mocked.
+  fs.writeFileSync(file, changed);
+  return lease;
+};
+const { run } = await import(pathToFileURL(path.join(here, 'dist', 'cli.js')).href);
+const code = await run(parentRequire.resolve(nativePackage + '/bin'), ['--no-color', file], Date.now());
+assert.equal(code, 1);
+assert.equal(registered, 1, 'CLI must register shared source, not use inline fallback');
+assert.equal(fs.readFileSync(file, 'utf8'), changed);
+console.log('PACKAGED_SHARED_OK');
+`;
+
+function stageNative(root: string, withBinary = false): void {
+  const nativeDir = path.join(root, 'node_modules', '@rslint', PKG_BASE);
+  fs.mkdirSync(nativeDir, { recursive: true });
+  const srcPkgDir = path.dirname(
+    require.resolve(`@rslint/${PKG_BASE}/package.json`),
+  );
+  const srcNode = path.join(srcPkgDir, NODE_FILE);
+  if (!fs.existsSync(srcNode)) {
+    throw new Error(
+      `no built ${NODE_FILE} in ${srcPkgDir} — run ` +
+        '`pnpm --filter @rslint/native build` before this test',
+    );
+  }
+  fs.copyFileSync(srcNode, path.join(nativeDir, NODE_FILE));
+  const exports: Record<string, string> = { '.': `./${NODE_FILE}` };
+  if (withBinary) {
+    const binary = require.resolve(`@rslint/${PKG_BASE}/bin`);
+    const name = path.basename(binary);
+    fs.copyFileSync(binary, path.join(nativeDir, name));
+    exports['./bin'] = `./${name}`;
+  }
+  fs.writeFileSync(
+    path.join(nativeDir, 'package.json'),
+    JSON.stringify({ name: `@rslint/${PKG_BASE}`, exports }),
+  );
+}
+
 /** Stage a packaged layout under `root`; omit the nested native for the negative control. */
 function stage(root: string, opts: { withNative: boolean }): void {
   const coreEpDir = path.resolve(__dirname, '../../dist/eslint-plugin');
@@ -113,26 +180,7 @@ function stage(root: string, opts: { withNative: boolean }): void {
     // Stage the host platform package `@rslint/native-<tuple>` (minimal
     // package.json + the `.node` under its real name) — what the worker's
     // loader resolves at runtime.
-    const nativeDir = path.join(epDest, 'node_modules', '@rslint', PKG_BASE);
-    fs.mkdirSync(nativeDir, { recursive: true });
-    const srcPkgDir = path.dirname(
-      require.resolve(`@rslint/${PKG_BASE}/package.json`),
-    );
-    const srcNode = path.join(srcPkgDir, NODE_FILE);
-    if (!fs.existsSync(srcNode)) {
-      throw new Error(
-        `no built ${NODE_FILE} in ${srcPkgDir} — run ` +
-          '`pnpm --filter @rslint/native build` before this test',
-      );
-    }
-    fs.copyFileSync(srcNode, path.join(nativeDir, NODE_FILE));
-    fs.writeFileSync(
-      path.join(nativeDir, 'package.json'),
-      JSON.stringify({
-        name: `@rslint/${PKG_BASE}`,
-        exports: { '.': `./${NODE_FILE}` },
-      }),
-    );
+    stageNative(epDest);
   }
 
   const cfgDir = path.join(root, 'cfg');
@@ -155,6 +203,61 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     afterAll(() => {
       if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
     });
+
+    test(
+      'complete CLI and worker share the staged native source registry',
+      () => {
+        const root = path.join(tmp, 'shared-cli');
+        fs.mkdirSync(root, { recursive: true });
+        fs.cpSync(
+          path.resolve(__dirname, '../../dist'),
+          path.join(root, 'dist'),
+          { recursive: true },
+        );
+        fs.writeFileSync(
+          path.join(root, 'package.json'),
+          JSON.stringify({ type: 'module' }),
+        );
+        stageNative(root, true);
+        fs.cpSync(
+          path.dirname(require.resolve('picomatch/package.json')),
+          path.join(root, 'node_modules', 'picomatch'),
+          { recursive: true },
+        );
+        const cfgDir = path.join(root, 'cfg');
+        fs.mkdirSync(cfgDir);
+        fs.writeFileSync(path.join(cfgDir, 'local-plugin.mjs'), LOCAL_PLUGIN);
+        fs.writeFileSync(
+          path.join(cfgDir, 'rslint.config.mjs'),
+          `import lp from './local-plugin.mjs';
+export default [{ files: ['**/*.ts'], plugins: { pkg: lp }, rules: { 'pkg/no-null': 'error' } }];`,
+        );
+        fs.writeFileSync(
+          path.join(cfgDir, 'input.ts'),
+          '\ufeffconst sample = null; // café 😀\r\n',
+        );
+        fs.writeFileSync(path.join(root, 'runner.mjs'), SHARED_RUNNER);
+        const result = spawnSync(
+          process.execPath,
+          [path.join(root, 'runner.mjs')],
+          {
+            cwd: cfgDir,
+            encoding: 'utf8',
+            timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+            killSignal: 'SIGKILL',
+            maxBuffer: 16 * 1024 * 1024,
+            env: { ...process.env, NODE_PATH: '' },
+          },
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.signal).toBeNull();
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout).toContain('no null');
+        expect(result.stdout).toContain('PACKAGED_SHARED_OK');
+        expect(result.stderr.trim()).toBe('');
+      },
+      PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
+    );
 
     test.each(HOST_ENTRIES)(
       '%s worker loads the nested platform package and a plugin rule fires',
