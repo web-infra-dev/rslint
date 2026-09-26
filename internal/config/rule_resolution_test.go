@@ -57,6 +57,22 @@ func TestResolveEnabledRules_MultiSlashNames(t *testing.T) {
 	}
 }
 
+func TestResolveEnabledRulesPreservesProgramRequirements(t *testing.T) {
+	configured, _ := ResolveEnabledRules(baseRuleCatalog(), RslintConfig{{
+		Plugins: []string{"import"},
+		Rules:   Rules{"import/no-cycle": "error", "import/default": "error", "no-debugger": "error"},
+	}}, "source.ts", "")
+	if len(configured) != 3 {
+		t.Fatalf("expected three configured rules, got %v", configured)
+	}
+	for _, configured := range configured {
+		want := configured.Name != "no-debugger"
+		if configured.RequiresProgram != want {
+			t.Errorf("%s RequiresProgram = %v, want %v", configured.Name, configured.RequiresProgram, want)
+		}
+	}
+}
+
 func TestResolveEnabledRules_FiltersByEnabledState(t *testing.T) {
 
 	config := RslintConfig{

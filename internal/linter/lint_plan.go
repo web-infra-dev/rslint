@@ -24,10 +24,13 @@ var (
 // host-side consumers such as third-party plugin dispatch. It preserves the
 // selected files per Program, including syntax-error and zero-rule files needed
 // for LintedFileCount, while resolving each eligible file's complete rule set
-// exactly once.
+// exactly once. Pipeline-prepared plans may additionally own deferred file
+// descriptors with immutable configuration; those acquire their AST and syntax
+// result only during execution and never publish AST-bearing artifacts.
 type LintPlan struct {
 	programs                  []programLintPlan
 	syntacticDiagnosticGroups []syntacticDiagnosticGroup
+	deferredFiles             []deferredFilePlan
 }
 
 type programLintPlan struct {
@@ -367,7 +370,7 @@ func (p *LintPlan) fileCount() int {
 	if p == nil {
 		return 0
 	}
-	fileCount := 0
+	fileCount := len(p.deferredFiles)
 	for _, programPlan := range p.programs {
 		fileCount += len(programPlan.files)
 	}

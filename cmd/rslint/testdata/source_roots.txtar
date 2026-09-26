@@ -1,0 +1,6 @@
+-- a.ts --
+import value from './b';
+export { value };
+-- b.ts --
+import './a';
+export const named = 1;

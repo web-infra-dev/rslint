@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -163,6 +164,94 @@ func TestRootProgramCachesSyntacticDiagnosticsDuringConstruction(t *testing.T) {
 	if len(got) != len(cached) || &got[0] != &cached[0] {
 		t.Fatal("SyntacticDiagnostics did not reuse immutable construction output")
 	}
+}
+
+func TestSourceSetDefersParsingAndPreservesPlatformPaths(t *testing.T) {
+	for _, root := range []string{"/source-set", "C:/source-set", "//server/share/source-set"} {
+		t.Run(root, func(t *testing.T) {
+			first := tspath.ResolvePath(root, "first.ts")
+			second := tspath.ResolvePath(root, "second.ts")
+			// Virtual drive and UNC paths must never reach the host filesystem.
+			fs := utils.NewOverlayVFS(sourceSetEmptyTestFS{}, map[string]string{
+				first: "import './second'; export const first = 1;", second: "export const second = 2;",
+			})
+			host := &sourceSetTestHost{CompilerHost: utils.CreateCompilerHost(root, fs)}
+			roots := []string{first, second, first}
+			sources, err := lintprogram.NewSourceSet(lintprogram.RootOptions{
+				RootFileNames: roots, Host: host, CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			roots[0] = "changed.ts"
+			if host.parses.Load() != 0 || len(sources.FileNames()) != 2 || sources.FileNames()[0] != first {
+				t.Fatal("source set parsed eagerly or retained the caller's root slice")
+			}
+			one, err := sources.BuildFile(0)
+			if err != nil || host.parses.Load() != 1 || len(one.SourceFiles()) != 1 || one.GetSourceFile(second) != nil {
+				t.Fatalf("one-file construction: parses=%d error=%v", host.parses.Load(), err)
+			}
+			file := one.SourceFiles()[0]
+			if !file.IsBound() || file.FileName() != first || one.CanProvideTypeChecker(file) {
+				t.Fatal("one-file construction changed source identity or capability")
+			}
+			all, err := sources.Build()
+			if err != nil || len(all.SourceFiles()) != 2 || all.GetSourceFile(second) == nil {
+				t.Fatalf("whole-set construction: %v", err)
+			}
+			if all.GetSourceFile(first) == file {
+				t.Fatal("independent builds shared a mutable bound AST")
+			}
+			if _, err := sources.BuildFile(2); err == nil {
+				t.Fatal("out-of-range source index was accepted")
+			}
+		})
+	}
+}
+
+func TestSourceSetRejectsInvalidInputsBeforeParsing(t *testing.T) {
+	var nilHost *typedNilCompilerHost
+	for _, options := range []lintprogram.RootOptions{
+		{Host: nilHost, CompilerOptions: lintprogram.SourceOnlyCompilerOptions()},
+		{Host: &typedNilFSCompilerHost{}, CompilerOptions: lintprogram.SourceOnlyCompilerOptions()},
+		{Host: utils.CreateCompilerHost("/source-set", osvfs.FS())},
+		{
+			RootFileNames:   []string{"C:/source-set/Case.ts", "c:/source-set/case.ts"},
+			Host:            utils.CreateCompilerHost("C:/source-set", caseInsensitiveFS{FS: osvfs.FS()}),
+			CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+		},
+	} {
+		if _, err := lintprogram.NewSourceSet(options); err == nil {
+			t.Fatalf("invalid source set accepted: %+v", options)
+		}
+	}
+	var empty lintprogram.SourceSet
+	if empty.IsValid() || empty.FileNames() != nil {
+		t.Fatal("zero source set is valid")
+	}
+	if _, err := empty.Build(); err == nil {
+		t.Fatal("zero source set was built")
+	}
+}
+
+type sourceSetTestHost struct {
+	compiler.CompilerHost
+	parses atomic.Int32
+}
+
+// Overlay misses are absent, never reads against a real drive or UNC share.
+// Unused filesystem operations deliberately have no implementation.
+type sourceSetEmptyTestFS struct{ vfs.FS }
+
+func (sourceSetEmptyTestFS) UseCaseSensitiveFileNames() bool { return true }
+func (sourceSetEmptyTestFS) FileExists(string) bool          { return false }
+func (sourceSetEmptyTestFS) ReadFile(string) (string, bool)  { return "", false }
+func (sourceSetEmptyTestFS) DirectoryExists(string) bool     { return false }
+func (sourceSetEmptyTestFS) Realpath(path string) string     { return path }
+
+func (h *sourceSetTestHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
+	h.parses.Add(1)
+	return h.CompilerHost.GetSourceFile(options)
 }
 
 type typedNilCompilerHost struct {

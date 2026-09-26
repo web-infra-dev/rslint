@@ -104,10 +104,16 @@ type NativeGeneration struct {
 	Programs         []*program.Program
 	TargetsByProgram [][]string
 	RulesForFile     RuleHandler
-	Cwd              string
-	TypeCheck        bool
-	SingleThreaded   bool
-	Timing           *TimingCollector
+	// DeferredSources contains complete, unparsed root sets. The pipeline may
+	// process independent files on demand, or materialize the complete set when
+	// rules or artifacts require it. RulesForPath resolves the same immutable
+	// configuration as RulesForFile without requiring an AST.
+	DeferredSources []*program.SourceSet
+	RulesForPath    func(string) []rule.ConfiguredRule
+	Cwd             string
+	TypeCheck       bool
+	SingleThreaded  bool
+	Timing          *TimingCollector
 }
 
 // TargetProjection binds Program-facing paths to the stable target identity

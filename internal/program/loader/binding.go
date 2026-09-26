@@ -16,15 +16,16 @@ import (
 )
 
 // LoadResult is the complete Program input for one lint generation. It carries
-// only the unified Program sequence, lint projection, and source/target path
-// mappings needed by integrations; compiler and parser assembly details remain
-// private to the loader. Its slices and maps are immutable after LoadCLI or
-// LoadAPI returns.
+// the unified Program sequence, lint projection, and source/target path mappings.
+// PrepareCLI may also return unparsed root sets for demand-driven materialization;
+// compiler and parser assembly details remain private to the loader. All slices
+// and maps are immutable after loading or preparation returns.
 type LoadResult struct {
 	compilerPrograms       []*compiler.Program
 	Programs               []*lintprogram.Program
 	TargetsByProgram       [][]string
 	LintTargetBySourcePath map[string]target.File
+	DeferredSources        []*lintprogram.SourceSet
 }
 
 func authoritativePath(filePath string, fsys vfs.FS) string {
@@ -507,6 +508,7 @@ func (s *Session) appendRootPrograms(
 	groups [][]target.File,
 	currentDirectory string,
 	singleThreaded bool,
+	deferSources bool,
 ) error {
 	for _, group := range groups {
 		sort.Slice(group, func(left, right int) bool {
@@ -516,12 +518,21 @@ func (s *Session) appendRootPrograms(
 		for index, target := range group {
 			rootFileNames[index] = target.Path
 		}
-		rootProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		options := lintprogram.RootOptions{
 			RootFileNames:   rootFileNames,
 			Host:            s.context.newTransientCompilerHost(currentDirectory),
 			CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
 			SingleThreaded:  singleThreaded,
-		})
+		}
+		if deferSources {
+			sources, err := lintprogram.NewSourceSet(options)
+			if err != nil {
+				return err
+			}
+			binding.DeferredSources = append(binding.DeferredSources, sources)
+			continue
+		}
+		rootProgram, err := lintprogram.NewFromRoots(options)
 		if err != nil {
 			return err
 		}
@@ -545,6 +556,28 @@ func (s *Session) LoadCLI(
 	currentDirectory string,
 	singleThreaded bool,
 ) (LoadResult, error) {
+	return s.loadCLI(set, plan, currentDirectory, singleThreaded, false)
+}
+
+// PrepareCLI preserves the same target binding and source universes as LoadCLI,
+// but leaves supported gap roots unparsed. The consumer decides whether its
+// rule and artifact requirements permit independent file lifetimes.
+func (s *Session) PrepareCLI(
+	set ProjectSet,
+	plan target.Plan,
+	currentDirectory string,
+	singleThreaded bool,
+) (LoadResult, error) {
+	return s.loadCLI(set, plan, currentDirectory, singleThreaded, true)
+}
+
+func (s *Session) loadCLI(
+	set ProjectSet,
+	plan target.Plan,
+	currentDirectory string,
+	singleThreaded bool,
+	deferSources bool,
+) (LoadResult, error) {
 	if err := s.validate(); err != nil {
 		return LoadResult{}, err
 	}
@@ -563,7 +596,7 @@ func (s *Session) LoadCLI(
 		// by no current compiler Program are evicted before root parsing. The root
 		// backend shares source snapshots, not bound compiler AST objects.
 		s.retainCompilerPrograms(binding.compilerPrograms)
-		if err := s.appendRootPrograms(&binding, groups, currentDirectory, singleThreaded); err != nil {
+		if err := s.appendRootPrograms(&binding, groups, currentDirectory, singleThreaded, deferSources); err != nil {
 			return LoadResult{}, err
 		}
 		finalizeResult(&binding)
