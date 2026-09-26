@@ -3,6 +3,7 @@ package linter
 import (
 	"context"
 	"errors"
+	"sort"
 	"sync/atomic"
 	"testing"
 
@@ -30,6 +31,37 @@ func pipelineTestProgram(t *testing.T, root string, fileName string, text string
 		t.Fatal(err)
 	}
 	return result
+}
+
+func pipelineDeferredTestGeneration(t *testing.T, files map[string]string, rulesForPath func(string) []rule.ConfiguredRule) Generation {
+	t.Helper()
+	root := tspath.NormalizePath(t.TempDir())
+	contents := make(map[string]string, len(files))
+	names := make([]string, 0, len(files))
+	for name, text := range files {
+		path := tspath.ResolvePath(root, name)
+		contents[path] = text
+		names = append(names, path)
+	}
+	sort.Strings(names)
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), contents)
+	sources, err := program.NewSourceSet(program.RootOptions{
+		RootFileNames: names, Host: utils.CreateCompilerHost(root, fs),
+		CompilerOptions: program.SourceOnlyCompilerOptions(), SingleThreaded: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return Generation{
+		Native: NativeGeneration{
+			DeferredSources: []*program.SourceSet{sources}, RulesForPath: rulesForPath,
+			RulesForFile:   func(file *ast.SourceFile) []rule.ConfiguredRule { return rulesForPath(file.FileName()) },
+			SingleThreaded: true, Cwd: root,
+		},
+		Target: TargetProjection{
+			ReadText: func(_ string, source ast.SourceFileLike) (string, error) { return source.Text(), nil },
+		},
+	}
 }
 
 func pipelineTestGeneration(

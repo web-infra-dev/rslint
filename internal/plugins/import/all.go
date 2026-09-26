@@ -40,7 +40,7 @@ import (
 )
 
 func GetAllRules() []rule.Rule {
-	return []rule.Rule{
+	rules := []rule.Rule{
 		consistent_type_specifier_style.ConsistentTypeSpecifierStyleRule,
 		default_rule.DefaultRule,
 		enforce_node_protocol_usage.EnforceNodeProtocolUsageRule,
@@ -77,4 +77,11 @@ func GetAllRules() []rule.Rule {
 		prefer_default_export.PreferDefaultExportRule,
 		unambiguous.UnambiguousRule,
 	}
+	// Import resolution includes a fallback against the loaded source universe,
+	// and export/cycle analysis follows its ASTs. Preserve that shared contract
+	// for the catalog instead of guessing independence from individual options.
+	for index := range rules {
+		rules[index].RequiresProgram = true
+	}
+	return rules
 }

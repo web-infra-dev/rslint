@@ -38,13 +38,10 @@ func executeObservation(
 	}
 
 	var plan *LintPlan
-	if generation.Native.RulesForFile != nil {
-		plan, err = PrepareLintPlanContext(ctx, PrepareLintPlanOptions{
-			Programs:         generation.Native.Programs,
-			TargetsByProgram: generation.Native.TargetsByProgram,
-			SingleThreaded:   generation.Native.SingleThreaded,
-			GetRulesForFile:  generation.Native.RulesForFile,
-		})
+	if generation.Native.RulesForFile != nil || len(generation.Native.DeferredSources) > 0 {
+		allowDeferred := !planChanges && snapshot.Empty() && !generation.Native.TypeCheck &&
+			generation.Plugin == nil && !policy.Demand.LintedFiles && policy.Demand.Native == rule.EditDemandNone
+		plan, err = prepareGenerationLintPlan(ctx, generation.Native, allowDeferred)
 		if err != nil {
 			return observationExecution{}, fmt.Errorf("linter pipeline: prepare lint plan: %w", err)
 		}
