@@ -281,6 +281,7 @@ define.test({
     './tests/eslint-plugin-react/rules/jsx-max-depth.test.ts',
     './tests/eslint-plugin-react/rules/jsx-max-props-per-line.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-bind.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-no-constructed-context-values.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-comment-textnodes.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-duplicate-props.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-leaked-render.test.ts',
