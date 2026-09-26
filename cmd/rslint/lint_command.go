@@ -506,7 +506,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		initialBinding = loader.LoadResult{Programs: programs}
 	}
 	provider := &cliGenerationProvider{
-		initial:   initialBinding,
+		initial:   &initialBinding,
 		initialFS: programSession.FS(),
 		rebuild: func(ctx context.Context, snapshot linter.SourceSnapshot) (loader.LoadResult, vfs.FS, error) {
 			if err := ctx.Err(); err != nil {

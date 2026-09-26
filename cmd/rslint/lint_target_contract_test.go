@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,9 +13,63 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
+
+func TestCLIGenerationProviderReleasesInitialOwnership(t *testing.T) {
+	loaded := loader.LoadResult{Programs: []*program.Program{
+		program.NewFromCompiler(createTestProgram(t, map[string]string{"source.ts": "const value = 1;"})),
+	}}
+	fsys := osvfs.FS()
+	provider := &cliGenerationProvider{
+		initial: &loaded, initialFS: fsys,
+		generation: func(binding loader.LoadResult, generationFS vfs.FS) linter.Generation {
+			if generationFS != fsys {
+				t.Fatal("generation lost its filesystem")
+			}
+			return linter.Generation{Native: linter.NativeGeneration{Programs: binding.Programs}}
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, _, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{}); !errors.Is(err, context.Canceled) || provider.initial == nil {
+		t.Fatalf("canceled acquisition changed initial ownership: %v", err)
+	}
+	generation, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+	if err != nil || release == nil || provider.initial == nil {
+		t.Fatalf("initial acquisition = release:%v error:%v", release != nil, err)
+	}
+	release()
+	release()
+	if provider.initial != nil || provider.initialFS != nil {
+		t.Fatal("provider retained its initial generation after release")
+	}
+	if generation.Native.Programs[0] != loaded.Programs[0] || len(generation.Native.Programs[0].SourceFiles()) == 0 {
+		t.Fatal("release invalidated published Program artifacts")
+	}
+	var rebuilds int
+	wantErr := errors.New("rebuild failure")
+	provider.rebuild = func(_ context.Context, snapshot linter.SourceSnapshot) (loader.LoadResult, vfs.FS, error) {
+		if !snapshot.Empty() {
+			t.Fatal("unexpected rebuild snapshot")
+		}
+		rebuilds++
+		return loaded, fsys, wantErr
+	}
+	if _, _, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{}); !errors.Is(err, wantErr) {
+		t.Fatalf("rebuild error = %v", err)
+	}
+	wantErr = nil
+	if _, _, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{}); err != nil || rebuilds != 2 || provider.initial != nil {
+		t.Fatalf("released initial generation was reused: rebuilds=%d error=%v", rebuilds, err)
+	}
+}
 
 type lintTargetContractDiagnostic struct {
 	RuleName string `json:"ruleName"`

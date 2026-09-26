@@ -255,6 +255,14 @@ func TestAutofixRestoredInitialReusesInitialObservation(t *testing.T) {
 	if provider.acquisitions != 2 || strings.Join(provider.observed, ",") != "a,b" {
 		t.Fatalf("restored cycle provider = %+v", provider)
 	}
+	initial := applied.Initial.Native.Diagnostics[0].SourceFile
+	last := applied.Last.Native.Diagnostics[0].SourceFile
+	if initial != last || last.Text() != "a" {
+		t.Fatal("restored observation lost its initial diagnostic source")
+	}
+	if _, retained := last.(*ast.SourceFile); retained {
+		t.Fatal("restored observation retained its initial compiler AST")
+	}
 }
 
 func TestAutofixSameTextFixConsumesRound(t *testing.T) {
