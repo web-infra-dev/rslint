@@ -38,8 +38,9 @@ func returnsParentType(typeNode *ast.Node, parent *ast.Node) bool {
 }
 
 var NoMisusedNewRule = rule.CreateRule(rule.Rule{
-	Name:   "no-misused-new",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-misused-new",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindMethodDeclaration: func(node *ast.Node) {

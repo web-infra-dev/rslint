@@ -58,9 +58,10 @@ var (
 // BanTsCommentRule implements the ban-ts-comment rule
 // Bans @ts-<directive> comments or requires descriptions after directive
 var BanTsCommentRule = rule.CreateRule(rule.Rule{
-	Name:   "ban-ts-comment",
-	Schema: rule.NewSchema(schemaJSON),
-	Run:    run,
+	Name:                  "ban-ts-comment",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
+	Run:                   run,
 })
 
 func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {

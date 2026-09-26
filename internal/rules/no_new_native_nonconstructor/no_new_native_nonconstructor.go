@@ -15,8 +15,9 @@ var nativeNonconstructorNames = map[string]struct{}{
 
 // https://eslint.org/docs/latest/rules/no-new-native-nonconstructor
 var NoNewNativeNonconstructorRule = rule.Rule{
-	Name:   "no-new-native-nonconstructor",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-new-native-nonconstructor",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {

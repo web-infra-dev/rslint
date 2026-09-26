@@ -65,8 +65,9 @@ func isDeclaredNamespace(node *ast.Node, isDefinitionFile bool) bool {
 }
 
 var NoNamespaceRule = rule.CreateRule(rule.Rule{
-	Name:   "no-namespace",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-namespace",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseNoNamespaceOptions(options)
 		if opts.AllowDefinitionFiles && ctx.SourceFile.IsDeclarationFile {

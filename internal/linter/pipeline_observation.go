@@ -36,6 +36,9 @@ func executeObservation(
 	if err := ctx.Err(); err != nil {
 		return observationExecution{}, err
 	}
+	if err := validateDeferredRoots(generation, snapshot, policy, planChanges, stopOnTargetSyntaxErrors); err != nil {
+		return observationExecution{}, err
+	}
 
 	var plan *LintPlan
 	if generation.Native.RulesForFile != nil {
@@ -95,6 +98,7 @@ func executeObservation(
 				diagnostics,
 			)
 		}
+		execution.observation.detachDiagnosticSources()
 		lease.close()
 		return execution, joinContextError(runErr, ctx)
 	case PluginAfterNativeJoined:
@@ -106,6 +110,7 @@ func executeObservation(
 		}
 		if stopOnTargetSyntaxErrors && native.HasTargetSyntaxErrors {
 			pluginWork.fixCandidates = nil
+			execution.observation.detachDiagnosticSources()
 			lease.close()
 			execution.observation.pluginKind = pluginObservationNone
 			return execution, ctx.Err()
@@ -132,6 +137,7 @@ func executeObservation(
 			}
 		}
 		pluginWork.fixCandidates = nil
+		execution.observation.detachDiagnosticSources()
 		// Detached plugin inputs and frozen fix text no longer reference generation
 		// state, so watcher/Program resources are released before a reverse request
 		// can block.
@@ -164,6 +170,7 @@ func executeObservation(
 	case pluginProgressiveAfterNative:
 		native, nativeErr := runNativeObservation(ctx, generation, plan, policy.Demand.Native, lintedFiles)
 		execution.observation.Native = native
+		execution.observation.detachDiagnosticSources()
 		// Clear the last SourceFile-bearing side channel before releasing the
 		// generation. The detached input itself was already deep-frozen above.
 		pluginWork.fixCandidates = nil

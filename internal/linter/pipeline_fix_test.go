@@ -2,6 +2,7 @@ package linter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -28,6 +29,57 @@ func TestFixSourcesRejectDistinctSourcesForSamePath(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "duplicate fix target") {
 		t.Fatalf("duplicate fix source error = %v", err)
+	}
+}
+
+func TestPipelineDetachesDiagnosticsAfterSharedFixSourceValidation(t *testing.T) {
+	for _, mode := range []PluginExecution{PluginConcurrentJoined, PluginAfterNativeJoined} {
+		t.Run(fmt.Sprintf("mode-%d", mode), func(t *testing.T) {
+			root := tspath.NormalizePath(t.TempDir())
+			path := tspath.ResolvePath(root, "source.ts")
+			generation := pipelineTestGeneration(t, root, path, "ab", []rule.ConfiguredRule{
+				{
+					Name: "native/fix", Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						r := core.NewTextRange(0, 1)
+						ctx.ReportRangeWithFixes(r, rule.RuleMessage{Description: "native"}, rule.RuleFix{Range: r, Text: "A"})
+						return nil
+					},
+				},
+				{Name: "plugin/fix", IsEslintPluginRule: true, Severity: rule.SeverityError},
+			}, &EslintPluginFileConfig{})
+			original := generation.Native.Programs[0].SourceFiles()[0]
+			generation.Target.ReadText = func(_ string, source ast.SourceFileLike) (string, error) {
+				if source != original {
+					return "", errors.New("fix text read lost generation source identity")
+				}
+				return "ab", nil
+			}
+			result, err := RunPipeline(context.Background(), NewAutofixRequest(
+				pipelineTestProvider(generation, nil),
+				ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix, Plugin: rule.EditDemandAutofix}, Plugin: mode},
+				autofixPolicyForTest(1, AutofixPolicy{}),
+				func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+					return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+						FilePath: request.Files[0].Path,
+						Diagnostics: []EslintPluginDiagnostic{{
+							RuleName: "plugin/fix", Message: "plugin", StartPos: 1, EndPos: 2,
+							Fixes: []EslintPluginFix{{Range: [2]int{1, 2}, Text: "B"}},
+						}},
+					}}}, nil
+				},
+			))
+			if err != nil {
+				t.Fatal(err)
+			}
+			applied, ok := result.AppliedFixes()
+			if !ok || len(applied.FinalChanges) != 1 || applied.FinalChanges[0].After != "AB" {
+				t.Fatalf("combined fixes = %+v", applied)
+			}
+			if _, retainedAST := applied.Initial.Native.Diagnostics[0].SourceFile.(*ast.SourceFile); retainedAST {
+				t.Fatal("autofix history retained its original AST")
+			}
+		})
 	}
 }
 

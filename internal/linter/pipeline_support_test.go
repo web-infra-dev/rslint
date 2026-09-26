@@ -3,6 +3,7 @@ package linter
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 
@@ -206,4 +207,23 @@ func (r *pipelineFinalChangeRecorder) CommitFinalChanges(
 		paths[index] = change.Path
 	}
 	return CommitResult{ConfirmedPaths: paths}, nil
+}
+
+func pipelineDeferredGeneration(t *testing.T, count int) Generation {
+	t.Helper()
+	root := tspath.NormalizePath(t.TempDir())
+	paths := make([]string, count)
+	for index := range paths {
+		paths[index] = tspath.ResolvePath(root, fmt.Sprintf("source-%d.ts", index))
+	}
+	return Generation{Native: NativeGeneration{
+		Cwd: root,
+		DeferredRoots: &program.DeferredRoots{
+			FileNames: paths,
+			Build: func(_ context.Context, path string) (*program.Program, error) {
+				return pipelineTestProgram(t, root, path, "const value = 1;"), nil
+			},
+		},
+		RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule { return nil },
+	}}
 }

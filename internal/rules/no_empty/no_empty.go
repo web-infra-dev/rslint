@@ -15,8 +15,9 @@ var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-empty
 var NoEmptyRule = rule.Rule{
-	Name:   "no-empty",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-empty",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 

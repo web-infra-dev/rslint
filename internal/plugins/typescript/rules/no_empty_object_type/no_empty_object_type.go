@@ -189,8 +189,9 @@ func interfaceFixRange(ctx rule.RuleContext, interfaceDecl *ast.InterfaceDeclara
 }
 
 var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
-	Name:   "no-empty-object-type",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-empty-object-type",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 

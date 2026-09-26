@@ -7,8 +7,9 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-delete-var
 var NoDeleteVarRule = rule.Rule{
-	Name:   "no-delete-var",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-delete-var",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindDeleteExpression: func(node *ast.Node) {

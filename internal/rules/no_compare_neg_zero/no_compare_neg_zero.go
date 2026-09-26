@@ -69,8 +69,9 @@ func isNegativeZero(node *ast.Node) bool {
 
 // NoCompareNegZeroRule disallows comparisons to negative zero
 var NoCompareNegZeroRule = rule.Rule{
-	Name:   "no-compare-neg-zero",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-compare-neg-zero",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindPrefixUnaryExpression: func(node *ast.Node) {

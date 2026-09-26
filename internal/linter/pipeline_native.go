@@ -58,6 +58,19 @@ func runNativeObservation(
 	runOptions.Consumer = consumer
 	lintResult, err := RunLinter(runOptions)
 	finish()
+	hasSyntaxErrors := plan != nil && plan.HasSyntacticDiagnostics()
+	if err == nil && ctx.Err() == nil && generation.Native.DeferredRoots != nil {
+		var isolated NativeObservation
+		isolated, err = runDeferredRoots(ctx, generation.Native)
+		diagnostics = append(diagnostics, isolated.Diagnostics...)
+		if isolated.Lint != nil {
+			lintResult.LintedFileCount += isolated.Lint.LintedFileCount
+			for name := range isolated.Lint.ExecutedRules {
+				lintResult.ExecutedRules[name] = struct{}{}
+			}
+		}
+		hasSyntaxErrors = hasSyntaxErrors || isolated.HasTargetSyntaxErrors
+	}
 
 	for index := range diagnostics {
 		diagnostics[index].FilePath = projectTargetPath(generation.Target.Path, diagnostics[index].FilePath)
@@ -66,7 +79,7 @@ func runNativeObservation(
 		Diagnostics:           diagnostics,
 		Lint:                  lintResult,
 		Files:                 lintedFiles,
-		HasTargetSyntaxErrors: plan != nil && plan.HasSyntacticDiagnostics(),
+		HasTargetSyntaxErrors: hasSyntaxErrors,
 	}
 	return result, joinContextError(err, ctx)
 }

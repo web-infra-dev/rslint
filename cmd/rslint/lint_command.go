@@ -401,7 +401,14 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	programs := projectSet.Programs()
 	var loadedPrograms loader.LoadResult
 	if !typeCheckOnly {
-		loadedPrograms, err = programSession.LoadCLI(projectSet, targetPlan, currentDirectory, singleThreaded)
+		var canIsolate func(target.File) bool
+		if !fix && !typeCheck && len(eslintPlugins) == 0 {
+			canIsolate = func(file target.File) bool {
+				resolved, ok := configResolver.ResolveTarget(file)
+				return ok && rule.CanIsolateSourceFile(resolved.EnabledRules)
+			}
+		}
+		loadedPrograms, err = programSession.PrepareCLI(projectSet, targetPlan, currentDirectory, singleThreaded, canIsolate)
 		if err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
@@ -484,6 +491,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return linter.Generation{
 			Native: linter.NativeGeneration{
 				Programs:         binding.Programs,
+				DeferredRoots:    binding.DeferredRoots,
 				TargetsByProgram: binding.TargetsByProgram,
 				RulesForFile:     rulesForFile,
 				Cwd:              cwd,

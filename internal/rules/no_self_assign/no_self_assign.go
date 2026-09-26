@@ -19,8 +19,9 @@ const skipOuterExprKinds = ast.OEKParentheses | ast.OEKTypeAssertions
 
 // https://eslint.org/docs/latest/rules/no-self-assign
 var NoSelfAssignRule = rule.Rule{
-	Name:   "no-self-assign",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-self-assign",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 

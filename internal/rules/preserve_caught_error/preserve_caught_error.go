@@ -446,8 +446,9 @@ func suggestIncludeCause(fixes []rule.RuleFix) []rule.RuleSuggestion {
 
 // https://eslint.org/docs/latest/rules/preserve-caught-error
 var PreserveCaughtErrorRule = rule.Rule{
-	Name:   "preserve-caught-error",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "preserve-caught-error",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 

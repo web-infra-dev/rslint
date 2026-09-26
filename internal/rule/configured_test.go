@@ -61,3 +61,25 @@ func TestCreateRulePreservesRequiresTypeInfo(t *testing.T) {
 		t.Fatal("RequiresTypeInfo should survive CreateRule")
 	}
 }
+
+func TestCanIsolateSourceFileKeepsUnknownAndExternalRulesConservative(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		rules []ConfiguredRule
+		want  bool
+	}{
+		{"empty", nil, true},
+		{"audited", []ConfiguredRule{{SupportsFileIsolation: true}}, true},
+		{"unknown", []ConfiguredRule{{}}, false},
+		{"type only", []ConfiguredRule{{RequiresTypeInfo: true}}, true},
+		{"mixed", []ConfiguredRule{{SupportsFileIsolation: true}, {}}, false},
+		{"external", []ConfiguredRule{{SupportsFileIsolation: true, IsEslintPluginRule: true}}, false},
+		{"external type", []ConfiguredRule{{RequiresTypeInfo: true, IsEslintPluginRule: true}}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := CanIsolateSourceFile(tc.rules); got != tc.want {
+				t.Fatalf("CanIsolateSourceFile = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

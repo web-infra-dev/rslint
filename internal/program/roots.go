@@ -1,6 +1,7 @@
 package program
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -15,6 +16,16 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
+
+// DeferredRoots describes selected roots whose source-only Programs may be
+// materialized independently. Names and the backing filesystem generation are
+// immutable. Build must support concurrent calls, return a fresh single-root
+// Program without a checker, and retain no resulting AST. The consumer owns
+// scheduling and must establish that all enabled rules allow file isolation.
+type DeferredRoots struct {
+	FileNames []string
+	Build     func(context.Context, string) (*Program, error)
+}
 
 // RootOptions describes one parser/binder-built source universe.
 // RootFileNames are parsed exactly; imports may resolve to paths, but the

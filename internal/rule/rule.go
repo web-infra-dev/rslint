@@ -97,6 +97,11 @@ type RuleListeners map[ast.Kind](func(node *ast.Node))
 type Rule struct {
 	Name             string
 	RequiresTypeInfo bool
+	// SupportsFileIsolation permits source-only execution with just the current
+	// file in the Program. Such rules must not inspect other files' ASTs or
+	// derive answers from Program membership. Filesystem and compiler options
+	// remain available. The default preserves the complete source universe.
+	SupportsFileIsolation bool
 	// IsEslintPluginRule marks a placeholder rule whose actual execution
 	// happens in a Node worker — an ESLint-plugin rule mounted via the
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
@@ -116,9 +121,10 @@ type Rule struct {
 
 func CreateRule(r Rule) Rule {
 	return Rule{
-		Name:             "@typescript-eslint/" + r.Name,
-		RequiresTypeInfo: r.RequiresTypeInfo,
-		Schema:           r.Schema,
-		Run:              r.Run,
+		Name:                  "@typescript-eslint/" + r.Name,
+		RequiresTypeInfo:      r.RequiresTypeInfo,
+		SupportsFileIsolation: r.SupportsFileIsolation,
+		Schema:                r.Schema,
+		Run:                   r.Run,
 	}
 }

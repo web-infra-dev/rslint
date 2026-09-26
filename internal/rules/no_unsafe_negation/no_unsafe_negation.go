@@ -15,8 +15,9 @@ var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-unsafe-negation
 var NoUnsafeNegationRule = rule.Rule{
-	Name:   "no-unsafe-negation",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-unsafe-negation",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 

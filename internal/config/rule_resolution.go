@@ -67,12 +67,13 @@ func ConfiguredRules(
 		ruleConfigCopy := ruleConfig
 		options := rule.NormalizeOptions(ruleConfigCopy.Options)
 		enabledRules = append(enabledRules, rule.ConfiguredRule{
-			Name:               ruleName,
-			Environment:        environment,
-			Severity:           ruleConfig.GetSeverity(),
-			RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
-			IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
-			Options:            options,
+			Name:                  ruleName,
+			Environment:           environment,
+			Severity:              ruleConfig.GetSeverity(),
+			RequiresTypeInfo:      ruleImpl.RequiresTypeInfo,
+			SupportsFileIsolation: ruleImpl.SupportsFileIsolation,
+			IsEslintPluginRule:    ruleImpl.IsEslintPluginRule,
+			Options:               options,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {
 				return ruleImpl.Run(ctx, options)
 			},

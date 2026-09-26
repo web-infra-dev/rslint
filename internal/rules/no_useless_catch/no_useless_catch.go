@@ -7,8 +7,9 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-useless-catch
 var NoUselessCatchRule = rule.Rule{
-	Name:   "no-useless-catch",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-useless-catch",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCatchClause: func(node *ast.Node) {

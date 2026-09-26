@@ -101,7 +101,10 @@ type Generation struct {
 
 // NativeGeneration is the input understood by the native lint engine.
 type NativeGeneration struct {
-	Programs         []*program.Program
+	Programs []*program.Program
+	// DeferredRoots are consumed only by ordinary native lint without edits or
+	// retained source artifacts. Complete Programs retain their original scope.
+	DeferredRoots    *program.DeferredRoots
 	TargetsByProgram [][]string
 	RulesForFile     RuleHandler
 	Cwd              string

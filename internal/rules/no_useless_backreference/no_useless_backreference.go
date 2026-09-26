@@ -13,8 +13,9 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-useless-backreference
 var NoUselessBackreferenceRule = rule.Rule{
-	Name:   "no-useless-backreference",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-useless-backreference",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Every pattern this rule can report contains a backslash. Constructor
 		// patterns folded by StaticStringEvaluator also get that character from

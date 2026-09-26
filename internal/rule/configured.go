@@ -5,10 +5,11 @@ import "github.com/web-infra-dev/rslint/internal/utils"
 // ConfiguredRule is one enabled rule after configuration resolution. It is a
 // rule-framework value: config produces it and linter consumes it.
 type ConfiguredRule struct {
-	Name             string
-	Environment      *RuleEnvironment
-	Severity         DiagnosticSeverity
-	RequiresTypeInfo bool
+	Name                  string
+	Environment           *RuleEnvironment
+	Severity              DiagnosticSeverity
+	RequiresTypeInfo      bool
+	SupportsFileIsolation bool
 	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint
 	// worker rather than natively in Go. Run remains a no-op placeholder for
 	// those entries.
@@ -42,4 +43,15 @@ func FilterNonTypeAwareRules(rules []ConfiguredRule) []ConfiguredRule {
 		}
 	}
 	return filtered
+}
+
+// CanIsolateSourceFile applies the source-only checker gate before inspecting
+// scope. Unknown native rules and external producers retain the full universe.
+func CanIsolateSourceFile(rules []ConfiguredRule) bool {
+	for _, configured := range rules {
+		if configured.IsEslintPluginRule || (!configured.RequiresTypeInfo && !configured.SupportsFileIsolation) {
+			return false
+		}
+	}
+	return true
 }

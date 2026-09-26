@@ -322,6 +322,14 @@ and cannot observe which construction path supplied it.
 
    Construction and capability boundaries remain separate. CLI parses supported gap roots with `program.NewFromRoots`, retaining the loader's grouping, parallelism and request-local source snapshots. Unsupported roots keep compiler compatibility admission. API retains that compiler construction for all gap roots and adapts its bound sources with `program.NewFromBoundSources`, which exposes no checker capability. Both compiler paths already reuse `utils.CreateProgramFromOptionsLenient` for parsing and binding. LSP uses that same helper for one fallback document over its editor or speculative overlay, keeps the compiler-backed facade, and filters type-aware rules when the document lacks a selected project. It does not borrow the CLI/API loader's snapshots or make gap Programs resident. The shared options do not select projects, create hosts, schedule work, cache across generations, or determine facade capabilities.
 
+   For ordinary native CLI lint, `loader.PrepareCLI` may instead publish
+   `program.DeferredRoots`: immutable selected names and a generation-local
+   builder. It defers an original gap group only when every effective rule
+   permits file isolation. One rule without this capability keeps the entire
+   group, including zero-rule dependencies. Unsupported roots, fix, type-check,
+   external plugins, API and LSP retain eager construction. Binding and config
+   ownership remain loader/integration decisions; the linter owns scheduling.
+
 4. **Semantic Analysis**: The lint plan reads each Program's per-file checker capability once, freezes that result with the file's configured rules, and acquires a checker only for eligible files. LSP can additionally narrow rule eligibility for a request before planning. Program capability, configured-rule eligibility, actual checker delivery, and program-wide diagnostics remain separate decisions.
 5. **Rule Registration**: Enabled rules register listeners keyed by AST kind.
 6. **AST Traversal**: The linter traverses each file once using a DFS walk. It prunes syntax that TypeScript-Go synthesized from JSDoc comments; ESLint-compatible parsers expose that text through comment APIs rather than rule AST listeners.
@@ -393,9 +401,10 @@ Rules are defined in `internal/rule/rule.go`:
 
 ```go
 type Rule struct {
-    Name             string
-    RequiresTypeInfo bool
-    Run              func(ctx RuleContext, options []any) RuleListeners
+    Name                  string
+    RequiresTypeInfo      bool
+    SupportsFileIsolation bool
+    Run                   func(ctx RuleContext, options []any) RuleListeners
 }
 
 type RuleListeners map[ast.Kind]func(node *ast.Node)
@@ -405,6 +414,14 @@ type RuleListeners map[ast.Kind]func(node *ast.Node)
 the file. Integrations with a narrower request-level guarantee, such as LSP's
 per-document `HasTypeInfo`, filter the configured rules before planning; rules
 never infer eligibility from a private Program construction strategy.
+
+`SupportsFileIsolation` is a separate, explicit source-only capability. Its
+default keeps the complete Program. An opted-in rule can inspect its file,
+compiler options and filesystem, but must not derive an answer from other
+files' ASTs or Program membership. The flag follows the rule into resolved
+configuration; checker-only rules remain excluded from source-only execution.
+The initial audited set covers the JavaScript and TypeScript recommended
+presets. Other rules conservatively retain their original source universe.
 
 Within `internal/rule`, ownership is split by concern: `rule.go` owns rule metadata and listeners,
 `diagnostic.go` owns diagnostic/edit value types, and `context.go` owns the
@@ -653,6 +670,15 @@ start byte offset only after each surface has projected paths into its own
 identity space; equal keys retain producer emission order. LSP deliberately
 does not use that completed-set ordering because it publishes native results
 first and merges generation-stamped plugin results later.
+
+Before publishing an observation or releasing its generation, the pipeline
+replaces diagnostic AST references with shared text-only projections. This
+happens after fix-source identity validation and generation text freezing;
+native and joined plugin diagnostics for the same exact source share one
+projection, while different source objects are never merged by path. Initial
+and final autofix observations therefore retain their own text without keeping
+obsolete ASTs alive. Explicitly requested `LintedFile` projections still retain
+their source generations for consumers that require them.
 
 After that semantic boundary, representation remains integration-owned. CLI
 validates and projects each semantic diagnostic into an
@@ -1431,6 +1457,16 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      use bounded file chunks.
    - `--singleThreaded` collapses the work group to serial execution.
 
+   After complete-Program work joins, deferred roots use at most
+   `min(GOMAXPROCS, root count)` persistent workers, or one with
+   `--singleThreaded`. Each worker builds one root, prepares its file plan,
+   reuses the same single-file rule traversal, and detaches diagnostics before
+   accepting another root. There is no pre-parsed queue or nested per-file
+   pipeline. Cancellation and abnormal worker exits stop admission and join
+   all workers before the generation is released; failures publish no partial
+   observation. Parsing and traversal currently check cancellation at file
+   stage boundaries, rather than interrupting an individual parser/listener.
+
 3. **Type-check work group** (`runTypeCheckAcrossPrograms`)
    - Schedules diagnostics for real tsconfig Programs and merges results in
      stable Program order.
@@ -1657,9 +1693,11 @@ lint and fix execution still await full config activation.
 
 ### Memory Management
 
+- **Deferred Source Lifetimes**: an ordinary native observation may own immutable source descriptors alongside complete Programs. Only active workers materialize isolated roots; their Programs, file plans and listeners stay inside a file execution. Results retain text projections, counts and rule names. Source snapshots, configuration, complete Programs and accumulated diagnostic text remain request-scoped, so the worker bound limits active ASTs rather than total RSS. AST-bearing Program caches are never promoted into the shared text layer.
+
 - **ts-go Owns the Heavy Graphs**: AST nodes, checker state, compiler project graphs, and session state are primarily owned by ts-go; an rslint Program adds a small immutable facade and generation cache, while listeners, diagnostics, lint selection, and configuration stay outside that object
 - **Short-Lived Per-File Structures**: comment stores, disable managers, and rule contexts are allocated per file and dropped after traversal. A comment slice is allocated only if requested
-- **Bounded Listener Retention**: a listener registry lives only for one checker-shard task. After each file it clears every function slot before shortening the slices, so backing capacity can be reused without retaining closures, source files, checker state, or rule contexts. The registry is dropped when that task completes and is never pooled across runs or LSP requests
+- **Bounded Listener Retention**: a listener registry lives only for one checker-shard task or deferred-root worker. After each file it clears every function slot before shortening the slices, so backing capacity can be reused without retaining closures, source files, checker state, or rule contexts. The registry is dropped when that task completes and is never pooled across runs or LSP requests
 - **Source Snapshot Ownership**: snapshot entries hold an immutable source string plus its 128-bit hash without explicitly copying source bytes; on an AST miss, that string is passed directly to the parser. After generation replacement, a retained unchanged AST may still hold the prior equal string while the fresh snapshot owns the new read. Replaced generations are reclaimed after any in-flight lookup releases them. AST retention and source-generation retention remain deliberately separate lifecycles.
 - **Metadata Snapshot Ownership**: metadata strings and extended-config parse entries live only for one loader session. The cache stores successful reads only, and its scope bounds growth to metadata touched by one CLI invocation or API request; no metadata entry survives into another request or the LSP session.
 - **Fix Application Uses Linear Rebuilds**: `ApplyRuleFixes` sorts fixes, skips overlapping edits, and rebuilds the output with `strings.Builder` rather than mutating source buffers in place
@@ -1819,7 +1857,7 @@ repeat it under a second source of truth.
 
 - **Targets and config**: target selection and config ownership are frozen before Program binding (`target.Plan` for CLI/API and a document snapshot for LSP). Later stages do not add lint targets, rediscover configs, or reassign owners
 - **Program generation**: each published `program.Program` is one logically immutable source, module-resolution, filesystem, and optional-checker generation. CLI/API build it through `internal/program/loader`; LSP adapts its session or isolated overlay without exposing the private backend
-- **Lint plan**: `PrepareLintPlan` accepts only files already bound to those Programs and freezes each file's rules, shared environment, and checker eligibility. Execution does not scan Program roots or resolve config and rules again
+- **Lint plan**: `PrepareLintPlan` accepts only files already bound to those Programs and freezes each file's rules, shared environment, and checker eligibility. Execution does not scan Program roots or resolve config and rules again. Deferred roots enter the same file-plan preparation only after a worker constructs their single-source Program. Their complete target identity projection is validated before any native execution, and the per-file rule scope is checked before listeners run
 - **Pipeline**: `RunPipeline` is the production orchestration boundary. CLI, API, and LSP choose a complete request and provide generation, plugin transport, presentation, or commit adapters; raw preparation, native lint, plugin dispatch, and fix stages are not product integration APIs
 - **Autofix**: fix rounds advance only pipeline-owned in-memory snapshots. Integrations receive the final in-memory delta for the operation, and optional persistence is one terminal commit rather than a series of intermediate writes
 - **Rules**: `RuleContext` exposes the bound Program and only the checker granted to that file. Shared structures such as module graphs derive from the Program generation rather than becoming a second authority

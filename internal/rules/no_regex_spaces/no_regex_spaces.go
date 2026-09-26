@@ -18,8 +18,9 @@ var (
 
 // https://eslint.org/docs/latest/rules/no-regex-spaces
 var NoRegexSpacesRule = rule.Rule{
-	Name:   "no-regex-spaces",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-regex-spaces",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sf := ctx.SourceFile
 

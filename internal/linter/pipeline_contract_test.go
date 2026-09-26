@@ -154,6 +154,36 @@ func TestPipelineAcceptsGenerationWithoutLintPlan(t *testing.T) {
 	}
 }
 
+func TestPipelineDetachesTypeCheckOnlyDiagnosticSources(t *testing.T) {
+	compiled, paths := createTestProgramWithFiles(t, map[string]string{
+		"source.ts": "const value: number = 'wrong';",
+	})
+	result, err := RunPipeline(context.Background(), NewLintRequest(
+		pipelineTestProvider(Generation{Native: NativeGeneration{
+			Programs: wrapTestPrograms(compiled), TypeCheck: true, SingleThreaded: true,
+		}}, nil),
+		ObservationPolicy{}, nil,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics := result.Observation.Native.Diagnostics
+	if len(diagnostics) == 0 {
+		t.Fatal("type-check-only observation lost its diagnostics")
+	}
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Origin != rule.DiagnosticOriginTypeScript || !diagnostic.PreFormatted || diagnostic.FilePath != paths["source.ts"] {
+			t.Fatalf("type diagnostic metadata changed: %+v", diagnostic)
+		}
+		if _, retainedAST := diagnostic.SourceFile.(*ast.SourceFile); retainedAST {
+			t.Fatal("type-check-only diagnostic retained its AST")
+		}
+		if diagnostic.SourceFile.Text() != "const value: number = 'wrong';" {
+			t.Fatalf("type diagnostic source = %q", diagnostic.SourceFile.Text())
+		}
+	}
+}
+
 func TestPipelineCollectsLintedFilesOnlyWhenDemanded(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	fileName := tspath.ResolvePath(root, "source.ts")
@@ -182,5 +212,95 @@ func TestPipelineCollectsLintedFilesOnlyWhenDemanded(t *testing.T) {
 	files := withFiles.Observation.Native.Files
 	if len(files) != 1 || files[0].Path != fileName || files[0].SourceFile == nil {
 		t.Fatalf("requested linted files = %+v", files)
+	}
+}
+
+func TestDeferredRootsRejectInvalidInputsBeforeBuilding(t *testing.T) {
+	for _, name := range []string{"missing builder", "missing resolver", "duplicate deferred", "duplicate eager", "empty name", "empty projection", "retained files", "edits", "plugins", "type check", "autofix", "progressive"} {
+		t.Run(name, func(t *testing.T) {
+			generation := pipelineDeferredGeneration(t, 1)
+			path := generation.Native.DeferredRoots.FileNames[0]
+			var builds, releases int
+			generation.Native.DeferredRoots.Build = func(context.Context, string) (*program.Program, error) {
+				builds++
+				return nil, errors.New("unexpected build")
+			}
+			policy := ObservationPolicy{}
+			switch name {
+			case "missing builder":
+				generation.Native.DeferredRoots.Build = nil
+			case "missing resolver":
+				generation.Native.RulesForFile = nil
+			case "duplicate deferred":
+				generation.Native.DeferredRoots.FileNames = []string{path, path}
+			case "duplicate eager":
+				generation.Native.Programs = []*program.Program{pipelineTestProgram(t, generation.Native.Cwd, path, "const value = 1;")}
+				generation.Native.TargetsByProgram = [][]string{{path}}
+			case "empty name":
+				generation.Native.DeferredRoots.FileNames = []string{""}
+			case "empty projection":
+				generation.Target.Path = func(string) string { return "" }
+			case "retained files":
+				policy.Demand.LintedFiles = true
+			case "edits":
+				policy.Demand.Native = rule.EditDemandSuggestion
+			case "plugins":
+				generation.Plugin = &PluginGeneration{}
+			case "type check":
+				generation.Native.TypeCheck = true
+			}
+			provider := pipelineTestProvider(generation, func() { releases++ })
+			request := NewLintRequest(provider, policy, nil)
+			if name == "autofix" {
+				policy.Demand.Native = rule.EditDemandAutofix
+				request = NewAutofixRequest(provider, policy, AutofixPolicy{}, nil)
+			}
+			if name == "progressive" {
+				request = NewProgressiveLintRequest(provider, ArtifactDemand{}, &pipelineProgressiveDiagnostics{})
+			}
+			result, err := RunPipeline(context.Background(), request)
+			if err == nil || builds != 0 || releases != 1 || result.Observation.Native.Lint != nil {
+				t.Fatalf("error/builds/releases = %v/%d/%d", err, builds, releases)
+			}
+		})
+	}
+}
+
+func TestDeferredRootsRejectInvalidProgramsAndRuleScopes(t *testing.T) {
+	for _, name := range []string{"nil program", "wrong source", "extra source", "checker", "unknown rule", "external rule"} {
+		t.Run(name, func(t *testing.T) {
+			generation := pipelineDeferredGeneration(t, 1)
+			path := generation.Native.DeferredRoots.FileNames[0]
+			var ran bool
+			generation.Native.RulesForFile = func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{Name: "test", SupportsFileIsolation: name != "unknown rule", IsEslintPluginRule: name == "external rule", Run: func(rule.RuleContext) rule.RuleListeners { ran = true; return nil }}}
+			}
+			switch name {
+			case "nil program":
+				generation.Native.DeferredRoots.Build = func(context.Context, string) (*program.Program, error) {
+					return nil, nil //nolint:nilnil // Exercise a builder that violates its contract.
+				}
+			case "wrong source":
+				generation.Native.DeferredRoots.Build = func(context.Context, string) (*program.Program, error) {
+					return pipelineTestProgram(t, generation.Native.Cwd, path+"x.ts", "const value = 1;"), nil
+				}
+			case "extra source", "checker":
+				compiled, paths := createTestProgramWithFiles(t, map[string]string{"source.ts": "export const value = 1;", "other.ts": "export const other = 1;"})
+				generation.Native.DeferredRoots.FileNames = []string{paths["source.ts"]}
+				p := program.NewFromCompiler(compiled)
+				if name == "extra source" {
+					var err error
+					p, err = program.NewFromBoundSources(compiled, compiled.GetSourceFiles())
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				generation.Native.DeferredRoots.Build = func(context.Context, string) (*program.Program, error) { return p, nil }
+			}
+			_, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, nil))
+			if err == nil || ran {
+				t.Fatalf("error/rule ran = %v/%v", err, ran)
+			}
+		})
 	}
 }

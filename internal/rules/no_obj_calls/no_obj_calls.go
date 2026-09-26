@@ -672,8 +672,9 @@ var directCallMessages = func() map[string]rule.RuleMessage {
 
 // https://eslint.org/docs/latest/rules/no-obj-calls
 var NoObjCallsRule = rule.Rule{
-	Name:   "no-obj-calls",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-obj-calls",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if !sourceMayUseNonCallableGlobal(ctx.SourceFile) {
 			return rule.RuleListeners{}

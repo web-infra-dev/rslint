@@ -97,8 +97,9 @@ func generatorHeadRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 
 // https://eslint.org/docs/latest/rules/require-yield
 var RequireYieldRule = rule.Rule{
-	Name:   "require-yield",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "require-yield",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if !strings.Contains(ctx.SourceFile.Text(), "*") {
 			return nil

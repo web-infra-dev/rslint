@@ -39,8 +39,9 @@ var noRequireImportsMessage = rule.RuleMessage{
 }
 
 var NoRequireImportsRule = rule.CreateRule(rule.Rule{
-	Name:   "no-require-imports",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-require-imports",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var optsMap map[string]interface{}
 		if len(options) > 0 {

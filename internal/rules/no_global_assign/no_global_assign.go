@@ -236,8 +236,9 @@ func isReadonlyGlobal(ctx *rule.RuleContext, name string) bool {
 
 // NoGlobalAssignRule disallows assignments to native objects or read-only global variables
 var NoGlobalAssignRule = rule.Rule{
-	Name:   "no-global-assign",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-global-assign",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		// A single-entry cache covers the common case of repeated writes to one

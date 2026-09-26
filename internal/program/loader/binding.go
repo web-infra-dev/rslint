@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
@@ -16,15 +17,16 @@ import (
 )
 
 // LoadResult is the complete Program input for one lint generation. It carries
-// only the unified Program sequence, lint projection, and source/target path
+// only the unified Program inputs, lint projection, and source/target path
 // mappings needed by integrations; compiler and parser assembly details remain
-// private to the loader. Its slices and maps are immutable after LoadCLI or
-// LoadAPI returns.
+// private to the loader. Its slices, maps and deferred descriptors are immutable
+// after PrepareCLI, LoadCLI or LoadAPI returns.
 type LoadResult struct {
 	compilerPrograms       []*compiler.Program
 	Programs               []*lintprogram.Program
 	TargetsByProgram       [][]string
 	LintTargetBySourcePath map[string]target.File
+	DeferredRoots          *lintprogram.DeferredRoots
 }
 
 func authoritativePath(filePath string, fsys vfs.FS) string {
@@ -545,6 +547,20 @@ func (s *Session) LoadCLI(
 	currentDirectory string,
 	singleThreaded bool,
 ) (LoadResult, error) {
+	return s.PrepareCLI(set, plan, currentDirectory, singleThreaded, nil)
+}
+
+// PrepareCLI binds targets once and defers a supported source-only group only
+// when every target permits independent execution. Keeping the original whole
+// group on a negative answer preserves cross-file rules, including dependencies
+// with no enabled rules of their own. A nil predicate selects eager loading.
+func (s *Session) PrepareCLI(
+	set ProjectSet,
+	plan target.Plan,
+	currentDirectory string,
+	singleThreaded bool,
+	canIsolate func(target.File) bool,
+) (LoadResult, error) {
 	if err := s.validate(); err != nil {
 		return LoadResult{}, err
 	}
@@ -563,8 +579,39 @@ func (s *Session) LoadCLI(
 		// by no current compiler Program are evicted before root parsing. The root
 		// backend shares source snapshots, not bound compiler AST objects.
 		s.retainCompilerPrograms(binding.compilerPrograms)
-		if err := s.appendRootPrograms(&binding, groups, currentDirectory, singleThreaded); err != nil {
-			return LoadResult{}, err
+		var deferredNames []string
+		for _, group := range groups {
+			isolate := canIsolate != nil
+			for _, file := range group {
+				if !isolate || !canIsolate(file) {
+					isolate = false
+					break
+				}
+			}
+			if isolate {
+				sort.Slice(group, func(i, j int) bool { return group[i].Path < group[j].Path })
+				for _, file := range group {
+					deferredNames = append(deferredNames, file.Path)
+				}
+			} else if err := s.appendRootPrograms(&binding, [][]target.File{group}, currentDirectory, singleThreaded); err != nil {
+				return LoadResult{}, err
+			}
+		}
+		if len(deferredNames) > 0 {
+			binding.DeferredRoots = &lintprogram.DeferredRoots{
+				FileNames: deferredNames,
+				Build: func(ctx context.Context, fileName string) (*lintprogram.Program, error) {
+					if err := ctx.Err(); err != nil {
+						return nil, err
+					}
+					return lintprogram.NewFromRoots(lintprogram.RootOptions{
+						RootFileNames:   []string{fileName},
+						Host:            s.context.newTransientCompilerHost(currentDirectory),
+						CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+						SingleThreaded:  true,
+					})
+				},
+			}
 		}
 		finalizeResult(&binding)
 		return binding, nil

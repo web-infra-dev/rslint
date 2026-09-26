@@ -237,8 +237,9 @@ func checkPropertyDescriptor(ctx rule.RuleContext, node *ast.Node, opts Options)
 
 // GetterReturnRule enforces return statements in getters.
 var GetterReturnRule = rule.Rule{
-	Name:   "getter-return",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "getter-return",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		return rule.RuleListeners{

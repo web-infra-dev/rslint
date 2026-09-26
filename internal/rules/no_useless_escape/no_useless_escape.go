@@ -23,8 +23,9 @@ var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-useless-escape
 var NoUselessEscapeRule = rule.Rule{
-	Name:   "no-useless-escape",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-useless-escape",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		allowed := parseAllowRegexCharacters(options)
 

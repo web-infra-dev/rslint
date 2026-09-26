@@ -37,8 +37,9 @@ func moduleDeclarationRanges(sourceFile *ast.SourceFile, node *ast.Node) (core.T
 }
 
 var PreferNamespaceKeywordRule = rule.CreateRule(rule.Rule{
-	Name:   "prefer-namespace-keyword",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "prefer-namespace-keyword",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindModuleDeclaration: func(node *ast.Node) {

@@ -121,8 +121,9 @@ func anyKeywordRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange 
 }
 
 var NoExplicitAnyRule = rule.CreateRule(rule.Rule{
-	Name:   "no-explicit-any",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-explicit-any",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 

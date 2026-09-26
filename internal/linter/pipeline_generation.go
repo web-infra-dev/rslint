@@ -72,6 +72,21 @@ func projectGenerationTargets(
 			}
 		}
 	}
+	if roots := generation.Native.DeferredRoots; roots != nil {
+		for _, name := range roots.FileNames {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			path := projectTargetPath(generation.Target.Path, name)
+			if name == "" || path == "" {
+				return nil, errors.New("linter pipeline: deferred target path must not be empty")
+			}
+			if _, duplicate := sources[path]; duplicate {
+				return nil, fmt.Errorf("linter pipeline: duplicate projected target %q", path)
+			}
+			sources[path] = nil
+		}
+	}
 	if snapshot.Empty() {
 		return lintedFiles, nil
 	}

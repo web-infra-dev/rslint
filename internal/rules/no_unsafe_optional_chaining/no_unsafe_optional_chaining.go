@@ -13,8 +13,9 @@ var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-unsafe-optional-chaining
 var NoUnsafeOptionalChainingRule = rule.Rule{
-	Name:   "no-unsafe-optional-chaining",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-unsafe-optional-chaining",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Every optional chain contains the contiguous `?.` token. A miss is
 		// conclusive, while matches in comments or strings are harmless false

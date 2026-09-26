@@ -21,8 +21,9 @@ func isPartOfOptionalChain(node *ast.Node) bool {
 }
 
 var NoNonNullAssertedOptionalChainRule = rule.CreateRule(rule.Rule{
-	Name:   "no-non-null-asserted-optional-chain",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-non-null-asserted-optional-chain",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		msg := rule.RuleMessage{
 			Id:          "noNonNullOptionalChain",

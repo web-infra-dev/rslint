@@ -90,8 +90,9 @@ type preferConstState struct {
 
 // https://eslint.org/docs/latest/rules/prefer-const
 var PreferConstRule = rule.Rule{
-	Name:   "prefer-const",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "prefer-const",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceText := ctx.SourceFile.Text()
 		// A real let declaration necessarily contains this exact byte sequence.
