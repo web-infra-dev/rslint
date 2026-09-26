@@ -237,6 +237,31 @@ func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
 	return nil
 }
 
+// IsNamedESMImportSymbolModules reports whether symbol is a runtime named ESM
+// import of one of exportNames from one of importModules. CommonJS require
+// bindings deliberately do not match: TypeScript types require() as any, so a
+// caller cannot use this fact to prove that generic call syntax is valid.
+func IsNamedESMImportSymbolModules(symbol *ast.Symbol, importModules, exportNames []string) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if declaration == nil || ast.IsTypeOnlyImportDeclaration(declaration) {
+			continue
+		}
+		name, _, ok := resolveModuleImportSpecifier(declaration, importModules, false)
+		if !ok {
+			continue
+		}
+		for _, exportName := range exportNames {
+			if name == exportName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // IsModuleNamespaceSymbol reports whether symbol is a namespace import or a
 // whole-module require for importModule.
 func IsModuleNamespaceSymbol(symbol *ast.Symbol, importModule string) bool {

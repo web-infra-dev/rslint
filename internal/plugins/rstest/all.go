@@ -29,6 +29,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_unnecessary_assertion"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_unneeded_async_expect_function"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_untyped_mock_factory"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_after_all_blocks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_after_each_blocks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_all"
@@ -113,6 +114,7 @@ func GetAllRules() []rule.Rule {
 		no_standalone_expect.NoStandaloneExpectRule,
 		no_unnecessary_assertion.NoUnnecessaryAssertionRule,
 		no_unneeded_async_expect_function.NoUnneededAsyncExpectFunctionRule,
+		no_untyped_mock_factory.NoUntypedMockFactoryRule,
 		padding_around_after_all_blocks.PaddingAroundAfterAllBlocksRule,
 		padding_around_after_each_blocks.PaddingAroundAfterEachBlocksRule,
 		padding_around_all.PaddingAroundAllRule,
