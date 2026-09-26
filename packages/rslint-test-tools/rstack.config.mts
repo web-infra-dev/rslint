@@ -249,6 +249,7 @@ define.test({
 
     // eslint-plugin-react
     './tests/eslint-plugin-react/rules/destructuring-assignment.test.ts',
+    './tests/eslint-plugin-react/rules/async-server-action.test.ts',
     './tests/eslint-plugin-react/rules/boolean-prop-naming.test.ts',
     './tests/eslint-plugin-react/rules/button-has-type.test.ts',
     './tests/eslint-plugin-react/rules/checked-requires-onchange-or-readonly.test.ts',
