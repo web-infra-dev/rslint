@@ -1,6 +1,7 @@
 package react_plugin
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/async_server_action"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/boolean_prop_naming"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/button_has_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/checked_requires_onchange_or_readonly"
@@ -99,6 +100,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		async_server_action.AsyncServerActionRule,
 		boolean_prop_naming.BooleanPropNamingRule,
 		button_has_type.ButtonHasTypeRule,
 		checked_requires_onchange_or_readonly.CheckedRequiresOnchangeOrReadonlyRule,
