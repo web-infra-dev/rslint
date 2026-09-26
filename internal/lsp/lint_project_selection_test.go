@@ -1373,13 +1373,29 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 						if speculative {
 							result, err = speculativePipelineResultForTest(server, context.Background(), uri, content, snapshot)
 						} else {
-							result, err = configuredDocumentPipelineResultForTest(server, context.Background(), uri, entries, directory, false, nil)
+							var selectedProgram *compiler.Program
+							provider := &documentGenerationProvider{
+								server: server, uri: uri, snapshot: snapshot,
+								buildGeneration: func(program *compiler.Program, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
+									selectedProgram = program
+									return buildDocumentGeneration(program, source, lintTarget, cwd, typed, snapshot)
+								},
+							}
+							result, err = linter.RunPipeline(context.Background(), linter.NewLintRequest(
+								provider,
+								linter.ObservationPolicy{
+									Demand:        linter.ArtifactDemand{Native: rule.EditDemandAll, Plugin: rule.EditDemandAll},
+									Plugin:        linter.PluginAfterNativeJoined,
+									PluginFailure: linter.PluginDiscardOnFailure,
+								},
+								nil,
+							))
 							if phase.name == "initial" && err == nil {
 								languageService, sessionErr := server.session.GetLanguageService(context.Background(), uri)
 								if sessionErr != nil {
 									t.Fatal(sessionErr)
 								}
-								if got := result.Observation.Native.Diagnostics; len(got) == 1 && got[0].SourceFile != languageService.GetProgram().GetSourceFile(fileName) {
+								if selectedProgram != languageService.GetProgram() {
 									t.Error("unchanged configuration rebuilt a Session-owned Program")
 								}
 							}
@@ -1389,6 +1405,14 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 						}
 						if got := len(result.Observation.Native.Diagnostics); got != phase.wantUnsafe {
 							t.Errorf("speculative=%v: unsafe diagnostics=%d, want %d: %+v", speculative, got, phase.wantUnsafe, result.Observation.Native.Diagnostics)
+						}
+						for _, diagnostic := range result.Observation.Native.Diagnostics {
+							if _, retained := diagnostic.SourceFile.(*ast.SourceFile); retained {
+								t.Error("completed observation retained a compiler AST")
+							}
+							if diagnostic.SourceFile == nil || diagnostic.SourceFile.Text() != content {
+								t.Error("diagnostic source did not preserve the current editor text")
+							}
 						}
 					}
 				})
