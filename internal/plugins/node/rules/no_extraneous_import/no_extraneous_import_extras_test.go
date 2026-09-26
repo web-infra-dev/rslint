@@ -19,22 +19,16 @@ func TestNoExtraneousImportExtras(t *testing.T) {
 
 		// non npm sources
 		{Code: "import './local'; import '/absolute'; import 'node:fs'; import 'fs'; import 'data:text/javascript,0'; import 'https://example.com/a.js'; import '#internal'; import 'virtual:thing';", FileName: "input.js"},
-		// Node's legacy internal builtins cannot be shadowed by installed packages.
+		// Supported internal builtins cannot be shadowed by installed packages.
 		{Code: `import '_http_agent';
 import '_http_client';
 import '_http_common';
 import '_http_incoming';
 import '_http_outgoing';
 import '_http_server';
-import '_stream_duplex';
-import '_stream_passthrough';
-import '_stream_readable';
-import '_stream_transform';
-import '_stream_wrap';
-import '_stream_writable';
 import '_tls_common';
 import '_tls_wrap';`, FileName: "input.js"},
-		{Code: "export * from '_http_agent'; import('_stream_readable'); import 'node:_tls_wrap';", FileName: "input.js"},
+		{Code: "export * from '_http_agent'; import('_http_agent'); import 'node:_tls_wrap';", FileName: "input.js"},
 		// Documented difference: upstream's caret class excludes lib and reports.
 		{Code: "import 'workspace-dep';", FileName: "workspace-caret/packages/lib/input.js"},
 		// declared and self
@@ -84,6 +78,22 @@ import '_tls_wrap';`, FileName: "input.js"},
 		// malformed package stops resolution
 		{Code: "import 'runtime';", FileName: "malformed/input.js"},
 	}, []rule_tester.InvalidTestCase{
+		// Node 26 removed stream internals, so installed packages need declarations.
+		{Code: `import '_stream_duplex';
+import '_stream_passthrough';
+import '_stream_readable';
+import '_stream_transform';
+import '_stream_wrap';
+import '_stream_writable';
+import('_stream_readable');`, FileName: "input.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "extraneous", Message: `"_stream_duplex" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 24},
+			{MessageId: "extraneous", Message: `"_stream_passthrough" is extraneous.`, Line: 2, Column: 8, EndLine: 2, EndColumn: 29},
+			{MessageId: "extraneous", Message: `"_stream_readable" is extraneous.`, Line: 3, Column: 8, EndLine: 3, EndColumn: 26},
+			{MessageId: "extraneous", Message: `"_stream_transform" is extraneous.`, Line: 4, Column: 8, EndLine: 4, EndColumn: 27},
+			{MessageId: "extraneous", Message: `"_stream_wrap" is extraneous.`, Line: 5, Column: 8, EndLine: 5, EndColumn: 22},
+			{MessageId: "extraneous", Message: `"_stream_writable" is extraneous.`, Line: 6, Column: 8, EndLine: 6, EndColumn: 26},
+			{MessageId: "extraneous", Message: `"_stream_readable" is extraneous.`, Line: 7, Column: 8, EndLine: 7, EndColumn: 26},
+		}},
 		// Resolver aliases and BigInt values follow the upstream behavior.
 		{Code: "import 'virtual';", FileName: "input.js", Options: map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual": "./local.js"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"virtual" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 17}}},
 
