@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"sync"
 	"testing"
 
@@ -307,7 +308,7 @@ func TestLoadCLIMatchesCompatibilityRootAdmission(t *testing.T) {
 			})
 			directContext := newContext()
 			direct := runRootProgramBind(func() (LoadResult, error) {
-				return sessionForTest(directContext).LoadCLI(ProjectSet{}, plan, configDir, true)
+				return sessionForTest(directContext).loadCLIForTest(ProjectSet{}, plan, configDir, true)
 			})
 
 			legacyError, directError := "", ""
@@ -390,7 +391,7 @@ func TestRootProgramsIsolateCaseFoldedPackageScopes(t *testing.T) {
 		t.Fatalf("loadAPIForTest: %v", err)
 	}
 	directContext := newBuildContext(newFS())
-	direct, err := sessionForTest(directContext).LoadCLI(ProjectSet{}, plan, configDir, true)
+	direct, err := sessionForTest(directContext).loadCLIForTest(ProjectSet{}, plan, configDir, true)
 	if err != nil {
 		t.Fatalf("prepareCLIForTest: %v", err)
 	}
@@ -427,34 +428,29 @@ func TestRootProgramsIsolateCaseFoldedPackageScopes(t *testing.T) {
 		directExternal[upper] != legacyExternal[upper] || directExternal[lower] != legacyExternal[lower] {
 		t.Fatalf("package scope leaked across exact-case targets: legacy=%v direct=%v", legacyExternal, directExternal)
 	}
-	for _, partial := range []bool{false, true} {
-		binding, err := NewSession(newFS()).PrepareCLI(ProjectSet{}, plan, configDir, false, func(file target.File) bool {
-			return !partial || file.Path != upper
-		})
+	binding, err := NewSession(newFS()).LoadCLI(ProjectSet{}, plan, configDir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(binding.RootGroups) != 2 {
+		t.Fatalf("case-separated root groups = %d", len(binding.RootGroups))
+	}
+	all := append([]*lintprogram.Program(nil), binding.Programs...)
+	targets := append([][]string(nil), binding.TargetsByProgram...)
+	for _, group := range binding.RootGroups {
+		p, err := group.Build(context.Background(), group.FileNames)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if binding.DeferredRoots == nil {
-			t.Fatal("case-separated eligible group was not deferred")
-		}
-		all := append([]*lintprogram.Program(nil), binding.Programs...)
-		targets := append([][]string(nil), binding.TargetsByProgram...)
-		for _, name := range binding.DeferredRoots.FileNames {
-			p, err := binding.DeferredRoots.Build(context.Background(), name)
-			if err != nil {
-				t.Fatal(err)
-			}
-			all = append(all, p)
-			targets = append(targets, []string{name})
-		}
-		for _, p := range all {
-			file := p.SourceFiles()[0]
+		all = append(all, p)
+		targets = append(targets, group.FileNames)
+		for _, file := range p.SourceFiles() {
 			if (file.ExternalModuleIndicator != nil) != legacyExternal[file.FileName()] {
 				t.Fatal("deferred package scope crossed a case-folded identity")
 			}
 		}
-		compareProgramSyntaxDiagnostics(t, legacyDiagnostics, collectTargetSyntacticDiagnostics(all, targets, false, false))
 	}
+	compareProgramSyntaxDiagnostics(t, legacyDiagnostics, collectTargetSyntacticDiagnostics(all, targets, false, false))
 
 }
 
@@ -479,7 +475,7 @@ func TestSourceOnlyProgramSyntaxDeduplicatesAgainstNonGoverningTypeCheckProgram(
 	}
 	targetPath := tspath.ResolvePath(childDir, "target.ts")
 	plan := target.Plan{Files: []target.File{testLintTarget(fsys, childDir, targetPath)}}
-	binding, err := sessionForTest(buildContext).LoadCLI(set, plan, rootDir, true)
+	binding, err := sessionForTest(buildContext).loadCLIForTest(set, plan, rootDir, true)
 	if err != nil {
 		t.Fatalf("prepareCLIForTest: %v", err)
 	}
@@ -597,7 +593,7 @@ func buildRootProgramsForTest(
 	singleThreaded bool,
 ) ([]*lintprogram.Program, []rule.RuleDiagnostic, error) {
 	result := LoadResult{}
-	if err := sessionForTest(context).appendRootPrograms(&result, groups, currentDirectory, singleThreaded); err != nil {
+	if err := sessionForTest(context).appendRootProgramsForTest(&result, groups, currentDirectory, singleThreaded); err != nil {
 		return nil, nil, err
 	}
 	diagnostics := collectTargetSyntacticDiagnostics(result.Programs, result.TargetsByProgram, false, false)
@@ -706,7 +702,7 @@ func configuredRuleNameSet(rules []rule.ConfiguredRule) map[string]struct{} {
 	return result
 }
 
-func TestPrepareCLIDefersConstructionAndKeepsSourceIdentity(t *testing.T) {
+func TestLoadCLIDefersConstructionAndKeepsSourceIdentity(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{"a.ts": "export const a = 1;", "b.tsx": "export const b = <div />;"})
 	plan := rootProgramTestPlan(dir, "a.ts", "b.tsx")
@@ -715,11 +711,11 @@ func TestPrepareCLIDefersConstructionAndKeepsSourceIdentity(t *testing.T) {
 		probe.sources[file.Path] = 0
 	}
 	session := NewSession(probe)
-	binding, err := session.PrepareCLI(ProjectSet{}, plan, dir, false, func(target.File) bool { return true })
+	binding, err := session.LoadCLI(ProjectSet{}, plan, dir, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(binding.Programs) != 0 || binding.DeferredRoots == nil || len(binding.DeferredRoots.FileNames) != 2 {
+	if len(binding.Programs) != 0 || len(binding.RootGroups) == 0 || len(binding.RootGroups[0].FileNames) != 2 {
 		t.Fatalf("unexpected prepared input: %+v", binding)
 	}
 	for _, reads := range probe.sources {
@@ -727,12 +723,12 @@ func TestPrepareCLIDefersConstructionAndKeepsSourceIdentity(t *testing.T) {
 			t.Fatal("preparation read source text")
 		}
 	}
-	for _, name := range binding.DeferredRoots.FileNames {
-		first, err := binding.DeferredRoots.Build(context.Background(), name)
+	for _, name := range binding.RootGroups[0].FileNames {
+		first, err := binding.RootGroups[0].Build(context.Background(), []string{name})
 		if err != nil {
 			t.Fatal(err)
 		}
-		second, err := binding.DeferredRoots.Build(context.Background(), name)
+		second, err := binding.RootGroups[0].Build(context.Background(), []string{name})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -766,27 +762,24 @@ func (fs *deferredSourceReadFS) ReadFile(name string) (string, bool) {
 	return fs.FS.ReadFile(name)
 }
 
-func TestPrepareCLIKeepsWholeUniverseForCrossFileRules(t *testing.T) {
+func TestLoadCLIKeepsWholeUniverseForCrossFileRules(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{
 		"a.ts": "import value from './b'; export const a = value;",
 		"b.ts": "import './a'; export const b = 1;",
 	})
 	plan := rootProgramTestPlan(dir, "a.ts", "b.ts")
-	binding, err := NewSession(bundled.WrapFS(cachedvfs.From(osvfs.FS()))).PrepareCLI(ProjectSet{}, plan, dir, true, func(file target.File) bool {
-		// b.ts has no enabled rules but its AST still belongs to a.ts's graph.
-		return file.Path != plan.Files[0].Path
-	})
+	binding, err := NewSession(bundled.WrapFS(cachedvfs.From(osvfs.FS()))).LoadCLI(ProjectSet{}, plan, dir, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if binding.DeferredRoots != nil || len(binding.Programs) != 1 || len(binding.Programs[0].SourceFiles()) != 2 {
+	if len(binding.RootGroups) != 1 || len(binding.Programs) != 0 || len(binding.RootGroups[0].FileNames) != 2 {
 		t.Fatal("split a cross-file source universe")
 	}
 	generation := linter.Generation{Native: linter.NativeGeneration{
-		Programs: binding.Programs, TargetsByProgram: binding.TargetsByProgram, SingleThreaded: true,
-		RulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
-			if file.FileName() != plan.Files[0].Path {
+		Programs: binding.Programs, RootGroups: binding.RootGroups, TargetsByProgram: binding.TargetsByProgram, SingleThreaded: true,
+		RulesForPath: func(path string) []rule.ConfiguredRule {
+			if path != plan.Files[0].Path {
 				return nil
 			}
 			return []rule.ConfiguredRule{
@@ -810,19 +803,19 @@ func TestPrepareCLIKeepsWholeUniverseForCrossFileRules(t *testing.T) {
 	}
 }
 
-func TestPrepareCLIConcurrentTransientHosts(t *testing.T) {
+func TestLoadCLIConcurrentTransientHosts(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{"source.ts": "export const value = 1;"})
 	plan := rootProgramTestPlan(dir, "source.ts")
 	path := plan.Files[0].Path
 	probe := &deferredSourceReadFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS())), sources: map[string]int{path: 0}}
-	binding, err := NewSession(probe).PrepareCLI(ProjectSet{}, plan, dir, false, func(target.File) bool { return true })
+	binding, err := NewSession(probe).LoadCLI(ProjectSet{}, plan, dir, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := binding.DeferredRoots.Build(canceled, path); err == nil || probe.sources[path] != 0 {
+	if _, err := binding.RootGroups[0].Build(canceled, []string{path}); err == nil || probe.sources[path] != 0 {
 		t.Fatal("canceled builder read source text")
 	}
 	const count = 32
@@ -835,7 +828,7 @@ func TestPrepareCLIConcurrentTransientHosts(t *testing.T) {
 		go func() {
 			defer workers.Done()
 			<-start
-			programs[index], errors[index] = binding.DeferredRoots.Build(context.Background(), path)
+			programs[index], errors[index] = binding.RootGroups[0].Build(context.Background(), []string{path})
 		}()
 	}
 	close(start)
@@ -856,7 +849,7 @@ func TestPrepareCLIConcurrentTransientHosts(t *testing.T) {
 	}
 }
 
-func TestPrepareCLIUnsupportedRootsKeepCompatibilityAdmission(t *testing.T) {
+func TestLoadCLIUnsupportedRootsKeepCompatibilityAdmission(t *testing.T) {
 	for _, name := range []string{"source.vue", "source", "source.TS"} {
 		t.Run(name, func(t *testing.T) {
 			const dir = "/repo"
@@ -868,13 +861,69 @@ func TestPrepareCLIUnsupportedRootsKeepCompatibilityAdmission(t *testing.T) {
 				fs.files[path] = "export const value = 1;"
 				return NewSession(fs)
 			}
-			eager := runRootProgramBind(func() (LoadResult, error) { return newSession().LoadCLI(ProjectSet{}, plan, dir, true) })
+			eager := runRootProgramBind(func() (LoadResult, error) { return newSession().loadCLIForTest(ProjectSet{}, plan, dir, true) })
 			prepared := runRootProgramBind(func() (LoadResult, error) {
-				return newSession().PrepareCLI(ProjectSet{}, plan, dir, true, func(target.File) bool { t.Error("unsupported roots reached isolation policy"); return true })
+				return newSession().LoadCLI(ProjectSet{}, plan, dir, true)
 			})
-			if fmt.Sprint(eager.err) != fmt.Sprint(prepared.err) || eager.panicText != prepared.panicText || prepared.binding.DeferredRoots != nil {
+			if fmt.Sprint(eager.err) != fmt.Sprint(prepared.err) || eager.panicText != prepared.panicText || len(prepared.binding.RootGroups) != 0 {
 				t.Fatalf("compatibility outcome changed: eager=%+v prepared=%+v", eager, prepared)
 			}
 		})
 	}
+}
+
+func (s *Session) loadCLIForTest(
+	set ProjectSet,
+	plan target.Plan,
+	currentDirectory string,
+	singleThreaded bool,
+) (LoadResult, error) {
+	binding, err := s.LoadCLI(set, plan, currentDirectory, singleThreaded)
+	if err != nil {
+		return LoadResult{}, err
+	}
+	for _, group := range binding.RootGroups {
+		p, err := group.Build(context.Background(), group.FileNames)
+		if err != nil {
+			return LoadResult{}, err
+		}
+		binding.Programs = append(binding.Programs, p)
+		binding.TargetsByProgram = append(binding.TargetsByProgram, group.FileNames)
+	}
+	binding.RootGroups = nil
+	return binding, nil
+}
+
+func (s *Session) appendRootProgramsForTest(
+	binding *LoadResult,
+	groups [][]target.File,
+	currentDirectory string,
+	singleThreaded bool,
+) error {
+	for _, group := range groups {
+		sort.Slice(group, func(left, right int) bool {
+			return group[left].Path < group[right].Path
+		})
+		rootFileNames := make([]string, len(group))
+		for index, target := range group {
+			rootFileNames[index] = target.Path
+		}
+		rootProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+			RootFileNames:   rootFileNames,
+			Host:            s.context.newTransientCompilerHost(currentDirectory),
+			CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+			SingleThreaded:  singleThreaded,
+		})
+		if err != nil {
+			return err
+		}
+		binding.Programs = append(binding.Programs, rootProgram)
+		files := rootProgram.SourceFiles()
+		targets := make([]string, len(files))
+		for index, file := range files {
+			targets[index] = file.FileName()
+		}
+		binding.TargetsByProgram = append(binding.TargetsByProgram, targets)
+	}
+	return nil
 }

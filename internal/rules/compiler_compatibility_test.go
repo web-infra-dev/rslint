@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -166,10 +167,10 @@ func TestFileIsolatedRulesMatchCompleteSourceUniverse(t *testing.T) {
 				t.Helper()
 				generation := linter.Generation{Native: linter.NativeGeneration{
 					SingleThreaded: singleThreaded, Cwd: root.Dir,
-					RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule { return configured },
+					RulesForPath: func(string) []rule.ConfiguredRule { return configured },
 				}}
 				if isolated {
-					generation.Native.DeferredRoots = &program.DeferredRoots{FileNames: paths, Build: func(_ context.Context, path string) (*program.Program, error) { return build([]string{path}) }}
+					generation.Native.RootGroups = []program.RootGroup{{FileNames: paths, Build: func(_ context.Context, names []string) (*program.Program, error) { return build(names) }}}
 				} else {
 					generation.Native.Programs = []*program.Program{complete}
 					generation.Native.TargetsByProgram = [][]string{paths}
@@ -183,8 +184,9 @@ func TestFileIsolatedRulesMatchCompleteSourceUniverse(t *testing.T) {
 				observation := result.Observation.Native
 				linter.StableSortDiagnosticsByFileAndStart(observation.Diagnostics)
 				// Materialize line maps before comparing their lazy projections.
-				for _, diagnostic := range observation.Diagnostics {
-					diagnostic.SourceFile.ECMALineMap()
+				for index := range observation.Diagnostics {
+					diagnostic := &observation.Diagnostics[index]
+					diagnostic.SourceFile = &compatibilitySourceText{text: diagnostic.SourceFile.Text(), lines: diagnostic.SourceFile.ECMALineMap()}
 				}
 				return observation
 			}
@@ -201,3 +203,13 @@ func TestFileIsolatedRulesMatchCompleteSourceUniverse(t *testing.T) {
 		t.Fatal("no file-isolated rules exercised")
 	}
 }
+
+// compatibilitySourceText compares the source contract shared by eager and
+// streamed diagnostics without requiring the same backing AST representation.
+type compatibilitySourceText struct {
+	text  string
+	lines []core.TextPos
+}
+
+func (s *compatibilitySourceText) Text() string                { return s.text }
+func (s *compatibilitySourceText) ECMALineMap() []core.TextPos { return s.lines }

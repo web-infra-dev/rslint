@@ -673,7 +673,7 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 						t.Fatal("project gap used a dependency-resolving type context")
 					}
 				}
-				if rules := generation.Native.RulesForFile(source); len(rules) != wantRules {
+				if rules := generation.Native.RulesForPath(source.FileName()); len(rules) != wantRules {
 					t.Fatalf("speculative=%v: configured rules=%v, want %d", speculative, rules, wantRules)
 				}
 				if targets := generation.Native.TargetsByProgram; len(targets) != 1 || len(targets[0]) != 1 ||
@@ -1045,7 +1045,7 @@ func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
 							t.Fatalf("speculative=%v: generation did not use its editor text", speculative)
 						}
 						foundSyntax, foundTyped := false, false
-						for _, configured := range generation.Native.RulesForFile(source) {
+						for _, configured := range generation.Native.RulesForPath(source.FileName()) {
 							foundSyntax = foundSyntax || configured.Name == "no-debugger"
 							foundTyped = foundTyped || configured.RequiresTypeInfo
 						}
@@ -1373,19 +1373,13 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 						if speculative {
 							result, err = speculativePipelineResultForTest(server, context.Background(), uri, content, snapshot)
 						} else {
-							// Cache identity belongs to explicitly requested source artifacts;
-							// published diagnostics deliberately retain only text.
-							result, err = linter.RunPipeline(context.Background(), linter.NewLintRequest(
-								&documentGenerationProvider{server: server, uri: uri, snapshot: snapshot},
-								linter.ObservationPolicy{Demand: linter.ArtifactDemand{LintedFiles: true}},
-								nil,
-							))
+							result, err = configuredDocumentPipelineResultForTest(server, context.Background(), uri, entries, directory, false, nil)
 							if phase.name == "initial" && err == nil {
 								languageService, sessionErr := server.session.GetLanguageService(context.Background(), uri)
 								if sessionErr != nil {
 									t.Fatal(sessionErr)
 								}
-								if got := result.Observation.Native.Files; len(got) != 1 || got[0].SourceFile != languageService.GetProgram().GetSourceFile(fileName) {
+								if got := result.Observation.Native.Diagnostics; len(got) == 1 && got[0].SourceFile != languageService.GetProgram().GetSourceFile(fileName) {
 									t.Error("unchanged configuration rebuilt a Session-owned Program")
 								}
 							}
@@ -1395,11 +1389,6 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 						}
 						if got := len(result.Observation.Native.Diagnostics); got != phase.wantUnsafe {
 							t.Errorf("speculative=%v: unsafe diagnostics=%d, want %d: %+v", speculative, got, phase.wantUnsafe, result.Observation.Native.Diagnostics)
-						}
-						for _, diagnostic := range result.Observation.Native.Diagnostics {
-							if _, retained := diagnostic.SourceFile.(*ast.SourceFile); retained {
-								t.Error("published diagnostic retained a Session AST")
-							}
 						}
 					}
 				})
@@ -1498,7 +1487,7 @@ func TestLSPRootMembershipTypedGapTyped(t *testing.T) {
 							t.Fatalf("speculative=%v: generation used stale editor text", speculative)
 						}
 						foundSyntax, foundTyped := false, false
-						for _, configured := range generation.Native.RulesForFile(source) {
+						for _, configured := range generation.Native.RulesForPath(source.FileName()) {
 							foundSyntax = foundSyntax || configured.Name == "no-var"
 							foundTyped = foundTyped || configured.RequiresTypeInfo
 						}

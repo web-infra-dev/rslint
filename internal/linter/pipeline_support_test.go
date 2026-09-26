@@ -48,7 +48,7 @@ func pipelineTestGeneration(
 			TargetsByProgram: [][]string{{fileName}},
 			SingleThreaded:   true,
 			Cwd:              root,
-			RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			RulesForPath: func(string) []rule.ConfiguredRule {
 				return configuredRules
 			},
 		},
@@ -80,7 +80,7 @@ func autofixPolicyForTest(maxRounds int, policy AutofixPolicy) AutofixPolicy {
 
 func runPipelineWithParallelRuleResolver(
 	t *testing.T,
-	resolver func(*ast.SourceFile) []rule.ConfiguredRule,
+	resolver func(string) []rule.ConfiguredRule,
 ) (recovered any, releases int32) {
 	t.Helper()
 	root := tspath.NormalizePath(t.TempDir())
@@ -92,7 +92,7 @@ func runPipelineWithParallelRuleResolver(
 			pipelineTestProgram(t, root, secondPath, "const second = 2;"),
 		},
 		TargetsByProgram: [][]string{{firstPath}, {secondPath}},
-		RulesForFile:     resolver,
+		RulesForPath:     resolver,
 	}}
 	var releaseCount atomic.Int32
 	func() {
@@ -213,17 +213,17 @@ func pipelineDeferredGeneration(t *testing.T, count int) Generation {
 	t.Helper()
 	root := tspath.NormalizePath(t.TempDir())
 	paths := make([]string, count)
+	texts := make(map[string]string, count)
 	for index := range paths {
 		paths[index] = tspath.ResolvePath(root, fmt.Sprintf("source-%d.ts", index))
+		texts[paths[index]] = "const value = 1;"
 	}
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), texts)
 	return Generation{Native: NativeGeneration{
 		Cwd: root,
-		DeferredRoots: &program.DeferredRoots{
-			FileNames: paths,
-			Build: func(_ context.Context, path string) (*program.Program, error) {
-				return pipelineTestProgram(t, root, path, "const value = 1;"), nil
-			},
-		},
-		RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule { return nil },
+		RootGroups: []program.RootGroup{{FileNames: paths, Build: func(_ context.Context, names []string) (*program.Program, error) {
+			return program.NewFromRoots(program.RootOptions{RootFileNames: names, Host: utils.CreateCompilerHost(root, fs), CompilerOptions: program.SourceOnlyCompilerOptions(), SingleThreaded: true})
+		}}},
+		RulesForPath: func(string) []rule.ConfiguredRule { return nil },
 	}}
 }

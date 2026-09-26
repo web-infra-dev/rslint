@@ -8,7 +8,7 @@ import (
 
 // textSourceFile is a lightweight ast.SourceFileLike backed only by raw
 // source text — no AST, scope, or types. Both plugin diagnostics and completed
-// native observations use it to render line/column through the scanner, which
+// streamed files use it to render line/column through the scanner, which
 // only needs Text() + ECMALineMap().
 type textSourceFile struct {
 	text     string

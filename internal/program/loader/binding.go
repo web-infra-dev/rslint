@@ -20,13 +20,13 @@ import (
 // only the unified Program inputs, lint projection, and source/target path
 // mappings needed by integrations; compiler and parser assembly details remain
 // private to the loader. Its slices, maps and deferred descriptors are immutable
-// after PrepareCLI, LoadCLI or LoadAPI returns.
+// after LoadCLI or LoadAPI returns.
 type LoadResult struct {
 	compilerPrograms       []*compiler.Program
 	Programs               []*lintprogram.Program
 	TargetsByProgram       [][]string
 	LintTargetBySourcePath map[string]target.File
-	DeferredRoots          *lintprogram.DeferredRoots
+	RootGroups             []lintprogram.RootGroup
 }
 
 func authoritativePath(filePath string, fsys vfs.FS) string {
@@ -504,62 +504,14 @@ func allRootsSupportedByParser(targets []target.File, useCaseSensitive bool) boo
 	return true
 }
 
-func (s *Session) appendRootPrograms(
-	binding *LoadResult,
-	groups [][]target.File,
-	currentDirectory string,
-	singleThreaded bool,
-) error {
-	for _, group := range groups {
-		sort.Slice(group, func(left, right int) bool {
-			return group[left].Path < group[right].Path
-		})
-		rootFileNames := make([]string, len(group))
-		for index, target := range group {
-			rootFileNames[index] = target.Path
-		}
-		rootProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
-			RootFileNames:   rootFileNames,
-			Host:            s.context.newTransientCompilerHost(currentDirectory),
-			CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
-			SingleThreaded:  singleThreaded,
-		})
-		if err != nil {
-			return err
-		}
-		binding.Programs = append(binding.Programs, rootProgram)
-		files := rootProgram.SourceFiles()
-		targets := make([]string, len(files))
-		for index, file := range files {
-			targets[index] = file.FileName()
-		}
-		binding.TargetsByProgram = append(binding.TargetsByProgram, targets)
-	}
-	return nil
-}
-
-// LoadCLI binds targets into one backend-agnostic Program sequence. Supported
-// project-external roots use the native parser/binder facade; roots that the
-// facade cannot admit retain the compatibility compiler behavior internally.
+// LoadCLI binds project targets and describes supported source-only groups
+// without parsing them. It preserves complete group membership, including
+// targets with no enabled rules; the consumer decides when to materialize them.
 func (s *Session) LoadCLI(
 	set ProjectSet,
 	plan target.Plan,
 	currentDirectory string,
 	singleThreaded bool,
-) (LoadResult, error) {
-	return s.PrepareCLI(set, plan, currentDirectory, singleThreaded, nil)
-}
-
-// PrepareCLI binds targets once and defers a supported source-only group only
-// when every target permits independent execution. Keeping the original whole
-// group on a negative answer preserves cross-file rules, including dependencies
-// with no enabled rules of their own. A nil predicate selects eager loading.
-func (s *Session) PrepareCLI(
-	set ProjectSet,
-	plan target.Plan,
-	currentDirectory string,
-	singleThreaded bool,
-	canIsolate func(target.File) bool,
 ) (LoadResult, error) {
 	if err := s.validate(); err != nil {
 		return LoadResult{}, err
@@ -579,39 +531,26 @@ func (s *Session) PrepareCLI(
 		// by no current compiler Program are evicted before root parsing. The root
 		// backend shares source snapshots, not bound compiler AST objects.
 		s.retainCompilerPrograms(binding.compilerPrograms)
-		var deferredNames []string
 		for _, group := range groups {
-			isolate := canIsolate != nil
-			for _, file := range group {
-				if !isolate || !canIsolate(file) {
-					isolate = false
-					break
-				}
+			sort.Slice(group, func(i, j int) bool { return group[i].Path < group[j].Path })
+			names := make([]string, len(group))
+			for i, file := range group {
+				names[i] = file.Path
 			}
-			if isolate {
-				sort.Slice(group, func(i, j int) bool { return group[i].Path < group[j].Path })
-				for _, file := range group {
-					deferredNames = append(deferredNames, file.Path)
-				}
-			} else if err := s.appendRootPrograms(&binding, [][]target.File{group}, currentDirectory, singleThreaded); err != nil {
-				return LoadResult{}, err
-			}
-		}
-		if len(deferredNames) > 0 {
-			binding.DeferredRoots = &lintprogram.DeferredRoots{
-				FileNames: deferredNames,
-				Build: func(ctx context.Context, fileName string) (*lintprogram.Program, error) {
+			binding.RootGroups = append(binding.RootGroups, lintprogram.RootGroup{
+				FileNames: names,
+				Build: func(ctx context.Context, fileNames []string) (*lintprogram.Program, error) {
 					if err := ctx.Err(); err != nil {
 						return nil, err
 					}
 					return lintprogram.NewFromRoots(lintprogram.RootOptions{
-						RootFileNames:   []string{fileName},
+						RootFileNames:   fileNames,
 						Host:            s.context.newTransientCompilerHost(currentDirectory),
 						CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
-						SingleThreaded:  true,
+						SingleThreaded:  singleThreaded || len(fileNames) == 1,
 					})
 				},
-			}
+			})
 		}
 		finalizeResult(&binding)
 		return binding, nil

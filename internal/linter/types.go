@@ -11,8 +11,9 @@ type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 
 // LintResult holds the outcome of a RunLinter invocation.
 type LintResult struct {
-	LintedFileCount int32
-	ExecutedRules   map[string]struct{}
+	LintedFileCount       int32
+	ExecutedRules         map[string]struct{}
+	HasTargetSyntaxErrors bool
 }
 
 // PrepareLintPlanOptions configures exact lint-plan construction for an ordered

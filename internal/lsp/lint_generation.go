@@ -233,7 +233,7 @@ func newLintGeneration(
 			TargetsByProgram: [][]string{{sourceFile.FileName()}},
 			SingleThreaded:   true,
 			Cwd:              processCwd,
-			RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			RulesForPath: func(string) []rule.ConfiguredRule {
 				return servedRules
 			},
 		},

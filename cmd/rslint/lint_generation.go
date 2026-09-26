@@ -40,7 +40,7 @@ func (p *cliGenerationProvider) AcquireGeneration(
 	if err != nil {
 		return linter.Generation{}, nil, fmt.Errorf("rebuild CLI lint generation: %w", err)
 	}
-	if len(binding.Programs) == 0 {
+	if len(binding.Programs) == 0 && len(binding.RootGroups) == 0 {
 		return linter.Generation{}, nil, errors.New("rebuild CLI lint generation: no programs returned")
 	}
 	return p.generation(binding, fsys), nil, nil

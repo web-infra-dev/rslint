@@ -56,20 +56,10 @@ func runNativeObservation(
 	finish := func() { finishOnce.Do(finishDiagnostics) }
 	defer finish()
 	runOptions.Consumer = consumer
-	lintResult, err := RunLinter(runOptions)
+	lintResult, err := RunLinterContext(ctx, runOptions)
 	finish()
-	hasSyntaxErrors := plan != nil && plan.HasSyntacticDiagnostics()
-	if err == nil && ctx.Err() == nil && generation.Native.DeferredRoots != nil {
-		var isolated NativeObservation
-		isolated, err = runDeferredRoots(ctx, generation.Native)
-		diagnostics = append(diagnostics, isolated.Diagnostics...)
-		if isolated.Lint != nil {
-			lintResult.LintedFileCount += isolated.Lint.LintedFileCount
-			for name := range isolated.Lint.ExecutedRules {
-				lintResult.ExecutedRules[name] = struct{}{}
-			}
-		}
-		hasSyntaxErrors = hasSyntaxErrors || isolated.HasTargetSyntaxErrors
+	if err != nil {
+		return NativeObservation{}, joinContextError(err, ctx)
 	}
 
 	for index := range diagnostics {
@@ -79,7 +69,7 @@ func runNativeObservation(
 		Diagnostics:           diagnostics,
 		Lint:                  lintResult,
 		Files:                 lintedFiles,
-		HasTargetSyntaxErrors: hasSyntaxErrors,
+		HasTargetSyntaxErrors: lintResult.HasTargetSyntaxErrors,
 	}
 	return result, joinContextError(err, ctx)
 }

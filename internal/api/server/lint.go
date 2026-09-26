@@ -418,9 +418,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				TargetsByProgram: binding.TargetsByProgram,
 				SingleThreaded:   false, // Don't use single-threaded mode for IPC
 				Cwd:              currentDirectory,
-				RulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-					return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
-				},
+				RulesForPath:     fileConfigResolver.EnabledRulesForSourcePath,
 			},
 			Target: linter.TargetProjection{
 				Path: targetPathForSourcePath,

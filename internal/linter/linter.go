@@ -472,6 +472,13 @@ func filterNativeRules(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
 //
 // See RunLinterOptions for each field's zero-value semantics.
 func RunLinter(opts RunLinterOptions) (*LintResult, error) {
+	return RunLinterContext(context.Background(), opts)
+}
+
+// RunLinterContext also cancels deferred file admission and joins active source
+// workers before returning. Parsing and rule traversal finish their current
+// stage before observing cancellation.
+func RunLinterContext(ctx context.Context, opts RunLinterOptions) (*LintResult, error) {
 	if !opts.Consumer.Demand.IsValid() {
 		return nil, errors.New("linter: invalid native edit demand")
 	}
@@ -498,6 +505,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 
 	executedRules := make(map[string]struct{})
 	var lintedFileCount int32
+	hasSyntaxErrors := opts.LintPlan.HasSyntacticDiagnostics()
 
 	// Phase 1: lint rules per Program (parallel). Skipped when no plan was
 	// supplied — see doc above.
@@ -527,6 +535,14 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 		for _, programResult := range programResults {
 			mergeResult(programResult)
 		}
+		if len(plan.sources) > 0 {
+			result, syntaxErrors, err := runSourceFiles(ctx, plan.sources, runOpts, consumer)
+			if err != nil {
+				return nil, err
+			}
+			mergeResult(result)
+			hasSyntaxErrors = hasSyntaxErrors || syntaxErrors
+		}
 	}
 
 	// Phase 2: program-level type-check (tsc-aligned).
@@ -539,8 +555,9 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	}
 
 	return &LintResult{
-		LintedFileCount: lintedFileCount,
-		ExecutedRules:   executedRules,
+		LintedFileCount:       lintedFileCount,
+		ExecutedRules:         executedRules,
+		HasTargetSyntaxErrors: hasSyntaxErrors,
 	}, nil
 }
 

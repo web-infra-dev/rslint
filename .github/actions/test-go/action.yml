@@ -125,14 +125,8 @@ runs:
 
         Write-Host ("Runner quotas: " + (@{cpu_limit = $env:cpu_limit; memory_Limit = $env:memory_Limit} | ConvertTo-Json -Compress))
         Write-Host "Go limits: GOMAXPROCS=$env:GOMAXPROCS, package parallelism=$packageParallelism, GOMEMLIMIT=$env:GOMEMLIMIT"
-        # Several test binaries embed the full rule catalog. Concurrent linkers
-        # can exceed the job's memory quota despite per-process soft limits.
-        # Limit test builds separately from ordinary compilation and runtime CPUs.
-        $testParallelism = [Math]::Min($packageParallelism, 2)
-        $testParallelArgs = @("-p=$testParallelism")
-        Write-Host "Go test package parallelism=$testParallelism"
         if ($env:GO_TEST_MODE -eq 'affected') {
-          go test @testParallelArgs -count=1 @targets
+          go test @parallelArgs -count=1 @targets
           exit $LASTEXITCODE
         }
 
@@ -152,7 +146,7 @@ runs:
 
           if ($batch.Count -ge $batchSize) {
             Write-Host "Running batch of $($batch.Count) packages..."
-            go test @testParallelArgs -count=1 $batch
+            go test @parallelArgs -count=1 $batch
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $batch = @()
           }
@@ -161,7 +155,7 @@ runs:
         # Run remaining packages
         if ($batch.Count -gt 0) {
           Write-Host "Running final batch of $($batch.Count) packages..."
-          go test @testParallelArgs -count=1 $batch
+          go test @parallelArgs -count=1 $batch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         }
         Write-Host "Go tests completed: packages=$($packages.Count), elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"

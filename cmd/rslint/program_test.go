@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,6 +40,16 @@ func TestGate_LinterFiltersTypeAwareRuleOnSourceOnlyProgram(t *testing.T) {
 		tmpDir,
 		false,
 	)
+	if err == nil {
+		for _, group := range loaded.RootGroups {
+			p, buildErr := group.Build(context.Background(), group.FileNames)
+			if buildErr != nil {
+				t.Fatal(buildErr)
+			}
+			loaded.Programs = append(loaded.Programs, p)
+			loaded.TargetsByProgram = append(loaded.TargetsByProgram, group.FileNames)
+		}
+	}
 	if err != nil || len(loaded.Programs) != 1 {
 		t.Fatalf("load source-only Program: programs=%d err=%v", len(loaded.Programs), err)
 	}

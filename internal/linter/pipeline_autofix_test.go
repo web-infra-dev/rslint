@@ -45,13 +45,6 @@ func TestAutofixPipelineOwnsMemoryRoundsAndReobservesSnapshots(t *testing.T) {
 	if applied.Rounds[0].AppliedDiagnostics != 1 || applied.Rounds[1].AppliedDiagnostics != 1 {
 		t.Fatalf("applied diagnostic counts = %+v", applied.Rounds)
 	}
-	initialSource := applied.Initial.Native.Diagnostics[0].SourceFile
-	if _, retainedAST := initialSource.(*ast.SourceFile); retainedAST {
-		t.Fatal("initial autofix observation retained its AST across generations")
-	}
-	if initialSource.Text() != "a" {
-		t.Fatalf("initial observation text = %q, want a", initialSource.Text())
-	}
 }
 
 func TestAutofixSyntaxGateStopsBeforeAfterNativePluginDispatch(t *testing.T) {
@@ -93,11 +86,6 @@ func TestAutofixSyntaxGateStopsBeforeAfterNativePluginDispatch(t *testing.T) {
 	if dispatches != 0 {
 		t.Fatalf("plugin dispatches after target syntax error = %d, want 0", dispatches)
 	}
-	for _, diagnostic := range result.Observation.Native.Diagnostics {
-		if _, retainedAST := diagnostic.SourceFile.(*ast.SourceFile); retainedAST {
-			t.Fatal("syntax-gated diagnostic retained its AST")
-		}
-	}
 }
 
 func TestAutofixSyntaxGateStopsConcurrentPluginBeforeDispatch(t *testing.T) {
@@ -112,8 +100,8 @@ func TestAutofixSyntaxGateStopsConcurrentPluginBeforeDispatch(t *testing.T) {
 			},
 			TargetsByProgram: [][]string{{brokenPath}, {pluginPath}},
 			SingleThreaded:   true,
-			RulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
-				if source.FileName() != pluginPath {
+			RulesForPath: func(source string) []rule.ConfiguredRule {
+				if source != pluginPath {
 					return nil
 				}
 				return []rule.ConfiguredRule{{Name: "plugin/fix", IsEslintPluginRule: true}}

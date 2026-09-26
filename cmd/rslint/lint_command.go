@@ -401,14 +401,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	programs := projectSet.Programs()
 	var loadedPrograms loader.LoadResult
 	if !typeCheckOnly {
-		var canIsolate func(target.File) bool
-		if !fix && !typeCheck && len(eslintPlugins) == 0 {
-			canIsolate = func(file target.File) bool {
-				resolved, ok := configResolver.ResolveTarget(file)
-				return ok && rule.CanIsolateSourceFile(resolved.EnabledRules)
-			}
-		}
-		loadedPrograms, err = programSession.PrepareCLI(projectSet, targetPlan, currentDirectory, singleThreaded, canIsolate)
+		loadedPrograms, err = programSession.LoadCLI(projectSet, targetPlan, currentDirectory, singleThreaded)
 		if err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
@@ -466,12 +459,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		generationFS vfs.FS,
 	) linter.Generation {
 		var fileConfigResolver *configLint.Resolver
-		var rulesForFile linter.RuleHandler
+		var rulesForPath func(string) []rule.ConfiguredRule
 		if !typeCheckOnly {
 			fileConfigResolver = configResolver.WithSourceMappings(binding.LintTargetBySourcePath, generationFS, true)
-			rulesForFile = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-				return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
-			}
+			rulesForPath = fileConfigResolver.EnabledRulesForSourcePath
 		}
 		targetPath := func(sourcePath string) string {
 			if lintTarget, ok := target.LookupSourceTarget(binding.LintTargetBySourcePath, sourcePath, generationFS); ok {
@@ -491,9 +482,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return linter.Generation{
 			Native: linter.NativeGeneration{
 				Programs:         binding.Programs,
-				DeferredRoots:    binding.DeferredRoots,
+				RootGroups:       binding.RootGroups,
 				TargetsByProgram: binding.TargetsByProgram,
-				RulesForFile:     rulesForFile,
+				RulesForPath:     rulesForPath,
 				Cwd:              cwd,
 				TypeCheck:        typeCheck,
 				SingleThreaded:   singleThreaded,

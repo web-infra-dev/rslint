@@ -101,16 +101,17 @@ type Generation struct {
 
 // NativeGeneration is the input understood by the native lint engine.
 type NativeGeneration struct {
-	Programs []*program.Program
-	// DeferredRoots are consumed only by ordinary native lint without edits or
-	// retained source artifacts. Complete Programs retain their original scope.
-	DeferredRoots    *program.DeferredRoots
+	Programs         []*program.Program
+	RootGroups       []program.RootGroup
 	TargetsByProgram [][]string
-	RulesForFile     RuleHandler
-	Cwd              string
-	TypeCheck        bool
-	SingleThreaded   bool
-	Timing           *TimingCollector
+	// RulesForPath resolves immutable configuration without requiring an AST.
+	// It may be called concurrently unless SingleThreaded is set, including
+	// before syntax diagnostics are known for a deferred root.
+	RulesForPath   func(string) []rule.ConfiguredRule
+	Cwd            string
+	TypeCheck      bool
+	SingleThreaded bool
+	Timing         *TimingCollector
 }
 
 // TargetProjection binds Program-facing paths to the stable target identity

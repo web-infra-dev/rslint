@@ -44,14 +44,3 @@ func FilterNonTypeAwareRules(rules []ConfiguredRule) []ConfiguredRule {
 	}
 	return filtered
 }
-
-// CanIsolateSourceFile applies the source-only checker gate before inspecting
-// scope. Unknown native rules and external producers retain the full universe.
-func CanIsolateSourceFile(rules []ConfiguredRule) bool {
-	for _, configured := range rules {
-		if configured.IsEslintPluginRule || (!configured.RequiresTypeInfo && !configured.SupportsFileIsolation) {
-			return false
-		}
-	}
-	return true
-}

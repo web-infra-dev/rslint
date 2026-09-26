@@ -27,6 +27,7 @@ var (
 // exactly once.
 type LintPlan struct {
 	programs                  []programLintPlan
+	sources                   []sourceFilePlan
 	syntacticDiagnosticGroups []syntacticDiagnosticGroup
 }
 
@@ -367,7 +368,7 @@ func (p *LintPlan) fileCount() int {
 	if p == nil {
 		return 0
 	}
-	fileCount := 0
+	fileCount := len(p.sources)
 	for _, programPlan := range p.programs {
 		fileCount += len(programPlan.files)
 	}

@@ -217,9 +217,9 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 				TargetsByProgram: [][]string{{paths[0]}, {paths[1]}},
 				SingleThreaded:   true,
 				Cwd:              root,
-				RulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
+				RulesForPath: func(source string) []rule.ConfiguredRule {
 					rules := []rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}
-					if source.FileName() == paths[0] && source.Text() == "a" {
+					if source == paths[0] && texts[source] == "a" {
 						rules = append(rules, rule.ConfiguredRule{
 							Name: "native/fix",
 							Run: func(ruleCtx rule.RuleContext) rule.RuleListeners {
@@ -297,7 +297,7 @@ func TestPipelineRejectsDuplicatePluginWirePath(t *testing.T) {
 			TargetsByProgram: [][]string{{firstPath}, {secondPath}},
 			SingleThreaded:   true,
 			Cwd:              root,
-			RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			RulesForPath: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}
 			},
 		},
@@ -331,12 +331,12 @@ func TestPipelineRejectsDuplicateProjectedTargetBeforeExecution(t *testing.T) {
 			TargetsByProgram: [][]string{{firstPath}, {secondPath}},
 			SingleThreaded:   true,
 			Cwd:              root,
-			RulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
+			RulesForPath: func(source string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name: "native/fix",
 					Run: func(ruleCtx rule.RuleContext) rule.RuleListeners {
 						ruleRan = true
-						textRange := core.NewTextRange(0, len(source.Text()))
+						textRange := core.NewTextRange(0, len(ruleCtx.SourceFile.Text()))
 						ruleCtx.ReportRangeWithFixes(
 							textRange,
 							rule.RuleMessage{Description: "fix"},

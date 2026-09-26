@@ -147,7 +147,7 @@ func TestBuildProjectsKeepsServiceGapsSourceOnly(t *testing.T) {
 				}
 				load := session.LoadAPI
 				if mode == "cli" {
-					load = session.LoadCLI
+					load = session.loadCLIForTest
 				}
 				binding, err := load(projects, plan, dir, true)
 				if err != nil {
@@ -437,7 +437,7 @@ func TestBuildProjectsKeepsEffectiveCandidatesSeparateFromTypeCheckScope(t *test
 			if err != nil || projects.Len() != wantProjects {
 				t.Fatalf("projects=%d, want %d; error=%v", projects.Len(), wantProjects, err)
 			}
-			for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadCLI, session.LoadAPI} {
+			for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.loadCLIForTest, session.LoadAPI} {
 				binding, err := load(projects, plan, dir, true)
 				if err != nil {
 					t.Fatal(err)
@@ -702,7 +702,7 @@ func TestBuildProjectsPreservesProjectDeclarationOrder(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadAPI, session.LoadCLI} {
+					for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadAPI, session.loadCLIForTest} {
 						binding, err := load(projects, plan, dir, true)
 						if err != nil {
 							t.Fatal(err)
@@ -806,7 +806,7 @@ func TestBuildProjectsRootContextsShareExecution(t *testing.T) {
 				if projects.Len() != 2 {
 					t.Fatalf("root contexts built %d Programs, want 2", projects.Len())
 				}
-				for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadCLI, session.LoadAPI} {
+				for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.loadCLIForTest, session.LoadAPI} {
 					binding, err := load(projects, plan, owner, true)
 					if err != nil {
 						t.Fatal(err)
@@ -872,7 +872,7 @@ func TestBuildProjectsWithoutEffectiveProjectsKeepTargetsUnbound(t *testing.T) {
 				if wantProjects > 0 && projects.compilerPrograms[0].GetSourceFile(files[1]) == nil {
 					t.Fatal("fixture must contain the disabled target in the ordinary Program")
 				}
-				for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadCLI, session.LoadAPI} {
+				for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.loadCLIForTest, session.LoadAPI} {
 					binding, err := load(projects, plan, dir, true)
 					if err != nil {
 						t.Fatal(err)
@@ -2485,7 +2485,7 @@ func TestBuildProjectsUnmatchedRootsDoNotBorrowImports(t *testing.T) {
 					if set.Len() > 0 && set.Programs()[0].GetSourceFile(gap.Path) == nil {
 						t.Fatal("selected Program lost its imported dependency")
 					}
-					for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadCLI, session.LoadAPI} {
+					for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.loadCLIForTest, session.LoadAPI} {
 						binding, err := load(set, plan, dir, serial)
 						if err != nil {
 							t.Fatal(err)

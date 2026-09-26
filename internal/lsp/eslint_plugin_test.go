@@ -176,11 +176,11 @@ func fixAllGenerationWithNativeFixForTest(
 		if err != nil {
 			return linter.Generation{}, nil, err
 		}
-		originalRules := generation.Native.RulesForFile
-		generation.Native.RulesForFile = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+		originalRules := generation.Native.RulesForPath
+		generation.Native.RulesForPath = func(sourcePath string) []rule.ConfiguredRule {
 			var configured []rule.ConfiguredRule
 			if originalRules != nil {
-				configured = append(configured, originalRules(sourceFile)...)
+				configured = append(configured, originalRules(sourcePath)...)
 			}
 			configured = append(configured, rule.ConfiguredRule{
 				Name:     "native/test-fix",

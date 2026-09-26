@@ -17,14 +17,14 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
-// DeferredRoots describes selected roots whose source-only Programs may be
-// materialized independently. Names and the backing filesystem generation are
-// immutable. Build must support concurrent calls, return a fresh single-root
-// Program without a checker, and retain no resulting AST. The consumer owns
-// scheduling and must establish that all enabled rules allow file isolation.
-type DeferredRoots struct {
+// RootGroup describes one source-only universe with normalized absolute file
+// names in stable order, before parsing. Build accepts
+// either the complete group or a selected subset, uses the same immutable
+// filesystem generation, and retains no resulting AST. Calls may be concurrent.
+// The lint planner owns the choice of which files must be built together.
+type RootGroup struct {
 	FileNames []string
-	Build     func(context.Context, string) (*Program, error)
+	Build     func(context.Context, []string) (*Program, error)
 }
 
 // RootOptions describes one parser/binder-built source universe.
