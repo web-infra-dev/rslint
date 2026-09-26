@@ -13,8 +13,9 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-var
 var NoVarRule = rule.Rule{
-	Name:   "no-var",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-var",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindVariableDeclarationList: func(node *ast.Node) {

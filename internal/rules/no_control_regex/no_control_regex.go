@@ -20,8 +20,9 @@ var controlCharNames = func() [0x20]string {
 
 // https://eslint.org/docs/latest/rules/no-control-regex
 var NoControlRegexRule = rule.Rule{
-	Name:   "no-control-regex",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-control-regex",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		report := func(node *ast.Node, controlChars []string) {
 			ctx.ReportNode(node, rule.RuleMessage{

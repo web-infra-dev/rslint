@@ -56,8 +56,11 @@ func runNativeObservation(
 	finish := func() { finishOnce.Do(finishDiagnostics) }
 	defer finish()
 	runOptions.Consumer = consumer
-	lintResult, err := RunLinter(runOptions)
+	lintResult, err := RunLinterContext(ctx, runOptions)
 	finish()
+	if err != nil {
+		return NativeObservation{}, joinContextError(err, ctx)
+	}
 
 	for index := range diagnostics {
 		diagnostics[index].FilePath = projectTargetPath(generation.Target.Path, diagnostics[index].FilePath)
@@ -66,7 +69,7 @@ func runNativeObservation(
 		Diagnostics:           diagnostics,
 		Lint:                  lintResult,
 		Files:                 lintedFiles,
-		HasTargetSyntaxErrors: plan != nil && plan.HasSyntacticDiagnostics(),
+		HasTargetSyntaxErrors: lintResult.HasTargetSyntaxErrors,
 	}
 	return result, joinContextError(err, ctx)
 }

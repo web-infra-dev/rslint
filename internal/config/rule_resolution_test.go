@@ -708,3 +708,14 @@ func ruleNameSet(rules []rule.ConfiguredRule) map[string]bool {
 	}
 	return set
 }
+
+func TestConfiguredRulesPreserveFileIsolationCapability(t *testing.T) {
+	for _, isolated := range []bool{false, true} {
+		impl := rule.CreateRule(rule.Rule{Name: "test", SupportsFileIsolation: isolated, Schema: rule.EmptyArraySchema})
+		catalog := rule.NewCatalog(impl)
+		configured, _ := ResolveEnabledRules(catalog, RslintConfig{{Plugins: []string{"@typescript-eslint"}, Rules: Rules{impl.Name: "error"}}}, "source.ts", "")
+		if len(configured) != 1 || configured[0].SupportsFileIsolation != isolated {
+			t.Fatalf("isolation capability lost: %+v", configured)
+		}
+	}
+}

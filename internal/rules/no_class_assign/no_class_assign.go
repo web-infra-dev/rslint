@@ -43,8 +43,9 @@ func checkClassReassignments(classNode *ast.Node, nameNode *ast.Node, ctx *rule.
 
 // NoClassAssignRule disallows reassigning class declarations
 var NoClassAssignRule = rule.Rule{
-	Name:   "no-class-assign",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-class-assign",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		checkClass := func(node *ast.Node) {
 			nameNode := node.Name()

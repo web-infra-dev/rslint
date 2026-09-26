@@ -19,8 +19,9 @@ func buildExAssignMessage() rule.RuleMessage {
 }
 
 var NoExAssignRule = rule.Rule{
-	Name:   "no-ex-assign",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-ex-assign",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCatchClause: func(node *ast.Node) {

@@ -19,8 +19,9 @@ func buildMessage(name string) rule.RuleMessage {
 
 // https://eslint.org/docs/latest/rules/no-useless-assignment
 var NoUselessAssignmentRule = rule.Rule{
-	Name:   "no-useless-assignment",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-useless-assignment",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.Refs == nil {
 			return rule.RuleListeners{}

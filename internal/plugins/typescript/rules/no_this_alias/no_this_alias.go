@@ -138,8 +138,9 @@ func configuredThisListener(ctx *rule.RuleContext, opts NoThisAliasOptions) func
 }
 
 var NoThisAliasRule = rule.CreateRule(rule.Rule{
-	Name:   "no-this-alias",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-this-alias",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if len(options) == 0 {
 			return rule.RuleListeners{ast.KindThisKeyword: defaultThisListener(&ctx)}

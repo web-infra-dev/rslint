@@ -32,8 +32,9 @@ var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-misleading-character-class
 var NoMisleadingCharacterClassRule = rule.Rule{
-	Name:   "no-misleading-character-class",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-misleading-character-class",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		var callTracker *regexpCallTracker

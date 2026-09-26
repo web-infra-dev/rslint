@@ -7,9 +7,9 @@ import (
 )
 
 // textSourceFile is a lightweight ast.SourceFileLike backed only by raw
-// source text — no AST, scope, or types. It lets diagnostics produced
-// outside ts-go (ESLint-plugin rules run in a Node worker) render
-// line/column through the scanner, which only needs Text() + ECMALineMap().
+// source text — no AST, scope, or types. Both plugin diagnostics and completed
+// streamed files use it to render line/column through the scanner, which
+// only needs Text() + ECMALineMap().
 type textSourceFile struct {
 	text     string
 	lineOnce sync.Once

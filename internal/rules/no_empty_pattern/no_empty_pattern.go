@@ -12,8 +12,9 @@ var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-empty-pattern
 var NoEmptyPatternRule = rule.Rule{
-	Name:   "no-empty-pattern",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-empty-pattern",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 

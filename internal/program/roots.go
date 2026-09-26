@@ -1,6 +1,7 @@
 package program
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -15,6 +16,16 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
+
+// RootGroup describes one source-only universe with normalized absolute file
+// names in stable order, before parsing. Build accepts
+// either the complete group or a selected subset, uses the same immutable
+// filesystem generation, and retains no resulting AST. Calls may be concurrent.
+// The lint planner owns the choice of which files must be built together.
+type RootGroup struct {
+	FileNames []string
+	Build     func(context.Context, []string) (*Program, error)
+}
 
 // RootOptions describes one parser/binder-built source universe.
 // RootFileNames are parsed exactly; imports may resolve to paths, but the

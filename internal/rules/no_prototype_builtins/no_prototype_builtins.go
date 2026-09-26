@@ -65,8 +65,9 @@ func isCommaBinaryExpression(node *ast.Node) bool {
 
 // https://eslint.org/docs/latest/rules/no-prototype-builtins
 var NoPrototypeBuiltinsRule = rule.Rule{
-	Name:   "no-prototype-builtins",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-prototype-builtins",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

@@ -20,8 +20,9 @@ func unusedExpressionMessage() rule.RuleMessage {
 
 // https://typescript-eslint.io/rules/no-unused-expressions
 var NoUnusedExpressionsRule = rule.CreateRule(rule.Rule{
-	Name:   "no-unused-expressions",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-unused-expressions",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := utils.ParseNoUnusedExpressionOptions(rawOptions)
 

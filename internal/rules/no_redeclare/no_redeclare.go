@@ -65,8 +65,9 @@ func typescriptDefaults() options {
 }
 
 var NoRedeclareRule = rule.Rule{
-	Name:   "no-redeclare",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-redeclare",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: runWithVariant(ruleVariant{
 		defaults:                 coreDefaults(),
 		includeBodylessFunctions: true,

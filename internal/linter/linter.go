@@ -103,6 +103,199 @@ func (r *listenerRegistry) reset() {
 	r.activeKinds = r.activeKinds[:0]
 }
 
+// lintFile executes one prepared file. The caller owns its Program lifetime
+// and an empty listener registry, which is cleared before successful return.
+func lintFile(sourceProgram *program.Program, opts programRunOptions, consumer rule.DiagnosticConsumer, filePlan *lintFilePlan, rules []rule.ConfiguredRule, chk *checker.Checker, registeredListeners *listenerRegistry) {
+	file := filePlan.file
+
+	// Per-rule durations for this file, parallel to rules. Listeners are
+	// wrapped at registration time, so when timing is off the traversal
+	// hot path pays nothing. All rules share one AST traversal; timing
+	// each listener invocation is what attributes traversal time to the
+	// rule that registered the listener.
+	var ruleDurations []time.Duration
+	if opts.Timing != nil {
+		ruleDurations = make([]time.Duration, len(rules))
+	}
+
+	// One lazy store is shared by directives, inline globals, and every
+	// comment-aware rule in this file. Most files never materialize it.
+	comments := rule.NewCommentStore(file)
+
+	// Directive parsing is itself lazy and only runs when a rule reports.
+	disableManager := rule.NewDisableManager(file, comments)
+
+	// A cheap source-text check inside each parser avoids asking the store
+	// for all comments unless that inline directive is possible.
+	inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
+	inlineExported, inlineExportedDeclarations := rule.ParseInlineExported(file, comments)
+	var environment rule.RuleEnvironment
+	if filePlan.environment != nil {
+		environment = *filePlan.environment
+	}
+
+	// Resolve immutable language initialization once per file. Globals and
+	// RefStore receive their own concrete data and never inspect the current
+	// selection input (the file extension) themselves.
+	globalsInit, refsInit, languageOptions := rule.ResolveLanguageDefaults(file.FileName(), environment.LanguageOptions)
+
+	fileChecker := chk
+
+	// One lazy reference index shared by every rule in this file; most
+	// files never materialize it. fileChecker is passed as a fallback for
+	// identifiers the binder scope walk can't resolve (declared outside
+	// this file); nil there just disables the fallback.
+	refs := rule.NewRefStore(file, sourceProgram.Options(), fileChecker, refsInit)
+
+	// One lazy byte-order-mark answer shared by every rule in this file.
+	// The mark is gone from the text by the time the file is parsed, so
+	// answering means going back to whatever produced that text; a file no
+	// rule asks about never does.
+	sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
+	fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
+	baseContext := (rule.RuleContext{
+		SourceFile:      file,
+		Settings:        environment.Settings,
+		LanguageOptions: languageOptions,
+		Globals:         rule.NewGlobals(languageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
+		Exported:        rule.NewExported(inlineExported, inlineExportedDeclarations),
+		Comments:        comments,
+		Refs:            refs,
+		BOM:             sourceBOM,
+		TypeChecker:     fileChecker,
+		DisableManager:  disableManager,
+	}).WithProgram(sourceProgram).WithFileCache(fileCache)
+
+	for ruleIndex, r := range rules {
+		ctx := baseContext
+		ctx = ctx.WithDiagnosticConsumer(
+			r.Name,
+			r.Severity,
+			consumer,
+		)
+
+		var runStart time.Time
+		if ruleDurations != nil {
+			runStart = time.Now()
+		}
+		ruleListeners := r.Run(ctx)
+		if ruleDurations != nil {
+			ruleDurations[ruleIndex] += time.Since(runStart)
+		}
+
+		for kind, listener := range ruleListeners {
+			if ruleDurations != nil {
+				inner := listener
+				listener = func(node *ast.Node) {
+					start := time.Now()
+					inner(node)
+					ruleDurations[ruleIndex] += time.Since(start)
+				}
+			}
+			registeredListeners.add(kind, listener)
+		}
+	}
+
+	runListeners := func(kind ast.Kind, node *ast.Node) {
+		for _, listener := range registeredListeners.listeners(kind) {
+			listener(node)
+		}
+	}
+
+	/* convert.ts -> allowPattern:
+	catch name
+	variabledeclaration name
+	forinstatement initializer
+	forofstatement initializer
+	(propagation) allowPattern > arrayliteralexpression elements
+	(propagation) allowPattern > objectliteralexpression properties
+	(propagation) allowPattern > spreadassignment,spreadelement expression
+	(propagation) allowPattern > propertyassignment value
+	arraybindingpattern elements
+	objectbindingpattern elements
+	(init) binaryexpression(with '=' operator') left
+	*/
+
+	var childVisitor ast.Visitor
+	var patternVisitor func(node *ast.Node)
+	patternVisitor = func(node *ast.Node) {
+		if expression := utils.JSDocTypeCastExpression(node); expression != nil {
+			patternVisitor(expression)
+			return
+		}
+		if utils.IsJSDocSyntaxNode(node) {
+			return
+		}
+		runListeners(node.Kind, node)
+		kind := rule.ListenerOnAllowPattern(node.Kind)
+		runListeners(kind, node)
+
+		switch node.Kind {
+		case ast.KindArrayLiteralExpression:
+			for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
+				patternVisitor(element)
+			}
+		case ast.KindObjectLiteralExpression:
+			for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
+				patternVisitor(property)
+			}
+		case ast.KindSpreadElement, ast.KindSpreadAssignment:
+			patternVisitor(node.Expression())
+		case ast.KindPropertyAssignment:
+			// Only the value of a pattern property is an assignment
+			// target; its key stays an ordinary expression (a computed one
+			// is even evaluated as such). ESTree visits that key like any
+			// other child, so visit it through the normal path before
+			// propagating pattern context to the initializer.
+			if name := node.Name(); name != nil {
+				childVisitor(name)
+			}
+			patternVisitor(node.Initializer())
+		default:
+			node.ForEachChild(childVisitor)
+		}
+
+		runListeners(rule.ListenerOnExit(kind), node)
+		runListeners(rule.ListenerOnExit(node.Kind), node)
+	}
+	childVisitor = func(node *ast.Node) bool {
+		if expression := utils.JSDocTypeCastExpression(node); expression != nil {
+			childVisitor(expression)
+			return false
+		}
+		if utils.IsJSDocSyntaxNode(node) {
+			return false
+		}
+		runListeners(node.Kind, node)
+
+		switch node.Kind {
+		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
+			kind := rule.ListenerOnNotAllowPattern(node.Kind)
+			runListeners(kind, node)
+			node.ForEachChild(childVisitor)
+			runListeners(rule.ListenerOnExit(kind), node)
+		default:
+			if ast.IsAssignmentExpression(node, true) {
+				expr := node.AsBinaryExpression()
+				patternVisitor(expr.Left)
+				childVisitor(expr.OperatorToken)
+				childVisitor(expr.Right)
+			} else {
+				node.ForEachChild(childVisitor)
+			}
+		}
+
+		runListeners(rule.ListenerOnExit(node.Kind), node)
+
+		return false
+	}
+	file.Node.ForEachChild(childVisitor)
+	if opts.Timing != nil {
+		opts.Timing.addFile(file.FileName(), rules, ruleDurations)
+	}
+	registeredListeners.reset()
+}
+
 // runLintRulesInProgram executes the files and rules already frozen for one
 // Program. It does not perform target discovery, filtering, or rule resolution.
 //
@@ -130,201 +323,6 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	// non-trivial when the checker hasn't been created yet).
 	if result.lintedFileCount == 0 {
 		return result
-	}
-
-	// lintFile lints one file with its already-resolved rules and checker. Its
-	// comments, DisableManager, and rule contexts are per-file. The listener
-	// registry belongs to the calling checker-shard task and is empty on entry;
-	// reset clears all captured per-file state before the next serial file.
-	lintFile := func(filePlan *lintFilePlan, rules []rule.ConfiguredRule, chk *checker.Checker, registeredListeners *listenerRegistry) {
-		file := filePlan.file
-
-		// Per-rule durations for this file, parallel to rules. Listeners are
-		// wrapped at registration time, so when timing is off the traversal
-		// hot path pays nothing. All rules share one AST traversal; timing
-		// each listener invocation is what attributes traversal time to the
-		// rule that registered the listener.
-		var ruleDurations []time.Duration
-		if opts.Timing != nil {
-			ruleDurations = make([]time.Duration, len(rules))
-		}
-
-		// One lazy store is shared by directives, inline globals, and every
-		// comment-aware rule in this file. Most files never materialize it.
-		comments := rule.NewCommentStore(file)
-
-		// Directive parsing is itself lazy and only runs when a rule reports.
-		disableManager := rule.NewDisableManager(file, comments)
-
-		// A cheap source-text check inside each parser avoids asking the store
-		// for all comments unless that inline directive is possible.
-		inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
-		inlineExported, inlineExportedDeclarations := rule.ParseInlineExported(file, comments)
-		var environment rule.RuleEnvironment
-		if filePlan.environment != nil {
-			environment = *filePlan.environment
-		}
-
-		// Resolve immutable language initialization once per file. Globals and
-		// RefStore receive their own concrete data and never inspect the current
-		// selection input (the file extension) themselves.
-		globalsInit, refsInit, languageOptions := rule.ResolveLanguageDefaults(file.FileName(), environment.LanguageOptions)
-
-		fileChecker := chk
-
-		// One lazy reference index shared by every rule in this file; most
-		// files never materialize it. fileChecker is passed as a fallback for
-		// identifiers the binder scope walk can't resolve (declared outside
-		// this file); nil there just disables the fallback.
-		refs := rule.NewRefStore(file, sourceProgram.Options(), fileChecker, refsInit)
-
-		// One lazy byte-order-mark answer shared by every rule in this file.
-		// The mark is gone from the text by the time the file is parsed, so
-		// answering means going back to whatever produced that text; a file no
-		// rule asks about never does.
-		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
-		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
-		baseContext := (rule.RuleContext{
-			SourceFile:      file,
-			Settings:        environment.Settings,
-			LanguageOptions: languageOptions,
-			Globals:         rule.NewGlobals(languageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
-			Exported:        rule.NewExported(inlineExported, inlineExportedDeclarations),
-			Comments:        comments,
-			Refs:            refs,
-			BOM:             sourceBOM,
-			TypeChecker:     fileChecker,
-			DisableManager:  disableManager,
-		}).WithProgram(sourceProgram).WithFileCache(fileCache)
-
-		for ruleIndex, r := range rules {
-			ctx := baseContext
-			ctx = ctx.WithDiagnosticConsumer(
-				r.Name,
-				r.Severity,
-				consumer,
-			)
-
-			var runStart time.Time
-			if ruleDurations != nil {
-				runStart = time.Now()
-			}
-			ruleListeners := r.Run(ctx)
-			if ruleDurations != nil {
-				ruleDurations[ruleIndex] += time.Since(runStart)
-			}
-
-			for kind, listener := range ruleListeners {
-				if ruleDurations != nil {
-					inner := listener
-					listener = func(node *ast.Node) {
-						start := time.Now()
-						inner(node)
-						ruleDurations[ruleIndex] += time.Since(start)
-					}
-				}
-				registeredListeners.add(kind, listener)
-			}
-		}
-
-		runListeners := func(kind ast.Kind, node *ast.Node) {
-			for _, listener := range registeredListeners.listeners(kind) {
-				listener(node)
-			}
-		}
-
-		/* convert.ts -> allowPattern:
-		catch name
-		variabledeclaration name
-		forinstatement initializer
-		forofstatement initializer
-		(propagation) allowPattern > arrayliteralexpression elements
-		(propagation) allowPattern > objectliteralexpression properties
-		(propagation) allowPattern > spreadassignment,spreadelement expression
-		(propagation) allowPattern > propertyassignment value
-		arraybindingpattern elements
-		objectbindingpattern elements
-		(init) binaryexpression(with '=' operator') left
-		*/
-
-		var childVisitor ast.Visitor
-		var patternVisitor func(node *ast.Node)
-		patternVisitor = func(node *ast.Node) {
-			if expression := utils.JSDocTypeCastExpression(node); expression != nil {
-				patternVisitor(expression)
-				return
-			}
-			if utils.IsJSDocSyntaxNode(node) {
-				return
-			}
-			runListeners(node.Kind, node)
-			kind := rule.ListenerOnAllowPattern(node.Kind)
-			runListeners(kind, node)
-
-			switch node.Kind {
-			case ast.KindArrayLiteralExpression:
-				for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
-					patternVisitor(element)
-				}
-			case ast.KindObjectLiteralExpression:
-				for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
-					patternVisitor(property)
-				}
-			case ast.KindSpreadElement, ast.KindSpreadAssignment:
-				patternVisitor(node.Expression())
-			case ast.KindPropertyAssignment:
-				// Only the value of a pattern property is an assignment
-				// target; its key stays an ordinary expression (a computed one
-				// is even evaluated as such). ESTree visits that key like any
-				// other child, so visit it through the normal path before
-				// propagating pattern context to the initializer.
-				if name := node.Name(); name != nil {
-					childVisitor(name)
-				}
-				patternVisitor(node.Initializer())
-			default:
-				node.ForEachChild(childVisitor)
-			}
-
-			runListeners(rule.ListenerOnExit(kind), node)
-			runListeners(rule.ListenerOnExit(node.Kind), node)
-		}
-		childVisitor = func(node *ast.Node) bool {
-			if expression := utils.JSDocTypeCastExpression(node); expression != nil {
-				childVisitor(expression)
-				return false
-			}
-			if utils.IsJSDocSyntaxNode(node) {
-				return false
-			}
-			runListeners(node.Kind, node)
-
-			switch node.Kind {
-			case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
-				kind := rule.ListenerOnNotAllowPattern(node.Kind)
-				runListeners(kind, node)
-				node.ForEachChild(childVisitor)
-				runListeners(rule.ListenerOnExit(kind), node)
-			default:
-				if ast.IsAssignmentExpression(node, true) {
-					expr := node.AsBinaryExpression()
-					patternVisitor(expr.Left)
-					childVisitor(expr.OperatorToken)
-					childVisitor(expr.Right)
-				} else {
-					node.ForEachChild(childVisitor)
-				}
-			}
-
-			runListeners(rule.ListenerOnExit(node.Kind), node)
-
-			return false
-		}
-		file.Node.ForEachChild(childVisitor)
-		if opts.Timing != nil {
-			opts.Timing.addFile(file.FileName(), rules, ruleDurations)
-		}
-		registeredListeners.reset()
 	}
 
 	// Phase 1 parallelism is per-file within the program: files are grouped
@@ -394,7 +392,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 				defer done()
 			}
 			for _, task := range tasks {
-				lintFile(task.plan, task.rules, chk, &registeredListeners)
+				lintFile(sourceProgram, opts, consumer, task.plan, task.rules, chk, &registeredListeners)
 			}
 		})
 	}
@@ -474,6 +472,13 @@ func filterNativeRules(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
 //
 // See RunLinterOptions for each field's zero-value semantics.
 func RunLinter(opts RunLinterOptions) (*LintResult, error) {
+	return RunLinterContext(context.Background(), opts)
+}
+
+// RunLinterContext also cancels deferred file admission and joins active source
+// workers before returning. Parsing and rule traversal finish their current
+// stage before observing cancellation.
+func RunLinterContext(ctx context.Context, opts RunLinterOptions) (*LintResult, error) {
 	if !opts.Consumer.Demand.IsValid() {
 		return nil, errors.New("linter: invalid native edit demand")
 	}
@@ -500,6 +505,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 
 	executedRules := make(map[string]struct{})
 	var lintedFileCount int32
+	hasSyntaxErrors := opts.LintPlan.HasSyntacticDiagnostics()
 
 	// Phase 1: lint rules per Program (parallel). Skipped when no plan was
 	// supplied — see doc above.
@@ -529,6 +535,14 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 		for _, programResult := range programResults {
 			mergeResult(programResult)
 		}
+		if len(plan.sources) > 0 {
+			result, syntaxErrors, err := runSourceFiles(ctx, plan.sources, runOpts, consumer)
+			if err != nil {
+				return nil, err
+			}
+			mergeResult(result)
+			hasSyntaxErrors = hasSyntaxErrors || syntaxErrors
+		}
 	}
 
 	// Phase 2: program-level type-check (tsc-aligned).
@@ -541,8 +555,9 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	}
 
 	return &LintResult{
-		LintedFileCount: lintedFileCount,
-		ExecutedRules:   executedRules,
+		LintedFileCount:       lintedFileCount,
+		ExecutedRules:         executedRules,
+		HasTargetSyntaxErrors: hasSyntaxErrors,
 	}, nil
 }
 

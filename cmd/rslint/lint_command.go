@@ -459,12 +459,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		generationFS vfs.FS,
 	) linter.Generation {
 		var fileConfigResolver *configLint.Resolver
-		var rulesForFile linter.RuleHandler
+		var rulesForPath func(string) []rule.ConfiguredRule
 		if !typeCheckOnly {
 			fileConfigResolver = configResolver.WithSourceMappings(binding.LintTargetBySourcePath, generationFS, true)
-			rulesForFile = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-				return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
-			}
+			rulesForPath = fileConfigResolver.EnabledRulesForSourcePath
 		}
 		targetPath := func(sourcePath string) string {
 			if lintTarget, ok := target.LookupSourceTarget(binding.LintTargetBySourcePath, sourcePath, generationFS); ok {
@@ -484,8 +482,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return linter.Generation{
 			Native: linter.NativeGeneration{
 				Programs:         binding.Programs,
+				RootGroups:       binding.RootGroups,
 				TargetsByProgram: binding.TargetsByProgram,
-				RulesForFile:     rulesForFile,
+				RulesForPath:     rulesForPath,
 				Cwd:              cwd,
 				TypeCheck:        typeCheck,
 				SingleThreaded:   singleThreaded,

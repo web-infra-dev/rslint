@@ -10,8 +10,9 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-duplicate-case
 var NoDuplicateCaseRule = rule.Rule{
-	Name:   "no-duplicate-case",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-duplicate-case",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {

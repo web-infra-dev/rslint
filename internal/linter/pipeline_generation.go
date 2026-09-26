@@ -72,6 +72,20 @@ func projectGenerationTargets(
 			}
 		}
 	}
+	for _, source := range plan.sources {
+		name := source.name
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		path := projectTargetPath(generation.Target.Path, name)
+		if name == "" || path == "" {
+			return nil, errors.New("linter pipeline: deferred target path must not be empty")
+		}
+		if _, duplicate := sources[path]; duplicate {
+			return nil, fmt.Errorf("linter pipeline: duplicate projected target %q", path)
+		}
+		sources[path] = nil
+	}
 	if snapshot.Empty() {
 		return lintedFiles, nil
 	}

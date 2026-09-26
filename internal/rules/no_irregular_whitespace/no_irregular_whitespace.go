@@ -16,8 +16,9 @@ var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-irregular-whitespace
 var NoIrregularWhitespaceRule = rule.Rule{
-	Name:   "no-irregular-whitespace",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-irregular-whitespace",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		checkNoIrregularWhitespace(ctx, opts)

@@ -9,8 +9,9 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-nonoctal-decimal-escape
 var NoNonoctalDecimalEscapeRule = rule.Rule{
-	Name:   "no-nonoctal-decimal-escape",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-nonoctal-decimal-escape",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceText := ctx.SourceFile.Text()
 		return rule.RuleListeners{

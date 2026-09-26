@@ -153,8 +153,9 @@ func parseOptions(options []any) string {
 
 // NoCondAssignRule disallows assignment operators in conditional test expressions.
 var NoCondAssignRule = rule.Rule{
-	Name:   "no-cond-assign",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-cond-assign",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if parseOptions(options) == "always" {
 			return rule.RuleListeners{

@@ -36,18 +36,10 @@ func executeObservation(
 	if err := ctx.Err(); err != nil {
 		return observationExecution{}, err
 	}
-
-	var plan *LintPlan
-	if generation.Native.RulesForFile != nil {
-		plan, err = PrepareLintPlanContext(ctx, PrepareLintPlanOptions{
-			Programs:         generation.Native.Programs,
-			TargetsByProgram: generation.Native.TargetsByProgram,
-			SingleThreaded:   generation.Native.SingleThreaded,
-			GetRulesForFile:  generation.Native.RulesForFile,
-		})
-		if err != nil {
-			return observationExecution{}, fmt.Errorf("linter pipeline: prepare lint plan: %w", err)
-		}
+	retainSources := planChanges || !snapshot.Empty() || policy.Demand.LintedFiles || generation.Plugin != nil
+	plan, err := prepareNativeLintPlan(ctx, generation.Native, retainSources)
+	if err != nil {
+		return observationExecution{}, fmt.Errorf("linter pipeline: prepare lint plan: %w", err)
 	}
 	lintedFiles, err := projectGenerationTargets(
 		ctx,

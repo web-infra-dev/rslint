@@ -2221,8 +2221,9 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 // port scope.
 func newRule() rule.Rule {
 	return rule.Rule{
-		Name:   "no-unused-vars",
-		Schema: rule.NewSchema(schemaJSON),
+		Name:                  "no-unused-vars",
+		SupportsFileIsolation: true,
+		Schema:                rule.NewSchema(schemaJSON),
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			if ctx.SourceFile == nil {
 				return rule.RuleListeners{}

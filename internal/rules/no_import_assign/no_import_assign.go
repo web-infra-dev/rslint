@@ -1291,8 +1291,9 @@ func noImportAssignListeners(
 
 // NoImportAssignRule disallows assigning to imported bindings.
 var NoImportAssignRule = rule.Rule{
-	Name:   "no-import-assign",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-import-assign",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return noImportAssignListeners(ctx, noImportAssignRefStoreAuto)
 	},

@@ -7,8 +7,9 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-with
 var NoWithRule = rule.Rule{
-	Name:   "no-with",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-with",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindWithStatement: func(node *ast.Node) {

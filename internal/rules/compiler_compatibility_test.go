@@ -1,9 +1,13 @@
 package rules_test
 
 import (
+	"context"
+	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -113,3 +117,99 @@ function unreachableForOf() { for (const value of (() => { throw 1; })()) { cons
 		}
 	}
 }
+
+// Every opt-in is exercised on the same source universe and isolated roots.
+// Adding an opt-in automatically extends this compatibility check; other rules
+// keep the complete-Program default.
+func TestFileIsolatedRulesMatchCompleteSourceUniverse(t *testing.T) {
+	root := fixtures.GetRootDir()
+	root.Dir = tspath.ResolvePath(root.Dir, "isolated-source-compatibility")
+	contents := map[string]string{
+		"a.ts":       "import value, * as other from './b'; export const a = value; const unused: any = other; if (true) { debugger; }\n",
+		"b.ts":       "import { a } from './a'; export const b = a; export default b; function unused() { return; }\n",
+		"global.js":  "/* global custom */\r\nvar duplicate = 1; var duplicate = 2; if (custom == NaN) { debugger; }\n",
+		"view.tsx":   "export const View = () => <div>{[1,,2].map(x => x)}</div>;\n",
+		"unicode.js": "const face = '😀';\r\nlet unused = face;\u2028debugger;\u2029",
+		"bad.ts":     "export const broken: = 1;",
+	}
+	paths := make([]string, 0, len(contents))
+	files := make(map[string]string, len(contents))
+	for name, text := range contents {
+		path := tspath.ResolvePath(root.Dir, name)
+		paths = append(paths, path)
+		files[path] = text
+	}
+	slices.Sort(paths)
+	fs := utils.NewOverlayVFS(root.FS, files)
+	build := func(names []string) (*program.Program, error) {
+		return program.NewFromRoots(program.RootOptions{
+			RootFileNames: names, Host: utils.CreateCompilerHost(root.Dir, fs),
+			CompilerOptions: program.SourceOnlyCompilerOptions(), SingleThreaded: true,
+		})
+	}
+	complete, err := build(paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected := 0
+	for name, impl := range rules.All().AllRules() {
+		if !impl.SupportsFileIsolation {
+			continue
+		}
+		selected++
+		t.Run(name, func(t *testing.T) {
+			if impl.RequiresTypeInfo || impl.IsEslintPluginRule {
+				t.Fatal("source-only scope was granted to a non-native or checker-only rule")
+			}
+			options := rule_tester.ResolveTestCaseOptions(t, &impl, nil)
+			configured := []rule.ConfiguredRule{{Name: name, SupportsFileIsolation: true, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners { return impl.Run(ctx, options) }}}
+			run := func(isolated, singleThreaded bool) linter.NativeObservation {
+				t.Helper()
+				generation := linter.Generation{Native: linter.NativeGeneration{
+					SingleThreaded: singleThreaded, Cwd: root.Dir,
+					RulesForPath: func(string) []rule.ConfiguredRule { return configured },
+				}}
+				if isolated {
+					generation.Native.RootGroups = []program.RootGroup{{FileNames: paths, Build: func(_ context.Context, names []string) (*program.Program, error) { return build(names) }}}
+				} else {
+					generation.Native.Programs = []*program.Program{complete}
+					generation.Native.TargetsByProgram = [][]string{paths}
+				}
+				result, err := linter.RunPipeline(context.Background(), linter.NewLintRequest(linter.GenerationProviderFunc(func(context.Context, linter.SourceSnapshot) (linter.Generation, linter.ReleaseFunc, error) {
+					return generation, nil, nil
+				}), linter.ObservationPolicy{}, nil))
+				if err != nil {
+					t.Fatal(err)
+				}
+				observation := result.Observation.Native
+				linter.StableSortDiagnosticsByFileAndStart(observation.Diagnostics)
+				// Materialize line maps before comparing their lazy projections.
+				for index := range observation.Diagnostics {
+					diagnostic := &observation.Diagnostics[index]
+					diagnostic.SourceFile = &compatibilitySourceText{text: diagnostic.SourceFile.Text(), lines: diagnostic.SourceFile.ECMALineMap()}
+				}
+				return observation
+			}
+			want := run(false, true)
+			for _, singleThreaded := range []bool{true, false} {
+				got := run(true, singleThreaded)
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("isolated diagnostics or accounting changed (singleThreaded=%v):\ncomplete=%+v\nisolated=%+v", singleThreaded, want, got)
+				}
+			}
+		})
+	}
+	if selected == 0 {
+		t.Fatal("no file-isolated rules exercised")
+	}
+}
+
+// compatibilitySourceText compares the source contract shared by eager and
+// streamed diagnostics without requiring the same backing AST representation.
+type compatibilitySourceText struct {
+	text  string
+	lines []core.TextPos
+}
+
+func (s *compatibilitySourceText) Text() string                { return s.text }
+func (s *compatibilitySourceText) ECMALineMap() []core.TextPos { return s.lines }

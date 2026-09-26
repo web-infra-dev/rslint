@@ -90,8 +90,9 @@ func isFixable(ctx rule.RuleContext, node *ast.Node) bool {
 
 // https://eslint.org/docs/latest/rules/no-unused-labels
 var NoUnusedLabelsRule = rule.Rule{
-	Name:   "no-unused-labels",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-unused-labels",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var scopeInfo *labelScope
 

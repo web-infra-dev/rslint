@@ -217,8 +217,9 @@ func parseOptions(options []any) useIsNaNOptions {
 
 // UseIsNaNRule requires calls to isNaN() when checking for NaN
 var UseIsNaNRule = rule.Rule{
-	Name:   "use-isnan",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "use-isnan",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if !sourceMayUseNaN(ctx.SourceFile) {
 			return nil

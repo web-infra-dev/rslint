@@ -165,8 +165,9 @@ func hasSameScopeNonVarUndefinedDeclaration(identNode *ast.Node, scopesWithFnOrC
 }
 
 var NoShadowRestrictedNamesRule = rule.Rule{
-	Name:   "no-shadow-restricted-names",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-shadow-restricted-names",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		restricted := map[string]bool{

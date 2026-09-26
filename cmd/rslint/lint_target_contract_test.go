@@ -292,3 +292,28 @@ func TestCLIImportOnlyGapKeepsTypeCheckScope(t *testing.T) {
 		}
 	}
 }
+
+func TestCLISourceOnlyCrossFileRulesKeepUnconfiguredDependencies(t *testing.T) {
+	dir := t.TempDir()
+	writeLintTargetContractFiles(t, dir, map[string]string{
+		"a.ts": "import value from './b'; export const a = value;",
+		"b.ts": "import './a'; export const b = 1;",
+	})
+	for _, singleThreaded := range []bool{false, true} {
+		code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+			ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{
+				{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{}},
+				{Files: []string{"a.ts"}, Plugins: []string{"import"}, Rules: rslintconfig.Rules{"import/no-cycle": "error", "import/default": "error"}},
+			}),
+			Format: "jsonline", NoColor: true, SingleThreaded: singleThreaded,
+		})
+		diagnostics := parseLintTargetContractDiagnostics(t, stdout)
+		counts := make(map[string]int)
+		for _, diagnostic := range diagnostics {
+			counts[diagnostic.RuleName]++
+		}
+		if code != 1 || len(diagnostics) != 2 || counts["import/no-cycle"] != 1 || counts["import/default"] != 1 {
+			t.Fatalf("singleThreaded=%v code=%d diagnostics=%+v stderr=%q", singleThreaded, code, diagnostics, stderr)
+		}
+	}
+}

@@ -50,9 +50,10 @@ var tripleSlashReferenceCommentFactory = ast.NewNodeFactory(ast.NodeFactoryHooks
 // TripleSlashReferenceRule implements the triple-slash-reference rule.
 // Disallow certain triple slash directives in favor of import declarations.
 var TripleSlashReferenceRule = rule.CreateRule(rule.Rule{
-	Name:   "triple-slash-reference",
-	Schema: rule.NewSchema(schemaJSON),
-	Run:    run,
+	Name:                  "triple-slash-reference",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
+	Run:                   run,
 })
 
 func run(ctx rule.RuleContext, options []any) rule.RuleListeners {

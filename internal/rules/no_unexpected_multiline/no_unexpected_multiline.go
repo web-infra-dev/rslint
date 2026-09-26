@@ -28,8 +28,9 @@ var messageDivision = rule.RuleMessage{
 
 // https://eslint.org/docs/latest/rules/no-unexpected-multiline
 var NoUnexpectedMultilineRule = rule.Rule{
-	Name:   "no-unexpected-multiline",
-	Schema: rule.EmptyArraySchema,
+	Name:                  "no-unexpected-multiline",
+	SupportsFileIsolation: true,
+	Schema:                rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sf := ctx.SourceFile
 		text := sf.Text()

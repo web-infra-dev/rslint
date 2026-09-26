@@ -353,8 +353,9 @@ func buildCallFix(ctx rule.RuleContext, callNode *ast.Node) []rule.RuleFix {
 // Reports `!!expr` (double negation) and `Boolean(expr)` calls in
 // contexts that already coerce to boolean.
 var NoExtraBooleanCastRule = rule.Rule{
-	Name:   "no-extra-boolean-cast",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:                  "no-extra-boolean-cast",
+	SupportsFileIsolation: true,
+	Schema:                rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, ruleOptions []any) rule.RuleListeners {
 		opts := parseOptions(ruleOptions)
 
