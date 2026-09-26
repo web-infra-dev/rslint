@@ -1,7 +1,7 @@
 package no_useless_continue
 
 import (
-	"strings"
+	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -21,10 +21,12 @@ var NoUselessContinueRule = rule.Rule{
 				}
 
 				textRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-				ctx.ReportRangeWithFixes(textRange, rule.RuleMessage{
+				ctx.ReportRangeWithDeferredFixes(textRange, rule.RuleMessage{
 					Id:          "no-useless-continue",
 					Description: "Unnecessary `continue` statement.",
-				}, rule.RuleFixRemoveRange(statementRemovalRange(ctx.SourceFile.Text(), textRange)))
+				}, func() []rule.RuleFix {
+					return []rule.RuleFix{rule.RuleFixRemoveRange(statementRemovalRange(ctx.SourceFile.Text(), textRange))}
+				})
 			},
 		}
 	},
@@ -70,14 +72,23 @@ func isUselessContinue(node *ast.Node) bool {
 // otherwise empty line, but leave leading and trailing comments intact.
 func statementRemovalRange(text string, statement core.TextRange) core.TextRange {
 	start, end := statement.Pos(), statement.End()
-	lineStart := strings.LastIndexAny(text[:start], "\r\n") + 1
+	// Only whitespace can extend the removal range. Stop at the first token
+	// or comment instead of scanning the whole line for each continue.
+	lineStart := start
+	for lineStart > 0 && text[lineStart-1] != '\r' && text[lineStart-1] != '\n' {
+		r, size := utf8.DecodeLastRuneInString(text[:lineStart])
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
+			return statement
+		}
+		lineStart -= size
+	}
 	lineEnd := end
 	for lineEnd < len(text) && text[lineEnd] != '\r' && text[lineEnd] != '\n' {
-		lineEnd++
-	}
-
-	if ecmascript.StringTrim(text[lineStart:start]) != "" || ecmascript.StringTrim(text[end:lineEnd]) != "" {
-		return statement
+		r, size := utf8.DecodeRuneInString(text[lineEnd:])
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
+			return statement
+		}
+		lineEnd += size
 	}
 
 	end = lineEnd
