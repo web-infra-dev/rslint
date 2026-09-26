@@ -12,7 +12,7 @@ import (
 // the pipeline-owned memory snapshot. The API does not own fix rounds or
 // mutate its base request VFS.
 type apiGenerationProvider struct {
-	initial linter.Generation
+	initial *linter.Generation
 	rebuild func(context.Context, linter.SourceSnapshot) (linter.Generation, error)
 }
 
@@ -26,8 +26,13 @@ func (p *apiGenerationProvider) AcquireGeneration(
 	if p == nil {
 		return linter.Generation{}, nil, errors.New("API lint generation provider is not configured")
 	}
-	if snapshot.Empty() {
-		return p.initial, nil, nil
+	if snapshot.Empty() && p.initial != nil {
+		generation := *p.initial
+		return generation, func() {
+			// Published diagnostics and requested source artifacts own their data;
+			// the provider must not retain the initial Program through later rounds.
+			p.initial = nil
+		}, nil
 	}
 	if p.rebuild == nil {
 		return linter.Generation{}, nil, errors.New("rebuild API lint generation: provider is not configured")
