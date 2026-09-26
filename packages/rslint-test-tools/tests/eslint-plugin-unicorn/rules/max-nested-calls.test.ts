@@ -1,10 +1,10 @@
 // Ported from eslint-plugin-unicorn v75.0.0 tests and documentation; see LICENSE.
-import { RuleTester } from '../rule-tester';
+import { RuleTester, type ValidTestCase } from '../rule-tester';
 
 const ruleTester = new RuleTester();
 const filename = 'src/virtual.js';
 
-const valid = [
+const valid: ValidTestCase[] = [
   'foo();',
   'foo(bar(baz()));',
   'foo(bar(), baz(), qux());',
@@ -20,11 +20,21 @@ const valid = [
   'foo(condition ? bar(baz()) : qux());',
 ].map((code) => ({ code, filename }));
 
-valid.push({
-  code: 'foo(bar(baz(qux())));',
-  filename,
-  options: [{ max: 4 }],
-});
+valid.push(
+  {
+    code: "nativeDiffButtons.parentElement.after(\n\ttooltipped(\n\t\t{},\n\t\t<a className={cx('btn', isHidingWhitespace() && 'color-fg-subtle')} />,\n\t),\n);",
+    filename: 'src/virtual.tsx',
+  },
+  {
+    code: "nativeDiffButtons.parentElement.after(\n\ttooltipped(\n\t\t{},\n\t\t<>{cx('btn', isHidingWhitespace() && 'color-fg-subtle')}</>,\n\t),\n);",
+    filename: 'src/virtual.tsx',
+  },
+  {
+    code: 'foo(bar(baz(qux())));',
+    filename,
+    options: [{ max: 4 }],
+  },
+);
 
 const invalid = [
   { code: 'foo(bar(baz(qux())));', max: 3 },
@@ -46,5 +56,28 @@ const invalid = [
     },
   ],
 }));
+
+invalid.push(
+  {
+    code: '<Component value={foo(bar(baz(qux())))} />;',
+    filename: 'src/virtual.tsx',
+    errors: [
+      {
+        messageId: 'max-nested-calls',
+        message: 'Call is nested too deeply. Maximum allowed is 3.',
+      },
+    ],
+  },
+  {
+    code: 'mergeReports(await pMap(\n\tawait mergeWithFileConfigs(uniq(paths), inputOptions, configFiles),\n\tasync ({files, options, prettierOptions}) => runEslint(files, buildConfig(options, prettierOptions), {isQuiet: options.quiet}),\n));',
+    filename,
+    errors: [
+      {
+        messageId: 'max-nested-calls',
+        message: 'Call is nested too deeply. Maximum allowed is 3.',
+      },
+    ],
+  },
+);
 
 ruleTester.run('max-nested-calls', null as never, { valid, invalid });
