@@ -46,7 +46,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.go-mode != 'skip'
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    # Windows limits concurrent test linkers to fit memory, so its full suite needs more time.
+    timeout-minutes: ${{ startsWith(matrix.runner, 'rspack-windows-') && 90 || 60 }}
     strategy:
       fail-fast: false
       matrix:

@@ -128,7 +128,7 @@ runs:
         # Several test binaries embed the full rule catalog. Concurrent linkers
         # can exceed the job's memory quota despite per-process soft limits.
         # Limit test builds separately from ordinary compilation and runtime CPUs.
-        $testParallelism = [Math]::Min($packageParallelism, 4)
+        $testParallelism = [Math]::Min($packageParallelism, 2)
         $testParallelArgs = @("-p=$testParallelism")
         Write-Host "Go test package parallelism=$testParallelism"
         if ($env:GO_TEST_MODE -eq 'affected') {
