@@ -264,6 +264,23 @@ func (compiled *ModuleSettings) IsExternalResolvedImport(ctx rule.RuleContext, s
 	return false
 }
 
+// IsExternalModule adds importType's package-name filter and unresolved-module
+// checks to the resolved import policy.
+func (compiled *ModuleSettings) IsExternalModule(ctx rule.RuleContext, specifier, resolvedPath string) bool {
+	if specifier == "" {
+		return false
+	}
+	c := specifier[0]
+	moduleName := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_'
+	if !moduleName && !IsScopedModuleSpecifier(specifier) {
+		return false
+	}
+	if resolvedPath != "" {
+		return compiled.IsExternalResolvedImport(ctx, specifier, resolvedPath)
+	}
+	return !nodeutil.IsAbsolutePath(specifier) && !compiled.IsInternalSpecifier(specifier) && !compiled.IsCoreModuleSpecifier(specifier)
+}
+
 // IsExternalPathFromPackage classifies a resolved target relative to the
 // importing package. Only configured external-module folders make a target
 // external, including hoisted folders above the package. A sibling workspace
