@@ -1536,10 +1536,10 @@ never exposes mapped slices; closing waits for an active writer. The CLI plugin
 dispatcher owns request encoding, ordered splitting by source bytes, IPC
 responses and their release acknowledgements. The CLI entry only assembles and
 closes that dispatcher. Logical batches larger than a slot keep the same
-rule/config metadata. Their segments can execute concurrently, with at most
-eight transport requests in flight across the dispatcher and results joined in
-input order. Storage boundaries do not introduce per-segment execution
-barriers, and their total source size is not limited by one slot.
+rule/config metadata. With sharing enabled, segments can execute concurrently,
+with at most eight transport requests in flight across the dispatcher and
+results joined in input order. Storage boundaries do not introduce per-segment
+execution barriers, and their total source size is not limited by one slot.
 An aligned 32-bit publication word per slot supplies the release/acquire memory
 fence between Go and Rust. The Node source adapter validates the ranges,
 registers a native read capability, and forwards only that capability to
