@@ -71,19 +71,32 @@ func (p *Program) ResolveModuleNameAt(sourceFile *ast.SourceFile, specifier stri
 
 // resolutionMode answers with the mode a specifier resolves under. TypeScript
 // reads a call as a `require` only when its callee is written as a bare
-// `require` identifier, and answers `(require)('pkg')` with the format of the
-// file holding it instead. The module accessor reads both spellings as a
-// `require`, so an ES module's parenthesized call resolves as CommonJS here too,
-// and a package's `require` condition stays selected for both.
+// `require` identifier and an unwrapped argument, and answers
+// `(require)(('pkg'))` with the format of the file holding it instead. Skip
+// parentheses and JavaScript's JSDoc wrappers around the callee and argument
+// so a package's `require` condition stays selected for every spelling.
 func resolutionMode(sourceProgram *Program, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) core.ResolutionMode {
 	mode := sourceProgram.GetModeForUsageLocation(sourceFile, moduleSpecifier)
-	if mode == core.ResolutionModeESM && isRequireCall(ast.WalkUpParenthesizedExpressions(moduleSpecifier.Parent)) {
+	if mode != core.ResolutionModeESM {
+		return mode
+	}
+	kinds := ast.OEKParentheses
+	if ast.IsInJSFile(moduleSpecifier) {
+		// These assertions are synthesized from JSDoc in JavaScript;
+		// authored TypeScript assertions remain visible in TypeScript files.
+		kinds |= ast.OEKTypeAssertions | ast.OEKSatisfies
+	}
+	parent := moduleSpecifier.Parent
+	for parent != nil && ast.IsOuterExpression(parent, kinds) {
+		parent = parent.Parent
+	}
+	if isRequireCall(parent, kinds) {
 		return core.ResolutionModeCommonJS
 	}
 	return mode
 }
 
-func isRequireCall(node *ast.Node) bool {
+func isRequireCall(node *ast.Node, kinds ast.OuterExpressionKinds) bool {
 	if node == nil || !ast.IsCallExpression(node) {
 		return false
 	}
@@ -93,7 +106,7 @@ func isRequireCall(node *ast.Node) bool {
 		return false
 	}
 
-	callee := ast.SkipParentheses(call.Expression)
+	callee := ast.SkipOuterExpressions(call.Expression, kinds)
 	return ast.IsIdentifier(callee) && callee.Text() == "require"
 }
 

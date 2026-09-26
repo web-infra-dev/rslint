@@ -219,6 +219,7 @@ define.test({
     './tests/eslint-plugin-import/rules/first.test.ts',
     './tests/eslint-plugin-import/rules/group-exports.test.ts',
     './tests/eslint-plugin-import/rules/max-dependencies.test.ts',
+    './tests/eslint-plugin-import/rules/named.test.ts',
     './tests/eslint-plugin-import/rules/namespace.test.ts',
     './tests/eslint-plugin-import/rules/newline-after-import.test.ts',
     './tests/eslint-plugin-import/rules/no-absolute-path.test.ts',

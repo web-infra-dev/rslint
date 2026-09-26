@@ -49,6 +49,14 @@ func TestDefaultExtras(t *testing.T) {
 			{Code: `import foo from "./cycle-with-local-default-a";`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// esModuleInterop does not create a default for ES named exports.
+			// The fixture config explicitly enables interop.
+			{
+				Code: `import missing from "./named-exports";`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noDefault", Message: noDefaultFromNamedExports, Line: 1, Column: 8, EndLine: 1, EndColumn: 15},
+				},
+			},
 			// ---- Dimension 4: declaration forms, default import plus named imports still checks the default specifier ----
 			{
 				Code:     `import missing, { foo } from "./named-exports";`,

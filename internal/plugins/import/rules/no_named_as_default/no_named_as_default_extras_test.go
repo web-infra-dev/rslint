@@ -38,6 +38,14 @@ func TestNoNamedAsDefaultExtras(t *testing.T) {
 			{Code: `import foo from './interop-default';`},
 			{Code: `import foo from './namespace-only';`},
 			{Code: `import foo from './namespace-types';`},
+			// Interop cannot supply a missing ES module default. import/default
+			// diagnoses these imports; there is no default-name collision.
+			{Code: `import foo from './named-only';`, TSConfig: "tsconfig.interop.json"},
+			{Code: `import foo from './interop-default';`, TSConfig: "tsconfig.interop.json"},
+			{Code: `import foo from './namespace-only';`, TSConfig: "tsconfig.interop.json"},
+			{Code: `import foo from './namespace-types';`, TSConfig: "tsconfig.interop.json"},
+			{Code: `import foo from './named-only';`, TSConfig: "tsconfig.nodenext.json"},
+			{Code: `import foo from './namespace-only';`, TSConfig: "tsconfig.nodenext.json"},
 			{Code: `import foo from './default-function';`},
 			{Code: `import foo from './ambient-module';`},
 			// A namespace re-export exposes its alias, not its members.
@@ -69,12 +77,9 @@ func TestNoNamedAsDefaultExtras(t *testing.T) {
 			{Code: `import foo from './through-local';`, Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: `import foo from './cycle-star-a';`, Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: `import foo from './default-namespace';`, Errors: namedDefaultError("foo", 1, 8, 11)},
-			// TypeScript interop makes these defaults available upstream.
+			// Interop makes an export assignment available as a default import.
 			{Code: `import foo from './export-equals';`, TSConfig: "tsconfig.interop.json", Errors: namedDefaultError("foo", 1, 8, 11)},
-			{Code: `import foo from './named-only';`, TSConfig: "tsconfig.interop.json", Errors: namedDefaultError("foo", 1, 8, 11)},
-			{Code: `import foo from './interop-default';`, TSConfig: "tsconfig.interop.json", Errors: namedDefaultError("foo", 1, 8, 11)},
-			{Code: `import foo from './namespace-only';`, TSConfig: "tsconfig.interop.json", Errors: namedDefaultError("foo", 1, 8, 11)},
-			{Code: `import foo from './namespace-types';`, TSConfig: "tsconfig.interop.json", Errors: namedDefaultError("foo", 1, 8, 11)},
+			{Code: `import foo from './export-equals';`, TSConfig: "tsconfig.nodenext.json", Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: `import foo from './quoted-namespace';`, Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: `import foo from './local-string';`, Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: `import foo from './named-types';`, Errors: namedDefaultError("foo", 1, 8, 11)},
@@ -82,13 +87,10 @@ func TestNoNamedAsDefaultExtras(t *testing.T) {
 			{Code: `import foo from './export-equals-function';`, Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: `import foo from './escaped-export';`, Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: `import foo from './destructuring';`, Errors: namedDefaultError("foo", 1, 8, 11)},
-			// Documented differences: quoted re-export names are recognized,
-			// and implicit esModuleInterop follows the TypeScript module option.
+			// Quoted re-export names are recognized.
 			{Code: `import foo from './quoted-named';`, Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: `import foo from './quoted-default';`, Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: `import foo from './quoted-local';`, Errors: namedDefaultError("foo", 1, 8, 11)},
-			{Code: `import foo from './named-only';`, TSConfig: "tsconfig.nodenext.json", Errors: namedDefaultError("foo", 1, 8, 11)},
-			{Code: `import foo from './namespace-only';`, TSConfig: "tsconfig.nodenext.json", Errors: namedDefaultError("foo", 1, 8, 11)},
 		},
 	)
 }

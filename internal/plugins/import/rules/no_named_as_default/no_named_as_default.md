@@ -25,7 +25,7 @@ import fruit from './fruit.js';
 import { pear } from './fruit.js';
 ```
 
-Unresolved and ignored modules, modules without a default export, and files using only CommonJS exports are skipped. TypeScript `export =` assignments and defaults supplied by `esModuleInterop` are also checked. Like upstream v2.32.0, the rule permits a name when both it and the default are explicit re-exports from the same file. Exporting the same local value under both names does not receive this exemption.
+Unresolved and ignored modules, modules without a default export, and files using only CommonJS exports are skipped. TypeScript `export =` assignments available as default imports are also checked. Like upstream v2.32.0, the rule permits a name when both it and the default are explicit re-exports from the same file. Exporting the same local value under both names does not receive this exemption.
 
 ## Options
 
@@ -53,11 +53,16 @@ This rule has no options. It does not provide automatic fixes or suggestions.
   contains `export default 1; export * as names from './base'`, a named export
   `foo` in `base.js` does not make `import foo from './module'` an error.
   Upstream v2.32.0 reports this case.
-- When `esModuleInterop` is omitted from `tsconfig.json`, configurations such as
-  `module: 'nodenext'` can produce additional reports in rslint. For example, importing `foo`
-  as the default from a module containing only `export const foo = 1` is reported.
-  Upstream reports this case only with explicit `esModuleInterop: true`.
-  With explicit `esModuleInterop: false`, neither tool reports this case.
+- `esModuleInterop` does not supply a missing ES module default. Given only
+  `export const foo = 1` in `values.mjs`, rslint skips
+  `import foo from './values.mjs'` because there is no default-name collision.
+  Enable `import/default` to report the missing default. With
+  `esModuleInterop: true`, upstream v2.32.0 reports a collision instead.
+- With NodeNext, native ES imports of CommonJS modules receive `module.exports`
+  as their default, regardless of `esModuleInterop`. For example, if
+  `values.cts` exports `const foo`, `import foo from './values.cjs'` in an
+  `.mts` file is checked for a name collision even when interop is omitted
+  or disabled. Upstream v2.32.0 requires explicit `esModuleInterop: true`.
 
 ## Original Documentation
 

@@ -173,34 +173,41 @@ func TestResolveFromSourceFileUnloadedTarget(t *testing.T) {
 	}
 }
 
-// TestResolveFromSourceFileParenthesizedRequireCondition covers a parenthesized
-// `require` in an ES module. TypeScript reads a call as a `require` only through
-// a bare `require` identifier, so it would answer this call with the file's own
-// ESM format and select the package's `import` condition; the call is a
-// `require` either way it is spelled, so the `require` condition is the one that
-// holds.
+// TestResolveFromSourceFileParenthesizedRequireCondition covers transparent
+// wrappers around a callee and argument in an ES module. Parentheses and JSDoc
+// casts must not change the package condition from `require` to `import`.
 func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
 	t.Parallel()
 
-	const consumer = "/condition-fixture/consumer.ts"
 	const requireFile = "/condition-fixture/node_modules/some-package/cjs.d.cts"
-	for _, call := range []string{`(require)("some-package")`, `((require))(("some-package"))`, `require(("some-package"))`} {
-		t.Run(call, func(t *testing.T) {
+	for _, tc := range []struct {
+		name, extension, code string
+	}{
+		{"TS callee parentheses", ".ts", `const pkg = (require)("some-package");`},
+		{"TS nested parentheses", ".ts", `const pkg = ((require))(("some-package"));`},
+		{"TS argument parentheses", ".ts", `const pkg = require(("some-package"));`},
+		{"JS parentheses", ".mjs", `const pkg = (require)(("some-package"));`},
+		{"JSDoc type argument", ".mjs", `const pkg = require(/** @type {string} */ ("some-package"));`},
+		{"JSDoc type callee", ".mjs", `const pkg = (/** @type {any} */ (require))("some-package");`},
+		{"JSDoc satisfies argument", ".mjs", `const pkg = require(/** @satisfies {string} */ ("some-package"));`},
+		{"JSDoc satisfies callee", ".mjs", `const pkg = (/** @satisfies {any} */ (require))("some-package");`},
+		{"nested wrappers", ".mjs", `const pkg = (/** @type {any} */ ((require)))(/** @satisfies {string} */ (("some-package")));`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-
+			consumer := "/condition-fixture/consumer" + tc.extension
 			files := map[string]string{
 				"/condition-fixture/package.json":                           `{"name": "root", "type": "module"}`,
 				"/condition-fixture/node_modules/some-package/package.json": `{"name": "some-package", "exports": {".": {"import": "./esm.d.mts", "require": "./cjs.d.cts"}, "./feature": {"import": "./esm.d.mts", "require": "./cjs.d.cts"}}}`,
 				"/condition-fixture/node_modules/some-package/esm.d.mts":    "export const value: unknown;\n",
 				requireFile: "declare const value: unknown;\nexport = value;\n",
-				consumer:    "const pkg = " + call + ";",
+				consumer:    tc.code,
 			}
-
 			program, sourceFile, specifier := programForRequireRoots(t, files, []string{consumer}, consumer, &core.CompilerOptions{
 				Module:           core.ModuleKindNodeNext,
 				ModuleResolution: core.ModuleResolutionKindNodeNext,
+				AllowJs:          core.TSTrue,
 			})
-			specifier = ast.SkipParentheses(specifier)
 
 			resolvedPath, _, ok := program.ResolveModule(sourceFile, specifier)
 			if !ok {
@@ -266,9 +273,9 @@ func programForRequireRoots(t *testing.T, files map[string]string, rootFiles []s
 	visit = func(node *ast.Node) bool {
 		if ast.IsCallExpression(node) {
 			call := node.AsCallExpression()
-			callee := ast.SkipParentheses(call.Expression)
+			callee := utils.ESTreeCallCallee(call.Expression)
 			if ast.IsIdentifier(callee) && callee.Text() == "require" && len(call.Arguments.Nodes) == 1 {
-				specifier = call.Arguments.Nodes[0]
+				specifier = utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0])
 				return true
 			}
 		}
