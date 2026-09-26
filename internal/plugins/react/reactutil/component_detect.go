@@ -783,16 +783,6 @@ func isInAllowedPositionForComponent(fn *ast.Node) bool {
 	return false
 }
 
-// skipParenParents walks up through ParenthesizedExpression wrappers and
-// returns the first non-paren ancestor of `node`, or nil.
-func skipParenParents(node *ast.Node) *ast.Node {
-	p := node.Parent
-	for p != nil && p.Kind == ast.KindParenthesizedExpression {
-		p = p.Parent
-	}
-	return p
-}
-
 // isPragmaComponentWrapperCall reports whether `call` is a React
 // component-wrapping call — `<pragma>.memo(fn)` / `<pragma>.forwardRef(fn)` /
 // bare `memo(fn)` / bare `forwardRef(fn)` — with `fn` as the first argument.
