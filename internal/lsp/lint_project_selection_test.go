@@ -1373,13 +1373,19 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 						if speculative {
 							result, err = speculativePipelineResultForTest(server, context.Background(), uri, content, snapshot)
 						} else {
-							result, err = configuredDocumentPipelineResultForTest(server, context.Background(), uri, entries, directory, false, nil)
+							// Cache identity belongs to explicitly requested source artifacts;
+							// published diagnostics deliberately retain only text.
+							result, err = linter.RunPipeline(context.Background(), linter.NewLintRequest(
+								&documentGenerationProvider{server: server, uri: uri, snapshot: snapshot},
+								linter.ObservationPolicy{Demand: linter.ArtifactDemand{LintedFiles: true}},
+								nil,
+							))
 							if phase.name == "initial" && err == nil {
 								languageService, sessionErr := server.session.GetLanguageService(context.Background(), uri)
 								if sessionErr != nil {
 									t.Fatal(sessionErr)
 								}
-								if got := result.Observation.Native.Diagnostics; len(got) == 1 && got[0].SourceFile != languageService.GetProgram().GetSourceFile(fileName) {
+								if got := result.Observation.Native.Files; len(got) != 1 || got[0].SourceFile != languageService.GetProgram().GetSourceFile(fileName) {
 									t.Error("unchanged configuration rebuilt a Session-owned Program")
 								}
 							}
@@ -1389,6 +1395,11 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 						}
 						if got := len(result.Observation.Native.Diagnostics); got != phase.wantUnsafe {
 							t.Errorf("speculative=%v: unsafe diagnostics=%d, want %d: %+v", speculative, got, phase.wantUnsafe, result.Observation.Native.Diagnostics)
+						}
+						for _, diagnostic := range result.Observation.Native.Diagnostics {
+							if _, retained := diagnostic.SourceFile.(*ast.SourceFile); retained {
+								t.Error("published diagnostic retained a Session AST")
+							}
 						}
 					}
 				})
