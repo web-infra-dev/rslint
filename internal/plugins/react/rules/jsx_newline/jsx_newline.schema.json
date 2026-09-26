@@ -1,0 +1,38 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "prevent": {
+          "default": false,
+          "type": "boolean"
+        },
+        "allowMultilines": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "properties": {
+            "allowMultilines": {
+              "enum": [false]
+            }
+          }
+        },
+        {
+          "properties": {
+            "prevent": {
+              "enum": [true]
+            }
+          },
+          "required": ["prevent"]
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
