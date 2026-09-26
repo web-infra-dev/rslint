@@ -1531,6 +1531,43 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    is a private CLI asset, not a new package export; `build:js` emits it in a
    separate library block to keep the worker independent of shared chunks.
 
+The framed CLI's source transport is private to its adapters. The linter still
+supplies immutable source strings; API and LSP continue using their existing
+wire formats. The Node engine owns a native shared-memory arena and passes its
+descriptor during initialization. Linux uses a sealed anonymous memory file,
+macOS an immediately unlinked POSIX shared-memory object, and Windows an
+anonymous pagefile mapping whose handle Go duplicates. Source transfer never
+uses source paths or process addresses. Mapping failure preserves complete
+inline source text through the existing JSON transport. Windows reserves the
+arena and commits its control page initially; source slots are committed in
+full only on their first write. A CLI without plugin sources therefore does
+not commit the entire arena. Failed commitment also preserves inline text.
+
+On the Go side, `internal/ipc/sharedsource` owns mapping lifetime, byte copies,
+publication and slot reuse. It has no linter or IPC-message dependency and
+never exposes mapped slices; closing waits for an active writer. The CLI plugin
+dispatcher owns request encoding, ordered splitting by source bytes, IPC
+responses and their release acknowledgements. The CLI entry only assembles and
+closes that dispatcher. Logical batches larger than a slot keep the same
+rule/config metadata. With sharing enabled, segments can execute concurrently,
+with at most eight transport requests in flight across the dispatcher and
+results joined in input order. Storage boundaries do not introduce per-segment
+execution barriers, and their total source size is not limited by one slot.
+An aligned 32-bit publication word per slot supplies the release/acquire memory
+fence between Go and Rust. The native reader owns a writable control view for
+atomic references and a separate read-only data view for source borrows; both
+views live as long as the mapping. The Node source adapter validates the ranges,
+registers a native read capability, and forwards only that capability to
+workers. Rust borrows the immutable UTF-8 snapshot for
+the parser and constructs the required JavaScript SourceCode string directly;
+the ESTree JSON boundary is unchanged. After dispatch, Rust revokes the
+capability before acknowledging reuse. An in-flight native reader pins the
+mapping and permanently retires its slot, so timeout, cancellation, shutdown,
+and late worker results cannot authorize an overlapping write. Pool exhaustion,
+oversized payloads and invalid UTF-8 retain complete inline text. The arena is
+bounded to sixteen 16 MiB slots plus a 4 KiB control page; slots are touched only
+when used.
+
 Other invariants:
 
 - Target discovery returns both the caller-visible lexical path and a canonical

@@ -7,11 +7,13 @@
 //! (`/` regex-vs-division, templates, JSX, TS `<`) comes from real parser state.
 
 mod parse;
+mod source_transport;
 mod token_map;
 
 use napi_derive::napi;
 
 pub use parse::{CommentObj, ParseResult};
+pub use source_transport::parse_shared_source;
 
 /// Reject sources whose serialized ESTree JSON would exceed V8's ~512MB single-string
 /// cap (the JSON is ~9-26x the source size). This is the JSON-transfer ceiling
@@ -37,12 +39,16 @@ pub fn parse(
     source_type: String,
     jsx: bool,
 ) -> napi::Result<ParseResult> {
-    if source.len() > MAX_SOURCE_BYTES {
+    check_source_size(source.len())?;
+    Ok(parse::parse_estree(&filename, &source, &source_type, jsx))
+}
+
+fn check_source_size(size: usize) -> napi::Result<()> {
+    if size > MAX_SOURCE_BYTES {
         return Err(napi::Error::from_reason(format!(
             "source too large ({} bytes > {}-byte JSON-transfer limit)",
-            source.len(),
-            MAX_SOURCE_BYTES
+            size, MAX_SOURCE_BYTES
         )));
     }
-    Ok(parse::parse_estree(&filename, &source, &source_type, jsx))
+    Ok(())
 }
