@@ -130,7 +130,7 @@ func TestIdMatchExternalTypeAndNamespaceReferences(t *testing.T) {
 				Program:                sourceProgram,
 				Files:                  []string{fileName},
 				ExcludedPathSubstrings: []string{},
-				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				GetRulesForFile: func(string) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{
 						Name:        IdMatchRule.Name,
 						Environment: &rule.RuleEnvironment{},

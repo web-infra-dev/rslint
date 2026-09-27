@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -44,8 +43,8 @@ function f(createElement) {
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program:                sourceProgram,
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-		GetRulesForFile: func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			if sf.FileName() != filePath {
+		GetRulesForFile: func(sf string) []rule.ConfiguredRule {
+			if sf != filePath {
 				return nil
 			}
 			return []rule.ConfiguredRule{{

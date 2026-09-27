@@ -1964,8 +1964,8 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		Programs:         binding.Programs,
 		TargetsByProgram: targetsByProgram,
 		SingleThreaded:   true,
-		GetRulesForFile: func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			return fileConfigResolver.EnabledRulesForSourcePath(sf.FileName())
+		GetRulesForFile: func(sf string) []rule.ConfiguredRule {
+			return fileConfigResolver.EnabledRulesForSourcePath(sf)
 		},
 	})
 	if err != nil {

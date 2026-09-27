@@ -3,7 +3,6 @@
 package prefer_dom_node_append_test
 
 import (
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_dom_node_append"
@@ -100,7 +99,7 @@ func TestPreferDomNodeAppendArtifactsFollowDemand(t *testing.T) {
 				var found []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: prefer_dom_node_append.PreferDomNodeAppendRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return prefer_dom_node_append.PreferDomNodeAppendRule.Run(ctx, nil)
 						}}}

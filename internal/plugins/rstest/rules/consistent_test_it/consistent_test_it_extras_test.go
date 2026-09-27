@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -286,7 +285,7 @@ namespace local { namespace it {}; it('not a registration'); }`
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: program, File: fileName,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{Name: ConsistentTestItRule.Name, Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners { return ConsistentTestItRule.Run(ctx, nil) },
 				}}
@@ -340,7 +339,7 @@ it('after');`
 	var lines []int
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: program, File: fileName,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{Name: ConsistentTestItRule.Name, Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners { return ConsistentTestItRule.Run(ctx, nil) },
 			}}
@@ -395,7 +394,7 @@ func BenchmarkConsistentTestItRegistrations(b *testing.B) {
 				count := 0
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: program, File: fileName,
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: ConsistentTestItRule.Name, Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners { return ConsistentTestItRule.Run(ctx, nil) },
 						}}

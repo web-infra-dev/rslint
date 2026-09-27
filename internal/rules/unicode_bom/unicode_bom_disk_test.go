@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -185,8 +184,8 @@ func lintFile(t *testing.T, filePath string, fs vfs.FS) []rule.RuleDiagnostic {
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program:                lintprogram.NewFromCompiler(program),
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-			if sourceFile.FileName() != filePath {
+		GetRulesForFile: func(sourceFile string) []rule.ConfiguredRule {
+			if sourceFile != filePath {
 				return nil
 			}
 			return []rule.ConfiguredRule{{

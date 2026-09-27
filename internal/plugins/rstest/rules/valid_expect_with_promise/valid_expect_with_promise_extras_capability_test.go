@@ -178,7 +178,7 @@ func runCapabilityRules(t *testing.T, program *lintprogram.Program, file *ast.So
 	t.Helper()
 	plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 		Programs: []*lintprogram.Program{program}, TargetsByProgram: [][]string{{file.FileName()}}, SingleThreaded: true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule { return rules },
+		GetRulesForFile: func(string) []rule.ConfiguredRule { return rules },
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -3,9 +3,12 @@ package program_test
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/binder"
@@ -166,94 +169,6 @@ func TestRootProgramCachesSyntacticDiagnosticsDuringConstruction(t *testing.T) {
 	}
 }
 
-func TestSourceSetDefersParsingAndPreservesPlatformPaths(t *testing.T) {
-	for _, root := range []string{"/source-set", "C:/source-set", "//server/share/source-set"} {
-		t.Run(root, func(t *testing.T) {
-			first := tspath.ResolvePath(root, "first.ts")
-			second := tspath.ResolvePath(root, "second.ts")
-			// Virtual drive and UNC paths must never reach the host filesystem.
-			fs := utils.NewOverlayVFS(sourceSetEmptyTestFS{}, map[string]string{
-				first: "import './second'; export const first = 1;", second: "export const second = 2;",
-			})
-			host := &sourceSetTestHost{CompilerHost: utils.CreateCompilerHost(root, fs)}
-			roots := []string{first, second, first}
-			sources, err := lintprogram.NewSourceSet(lintprogram.RootOptions{
-				RootFileNames: roots, Host: host, CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			roots[0] = "changed.ts"
-			if host.parses.Load() != 0 || len(sources.FileNames()) != 2 || sources.FileNames()[0] != first {
-				t.Fatal("source set parsed eagerly or retained the caller's root slice")
-			}
-			one, err := sources.BuildFile(0)
-			if err != nil || host.parses.Load() != 1 || len(one.SourceFiles()) != 1 || one.GetSourceFile(second) != nil {
-				t.Fatalf("one-file construction: parses=%d error=%v", host.parses.Load(), err)
-			}
-			file := one.SourceFiles()[0]
-			if !file.IsBound() || file.FileName() != first || one.CanProvideTypeChecker(file) {
-				t.Fatal("one-file construction changed source identity or capability")
-			}
-			all, err := sources.Build()
-			if err != nil || len(all.SourceFiles()) != 2 || all.GetSourceFile(second) == nil {
-				t.Fatalf("whole-set construction: %v", err)
-			}
-			if all.GetSourceFile(first) == file {
-				t.Fatal("independent builds shared a mutable bound AST")
-			}
-			if _, err := sources.BuildFile(2); err == nil {
-				t.Fatal("out-of-range source index was accepted")
-			}
-		})
-	}
-}
-
-func TestSourceSetRejectsInvalidInputsBeforeParsing(t *testing.T) {
-	var nilHost *typedNilCompilerHost
-	for _, options := range []lintprogram.RootOptions{
-		{Host: nilHost, CompilerOptions: lintprogram.SourceOnlyCompilerOptions()},
-		{Host: &typedNilFSCompilerHost{}, CompilerOptions: lintprogram.SourceOnlyCompilerOptions()},
-		{Host: utils.CreateCompilerHost("/source-set", osvfs.FS())},
-		{
-			RootFileNames:   []string{"C:/source-set/Case.ts", "c:/source-set/case.ts"},
-			Host:            utils.CreateCompilerHost("C:/source-set", caseInsensitiveFS{FS: osvfs.FS()}),
-			CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
-		},
-	} {
-		if _, err := lintprogram.NewSourceSet(options); err == nil {
-			t.Fatalf("invalid source set accepted: %+v", options)
-		}
-	}
-	var empty lintprogram.SourceSet
-	if empty.IsValid() || empty.FileNames() != nil {
-		t.Fatal("zero source set is valid")
-	}
-	if _, err := empty.Build(); err == nil {
-		t.Fatal("zero source set was built")
-	}
-}
-
-type sourceSetTestHost struct {
-	compiler.CompilerHost
-	parses atomic.Int32
-}
-
-// Overlay misses are absent, never reads against a real drive or UNC share.
-// Unused filesystem operations deliberately have no implementation.
-type sourceSetEmptyTestFS struct{ vfs.FS }
-
-func (sourceSetEmptyTestFS) UseCaseSensitiveFileNames() bool { return true }
-func (sourceSetEmptyTestFS) FileExists(string) bool          { return false }
-func (sourceSetEmptyTestFS) ReadFile(string) (string, bool)  { return "", false }
-func (sourceSetEmptyTestFS) DirectoryExists(string) bool     { return false }
-func (sourceSetEmptyTestFS) Realpath(path string) string     { return path }
-
-func (h *sourceSetTestHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
-	h.parses.Add(1)
-	return h.CompilerHost.GetSourceFile(options)
-}
-
 type typedNilCompilerHost struct {
 	compiler.CompilerHost
 }
@@ -276,3 +191,114 @@ func (*typedNilFSCompilerHost) FS() vfs.FS {
 	var fs *typedNilFS
 	return fs
 }
+
+func TestRootProgramRecreatesCollectedASTsFromFrozenSources(t *testing.T) {
+	for _, root := range []string{"/root-snapshot", "C:/root-snapshot", "//server/share/root-snapshot"} {
+		t.Run(root, func(t *testing.T) {
+			first := tspath.ResolvePath(root, "first.ts")
+			second := tspath.ResolvePath(root, "second.ts")
+			const original = "import './second'; export const first = 1;"
+			contents := map[string]string{first: original, second: "export const second = 2;"}
+			// Virtual drive and UNC paths must never reach the host filesystem.
+			fs := utils.NewOverlayVFS(rootSnapshotEmptyTestFS{}, contents)
+			host := &rootSnapshotTestHost{CompilerHost: utils.CreateCompilerHost(root, fs)}
+			roots := []string{first, second, first}
+			p, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+				RootFileNames: roots, Host: host, CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			roots[0] = "changed.ts"
+			source, found := p.LookupSource(first)
+			_, absent := p.LookupSource("absent.ts")
+			if !found || source.FileName() != first || absent || len(p.RootFileNames()) != 2 {
+				t.Fatal("source membership lost its frozen normalized identities")
+			}
+			dead := rootSnapshotWeakFile(p, first)
+			runtime.GC()
+			runtime.GC()
+			if dead.Value() != nil {
+				t.Fatal("Program retains an unreferenced root AST")
+			}
+			contents[first] = "changed on disk"
+			delete(contents, second)
+			file := p.GetSourceFile(first)
+			if file.Text() != original || !file.IsBound() || !p.OwnsSourceFile(file) || p.CanProvideTypeChecker(file) {
+				t.Fatal("materialization changed the frozen source generation or its capabilities")
+			}
+			if host.parses.Load() != 2 {
+				t.Fatal("materialization reread the host instead of the frozen source")
+			}
+			foreign := parser.ParseSourceFile(file.ParseOptions(), file.Text(), file.ScriptKind)
+			if p.OwnsSourceFile(foreign) {
+				t.Fatal("Program accepted a foreign AST of the same file")
+			}
+			files := p.SourceFiles()
+			if len(files) != 2 || files[0] != file || files[1].FileName() != second || !p.OwnsSourceFile(files[1]) {
+				t.Fatal("materialization reduced the complete source universe")
+			}
+			resolved := p.GetResolvedModuleFromModuleSpecifier(file, file.Imports()[0])
+			if resolved == nil || p.GetSourceFileForResolvedModule(resolved.ResolvedFileName) != files[1] {
+				t.Fatal("collection changed the generation's import resolution")
+			}
+			runtime.GC()
+			if p.GetSourceFile(first) != file || !p.OwnsSourceFile(file) {
+				t.Fatal("a borrowed AST lost its identity across collection")
+			}
+		})
+	}
+}
+
+func TestRootProgramConcurrentMaterializationSharesLiveIdentity(t *testing.T) {
+	const root = "/root-concurrent"
+	name := tspath.ResolvePath(root, "file.tsx")
+	p, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames: []string{name}, CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+		Host: utils.CreateCompilerHost(root, utils.NewOverlayVFS(rootSnapshotEmptyTestFS{}, map[string]string{
+			name: "export const view = <div />;",
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dead := rootSnapshotWeakFile(p, name)
+	runtime.GC()
+	runtime.GC()
+	if dead.Value() != nil {
+		t.Fatal("fixture still retains its original AST")
+	}
+	files := make([]*ast.SourceFile, 32)
+	var workers sync.WaitGroup
+	for i := range files {
+		workers.Go(func() { files[i] = p.GetSourceFile(name) })
+	}
+	workers.Wait()
+	for _, file := range files {
+		if file != files[0] || !p.OwnsSourceFile(file) || !file.IsBound() || file.ScriptKind != core.ScriptKindTSX {
+			t.Fatal("concurrent materialization published inconsistent ASTs")
+		}
+	}
+}
+
+func rootSnapshotWeakFile(p *lintprogram.Program, name string) weak.Pointer[ast.SourceFile] {
+	return weak.Make(p.GetSourceFile(name))
+}
+
+type rootSnapshotTestHost struct {
+	compiler.CompilerHost
+	parses atomic.Int32
+}
+
+func (h *rootSnapshotTestHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
+	h.parses.Add(1)
+	return h.CompilerHost.GetSourceFile(options)
+}
+
+type rootSnapshotEmptyTestFS struct{ vfs.FS }
+
+func (rootSnapshotEmptyTestFS) UseCaseSensitiveFileNames() bool { return true }
+func (rootSnapshotEmptyTestFS) FileExists(string) bool          { return false }
+func (rootSnapshotEmptyTestFS) ReadFile(string) (string, bool)  { return "", false }
+func (rootSnapshotEmptyTestFS) DirectoryExists(string) bool     { return false }
+func (rootSnapshotEmptyTestFS) Realpath(path string) string     { return path }

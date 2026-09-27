@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -423,7 +422,7 @@ func TestDotNotationEditDemand(t *testing.T) {
 			Program:     lintprogram.NewFromCompiler(program),
 			File:        sourceFile.FileName(),
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:             DotNotationRule.Name,
 					Severity:         rule.SeverityError,

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -222,7 +221,7 @@ func lintPreferSetSizeProjectFalse(t *testing.T, code string) []rule.RuleDiagnos
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: program,
 		File:    fileName,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     prefer_set_size.PreferSetSizeRule.Name,
 				Severity: rule.SeverityError,

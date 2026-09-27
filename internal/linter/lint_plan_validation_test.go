@@ -26,7 +26,7 @@ func TestRunLinterRejectsTypeCheckOnlyProgramsWithLintPlan(t *testing.T) {
 		Programs:         wrapTestPrograms(programA),
 		SingleThreaded:   true,
 		TargetsByProgram: [][]string{{pathsA["a.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			configured := noopRule()
 			configured[0].Run = func(rule.RuleContext) rule.RuleListeners {
 				runs.Add(1)
@@ -55,7 +55,7 @@ func TestPrepareLintPlanRequiresTargetsForEveryProgram(t *testing.T) {
 		_, err := PrepareLintPlan(PrepareLintPlanOptions{
 			Programs:         programs,
 			TargetsByProgram: targetsByProgram,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				ruleCalls.Add(1)
 				return noopRule()
 			},
@@ -111,8 +111,8 @@ func TestPrepareLintPlanContextDoesNotPublishCanceledPlan(t *testing.T) {
 		plan, err := PrepareLintPlanContext(ctx, PrepareLintPlanOptions{
 			Programs:         wrapTestPrograms(raw),
 			TargetsByProgram: [][]string{{paths["a.ts"], paths["b.ts"]}},
-			GetRulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
-				switch source.FileName() {
+			GetRulesForFile: func(source string) []rule.ConfiguredRule {
+				switch source {
 				case paths["a.ts"]:
 					<-secondResolverStarted
 					cancel()
@@ -158,7 +158,7 @@ func TestPrepareLintPlanRejectsTargetOutsideBoundProgramBeforeRuleResolution(t *
 	_, err := PrepareLintPlan(PrepareLintPlanOptions{
 		Programs:         wrapTestPrograms(raw),
 		TargetsByProgram: [][]string{{paths["a.ts"], missing}},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			ruleCalls.Add(1)
 			return noopRule()
 		},
@@ -184,7 +184,7 @@ func TestPrepareLintPlanDoesNotReapplyDefaultExclusions(t *testing.T) {
 		Programs:         wrapTestPrograms(raw),
 		TargetsByProgram: [][]string{{target}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			ruleCalls.Add(1)
 			return noopRule()
 		},
@@ -208,7 +208,7 @@ func TestSyntaxErrorTargetIsCountedWithoutResolvingOrRunningRules(t *testing.T) 
 		Programs:         wrapTestPrograms(raw),
 		TargetsByProgram: [][]string{{target}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			ruleCalls.Add(1)
 			return noopRule()
 		},
@@ -235,7 +235,7 @@ func TestRunLinterRejectsNilProgramBeforeLintSideEffects(t *testing.T) {
 	planOpts := PrepareLintPlanOptions{
 		Programs:         append(wrapTestPrograms(raw), nil),
 		TargetsByProgram: [][]string{{paths["a.ts"]}, nil},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			ruleCalls.Add(1)
 			return noopRule()
 		},
@@ -263,7 +263,7 @@ func TestRunLinterRejectsNilProgramBeforeLintSideEffects(t *testing.T) {
 	invalidOpts := PrepareLintPlanOptions{
 		Programs:         []*lintprogram.Program{invalid},
 		TargetsByProgram: [][]string{nil},
-		GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
+		GetRulesForFile:  func(string) []rule.ConfiguredRule { return noopRule() },
 	}
 	if _, err := PrepareLintPlan(invalidOpts); !errors.Is(err, errInvalidProgram) {
 		t.Fatalf("PrepareLintPlan zero Program error = %v", err)
@@ -299,7 +299,7 @@ func TestPreparedLintPlanFreezesProgramTypeCapability(t *testing.T) {
 			plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
 				Programs:         programs,
 				TargetsByProgram: [][]string{{paths["a.ts"]}},
-				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				GetRulesForFile: func(string) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{
 						Name:             "type-aware-probe",
 						RequiresTypeInfo: true,

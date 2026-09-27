@@ -401,7 +401,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	programs := projectSet.Programs()
 	var loadedPrograms loader.LoadResult
 	if !typeCheckOnly {
-		loadedPrograms, err = programSession.PrepareCLI(projectSet, targetPlan, currentDirectory, singleThreaded)
+		loadedPrograms, err = programSession.LoadCLI(projectSet, targetPlan, currentDirectory, singleThreaded)
 		if err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
@@ -460,13 +460,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	) linter.Generation {
 		var fileConfigResolver *configLint.Resolver
 		var rulesForFile linter.RuleHandler
-		var rulesForPath func(string) []rule.ConfiguredRule
 		if !typeCheckOnly {
 			fileConfigResolver = configResolver.WithSourceMappings(binding.LintTargetBySourcePath, generationFS, true)
-			rulesForPath = fileConfigResolver.EnabledRulesForSourcePath
-			rulesForFile = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-				return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
-			}
+			rulesForFile = fileConfigResolver.EnabledRulesForSourcePath
 		}
 		targetPath := func(sourcePath string) string {
 			if lintTarget, ok := target.LookupSourceTarget(binding.LintTargetBySourcePath, sourcePath, generationFS); ok {
@@ -488,8 +484,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				Programs:         binding.Programs,
 				TargetsByProgram: binding.TargetsByProgram,
 				RulesForFile:     rulesForFile,
-				DeferredSources:  binding.DeferredSources,
-				RulesForPath:     rulesForPath,
 				Cwd:              cwd,
 				TypeCheck:        typeCheck,
 				SingleThreaded:   singleThreaded,

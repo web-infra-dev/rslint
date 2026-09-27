@@ -673,7 +673,7 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program: lintprogram.NewFromCompiler(program),
 		Files:   []string{sourceFile.FileName()},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     NoUselessBackreferenceRule.Name,
 				Severity: rule.SeverityError,
@@ -731,7 +731,7 @@ first("\\1(a)");
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program: sourceProgram,
 		Files:   []string{sourceFile.FileName()},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     NoUselessBackreferenceRule.Name,
 				Severity: rule.SeverityError,

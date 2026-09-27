@@ -3,7 +3,6 @@ package prefer_expect_resolves_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -33,7 +32,7 @@ func TestRstestResolvesSourceOnlyAndEditDemand(t *testing.T) {
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: program, File: filename,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{Name: impl.PreferExpectResolvesRule.Name, Run: func(ctx rule.RuleContext) rule.RuleListeners { return impl.PreferExpectResolvesRule.Run(ctx, nil) }}}
 			},
 			Consumer: rule.DiagnosticConsumer{Demand: demand, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},

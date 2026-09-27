@@ -1,15 +1,12 @@
 package linter
 
 import (
-	"context"
 	"reflect"
 	"runtime"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -30,50 +27,6 @@ func TestCheckerFreeLintWorkerCountKeepsSmallSetsSerial(t *testing.T) {
 		if got := checkerFreeLintWorkerCount(test.files, test.procs); got != test.want {
 			t.Fatalf("checkerFreeLintWorkerCount(%d, %d) = %d, want %d", test.files, test.procs, got, test.want)
 		}
-	}
-}
-
-func TestDeferredWorkersTakeNextFileWithoutBatchBarrier(t *testing.T) {
-	previous := runtime.GOMAXPROCS(2)
-	defer runtime.GOMAXPROCS(previous)
-	releaseFirst := make(chan struct{})
-	thirdStarted := make(chan struct{})
-	var active, maximum atomic.Int32
-	configured := []rule.ConfiguredRule{{Name: "native/check", Run: func(ctx rule.RuleContext) rule.RuleListeners {
-		current := active.Add(1)
-		defer active.Add(-1)
-		for observed := maximum.Load(); current > observed; observed = maximum.Load() {
-			if maximum.CompareAndSwap(observed, current) {
-				break
-			}
-		}
-		switch {
-		case strings.HasSuffix(ctx.SourceFile.FileName(), "first.ts"):
-			<-releaseFirst
-		case strings.HasSuffix(ctx.SourceFile.FileName(), "third.ts"):
-			close(thirdStarted)
-		}
-		return nil
-	}}}
-	generation := pipelineDeferredTestGeneration(t, map[string]string{
-		"first.ts": "export {};", "second.ts": "export {};", "third.ts": "export {};",
-	}, func(string) []rule.ConfiguredRule { return configured })
-	generation.Native.SingleThreaded = false
-	done := make(chan error, 1)
-	go func() {
-		_, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, nil))
-		done <- err
-	}()
-	select {
-	case <-thirdStarted:
-		close(releaseFirst)
-	case <-time.After(5 * time.Second):
-		close(releaseFirst)
-		<-done
-		t.Fatal("completed worker waited for an unrelated slow file")
-	}
-	if err := <-done; err != nil || maximum.Load() > 2 {
-		t.Fatalf("error=%v maximum workers=%d", err, maximum.Load())
 	}
 }
 
@@ -178,7 +131,7 @@ func TestPrepareLintPlanParallelizesRuleResolution(t *testing.T) {
 	opts := PrepareLintPlanOptions{
 		Programs:         wrapTestPrograms(program),
 		TargetsByProgram: [][]string{{paths["a.ts"], paths["b.ts"], paths["c.ts"], paths["d.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			if active.Add(1) >= 2 && signaled.CompareAndSwap(false, true) {
 				close(twoActive)
 			}
@@ -221,8 +174,8 @@ func TestPrepareLintPlanHonorsSingleThreadedOrder(t *testing.T) {
 		Programs:         wrapTestPrograms(program),
 		SingleThreaded:   true,
 		TargetsByProgram: [][]string{wantOrder},
-		GetRulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
-			gotOrder = append(gotOrder, file.FileName())
+		GetRulesForFile: func(file string) []rule.ConfiguredRule {
+			gotOrder = append(gotOrder, file)
 			return noopRule()
 		},
 	})
@@ -243,7 +196,7 @@ func TestPreparedLintPlanPreservesSameFileAcrossProgramsInParallel(t *testing.T)
 	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
 		Programs:         programs,
 		TargetsByProgram: [][]string{{paths["shared.ts"]}, {paths["shared.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			calls.Add(1)
 			return noopRule()
 		},
@@ -274,7 +227,7 @@ func TestPrepareLintPlanDeduplicatesTargetsInFirstOccurrenceOrder(t *testing.T) 
 		Programs:         wrapTestPrograms(raw),
 		TargetsByProgram: [][]string{{paths["b.ts"], paths["a.ts"], paths["b.ts"]}},
 		SingleThreaded:   true,
-		GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
+		GetRulesForFile:  func(string) []rule.ConfiguredRule { return noopRule() },
 	})
 	targets := plan.Targets()
 	if len(targets) != 2 || targets[0].File.FileName() != paths["b.ts"] || targets[1].File.FileName() != paths["a.ts"] {

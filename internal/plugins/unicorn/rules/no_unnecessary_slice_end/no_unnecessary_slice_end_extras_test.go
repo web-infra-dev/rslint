@@ -3,7 +3,6 @@
 package no_unnecessary_slice_end_test
 
 import (
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_slice_end"
@@ -88,7 +87,7 @@ func TestNoUnnecessarySliceEndArtifactsFollowDemand(t *testing.T) {
 				var found []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: no_unnecessary_slice_end.NoUnnecessarySliceEndRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return no_unnecessary_slice_end.NoUnnecessarySliceEndRule.Run(ctx, nil)
 						}}}

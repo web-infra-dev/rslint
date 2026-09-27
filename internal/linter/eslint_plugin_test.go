@@ -11,8 +11,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func pluginRule(name string, opts []any, sev rule.DiagnosticSeverity) rule.ConfiguredRule {
@@ -917,20 +923,35 @@ func TestDispatchEslintPlugin_RealErrorOutranksCanceled(t *testing.T) {
 }
 
 func TestBuildEslintPluginFileInputsUsesPreparedPlan(t *testing.T) {
-	compilerProgram, paths := createTestProgramWithFiles(t, map[string]string{
-		"native.ts": "export const native = 1;\n",
-		"plugin.ts": "export const plugin = 1;\n",
+	root := tspath.NormalizePath(t.TempDir())
+	paths := map[string]string{"native.ts": tspath.ResolvePath(root, "native.ts"), "plugin.ts": tspath.ResolvePath(root, "plugin.ts")}
+	fs := utils.NewOverlayVFS(osvfs.FS(), map[string]string{
+		paths["native.ts"]: "export const native = 1;\n",
+		paths["plugin.ts"]: "export const plugin = 1;\n",
 	})
-	nativeFile := compilerProgram.GetSourceFile(paths["native.ts"])
-	pluginFile := compilerProgram.GetSourceFile(paths["plugin.ts"])
+	host := &pluginInputTestHost{CompilerHost: utils.CreateCompilerHost(root, fs), files: make(map[string]*ast.SourceFile)}
+	sourceProgram, err := program.NewFromRoots(program.RootOptions{
+		RootFileNames: []string{paths["native.ts"], paths["plugin.ts"]}, Host: host,
+		CompilerOptions: program.SourceOnlyCompilerOptions(), SingleThreaded: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	nativeFile := host.files[paths["native.ts"]]
+	pluginFile := host.files[paths["plugin.ts"]]
 	if nativeFile == nil || pluginFile == nil {
 		t.Fatalf("prepared plan fixtures are missing: native=%v plugin=%v", nativeFile != nil, pluginFile != nil)
 	}
+	if nativeFile.IsBound() || pluginFile.IsBound() {
+		t.Fatal("fixture borrowed an AST before preparing plugin inputs")
+	}
 	nativeRule := rule.ConfiguredRule{Name: "native/rule", Severity: rule.SeverityError}
 	pluginConfiguredRule := pluginRule("external/rule", []any{"option"}, rule.SeverityWarning)
-	plan := &LintPlan{programs: []programLintPlan{{files: []lintFilePlan{
-		{file: nativeFile, rules: []rule.ConfiguredRule{nativeRule}},
-		{file: pluginFile, rules: []rule.ConfiguredRule{nativeRule, pluginConfiguredRule}},
+	nativeSource, _ := sourceProgram.LookupSource(nativeFile.FileName())
+	pluginSource, _ := sourceProgram.LookupSource(pluginFile.FileName())
+	plan := &LintPlan{programs: []programLintPlan{{program: sourceProgram, files: []lintFilePlan{
+		{source: nativeSource, rules: []rule.ConfiguredRule{nativeRule}},
+		{source: pluginSource, rules: []rule.ConfiguredRule{nativeRule, pluginConfiguredRule}},
 	}}}}
 
 	resolveCalls := 0
@@ -948,6 +969,9 @@ func TestBuildEslintPluginFileInputsUsesPreparedPlan(t *testing.T) {
 
 	if resolveCalls != 1 {
 		t.Fatalf("config resolver calls = %d, want one for plugin targets only", resolveCalls)
+	}
+	if nativeFile.IsBound() || !pluginFile.IsBound() {
+		t.Fatal("plugin projection must borrow only the plugin target's AST")
 	}
 	if len(inputs) != 1 {
 		t.Fatalf("plugin inputs = %d, want 1", len(inputs))
@@ -967,6 +991,19 @@ func TestBuildEslintPluginFileInputsUsesPreparedPlan(t *testing.T) {
 	if len(withoutConfig) != 1 || withoutConfig[0].ConfigKey != "" {
 		t.Errorf("nil config resolver inputs = %+v, want one input without a routing key", withoutConfig)
 	}
+}
+
+// Keep the initial parses visible so this test can detect unnecessary AST
+// access through the binder, without depending on GC or allocation counters.
+type pluginInputTestHost struct {
+	compiler.CompilerHost
+	files map[string]*ast.SourceFile
+}
+
+func (h *pluginInputTestHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
+	file := h.CompilerHost.GetSourceFile(options)
+	h.files[options.FileName] = file
+	return file
 }
 
 func TestDispatchEslintPluginRulesWithOutcomeSurfacesFailure(t *testing.T) {

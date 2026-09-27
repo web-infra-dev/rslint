@@ -24,13 +24,10 @@ var (
 // host-side consumers such as third-party plugin dispatch. It preserves the
 // selected files per Program, including syntax-error and zero-rule files needed
 // for LintedFileCount, while resolving each eligible file's complete rule set
-// exactly once. Pipeline-prepared plans may additionally own deferred file
-// descriptors with immutable configuration; those acquire their AST and syntax
-// result only during execution and never publish AST-bearing artifacts.
+// exactly once.
 type LintPlan struct {
 	programs                  []programLintPlan
 	syntacticDiagnosticGroups []syntacticDiagnosticGroup
-	deferredFiles             []deferredFilePlan
 }
 
 type programLintPlan struct {
@@ -38,11 +35,11 @@ type programLintPlan struct {
 	files   []lintFilePlan
 }
 
-// lintFilePlan freezes one AST generation, its resolved rules, shared rule
-// environment, and checker policy as a coherent execution unit. Parallel
-// slices would allow these decisions to drift by index across plan reuse.
+// lintFilePlan freezes a file identity within its Program, resolved rules,
+// environment, and checker policy. The plan does not own an AST reference;
+// execution and artifact consumers borrow it from the same source generation.
 type lintFilePlan struct {
-	file           *ast.SourceFile
+	source         program.Source
 	rules          []rule.ConfiguredRule
 	environment    *rule.RuleEnvironment
 	hasTypeChecker bool
@@ -121,11 +118,11 @@ func PrepareLintPlanContext(ctx context.Context, opts PrepareLintPlanOptions) (*
 	plan := &LintPlan{programs: make([]programLintPlan, len(opts.Programs))}
 	totalFiles := 0
 	for programIndex := range opts.Programs {
-		files, err := resolveExactProgramFiles(opts.Programs[programIndex], opts.TargetsByProgram[programIndex])
+		files, err := resolveExactProgramSources(opts.Programs[programIndex], opts.TargetsByProgram[programIndex])
 		if err != nil {
 			return nil, fmt.Errorf("linter: Program index %d: %w", programIndex, err)
 		}
-		plan.programs[programIndex] = programLintPlanFromFiles(opts.Programs[programIndex], files)
+		plan.programs[programIndex] = programLintPlan{program: opts.Programs[programIndex], files: files}
 		totalFiles += len(plan.programs[programIndex].files)
 	}
 
@@ -247,7 +244,7 @@ func newProgramLintPlanForFiles(sourceProgram *program.Program, files []*ast.Sou
 func programLintPlanFromFiles(sourceProgram *program.Program, files []*ast.SourceFile) programLintPlan {
 	filePlans := make([]lintFilePlan, len(files))
 	for index, file := range files {
-		filePlans[index].file = file
+		filePlans[index].source, _ = sourceProgram.LookupSource(file.FileName())
 	}
 	return programLintPlan{
 		program: sourceProgram,
@@ -277,21 +274,19 @@ func resolveProgramLintPlanFile(
 	ctx context.Context,
 ) []rule.RuleDiagnostic {
 	filePlan := &plan.files[fileIndex]
-	file := filePlan.file
 	if !opts.SkipSyntaxCheck {
-		diagnostics := CollectFileSyntacticDiagnostics(ctx, opts.Program, file)
-		if len(diagnostics) > 0 {
-			return diagnostics
+		if diagnostics := filePlan.source.SyntacticDiagnostics(ctx); len(diagnostics) > 0 {
+			return projectSyntacticDiagnostics(filePlan.source.AST(), diagnostics)
 		}
 	}
 	if ctx.Err() != nil {
 		return nil
 	}
-	rules := opts.GetRulesForFile(file)
+	rules := opts.GetRulesForFile(filePlan.source.FileName())
 	// Program capability is the only checker gate at this boundary. Callers with
 	// a narrower request policy, such as LSP HasTypeInfo=false, filter the
 	// configured rule set before planning without inspecting Program adapters.
-	filePlan.hasTypeChecker = opts.Program.CanProvideTypeChecker(file)
+	filePlan.hasTypeChecker = filePlan.source.CanProvideTypeChecker()
 	if filePlan.hasTypeChecker {
 		filePlan.rules = rules
 	} else {
@@ -360,7 +355,7 @@ func (p *LintPlan) Targets() []LintTarget {
 			if len(rules) == 0 {
 				continue
 			}
-			targets = append(targets, LintTarget{File: filePlan.file, Rules: rules})
+			targets = append(targets, LintTarget{File: filePlan.source.AST(), Rules: rules})
 		}
 	}
 	return targets
@@ -370,7 +365,7 @@ func (p *LintPlan) fileCount() int {
 	if p == nil {
 		return 0
 	}
-	fileCount := len(p.deferredFiles)
+	fileCount := 0
 	for _, programPlan := range p.programs {
 		fileCount += len(programPlan.files)
 	}
@@ -385,42 +380,20 @@ func (p *LintPlan) sourcePrograms() []*program.Program {
 	return programs
 }
 
-func resolveExactProgramFiles(sourceProgram *program.Program, targets []string) ([]*ast.SourceFile, error) {
-	// Exact target plans commonly select a Program's complete universe in the
-	// same stable order. Preserve the Program-owned slice when selection makes
-	// no change, avoiding a map and pointer-slice allocation without inspecting
-	// how the Program was constructed.
-	files := sourceProgram.SourceFiles()
-	if len(targets) == len(files) {
-		exact := true
-		for fileIndex, target := range targets {
-			file := sourceProgram.GetSourceFile(target)
-			if file == nil {
-				return nil, fmt.Errorf("%w: %q", errTargetNotInProgram, target)
-			}
-			if file != files[fileIndex] {
-				exact = false
-				break
-			}
-		}
-		if exact {
-			return files, nil
-		}
-	}
-
-	var filesToLint []*ast.SourceFile
+func resolveExactProgramSources(sourceProgram *program.Program, targets []string) ([]lintFilePlan, error) {
+	files := make([]lintFilePlan, 0, len(targets))
 	seen := make(map[string]struct{}, len(targets))
 	for _, target := range targets {
-		file := sourceProgram.GetSourceFile(target)
-		if file == nil {
+		source, ok := sourceProgram.LookupSource(target)
+		if !ok {
 			return nil, fmt.Errorf("%w: %q", errTargetNotInProgram, target)
 		}
-		fileName := file.FileName()
-		if _, ok := seen[fileName]; ok {
+		name := source.FileName()
+		if _, duplicate := seen[name]; duplicate {
 			continue
 		}
-		seen[fileName] = struct{}{}
-		filesToLint = append(filesToLint, file)
+		seen[name] = struct{}{}
+		files = append(files, lintFilePlan{source: source})
 	}
-	return filesToLint, nil
+	return files, nil
 }

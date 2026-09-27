@@ -1,6 +1,8 @@
 package linter
 
 import (
+	"weak"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -56,16 +58,35 @@ func (r ObservationResult) CompleteDiagnostics() ([]rule.RuleDiagnostic, bool) {
 	return diagnostics, true
 }
 
-// detachDiagnosticSources ends diagnostic ownership of ASTs only after fix
-// source identity checks and generation text reads have completed. Preserve
-// exact source identity within the observation, including native/plugin pairs;
-// paths alone cannot distinguish different source generations.
-func (r *ObservationResult) detachDiagnosticSources() {
-	detachDiagnosticSources(r.Native.Diagnostics, r.pluginOutcome.Diagnostics)
+// diagnosticSource carries only presentation text and a non-owning identity.
+// This lets early text projections share identity with fix-bearing diagnostics
+// detached after validation, without keeping the source AST alive between them.
+type diagnosticSource struct {
+	*textSourceFile
+	origin weak.Pointer[ast.SourceFile]
 }
 
-func detachDiagnosticSources(groups ...[]rule.RuleDiagnostic) {
-	var sources map[*ast.SourceFile]*textSourceFile
+func newDiagnosticSource(source *ast.SourceFile) *diagnosticSource {
+	return &diagnosticSource{textSourceFile: newTextSourceFile(source.Text()), origin: weak.Make(source)}
+}
+
+// detachDiagnosticSources ends diagnostic ownership of ASTs at generation
+// release, after fix validation finishes or fails. Preserve exact source
+// identity within the observation, including native/plugin pairs; paths alone
+// cannot distinguish different source generations.
+func (r *ObservationResult) detachDiagnosticSources() {
+	groups := [][]rule.RuleDiagnostic{r.Native.Diagnostics, r.pluginOutcome.Diagnostics}
+	var sources map[weak.Pointer[ast.SourceFile]]*diagnosticSource
+	for _, diagnostics := range groups {
+		for _, diagnostic := range diagnostics {
+			if projection, ok := diagnostic.SourceFile.(*diagnosticSource); ok && projection != nil {
+				if sources == nil {
+					sources = make(map[weak.Pointer[ast.SourceFile]]*diagnosticSource)
+				}
+				sources[projection.origin] = projection
+			}
+		}
+	}
 	for _, diagnostics := range groups {
 		for index := range diagnostics {
 			diagnostic := &diagnostics[index]
@@ -73,13 +94,14 @@ func detachDiagnosticSources(groups ...[]rule.RuleDiagnostic) {
 			if !ok || source == nil {
 				continue
 			}
-			projection := sources[source]
+			key := weak.Make(source)
+			projection := sources[key]
 			if projection == nil {
 				if sources == nil {
-					sources = make(map[*ast.SourceFile]*textSourceFile)
+					sources = make(map[weak.Pointer[ast.SourceFile]]*diagnosticSource)
 				}
-				projection = newTextSourceFile(source.Text())
-				sources[source] = projection
+				projection = newDiagnosticSource(source)
+				sources[key] = projection
 			}
 			diagnostic.SourceFile = projection
 		}

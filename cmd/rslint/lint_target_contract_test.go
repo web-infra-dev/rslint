@@ -175,7 +175,7 @@ func TestCLINoArgsUsesDefaultScriptExtensions(t *testing.T) {
 	}
 }
 
-func TestCLIDeferredSourceRootsPreserveCrossFileRules(t *testing.T) {
+func TestCLISourceRootsPreserveCrossFileRules(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/source_roots.txtar").Materialize(t, ""))
 	for _, singleThreaded := range []bool{true, false} {
 		code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{

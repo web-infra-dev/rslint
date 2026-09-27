@@ -493,8 +493,8 @@ func countDiagnosticsForRule(t *testing.T, fileName, source string, impl rule.Ru
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program:                sourceProgram,
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-		GetRulesForFile: func(sf *tsast.SourceFile) []rule.ConfiguredRule {
-			if sf.FileName() != filePath {
+		GetRulesForFile: func(sf string) []rule.ConfiguredRule {
+			if sf != filePath {
 				return nil
 			}
 			return []rule.ConfiguredRule{configured}
@@ -614,7 +614,7 @@ func TestGapFile_OptionalTypeCheckerRules_DoNotPanic(t *testing.T) {
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program:                sourceProgram,
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-		GetRulesForFile:        func(sf *tsast.SourceFile) []rule.ConfiguredRule { return configured },
+		GetRulesForFile:        func(sf string) []rule.ConfiguredRule { return configured },
 		OnDiagnostic:           func(d rule.RuleDiagnostic) {},
 	})
 

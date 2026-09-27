@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -88,8 +87,8 @@ func collectLintedFiles(t *testing.T, programs []*compiler.Program) map[string]i
 	counts := make(map[string]int)
 	_, err := runLinterPositional(
 		programs, true, nil, nil, legacyDefaultExcludedPathSubstrings,
-		func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			counts[sf.FileName()]++
+		func(sf string) []rule.ConfiguredRule {
+			counts[sf]++
 			return noopRule()
 		},
 		false, func(d rule.RuleDiagnostic) {}, nil, nil,
@@ -281,7 +280,7 @@ func TestRunLinter_DiagnosticsNotDuplicated(t *testing.T) {
 	// Baseline: diagnostic count for lib.ts in single-program mode
 	singleDiags := 0
 	runLinterInCompilerProgram(programLib, nil, nil, legacyDefaultExcludedPathSubstrings,
-		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
+		func(sf string) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {
 			if d.FilePath == libPath {
 				singleDiags++
@@ -297,7 +296,7 @@ func TestRunLinter_DiagnosticsNotDuplicated(t *testing.T) {
 	runLinterPositional(
 		[]*compiler.Program{programLib, programApp},
 		true, nil, nil, legacyDefaultExcludedPathSubstrings,
-		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
+		func(sf string) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {
 			if d.FilePath == libPath {
 				multiDiags++
@@ -426,8 +425,8 @@ func TestLegacySingleProgramScopeCanSelectImportedFile(t *testing.T) {
 	// The explicit compatibility scope is not constrained by root ownership.
 	lintedFiles := make(map[string]int)
 	runLinterInCompilerProgram(program, []string{libPath}, nil, legacyDefaultExcludedPathSubstrings,
-		func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			lintedFiles[sf.FileName()]++
+		func(sf string) []rule.ConfiguredRule {
+			lintedFiles[sf]++
 			return noopRule()
 		},
 		false, func(d rule.RuleDiagnostic) {}, nil, nil,

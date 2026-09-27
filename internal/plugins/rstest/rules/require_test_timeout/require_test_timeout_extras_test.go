@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_test_timeout"
@@ -406,7 +405,7 @@ describe("s", () => { it("b", () => {}) });`,
 			Program:     lintprogram.NewFromCompiler(program),
 			File:        sourceFile.FileName(),
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:     require_test_timeout.RequireTestTimeoutRule.Name,
 					Severity: rule.SeverityError,

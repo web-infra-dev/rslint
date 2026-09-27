@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -268,7 +267,7 @@ func TestExportsStyleEditDemand(t *testing.T) {
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: lintprogram.NewFromCompiler(program), File: file.FileName(),
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: ExportsStyleRule.Name, Severity: rule.SeverityError,
 							Environment: &rule.RuleEnvironment{LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"}},
 							Run:         func(ctx rule.RuleContext) rule.RuleListeners { return ExportsStyleRule.Run(ctx, []any{test.mode}) },

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -115,8 +114,8 @@ func lintSourceOnly(t *testing.T, source string) int {
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program:                sourceProgram,
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-			if sourceFile.FileName() != filePath {
+		GetRulesForFile: func(sourceFile string) []rule.ConfiguredRule {
+			if sourceFile != filePath {
 				return nil
 			}
 			return []rule.ConfiguredRule{{

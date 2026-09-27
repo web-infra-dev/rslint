@@ -44,7 +44,7 @@ func TestUnboundMethodProgramCapabilities(t *testing.T) {
 			var reports []string
 			plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 				Programs: []*lintprogram.Program{program}, TargetsByProgram: [][]string{{file.FileName()}}, SingleThreaded: true,
-				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				GetRulesForFile: func(string) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{
 						Name: UnboundMethodRule.Name, RequiresTypeInfo: UnboundMethodRule.RequiresTypeInfo, Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {

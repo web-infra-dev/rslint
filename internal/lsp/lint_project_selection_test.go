@@ -673,7 +673,7 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 						t.Fatal("project gap used a dependency-resolving type context")
 					}
 				}
-				if rules := generation.Native.RulesForFile(source); len(rules) != wantRules {
+				if rules := generation.Native.RulesForFile(source.FileName()); len(rules) != wantRules {
 					t.Fatalf("speculative=%v: configured rules=%v, want %d", speculative, rules, wantRules)
 				}
 				if targets := generation.Native.TargetsByProgram; len(targets) != 1 || len(targets[0]) != 1 ||
@@ -1045,7 +1045,7 @@ func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
 							t.Fatalf("speculative=%v: generation did not use its editor text", speculative)
 						}
 						foundSyntax, foundTyped := false, false
-						for _, configured := range generation.Native.RulesForFile(source) {
+						for _, configured := range generation.Native.RulesForFile(source.FileName()) {
 							foundSyntax = foundSyntax || configured.Name == "no-debugger"
 							foundTyped = foundTyped || configured.RequiresTypeInfo
 						}
@@ -1511,7 +1511,7 @@ func TestLSPRootMembershipTypedGapTyped(t *testing.T) {
 							t.Fatalf("speculative=%v: generation used stale editor text", speculative)
 						}
 						foundSyntax, foundTyped := false, false
-						for _, configured := range generation.Native.RulesForFile(source) {
+						for _, configured := range generation.Native.RulesForFile(source.FileName()) {
 							foundSyntax = foundSyntax || configured.Name == "no-var"
 							foundTyped = foundTyped || configured.RequiresTypeInfo
 						}

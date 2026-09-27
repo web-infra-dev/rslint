@@ -3,7 +3,6 @@ package unicode_bom
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -364,7 +363,7 @@ func runUnicodeBom(t *testing.T, code string, demand rule.EditDemand) []rule.Rul
 		Programs:         programs,
 		TargetsByProgram: [][]string{{program.GetSourceFile(fileName).FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     UnicodeBomRule.Name,
 				Severity: rule.SeverityError,

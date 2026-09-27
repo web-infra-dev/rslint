@@ -96,7 +96,7 @@ func collectDiags(t *testing.T, programs []*compiler.Program, singleThreaded boo
 			Programs:         lintPrograms,
 			TargetsByProgram: targetsByProgram,
 			SingleThreaded:   singleThreaded,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return varReportingRule()
 			},
 		})

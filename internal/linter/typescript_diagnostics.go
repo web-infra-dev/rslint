@@ -33,7 +33,10 @@ func CollectFileSyntacticDiagnostics(
 		return nil
 	}
 
-	typeScriptDiagnostics := program.SyntacticDiagnostics(ctx, sourceFile)
+	return projectSyntacticDiagnostics(sourceFile, program.SyntacticDiagnostics(ctx, sourceFile))
+}
+
+func projectSyntacticDiagnostics(sourceFile *ast.SourceFile, typeScriptDiagnostics []*ast.Diagnostic) []rule.RuleDiagnostic {
 	diagnostics := make([]rule.RuleDiagnostic, 0, len(typeScriptDiagnostics))
 	for _, diagnostic := range typeScriptDiagnostics {
 		diagnostics = append(diagnostics, newTypeScriptDiagnostic(sourceFile, diagnostic, diagnostic.String()))

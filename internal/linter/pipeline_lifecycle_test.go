@@ -11,7 +11,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -189,205 +188,6 @@ func TestPipelineDetachesTypeCheckOnlyDiagnostics(t *testing.T) {
 		if _, retained := diagnostic.SourceFile.(*ast.SourceFile); retained {
 			t.Fatal("type-check-only diagnostic retained a compiler AST")
 		}
-	}
-}
-
-func TestDeferredPipelineReleasesCompletedASTsBeforeNextFile(t *testing.T) {
-	var first weak.Pointer[ast.SourceFile]
-	var calls atomic.Int32
-	configured := []rule.ConfiguredRule{{Name: "native/check", Run: func(ctx rule.RuleContext) rule.RuleListeners {
-		if len(ctx.Program().SourceFiles()) != 1 {
-			t.Error("independent execution retained other root ASTs")
-		}
-		if calls.Add(1) == 1 {
-			first = weak.Make(ctx.SourceFile)
-		} else {
-			// Collection is only a test probe. Production never forces a GC.
-			runtime.GC()
-			runtime.GC()
-			if first.Value() != nil {
-				t.Error("completed file remains reachable during the next file")
-			}
-		}
-		return rule.RuleListeners{ast.KindIdentifier: func(node *ast.Node) {
-			ctx.ReportNode(node, rule.RuleMessage{Description: "identifier"})
-		}}
-	}}}
-	generation := pipelineDeferredTestGeneration(t, map[string]string{
-		"first.ts": "const first = '😀';\r\nfirst;", "second.ts": "const second = 2; second;",
-	}, func(string) []rule.ConfiguredRule { return configured })
-	var releases int
-	result, err := RunPipeline(context.Background(), NewLintRequest(
-		pipelineTestProvider(generation, func() { releases++ }), ObservationPolicy{}, nil,
-	))
-	if err != nil || calls.Load() != 2 || releases != 1 {
-		t.Fatalf("error/calls/releases = %v/%d/%d", err, calls.Load(), releases)
-	}
-	native := result.Observation.Native
-	if native.Lint.LintedFileCount != 2 || len(native.Diagnostics) != 4 || len(native.Files) != 0 {
-		t.Fatalf("unexpected observation: %+v", native)
-	}
-	for _, diagnostic := range native.Diagnostics {
-		if _, astRetained := diagnostic.SourceFile.(*ast.SourceFile); astRetained {
-			t.Fatal("deferred diagnostic retained its AST")
-		}
-		if diagnostic.SourceFile.Text() == "" || len(diagnostic.SourceFile.ECMALineMap()) == 0 {
-			t.Fatal("deferred diagnostic lost its source presentation")
-		}
-	}
-}
-
-func TestDeferredPipelinePreservesSyntaxAndZeroRuleCounts(t *testing.T) {
-	var calls atomic.Int32
-	generation := pipelineDeferredTestGeneration(t, map[string]string{
-		"invalid.ts": "const invalid = ;", "empty.ts": "", "valid.ts": "const value = 1;",
-	}, func(path string) []rule.ConfiguredRule {
-		if strings.HasSuffix(path, "empty.ts") {
-			return nil
-		}
-		return []rule.ConfiguredRule{
-			{Name: "native/check", Run: func(ctx rule.RuleContext) rule.RuleListeners {
-				calls.Add(1)
-				ctx.ReportRange(core.NewTextRange(0, 1), rule.RuleMessage{Description: "check"})
-				return nil
-			}},
-			{Name: "typed/check", RequiresTypeInfo: true, RequiresProgram: true, Run: func(rule.RuleContext) rule.RuleListeners {
-				panic("source-only execution enabled a type-aware rule")
-			}},
-		}
-	})
-	result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-	native := result.Observation.Native
-	if calls.Load() != 1 || native.Lint.LintedFileCount != 3 || !native.HasTargetSyntaxErrors || len(native.Diagnostics) < 2 {
-		t.Fatalf("calls=%d observation=%+v", calls.Load(), native)
-	}
-	if len(result.ExecutedRules()) != 1 {
-		t.Fatalf("executed rules = %v", result.ExecutedRules())
-	}
-}
-
-func TestDeferredPipelinePreservesWholeProgramConsumers(t *testing.T) {
-	for _, reason := range []string{"rule", "files", "edits", "type-check", "plugin", "no-path-resolver"} {
-		t.Run(reason, func(t *testing.T) {
-			var calls atomic.Int32
-			configured := []rule.ConfiguredRule{{
-				Name: "native/check", RequiresProgram: reason == "rule",
-				Run: func(ctx rule.RuleContext) rule.RuleListeners {
-					calls.Add(1)
-					if len(ctx.Program().SourceFiles()) != 2 {
-						t.Error("whole-Program consumer lost the zero-rule dependency")
-					}
-					ctx.ReportNode(ctx.SourceFile.AsNode(), rule.RuleMessage{Description: "check"})
-					return nil
-				},
-			}}
-			generation := pipelineDeferredTestGeneration(t, map[string]string{
-				"first.ts": "import './second';", "second.ts": "export const value = 1;",
-			}, func(path string) []rule.ConfiguredRule {
-				if strings.HasSuffix(path, "second.ts") {
-					return nil
-				}
-				return configured
-			})
-			policy := ObservationPolicy{}
-			switch reason {
-			case "files":
-				policy.Demand.LintedFiles = true
-			case "edits":
-				policy.Demand.Native = rule.EditDemandAll
-			case "type-check":
-				generation.Native.TypeCheck = true
-			case "plugin":
-				generation.Plugin = &PluginGeneration{ConfigForFile: func(string) EslintPluginFileConfig { return EslintPluginFileConfig{} }}
-			case "no-path-resolver":
-				generation.Native.RulesForPath = nil
-			}
-			result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), policy, nil))
-			if err != nil || calls.Load() != 1 {
-				t.Fatalf("error/calls = %v/%d", err, calls.Load())
-			}
-			if result.Observation.Native.Lint.LintedFileCount != 2 {
-				t.Fatal("zero-rule dependency was not counted")
-			}
-			if reason == "files" && len(result.Observation.Native.Files) != 2 {
-				t.Fatal("requested file artifacts were not retained")
-			}
-		})
-	}
-}
-
-func TestDeferredPipelineJoinsWorkersBeforeReleaseOnFailure(t *testing.T) {
-	previous := runtime.GOMAXPROCS(2)
-	defer runtime.GOMAXPROCS(previous)
-	for _, failure := range []string{"cancel", "panic", "goexit"} {
-		t.Run(failure, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			bothStarted := make(chan struct{})
-			finishOther := make(chan struct{})
-			var active, entered, released atomic.Int32
-			configured := []rule.ConfiguredRule{{Name: "native/check", Run: func(ruleCtx rule.RuleContext) rule.RuleListeners {
-				active.Add(1)
-				defer active.Add(-1)
-				if entered.Add(1) == 2 {
-					close(bothStarted)
-				}
-				select {
-				case <-bothStarted:
-				case <-ctx.Done():
-					return nil
-				}
-				if strings.HasSuffix(ruleCtx.SourceFile.FileName(), "first.ts") {
-					defer close(finishOther)
-					switch failure {
-					case "cancel":
-						cancel()
-					case "panic":
-						panic("deferred failure")
-					case "goexit":
-						runtime.Goexit()
-					}
-				} else {
-					select {
-					case <-finishOther:
-					case <-ctx.Done():
-					}
-				}
-				return nil
-			}}}
-			generation := pipelineDeferredTestGeneration(t, map[string]string{
-				"first.ts": "export {};", "second.ts": "export {};",
-			}, func(string) []rule.ConfiguredRule { return configured })
-			generation.Native.SingleThreaded = false
-			type outcome struct {
-				err        error
-				panicValue any
-			}
-			done := make(chan outcome, 1)
-			go func() {
-				result := outcome{}
-				defer func() { result.panicValue = recover(); done <- result }()
-				_, result.err = RunPipeline(ctx, NewLintRequest(pipelineTestProvider(generation, func() {
-					if active.Load() != 0 {
-						t.Error("generation released while a worker is active")
-					}
-					released.Add(1)
-				}), ObservationPolicy{}, nil))
-			}()
-			select {
-			case result := <-done:
-				if released.Load() != 1 || (failure == "cancel" && !errors.Is(result.err, context.Canceled)) ||
-					(failure != "cancel" && result.panicValue == nil) {
-					t.Fatalf("result=%+v releases=%d", result, released.Load())
-				}
-			case <-time.After(10 * time.Second):
-				cancel()
-				t.Fatal("deferred workers did not finish")
-			}
-		})
 	}
 }
 
@@ -770,5 +570,61 @@ func TestConcurrentPipelineCancelsAndJoinsPluginBeforeReleaseOnNativePanic(t *te
 	}()
 	if recovered == nil || releases.Load() != 1 {
 		t.Fatalf("panic/releases = %v/%d, want panic/1", recovered, releases.Load())
+	}
+}
+
+func TestPipelineReleasesCompletedRootASTBeforeNextFile(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		demand rule.EditDemand
+	}{{"lint", rule.EditDemandNone}, {"fix", rule.EditDemandAutofix}, {"all-edits", rule.EditDemandAll}} {
+		t.Run(test.name, func(t *testing.T) {
+			var first weak.Pointer[ast.SourceFile]
+			var calls int
+			configured := []rule.ConfiguredRule{{Name: "native/check", Run: func(ctx rule.RuleContext) rule.RuleListeners {
+				calls++
+				if calls == 1 {
+					first = weak.Make(ctx.SourceFile)
+				} else {
+					runtime.GC()
+					runtime.GC()
+					if first.Value() != nil {
+						t.Error("completed AST remains reachable during the next file")
+					}
+					// Cross-file access stays available without a rule capability flag.
+					files := ctx.Program().SourceFiles()
+					if len(files) != 2 || !ctx.Program().OwnsSourceFile(files[0]) || files[1] != ctx.SourceFile {
+						t.Error("collection changed the complete Program universe")
+					}
+				}
+				return rule.RuleListeners{ast.KindIdentifier: func(node *ast.Node) {
+					ctx.ReportNode(node, rule.RuleMessage{Description: "identifier"})
+				}}
+			}}}
+			generation := pipelineRootTestGeneration(t, map[string]string{
+				"first.ts": "const first = '😀';\r\nfirst;", "second.ts": "const second = 2; second;",
+			}, func(string) []rule.ConfiguredRule { return configured })
+			var releases int
+			result, err := RunPipeline(context.Background(), NewLintRequest(
+				pipelineTestProvider(generation, func() { releases++ }), ObservationPolicy{Demand: ArtifactDemand{Native: test.demand}}, nil,
+			))
+			if err != nil || calls != 2 || releases != 1 {
+				t.Fatalf("error/calls/releases = %v/%d/%d", err, calls, releases)
+			}
+			diagnostics := result.Observation.Native.Diagnostics
+			if result.Observation.Native.Lint.LintedFileCount != 2 || len(diagnostics) != 4 {
+				t.Fatalf("unexpected observation: %+v", result.Observation.Native)
+			}
+			if diagnostics[0].SourceFile != diagnostics[1].SourceFile {
+				t.Fatal("diagnostics for the same AST lost their shared text projection")
+			}
+			for _, diagnostic := range diagnostics {
+				if _, retained := diagnostic.SourceFile.(*ast.SourceFile); retained {
+					t.Fatal("completed diagnostic retained its AST")
+				}
+			}
+			runtime.KeepAlive(generation)
+
+		})
 	}
 }

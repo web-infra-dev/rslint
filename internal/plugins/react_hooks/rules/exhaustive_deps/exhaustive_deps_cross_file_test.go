@@ -217,7 +217,7 @@ declare function setTimeout(handler: () => void, timeout: number): number;
 		Programs:         programs,
 		TargetsByProgram: [][]string{{tsxPath}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(_ *ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(_ string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     "react-hooks/exhaustive-deps",
 				Severity: rule.SeverityError,

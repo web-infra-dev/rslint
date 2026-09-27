@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_post_message_target_origin"
@@ -115,7 +114,7 @@ func TestRequirePostMessageTargetOriginEditDemand(t *testing.T) {
 		var got []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{Name: require_post_message_target_origin.RequirePostMessageTargetOriginRule.Name, Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return require_post_message_target_origin.RequirePostMessageTargetOriginRule.Run(ctx, nil)

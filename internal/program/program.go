@@ -19,9 +19,9 @@ import (
 // services are exposed through one contract. Which private adapter supplies
 // them is deliberately not observable outside this package.
 //
-// Program pointer identity is generation identity. Reparse/rebuild operations
-// create a new Program rather than replacing files or services in place, so a
-// prepared lint plan can bind to one exact source world.
+// Program pointer identity is generation identity. Source changes require a new
+// Program. A collected root AST may be recreated from its frozen snapshot; all
+// live references to a file still identify the same AST, including across GC.
 type Program struct {
 	source sourceBackend
 	types  typeBackend
@@ -47,8 +47,9 @@ type sourceBackend interface {
 	resolveModuleName(moduleName string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule
 	sourceFileForResolvedModule(fileName string) *ast.SourceFile
 	sourceFile(fileName string) *ast.SourceFile
+	sourceFileName(fileName string) string
 	sourceFileMetadata(file *ast.SourceFile) ast.SourceFileMetaData
-	syntacticDiagnostics(ctx context.Context, file *ast.SourceFile) []*ast.Diagnostic
+	syntacticDiagnostics(ctx context.Context, fileName string) []*ast.Diagnostic
 	isSourceFileDefaultLibrary(file *ast.SourceFile) bool
 	isSourceFileFromExternalLibrary(file *ast.SourceFile) bool
 	packageNamesBySourceFile() map[tspath.Path][]string
@@ -100,6 +101,47 @@ func (p *Program) SourceFiles() []*ast.SourceFile {
 		return nil
 	}
 	return p.source.sourceFiles()
+}
+
+// Source identifies one file within an immutable Program. Planning can read
+// its name, syntax result and checker capability without borrowing its AST.
+// AST materialization and retention remain the Program's responsibility.
+type Source struct {
+	program *Program
+	name    string
+}
+
+// LookupSource validates membership without materializing an AST.
+func (p *Program) LookupSource(fileName string) (Source, bool) {
+	if !p.IsValid() {
+		return Source{}, false
+	}
+	name := p.source.sourceFileName(fileName)
+	if name == "" {
+		return Source{}, false
+	}
+	return Source{program: p, name: name}, true
+}
+
+// FileName returns the exact source name exposed by the owning Program.
+func (s Source) FileName() string { return s.name }
+
+// AST borrows the bound source file. It retains its identity while any caller
+// still holds it; after collection, the Program may recreate it from its text.
+func (s Source) AST() *ast.SourceFile { return s.program.GetSourceFile(s.name) }
+
+// CanProvideTypeChecker reports the capability of this bound source identity.
+func (s Source) CanProvideTypeChecker() bool {
+	return s.program.IsValid() && s.program.types != nil
+}
+
+// SyntacticDiagnostics returns this source's complete syntax result. Root
+// construction freezes it, so planning does not need to parse the file again.
+func (s Source) SyntacticDiagnostics(ctx context.Context) []*ast.Diagnostic {
+	if !s.program.IsValid() {
+		return nil
+	}
+	return s.program.source.syntacticDiagnostics(ctx, s.name)
 }
 
 // RootFileNames returns the source roots that define ownership. Dependencies
@@ -227,7 +269,7 @@ func (p *Program) SyntacticDiagnostics(ctx context.Context, file *ast.SourceFile
 	if !p.OwnsSourceFile(file) {
 		return nil
 	}
-	return p.source.syntacticDiagnostics(ctx, file)
+	return p.source.syntacticDiagnostics(ctx, file.FileName())
 }
 
 // CanProvideTypeChecker reports a source capability, not lint eligibility.
@@ -388,11 +430,17 @@ func (b *compilerBackend) sourceFileForResolvedModule(fileName string) *ast.Sour
 func (b *compilerBackend) sourceFile(fileName string) *ast.SourceFile {
 	return b.raw.GetSourceFile(fileName)
 }
+func (b *compilerBackend) sourceFileName(fileName string) string {
+	if file := b.sourceFile(fileName); file != nil {
+		return file.FileName()
+	}
+	return ""
+}
 func (b *compilerBackend) sourceFileMetadata(file *ast.SourceFile) ast.SourceFileMetaData {
 	return b.raw.GetSourceFileMetaData(file.Path())
 }
-func (b *compilerBackend) syntacticDiagnostics(ctx context.Context, file *ast.SourceFile) []*ast.Diagnostic {
-	return b.raw.GetSyntacticDiagnostics(ctx, file)
+func (b *compilerBackend) syntacticDiagnostics(ctx context.Context, fileName string) []*ast.Diagnostic {
+	return b.raw.GetSyntacticDiagnostics(ctx, b.raw.GetSourceFile(fileName))
 }
 func (b *compilerBackend) isSourceFileDefaultLibrary(file *ast.SourceFile) bool {
 	return b.raw.IsSourceFileDefaultLibrary(file.Path())
@@ -417,8 +465,20 @@ func (b *compilerBackend) noEmitDiagnostics(ctx context.Context) []*ast.Diagnost
 	return collectNoEmitDiagnostics(ctx, b.raw)
 }
 
-func (s *parsedBackend) sourceFiles() []*ast.SourceFile { return s.files }
+func (s *parsedBackend) sourceFiles() []*ast.SourceFile {
+	if s.snapshots == nil {
+		return s.files
+	}
+	files := make([]*ast.SourceFile, len(s.roots))
+	for i, name := range s.roots {
+		files[i] = s.sourceFile(name)
+	}
+	return files
+}
 func (s *parsedBackend) rootFileNames() []string {
+	if s.snapshots != nil {
+		return slices.Clone(s.roots)
+	}
 	roots := make([]string, len(s.files))
 	for index, file := range s.files {
 		roots[index] = file.FileName()
@@ -426,6 +486,9 @@ func (s *parsedBackend) rootFileNames() []string {
 	return roots
 }
 func (s *parsedBackend) ownsSourceFile(file *ast.SourceFile) bool {
+	if snapshot := s.snapshots[file.Path()]; snapshot != nil {
+		return snapshot.owns(file)
+	}
 	return s.sourcesByPath[file.Path()] == file
 }
 func (s *parsedBackend) compilerOptions() *core.CompilerOptions { return s.options }
@@ -462,8 +525,9 @@ func (s *parsedBackend) sourceFileForResolvedModule(fileName string) *ast.Source
 func (s *parsedBackend) sourceFileMetadata(file *ast.SourceFile) ast.SourceFileMetaData {
 	return s.metadataByPath[file.Path()]
 }
-func (s *parsedBackend) syntacticDiagnostics(_ context.Context, file *ast.SourceFile) []*ast.Diagnostic {
-	return s.syntacticDiagnosticsByPath[file.Path()]
+func (s *parsedBackend) syntacticDiagnostics(_ context.Context, fileName string) []*ast.Diagnostic {
+	path := tspath.ToPath(fileName, s.currentDirectory, s.fs.UseCaseSensitiveFileNames())
+	return s.syntacticDiagnosticsByPath[path]
 }
 func (s *parsedBackend) isSourceFileDefaultLibrary(*ast.SourceFile) bool      { return false }
 func (s *parsedBackend) isSourceFileFromExternalLibrary(*ast.SourceFile) bool { return false }

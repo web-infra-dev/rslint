@@ -71,7 +71,6 @@ func ConfiguredRules(
 			Environment:        environment,
 			Severity:           ruleConfig.GetSeverity(),
 			RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
-			RequiresProgram:    ruleImpl.RequiresProgram,
 			IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
 			Options:            options,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {

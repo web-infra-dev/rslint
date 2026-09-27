@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -58,7 +57,7 @@ func TestGate_LinterFiltersTypeAwareRuleOnSourceOnlyProgram(t *testing.T) {
 	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 		Programs:         loaded.Programs,
 		TargetsByProgram: loaded.TargetsByProgram,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return configuredRules
 		},
 	})

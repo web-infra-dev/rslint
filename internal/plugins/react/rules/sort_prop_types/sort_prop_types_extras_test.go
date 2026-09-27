@@ -6,7 +6,6 @@ package sort_prop_types
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -153,7 +152,7 @@ func TestSortPropTypesDoesNotResolveObjectsAcrossFiles(t *testing.T) {
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program: lintprogram.NewFromCompiler(program),
 		Files:   []string{usageFile},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     SortPropTypesRule.Name,
 				Severity: rule.SeverityError,

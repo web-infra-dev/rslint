@@ -5,7 +5,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -292,7 +291,7 @@ import.meta.rstest!.expect(1).toBe(1);
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: lintprogram.NewFromCompiler(program),
 					File:    sourceFile.FileName(),
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{
 							Name:     PreferRsMockedRule.Name,
 							Severity: rule.SeverityError,
@@ -369,7 +368,7 @@ func TestPreferRsMockedConvergesWithConsistentNamespace(t *testing.T) {
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: lintprogram.NewFromCompiler(program),
 			File:    sourceFile.FileName(),
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{
 					{
 						Name:     PreferRsMockedRule.Name,
@@ -448,7 +447,7 @@ import type { Mock as ForeignMock } from './test-helpers';
 		Programs:         []*lintprogram.Program{sourceProgram},
 		TargetsByProgram: [][]string{{fileName}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     PreferRsMockedRule.Name,
 				Severity: rule.SeverityError,

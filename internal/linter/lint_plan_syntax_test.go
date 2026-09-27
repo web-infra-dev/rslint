@@ -43,7 +43,7 @@ func preparedSyntaxPlan(
 		Programs:         programs,
 		TargetsByProgram: targets,
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return nil
 		},
 	})
@@ -118,7 +118,7 @@ func TestLintPlanPublishesSyntacticStateAfterParallelPreparation(t *testing.T) {
 	plan, err := PrepareLintPlan(PrepareLintPlanOptions{
 		Programs:         programs,
 		TargetsByProgram: [][]string{{brokenPath, validPath}},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return nil
 		},
 	})
@@ -148,7 +148,7 @@ func TestLintPlanKeepsCleanSyntacticProjectionSparse(t *testing.T) {
 	plan, err := PrepareLintPlan(PrepareLintPlanOptions{
 		Programs:         wrapTestPrograms(gapProgram(t, directory, []string{firstPath, secondPath})),
 		TargetsByProgram: [][]string{{firstPath, secondPath}},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return nil
 		},
 	})
@@ -199,8 +199,8 @@ func TestLintPlanParallelSyntacticDiagnosticsPreserveTargetOrder(t *testing.T) {
 		plan, err := PrepareLintPlan(PrepareLintPlanOptions{
 			Programs:         programs,
 			TargetsByProgram: [][]string{{earlyValid, earlyBroken}, {lateBroken, lateValid}},
-			GetRulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
-				switch file.FileName() {
+			GetRulesForFile: func(file string) []rule.ConfiguredRule {
+				switch file {
 				case earlyValid:
 					close(earlyBlocked)
 					<-releaseEarly

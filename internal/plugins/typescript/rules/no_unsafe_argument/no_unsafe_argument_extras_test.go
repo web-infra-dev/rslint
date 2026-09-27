@@ -7,7 +7,6 @@ package no_unsafe_argument
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -56,7 +55,7 @@ func runNoUnsafeArgumentLenientProgram(
 		Programs:         programs,
 		TargetsByProgram: [][]string{{sourceFile.FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:             NoUnsafeArgumentRule.Name,
 				Severity:         rule.SeverityError,

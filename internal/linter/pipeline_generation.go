@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/program"
 )
 
 // releaseLease gives every acquired generation exact-once release semantics,
@@ -45,7 +46,7 @@ func projectGenerationTargets(
 		return nil, errors.New("linter pipeline: an in-memory snapshot requires a lint plan")
 	}
 	fileCount := plan.fileCount()
-	sources := make(map[string]ast.SourceFileLike, fileCount)
+	sources := make(map[string]program.Source, fileCount)
 	var lintedFiles []LintedFile
 	if collectLintedFiles {
 		lintedFiles = make([]LintedFile, 0, fileCount)
@@ -55,35 +56,23 @@ func projectGenerationTargets(
 			if err := ctx.Err(); err != nil {
 				return nil, err
 			}
-			source := filePlan.file
-			if source == nil {
-				continue
-			}
-			path := projectTargetPath(generation.Target.Path, source.FileName())
+			identity := filePlan.source
+			path := projectTargetPath(generation.Target.Path, identity.FileName())
 			if path == "" {
 				return nil, errors.New("linter pipeline: projected target path must not be empty")
 			}
-			if previous, duplicate := sources[path]; duplicate && previous != source {
-				return nil, fmt.Errorf("linter pipeline: duplicate projected target %q", path)
+			if previous, duplicate := sources[path]; duplicate && previous != identity {
+				// Two facades may wrap the same compiler generation. Materialize
+				// only collisions to preserve exact AST identity validation.
+				if previous.AST() != identity.AST() {
+					return nil, fmt.Errorf("linter pipeline: duplicate projected target %q", path)
+				}
 			}
-			sources[path] = source
+			sources[path] = identity
 			if collectLintedFiles {
-				lintedFiles = append(lintedFiles, LintedFile{Path: path, SourceFile: source})
+				lintedFiles = append(lintedFiles, LintedFile{Path: path, SourceFile: identity.AST()})
 			}
 		}
-	}
-	for _, filePlan := range plan.deferredFiles {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		path := projectTargetPath(generation.Target.Path, filePlan.fileName())
-		if path == "" {
-			return nil, errors.New("linter pipeline: projected target path must not be empty")
-		}
-		if _, duplicate := sources[path]; duplicate {
-			return nil, fmt.Errorf("linter pipeline: duplicate projected target %q", path)
-		}
-		sources[path] = nil
 	}
 	if snapshot.Empty() {
 		return lintedFiles, nil
@@ -95,10 +84,11 @@ func projectGenerationTargets(
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		source := sources[file.Path]
-		if source == nil {
+		identity, exists := sources[file.Path]
+		if !exists {
 			return nil, fmt.Errorf("linter pipeline: in-memory target %q is absent from its generation", file.Path)
 		}
+		source := identity.AST()
 		text, err := generation.Target.ReadText(file.Path, source)
 		if err != nil {
 			return nil, fmt.Errorf("linter pipeline: validate in-memory target %q: %w", file.Path, err)

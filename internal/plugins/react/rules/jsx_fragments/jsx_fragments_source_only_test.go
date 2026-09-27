@@ -3,7 +3,6 @@ package jsx_fragments
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -111,7 +110,7 @@ func TestJsxFragmentsSourceOnlyBindings(t *testing.T) {
 			linter.LintSingleFile(linter.LintSingleFileOptions{
 				Program: program,
 				File:    fileName,
-				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				GetRulesForFile: func(string) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{
 						Name:     JsxFragmentsRule.Name,
 						Severity: rule.SeverityError,

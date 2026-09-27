@@ -3,7 +3,6 @@ package consistent_type_exports
 import (
 	"reflect"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -861,7 +860,7 @@ func TestConsistentTypeExportsEditDemandAndDirectives(t *testing.T) {
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: program, File: file.FileName(), HasTypeInfo: true,
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: "@typescript-eslint/consistent-type-exports", Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners { return ConsistentTypeExportsRule.Run(ctx, options) }}}
 					},
 					Consumer: rule.DiagnosticConsumer{Demand: demand, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},

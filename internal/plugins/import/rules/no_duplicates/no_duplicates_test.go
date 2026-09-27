@@ -927,7 +927,7 @@ func createNoDuplicatesProgram(t testing.TB, fileName string, code string) (*com
 	return program, sourceFile
 }
 
-func noDuplicatesConfiguredRules(*ast.SourceFile) []rule.ConfiguredRule {
+func noDuplicatesConfiguredRules(string) []rule.ConfiguredRule {
 	return []rule.ConfiguredRule{{
 		Name:     no_duplicates.NoDuplicatesRule.Name,
 		Severity: rule.SeverityError,

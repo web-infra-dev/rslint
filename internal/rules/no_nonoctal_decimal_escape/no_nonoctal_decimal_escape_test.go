@@ -1335,8 +1335,8 @@ func runRuleLeniently(t *testing.T, code string, tsx bool) []rule.RuleDiagnostic
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program:                lintprogram.NewFromCompiler(program),
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-		GetRulesForFile: func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			if sf.FileName() != filePath {
+		GetRulesForFile: func(sf string) []rule.ConfiguredRule {
+			if sf != filePath {
 				return nil
 			}
 			return []rule.ConfiguredRule{configured}

@@ -278,7 +278,7 @@ func TestNoUnnecessaryAssertionIsFilteredFromSourceOnlyPrograms(t *testing.T) {
 		Programs:         []*lintprogram.Program{program},
 		TargetsByProgram: [][]string{{fileName}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:             NoUnnecessaryAssertionRule.Name,
 				Severity:         rule.SeverityError,

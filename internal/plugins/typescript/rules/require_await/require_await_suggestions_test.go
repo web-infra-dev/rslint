@@ -498,7 +498,7 @@ func TestRequireAwaitSuggestionDemand(t *testing.T) {
 			return RequireAwaitRule.Run(ctx, nil)
 		},
 	}}
-	getRules := func(*ast.SourceFile) []rule.ConfiguredRule { return configuredRules }
+	getRules := func(string) []rule.ConfiguredRule { return configuredRules }
 
 	diagnostics := make(map[rule.EditDemand]rule.RuleDiagnostic, 4)
 	for _, demand := range []rule.EditDemand{

@@ -392,7 +392,7 @@ func lintNoUnnecessaryArrayFlatDepthWithDemand(
 		Program:     program.NewFromCompiler(compilerProgram),
 		File:        sourceFile.FileName(),
 		HasTypeInfo: true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     no_unnecessary_array_flat_depth.NoUnnecessaryArrayFlatDepthRule.Name,
 				Severity: rule.SeverityError,

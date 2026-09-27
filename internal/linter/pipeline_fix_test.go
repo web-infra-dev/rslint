@@ -86,6 +86,54 @@ func TestPipelineDetachesSourcesAfterFreezingNativeAndPluginFixes(t *testing.T) 
 	}
 }
 
+func TestObservationDetachesFixSourcesOnTextFailure(t *testing.T) {
+	for _, mode := range []PluginExecution{PluginConcurrentJoined, PluginAfterNativeJoined} {
+		for _, failure := range []string{"read", "cancel"} {
+			t.Run(fmt.Sprintf("mode-%d/%s", mode, failure), func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				root := tspath.NormalizePath(t.TempDir())
+				path := tspath.ResolvePath(root, "source.ts")
+				generation := pipelineTestGeneration(t, root, path, "ab", []rule.ConfiguredRule{{
+					Name: "native/fix", Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						span := core.NewTextRange(0, 1)
+						ctx.ReportRangeWithFixes(span, rule.RuleMessage{Description: "fix"}, rule.RuleFix{Range: span, Text: "A"})
+						return nil
+					},
+				}}, nil)
+				wantErr := errors.New("source read failed")
+				if failure == "cancel" {
+					wantErr = context.Canceled
+				}
+				generation.Target.ReadText = func(_ string, source ast.SourceFileLike) (string, error) {
+					if _, ok := source.(*ast.SourceFile); !ok {
+						t.Fatal("fix source was detached before its text read")
+					}
+					if failure == "cancel" {
+						cancel()
+						return source.Text(), nil
+					}
+					return "", wantErr
+				}
+				var releases int
+				execution, err := executeObservation(ctx, pipelineTestProvider(generation, func() { releases++ }), SourceSnapshot{},
+					ObservationPolicy{Plugin: mode, Demand: ArtifactDemand{Native: rule.EditDemandAutofix}}, nil, 0, true, false)
+				if !errors.Is(err, wantErr) || releases != 1 {
+					t.Fatalf("error/releases = %v/%d, want %v/1", err, releases, wantErr)
+				}
+				diagnostics := execution.observation.Native.Diagnostics
+				if len(diagnostics) != 1 || diagnostics[0].SourceFile.Text() != "ab" || len(diagnostics[0].Fixes()) != 1 {
+					t.Fatalf("failed observation lost its diagnostic: %+v", diagnostics)
+				}
+				if _, retained := diagnostics[0].SourceFile.(*ast.SourceFile); retained {
+					t.Fatal("failed observation retained its AST after generation release")
+				}
+			})
+		}
+	}
+}
+
 func TestPipelineFreezesTextOnlyForFixableTargets(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	fixablePath := tspath.ResolvePath(root, "fixable.ts")
@@ -98,8 +146,8 @@ func TestPipelineFreezesTextOnlyForFixableTargets(t *testing.T) {
 			TargetsByProgram: [][]string{{fixablePath}, {nonFixablePath}},
 			SingleThreaded:   true,
 			Cwd:              root,
-			RulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
-				if source.FileName() != fixablePath {
+			RulesForFile: func(source string) []rule.ConfiguredRule {
+				if source != fixablePath {
 					return nil
 				}
 				return []rule.ConfiguredRule{{

@@ -76,7 +76,7 @@ func TestRunLinterDiagnosticConsumerEditDemand(t *testing.T) {
 				Programs:         programs,
 				SingleThreaded:   true,
 				TargetsByProgram: [][]string{{paths["edits.ts"]}},
-				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				GetRulesForFile: func(string) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{
 						Name:     "edit-demand",
 						Severity: rule.SeverityWarning,
@@ -175,7 +175,7 @@ func TestRunLinterDeferredFixesSkipSuppressedDiagnostic(t *testing.T) {
 		Programs:         programs,
 		SingleThreaded:   true,
 		TargetsByProgram: [][]string{{paths["suppressed.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     "deferred-rule",
 				Severity: rule.SeverityWarning,
@@ -231,7 +231,7 @@ func TestRunLinterDeferredBuilderMayDeclineArtifact(t *testing.T) {
 		Programs:         programs,
 		SingleThreaded:   true,
 		TargetsByProgram: [][]string{{paths["decline.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     "decline-fix",
 				Severity: rule.SeverityWarning,
@@ -305,7 +305,7 @@ func TestRunLinterLegacyReportsRespectEditDemand(t *testing.T) {
 				Programs:         programs,
 				SingleThreaded:   true,
 				TargetsByProgram: [][]string{{paths["legacy.ts"]}},
-				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				GetRulesForFile: func(string) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{
 						Name:     "legacy-report",
 						Severity: rule.SeverityWarning,
@@ -358,7 +358,7 @@ func TestRunLinterDiscardingConsumerSkipsDeferredEdits(t *testing.T) {
 		Programs:         programs,
 		SingleThreaded:   true,
 		TargetsByProgram: [][]string{{paths["discarded.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     "discarded",
 				Severity: rule.SeverityWarning,

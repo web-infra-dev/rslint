@@ -177,7 +177,7 @@ func fixAllGenerationWithNativeFixForTest(
 			return linter.Generation{}, nil, err
 		}
 		originalRules := generation.Native.RulesForFile
-		generation.Native.RulesForFile = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+		generation.Native.RulesForFile = func(sourceFile string) []rule.ConfiguredRule {
 			var configured []rule.ConfiguredRule
 			if originalRules != nil {
 				configured = append(configured, originalRules(sourceFile)...)

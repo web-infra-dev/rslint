@@ -112,8 +112,8 @@ func TestAutofixSyntaxGateStopsConcurrentPluginBeforeDispatch(t *testing.T) {
 			},
 			TargetsByProgram: [][]string{{brokenPath}, {pluginPath}},
 			SingleThreaded:   true,
-			RulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
-				if source.FileName() != pluginPath {
+			RulesForFile: func(source string) []rule.ConfiguredRule {
+				if source != pluginPath {
 					return nil
 				}
 				return []rule.ConfiguredRule{{Name: "plugin/fix", IsEslintPluginRule: true}}
