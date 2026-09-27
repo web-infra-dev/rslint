@@ -41,6 +41,9 @@ test('large links wait for memory; small tools retain concurrency; queued work s
     const second = await acquire(scheduler.endpoint, request('test', 0, 2));
     const third = await acquire(scheduler.endpoint, request('tool', 0, 3));
     assert.equal(scheduler.stats.max_reserved_mib, 40 * 1024);
+    assert.equal(scheduler.stats.max_concurrent_processes, 3);
+    assert.equal(scheduler.stats.max_concurrent_links, 1);
+    assert.equal(scheduler.stats.max_link_estimate_mib, 30 * 1024);
     const queuedFourth = once(changes, 'queue-4');
     const waiting = acquire(scheduler.endpoint, request('link', 24 * 1024, 4));
     await queuedFourth;
@@ -141,7 +144,7 @@ test('version probes preserve stdout, arguments, and exit status without needing
   assert.deepEqual(JSON.parse(result.stdout), ['-V=full', 'a b', '"quote"']);
 });
 
-test('test wrapper runs a real child only after its grant and records the sampled process ID', async () => {
+test('test wrapper forwards arguments and failure status and releases its reservation', async () => {
   const records = [];
   const scheduler = await createScheduler(40, 4, (record) =>
     records.push(record),
@@ -157,7 +160,7 @@ test('test wrapper runs a real child only after its grant and records the sample
         'exec',
         process.execPath,
         '-e',
-        'console.log(JSON.stringify({pid:process.pid,args:process.argv.slice(1)}));process.exitCode=3',
+        'console.log(JSON.stringify(process.argv.slice(1)));process.exitCode=3',
         '--',
         'a b',
         '中',
@@ -181,14 +184,52 @@ test('test wrapper runs a real child only after its grant and records the sample
     const [code] = await once(child, 'close');
     assert.equal(code, 3, error);
     const result = JSON.parse(output);
-    assert.deepEqual(result.args, ['a b', '中']);
-    assert.equal(records.find((r) => r.event === 'start').tool_pid, result.pid);
+    assert.deepEqual(result, ['a b', '中']);
     assert.deepEqual(
       records.map((r) => r.event),
-      ['queue', 'grant', 'start', 'release'],
+      ['queue', 'grant', 'release'],
     );
     assert.equal(records.at(-1).used_mib, 0);
   } finally {
     await scheduler.close();
   }
 });
+
+test(
+  'losing the coordinator stops a running tool and fails the wrapper',
+  { timeout: 15000 },
+  async () => {
+    const scheduler = await createScheduler(40, 4);
+    const script = fileURLToPath(
+      new URL('./windows-go-tools.mjs', import.meta.url),
+    );
+    const child = spawn(
+      process.execPath,
+      [
+        script,
+        'exec',
+        process.execPath,
+        '-e',
+        'console.log("started"); setInterval(() => {}, 1000)',
+      ],
+      {
+        env: {
+          ...process.env,
+          RSLINT_GO_SCHEDULER: JSON.stringify(scheduler.endpoint),
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    const completed = once(child, 'close');
+    try {
+      await once(child.stdout, 'data');
+      await scheduler.close();
+      const [code] = await completed;
+      assert.notEqual(code, 0);
+      assert.equal(scheduler.stats.grants, 1);
+    } finally {
+      await scheduler.close();
+      child.kill();
+    }
+  },
+);

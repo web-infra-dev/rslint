@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { appendFileSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,24 +27,19 @@ export function linkerInputs(args) {
       ? args[index + 1]
       : args.find((arg) => arg.startsWith('-importcfg='))?.slice(11);
   if (!config) throw new Error('Linker invocation has no import configuration');
-  const files = new Map();
+  const files = new Set();
   for (const line of readFileSync(config, 'utf8').split(/\r?\n/)) {
     const match = /^packagefile ([^=]+)=(.+)$/.exec(line);
-    if (match) files.set(match[2], match[1]);
+    if (match) files.add(match[2]);
   }
   // cmd/go places the main archive last. Cached archives have no .a suffix.
   const main = args.at(-1);
   if (!main || main.startsWith('-'))
     throw new Error('Linker invocation has no main archive');
-  files.set(main, '(main)');
-  const inputs = [...files].map(([file, name]) => ({
-    name,
-    bytes: statSync(file).size,
-  }));
+  files.add(main);
   return {
-    input_bytes: inputs.reduce((sum, input) => sum + input.bytes, 0),
-    input_count: inputs.length,
-    largest_inputs: inputs.sort((a, b) => b.bytes - a.bytes).slice(0, 8),
+    input_bytes: [...files].reduce((sum, file) => sum + statSync(file).size, 0),
+    input_count: files.size,
   };
 }
 
@@ -61,11 +56,16 @@ export async function createScheduler(budgetMiB, slotMiB, record = () => {}) {
   const sockets = new Set();
   const queue = [];
   let used = 0;
+  let active = 0;
+  let activeLinks = 0;
   const stats = {
     grants: 0,
     links: 0,
     oversized_links: 0,
     max_reserved_mib: 0,
+    max_concurrent_processes: 0,
+    max_concurrent_links: 0,
+    max_link_estimate_mib: 0,
     wait_ms: 0,
   };
   function drain() {
@@ -77,6 +77,8 @@ export async function createScheduler(budgetMiB, slotMiB, record = () => {}) {
       queue.shift();
       entry.active = true;
       used += entry.reserved_mib;
+      active++;
+      activeLinks += Number(entry.kind === 'link');
       const waitMs = Date.now() - entry.queuedAt;
       stats.grants++;
       stats.links += Number(entry.kind === 'link');
@@ -84,6 +86,20 @@ export async function createScheduler(budgetMiB, slotMiB, record = () => {}) {
         entry.kind === 'link' && entry.estimate_mib > budgetMiB,
       );
       stats.max_reserved_mib = Math.max(stats.max_reserved_mib, used);
+      stats.max_concurrent_processes = Math.max(
+        stats.max_concurrent_processes,
+        active,
+      );
+      stats.max_concurrent_links = Math.max(
+        stats.max_concurrent_links,
+        activeLinks,
+      );
+      if (entry.kind === 'link') {
+        stats.max_link_estimate_mib = Math.max(
+          stats.max_link_estimate_mib,
+          entry.estimate_mib,
+        );
+      }
       stats.wait_ms += waitMs;
       record({
         event: 'grant',
@@ -109,20 +125,8 @@ export async function createScheduler(budgetMiB, slotMiB, record = () => {}) {
           const end = buffer.indexOf('\n');
           const request = JSON.parse(buffer.slice(0, end));
           buffer = buffer.slice(end + 1);
-          if (entry) {
-            if (
-              !entry.active ||
-              entry.details.tool_pid ||
-              !Number.isSafeInteger(request.tool_pid) ||
-              request.tool_pid < 1
-            ) {
-              throw new Error('Invalid child process record');
-            }
-            entry.details.tool_pid = request.tool_pid;
-            record({ event: 'start', ...entry.details, used_mib: used });
-            continue;
-          }
           if (
+            entry ||
             request.token !== token ||
             !['tool', 'link', 'test'].includes(request.kind) ||
             !Number.isSafeInteger(request.input_bytes) ||
@@ -156,10 +160,11 @@ export async function createScheduler(budgetMiB, slotMiB, record = () => {}) {
       sockets.delete(socket);
       if (entry?.active) {
         used -= entry.reserved_mib;
+        active--;
+        activeLinks -= Number(entry.kind === 'link');
         record({
           event: 'release',
           pid: entry.details.pid,
-          tool_pid: entry.details.tool_pid,
           used_mib: used,
         });
       } else if (entry) {
@@ -210,9 +215,6 @@ export async function acquire(endpoint, details) {
 
 export async function execute(command, args, env = process.env, lease) {
   const child = spawn(command, args, { env, stdio: 'inherit' });
-  child.once('spawn', () =>
-    lease?.write(JSON.stringify({ tool_pid: child.pid }) + '\n'),
-  );
   const kill = () => child.kill();
   // A lost coordinator must not leave an unaccounted tool running.
   lease?.once('close', kill);
@@ -262,21 +264,7 @@ async function main([mode, ...args]) {
     throw new Error('Invalid CPU parallelism');
   // Missing memory quotas preserve the ordinary go command and its flags.
   if (budget === 0) return execute('go', [command, ...goArgs]);
-  const log = path.join(process.env.RUNNER_TEMP, 'windows-go-tools.jsonl');
-  const scheduler = await createScheduler(
-    budget,
-    Math.floor(budget / cpu),
-    (data) => {
-      appendFileSync(
-        log,
-        JSON.stringify({
-          utc: new Date().toISOString(),
-          phase: command,
-          ...data,
-        }) + '\n',
-      );
-    },
-  );
+  const scheduler = await createScheduler(budget, Math.floor(budget / cpu));
   // Go's quoted.Split strips quotes without interpreting backslash escapes.
   const wrapper = [process.execPath, script]
     .map((value) => {
