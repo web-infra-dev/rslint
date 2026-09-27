@@ -1,4 +1,4 @@
-// Schedule Go processes by estimated memory without reducing CPU parallelism.
+// Share an estimated memory budget across Windows Go tools over a named pipe.
 // cspell:ignore toolexec importcfg packagefile DWARF gcflags
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -50,6 +50,7 @@ async function createScheduler(budgetMiB, slotMiB) {
     throw new Error('Expected positive integer memory budgets');
   }
   const token = randomBytes(24).toString('hex');
+  const pipe = String.raw`\\.\pipe\rslint-go-${randomBytes(16).toString('hex')}`;
   const sockets = new Set();
   const queue = [];
   let used = 0;
@@ -70,17 +71,17 @@ async function createScheduler(budgetMiB, slotMiB) {
       const entry = queue[0];
       // An input larger than the entire estimate budget must run alone.
       // This is an explicit exception, not a claim of a hard memory bound.
-      if (used + entry.reserved_mib > budgetMiB) return;
+      if (used + entry.reservedMiB > budgetMiB) return;
       queue.shift();
       entry.active = true;
-      used += entry.reserved_mib;
+      used += entry.reservedMiB;
       active++;
       activeLinks += Number(entry.kind === 'link');
       const waitMs = Date.now() - entry.queuedAt;
       stats.grants++;
       stats.links += Number(entry.kind === 'link');
       stats.oversized_links += Number(
-        entry.kind === 'link' && entry.estimate_mib > budgetMiB,
+        entry.kind === 'link' && entry.estimateMiB > budgetMiB,
       );
       stats.max_reserved_mib = Math.max(stats.max_reserved_mib, used);
       stats.max_concurrent_processes = Math.max(
@@ -94,7 +95,7 @@ async function createScheduler(budgetMiB, slotMiB) {
       if (entry.kind === 'link') {
         stats.max_link_estimate_mib = Math.max(
           stats.max_link_estimate_mib,
-          entry.estimate_mib,
+          entry.estimateMiB,
         );
       }
       stats.wait_ms += waitMs;
@@ -109,36 +110,33 @@ async function createScheduler(budgetMiB, slotMiB) {
     socket.on('error', () => socket.destroy());
     socket.on('data', (chunk) => {
       buffer += chunk;
-      if (buffer.length > 16384) return socket.destroy();
+      // Each connection requests one lease and holds it until the tool exits.
+      if (entry || buffer.length > 16384) return socket.destroy();
+      if (!buffer.endsWith('\n')) return;
       try {
-        while (buffer.includes('\n')) {
-          const end = buffer.indexOf('\n');
-          const request = JSON.parse(buffer.slice(0, end));
-          buffer = buffer.slice(end + 1);
-          if (
-            entry ||
-            request.token !== token ||
-            !['tool', 'link', 'test'].includes(request.kind) ||
-            !Number.isSafeInteger(request.input_bytes) ||
-            request.input_bytes < 0
-          ) {
-            throw new Error('Invalid scheduler request');
-          }
-          const estimate =
-            request.kind === 'link'
-              ? estimateLinkMemoryMiB(request.input_bytes, slotMiB)
-              : slotMiB;
-          entry = {
-            socket,
-            kind: request.kind,
-            estimate_mib: estimate,
-            reserved_mib: Math.min(budgetMiB, estimate),
-            queuedAt: Date.now(),
-            active: false,
-          };
-          queue.push(entry);
-          drain();
+        const request = JSON.parse(buffer);
+        if (
+          request.token !== token ||
+          !['tool', 'link', 'test'].includes(request.kind) ||
+          !Number.isSafeInteger(request.inputBytes) ||
+          request.inputBytes < 0
+        ) {
+          throw new Error('Invalid scheduler request');
         }
+        const estimateMiB =
+          request.kind === 'link'
+            ? estimateLinkMemoryMiB(request.inputBytes, slotMiB)
+            : slotMiB;
+        entry = {
+          socket,
+          kind: request.kind,
+          estimateMiB,
+          reservedMiB: Math.min(budgetMiB, estimateMiB),
+          queuedAt: Date.now(),
+          active: false,
+        };
+        queue.push(entry);
+        drain();
       } catch {
         socket.destroy();
       }
@@ -146,7 +144,7 @@ async function createScheduler(budgetMiB, slotMiB) {
     socket.on('close', () => {
       sockets.delete(socket);
       if (entry?.active) {
-        used -= entry.reserved_mib;
+        used -= entry.reservedMiB;
         active--;
         activeLinks -= Number(entry.kind === 'link');
       } else if (entry) {
@@ -156,10 +154,11 @@ async function createScheduler(budgetMiB, slotMiB) {
       drain();
     });
   });
-  server.listen(0, '127.0.0.1');
+  // Windows owns the pipe lifetime; no TCP port or socket file to clean up.
+  server.listen(pipe);
   await once(server, 'listening');
   return {
-    endpoint: { port: server.address().port, token },
+    endpoint: { pipe, token },
     stats,
     async close() {
       // The go command has finished or been interrupted; no new work may start.
@@ -171,10 +170,7 @@ async function createScheduler(budgetMiB, slotMiB) {
 }
 
 async function acquire(endpoint, kind, inputBytes) {
-  const socket = net.createConnection({
-    host: '127.0.0.1',
-    port: endpoint.port,
-  });
+  const socket = net.createConnection(endpoint.pipe);
   socket.setEncoding('utf8');
   await once(socket, 'connect');
   const ready = new Promise((resolve, reject) => {
@@ -191,8 +187,7 @@ async function acquire(endpoint, kind, inputBytes) {
     });
   });
   socket.write(
-    JSON.stringify({ kind, input_bytes: inputBytes, token: endpoint.token }) +
-      '\n',
+    JSON.stringify({ kind, inputBytes, token: endpoint.token }) + '\n',
   );
   await ready;
   return socket;
@@ -246,7 +241,6 @@ async function main([mode, ...args]) {
     throw new Error('Invalid CPU parallelism');
   // Missing memory quotas preserve the ordinary go command and its flags.
   if (budget === 0) return execute('go', [command, ...goArgs]);
-  const scheduler = await createScheduler(budget, Math.floor(budget / cpu));
   // Go's quoted.Split strips quotes without interpreting backslash escapes.
   const wrapper = [process.execPath, script]
     .map((value) => {
@@ -255,6 +249,7 @@ async function main([mode, ...args]) {
       return `"${value}"`;
     })
     .join(' ');
+  const scheduler = await createScheduler(budget, Math.floor(budget / cpu));
   try {
     const flags = [`-toolexec=${wrapper} tool`];
     if (command === 'test') flags.push(`-exec=${wrapper} exec`);
@@ -266,6 +261,7 @@ async function main([mode, ...args]) {
       'Windows Go scheduler: ' +
         JSON.stringify({
           phase: command,
+          transport: 'named-pipe',
           budget_mib: budget,
           slot_mib: Math.floor(budget / cpu),
           ...scheduler.stats,
