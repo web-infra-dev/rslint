@@ -147,24 +147,8 @@ runs:
         $packages = @(go list @parallelArgs @targets | Where-Object { $_ -ne "" })
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         if ($packages.Count -eq 0) { throw 'No Go packages found for the full test run.' }
-        $batchSize = 32
-        $batch = @()
-
-        foreach ($pkg in $packages) {
-          $batch += $pkg
-
-          if ($batch.Count -ge $batchSize) {
-            Write-Host "Running batch of $($batch.Count) packages..."
-            go test @testParallelArgs -count=1 $batch
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            $batch = @()
-          }
-        }
-
-        # Run remaining packages
-        if ($batch.Count -gt 0) {
-          Write-Host "Running final batch of $($batch.Count) packages..."
-          go test @testParallelArgs -count=1 $batch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        }
+        Write-Host "Running all $($packages.Count) packages..."
+        # Pass the original patterns to stay within Windows command-line limits.
+        go test @testParallelArgs -count=1 @targets
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         Write-Host "Go tests completed: packages=$($packages.Count), elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
