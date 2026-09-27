@@ -208,6 +208,7 @@ export class IpcClient {
         finishPreparing = resolve;
       });
     }
+    let response: Promise<IpcMessage<TOut>>;
     try {
       const id = this.nextId++; // id > 0 always; notifications use 0
       const mapping = this.mappingSent ? undefined : this.sources?.descriptor;
@@ -222,7 +223,7 @@ export class IpcClient {
         throw new Error('IpcClient: closed during request serialization');
       this.mappingSent = true;
 
-      const promise = new Promise<IpcMessage<TOut>>((resolve, reject) => {
+      response = new Promise<IpcMessage<TOut>>((resolve, reject) => {
         this.pending.set(id, {
           resolve: resolve as (msg: IpcMessage) => void,
           reject,
@@ -230,13 +231,13 @@ export class IpcClient {
       });
       // Register pending BEFORE writing, including synchronous in-process peers.
       this.writeFrameNow(frame);
-      return promise;
     } finally {
       if (finishPreparing) {
         this.preparingFirstRequest = undefined;
         finishPreparing();
       }
     }
+    return response;
   }
 
   /**

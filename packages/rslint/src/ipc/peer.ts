@@ -46,7 +46,13 @@ export function spawnIpcPeer(options: IpcPeerOptions) {
     const client = new IpcClient(child.stdout, child.stdin, {
       sourceTransport: sources,
     });
-    return { child, client, close: () => client.close() };
+    return {
+      child,
+      client,
+      close: () => {
+        client.close();
+      },
+    };
   } catch (error) {
     sources?.close();
     throw error;
