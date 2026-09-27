@@ -99,6 +99,9 @@ runs:
         $targets = @(Get-Content (Join-Path $env:RUNNER_TEMP 'go-test-packages.txt'))
         if ($targets.Count -eq 0) { throw 'No Go packages selected for testing.' }
 
+        # Windows linkers preload object files into private memory. Test
+        # executables do not need DWARF; omit it in dependency objects too.
+        $compilerArgs = @('-gcflags=all=-dwarf=false')
         $parallelArgs = @()
         $packageParallelism = [int]$env:GOMAXPROCS
         $cpuLimit = 0
@@ -135,27 +138,28 @@ runs:
 
         Write-Host ("Runner quotas: " + (@{cpu_limit = $env:cpu_limit; memory_Limit = $env:memory_Limit} | ConvertTo-Json -Compress))
         Write-Host "Go limits: GOMAXPROCS=$env:GOMAXPROCS, build parallelism=$packageParallelism, test parallelism=$testParallelism, GOMEMLIMIT=$env:GOMEMLIMIT"
+        Write-Host "Go compiler flags: $($compilerArgs -join ' ')"
         $memoryLog = Join-Path $env:RUNNER_TEMP 'windows-go-memory.jsonl'
         $memoryStop = Join-Path $env:RUNNER_TEMP 'windows-go-memory.stop'
         Remove-Item $memoryLog, $memoryStop -ErrorAction SilentlyContinue
         $memoryJob = Start-Job -FilePath (Join-Path $env:ACTION_PATH 'windows-memory.ps1') -ArgumentList $memoryLog, $memoryStop, $PID
         try {
           if ($env:GO_TEST_MODE -eq 'affected') {
-            go test @testParallelArgs -count=1 @targets
+            go test @compilerArgs @testParallelArgs -count=1 @targets
             exit $LASTEXITCODE
           }
 
           $startedAt = [DateTime]::UtcNow
-          go build @parallelArgs @targets
+          go build @compilerArgs @parallelArgs @targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Write-Host "Go build completed: elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
 
-          $packages = @(go list @parallelArgs @targets | Where-Object { $_ -ne "" })
+          $packages = @(go list @compilerArgs @parallelArgs @targets | Where-Object { $_ -ne "" })
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ($packages.Count -eq 0) { throw 'No Go packages found for the full test run.' }
           Write-Host "Running all $($packages.Count) packages..."
           # Pass the original patterns to stay within Windows command-line limits.
-          go test @testParallelArgs -count=1 @targets
+          go test @compilerArgs @testParallelArgs -count=1 @targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Write-Host "Go tests completed: packages=$($packages.Count), elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
         } finally {
