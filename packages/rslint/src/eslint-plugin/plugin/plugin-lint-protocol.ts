@@ -114,9 +114,9 @@ export function buildPluginLintTasks(
   const collectTiming = input.collectTiming ?? false;
 
   return input.files.map((f) => {
-    // Only the CLI source adapter can resolve wire ranges. In particular, a
+    // Only the CLI application adapter can resolve attachment references. A
     // missing/older adapter must not turn a shared snapshot into a disk read.
-    if ('sourceRange' in f) {
+    if ('sourceIndex' in f || 'sourceRange' in f) {
       throw new Error('unresolved shared plugin source');
     }
     const configKey = f.configKey ?? '';

@@ -5,19 +5,20 @@
 //! No mapped memory or pointer is exposed to JavaScript; AST JSON is unchanged.
 
 mod mapping;
+mod protocol_generated;
 
-use napi::{Env, Error, JsString, Result};
+use protocol_generated::{
+    SourceMapping, CAPACITY, HEADER_SIZE, PROTOCOL_VERSION, PUBLICATION_STRIDE, SLOT_COUNT,
+    SLOT_SIZE,
+};
+
+use napi::{Error, Result};
 use napi_derive::napi;
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc, Mutex, OnceLock,
 };
-
-const SLOT_COUNT: usize = 16;
-const SLOT_SIZE: usize = 16 * 1024 * 1024;
-const HEADER_SIZE: usize = 4096;
-const CAPACITY: usize = HEADER_SIZE + SLOT_COUNT * SLOT_SIZE;
 
 // Native addon statics are shared by Node's worker isolates. An Arc pins BOTH
 // the slot contents and their mapping across revocation, shutdown and GC.
@@ -58,14 +59,6 @@ struct Slot {
     generation: u32,
     lease: u32,
     retired: bool,
-}
-
-#[napi(object)]
-pub struct SourceMapping {
-    pub version: u32,
-    pub fd: Option<i32>,
-    pub handle: Option<String>,
-    pub process_id: Option<u32>,
 }
 
 /// Owned by one CLI engine, never by a plugin worker. Creation may fail; the
@@ -173,42 +166,19 @@ pub struct SharedSource {
     pub length: u32,
 }
 
-#[napi(object)]
-pub struct SourceParseResult<'env> {
-    pub parsed: crate::ParseResult,
-    pub source_text: JsString<'env>,
-    pub had_bom: bool,
-}
-
-#[napi(catch_unwind)]
-pub fn parse_shared_source(
-    env: &Env,
-    filename: String,
+/// Pin the registered lease for the whole callback. Its borrowed slice cannot
+/// escape the callback, so revocation cannot unmap or reuse bytes while read.
+pub(crate) fn with_bytes<T>(
     source: SharedSource,
-    source_type: String,
-    jsx: bool,
-) -> Result<SourceParseResult<'_>> {
+    read: impl FnOnce(&[u8]) -> Result<T>,
+) -> Result<T> {
     let lease = readers()
         .lock()
         .map_err(|_| invalid())?
         .get(&source.lease)
         .cloned()
         .ok_or_else(invalid)?;
-    let bytes = lease.bytes(source.offset, source.length)?;
-    let text = std::str::from_utf8(bytes)
-        .map_err(|_| Error::from_reason("invalid shared source UTF-8"))?;
-    let had_bom = text.starts_with('\u{feff}');
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    crate::check_source_size(text.len())?;
-    let parsed = crate::parse::parse_estree(&filename, text, &source_type, jsx);
-    // N-API copies directly from borrowed UTF-8 into the required JS SourceCode
-    // string. There is no temporary Rust String and no JS -> Rust round trip.
-    let source_text = env.create_string(text)?;
-    Ok(SourceParseResult {
-        parsed,
-        source_text,
-        had_bom,
-    })
+    read(lease.bytes(source.offset, source.length)?)
 }
 
 #[cfg(test)]
@@ -248,15 +218,24 @@ mod tests {
         let mut arena = SourceArena::new().unwrap();
         arena.mapping.as_ref().unwrap().publish_for_test(0, 1);
         let id = arena.register(0, 1, 8).unwrap();
-        let reader = readers().lock().unwrap().get(&id).unwrap().clone();
-        assert!(!arena.release(id));
-        assert!(!readers().lock().unwrap().contains_key(&id));
-        assert!(arena.register(0, 2, 8).is_err());
-        arena.close();
-        assert!(arena.descriptor().is_err());
-        assert!(arena.register(1, 1, 8).is_err());
-        assert_eq!(reader.bytes(0, 8).unwrap(), &[0; 8]);
-        drop(reader);
+        with_bytes(
+            SharedSource {
+                lease: id,
+                offset: 0,
+                length: 8,
+            },
+            |bytes| {
+                assert!(!arena.release(id));
+                assert!(!readers().lock().unwrap().contains_key(&id));
+                assert!(arena.register(0, 2, 8).is_err());
+                arena.close();
+                assert!(arena.descriptor().is_err());
+                assert!(arena.register(1, 1, 8).is_err());
+                assert_eq!(bytes, &[0; 8]);
+                Ok(())
+            },
+        )
+        .unwrap();
         arena.close();
     }
 

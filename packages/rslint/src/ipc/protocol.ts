@@ -1,66 +1,41 @@
+import type { SharedSource } from '../native/binding.js';
+import type { WireMessage } from './protocol.generated.js';
+
 /**
- * Wire-format protocol types for the Go↔Node IPC transport, shared between
- * the Go side (`internal/ipc.Channel`, and `internal/api` for `--api` mode)
- * and the Node {@link IpcClient}.
- *
- * The frame layout is `[4 bytes u32 LE length][JSON payload]`. The payload is
- * the {@link IpcMessage} `{kind, id, data}` triple, mirroring Go's
- * `ipc.Message` byte-for-byte. The two definitions must stay in lockstep; the
- * cross-language contract tests pin it.
+ * Handler-facing types for Go↔Node IPC. Go owns the generated wire envelope
+ * and framing constants. IpcClient resolves its text attachments and hides
+ * storage metadata before delivering a message to an application handler.
  *
  * This is pure transport protocol — it carries no knowledge of any specific
  * task (lint, …); those live in their own layers.
  */
 
 /**
- * Frame kinds used in {@link IpcMessage.kind}. A string union so consumers can
- * switch exhaustively. These map directly to Go's `MessageKind` constants.
+ * Application kinds remain opaque to IPC; infrastructure kinds come from Go.
  */
-export type MessageKind =
-  // ── shared infrastructure (also consumed by `--api` mode for wasm/rslint-api) ──
-  | 'lint'
-  | 'getAstInfo'
-  | 'response'
-  | 'error'
-  | 'handshake'
-  | 'exit'
-  // ── CLI host-process IPC kinds ──
-  // (Go child ↔ Node parent over stdio. The LSP path is NOT wired
-  //  through these frames — it uses LSP custom requests instead.)
-  | 'init'
-  | 'cancel'
-  | 'output'
-  | 'log'
-  | 'shutdown'
-  // Go -> Node reverse request: evaluate one staged config frontier. The same
-  // logical payload is used by the API and LSP adapters.
-  | 'loadConfigs'
-  | 'activateConfigs'
-  // CLI-only: start the same activation, returning provisional metadata for
-  // planning. activateConfigs must complete before lint/fix execution.
-  | 'prepareConfigs'
-  // Go → Node reverse request: run JS ESLint-plugin rules for a batch of
-  // files in the worker pool and return the diagnostics.
-  | 'pluginLint';
+export type MessageKind = WireMessage['kind'];
+
+/** Complete inline text or a revocable, pointer-free native reader capability. */
+export type IpcAttachment = string | SharedSource;
 
 /**
  * Single IPC frame (JSON-decoded). `id` is 0 for notifications and a positive
  * monotonic integer for requests/responses. `data` is the untyped payload —
  * handlers re-decode into a typed shape as needed.
  */
-export interface IpcMessage<T = unknown> {
-  kind: MessageKind;
-  id: number;
+export interface IpcMessage<T = unknown> extends Omit<
+  WireMessage,
+  'data' | 'attachments' | 'transport'
+> {
   data?: T;
+  attachments?: readonly IpcAttachment[];
 }
 
 /**
  * Canonical error payload sent in `error` frames. Mirrors Go's
  * `ipc.ErrorResponseData`.
  */
-export interface ErrorResponseData {
-  message: string;
-}
+export type { ErrorResponseData } from './protocol.generated.js';
 
 /**
  * Inbound request handler signature. Returning a value resolves the matching

@@ -51,8 +51,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
-	"github.com/web-infra-dev/rslint/internal/ipc/sharedsource"
 	"github.com/web-infra-dev/rslint/internal/output"
+	"github.com/web-infra-dev/rslint/internal/pluginlint"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -63,7 +63,6 @@ const (
 	kindInit            ipc.MessageKind = "init"            // Node → Go: handshake payload
 	kindShutdown        ipc.MessageKind = "shutdown"        // Go → Node: lint done
 	kindOutput          ipc.MessageKind = "output"          // Go → Node: forwarded stdout text (request = acknowledged)
-	kindPluginLint      ipc.MessageKind = "pluginLint"      // Go → Node: run ESLint-plugin rules in a worker
 	kindLoadConfigs     ipc.MessageKind = "loadConfigs"     // Go → Node: evaluate one config frontier
 	kindActivateConfigs ipc.MessageKind = "activateConfigs" // Go → Node: prepare the effective config/plugin set
 	kindPrepareConfigs  ipc.MessageKind = "prepareConfigs"  // Go → Node: start activation, return planning metadata
@@ -155,9 +154,8 @@ type runtimePayload struct {
 	// observe this itself (its own stdout is the IPC pipe). Absent (false)
 	// when unavailable (for example in the wasm fallback), which degrades to
 	// colorless output.
-	StdoutIsTTY    bool                     `json:"stdoutIsTTY,omitempty"`
-	SingleThreaded bool                     `json:"singleThreaded,omitempty"`
-	PluginSources  *sharedsource.Descriptor `json:"pluginSources,omitempty"`
+	StdoutIsTTY    bool `json:"stdoutIsTTY,omitempty"`
+	SingleThreaded bool `json:"singleThreaded,omitempty"`
 }
 
 // runCLIState carries the init-handshake outcome from the inbound handler
@@ -411,8 +409,7 @@ func runCLI(args []string) int {
 	// Reverse dispatcher: send each plugin-lint batch back to the Node host
 	// over the IPC channel and decode its result. Runs concurrently with the
 	// native lint pass (handleLintCommand awaits it before output / --fix).
-	plugins := newPluginLintDispatcher(ch, delivery.payload.Runtime.PluginSources)
-	defer plugins.close()
+	plugins := pluginlint.New(ch)
 
 	// Hold the --timing table until Node confirms that its real stdout sink has
 	// completed every forwarded write. Draining the Go pipe alone is not a
@@ -421,7 +418,7 @@ func runCLI(args []string) int {
 	baseArgs.DeferTimingTable = func(table string) { timingTable = table }
 	baseArgs.StartWriter = acknowledgedOutputWriter{ctx: lintCtx, channel: ch}
 
-	exitCode := handleLintCommand(baseArgs, lintCtx, plugins.dispatch)
+	exitCode := handleLintCommand(baseArgs, lintCtx, plugins.Dispatch)
 
 	finalizeStdout()
 	// Publish cancellation synchronously before deciding whether to perform the

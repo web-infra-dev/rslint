@@ -10,10 +10,11 @@ mod parse;
 mod source_transport;
 mod token_map;
 
+use napi::{Env, JsString};
 use napi_derive::napi;
 
 pub use parse::{CommentObj, ParseResult};
-pub use source_transport::parse_shared_source;
+use source_transport::SharedSource;
 
 /// Reject sources whose serialized ESTree JSON would exceed V8's ~512MB single-string
 /// cap (the JSON is ~9-26x the source size). This is the JSON-transfer ceiling
@@ -41,6 +42,42 @@ pub fn parse(
 ) -> napi::Result<ParseResult> {
     check_source_size(source.len())?;
     Ok(parse::parse_estree(&filename, &source, &source_type, jsx))
+}
+
+#[napi(object)]
+pub struct SourceParseResult<'env> {
+    pub parsed: ParseResult,
+    pub source_text: JsString<'env>,
+    pub had_bom: bool,
+}
+
+/// Parse a source snapshot while its transport lease pins the mapped bytes.
+/// Source decoding and BOM handling belong to this parser boundary, not the
+/// shared-memory owner. The ESTree JSON result is identical to inline parsing.
+#[napi(catch_unwind)]
+pub fn parse_shared_source(
+    env: &Env,
+    filename: String,
+    source: SharedSource,
+    source_type: String,
+    jsx: bool,
+) -> napi::Result<SourceParseResult<'_>> {
+    source_transport::with_bytes(source, |bytes| {
+        let text = std::str::from_utf8(bytes)
+            .map_err(|_| napi::Error::from_reason("invalid shared source UTF-8"))?;
+        let had_bom = text.starts_with('\u{feff}');
+        let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+        check_source_size(text.len())?;
+        let parsed = parse::parse_estree(&filename, text, &source_type, jsx);
+        // N-API copies borrowed UTF-8 directly into the required JS SourceCode
+        // string, with no temporary Rust String or JS -> Rust round trip.
+        let source_text = env.create_string(text)?;
+        Ok(SourceParseResult {
+            parsed,
+            source_text,
+            had_bom,
+        })
+    })
 }
 
 fn check_source_size(size: usize) -> napi::Result<()> {

@@ -108,6 +108,11 @@ type Channel struct {
 	nextID   int
 	closed   bool
 	closeErr error
+	// Source storage is optional and belongs to this channel. Bootstrap is
+	// serialized with closure; application handlers never own a mapping.
+	sources            *sourcePool
+	sourcesInitialized bool
+	closeDone          chan struct{}
 	// writeSealed rejects frames that have not yet passed write admission.
 	// It is published while writeMu is held on a terminal response or write
 	// fault, closing the unlock-before-close race for queued writers.
@@ -144,6 +149,7 @@ func NewChannel(r io.Reader, w io.Writer) *Channel {
 		nextID:         1, // requests use id > 0; notifications use 0
 		notifyHandlers: make(map[MessageKind]NotificationHandler),
 		done:           make(chan struct{}),
+		closeDone:      make(chan struct{}),
 		inCtx:          ctx,
 		inCancel:       cancel,
 		writeTimeout:   defaultWriteTimeout,
@@ -187,8 +193,13 @@ func (c *Channel) Start() {
 func (c *Channel) Done() <-chan struct{} { return c.done }
 
 // SendRequest sends a request and blocks until the matching response/error
-// arrives, ctx is cancelled, or the channel closes.
-func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any) (*Message, error) {
+// arrives, ctx is cancelled, or the channel closes. Optional complete text
+// attachments travel inline or through the channel's negotiated source storage;
+// their transport metadata never changes the application payload.
+func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any, attachments ...string) (*Message, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	msg, err := NewMessage(kind, 0, payload)
 	if err != nil {
 		return nil, err
@@ -215,7 +226,9 @@ func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any
 	msg.ID = id
 	ch := make(chan *Message, 1) // buffered so dispatch never blocks
 	c.pending[id] = ch
+	sources := c.sources
 	c.mu.Unlock()
+	batch := attachTexts(msg, sources, attachments)
 
 	// Register pending BEFORE writing — a fast peer could respond before
 	// the resolver is in the map otherwise. A write failure cascade-closes
@@ -229,6 +242,12 @@ func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any
 
 	select {
 	case resp := <-ch:
+		// Both successful and failed application requests can acknowledge a
+		// completed native revocation. Cancellation/orphan replies never do.
+		if batch != nil && resp.Transport != nil && resp.Transport.Released != nil &&
+			*resp.Transport.Released == *batch {
+			sources.release(*batch)
+		}
 		if resp.Kind == KindError {
 			var e ErrorResponseData
 			_ = resp.Decode(&e)
@@ -435,6 +454,10 @@ func (c *Channel) dispatch(msg *Message) {
 	// frames (lets an in-handler SendRequest receive its reply). A handler
 	// panic is trapped and surfaced as an error frame, never crashing the
 	// process (mirrors the Node side's runSafely).
+	if err := c.initializeSources(msg.Transport); err != nil {
+		c.sendError(msg.ID, err.Error())
+		return
+	}
 	h := c.inbound
 	if h == nil {
 		c.sendError(msg.ID, fmt.Sprintf("no inbound handler registered (kind=%s)", msg.Kind))
@@ -560,13 +583,13 @@ func newResponseMessage(id int, payload any) (msg *Message, err error) {
 // us — so an inline close deadlocks the exit path and a backgrounded close just
 // leaks a second goroutine wedged the same way.
 //
-// Interrupting readLoop is unnecessary. This Channel is used only by the CLI
-// (cmd/rslint/ipc_cli.go), which always terminates via os.Exit (main.go); that
-// reaps a parked readLoop goroutine instantly. Everything other code observes on
-// close — closeErr, c.done, inbound ctx cancellation — is published here
-// regardless, so SendRequest waiters and Done() consumers wake exactly as
-// before. When readLoop itself originates the close (a ReadFrame error), its
-// reader has already returned and the goroutine exits on its own.
+// The connection owner controls reader lifetime and eventually supplies EOF or
+// disposes the hosting process. Everything other code observes on close —
+// closeErr, c.done, inbound ctx cancellation — is published here regardless,
+// so pending requests wake without waiting for that reader. When readLoop
+// itself originates the close, its reader has already returned and the
+// goroutine exits on its own. Shared-source cleanup waits only for active
+// memory writers, never for a blocked stream reader or arbitrary io.Writer.
 func (c *Channel) closeWith(cause error) {
 	c.mu.Lock()
 	if c.closed {
@@ -584,14 +607,23 @@ func (c *Channel) closeWith(cause error) {
 		c.writeSealErr = c.closeErr
 	}
 	c.pending = make(map[int]chan *Message) // drop refs; waiters wake via c.done
+	sources := c.sources
+	c.sources = nil
 	c.mu.Unlock()
 
 	c.inCancel()
 	close(c.done)
+	if sources != nil {
+		// Wait for any copy/publication before releasing the mapping. An in-flight native
+		// reader owns its own retained view in the peer process.
+		_ = sources.close()
+	}
+	close(c.closeDone)
 }
 
 // Close shuts the channel down. Pending requests fail with a stable error.
 func (c *Channel) Close() error {
 	c.closeWith(errors.New("closed by caller"))
+	<-c.closeDone
 	return nil
 }

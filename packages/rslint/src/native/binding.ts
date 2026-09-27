@@ -22,6 +22,7 @@
 import { createRequire } from 'node:module';
 
 import { platformPackageName } from './platform-tuple.js';
+import type { SourceMapping, SourceRange } from '../ipc/protocol.generated.js';
 
 const require = createRequire(import.meta.url);
 
@@ -47,17 +48,8 @@ export interface ParseResult {
 }
 
 /** Opaque reader capability; never a pointer or a filesystem path. */
-export interface SharedSource {
+export interface SharedSource extends SourceRange {
   lease: number;
-  offset: number;
-  length: number;
-}
-
-export interface SourceMapping {
-  version: number;
-  fd?: number;
-  handle?: string;
-  processId?: number;
 }
 
 export interface SourceArena {

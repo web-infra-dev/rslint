@@ -6,14 +6,10 @@
  * Wire format and message shape mirror Go's `internal/ipc.Channel`:
  *
  *   `[4 bytes u32 LE length][JSON payload]`
- *   payload  = { kind: MessageKind, id: number, data?: unknown }
+ *   payload = generated WireMessage, with optional text attachments
  *
- * This is the Node-side counterpart to Go's `internal/ipc.Channel`. The
- * two are deliberately not import-coupled — keeping the packages
- * independent lets the IPC contract evolve via tests rather than via a
- * shared type module. Cross-language wire compatibility is exercised
- * end-to-end through the real CLI path (rslint-test-tools spawns the Go
- * binary over this transport); both ends must agree on the framing above.
+ * Go owns the generated framing constants and wire types consumed here.
+ * Cross-language tests exercise the same contract through the real CLI.
  *
  * Concurrency model:
  *
@@ -40,6 +36,19 @@
  */
 
 import type { Readable, Writable } from 'node:stream';
+import {
+  FRAME_HEADER_SIZE as HEADER_BYTES,
+  MAX_FRAME_SIZE as MAX_FRAME_BYTES,
+  KIND_RESPONSE as RESPONSE_KIND,
+  KIND_ERROR as ERROR_KIND,
+  type SourceBatch,
+  type WireMessage,
+} from './protocol.generated.js';
+import {
+  receiveAttachments,
+  type ReceivedAttachments,
+  type SourceTransport,
+} from './source-transport.js';
 import type {
   IpcMessage,
   MessageKind,
@@ -54,22 +63,11 @@ interface PendingRequest {
   reject: (err: Error) => void;
 }
 
-/** Symbol-like sentinel kinds we route specially. */
-const RESPONSE_KIND: MessageKind = 'response';
-const ERROR_KIND: MessageKind = 'error';
-
-/** Header is 4 bytes u32 LE. */
-const HEADER_BYTES = 4;
-/**
- * Per-frame body cap, matched to Go's `maxFrameSize` (internal/ipc/frame.go).
- * A peer that writes a frame larger than this is treated as a stream
- * desync and the connection is torn down — without this guard a
- * malformed length header would let the read queue grow unboundedly
- * until the worker OOMs.
- */
-const MAX_FRAME_BYTES = 256 * 1024 * 1024;
+type WireFrame<T = unknown> = Omit<WireMessage, 'data'> & { data?: T };
 
 export interface IpcClientOptions {
+  /** Native reader storage, owned and closed by this IPC session. */
+  readonly sourceTransport?: SourceTransport;
   /**
    * Initial buffer size for the read accumulator. Frames larger than this
    * will simply grow the buffer; this is just a starting hint for typical
@@ -105,11 +103,14 @@ export class IpcClient {
   private nextId = 1;
   private closed = false;
   private started = false;
+  private readonly sources: SourceTransport | undefined;
+  private mappingSent = false;
+  private preparingFirstRequest: Promise<void> | undefined;
 
   constructor(input: Readable, output: Writable, opts: IpcClientOptions = {}) {
     this.input = input;
     this.output = output;
-    void opts; // reserved for future use; signature stable
+    this.sources = opts.sourceTransport;
   }
 
   /**
@@ -146,7 +147,7 @@ export class IpcClient {
    * all pending and flip closed.
    */
   start(): void {
-    if (this.started) return;
+    if (this.started || this.closed) return;
     this.started = true;
 
     this.input.on('data', this.onChunk);
@@ -169,6 +170,7 @@ export class IpcClient {
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    this.sources?.close();
 
     this.input.off('data', this.onChunk);
     this.input.off('end', this.onEnd);
@@ -192,24 +194,49 @@ export class IpcClient {
   async sendRequest<TIn = unknown, TOut = unknown>(
     kind: Exclude<MessageKind, 'response' | 'error'>,
     data: TIn,
+    attachments?: readonly string[],
   ): Promise<IpcMessage<TOut>> {
+    // A payload's toJSON may synchronously call sendRequest again. Keep only
+    // bootstrap serialization ordered so the mapping stays on the first frame.
+    if (this.preparingFirstRequest) await this.preparingFirstRequest;
     if (this.closed) {
       throw new Error('IpcClient: cannot sendRequest on closed client');
     }
-    const id = this.nextId++; // id > 0 always; notifications use 0
-    const frame = encodeFrame({ kind, id, data });
-
-    const promise = new Promise<IpcMessage<TOut>>((resolve, reject) => {
-      this.pending.set(id, {
-        resolve: resolve as (msg: IpcMessage) => void,
-        reject,
+    let finishPreparing: (() => void) | undefined;
+    if (this.sources && !this.mappingSent) {
+      this.preparingFirstRequest = new Promise<void>((resolve) => {
+        finishPreparing = resolve;
       });
-    });
+    }
+    try {
+      const id = this.nextId++; // id > 0 always; notifications use 0
+      const mapping = this.mappingSent ? undefined : this.sources?.descriptor;
+      const frame = encodeFrame({
+        kind,
+        id,
+        data,
+        attachments: attachments?.map((text) => ({ text })),
+        transport: mapping ? { mapping } : undefined,
+      });
+      if (this.closed)
+        throw new Error('IpcClient: closed during request serialization');
+      this.mappingSent = true;
 
-    // Order matters: register pending BEFORE writing, otherwise a fast
-    // peer could respond before the resolver is in the map.
-    this.writeFrameNow(frame);
-    return promise;
+      const promise = new Promise<IpcMessage<TOut>>((resolve, reject) => {
+        this.pending.set(id, {
+          resolve: resolve as (msg: IpcMessage) => void,
+          reject,
+        });
+      });
+      // Register pending BEFORE writing, including synchronous in-process peers.
+      this.writeFrameNow(frame);
+      return promise;
+    } finally {
+      if (finishPreparing) {
+        this.preparingFirstRequest = undefined;
+        finishPreparing();
+      }
+    }
   }
 
   /**
@@ -231,20 +258,27 @@ export class IpcClient {
    * advanced users can reply asynchronously from outside the handler.
    */
   sendResponse<TOut = unknown>(reqId: number, data: TOut): void {
-    if (this.closed) return;
-    this.writeFrameNow(encodeFrame({ kind: 'response', id: reqId, data }));
+    this.writeResponse(RESPONSE_KIND, reqId, data);
   }
 
-  /**
-   * Send an `error` reply. Same caveat as {@link sendResponse}.
-   */
+  /** Send a manual error reply; request-owned release remains internal. */
   sendErrorResponse(reqId: number, message: string): void {
+    this.writeResponse(ERROR_KIND, reqId, { message });
+  }
+
+  private writeResponse(
+    kind: string,
+    id: number,
+    data: unknown,
+    released?: SourceBatch,
+  ): void {
     if (this.closed) return;
     this.writeFrameNow(
-      encodeFrame<ErrorResponseData>({
-        kind: 'error',
-        id: reqId,
-        data: { message },
+      encodeFrame({
+        kind,
+        id,
+        data,
+        transport: released ? { released } : undefined,
       }),
     );
   }
@@ -281,6 +315,7 @@ export class IpcClient {
     for (const [, p] of this.pending) p.reject(wrapped);
     this.pending.clear();
     this.closed = true;
+    this.sources?.close();
     // Detach listeners to mirror close() — close() itself is a no-op
     // now (closed=true) but we should not leave the input listeners
     // dangling.
@@ -309,6 +344,7 @@ export class IpcClient {
     for (const [, p] of this.pending) p.reject(err);
     this.pending.clear();
     this.closed = true;
+    this.sources?.close();
     this.input.off('data', this.onChunk);
     this.input.off('end', this.onEnd);
     this.input.off('error', this.onStreamError);
@@ -334,7 +370,7 @@ export class IpcClient {
     this.chunks.push(chunk);
     this.bufferedBytes += chunk.length;
 
-    while (this.bufferedBytes >= HEADER_BYTES) {
+    while (!this.closed && this.bufferedBytes >= HEADER_BYTES) {
       const len = this.peekHeaderLen();
       // Symmetric to Go's `maxFrameSize = 256 MiB` in
       // internal/ipc/frame.go. A frame length that exceeds the
@@ -362,9 +398,9 @@ export class IpcClient {
       const frame = this.consumeFront(HEADER_BYTES + len);
       const body = frame.subarray(HEADER_BYTES);
 
-      let msg: IpcMessage;
+      let msg: WireMessage;
       try {
-        msg = JSON.parse(body.toString('utf8')) as IpcMessage;
+        msg = JSON.parse(body.toString('utf8')) as WireMessage;
       } catch (err) {
         // Malformed frame — log and skip; framing is intact (we already
         // consumed the body), so subsequent frames decode normally.
@@ -464,6 +500,7 @@ export class IpcClient {
     // immediately instead of an indefinite hang.
     if (this.closed) return;
     this.closed = true;
+    this.sources?.close();
     const err = new Error('IpcClient: peer closed input stream');
     for (const [, p] of this.pending) p.reject(err);
     this.pending.clear();
@@ -485,7 +522,7 @@ export class IpcClient {
   };
 
   /** Route a fully decoded frame. */
-  private dispatch(msg: IpcMessage): void {
+  private dispatch(msg: WireMessage): void {
     if (msg.kind === RESPONSE_KIND || msg.kind === ERROR_KIND) {
       this.routeResponse(msg);
       return;
@@ -497,7 +534,7 @@ export class IpcClient {
     this.dispatchInboundRequest(msg);
   }
 
-  private routeResponse(msg: IpcMessage): void {
+  private routeResponse(msg: WireMessage): void {
     const p = this.pending.get(msg.id);
     if (!p) {
       process.stderr.write(
@@ -518,40 +555,101 @@ export class IpcClient {
       );
       return;
     }
-    p.resolve(msg);
+    try {
+      // This endpoint only writes inline attachments. Shared response ownership
+      // would need a separate caller lifetime, so reject it before admitting a lease.
+      if (msg.transport?.batch !== undefined) {
+        throw new Error('unexpected shared IPC response attachments');
+      }
+      const received = receiveAttachments(msg.attachments, undefined);
+      p.resolve(this.handlerMessage(msg, received));
+    } catch (error) {
+      p.reject(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 
-  private dispatchNotification(msg: IpcMessage): void {
+  private handlerMessage(
+    msg: WireMessage,
+    received: ReceivedAttachments,
+  ): IpcMessage {
+    const result: IpcMessage = { kind: msg.kind, id: msg.id };
+    if (msg.data !== undefined) result.data = msg.data;
+    if (received.values !== undefined) result.attachments = received.values;
+    return result;
+  }
+
+  private dispatchNotification(msg: WireMessage): void {
     const handler = this.notificationHandlers.get(msg.kind);
     if (!handler) {
-      // A notification with no registered handler is unexpected — the peer
-      // only emits kinds we register. Surface it to stderr as a diagnostic
-      // rather than erroring; the frame body is already fully consumed.
       process.stderr.write(`rslint: unhandled notification kind=${msg.kind}\n`);
       return;
     }
-    void runSafely(async () => handler(msg), `notification:${msg.kind}`);
+    void runSafely(async () => {
+      // Notifications have no acknowledgement and cannot own shared storage.
+      if (msg.transport?.batch !== undefined) {
+        throw new Error('shared IPC attachments require a request');
+      }
+      const received = receiveAttachments(msg.attachments, undefined);
+      await handler(this.handlerMessage(msg, received));
+    }, `notification:${msg.kind}`);
   }
 
-  private dispatchInboundRequest(msg: IpcMessage): void {
-    const handler = this.inboundHandler;
-    if (!handler) {
-      this.sendErrorResponse(
-        msg.id,
-        `no inbound handler registered (kind=${msg.kind})`,
-      );
-      return;
-    }
-    // Spawn the handler async so the data loop continues to consume frames
-    // even while a handler awaits. This is what enables in-handler
-    // sendRequest to receive its reply.
+  private dispatchInboundRequest(msg: WireMessage): void {
+    // Keep the read loop running while handlers await nested IPC or workers.
     void (async () => {
+      let received: ReceivedAttachments | undefined;
+      let released: SourceBatch | undefined;
+      let kind: string = RESPONSE_KIND;
+      let result: unknown;
       try {
-        const result = await handler(msg);
-        this.sendResponse(msg.id, result);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        this.sendErrorResponse(msg.id, message);
+        if (
+          msg.transport !== undefined &&
+          (msg.transport === null ||
+            typeof msg.transport !== 'object' ||
+            Array.isArray(msg.transport) ||
+            msg.transport.mapping !== undefined ||
+            msg.transport.released !== undefined)
+        ) {
+          throw new Error('invalid inbound IPC transport metadata');
+        }
+        received = receiveAttachments(
+          msg.attachments,
+          msg.transport?.batch,
+          this.sources,
+        );
+        const handler = this.inboundHandler;
+        if (!handler) {
+          throw new Error(`no inbound handler registered (kind=${msg.kind})`);
+        }
+        result = await handler(this.handlerMessage(msg, received));
+      } catch (error) {
+        kind = ERROR_KIND;
+        result = {
+          message: safeErrorMessage(error),
+        };
+      } finally {
+        try {
+          released = received?.release();
+        } catch (error) {
+          kind = ERROR_KIND;
+          result = {
+            message: safeErrorMessage(error),
+          };
+        }
+      }
+      try {
+        this.writeResponse(kind, msg.id, result, released);
+      } catch (error) {
+        // Serialization can fail after the handler returned. The already-proven
+        // release still belongs on its error reply, never on the business result.
+        this.writeResponse(
+          ERROR_KIND,
+          msg.id,
+          {
+            message: safeErrorMessage(error),
+          },
+          released,
+        );
       }
     })();
   }
@@ -564,7 +662,7 @@ export class IpcClient {
 /**
  * Encode an IPC message into the `[4B u32 LE length][JSON]` wire format.
  */
-export function encodeFrame<T = unknown>(msg: IpcMessage<T>): Buffer {
+export function encodeFrame<T = unknown>(msg: WireFrame<T>): Buffer {
   const body = Buffer.from(JSON.stringify(msg), 'utf8');
   const out = Buffer.allocUnsafe(HEADER_BYTES + body.length);
   out.writeUInt32LE(body.length, 0);
@@ -582,7 +680,7 @@ export function encodeFrame<T = unknown>(msg: IpcMessage<T>): Buffer {
  */
 export function decodeFrame(
   buf: Buffer,
-): { msg: IpcMessage; consumed: number } | null {
+): { msg: WireMessage; consumed: number } | null {
   if (buf.length < HEADER_BYTES) return null;
   const len = buf.readUInt32LE(0);
   // Enforce the same cap as the streaming path (ipc-client.ts:290).
@@ -598,7 +696,7 @@ export function decodeFrame(
   }
   if (buf.length < HEADER_BYTES + len) return null;
   const body = buf.subarray(HEADER_BYTES, HEADER_BYTES + len);
-  const msg = JSON.parse(body.toString('utf8')) as IpcMessage;
+  const msg = JSON.parse(body.toString('utf8')) as WireMessage;
   return { msg, consumed: HEADER_BYTES + len };
 }
 
@@ -612,7 +710,16 @@ async function runSafely(fn: () => unknown, tag: string): Promise<void> {
     const ret = fn();
     if (ret instanceof Promise) await ret;
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = safeErrorMessage(err);
     process.stderr.write(`rslint: handler ${tag} threw: ${message}\n`);
+  }
+}
+
+/** Error conversion itself must not prevent revocation acknowledgements. */
+function safeErrorMessage(error: unknown): string {
+  try {
+    return error instanceof Error ? String(error.message) : String(error);
+  } catch {
+    return 'request failed';
   }
 }

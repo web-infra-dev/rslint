@@ -5,13 +5,12 @@
 // packages/rslint/src/ipc/client.ts):
 //
 //	[4 bytes u32 LE length][JSON body]
-//	body = Message{kind, id, data}
+//	body = Message{kind, id, data, attachments?, transport?}
 //
 // `data` is opaque to the transport (json.RawMessage). Application layers
 // marshal/unmarshal their own typed payloads at the task boundary — the
-// transport never inspects task content. The two ends are deliberately
-// not import-coupled; the contract is pinned by the cross-language tests
-// rather than a shared type module.
+// transport never inspects task content. Protocol bindings for Node and Rust
+// are generated from the Go definitions; cross-language tests pin behavior.
 package ipc
 
 import (
@@ -23,13 +22,6 @@ import (
 	"io"
 	"reflect"
 )
-
-// maxFrameSize caps a single frame body. A length header beyond this is
-// treated as a stream desync (unframed bytes shifted the 4-byte header by
-// N), not a real payload — without the cap a malformed uint32 (up to
-// 4 GiB) makes ReadFrame allocate unboundedly and OOM the process. Matched
-// to the Node side's MAX_FRAME_BYTES.
-const maxFrameSize = 256 * 1024 * 1024 // 256 MiB
 
 // MessageKind identifies a frame's purpose. The transport only owns the
 // protocol-level kinds below; application kinds (e.g. task dispatch,
@@ -52,9 +44,11 @@ const (
 // positive monotonic integer for requests/responses. `Data` is the
 // untyped payload — handlers decode it into a typed shape as needed.
 type Message struct {
-	Kind MessageKind     `json:"kind"`
-	ID   int             `json:"id"`
-	Data json.RawMessage `json:"data,omitempty"`
+	Kind        MessageKind        `json:"kind"`
+	ID          int                `json:"id"`
+	Data        json.RawMessage    `json:"data,omitempty"`
+	Attachments []TextAttachment   `json:"attachments,omitempty"`
+	Transport   *TransportMetadata `json:"transport,omitempty"`
 }
 
 // Decode unmarshals the message's Data into v.
@@ -138,10 +132,10 @@ func ReadFrame(r *bufio.Reader) (*Message, error) {
 		// Propagate io.EOF unwrapped: a clean close is not an error.
 		return nil, err
 	}
-	if length > maxFrameSize {
+	if length > MaxFrameSize {
 		return nil, fmt.Errorf(
 			"ipc: frame length %d exceeds cap %d (likely stream desync)",
-			length, maxFrameSize)
+			length, MaxFrameSize)
 	}
 	body := make([]byte, length)
 	if _, err := io.ReadFull(r, body); err != nil {
@@ -162,10 +156,10 @@ func WriteFrame(w io.Writer, msg *Message) error {
 	if err != nil {
 		return fmt.Errorf("ipc: encode frame (kind=%s): %w", msg.Kind, err)
 	}
-	if len(body) > maxFrameSize {
-		return fmt.Errorf("ipc: frame body %d exceeds cap %d", len(body), maxFrameSize)
+	if len(body) > MaxFrameSize {
+		return fmt.Errorf("ipc: frame body %d exceeds cap %d", len(body), MaxFrameSize)
 	}
-	var header [4]byte
+	var header [FrameHeaderSize]byte
 	binary.LittleEndian.PutUint32(header[:], uint32(len(body)))
 	if err := writeExact(w, header[:]); err != nil {
 		return fmt.Errorf("ipc: write frame length: %w", err)

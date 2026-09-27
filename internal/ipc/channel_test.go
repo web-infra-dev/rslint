@@ -11,9 +11,262 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
+
+func TestChannelAttachmentsPreserveCompleteSnapshots(t *testing.T) {
+	texts := []string{"", "\ufeff" + "const café = '😀';\r\n// \x00", string([]byte{0xff}), strings.Repeat("x", SourceSlotSize+1)}
+	pool := &sourcePool{mapping: sourceMapping{data: make([]byte, SourceHeaderSize+128)}}
+	msg, err := NewMessage("snapshot", 1, map[string]bool{"unchanged": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := string(msg.Data)
+	batch := attachTexts(msg, pool, texts)
+	if batch == nil || batch.Length != uint32(len(texts[1])) || string(msg.Data) != payload {
+		t.Fatalf("incorrect attachment batch or modified application payload: %+v", batch)
+	}
+	for i := range 2 {
+		attachment := msg.Attachments[i]
+		if attachment.Text != nil || attachment.Range == nil {
+			t.Fatalf("snapshot %d was not shared", i)
+		}
+		span := attachment.Range
+		start := SourceHeaderSize + int(span.Offset)
+		if string(pool.mapping.data[start:start+int(span.Length)]) != texts[i] {
+			t.Fatalf("snapshot %d changed", i)
+		}
+	}
+	for _, i := range []int{2, 3} {
+		if msg.Attachments[i].Text == nil || *msg.Attachments[i].Text != texts[i] || msg.Attachments[i].Range != nil {
+			t.Fatalf("inline fallback changed snapshot %d", i)
+		}
+	}
+	for _, backend := range []*sourcePool{nil, pool} {
+		for i := range pool.slots {
+			pool.slots[i].busy = true
+		}
+		inline := &Message{}
+		if attachTexts(inline, backend, texts) != nil || inline.Transport != nil {
+			t.Fatal("unavailable storage did not preserve inline attachments")
+		}
+		for i, attachment := range inline.Attachments {
+			if attachment.Text == nil || *attachment.Text != texts[i] || attachment.Range != nil {
+				t.Fatalf("fallback lost snapshot %d", i)
+			}
+		}
+	}
+}
+
+func TestChannelAttachmentReleaseAcknowledgement(t *testing.T) {
+	for _, mode := range []string{"release", "missing", "wrong-slot", "wrong-generation", "wrong-length", "error-release", "error-missing"} {
+		t.Run(mode, func(t *testing.T) {
+			client, peer := newChannelPair(t)
+			pool := &sourcePool{mapping: sourceMapping{data: make([]byte, SourceHeaderSize+64)}}
+			client.sources = pool
+			client.sourcesInitialized = true
+			client.Start()
+			peerDone := make(chan error, 1)
+			go func() {
+				request, err := ReadFrame(peer.reader)
+				if err != nil {
+					peerDone <- err
+					return
+				}
+				if request.Transport == nil || request.Transport.Batch == nil || len(request.Attachments) != 1 || request.Attachments[0].Range == nil {
+					peerDone <- errors.New("request did not publish its attachment")
+					_ = client.Close()
+					return
+				}
+				batch := *request.Transport.Batch
+				response := &Message{Kind: KindResponse, ID: request.ID}
+				switch mode {
+				case "wrong-slot":
+					batch.Slot++
+				case "wrong-generation":
+					batch.Generation++
+				case "wrong-length":
+					batch.Length++
+				}
+				if mode != "missing" && mode != "error-missing" {
+					response.Transport = &TransportMetadata{Released: &batch}
+				}
+				if strings.HasPrefix(mode, "error-") {
+					response.Kind = KindError
+					response.Data = []byte(`{"message":"worker failed"}`)
+				}
+				peerDone <- peer.writeFrame(response)
+			}()
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_, err := client.SendRequest(ctx, "attached", nil, "snapshot 😀")
+			if strings.HasPrefix(mode, "error-") != (err != nil) {
+				t.Fatalf("unexpected request result: %v", err)
+			}
+			if err := <-peerDone; err != nil {
+				t.Fatal(err)
+			}
+			wantReleased := mode == "release" || mode == "error-release"
+			if pool.slots[0].busy == wantReleased {
+				t.Fatalf("wrong release outcome: busy=%v, mode=%s", pool.slots[0].busy, mode)
+			}
+		})
+	}
+}
+
+func TestChannelCancelledAttachmentRetainsSlotAfterLateAck(t *testing.T) {
+	client, peer := newChannelPair(t)
+	pool := &sourcePool{mapping: sourceMapping{data: make([]byte, SourceHeaderSize+64)}}
+	client.sources = pool
+	client.sourcesInitialized = true
+	client.SetInboundHandler(func(context.Context, *Message) (any, error) { return struct{}{}, nil })
+	client.Start()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := client.SendRequest(ctx, "attached", nil, "snapshot")
+		done <- err
+	}()
+	request, err := ReadFrame(peer.reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancel result: %v", err)
+	}
+	if request.Transport == nil || request.Transport.Batch == nil {
+		t.Fatal("request was not shared")
+	}
+	if err := peer.writeFrame(&Message{Kind: KindResponse, ID: request.ID, Transport: &TransportMetadata{Released: request.Transport.Batch}}); err != nil {
+		t.Fatal(err)
+	}
+	// A later request's reply proves the read loop has consumed the orphan ACK.
+	if err := peer.writeFrame(&Message{Kind: "barrier", ID: request.ID + 1}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadFrame(peer.reader); err != nil {
+		t.Fatal(err)
+	}
+	if !pool.slots[0].busy {
+		t.Fatal("cancellation or orphan ACK released a source slot")
+	}
+}
+
+func TestChannelSourceBootstrapBeforeHandlerAndOnlyOnce(t *testing.T) {
+	client, peer := newChannelPair(t)
+	var calls atomic.Int32
+	client.SetInboundHandler(func(_ context.Context, _ *Message) (any, error) {
+		calls.Add(1)
+		client.mu.Lock()
+		initialized := client.sourcesInitialized
+		client.mu.Unlock()
+		if !initialized || client.AttachmentLimit() != 0 {
+			return nil, errors.New("unavailable mapping was not initialized before the handler")
+		}
+		return true, nil
+	})
+	client.Start()
+	// Invalid handles/FDs reject on every OS without closing unrelated handles.
+	descriptor := &SourceDescriptor{Version: SourceVersion, FD: SourceInheritedFD + 1, Handle: "invalid", ProcessID: 1}
+	for id := range 2 {
+		if err := peer.writeFrame(&Message{Kind: "init", ID: id + 1, Transport: &TransportMetadata{Mapping: descriptor}}); err != nil {
+			t.Fatal(err)
+		}
+		response, err := ReadFrame(peer.reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := KindResponse
+		if id == 1 {
+			want = KindError
+		}
+		if response.Kind != want {
+			t.Fatalf("bootstrap response %d: %s", id, response.Kind)
+		}
+	}
+	if calls.Load() != 1 {
+		t.Fatal("repeated source bootstrap reached the application handler")
+	}
+}
+
+func TestChannelAbsentInitialMappingCannotBeInstalledLater(t *testing.T) {
+	client, peer := newChannelPair(t)
+	var calls atomic.Int32
+	client.SetInboundHandler(func(_ context.Context, _ *Message) (any, error) {
+		calls.Add(1)
+		return true, nil
+	})
+	client.Start()
+	requests := []*Message{
+		{Kind: "init", ID: 1},
+		{Kind: "late", ID: 2, Transport: &TransportMetadata{Mapping: &SourceDescriptor{Version: SourceVersion}}},
+		{Kind: "ordinary", ID: 3},
+	}
+	for i, request := range requests {
+		if err := peer.writeFrame(request); err != nil {
+			t.Fatal(err)
+		}
+		response, err := ReadFrame(peer.reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := KindResponse
+		if i == 1 {
+			want = KindError
+		}
+		if response.Kind != want {
+			t.Fatalf("response %d: %s", i, response.Kind)
+		}
+	}
+	if calls.Load() != 2 || client.AttachmentLimit() != 0 {
+		t.Fatal("late bootstrap reached the handler or changed the inline backend")
+	}
+}
+
+func TestChannelCloseJoinsSourceWriter(t *testing.T) {
+	entered, finish := make(chan struct{}), make(chan struct{})
+	var unmapped atomic.Bool
+	pool := &sourcePool{mapping: sourceMapping{
+		data: make([]byte, SourceHeaderSize+64),
+		commitSlot: func(int) error {
+			close(entered)
+			<-finish
+			return nil
+		},
+		unmap: func() error { unmapped.Store(true); return nil },
+	}}
+	client := NewChannel(strings.NewReader(""), io.Discard)
+	client.sources = pool
+	sent := make(chan error, 1)
+	go func() {
+		_, err := client.SendRequest(context.Background(), "attached", nil, "snapshot")
+		sent <- err
+	}()
+	<-entered
+	closed := make(chan struct{})
+	go func() { _ = client.Close(); close(closed) }()
+	<-client.Done()
+	select {
+	case <-closed:
+		t.Error("Close returned before the source writer")
+	default:
+	}
+	if unmapped.Load() {
+		t.Error("mapping was removed during an active source write")
+	}
+	close(finish)
+	<-closed
+	if err := <-sent; err == nil || !unmapped.Load() || client.AttachmentLimit() != 0 {
+		t.Fatalf("source shutdown did not finish: send=%v, unmapped=%v", err, unmapped.Load())
+	}
+	if err := client.initializeSources(&TransportMetadata{Mapping: &SourceDescriptor{Version: SourceVersion}}); err == nil {
+		t.Fatal("closed channel accepted a mapping")
+	}
+}
 
 // newChannelPair wires two channels back-to-back over two io.Pipes so they
 // can talk to each other in-process (A writes → B reads, and vice versa).
@@ -290,7 +543,7 @@ func TestNewMessage_NilContainerPayloadOmitted(t *testing.T) {
 func TestReadFrame_CapExceeded(t *testing.T) {
 	var buf bytes.Buffer
 	// A length header beyond the cap must be rejected before allocating.
-	if err := binary.Write(&buf, binary.LittleEndian, uint32(maxFrameSize+1)); err != nil {
+	if err := binary.Write(&buf, binary.LittleEndian, uint32(MaxFrameSize+1)); err != nil {
 		t.Fatal(err)
 	}
 	_, err := ReadFrame(bufio.NewReader(&buf))

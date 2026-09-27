@@ -89,8 +89,8 @@ async function run() {
       const settled = [false, false, false];
       const waiters = [
         request('activateConfigs', selection),
-        request('pluginLint', { request: 'first' }),
-        request('pluginLint', { request: 'second' }),
+        request('pluginLint', { request: 'first', files: [] }),
+        request('pluginLint', { request: 'second', files: [] }),
       ].map((promise, index) =>
         promise.then((result) => {
           settled[index] = true;
@@ -106,7 +106,7 @@ async function run() {
       const plugin =
         mode === 'failure-without-tasks'
           ? undefined
-          : await request('pluginLint', {});
+          : await request('pluginLint', { files: [] });
       await report('completed', { activation, plugin });
     }
   }

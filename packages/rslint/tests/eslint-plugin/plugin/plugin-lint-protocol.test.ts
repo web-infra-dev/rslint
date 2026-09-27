@@ -22,8 +22,66 @@ import {
   type EslintPluginLintRequest,
 } from '../../../src/eslint-plugin/plugin/plugin-lint-protocol.js';
 import type { LintFileResult } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
-import { createSourceTransport } from '../../../src/ipc/source-transport.js';
-import { parseSharedSource } from '../../../src/eslint-plugin/native/load-binding.js';
+import { resolvePluginSources } from '../../../src/cli/plugin-lint-codec.js';
+
+describe('CLI plugin attachment references', () => {
+  test('preserves complete text, native capabilities and file metadata', () => {
+    const source = '\ufeffconst café = "😀";\r\n// \u0000';
+    const capability = { lease: 7, offset: 3, length: 2 };
+    const request = {
+      collectFixes: true,
+      rules: { 'local/check': {} },
+      files: [
+        { path: 'a.ts', sourceIndex: 0, configKey: 'config-a' },
+        { path: 'b.ts', text: 'existing inline' },
+        { path: 'c.ts', sourceIndex: 1 },
+        { path: 'd.ts' },
+      ],
+    };
+    expect(resolvePluginSources(request, [source, capability])).toEqual({
+      ...request,
+      files: [
+        { path: 'a.ts', text: source, configKey: 'config-a' },
+        { path: 'b.ts', text: 'existing inline' },
+        { path: 'c.ts', sharedSource: capability },
+        { path: 'd.ts' },
+      ],
+    });
+    expect(request.files[0]).toHaveProperty('sourceIndex', 0);
+  });
+
+  test('preserves an explicitly empty snapshot', () => {
+    expect(
+      resolvePluginSources(
+        { files: [{ path: '/missing.ts', sourceIndex: 0 }] },
+        [''],
+      ),
+    ).toEqual({ files: [{ path: '/missing.ts', text: '' }] });
+  });
+
+  test.each([
+    { files: [{ sourceIndex: -1 }] },
+    { files: [{ sourceIndex: 0.5 }] },
+    { files: [{ sourceIndex: '0' }] },
+    { files: [{ sourceIndex: 1 }] },
+    { files: [{ sourceIndex: 0, text: '' }] },
+    { files: [{ sourceIndex: 0, sharedSource: {} }] },
+    { files: [{ sourceIndex: 0 }, { sourceIndex: 0 }] },
+    { files: [{ sourceRange: { offset: 0, length: 0 } }] },
+    { files: [{}] },
+    { files: [null] },
+  ])('rejects ambiguous or incomplete references: %j', (request) => {
+    expect(() => resolvePluginSources(request, ['complete source'])).toThrow();
+  });
+
+  test('a missing attachment cannot become a filesystem read', () => {
+    expect(() =>
+      resolvePluginSources({
+        files: [{ path: '/missing.ts', sourceIndex: 0 }],
+      }),
+    ).toThrow('invalid plugin source attachment');
+  });
+});
 
 function input(
   files: EslintPluginLintRequest['files'],
@@ -39,9 +97,7 @@ function input(
 
 describe('buildPluginLintTasks', () => {
   test('rejects an unresolved wire range instead of reading disk', () => {
-    const files = [
-      { path: '/missing.ts', sourceRange: { offset: 0, length: 0 } },
-    ];
+    const files = [{ path: '/missing.ts', sourceIndex: 0 }];
     expect(() =>
       buildPluginLintTasks(input(files), { configDirSet: new Set() }),
     ).toThrow('unresolved shared plugin source');
@@ -157,100 +213,6 @@ describe('buildPluginLintTasks', () => {
     );
     expect(tasks[0].languageOptions).toBe(langOpts);
     expect(tasks[0].settings).toBe(settings);
-  });
-});
-
-describe('CLI source capabilities', () => {
-  function emptyBatch() {
-    return {
-      sourceBatch: { slot: 0, generation: 1, length: 0 },
-      files: [{ path: '/missing.ts', sourceRange: { offset: 0, length: 0 } }],
-    };
-  }
-
-  test('revokes reads on success, failure and shutdown; rejects stale generations', async () => {
-    const transport = createSourceTransport();
-    let source!: Parameters<typeof parseSharedSource>[1];
-    try {
-      const input = emptyBatch();
-      const result = await transport.lint(input, async (req: any) => {
-        source = req.files[0].sharedSource;
-        expect(
-          parseSharedSource('/missing.ts', source, 'module', false).sourceText,
-        ).toBe('');
-        return { results: [] };
-      });
-      expect(result).toEqual({
-        results: [],
-        releasedSource: input.sourceBatch,
-      });
-      expect(() =>
-        parseSharedSource('/missing.ts', source, 'module', false),
-      ).toThrow('expired');
-      await expect(
-        transport.lint(input, async () => ({ results: [] })),
-      ).rejects.toThrow('expired');
-      input.sourceBatch.generation++;
-      await expect(
-        transport.lint(input, async (req: any) => {
-          source = req.files[0].sharedSource;
-          throw new Error('dispatch failed');
-        }),
-      ).rejects.toThrow('dispatch failed');
-      expect(() =>
-        parseSharedSource('/missing.ts', source, 'module', false),
-      ).toThrow('expired');
-    } finally {
-      transport.close();
-    }
-    await expect(
-      transport.lint(emptyBatch(), async () => ({ results: [] })),
-    ).rejects.toThrow('expired');
-  });
-
-  test.each([
-    { slot: -1 },
-    { slot: 16 },
-    { slot: 0.5 },
-    { generation: 0 },
-    { generation: 2 ** 32 },
-    { length: NaN },
-    { length: Infinity },
-    { length: 16 * 1024 * 1024 + 1 },
-  ])('rejects malformed batches: %j', async (change) => {
-    const transport = createSourceTransport();
-    try {
-      const input = emptyBatch();
-      Object.assign(input.sourceBatch, change);
-      await expect(
-        transport.lint(input, async () => {
-          throw new Error('must not dispatch');
-        }),
-      ).rejects.toThrow('invalid plugin source batch');
-    } finally {
-      transport.close();
-    }
-  });
-
-  test.each([
-    { offset: -1, length: 0 },
-    { offset: 1, length: 0 },
-    { offset: 0, length: 1 },
-    { offset: 0, length: 0.5 },
-    { offset: 2 ** 32, length: 2 ** 32 },
-  ])('rejects malformed ranges without reading disk: %j', async (range) => {
-    const transport = createSourceTransport();
-    try {
-      const input = emptyBatch();
-      input.files[0].sourceRange = range;
-      await expect(
-        transport.lint(input, async () => {
-          throw new Error('must not dispatch');
-        }),
-      ).rejects.toThrow('invalid plugin source range');
-    } finally {
-      transport.close();
-    }
   });
 });
 

@@ -1623,7 +1623,7 @@ func TestHandleLint_FixRangeIsUTF16(t *testing.T) {
 
 type apiRequesterFunc func(context.Context, ipc.MessageKind, any) (*ipc.Message, error)
 
-func (f apiRequesterFunc) SendRequest(ctx context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+func (f apiRequesterFunc) SendRequest(ctx context.Context, kind ipc.MessageKind, payload any, _ ...string) (*ipc.Message, error) {
 	return f(ctx, kind, payload)
 }
 

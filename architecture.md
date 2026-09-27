@@ -1545,42 +1545,64 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    is a private CLI asset, not a new package export; `build:js` emits it in a
    separate library block to keep the worker independent of shared chunks.
 
-The framed CLI's source transport is private to its adapters. The linter still
-supplies immutable source strings; API and LSP continue using their existing
-wire formats. The Node engine owns a native shared-memory arena and passes its
-descriptor during initialization. Linux uses a sealed anonymous memory file,
-macOS an immediately unlinked POSIX shared-memory object, and Windows an
-anonymous pagefile mapping whose handle Go duplicates. Source transfer never
-uses source paths or process addresses. Mapping failure preserves complete
-inline source text through the existing JSON transport. Windows reserves the
-arena and commits its control page initially; source slots are committed in
-full only on their first write. A CLI without plugin sources therefore does
-not commit the entire arena. Failed commitment also preserves inline text.
+The framed CLI uses the same IPC request mechanism for ordinary data and
+complete text attachments. The linter supplies immutable source strings; API
+and LSP retain their existing wire formats. `internal/pluginlint.Client` adapts
+lint requests to that mechanism: it associates each file with an attachment
+index, splits logical batches against the channel's byte budget, and joins
+results in input order. All segments preserve rule/config metadata. At most
+eight plugin requests run concurrently across all logical batches of one
+client when shared storage is enabled; control messages do not use this
+application limit. A slow segment
+does not block later segments from reaching idle workers.
 
-On the Go side, `internal/ipc/sharedsource` owns mapping lifetime, byte copies,
-publication and slot reuse. It has no linter or IPC-message dependency and
-never exposes mapped slices; closing waits for an active writer. The CLI plugin
-dispatcher owns request encoding, ordered splitting by source bytes, IPC
-responses and their release acknowledgements. The CLI entry only assembles and
-closes that dispatcher. Logical batches larger than a slot keep the same
-rule/config metadata. With sharing enabled, segments can execute concurrently,
-with at most eight transport requests in flight across the dispatcher and
-results joined in input order. Storage boundaries do not introduce per-segment
-execution barriers, and their total source size is not limited by one slot.
+`internal/ipc.Channel` owns framing, request matching and attachment storage.
+`SendRequest` accepts ordinary data plus optional complete strings; it selects
+inline text or shared storage without exposing that choice to the caller.
+Mapping descriptors, published batches and release acknowledgements belong to
+the transport envelope, never to plugin requests or results. The private pool
+and platform mapping files live in the same IPC package. Closing the channel
+rejects new work, wakes pending calls and waits for a current source writer
+before releasing the mapping; mapped slices never escape the storage implementation.
+
+On Node, `spawnIpcPeer` prepares the native arena and inherited handles before
+spawning Go. `IpcClient` sends the mapping in the first request envelope and
+owns its lifetime. Neither the CLI engine nor the plugin host chooses a
+platform mapping or manages a lease. The client validates attachment ranges,
+registers a native capability, dispatches the application handler and revokes
+the capability before returning either a result or an error. It acknowledges
+reuse only when native revocation succeeds. Go matches that acknowledgement
+to the exact batch of the pending request; ordinary results, cancellation and
+timeouts never grant reuse. The CLI application codec resolves file attachment
+indices into inline strings or opaque native capabilities before worker dispatch.
+
+Linux uses a sealed anonymous memory file, macOS an immediately unlinked POSIX
+shared-memory object, and Windows an anonymous pagefile mapping whose handle
+Go duplicates. These are private backend details: source transfer never uses
+source paths or process addresses. Windows reserves the arena and commits its
+control page initially; each complete source slot is committed on its first
+write. Allocation or commitment failures, exhausted capacity, oversized text
+and invalid UTF-8 preserve complete inline text through the same request API.
+The arena is bounded to sixteen 16 MiB slots plus a 4 KiB control region.
+
 An aligned 32-bit publication word per slot supplies the release/acquire memory
-fence between Go and Rust. The native reader owns a writable control view for
-atomic references and a separate read-only data view for source borrows; both
-views live as long as the mapping. The Node source adapter validates the ranges,
-registers a native read capability, and forwards only that capability to
-workers. Rust borrows the immutable UTF-8 snapshot for
-the parser and constructs the required JavaScript SourceCode string directly;
-the ESTree JSON boundary is unchanged. After dispatch, Rust revokes the
-capability before acknowledging reuse. An in-flight native reader pins the
-mapping and permanently retires its slot, so timeout, cancellation, shutdown,
-and late worker results cannot authorize an overlapping write. Pool exhaustion,
-oversized payloads and invalid UTF-8 retain complete inline text. The arena is
-bounded to sixteen 16 MiB slots plus a 4 KiB control page; slots are touched only
-when used.
+fence between Go and Rust. The native reader holds a writable control view for
+atomic references and a separate read-only data view for source borrows.
+A lease pins both views while the native parser borrows a snapshot. The parser
+entry handles UTF-8/BOM normalization, ESTree parsing and direct construction
+of the required JavaScript SourceCode string; the memory module handles only
+resources and bounded byte access. ESTree JSON is unchanged. If a reader is
+still active at revocation, its slot is permanently retired, so cancellation,
+shutdown and late worker results cannot authorize an overlapping write.
+
+`internal/ipc/protocol.go` and the Go frame DTOs are the source of truth for
+frame limits, message kinds, memory layout and attachment descriptors.
+`go generate ./internal/ipc` emits the Rust and TypeScript constants and types.
+Generated files are checked in, so native and JavaScript builds do not require
+Go; a generator test and the CI binding check reject stale output, including
+changes made only to a generated file. Each language still validates inputs
+at its own boundary. Platform handles, native reader leases and application
+scheduling remain implementation details of their owners.
 
 Other invariants:
 

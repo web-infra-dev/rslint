@@ -184,8 +184,8 @@ describe.each([false, true])(
         ]);
         expect(completed.results?.[0].data).toEqual(prepared.preparation?.data);
         expect(lintRequests).toEqual([
-          { request: 'first' },
-          { request: 'second' },
+          { request: 'first', files: [] },
+          { request: 'second', files: [] },
         ]);
         expect(await run).toBe(0);
         expect(shutdownCalls).toBe(1);

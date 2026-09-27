@@ -3,7 +3,7 @@
 //! the same fixed-slot protocol above this module.
 // cspell:words munmap syscall memfd CLOEXEC CREAT RDWR fcntl SETFD ftruncate READWRITE EFAULT
 
-use super::SourceMapping;
+use super::{SourceMapping, PROTOCOL_VERSION, PUBLICATION_STRIDE};
 use std::io;
 
 unsafe fn publication(control: *mut u8, slot: usize) -> u32 {
@@ -11,7 +11,7 @@ unsafe fn publication(control: *mut u8, slot: usize) -> u32 {
     // AtomicU32::from_ptr requires readable and writable memory, even for loads.
     // The separate control view satisfies that contract; source slices always
     // use the read-only data view.
-    AtomicU32::from_ptr(control.add(slot * 4).cast()).load(Ordering::Acquire)
+    AtomicU32::from_ptr(control.add(slot * PUBLICATION_STRIDE).cast()).load(Ordering::Acquire)
 }
 
 #[cfg(unix)]
@@ -46,7 +46,7 @@ mod platform {
                     0,
                 );
                 assert_ne!(view, libc::MAP_FAILED);
-                let word = (view as *mut u32).add(slot);
+                let word = (view as *mut u8).add(slot * PUBLICATION_STRIDE).cast();
                 std::sync::atomic::AtomicU32::from_ptr(word)
                     .store(generation, std::sync::atomic::Ordering::Release);
                 libc::munmap(view, self.length);
@@ -150,7 +150,7 @@ mod platform {
 
         pub fn descriptor(&self) -> SourceMapping {
             SourceMapping {
-                version: 1,
+                version: PROTOCOL_VERSION,
                 fd: Some(self.fd.as_raw_fd()),
                 handle: None,
                 process_id: None,
@@ -234,7 +234,9 @@ mod platform {
                     PAGE_READWRITE,
                 )
                 .is_null());
-                let word = (view.Value as *mut u32).add(slot);
+                let word = (view.Value as *mut u8)
+                    .add(slot * PUBLICATION_STRIDE)
+                    .cast();
                 std::sync::atomic::AtomicU32::from_ptr(word)
                     .store(generation, std::sync::atomic::Ordering::Release);
                 UnmapViewOfFile(view);
@@ -300,7 +302,7 @@ mod platform {
 
         pub fn descriptor(&self) -> SourceMapping {
             SourceMapping {
-                version: 1,
+                version: PROTOCOL_VERSION,
                 fd: None,
                 handle: Some((self.handle as usize).to_string()),
                 process_id: Some(std::process::id()),

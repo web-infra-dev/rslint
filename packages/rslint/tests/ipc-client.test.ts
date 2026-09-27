@@ -2,7 +2,18 @@ import { describe, test, expect } from 'rstack/test';
 import { once } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { IpcClient, encodeFrame, decodeFrame } from '../src/ipc/client.js';
-import type { IpcMessage, MessageKind } from '../src/ipc/protocol.js';
+import type { MessageKind } from '../src/ipc/protocol.js';
+import type { IpcClientOptions } from '../src/ipc/client.js';
+import { createSourceTransport } from '../src/ipc/source-transport.js';
+import { getNativeBinding, type SharedSource } from '../src/native/binding.js';
+import {
+  MAX_GENERATION,
+  PROTOCOL_VERSION,
+  SLOT_COUNT,
+  SLOT_SIZE,
+  type WireMessage as IpcMessage,
+  type SourceBatch,
+} from '../src/ipc/protocol.generated.js';
 
 /**
  * pairClients wires two IpcClient instances together via two PassThrough
@@ -12,7 +23,7 @@ import type { IpcMessage, MessageKind } from '../src/ipc/protocol.js';
  * Naming: A is the "Go-equivalent side"; B is the "peer". Tests pick
  * which side acts as the inbound handler.
  */
-function pairClients(): {
+function pairClients(options: IpcClientOptions = {}): {
   a: IpcClient;
   b: IpcClient;
   streams: {
@@ -29,7 +40,7 @@ function pairClients(): {
   // where we write. So A's input is bToA (what B writes), A's output
   // is aToB (what A writes).
   const a = new IpcClient(bToA, aToB);
-  const b = new IpcClient(aToB, bToA);
+  const b = new IpcClient(aToB, bToA, options);
   return {
     a,
     b,
@@ -44,6 +55,474 @@ function pairClients(): {
     },
   };
 }
+
+describe('IPC text attachments', () => {
+  function receiver(options: IpcClientOptions = {}) {
+    const pair = pairClients(options);
+    let id = 0;
+    pair.b.start();
+    return {
+      ...pair,
+      async request(message: Partial<IpcMessage>) {
+        const response = once(pair.streams.bToA, 'data');
+        pair.streams.aToB.write(
+          encodeFrame({
+            kind: 'testAttachments',
+            id: ++id,
+            ...message,
+          }),
+        );
+        return decodeFrame((await response)[0])!.msg;
+      },
+    };
+  }
+
+  function emptyBatch(): SourceBatch {
+    return { slot: 0, generation: 1, length: 0 };
+  }
+
+  test('delivers complete inline attachments through the ordinary request API', async () => {
+    const pair = pairClients();
+    pair.b.setInboundHandler((msg) => {
+      expect(msg.data).toEqual({ arbitrary: true });
+      expect(msg.attachments).toEqual(['', '\ufeff😀\u0000\r\n']);
+      expect('transport' in msg).toBe(false);
+      return { ok: true };
+    });
+    pair.a.start();
+    pair.b.start();
+    try {
+      expect(
+        (
+          await pair.a.sendRequest('anything', { arbitrary: true }, [
+            '',
+            '\ufeff😀\u0000\r\n',
+          ])
+        ).data,
+      ).toEqual({ ok: true });
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test('adds the mapping to the first request envelope only', async () => {
+    const sources = createSourceTransport();
+    const pair = pairClients({ sourceTransport: sources });
+    const frames: IpcMessage[] = [];
+    pair.streams.bToA.on('data', (chunk: Buffer) => {
+      const message = decodeFrame(chunk)!.msg;
+      frames.push(message);
+      pair.streams.aToB.write(
+        encodeFrame({ kind: 'response', id: message.id, data: { ok: true } }),
+      );
+    });
+    pair.b.start();
+    try {
+      await pair.b.sendRequest('init', { runtime: {} });
+      await pair.b.sendRequest('other', {});
+      expect(frames[0].transport).toEqual({ mapping: sources.descriptor });
+      expect(frames[0].data).toEqual({ runtime: {} });
+      expect(frames[1].transport).toBeUndefined();
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test.each([false, true])(
+    'keeps bootstrap first under serialization reentry (outer fails: %s)',
+    async (failOuter) => {
+      const sources = createSourceTransport();
+      const pair = pairClients({ sourceTransport: sources });
+      const frames: IpcMessage[] = [];
+      pair.streams.bToA.on('data', (chunk: Buffer) => {
+        const message = decodeFrame(chunk)!.msg;
+        frames.push(message);
+        pair.streams.aToB.write(
+          encodeFrame({ kind: 'response', id: message.id, data: {} }),
+        );
+      });
+      pair.b.start();
+      let nested: Promise<unknown> | undefined;
+      try {
+        const outer = pair.b.sendRequest('outer', {
+          toJSON() {
+            nested = pair.b.sendRequest('nested', {});
+            if (failOuter) throw new Error('cannot encode outer');
+            return {};
+          },
+        });
+        if (failOuter)
+          await expect(outer).rejects.toThrow('cannot encode outer');
+        else await outer;
+        await nested;
+        expect(frames.map((message) => message.kind)).toEqual(
+          failOuter ? ['nested'] : ['outer', 'nested'],
+        );
+        expect(frames[0].transport).toEqual({ mapping: sources.descriptor });
+        if (!failOuter) expect(frames[1].transport).toBeUndefined();
+      } finally {
+        pair.cleanup();
+      }
+    },
+  );
+
+  test.each(['version', 'descriptor'] as const)(
+    'closes native storage when initialization fails: %s',
+    (failure) => {
+      const binding = getNativeBinding();
+      const SourceArena = binding.SourceArena;
+      let closed = false;
+      binding.SourceArena = class {
+        descriptor() {
+          if (failure === 'descriptor')
+            throw new Error('descriptor unavailable');
+          return { version: PROTOCOL_VERSION + 1 };
+        }
+        register(): number {
+          throw new Error('must not register');
+        }
+        release(): boolean {
+          throw new Error('must not release');
+        }
+        close() {
+          closed = true;
+        }
+      };
+      try {
+        expect(createSourceTransport).toThrow(
+          failure === 'version'
+            ? 'unsupported shared source version'
+            : 'descriptor unavailable',
+        );
+        expect(closed).toBe(true);
+      } finally {
+        binding.SourceArena = SourceArena;
+      }
+    },
+  );
+
+  test.each([
+    'success',
+    'error',
+    'serialization',
+    'message-getter',
+    'toString',
+  ] as const)(
+    'revokes native reads before replying and acknowledges release on %s',
+    async (outcome) => {
+      const pair = receiver({ sourceTransport: createSourceTransport() });
+      const batch = emptyBatch();
+      let source: SharedSource | undefined;
+      pair.b.setInboundHandler((msg) => {
+        const attachment = msg.attachments?.[0];
+        if (typeof attachment !== 'object')
+          throw new Error('missing capability');
+        source = attachment;
+        expect(
+          getNativeBinding().parseSharedSource(
+            '/missing.ts',
+            source,
+            'module',
+            false,
+          ).sourceText,
+        ).toBe('');
+        expect(msg.data).toEqual({ arbitrary: true });
+        expect('transport' in msg).toBe(false);
+        if (outcome === 'error') throw new Error('dispatch failed');
+        if (outcome === 'message-getter') {
+          throw Object.defineProperty(new Error(), 'message', {
+            get() {
+              throw new Error('bad getter');
+            },
+          });
+        }
+        if (outcome === 'toString') {
+          throw {
+            toString() {
+              throw new Error('bad conversion');
+            },
+          };
+        }
+        return outcome === 'serialization' ? { value: 1n } : { ok: true };
+      });
+      try {
+        const wire = {
+          data: { arbitrary: true },
+          attachments: [{ range: { offset: 0, length: 0 } }],
+          transport: { batch },
+        };
+        const response = await pair.request(wire);
+        expect(response.kind).toBe(
+          outcome === 'success' ? 'response' : 'error',
+        );
+        expect(response.transport).toEqual({ released: batch });
+        if (outcome === 'message-getter' || outcome === 'toString') {
+          expect(response.data).toEqual({ message: 'request failed' });
+        }
+        expect(() =>
+          getNativeBinding().parseSharedSource(
+            '/missing.ts',
+            source!,
+            'module',
+            false,
+          ),
+        ).toThrow('expired');
+        const replay = await pair.request(wire);
+        expect(replay.kind).toBe('error');
+        expect(replay.transport).toBeUndefined();
+        expect(replay.data).toEqual({
+          message: expect.stringContaining('expired'),
+        });
+      } finally {
+        pair.cleanup();
+      }
+    },
+  );
+
+  test('does not acknowledge a native release that cannot prove reuse', async () => {
+    const sources = createSourceTransport();
+    const release = sources.release;
+    sources.release = (lease) => {
+      release(lease);
+      return false;
+    };
+    const pair = receiver({ sourceTransport: sources });
+    pair.b.setInboundHandler(() => ({ ok: true }));
+    try {
+      const response = await pair.request({
+        attachments: [{ range: { offset: 0, length: 0 } }],
+        transport: { batch: emptyBatch() },
+      });
+      expect(response.kind).toBe('response');
+      expect(response.transport).toBeUndefined();
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test('keeps mixed inline/shared attachments ordered and out of application data', async () => {
+    const pair = receiver({ sourceTransport: createSourceTransport() });
+    pair.b.setInboundHandler((msg) => {
+      expect(msg.attachments).toEqual([
+        'inline',
+        { offset: 0, length: 0, lease: expect.any(Number) },
+        '',
+      ]);
+      expect(msg.data).toEqual({ payload: 'unchanged' });
+      return {};
+    });
+    try {
+      const response = await pair.request({
+        data: { payload: 'unchanged' },
+        attachments: [
+          { text: 'inline' },
+          { range: { offset: 0, length: 0 } },
+          { text: '' },
+        ],
+        transport: { batch: emptyBatch() },
+      });
+      expect(response.transport).toEqual({ released: emptyBatch() });
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test('revokes a valid batch even when no application handler is installed', async () => {
+    const pair = receiver({ sourceTransport: createSourceTransport() });
+    try {
+      const response = await pair.request({
+        attachments: [{ range: { offset: 0, length: 0 } }],
+        transport: { batch: emptyBatch() },
+      });
+      expect(response.kind).toBe('error');
+      expect(response.transport).toEqual({ released: emptyBatch() });
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test('rejects shared attachments when native storage is unavailable', async () => {
+    const pair = receiver();
+    pair.b.setInboundHandler(() => {
+      throw new Error('must not dispatch');
+    });
+    try {
+      const response = await pair.request({
+        attachments: [{ range: { offset: 0, length: 0 } }],
+        transport: { batch: emptyBatch() },
+      });
+      expect(response.kind).toBe('error');
+      expect(response.data).toEqual({
+        message: 'shared IPC attachments are unavailable',
+      });
+      expect(response.transport).toBeUndefined();
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test('close revokes a pending handler capability and suppresses a late acknowledgement', async () => {
+    const pair = receiver({ sourceTransport: createSourceTransport() });
+    let entered!: () => void;
+    let finish!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    let source: SharedSource | undefined;
+    let replies = 0;
+    pair.streams.bToA.on('data', () => {
+      replies++;
+    });
+    pair.b.setInboundHandler(async (msg) => {
+      const value = msg.attachments?.[0];
+      if (typeof value !== 'object') throw new Error('missing capability');
+      source = value;
+      entered();
+      await pending;
+      return { ok: true };
+    });
+    try {
+      pair.streams.aToB.write(
+        encodeFrame({
+          kind: 'anything',
+          id: 1,
+          attachments: [{ range: { offset: 0, length: 0 } }],
+          transport: { batch: emptyBatch() },
+        }),
+      );
+      await started;
+      pair.b.close();
+      expect(() =>
+        getNativeBinding().parseSharedSource(
+          '/missing.ts',
+          source!,
+          'module',
+          false,
+        ),
+      ).toThrow('expired');
+      finish();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(replies).toBe(0);
+    } finally {
+      finish();
+      pair.cleanup();
+    }
+  });
+
+  test.each([
+    { slot: -1 },
+    { slot: SLOT_COUNT },
+    { slot: 0.5 },
+    { generation: 0 },
+    { generation: MAX_GENERATION + 1 },
+    { length: NaN },
+    { length: Infinity },
+    { length: SLOT_SIZE + 1 },
+  ])(
+    'rejects malformed batches before creating a capability: %j',
+    async (change) => {
+      const pair = receiver({ sourceTransport: createSourceTransport() });
+      let calls = 0;
+      pair.b.setInboundHandler(() => {
+        calls++;
+        return {};
+      });
+      try {
+        const response = await pair.request({
+          attachments: [{ range: { offset: 0, length: 0 } }],
+          transport: { batch: { ...emptyBatch(), ...change } },
+        });
+        expect(response.kind).toBe('error');
+        expect(response.data).toEqual({
+          message: 'invalid IPC attachment batch',
+        });
+        expect(response.transport).toBeUndefined();
+        expect(calls).toBe(0);
+        const valid = await pair.request({
+          attachments: [{ range: { offset: 0, length: 0 } }],
+          transport: { batch: emptyBatch() },
+        });
+        expect(valid.kind).toBe('response');
+        expect(calls).toBe(1);
+      } finally {
+        pair.cleanup();
+      }
+    },
+  );
+
+  test.each([
+    { offset: -1, length: 0 },
+    { offset: 1, length: 0 },
+    { offset: 0, length: 1 },
+    { offset: 0, length: 0.5 },
+    { offset: 2 ** 32, length: 2 ** 32 },
+  ])(
+    'rejects malformed ranges before creating a capability: %j',
+    async (range) => {
+      const pair = receiver({ sourceTransport: createSourceTransport() });
+      let calls = 0;
+      pair.b.setInboundHandler(() => {
+        calls++;
+        return {};
+      });
+      try {
+        const response = await pair.request({
+          attachments: [{ range }],
+          transport: { batch: emptyBatch() },
+        });
+        expect(response.kind).toBe('error');
+        expect(response.transport).toBeUndefined();
+        expect(calls).toBe(0);
+        const valid = await pair.request({
+          attachments: [{ range: { offset: 0, length: 0 } }],
+          transport: { batch: emptyBatch() },
+        });
+        expect(valid.kind).toBe('response');
+      } finally {
+        pair.cleanup();
+      }
+    },
+  );
+
+  test.each([
+    { attachments: [{ range: { offset: 0, length: 0 } }] },
+    {
+      attachments: [{ text: '', range: { offset: 0, length: 0 } }],
+      transport: { batch: emptyBatch() },
+    },
+    { attachments: [{ text: '' }], transport: { batch: emptyBatch() } },
+    {
+      attachments: [{ range: { offset: 0, length: 0 } }],
+      transport: { batch: { ...emptyBatch(), length: 1 } },
+    },
+    {
+      attachments: [
+        { range: { offset: 0, length: 1 } },
+        { range: { offset: 0, length: 1 } },
+      ],
+      transport: { batch: { ...emptyBatch(), length: 2 } },
+    },
+  ])(
+    'rejects missing, conflicting or incomplete attachment metadata: %j',
+    async (message) => {
+      const pair = receiver({ sourceTransport: createSourceTransport() });
+      pair.b.setInboundHandler(() => {
+        throw new Error('must not dispatch');
+      });
+      try {
+        const response = await pair.request(message);
+        expect(response.kind).toBe('error');
+        expect(response.data).not.toEqual({ message: 'must not dispatch' });
+        expect(response.transport).toBeUndefined();
+      } finally {
+        pair.cleanup();
+      }
+    },
+  );
+});
 
 describe('encode/decode round-trip', () => {
   test('encodes a basic message', () => {
