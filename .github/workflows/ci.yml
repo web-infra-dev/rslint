@@ -95,10 +95,6 @@ jobs:
           go-version: 1.27.0
           cache-name: ci-go-lint
 
-      - name: Check shared source protocol bindings
-        if: needs.changes.outputs.changed == 'true'
-        run: go run ./internal/ipc/internal/generate -check -root .
-
       - name: golangci-lint
         if: needs.changes.outputs.changed == 'true'
         uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8

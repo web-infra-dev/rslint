@@ -1565,9 +1565,16 @@ and platform mapping files live in the same IPC package. Closing the channel
 rejects new work, wakes pending calls and waits for a current source writer
 before releasing the mapping; mapped slices never escape the storage implementation.
 
-On Node, `spawnIpcPeer` prepares the native arena and inherited handles before
-spawning Go. `IpcClient` sends the mapping in the first request envelope and
-owns its lifetime. Neither the CLI engine nor the plugin host chooses a
+On Node, `spawnIpcPeer` prepares an empty anonymous Unix descriptor before
+spawning Go; Windows needs no mapping at this point. Before sending the first
+application request, `IpcClient` requests the storage configuration through the
+same channel's `transportConfig` request. Go supplies the layout, and Rust
+uses it to size and map the arena. The configuration request is handled inside
+IPC and does not consume the application request's mapping bootstrap. Concurrent
+initial requests share this one configuration exchange. `IpcClient` then sends
+the initialized mapping in the first application request envelope and owns its
+lifetime. A failed setup closes native resources and keeps complete text inline
+for the session. Neither the CLI engine nor the plugin host chooses a
 platform mapping or manages a lease. The client validates attachment ranges,
 registers a native capability, dispatches the application handler and revokes
 the capability before returning either a result or an error. It acknowledges
@@ -1595,14 +1602,17 @@ resources and bounded byte access. ESTree JSON is unchanged. If a reader is
 still active at revocation, its slot is permanently retired, so cancellation,
 shutdown and late worker results cannot authorize an overlapping write.
 
-`internal/ipc/protocol.go` and the Go frame DTOs are the source of truth for
-frame limits, message kinds, memory layout and attachment descriptors.
-`go generate ./internal/ipc` emits the Rust and TypeScript constants and types.
-Generated files are checked in, so native and JavaScript builds do not require
-Go; a generator test and the CI binding check reject stale output, including
-changes made only to a generated file. Each language still validates inputs
-at its own boundary. Platform handles, native reader leases and application
-scheduling remain implementation details of their owners.
+`internal/ipc/protocol.go` owns the storage settings: slot count, slot size,
+control-region size and publication stride. They travel to Node and Rust at
+runtime; native mapping, address calculations and range checks use that received
+configuration. Capacity is derived from the layout instead of transmitted as
+another independent setting. Rust validates the supported publication version,
+integer bounds, alignment and arithmetic before mapping, and permits only one
+configuration attempt per arena. The four-byte little-endian frame prefix, JSON
+envelope and 32-bit publication words remain fixed wire conventions. There is no
+protocol code generator or generated binding build step. Each language validates
+inputs at its own boundary. Platform handles, native reader leases and
+application scheduling remain implementation details of their owners.
 
 Other invariants:
 

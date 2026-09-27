@@ -109,8 +109,23 @@ const file = path.join(here, 'cfg', 'input.ts');
 const original = fs.readFileSync(file, 'utf8');
 const changed = 'const changedOnDisk = false;';
 let registered = 0;
+let configured = 0;
+const configure = native.SourceArena.prototype.configure;
+native.SourceArena.prototype.configure = function(config) {
+  assert.equal(configured, 0);
+  assert.equal(registered, 0);
+  const fd = this.fd();
+  if (fd !== undefined && fd !== null) assert.equal(fs.fstatSync(fd).size, 0);
+  for (const field of ['version', 'slotCount', 'slotSize', 'headerSize', 'publicationStride']) {
+    assert.equal(Number.isInteger(config[field]) && config[field] > 0, true);
+  }
+  configure.call(this, config);
+  configured++;
+  assert.equal(this.descriptor().version, config.version);
+};
 const register = native.SourceArena.prototype.register;
 native.SourceArena.prototype.register = function(slot, generation, length) {
+  assert.equal(configured, 1);
   const lease = register.call(this, slot, generation, length);
   const source = native.parseSharedSource(file, { lease, offset: 0, length }, 'module', false);
   assert.equal(source.sourceText, original.slice(1));
@@ -124,6 +139,7 @@ native.SourceArena.prototype.register = function(slot, generation, length) {
 const { run } = await import(pathToFileURL(path.join(here, 'dist', 'cli.js')).href);
 const code = await run(parentRequire.resolve(nativePackage + '/bin'), ['--no-color', file], Date.now());
 assert.equal(code, 1);
+assert.equal(configured, 1, 'CLI must configure storage through its Go peer');
 assert.equal(registered, 1, 'CLI must register shared source, not use inline fallback');
 assert.equal(fs.readFileSync(file, 'utf8'), changed);
 console.log('PACKAGED_SHARED_OK');

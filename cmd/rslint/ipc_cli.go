@@ -57,8 +57,8 @@ import (
 )
 
 // Application-level IPC message kinds for the CLI ⇆ Node engine protocol.
-// The transport (ipc.Channel) owns only response/error/handshake/exit; the
-// kinds below are declared here and travel through the same opaque envelope.
+// The transport (ipc.Channel) owns response/error, storage configuration and
+// lifecycle kinds; application kinds travel through the same opaque envelope.
 const (
 	kindInit            ipc.MessageKind = "init"            // Node → Go: handshake payload
 	kindShutdown        ipc.MessageKind = "shutdown"        // Go → Node: lint done

@@ -6,14 +6,21 @@ import type { MessageKind } from '../src/ipc/protocol.js';
 import type { IpcClientOptions } from '../src/ipc/client.js';
 import { createSourceTransport } from '../src/ipc/source-transport.js';
 import { getNativeBinding, type SharedSource } from '../src/native/binding.js';
-import {
-  MAX_GENERATION,
-  PROTOCOL_VERSION,
-  SLOT_COUNT,
-  SLOT_SIZE,
-  type WireMessage as IpcMessage,
-  type SourceBatch,
-} from '../src/ipc/protocol.generated.js';
+import type {
+  WireMessage as IpcMessage,
+  SourceBatch,
+  SourceConfiguration,
+} from '../src/ipc/protocol.js';
+
+// Deliberately differs from Go's production layout. Node consumes peer values.
+const SOURCE_CONFIG: SourceConfiguration = {
+  version: 1,
+  slotCount: 3,
+  slotSize: 4096,
+  headerSize: 512,
+  publicationStride: 32,
+};
+const MAX_GENERATION = 0xffff_ffff;
 
 /**
  * pairClients wires two IpcClient instances together via two PassThrough
@@ -58,6 +65,8 @@ function pairClients(options: IpcClientOptions = {}): {
 
 describe('IPC text attachments', () => {
   function receiver(options: IpcClientOptions = {}) {
+    // Inbound attachment cases start after the Go configuration exchange.
+    options.sourceTransport?.configure(SOURCE_CONFIG);
     const pair = pairClients(options);
     let id = 0;
     pair.b.start();
@@ -113,16 +122,191 @@ describe('IPC text attachments', () => {
       const message = decodeFrame(chunk)!.msg;
       frames.push(message);
       pair.streams.aToB.write(
-        encodeFrame({ kind: 'response', id: message.id, data: { ok: true } }),
+        encodeFrame({
+          kind: 'response',
+          id: message.id,
+          data:
+            message.kind === 'transportConfig' ? SOURCE_CONFIG : { ok: true },
+        }),
       );
     });
     pair.b.start();
     try {
       await pair.b.sendRequest('init', { runtime: {} });
       await pair.b.sendRequest('other', {});
-      expect(frames[0].transport).toEqual({ mapping: sources.descriptor });
-      expect(frames[0].data).toEqual({ runtime: {} });
-      expect(frames[1].transport).toBeUndefined();
+      expect(frames.map(({ kind }) => kind)).toEqual([
+        'transportConfig',
+        'init',
+        'other',
+      ]);
+      expect(frames[0]).toEqual({ kind: 'transportConfig', id: 1 });
+      expect(frames[1].transport).toEqual({ mapping: sources.descriptor() });
+      expect(frames[1].data).toEqual({ runtime: {} });
+      expect(frames[2].transport).toBeUndefined();
+      expect(sources.configuration()).toEqual(SOURCE_CONFIG);
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test('shares one runtime configuration exchange across concurrent first requests', async () => {
+    const sources = createSourceTransport();
+    expect(() => sources.descriptor()).toThrow('not configured');
+    const pair = pairClients({
+      sourceTransport: sources,
+      inheritedSourceFd: 7,
+    });
+    const frames: IpcMessage[] = [];
+    pair.streams.bToA.on('data', (chunk: Buffer) => {
+      const message = decodeFrame(chunk)!.msg;
+      frames.push(message);
+      if (message.kind !== 'transportConfig') {
+        pair.streams.aToB.write(
+          encodeFrame({ kind: 'response', id: message.id }),
+        );
+      }
+    });
+    pair.b.start();
+    try {
+      const configurationRequest = once(pair.streams.bToA, 'data');
+      const first = pair.b.sendRequest('first', {});
+      const second = pair.b.sendRequest('second', {});
+      const config = decodeFrame((await configurationRequest)[0])!.msg;
+      expect(frames).toEqual([{ kind: 'transportConfig', id: config.id }]);
+      pair.streams.aToB.write(
+        encodeFrame({ kind: 'response', id: config.id, data: SOURCE_CONFIG }),
+      );
+      await Promise.all([first, second]);
+      expect(frames.map(({ kind }) => kind)).toEqual([
+        'transportConfig',
+        'first',
+        'second',
+      ]);
+      expect(frames[1].transport).toEqual({ mapping: sources.descriptor(7) });
+      expect(frames[2].transport).toBeUndefined();
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test.each(['before response', 'after response'] as const)(
+    'close during bootstrap rejects every waiter without configuring or sending init: %s',
+    async (when) => {
+      const sources = createSourceTransport();
+      let configured = 0;
+      const configure = sources.configure;
+      sources.configure = (value) => {
+        configured++;
+        configure(value);
+      };
+      const pair = pairClients({ sourceTransport: sources });
+      const frames: IpcMessage[] = [];
+      pair.streams.bToA.on('data', (chunk: Buffer) => {
+        frames.push(decodeFrame(chunk)!.msg);
+      });
+      pair.b.start();
+      try {
+        const configurationRequest = once(pair.streams.bToA, 'data');
+        const pending = Promise.allSettled([
+          pair.b.sendRequest('init', {}),
+          pair.b.sendRequest('other', {}),
+        ]);
+        const config = decodeFrame((await configurationRequest)[0])!.msg;
+        if (when === 'after response') {
+          pair.streams.aToB.write(
+            encodeFrame({
+              kind: 'response',
+              id: config.id,
+              data: SOURCE_CONFIG,
+            }),
+          );
+        }
+        pair.b.close();
+        for (const result of await pending) {
+          expect(result.status).toBe('rejected');
+          if (result.status === 'rejected')
+            expect(result.reason.message).toContain('closed');
+        }
+        expect(configured).toBe(0);
+        expect(frames.map(({ kind }) => kind)).toEqual(['transportConfig']);
+        expect(sources.fd()).toBeUndefined();
+      } finally {
+        pair.cleanup();
+      }
+    },
+  );
+
+  test.each(['peer error', 'invalid configuration', 'native failure'] as const)(
+    'closes the arena and keeps complete inline text after bootstrap %s',
+    async (failure) => {
+      const sources = createSourceTransport();
+      const configure = sources.configure;
+      if (failure === 'native failure') {
+        sources.configure = () => {
+          throw new Error('allocation failed');
+        };
+      }
+      const pair = pairClients({ sourceTransport: sources });
+      const frames: IpcMessage[] = [];
+      const text = '\ufeffconst complete = "😀";\u0000\r\n';
+      pair.streams.bToA.on('data', (chunk: Buffer) => {
+        const message = decodeFrame(chunk)!.msg;
+        frames.push(message);
+        const configuring = message.kind === 'transportConfig';
+        pair.streams.aToB.write(
+          encodeFrame({
+            kind:
+              configuring && failure === 'peer error' ? 'error' : 'response',
+            id: message.id,
+            data: configuring
+              ? failure === 'peer error'
+                ? { message: 'unsupported request' }
+                : failure === 'invalid configuration'
+                  ? { ...SOURCE_CONFIG, slotSize: '4096' }
+                  : SOURCE_CONFIG
+              : { ok: true },
+          }),
+        );
+      });
+      pair.b.start();
+      try {
+        await Promise.all([
+          pair.b.sendRequest('init', {}, [text]),
+          pair.b.sendRequest('other', {}, [text]),
+        ]);
+        await pair.b.sendRequest('later', {}, [text]);
+        expect(frames.map(({ kind }) => kind)).toEqual([
+          'transportConfig',
+          'init',
+          'other',
+          'later',
+        ]);
+        for (const frame of frames.slice(1)) {
+          expect(frame.transport).toBeUndefined();
+          expect(frame.attachments).toEqual([{ text }]);
+        }
+        expect(sources.configuration()).toBeUndefined();
+        expect(() => configure(SOURCE_CONFIG)).toThrow('closed');
+      } finally {
+        pair.cleanup();
+      }
+    },
+  );
+
+  test('does not dispatch the reserved configuration kind to application handlers', async () => {
+    const pair = receiver();
+    let calls = 0;
+    pair.b.setInboundHandler(() => {
+      calls++;
+    });
+    pair.b.registerNotification('transportConfig', () => {
+      calls++;
+    });
+    try {
+      const response = await pair.request({ kind: 'transportConfig' });
+      expect(response.kind).toBe('error');
+      pair.streams.aToB.write(encodeFrame({ kind: 'transportConfig', id: 0 }));
+      expect(calls).toBe(0);
     } finally {
       pair.cleanup();
     }
@@ -138,7 +322,11 @@ describe('IPC text attachments', () => {
         const message = decodeFrame(chunk)!.msg;
         frames.push(message);
         pair.streams.aToB.write(
-          encodeFrame({ kind: 'response', id: message.id, data: {} }),
+          encodeFrame({
+            kind: 'response',
+            id: message.id,
+            data: message.kind === 'transportConfig' ? SOURCE_CONFIG : {},
+          }),
         );
       });
       pair.b.start();
@@ -156,27 +344,37 @@ describe('IPC text attachments', () => {
         else await outer;
         await nested;
         expect(frames.map((message) => message.kind)).toEqual(
-          failOuter ? ['nested'] : ['outer', 'nested'],
+          failOuter
+            ? ['transportConfig', 'nested']
+            : ['transportConfig', 'outer', 'nested'],
         );
-        expect(frames[0].transport).toEqual({ mapping: sources.descriptor });
-        if (!failOuter) expect(frames[1].transport).toBeUndefined();
+        expect(frames[0].transport).toBeUndefined();
+        expect(frames[1].transport).toEqual({ mapping: sources.descriptor() });
+        if (!failOuter) expect(frames[2].transport).toBeUndefined();
       } finally {
         pair.cleanup();
       }
     },
   );
 
-  test.each(['version', 'descriptor'] as const)(
+  test.each(['fd', 'configure', 'version', 'descriptor'] as const)(
     'closes native storage when initialization fails: %s',
     (failure) => {
       const binding = getNativeBinding();
       const SourceArena = binding.SourceArena;
       let closed = false;
       binding.SourceArena = class {
+        fd() {
+          if (failure === 'fd') throw new Error('fd unavailable');
+          return undefined;
+        }
+        configure() {
+          if (failure === 'configure') throw new Error('configure unavailable');
+        }
         descriptor() {
           if (failure === 'descriptor')
             throw new Error('descriptor unavailable');
-          return { version: PROTOCOL_VERSION + 1 };
+          return { version: SOURCE_CONFIG.version + 1 };
         }
         register(): number {
           throw new Error('must not register');
@@ -189,10 +387,10 @@ describe('IPC text attachments', () => {
         }
       };
       try {
-        expect(createSourceTransport).toThrow(
+        expect(() => createSourceTransport().configure(SOURCE_CONFIG)).toThrow(
           failure === 'version'
-            ? 'unsupported shared source version'
-            : 'descriptor unavailable',
+            ? 'inconsistent shared source version'
+            : `${failure} unavailable`,
         );
         expect(closed).toBe(true);
       } finally {
@@ -200,6 +398,100 @@ describe('IPC text attachments', () => {
       }
     },
   );
+
+  test.each(['windows', 'unix'] as const)(
+    'normalizes nullable native handle fields before publishing a %s descriptor',
+    (platform) => {
+      const binding = getNativeBinding();
+      const SourceArena = binding.SourceArena;
+      let closed = false;
+      binding.SourceArena = class {
+        fd() {
+          return platform === 'windows' ? null : 5;
+        }
+        configure() {}
+        descriptor() {
+          return {
+            version: SOURCE_CONFIG.version,
+            fd: platform === 'windows' ? null : 5,
+            handle: platform === 'windows' ? '42' : null,
+            processId: platform === 'windows' ? 123 : null,
+          };
+        }
+        register(): number {
+          throw new Error('must not register');
+        }
+        release(): boolean {
+          throw new Error('must not release');
+        }
+        close() {
+          closed = true;
+        }
+      };
+      let sources: ReturnType<typeof createSourceTransport> | undefined;
+      try {
+        sources = createSourceTransport();
+        expect(sources.fd()).toBe(platform === 'windows' ? undefined : 5);
+        sources.configure(SOURCE_CONFIG);
+        expect(JSON.parse(JSON.stringify(sources.descriptor(7)))).toEqual(
+          platform === 'windows'
+            ? { version: SOURCE_CONFIG.version, handle: '42', processId: 123 }
+            : { version: SOURCE_CONFIG.version, fd: 7 },
+        );
+      } finally {
+        sources?.close();
+        binding.SourceArena = SourceArena;
+      }
+      expect(closed).toBe(true);
+    },
+  );
+
+  test.each(
+    [
+      undefined,
+      [],
+      { ...SOURCE_CONFIG, version: 0 },
+      { ...SOURCE_CONFIG, slotCount: -1 },
+      { ...SOURCE_CONFIG, slotSize: 1.5 },
+      { ...SOURCE_CONFIG, headerSize: '512' },
+      { ...SOURCE_CONFIG, publicationStride: NaN },
+      { ...SOURCE_CONFIG, slotCount: 2 ** 32 + 3 },
+      { ...SOURCE_CONFIG, slotSize: 2 ** 32 + 4096 },
+    ].map((config) => ({ config })),
+  )(
+    'rejects an invalid runtime configuration and permanently closes storage: %j',
+    ({ config }) => {
+      const sources = createSourceTransport();
+      expect(() => sources.configure(config)).toThrow(
+        'invalid shared source configuration',
+      );
+      expect(sources.fd()).toBeUndefined();
+      expect(sources.configuration()).toBeUndefined();
+      expect(() => sources.configure(SOURCE_CONFIG)).toThrow('closed');
+      sources.close();
+    },
+  );
+
+  test('accepts the final slot in the peer-provided layout', async () => {
+    const pair = receiver({ sourceTransport: createSourceTransport() });
+    const batch = { ...emptyBatch(), slot: SOURCE_CONFIG.slotCount - 1 };
+    pair.b.setInboundHandler((msg) => {
+      expect(msg.attachments).toEqual([
+        { offset: 0, length: 0, lease: expect.any(Number) },
+      ]);
+      return {};
+    });
+    try {
+      const response = await pair.request({
+        attachments: [{ range: { offset: 0, length: 0 } }],
+        transport: { batch },
+      });
+      expect(response.kind).toBe('response');
+      expect(response.transport).toEqual({ released: batch });
+    } finally {
+      pair.cleanup();
+    }
+  });
 
   test.each([
     'success',
@@ -414,13 +706,13 @@ describe('IPC text attachments', () => {
 
   test.each([
     { slot: -1 },
-    { slot: SLOT_COUNT },
+    { slot: SOURCE_CONFIG.slotCount },
     { slot: 0.5 },
     { generation: 0 },
     { generation: MAX_GENERATION + 1 },
     { length: NaN },
     { length: Infinity },
-    { length: SLOT_SIZE + 1 },
+    { length: SOURCE_CONFIG.slotSize + 1 },
   ])(
     'rejects malformed batches before creating a capability: %j',
     async (change) => {

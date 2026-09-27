@@ -22,7 +22,11 @@
 import { createRequire } from 'node:module';
 
 import { platformPackageName } from './platform-tuple.js';
-import type { SourceMapping, SourceRange } from '../ipc/protocol.generated.js';
+import type {
+  SourceConfiguration,
+  SourceMapping,
+  SourceRange,
+} from '../ipc/protocol.js';
 
 const require = createRequire(import.meta.url);
 
@@ -52,8 +56,20 @@ export interface SharedSource extends SourceRange {
   lease: number;
 }
 
+/** N-API optional return values may use null; the wire envelope omits them. */
+export interface NativeSourceMapping extends Omit<
+  SourceMapping,
+  'fd' | 'handle' | 'processId'
+> {
+  fd?: number | null;
+  handle?: string | null;
+  processId?: number | null;
+}
+
 export interface SourceArena {
-  descriptor(): SourceMapping;
+  fd(): number | null | undefined;
+  configure(config: SourceConfiguration): void;
+  descriptor(): NativeSourceMapping;
   register(slot: number, generation: number, length: number): number;
   release(lease: number): boolean;
   close(): void;

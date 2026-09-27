@@ -170,10 +170,42 @@ func TestChannelSourceBootstrapBeforeHandlerAndOnlyOnce(t *testing.T) {
 		return true, nil
 	})
 	client.Start()
+	if err := peer.writeFrame(&Message{Kind: KindTransportConfig, ID: 1}); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := ReadFrame(peer.reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var layout SourceConfiguration
+	if err := configuration.Decode(&layout); err != nil {
+		t.Fatal(err)
+	}
+	if configuration.Kind != KindResponse || configuration.ID != 1 || layout != sourceConfiguration() {
+		t.Fatalf("incorrect runtime storage configuration: %+v, %+v", configuration, layout)
+	}
+	// Even malformed control requests must not install a mapping or dispatch
+	// application work before the actual initialization request.
+	if err := peer.writeFrame(&Message{Kind: KindTransportConfig, ID: 2, Transport: &TransportMetadata{Mapping: &SourceDescriptor{Version: SourceVersion}}}); err != nil {
+		t.Fatal(err)
+	}
+	rejected, err := ReadFrame(peer.reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rejected.Kind != KindError || rejected.ID != 2 {
+		t.Fatalf("accepted malformed configuration request: %+v", rejected)
+	}
+	client.mu.Lock()
+	initialized := client.sourcesInitialized
+	client.mu.Unlock()
+	if initialized || calls.Load() != 0 {
+		t.Fatal("configuration lookup consumed the mapping bootstrap or invoked the application")
+	}
 	// Invalid handles/FDs reject on every OS without closing unrelated handles.
 	descriptor := &SourceDescriptor{Version: SourceVersion, FD: SourceInheritedFD + 1, Handle: "invalid", ProcessID: 1}
 	for id := range 2 {
-		if err := peer.writeFrame(&Message{Kind: "init", ID: id + 1, Transport: &TransportMetadata{Mapping: descriptor}}); err != nil {
+		if err := peer.writeFrame(&Message{Kind: "init", ID: id + 3, Transport: &TransportMetadata{Mapping: descriptor}}); err != nil {
 			t.Fatal(err)
 		}
 		response, err := ReadFrame(peer.reader)

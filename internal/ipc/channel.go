@@ -450,6 +450,18 @@ func (c *Channel) dispatch(msg *Message) {
 		return
 	}
 
+	// Configuration uses the same request/reply mechanism but does not consume
+	// the first application request's mapping bootstrap or invoke its handler.
+	// The peer can now initialize native storage with Go's runtime layout.
+	if msg.Kind == KindTransportConfig {
+		if msg.Transport != nil || len(msg.Attachments) != 0 || len(msg.Data) != 0 {
+			c.sendError(msg.ID, "transport configuration request must be empty")
+		} else {
+			c.sendResponse(msg.ID, sourceConfiguration())
+		}
+		return
+	}
+
 	// Inbound request → handler, run async so the read loop keeps consuming
 	// frames (lets an in-handler SendRequest receive its reply). A handler
 	// panic is trapped and surfaced as an error frame, never crashing the

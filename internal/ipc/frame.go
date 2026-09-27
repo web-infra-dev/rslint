@@ -9,8 +9,8 @@
 //
 // `data` is opaque to the transport (json.RawMessage). Application layers
 // marshal/unmarshal their own typed payloads at the task boundary — the
-// transport never inspects task content. Protocol bindings for Node and Rust
-// are generated from the Go definitions; cross-language tests pin behavior.
+// transport never inspects task content. Storage settings are exchanged at
+// runtime; cross-language tests pin the fixed frame and envelope contract.
 package ipc
 
 import (
@@ -36,6 +36,8 @@ const (
 	KindError MessageKind = "error"
 	// KindHandshake is the initial version-negotiation exchange.
 	KindHandshake MessageKind = "handshake"
+	// KindTransportConfig returns storage settings before mapping bootstrap.
+	KindTransportConfig MessageKind = "transportConfig"
 	// KindExit requests termination.
 	KindExit MessageKind = "exit"
 )

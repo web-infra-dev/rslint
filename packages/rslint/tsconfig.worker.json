@@ -5,7 +5,7 @@
     "tsBuildInfoFile": "${configDir}/node_modules/.cache/rslint-core-worker-dts.tsbuildinfo"
   },
   "include": [
-    "${configDir}/src/ipc/protocol.generated.ts",
+    "${configDir}/src/ipc/protocol.ts",
     "${configDir}/src/eslint-plugin/**/*.ts",
     "${configDir}/src/native/**/*.ts",
     "${configDir}/src/config/config-source.ts",

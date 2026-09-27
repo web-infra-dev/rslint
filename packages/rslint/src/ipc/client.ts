@@ -6,9 +6,9 @@
  * Wire format and message shape mirror Go's `internal/ipc.Channel`:
  *
  *   `[4 bytes u32 LE length][JSON payload]`
- *   payload = generated WireMessage, with optional text attachments
+ *   payload = WireMessage, with optional text attachments
  *
- * Go owns the generated framing constants and wire types consumed here.
+ * Go supplies the shared storage layout through an internal runtime request.
  * Cross-language tests exercise the same contract through the real CLI.
  *
  * Concurrency model:
@@ -37,14 +37,6 @@
 
 import type { Readable, Writable } from 'node:stream';
 import {
-  FRAME_HEADER_SIZE as HEADER_BYTES,
-  MAX_FRAME_SIZE as MAX_FRAME_BYTES,
-  KIND_RESPONSE as RESPONSE_KIND,
-  KIND_ERROR as ERROR_KIND,
-  type SourceBatch,
-  type WireMessage,
-} from './protocol.generated.js';
-import {
   receiveAttachments,
   type ReceivedAttachments,
   type SourceTransport,
@@ -55,7 +47,17 @@ import type {
   InboundRequestHandler,
   NotificationHandler,
   ErrorResponseData,
+  SourceBatch,
+  SourceMapping,
+  WireMessage,
 } from './protocol.js';
+
+// Framing is the fixed wire format, independent of the runtime storage layout.
+const HEADER_BYTES = 4;
+const MAX_FRAME_BYTES = 256 * 1024 * 1024;
+const RESPONSE_KIND = 'response';
+const ERROR_KIND = 'error';
+const TRANSPORT_CONFIG_KIND = 'transportConfig';
 
 /** Internal record for a request awaiting its response. */
 interface PendingRequest {
@@ -68,6 +70,8 @@ type WireFrame<T = unknown> = Omit<WireMessage, 'data'> & { data?: T };
 export interface IpcClientOptions {
   /** Native reader storage, owned and closed by this IPC session. */
   readonly sourceTransport?: SourceTransport;
+  /** Child stdio index chosen by spawnIpcPeer for the prepared Unix fd. */
+  readonly inheritedSourceFd?: number;
   /**
    * Initial buffer size for the read accumulator. Frames larger than this
    * will simply grow the buffer; this is just a starting hint for typical
@@ -103,7 +107,9 @@ export class IpcClient {
   private nextId = 1;
   private closed = false;
   private started = false;
-  private readonly sources: SourceTransport | undefined;
+  private sources: SourceTransport | undefined;
+  private readonly inheritedSourceFd: number | undefined;
+  private bootstrapPromise: Promise<void> | undefined;
   private mappingSent = false;
   private preparingFirstRequest: Promise<void> | undefined;
 
@@ -111,6 +117,7 @@ export class IpcClient {
     this.input = input;
     this.output = output;
     this.sources = opts.sourceTransport;
+    this.inheritedSourceFd = opts.inheritedSourceFd;
   }
 
   /**
@@ -196,6 +203,10 @@ export class IpcClient {
     data: TIn,
     attachments?: readonly string[],
   ): Promise<IpcMessage<TOut>> {
+    if (kind === TRANSPORT_CONFIG_KIND) {
+      throw new Error('IpcClient: transportConfig is an internal request');
+    }
+    if (this.sources && !this.mappingSent) await this.configureSources();
     // A payload's toJSON may synchronously call sendRequest again. Keep only
     // bootstrap serialization ordered so the mapping stays on the first frame.
     if (this.preparingFirstRequest) await this.preparingFirstRequest;
@@ -210,33 +221,70 @@ export class IpcClient {
     }
     let response: Promise<IpcMessage<TOut>>;
     try {
-      const id = this.nextId++; // id > 0 always; notifications use 0
-      const mapping = this.mappingSent ? undefined : this.sources?.descriptor;
-      const frame = encodeFrame({
-        kind,
-        id,
-        data,
-        attachments: attachments?.map((text) => ({ text })),
-        transport: mapping ? { mapping } : undefined,
-      });
-      if (this.closed)
-        throw new Error('IpcClient: closed during request serialization');
-      this.mappingSent = true;
-
-      response = new Promise<IpcMessage<TOut>>((resolve, reject) => {
-        this.pending.set(id, {
-          resolve: resolve as (msg: IpcMessage) => void,
-          reject,
-        });
-      });
-      // Register pending BEFORE writing, including synchronous in-process peers.
-      this.writeFrameNow(frame);
+      const mapping = this.mappingSent
+        ? undefined
+        : this.sources?.descriptor(this.inheritedSourceFd);
+      response = this.writeRequest(kind, data, attachments, mapping);
     } finally {
       if (finishPreparing) {
         this.preparingFirstRequest = undefined;
         finishPreparing();
       }
     }
+    return response;
+  }
+
+  private configureSources(): Promise<void> {
+    // Publish the promise before writing: even an in-process peer can reenter.
+    // This RPC uses pending/write directly and never waits for its own bootstrap.
+    this.bootstrapPromise ??= Promise.resolve().then(async () => {
+      const sources = this.sources;
+      if (!sources || this.closed) return;
+      try {
+        const response = await this.writeRequest(
+          TRANSPORT_CONFIG_KIND,
+          undefined,
+        );
+        if (this.closed)
+          throw new Error('IpcClient: closed during source configuration');
+        sources.configure(response.data);
+      } catch (error) {
+        sources.close();
+        this.sources = undefined;
+        if (this.closed) throw error;
+        // Unsupported peers, invalid layouts and allocation failures all keep
+        // the session usable with complete inline attachments, without retries.
+      }
+    });
+    return this.bootstrapPromise;
+  }
+
+  private writeRequest<TIn = unknown, TOut = unknown>(
+    kind: string,
+    data: TIn,
+    attachments?: readonly string[],
+    mapping?: SourceMapping,
+  ): Promise<IpcMessage<TOut>> {
+    const id = this.nextId++; // id > 0 always; notifications use 0
+    const frame = encodeFrame({
+      kind,
+      id,
+      data,
+      attachments: attachments?.map((text) => ({ text })),
+      transport: mapping ? { mapping } : undefined,
+    });
+    if (this.closed)
+      throw new Error('IpcClient: closed during request serialization');
+    // Only a successfully serialized application envelope publishes the mapping.
+    if (mapping) this.mappingSent = true;
+    const response = new Promise<IpcMessage<TOut>>((resolve, reject) => {
+      this.pending.set(id, {
+        resolve: resolve as (msg: IpcMessage) => void,
+        reject,
+      });
+    });
+    // Register pending BEFORE writing, including synchronous in-process peers.
+    this.writeFrameNow(frame);
     return response;
   }
 
@@ -526,6 +574,16 @@ export class IpcClient {
   private dispatch(msg: WireMessage): void {
     if (msg.kind === RESPONSE_KIND || msg.kind === ERROR_KIND) {
       this.routeResponse(msg);
+      return;
+    }
+    if (msg.kind === TRANSPORT_CONFIG_KIND) {
+      // Only Go provides the layout. Never expose this control kind to handlers.
+      if (msg.id !== 0) {
+        this.sendErrorResponse(
+          msg.id,
+          'transport configuration is provided by Go',
+        );
+      }
       return;
     }
     if (msg.id === 0) {

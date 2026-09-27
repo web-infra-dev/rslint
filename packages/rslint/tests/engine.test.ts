@@ -28,7 +28,7 @@ const EXIT_DURING_CONFIG_ACTIVATION_BIN = path.resolve(
 const CONFIG_ACTIVATION_OUTER_DEADLOCK_SENTINEL_MS = 35 * 60_000;
 
 describe('CLI shared source integration', () => {
-  test.each(['snapshot', 'fix', 'inline'] as const)(
+  test.each(['snapshot', 'fix', 'inline', 'configure-failure'] as const)(
     'preserves complete source and parser output: %s',
     async (mode) => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-source-'));
@@ -46,6 +46,17 @@ describe('CLI shared source integration', () => {
     } } } }, rules: { 'local/rename': 'error' } }];`,
       );
       const transport = mode === 'inline' ? undefined : createSourceTransport();
+      const shared = mode !== 'inline' && mode !== 'configure-failure';
+      let configurationCalls = 0;
+      if (transport) {
+        const configure = transport.configure;
+        transport.configure = (config) => {
+          configurationCalls++;
+          if (mode === 'configure-failure')
+            throw new Error('allocation failed');
+          configure(config);
+        };
+      }
       const snapshots: string[] = [];
       const stdout = new PassThrough();
       let output = '';
@@ -72,7 +83,7 @@ describe('CLI shared source integration', () => {
               shutdown: () => host.shutdown(),
               lint: async (request: any) => {
                 for (const input of request.files) {
-                  if (transport) {
+                  if (shared) {
                     expect(input.text).toBeUndefined();
                     expect(input.sharedSource).toBeDefined();
                     const native = parseSharedSource(
@@ -100,9 +111,8 @@ describe('CLI shared source integration', () => {
           },
         });
         expect(exit).toBe(mode === 'fix' ? 0 : 1);
-        expect(snapshots[0]).toBe(
-          mode === 'inline' ? original : original.slice(1),
-        );
+        expect(configurationCalls).toBe(mode === 'inline' ? 0 : 1);
+        expect(snapshots[0]).toBe(shared ? original.slice(1) : original);
         if (mode === 'fix') {
           expect(snapshots).toEqual([
             original.slice(1),
@@ -120,6 +130,40 @@ describe('CLI shared source integration', () => {
       }
     },
   );
+
+  test('configures the inherited empty arena from a non-default peer layout', async () => {
+    const transport = createSourceTransport();
+    const fd = transport.fd();
+    if (fd !== undefined) expect(fs.fstatSync(fd).size).toBe(0);
+    expect(transport.configuration()).toBeUndefined();
+    const configurations: unknown[] = [];
+    const configure = transport.configure;
+    transport.configure = (config) => {
+      configurations.push(config);
+      configure(config);
+    };
+    try {
+      const exitCode = await runEngine({
+        binPath: process.execPath,
+        goArgs: [FAKE_BIN, 'require-mapping'],
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        createSourceTransport: () => transport,
+      });
+      expect(exitCode).toBe(0);
+      expect(configurations).toEqual([
+        {
+          version: 1,
+          slotCount: 3,
+          slotSize: 4096,
+          headerSize: 512,
+          publicationStride: 32,
+        },
+      ]);
+    } finally {
+      transport.close();
+    }
+  });
 });
 
 /**

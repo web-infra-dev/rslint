@@ -1,7 +1,6 @@
 /** Process bootstrap and native storage belong to the IPC session. */
 import { spawn, type StdioOptions } from 'node:child_process';
 import { IpcClient } from './client.js';
-import { INHERITED_FD } from './protocol.generated.js';
 import {
   createSourceTransport,
   type SourceTransport,
@@ -31,9 +30,11 @@ export function spawnIpcPeer(options: IpcPeerOptions) {
     : optionalSourceTransport();
   try {
     const stdio: StdioOptions = ['pipe', 'pipe', 'inherit'];
-    if (sources?.fd !== undefined) {
-      while (stdio.length < INHERITED_FD) stdio.push('ignore');
-      stdio[INHERITED_FD] = sources.fd;
+    const fd = sources?.fd();
+    let inheritedSourceFd: number | undefined;
+    if (fd !== undefined) {
+      inheritedSourceFd = stdio.length;
+      stdio.push(fd);
     }
     const child = spawn(options.binPath, options.goArgs, {
       stdio,
@@ -45,6 +46,7 @@ export function spawnIpcPeer(options: IpcPeerOptions) {
     }
     const client = new IpcClient(child.stdout, child.stdin, {
       sourceTransport: sources,
+      inheritedSourceFd,
     });
     return {
       child,

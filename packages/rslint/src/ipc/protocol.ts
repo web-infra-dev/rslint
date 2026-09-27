@@ -1,9 +1,8 @@
 import type { SharedSource } from '../native/binding.js';
-import type { WireMessage } from './protocol.generated.js';
 
 /**
- * Handler-facing types for Go↔Node IPC. Go owns the generated wire envelope
- * and framing constants. IpcClient resolves its text attachments and hides
+ * Wire and handler-facing types for Go↔Node IPC. Go provides shared storage
+ * configuration at runtime. IpcClient resolves text attachments and hides
  * storage metadata before delivering a message to an application handler.
  *
  * This is pure transport protocol — it carries no knowledge of any specific
@@ -11,9 +10,55 @@ import type { WireMessage } from './protocol.generated.js';
  */
 
 /**
- * Application kinds remain opaque to IPC; infrastructure kinds come from Go.
+ * Application kinds remain opaque to IPC.
  */
 export type MessageKind = WireMessage['kind'];
+
+/** Shared storage layout supplied by Go before the first application request. */
+export interface SourceConfiguration {
+  version: number;
+  slotCount: number;
+  slotSize: number;
+  headerSize: number;
+  publicationStride: number;
+}
+
+export interface SourceMapping {
+  version: number;
+  fd?: number;
+  handle?: string;
+  processId?: number;
+}
+
+export interface SourceBatch {
+  slot: number;
+  generation: number;
+  length: number;
+}
+
+export interface SourceRange {
+  offset: number;
+  length: number;
+}
+
+export interface TextAttachment {
+  text?: string;
+  range?: SourceRange;
+}
+
+export interface TransportMetadata {
+  mapping?: SourceMapping;
+  batch?: SourceBatch;
+  released?: SourceBatch;
+}
+
+export interface WireMessage {
+  kind: string;
+  id: number;
+  data?: unknown;
+  attachments?: TextAttachment[];
+  transport?: TransportMetadata;
+}
 
 /** Complete inline text or a revocable, pointer-free native reader capability. */
 export type IpcAttachment = string | SharedSource;
@@ -35,7 +80,9 @@ export interface IpcMessage<T = unknown> extends Omit<
  * Canonical error payload sent in `error` frames. Mirrors Go's
  * `ipc.ErrorResponseData`.
  */
-export type { ErrorResponseData } from './protocol.generated.js';
+export interface ErrorResponseData {
+  message: string;
+}
 
 /**
  * Inbound request handler signature. Returning a value resolves the matching

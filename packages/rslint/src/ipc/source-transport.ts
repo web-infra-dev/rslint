@@ -1,16 +1,16 @@
 /** Native storage for generic IPC text attachments. No application payloads. */
 import { getNativeBinding } from '../native/binding.js';
-import type { IpcAttachment } from './protocol.js';
-import {
-  INHERITED_FD,
-  MAX_GENERATION,
-  PROTOCOL_VERSION,
-  SLOT_COUNT,
-  SLOT_SIZE,
-  type SourceBatch,
-  type SourceMapping,
-  type SourceRange,
-} from './protocol.generated.js';
+import type {
+  IpcAttachment,
+  SourceBatch,
+  SourceConfiguration,
+  SourceMapping,
+  SourceRange,
+} from './protocol.js';
+
+// Publication words and native configuration fields are represented as u32.
+// This bounds their representation; the peer selects every layout dimension.
+const MAX_U32 = 0xffff_ffff;
 
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -25,26 +25,81 @@ function uint(value: unknown, max: number): value is number {
   );
 }
 
+function configurationNumber(value: unknown): number {
+  if (!uint(value, MAX_U32) || value === 0) {
+    throw new Error('invalid shared source configuration');
+  }
+  return value;
+}
+
 export function createSourceTransport() {
   const { SourceArena } = getNativeBinding();
   const arena = new SourceArena();
-  let mapping: SourceMapping;
+  let fd: number | undefined;
   try {
-    mapping = arena.descriptor();
-    if (mapping.version !== PROTOCOL_VERSION) {
-      throw new Error('unsupported shared source version');
-    }
+    // Only prepare the inheritable Unix handle; no layout is known yet.
+    fd = arena.fd() ?? undefined;
   } catch (error) {
     arena.close();
     throw error;
   }
+  let configuration: SourceConfiguration | undefined;
+  let mapping: SourceMapping | undefined;
+  let closed = false;
+  function close() {
+    if (closed) return;
+    closed = true;
+    configuration = undefined;
+    mapping = undefined;
+    arena.close();
+  }
   return {
-    // Unix spawn duplicates the local fd into the protocol's inherited fd.
-    // Windows transfers an anonymous mapping handle inside the descriptor.
-    fd: mapping.fd,
-    descriptor: {
-      ...mapping,
-      fd: mapping.fd === undefined ? undefined : INHERITED_FD,
+    fd() {
+      return closed ? undefined : fd;
+    },
+    configure(value: unknown) {
+      try {
+        if (closed) throw new Error('shared source storage is closed');
+        if (!record(value)) {
+          throw new Error('invalid shared source configuration');
+        }
+        const config: SourceConfiguration = {
+          version: configurationNumber(value.version),
+          slotCount: configurationNumber(value.slotCount),
+          slotSize: configurationNumber(value.slotSize),
+          headerSize: configurationNumber(value.headerSize),
+          publicationStride: configurationNumber(value.publicationStride),
+        };
+        arena.configure(config);
+        const descriptor = arena.descriptor();
+        if (descriptor.version !== config.version) {
+          throw new Error('inconsistent shared source version');
+        }
+        configuration = config;
+        mapping = {
+          version: descriptor.version,
+          fd: descriptor.fd ?? undefined,
+          handle: descriptor.handle ?? undefined,
+          processId: descriptor.processId ?? undefined,
+        };
+      } catch (error) {
+        close();
+        throw error;
+      }
+    },
+    configuration() {
+      return configuration;
+    },
+    descriptor(inheritedFd?: number): SourceMapping {
+      if (!mapping) throw new Error('shared source storage is not configured');
+      // Unix spawn chooses the child's fd index. Windows transfers the handle.
+      return {
+        ...mapping,
+        fd:
+          typeof mapping.fd === 'number'
+            ? (inheritedFd ?? mapping.fd)
+            : undefined,
+      };
     },
     register(batch: SourceBatch) {
       return arena.register(batch.slot, batch.generation, batch.length);
@@ -52,9 +107,7 @@ export function createSourceTransport() {
     release(lease: number) {
       return arena.release(lease);
     },
-    close() {
-      arena.close();
-    },
+    close,
   };
 }
 
@@ -74,12 +127,15 @@ export function receiveAttachments(
 ): ReceivedAttachments {
   let batch: SourceBatch | undefined;
   if (rawBatch !== undefined) {
+    const configuration = sources?.configuration();
+    if (!configuration)
+      throw new Error('shared IPC attachments are unavailable');
     if (
       !record(rawBatch) ||
-      !uint(rawBatch.slot, SLOT_COUNT - 1) ||
-      !uint(rawBatch.generation, MAX_GENERATION) ||
+      !uint(rawBatch.slot, configuration.slotCount - 1) ||
+      !uint(rawBatch.generation, MAX_U32) ||
       rawBatch.generation === 0 ||
-      !uint(rawBatch.length, SLOT_SIZE)
+      !uint(rawBatch.length, configuration.slotSize)
     ) {
       throw new Error('invalid IPC attachment batch');
     }

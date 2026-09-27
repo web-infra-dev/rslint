@@ -1,9 +1,8 @@
 package ipc
 
-// This file owns the private cross-language IPC and source-attachment protocol.
-// Rust and TypeScript consume checked-in bindings generated from these values
-// and DTOs; their builds do not require a Go toolchain.
-//go:generate go run ./internal/generate -root ../..
+// Go owns the source-storage policy. The peer requests these settings over the
+// existing channel before constructing its mapping; no build-time bindings are
+// needed to keep the native reader's layout in sync.
 
 const (
 	FrameHeaderSize = 4
@@ -18,6 +17,27 @@ const (
 	SourceInheritedFD              = 3
 	SourceMaxGeneration            = ^uint32(0)
 )
+
+// SourceConfiguration is the runtime layout supplied to the native reader.
+// Capacity is derived from HeaderSize + SlotCount*SlotSize by each consumer.
+// Version identifies the publication algorithm, not a second set of defaults.
+type SourceConfiguration struct {
+	Version           uint32 `json:"version"`
+	SlotCount         uint32 `json:"slotCount"`
+	SlotSize          uint32 `json:"slotSize"`
+	HeaderSize        uint32 `json:"headerSize"`
+	PublicationStride uint32 `json:"publicationStride"`
+}
+
+func sourceConfiguration() SourceConfiguration {
+	return SourceConfiguration{
+		Version:           SourceVersion,
+		SlotCount:         SourceSlotCount,
+		SlotSize:          SourceSlotSize,
+		HeaderSize:        SourceHeaderSize,
+		PublicationStride: SourcePublicationStride,
+	}
+}
 
 // SourceDescriptor identifies an OS mapping owned by the native reader.
 // The Node transport replaces a local FD with SourceInheritedFD for the child.
