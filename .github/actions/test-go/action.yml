@@ -96,6 +96,8 @@ runs:
         # Keep the existing default concurrency when runner quotas are unavailable.
         GOMAXPROCS: 16
       run: |
+        node --test (Join-Path $env:ACTION_PATH 'windows-go-tools.test.mjs')
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         $targets = @(Get-Content (Join-Path $env:RUNNER_TEMP 'go-test-packages.txt'))
         if ($targets.Count -eq 0) { throw 'No Go packages selected for testing.' }
 
@@ -115,6 +117,7 @@ runs:
 
         $testParallelism = $packageParallelism
         $testParallelArgs = $parallelArgs
+        $memoryBudgetMiB = 0
         $memoryLimitGiB = 0
         if ([int]::TryParse($env:memory_Limit, [ref]$memoryLimitGiB) -and $memoryLimitGiB -gt 0) {
           # memory_Limit is the runner's total memory quota in GiB.
@@ -122,16 +125,11 @@ runs:
           # across the full CPU-quota package parallelism.
           $memoryBudgetMiB = [Math]::Floor($memoryLimitGiB * 1024 * 0.9)
 
-          # GOMEMLIMIT is a soft limit for each Go process, not the whole job.
-          # Keep the CPU-based divisor so reducing test concurrency does not
-          # increase each process's memory budget.
+          # Ordinary tools and test executables each reserve this amount.
+          # Linkers also reserve their actual input archive sizes because
+          # Windows preloads these live buffers beyond the soft GC limit.
           $processMemoryMiB = [Math]::Floor($memoryBudgetMiB / $packageParallelism)
           $env:GOMEMLIMIT = "${processMemoryMiB}MiB"
-
-          # Use a 6 GiB estimate per concurrent test build or test binary for
-          # compiler/linker peaks above the soft Go memory limit.
-          $testParallelism = [Math]::Max(1, [Math]::Min($packageParallelism, [Math]::Floor($memoryBudgetMiB / 6144)))
-          $testParallelArgs = @("-p=$testParallelism")
         } elseif ($env:memory_Limit) {
           Write-Warning "Ignoring invalid memory_Limit; keeping the existing memory settings."
         }
@@ -139,18 +137,21 @@ runs:
         Write-Host ("Runner quotas: " + (@{cpu_limit = $env:cpu_limit; memory_Limit = $env:memory_Limit} | ConvertTo-Json -Compress))
         Write-Host "Go limits: GOMAXPROCS=$env:GOMAXPROCS, build parallelism=$packageParallelism, test parallelism=$testParallelism, GOMEMLIMIT=$env:GOMEMLIMIT"
         Write-Host "Go compiler flags: $($compilerArgs -join ' ')"
+        Write-Host "Go memory scheduler: budget_mib=$memoryBudgetMiB, policy=archive-plus-slot"
+        $goTools = Join-Path $env:ACTION_PATH 'windows-go-tools.mjs'
         $memoryLog = Join-Path $env:RUNNER_TEMP 'windows-go-memory.jsonl'
         $memoryStop = Join-Path $env:RUNNER_TEMP 'windows-go-memory.stop'
-        Remove-Item $memoryLog, $memoryStop -ErrorAction SilentlyContinue
+        $toolsLog = Join-Path $env:RUNNER_TEMP 'windows-go-tools.jsonl'
+        Remove-Item $memoryLog, $memoryStop, $toolsLog -ErrorAction SilentlyContinue
         $memoryJob = Start-Job -FilePath (Join-Path $env:ACTION_PATH 'windows-memory.ps1') -ArgumentList $memoryLog, $memoryStop, $PID
         try {
           if ($env:GO_TEST_MODE -eq 'affected') {
-            go test @compilerArgs @testParallelArgs -count=1 @targets
+            node $goTools run $memoryBudgetMiB $packageParallelism test @compilerArgs @testParallelArgs -count=1 @targets
             exit $LASTEXITCODE
           }
 
           $startedAt = [DateTime]::UtcNow
-          go build @compilerArgs @parallelArgs @targets
+          node $goTools run $memoryBudgetMiB $packageParallelism build @compilerArgs @parallelArgs @targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Write-Host "Go build completed: elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
 
@@ -159,7 +160,7 @@ runs:
           if ($packages.Count -eq 0) { throw 'No Go packages found for the full test run.' }
           Write-Host "Running all $($packages.Count) packages..."
           # Pass the original patterns to stay within Windows command-line limits.
-          go test @compilerArgs @testParallelArgs -count=1 @targets
+          node $goTools run $memoryBudgetMiB $packageParallelism test @compilerArgs @testParallelArgs -count=1 @targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Write-Host "Go tests completed: packages=$($packages.Count), elapsed_seconds=$([int]([DateTime]::UtcNow - $startedAt).TotalSeconds)"
         } finally {
@@ -179,5 +180,7 @@ runs:
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
         name: windows-go-memory-${{ github.run_attempt }}-${{ inputs.go-version }}
-        path: ${{ runner.temp }}/windows-go-memory.jsonl
+        path: |
+          ${{ runner.temp }}/windows-go-memory.jsonl
+          ${{ runner.temp }}/windows-go-tools.jsonl
         retention-days: 7
