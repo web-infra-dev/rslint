@@ -7,7 +7,12 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { acquire, createScheduler, linkerInputs } from './windows-go-tools.mjs';
+import {
+  acquire,
+  createScheduler,
+  estimateLinkMemoryMiB,
+  linkerInputs,
+} from './windows-go-tools.mjs';
 
 const MiB = 1024 * 1024;
 const request = (kind, inputMiB, pid) => ({
@@ -24,17 +29,20 @@ async function release(socket) {
 test('large links wait for memory; small tools retain concurrency; queued work stays fair', async () => {
   const events = [];
   const changes = new EventEmitter();
-  const scheduler = await createScheduler(40, 4, (event) => {
+  const scheduler = await createScheduler(40 * 1024, 5 * 1024, (event) => {
     events.push(event);
     changes.emit(`${event.event}-${event.pid}`);
   });
   try {
-    const first = await acquire(scheduler.endpoint, request('link', 28, 1));
+    const first = await acquire(
+      scheduler.endpoint,
+      request('link', 24 * 1024, 1),
+    );
     const second = await acquire(scheduler.endpoint, request('test', 0, 2));
     const third = await acquire(scheduler.endpoint, request('tool', 0, 3));
-    assert.equal(scheduler.stats.max_reserved_mib, 40);
+    assert.equal(scheduler.stats.max_reserved_mib, 40 * 1024);
     const queuedFourth = once(changes, 'queue-4');
-    const waiting = acquire(scheduler.endpoint, request('link', 28, 4));
+    const waiting = acquire(scheduler.endpoint, request('link', 24 * 1024, 4));
     await queuedFourth;
     const queuedFifth = once(changes, 'queue-5');
     const small = acquire(scheduler.endpoint, request('tool', 0, 5));
@@ -48,7 +56,7 @@ test('large links wait for memory; small tools retain concurrency; queued work s
       events.filter((e) => e.event === 'grant').map((e) => e.pid),
       [1, 2, 3, 4, 5],
     );
-    assert.ok(events.every((e) => e.used_mib >= 0 && e.used_mib <= 40));
+    assert.ok(events.every((e) => e.used_mib >= 0 && e.used_mib <= 40 * 1024));
     await release(fourth);
     await release(fifth);
   } finally {
@@ -57,9 +65,12 @@ test('large links wait for memory; small tools retain concurrency; queued work s
 });
 
 test('an oversized linker runs alone, is recorded, and disconnect releases its reservation', async () => {
-  const scheduler = await createScheduler(40, 4);
+  const scheduler = await createScheduler(40 * 1024, 4 * 1024);
   try {
-    const big = await acquire(scheduler.endpoint, request('link', 50, 1));
+    const big = await acquire(
+      scheduler.endpoint,
+      request('link', 50 * 1024, 1),
+    );
     const next = acquire(scheduler.endpoint, request('test', 0, 2));
     assert.equal(scheduler.stats.oversized_links, 1);
     big.destroy();
@@ -68,6 +79,21 @@ test('an oversized linker runs alone, is recorded, and disconnect releases its r
     await release(small);
   } finally {
     await scheduler.close();
+  }
+});
+
+test('measured link sizes retain small-task concurrency and include large-task overhead', () => {
+  const slot = 3686;
+  const common = estimateLinkMemoryMiB(1897 * MiB, slot);
+  assert.equal(common, slot);
+  assert.equal(Math.floor(36864 / common), 10);
+  assert.equal(estimateLinkMemoryMiB(30432757580, slot), 36279);
+  assert.ok(estimateLinkMemoryMiB(30110032156, slot) > 33961.93);
+  // A small per-process slot must not erase the fixed linker overhead.
+  assert.ok(estimateLinkMemoryMiB(Math.ceil(2094.46 * MiB), 512) > 3085.75);
+  for (const cores of [10, 20, 40]) {
+    const budget = Math.floor(cores * 4 * 1024 * 0.9);
+    assert.ok(Math.floor(budget / common) >= cores);
   }
 });
 

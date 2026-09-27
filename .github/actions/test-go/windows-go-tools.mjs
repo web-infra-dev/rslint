@@ -11,6 +11,15 @@ import { fileURLToPath } from 'node:url';
 const script = fileURLToPath(import.meta.url);
 const MiB = 1024 * 1024;
 
+export function estimateLinkMemoryMiB(inputBytes, slotMiB) {
+  const inputMiB = Math.ceil(inputBytes / MiB);
+  // Observed linker overhead reached 991 MiB for small inputs and 18.3% for
+  // large inputs. Leave room above both, without adding the full process slot
+  // on top of every archive. These reservations are estimates, not limits.
+  const overheadMiB = Math.max(1536, Math.ceil(inputMiB / 4));
+  return Math.max(slotMiB, inputMiB + overheadMiB);
+}
+
 export function linkerInputs(args) {
   const index = args.indexOf('-importcfg');
   const config =
@@ -121,7 +130,10 @@ export async function createScheduler(budgetMiB, slotMiB, record = () => {}) {
           ) {
             throw new Error('Invalid scheduler request');
           }
-          const estimate = slotMiB + Math.ceil(request.input_bytes / MiB);
+          const estimate =
+            request.kind === 'link'
+              ? estimateLinkMemoryMiB(request.input_bytes, slotMiB)
+              : slotMiB;
           const { token: _, ...details } = request;
           entry = {
             socket,

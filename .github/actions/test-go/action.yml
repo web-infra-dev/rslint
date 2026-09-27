@@ -126,8 +126,8 @@ runs:
           $memoryBudgetMiB = [Math]::Floor($memoryLimitGiB * 1024 * 0.9)
 
           # Ordinary tools and test executables each reserve this amount.
-          # Linkers also reserve their actual input archive sizes because
-          # Windows preloads these live buffers beyond the soft GC limit.
+          # Linkers reserve at least this amount, or their input archives
+          # plus overhead when larger. Windows preloads these live buffers.
           $processMemoryMiB = [Math]::Floor($memoryBudgetMiB / $packageParallelism)
           $env:GOMEMLIMIT = "${processMemoryMiB}MiB"
         } elseif ($env:memory_Limit) {
@@ -137,7 +137,7 @@ runs:
         Write-Host ("Runner quotas: " + (@{cpu_limit = $env:cpu_limit; memory_Limit = $env:memory_Limit} | ConvertTo-Json -Compress))
         Write-Host "Go limits: GOMAXPROCS=$env:GOMAXPROCS, build parallelism=$packageParallelism, test parallelism=$testParallelism, GOMEMLIMIT=$env:GOMEMLIMIT"
         Write-Host "Go compiler flags: $($compilerArgs -join ' ')"
-        Write-Host "Go memory scheduler: budget_mib=$memoryBudgetMiB, policy=archive-plus-slot"
+        Write-Host "Go memory scheduler: budget_mib=$memoryBudgetMiB, policy=archive-calibrated"
         $goTools = Join-Path $env:ACTION_PATH 'windows-go-tools.mjs'
         $memoryLog = Join-Path $env:RUNNER_TEMP 'windows-go-memory.jsonl'
         $memoryStop = Join-Path $env:RUNNER_TEMP 'windows-go-memory.stop'
