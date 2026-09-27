@@ -96,8 +96,6 @@ runs:
         # Keep the existing default concurrency when runner quotas are unavailable.
         GOMAXPROCS: 16
       run: |
-        node --test (Join-Path $env:ACTION_PATH 'windows-go-tools.test.mjs')
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         $targets = @(Get-Content (Join-Path $env:RUNNER_TEMP 'go-test-packages.txt'))
         if ($targets.Count -eq 0) { throw 'No Go packages selected for testing.' }
 

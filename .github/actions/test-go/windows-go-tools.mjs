@@ -1,5 +1,5 @@
 // Schedule Go processes by estimated memory without reducing CPU parallelism.
-// cspell:ignore toolexec importcfg packagefile TOOLEXEC IMPORTPATH DWARF gcflags
+// cspell:ignore toolexec importcfg packagefile DWARF gcflags
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const script = fileURLToPath(import.meta.url);
 const MiB = 1024 * 1024;
 
-export function estimateLinkMemoryMiB(inputBytes, slotMiB) {
+function estimateLinkMemoryMiB(inputBytes, slotMiB) {
   const inputMiB = Math.ceil(inputBytes / MiB);
   // Observed linker overhead reached 991 MiB for small inputs and 18.3% for
   // large inputs. Leave room above both, without adding the full process slot
@@ -20,7 +20,7 @@ export function estimateLinkMemoryMiB(inputBytes, slotMiB) {
   return Math.max(slotMiB, inputMiB + overheadMiB);
 }
 
-export function linkerInputs(args) {
+function linkerInputBytes(args) {
   const index = args.indexOf('-importcfg');
   const config =
     index >= 0
@@ -37,13 +37,10 @@ export function linkerInputs(args) {
   if (!main || main.startsWith('-'))
     throw new Error('Linker invocation has no main archive');
   files.add(main);
-  return {
-    input_bytes: [...files].reduce((sum, file) => sum + statSync(file).size, 0),
-    input_count: files.size,
-  };
+  return [...files].reduce((sum, file) => sum + statSync(file).size, 0);
 }
 
-export async function createScheduler(budgetMiB, slotMiB, record = () => {}) {
+async function createScheduler(budgetMiB, slotMiB) {
   if (
     !Number.isSafeInteger(budgetMiB) ||
     budgetMiB < 1 ||
@@ -101,13 +98,6 @@ export async function createScheduler(budgetMiB, slotMiB, record = () => {}) {
         );
       }
       stats.wait_ms += waitMs;
-      record({
-        event: 'grant',
-        ...entry.details,
-        reserved_mib: entry.reserved_mib,
-        wait_ms: waitMs,
-        used_mib: used,
-      });
       entry.socket.write('ready\n');
     }
   }
@@ -138,18 +128,15 @@ export async function createScheduler(budgetMiB, slotMiB, record = () => {}) {
             request.kind === 'link'
               ? estimateLinkMemoryMiB(request.input_bytes, slotMiB)
               : slotMiB;
-          const { token: _, ...details } = request;
           entry = {
             socket,
             kind: request.kind,
             estimate_mib: estimate,
             reserved_mib: Math.min(budgetMiB, estimate),
-            details: { ...details, estimate_mib: estimate },
             queuedAt: Date.now(),
             active: false,
           };
           queue.push(entry);
-          record({ event: 'queue', ...entry.details, used_mib: used });
           drain();
         }
       } catch {
@@ -162,11 +149,6 @@ export async function createScheduler(budgetMiB, slotMiB, record = () => {}) {
         used -= entry.reserved_mib;
         active--;
         activeLinks -= Number(entry.kind === 'link');
-        record({
-          event: 'release',
-          pid: entry.details.pid,
-          used_mib: used,
-        });
       } else if (entry) {
         const index = queue.indexOf(entry);
         if (index >= 0) queue.splice(index, 1);
@@ -188,7 +170,7 @@ export async function createScheduler(budgetMiB, slotMiB, record = () => {}) {
   };
 }
 
-export async function acquire(endpoint, details) {
+async function acquire(endpoint, kind, inputBytes) {
   const socket = net.createConnection({
     host: '127.0.0.1',
     port: endpoint.port,
@@ -208,12 +190,15 @@ export async function acquire(endpoint, details) {
       if (response === 'ready\n') resolve();
     });
   });
-  socket.write(JSON.stringify({ ...details, token: endpoint.token }) + '\n');
+  socket.write(
+    JSON.stringify({ kind, input_bytes: inputBytes, token: endpoint.token }) +
+      '\n',
+  );
   await ready;
   return socket;
 }
 
-export async function execute(command, args, env = process.env, lease) {
+async function execute(command, args, env = process.env, lease) {
   const child = spawn(command, args, { env, stdio: 'inherit' });
   const kill = () => child.kill();
   // A lost coordinator must not leave an unaccounted tool running.
@@ -244,14 +229,11 @@ async function main([mode, ...args]) {
         : /^link(?:\.exe)?$/i.test(path.basename(tool))
           ? 'link'
           : 'tool';
-    const inputs =
-      kind === 'link' ? linkerInputs(toolArgs) : { input_bytes: 0 };
-    const lease = await acquire(JSON.parse(process.env.RSLINT_GO_SCHEDULER), {
+    const lease = await acquire(
+      JSON.parse(process.env.RSLINT_GO_SCHEDULER),
       kind,
-      pid: process.pid,
-      package: process.env.TOOLEXEC_IMPORTPATH ?? path.basename(tool),
-      ...inputs,
-    });
+      kind === 'link' ? linkerInputBytes(toolArgs) : 0,
+    );
     return execute(tool, toolArgs, process.env, lease);
   }
   if (mode !== 'run') throw new Error('Expected run, tool, or exec');
@@ -296,13 +278,11 @@ async function main([mode, ...args]) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === script) {
-  main(process.argv.slice(2))
-    .then((code) => {
-      process.exitCode = code;
-    })
-    .catch((error) => {
-      console.error(error);
-      process.exitCode = 1;
-    });
-}
+main(process.argv.slice(2))
+  .then((code) => {
+    process.exitCode = code;
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
