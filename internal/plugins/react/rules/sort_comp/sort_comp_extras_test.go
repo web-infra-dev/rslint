@@ -35,6 +35,8 @@ func TestSortCompExtras(t *testing.T) {
 		{Code: "class Foo extends React.Component { [`render`]() {} render() {} }", Tsx: true},
 		// ---- Dimension 4: nested non-React classes are independent. ----
 		{Code: `class Outer extends React.Component { onClick() {} render() { class Helper { render() {} foo() {} } return null; } }`, Tsx: true},
+		// Dynamic superclass keys do not identify React components by variable name.
+		{Code: `class Foo extends React[Component] { render() {} componentDidMount() {} }`, Tsx: true},
 		// ---- Dimension 4: empty containers and spread members are safe. ----
 		{Code: `class Foo extends React.Component {}`, Tsx: true},
 		{Code: `var Foo = createReactClass({ ...defaults, render() {} });`, Tsx: true},
@@ -107,8 +109,8 @@ func TestSortCompExtras(t *testing.T) {
 		{Code: `/** @extends React.Component */ class Foo { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
 		{Code: `/** @augments React.PureComponent */ class Foo { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
 		{Code: `/** @extends React.Component */ const Foo = class { render() {} componentDidMount() {} };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
-		// ---- Compatibility: computed React component inheritance. ----
-		{Code: `class Foo extends React[Component] { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
+		// Static superclass keys identify React components.
+		{Code: `class Foo extends React['Component'] { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
 		// ---- Compatibility: error deduplication uses the original entry snapshot. ----
 		{Code: `class Foo extends React.Component { render() {} static foo() {} componentDidMount() {} onClick() {} displayName() {} }`, Tsx: true, Options: sortCompOrder("lifecycle", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("displayName", "before", "componentDidMount")}},
 	})

@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Expectations were checked with eslint-plugin-react 7.37.5 and ESLint 9.39.5.
@@ -82,6 +83,48 @@ class C {}`, want: []bool{true}},
 						t.Fatalf("IsExplicitReactComponent() = %v, want %v", got, tc.want)
 					}
 				})
+			}
+		})
+	}
+}
+
+func TestExtendsReactComponent(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, code, pragma string
+		kind               core.ScriptKind
+		want               []bool
+	}{
+		{"ordinary bases", `class A extends Component {} class B extends React.PureComponent {} class C extends Other {}`, "", core.ScriptKindTSX, []bool{true, true, false}},
+		{"JSDoc base cast", `class C extends (/** @type {any} */ (React.Component)) {}`, "", core.ScriptKindJSX, []bool{true}},
+		{"JSDoc receiver cast", `class C extends (/** @type {any} */ (Custom)).Component {}`, "Custom", core.ScriptKindJSX, []bool{true}},
+		{"JSDoc dynamic key cast", `class C extends React[/** @type {string} */ (Component)] {}`, "", core.ScriptKindJSX, []bool{false}},
+		{"private base", `class React { static #Component; static make() { return class C extends React.#Component {}; } }`, "", core.ScriptKindTSX, []bool{false, false}},
+		{"authored TypeScript cast", `class C extends (React.Component as any) {}`, "", core.ScriptKindTSX, []bool{false}},
+		{"literal base key", `class C extends React['Component'] {}`, "", core.ScriptKindJSX, []bool{true}},
+		{"template base keys", "class A extends React[`Component`] {} class B extends React[`PureComponent`] {}", "", core.ScriptKindJSX, []bool{true, true}},
+		{"dynamic base keys", `const Component = 'Other'; const PureComponent = 'Other'; class A extends React[Component] {} class B extends React[PureComponent] {}`, "", core.ScriptKindJSX, []bool{false, false}},
+		{"parenthesized literal key", `class C extends React[('Component')] {}`, "", core.ScriptKindJSX, []bool{true}},
+		{"JSDoc literal key cast", `class C extends React[/** @type {string} */ ('Component')] {}`, "", core.ScriptKindJSX, []bool{true}},
+		{"asserted literal key", `class C extends React['Component' as const] {}`, "", core.ScriptKindTSX, []bool{true}},
+		{"custom pragma literal key", `class A extends Preact['Component'] {} class B extends React['Component'] {}`, "Preact", core.ScriptKindJSX, []bool{true, false}},
+		{"other literal key", `class C extends React['Other'] {}`, "", core.ScriptKindJSX, []bool{false}},
+		{"interpolated template key", "class C extends React[`${Component}`] {}", "", core.ScriptKindJSX, []bool{false}},
+		{"optional literal base", `class C extends (React?.['Component']) {}`, "", core.ScriptKindJSX, []bool{false}},
+		{"optional base with JSDoc", `class C extends (/** @type {any} */ (React?.Component)) {}`, "", core.ScriptKindJSX, []bool{false}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/component.tsx", Path: "/component.tsx"}, tc.code, tc.kind)
+			var got []bool
+			utils.VisitDescendants(source.AsNode(), func(node *ast.Node) bool {
+				if ast.IsClassLike(node) {
+					got = append(got, ExtendsReactComponent(node, tc.pragma))
+				}
+				return true
+			})
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("ExtendsReactComponent() = %v, want %v", got, tc.want)
 			}
 		})
 	}

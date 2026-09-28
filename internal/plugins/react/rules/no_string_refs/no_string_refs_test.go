@@ -172,18 +172,6 @@ var Hello = createReactClass({
 			Tsx:      true,
 			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
 		},
-		// extends via computed property `React['Component']` — upstream
-		// requires `superClass.property.name`, which is undefined for
-		// computed access, so this is NOT a React component.
-		{
-			Code: `
-class Hello extends React['Component'] {
-  componentDidMount() { var c = this.refs.foo; }
-}
-`,
-			Tsx:      true,
-			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
-		},
 		// Computed createClass access `React['createClass']({...})` — upstream
 		// requires `callee.property.name`, which is undefined here, so this
 		// is NOT an ES5 React component call.

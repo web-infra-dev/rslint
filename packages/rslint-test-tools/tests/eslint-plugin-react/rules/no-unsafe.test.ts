@@ -181,15 +181,6 @@ ruleTester.run('no-unsafe', {} as never, {
       `,
       settings: { react: { version: '16.4.0' } },
     },
-    // ---- Edge: ElementAccessExpression in extends ----
-    {
-      code: `
-        class Foo extends React['Component'] {
-          UNSAFE_componentWillMount() {}
-        }
-      `,
-      settings: { react: { version: '16.4.0' } },
-    },
     // ---- Edge: HOC return value in extends — doesn't match literal Component ----
     {
       code: `
@@ -236,6 +227,16 @@ ruleTester.run('no-unsafe', {} as never, {
     },
   ],
   invalid: [
+    // Intentional correction: a literal superclass key identifies a React component.
+    {
+      code: `
+        class Foo extends React['Component'] {
+          UNSAFE_componentWillMount() {}
+        }
+      `,
+      settings: { react: { version: '16.4.0' } },
+      errors: [{ messageId: 'unsafeMethod' }],
+    },
     // ---- Upstream invalid #1: React.Component + checkAliases: true ----
     {
       code: `

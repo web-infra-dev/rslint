@@ -782,17 +782,6 @@ func TestPreferStatelessFunctionRule(t *testing.T) {
         }
       `, Tsx: true},
 
-		// ---- tsgo: `extends React['Component']` — element access form,
-		// neither Identifier nor PropertyAccessExpression of pragma. Not
-		// recognized as React component. ----
-		{Code: `
-        class Foo extends React['Component'] {
-          render() {
-            return <div>{this.props.foo}</div>;
-          }
-        }
-      `, Tsx: true},
-
 		// ---- tsgo: render returning JSX wrapped in `as` cast — AsExpression
 		// is not peeled by SkipParentheses, so isJSXLike returns false →
 		// invalidReturn=true → component suppressed. ----
