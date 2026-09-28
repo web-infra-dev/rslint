@@ -56,7 +56,7 @@ var NoAsyncPromiseFinallyRule = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(ast.SkipParentheses(callback), message)
+				ctx.ReportNode(utils.ESTreeRuntimeExpression(callback), message)
 			},
 		}
 	},
