@@ -7,9 +7,25 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// These expectations were checked against eslint-plugin-react v7.37.5.
+// Expectations mirror eslint-plugin-react v7.37.5.
 func TestNoObjectTypeAsDefaultPropExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoObjectTypeAsDefaultPropRule, []rule_tester.ValidTestCase{
+		// Computed identifier keys retain the lowercase first-character gate.
+		{Code: `const views = { [foo]({items = []}) { return <div />; }, [_Foo]({items = []}) { return <div />; } };`, Tsx: true},
+		// Computed object methods returning only null remain excluded.
+		{Code: `const views = { ['Foo']({items = []}) { return null; }, [Foo]({items = []}) { return null; }, [keys.Foo]({items = []}) { return null; } };`, Tsx: true},
+		// Computed setters returning only null are excluded too.
+		{Code: `const views = { set ['Foo']({items = []}) { return null; } };`, Tsx: true},
+		// Lowercase element-access assignments stay excluded for JSX and null.
+		{Code: `view[foo] = ({items = []}) => <div />; view[foo] = ({items = []}) => null;`, Tsx: true},
+		// Literal element-access keys have no ESTree property.name.
+		{Code: `view['Foo'] = ({items = []}) => <div />; module['exports'] = ({items = []}) => null;`, Tsx: true},
+		// Named function expressions retain their own capitalization gate.
+		{Code: `view[Foo] = function lower({items = []}) { return <div />; };`, Tsx: true},
+		// Computed class methods are not object-literal components.
+		{Code: `class View { ['Foo']({items = []}) { return <div />; } }`, Tsx: true},
+		// Private member names follow the same capitalization check.
+		{Code: `class View { #foo; constructor() { this.#foo = ({items = []}) => <div />; } }`, Tsx: true},
 		// Authored this remains the first TypeScript parameter.
 		{Code: `function Foo(this: unknown, {items = []}: any) { return null; }`, Tsx: true},
 		// Tagged templates and comma expressions are outside the forbidden syntax set.
@@ -63,6 +79,49 @@ const Foo = ({items = []}) => null;`, Tsx: true},
 		// Body-absent declarations have no component return.
 		{Code: `declare function Foo({items = []}: any): unknown;`, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
+		// Computed string method keys do not apply identifier capitalization.
+		{Code: `const views = { ['Foo']({items = []}) { return <div />; }, ['foo']({items = []}) { return <div />; } };`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "forbiddenTypeDefaultParam", Message: "items has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.", Line: 1, Column: 26, EndLine: 1, EndColumn: 36},
+				{MessageId: "forbiddenTypeDefaultParam", Message: "items has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.", Line: 1, Column: 69, EndLine: 1, EndColumn: 79},
+			}},
+		// Computed identifier and member method keys can identify components.
+		{Code: `const views = { [Foo]({items = []}) { return <div />; }, [keys.foo]({items = []}) { return <div />; } };`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "forbiddenTypeDefaultParam", Message: "items has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.", Line: 1, Column: 24, EndLine: 1, EndColumn: 34},
+				{MessageId: "forbiddenTypeDefaultParam", Message: "items has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.", Line: 1, Column: 70, EndLine: 1, EndColumn: 80},
+			}},
+		// Computed setters with JSX returns use the object-method path.
+		{Code: `const views = { set ['Foo']({items = []}) { return <div />; } };`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "forbiddenTypeDefaultParam", Message: "items has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.", Line: 1, Column: 30, EndLine: 1, EndColumn: 40},
+			}},
+		// Uppercase element-access assignments accept JSX or null returns.
+		{Code: `view[Foo] = ({items = []}) => <div />; view[Foo] = ({items = []}) => null;`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "forbiddenTypeDefaultParam", Message: "items has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.", Line: 1, Column: 15, EndLine: 1, EndColumn: 25},
+				{MessageId: "forbiddenTypeDefaultParam", Message: "items has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.", Line: 1, Column: 54, EndLine: 1, EndColumn: 64},
+			}},
+		// Parentheses around a computed assignment key remain transparent.
+		{Code: `view[(Foo)] = (({items = []}) => <div />);`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "forbiddenTypeDefaultParam", Message: "items has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.", Line: 1, Column: 18, EndLine: 1, EndColumn: 28},
+			}},
+		// Computed identifier exports preserve the module.exports exception.
+		{Code: `module[exports] = ({items = []}) => null;`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "forbiddenTypeDefaultParam", Message: "items has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.", Line: 1, Column: 21, EndLine: 1, EndColumn: 31},
+			}},
+		// A function expression name precedes the assigned member name gate.
+		{Code: `view[lower] = function Foo({items = []}) { return null; };`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "forbiddenTypeDefaultParam", Message: "items has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.", Line: 1, Column: 29, EndLine: 1, EndColumn: 39},
+			}},
+		// Private member names omit the hash when checking capitalization.
+		{Code: `class View { #Foo; constructor() { this.#Foo = ({items = []}) => <div />; } }`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "forbiddenTypeDefaultParam", Message: "items has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.", Line: 1, Column: 50, EndLine: 1, EndColumn: 60},
+			}},
 		// JSDoc this does not hide the first authored props parameter.
 		{Code: `/** @this {unknown} */
 function Foo({items = []}) { return null; }`, FileName: "review.jsx", TSConfig: "tsconfig.allow-js.json",
