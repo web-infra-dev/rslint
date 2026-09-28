@@ -29,6 +29,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_key"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_max_depth"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_max_props_per_line"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_newline"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_bind"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_constructed_context_values"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_duplicate_props"
@@ -129,6 +130,7 @@ func GetAllRules() []rule.Rule {
 		jsx_key.JsxKeyRule,
 		jsx_max_depth.JsxMaxDepthRule,
 		jsx_max_props_per_line.JsxMaxPropsPerLineRule,
+		jsx_newline.JsxNewlineRule,
 		jsx_no_bind.JsxNoBindRule,
 		jsx_no_constructed_context_values.JsxNoConstructedContextValuesRule,
 		jsx_no_duplicate_props.JsxNoDuplicatePropsRule,
