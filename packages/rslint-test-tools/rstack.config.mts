@@ -648,6 +648,7 @@ define.test({
     './tests/eslint/rules/yoda.test.ts',
 
     // eslint-plugin-jest
+    './tests/eslint-plugin-jest/rules/consistent-test-it.test.ts',
     './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
     './tests/eslint-plugin-jest/rules/max-expects.test.ts',
     './tests/eslint-plugin-jest/rules/max-nested-describe.test.ts',

@@ -29,33 +29,11 @@ func RstestCoreModuleFromRequireCall(node *ast.Node) (string, bool) {
 }
 
 func NamedImportElements(declaration *ast.ImportDeclaration) []*ast.Node {
-	if declaration == nil || declaration.ImportClause == nil || declaration.ImportClause.IsTypeOnly() {
-		return nil
-	}
-	clause := declaration.ImportClause.AsImportClause()
-	if clause == nil || clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
-		return nil
-	}
-	named := clause.NamedBindings.AsNamedImports()
-	if named == nil || named.Elements == nil {
-		return nil
-	}
-	return named.Elements.Nodes
+	return testFramework.NamedImportElements(declaration)
 }
 
 func ImportedSpecifierName(element *ast.Node) string {
-	specifier := element.AsImportSpecifier()
-	if specifier == nil || specifier.IsTypeOnly {
-		return ""
-	}
-	name := specifier.Name()
-	if specifier.PropertyName != nil {
-		name = specifier.PropertyName
-	}
-	if name == nil {
-		return ""
-	}
-	return name.Text()
+	return testFramework.ImportedSpecifierName(element)
 }
 
 // RequireBindingImportedName returns the name a destructured `require` binding

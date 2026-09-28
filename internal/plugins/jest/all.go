@@ -1,6 +1,7 @@
 package jest
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/consistent_test_it"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/expect_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/max_expects"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/max_nested_describe"
@@ -74,6 +75,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		consistent_test_it.ConsistentTestItRule,
 		expect_expect.ExpectExpectRule,
 		max_expects.MaxExpectsRule,
 		max_nested_describe.MaxNestedDescribeRule,
