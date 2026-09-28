@@ -4,8 +4,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
+	unboundMethod "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/unbound_method"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/unbound_method"
 )
 
 // toThrowMatchers invoke the value passed to expect.
@@ -16,11 +16,13 @@ var toThrowMatchers = map[string]bool{
 	"toThrowErrorMatchingInlineSnapshot": true,
 }
 
-var UnboundMethodRule = shared.NewRule(shared.Config{
-	Name: "jest/unbound-method",
-	Prepare: func(ctx rule.RuleContext) func(*ast.Node) bool {
+var UnboundMethodRule = rule.Rule{
+	Name:             "jest/unbound-method",
+	Schema:           unboundMethod.UnboundMethodRule.Schema,
+	RequiresTypeInfo: true,
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var analysis *utils.JestCallAnalysis
-		return func(member *ast.Node) bool {
+		return unboundMethod.CreateListeners(ctx, options, func(member *ast.Node) bool {
 			call := parentCallOfArgument(member)
 			if call == nil {
 				return false
@@ -45,9 +47,9 @@ var UnboundMethodRule = shared.NewRule(shared.Config{
 			default:
 				return false
 			}
-		}
+		})
 	},
-})
+}
 
 // parentCallOfArgument returns the call member is passed to, if the call is
 // member's ESTree parent. An optional chain ends in a ChainExpression and a
