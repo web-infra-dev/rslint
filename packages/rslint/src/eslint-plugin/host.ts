@@ -17,6 +17,8 @@ import {
   type EslintPluginLintResult,
 } from './plugin/plugin-lint-protocol.js';
 import type { ConfigDescriptor } from './types.js';
+import type { ByteInput } from '../native/binding.js';
+import { resolvePluginAttachments } from './plugin/attachments.js';
 
 export interface PluginLintHost {
   /**
@@ -28,6 +30,7 @@ export interface PluginLintHost {
   lint(
     req: EslintPluginLintRequest,
     signal?: AbortSignal,
+    attachments?: readonly ByteInput[],
   ): Promise<EslintPluginLintResult>;
   /** Drain in-flight tasks and terminate the worker pool. Idempotent. */
   shutdown(): Promise<void>;
@@ -58,16 +61,19 @@ export async function createPluginLintHost(
   // supplied for every adapter, so no normalization is needed or wanted here.
   const configDirSet = new Set(configs.map((c) => c.configDirectory));
   return {
-    async lint(req, signal) {
-      const tasks = buildPluginLintTasks(req, {
-        configDirSet,
-        onUnknownConfigKey: (filePath, configKey) =>
-          onLog?.({
-            level: 'error',
-            source: 'runner',
-            text: `eslint-plugin: file ${filePath} carries unknown configKey ${configKey}`,
-          }),
-      });
+    async lint(req, signal, attachments) {
+      const tasks = buildPluginLintTasks(
+        resolvePluginAttachments(req, attachments),
+        {
+          configDirSet,
+          onUnknownConfigKey: (filePath, configKey) =>
+            onLog?.({
+              level: 'error',
+              source: 'runner',
+              text: `eslint-plugin: file ${filePath} carries unknown configKey ${configKey}`,
+            }),
+        },
+      );
       // Cancel the dispatched worker tasks if the caller aborts (a superseding
       // keystroke / document close). cancelTask works whether the task is still
       // queued or already running (cooperative SAB cancel-flag).

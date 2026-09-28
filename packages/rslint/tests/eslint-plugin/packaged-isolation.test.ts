@@ -28,7 +28,7 @@ import { platformTuple } from '../../src/native/platform-tuple.js';
  * The complete CLI case additionally proves that its arena and worker parser
  * share the staged native registry, preserving Go's snapshot after a disk edit.
  * The termination case builds a separate feature-only addon to stop a real
- * worker inside parseSharedSource while its native reader holds the mapping.
+ * worker inside parseSharedBytes while its native reader holds the mapping.
  *
  * Requires `dist/`, the host Go binary (built by `pnpm build`) and the host
  * platform package's `.node` (built by `pnpm --filter @rslint/native build`).
@@ -113,8 +113,8 @@ const original = fs.readFileSync(file, 'utf8');
 const changed = 'const changedOnDisk = false;';
 let registered = 0;
 let configured = 0;
-const configure = native.SourceArena.prototype.configure;
-native.SourceArena.prototype.configure = function(config) {
+const configure = native.MemoryArena.prototype.configure;
+native.MemoryArena.prototype.configure = function(config) {
   assert.equal(configured, 0);
   assert.equal(registered, 0);
   const fd = this.fd();
@@ -126,11 +126,12 @@ native.SourceArena.prototype.configure = function(config) {
   configured++;
   assert.equal(this.descriptor().version, config.version);
 };
-const register = native.SourceArena.prototype.register;
-native.SourceArena.prototype.register = function(slot, generation, length) {
+const register = native.MemoryArena.prototype.register;
+native.MemoryArena.prototype.register = function(batches) {
   assert.equal(configured, 1);
-  const lease = register.call(this, slot, generation, length);
-  const source = native.parseSharedSource(file, { lease, offset: 0, length }, 'module', false);
+  const lease = register.call(this, batches);
+  const length = batches.reduce((total, batch) => total + batch.length, 0);
+  const source = native.parseSharedBytes(file, { lease, offset: 0, length }, 'module', false);
   assert.equal(source.sourceText, original.slice(1));
   assert.equal(source.hadBom, true);
   registered++;
@@ -192,9 +193,9 @@ try {
   assert.equal(result[0].parseError, 'task_timeout');
   assert.deepEqual(result[0].diagnostics, []);
   assert.equal(arena.release(source.lease), false, 'an active native reader must prevent reuse');
-  assert.throws(() => native.parseSharedSource('pinned.ts', source, 'module', false), /invalid or expired/);
+  assert.throws(() => native.parseSharedBytes('pinned.ts', source, 'module', false), /invalid or expired/);
   native.republishWorkerFixture(arena);
-  assert.throws(() => arena.register(0, 2, source.length), /invalid or expired/);
+  assert.throws(() => arena.register([{ slot: 0, generation: 2, length: source.length }]), /invalid or expired/);
   arena.close();
   assert.throws(() => arena.descriptor(), /invalid or expired/);
   // Node termination is pending while synchronous native code runs. Releasing

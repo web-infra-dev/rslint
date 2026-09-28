@@ -33,6 +33,7 @@ type EslintPluginRuleConfig struct {
 type EslintPluginLintFile struct {
 	Path            string         `json:"path"`
 	Text            *string        `json:"text,omitempty"`
+	TextAttachment  *uint32        `json:"textAttachment,omitempty"`
 	ConfigKey       string         `json:"configKey"`
 	LanguageOptions map[string]any `json:"languageOptions,omitempty"`
 	Settings        map[string]any `json:"settings,omitempty"`
@@ -45,6 +46,27 @@ type EslintPluginLintRequest struct {
 	CollectFixes    bool                              `json:"collectFixes"`
 	SuggestionsMode string                            `json:"suggestionsMode"`
 	CollectTiming   bool                              `json:"collectTiming,omitempty"`
+}
+
+// WithTextAttachments projects complete snapshots into attachment indices for
+// hosts that support them. It preserves the logical request, file order and
+// metadata; storage and request scheduling remain outside this wire projection.
+// The original request and its immutable text strings are not modified.
+func (req EslintPluginLintRequest) WithTextAttachments() (EslintPluginLintRequest, []string) {
+	files := make([]EslintPluginLintFile, len(req.Files))
+	texts := make([]string, 0, len(req.Files))
+	for i, file := range req.Files {
+		files[i] = file
+		if file.Text == nil {
+			continue
+		}
+		index := uint32(len(texts))
+		texts = append(texts, *file.Text)
+		files[i].Text = nil
+		files[i].TextAttachment = &index
+	}
+	req.Files = files
+	return req, texts
 }
 
 // SuggestionsMode values for EslintPluginLintRequest.SuggestionsMode — the wire

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	api "github.com/web-infra-dev/rslint/internal/api"
+	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
@@ -23,7 +24,16 @@ func (h *Handler) HandleLintWithContext(ctx context.Context, req api.LintRequest
 	var dispatch linter.EslintPluginDispatcher
 	if requester != nil {
 		dispatch = func(reqCtx context.Context, pluginReq linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-			msg, err := requester.SendRequest(reqCtx, api.KindPluginLint, pluginReq)
+			var attachments []ipc.Attachment
+			if peer, ok := requester.(api.PeerCapabilityRequester); ok && peer.PeerSupportsCapability(api.CapabilityPluginLintAttachments) {
+				var texts []string
+				pluginReq, texts = pluginReq.WithTextAttachments()
+				attachments = make([]ipc.Attachment, len(texts))
+				for i, text := range texts {
+					attachments[i] = ipc.Text(text)
+				}
+			}
+			msg, err := requester.SendRequest(reqCtx, api.KindPluginLint, pluginReq, attachments...)
 			if err != nil {
 				return nil, err
 			}

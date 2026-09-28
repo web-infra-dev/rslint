@@ -20,7 +20,10 @@ function send(msg) {
 }
 
 function onMessage(msg) {
-  if (msg.kind === 'handshake') {
+  if (msg.kind === 'transportConfig') {
+    // An older API peer does not implement optional memory negotiation.
+    send({ kind: 'error', id: msg.id, data: { message: 'unknown request' } });
+  } else if (msg.kind === 'handshake') {
     send({
       kind: 'response',
       id: msg.id,
@@ -46,15 +49,18 @@ function onMessage(msg) {
       data: { files: [{ path: 'probe.ts' }], rules: {} },
     });
     process.stdout.end();
-  } else if (msg.kind === 'reverse') {
+  } else if (msg.kind === 'reverse' || msg.kind === 'reverse-bytes') {
     // Deliberately reuse the outer request ID. Request IDs are independent in
     // each direction, so Node must route by frame kind rather than treating
     // this pluginLint frame as the response to `reverse`.
     reverseRequests.add(msg.id);
     send({
-      kind: 'pluginLint',
+      kind: msg.kind === 'reverse-bytes' ? 'arbitraryBinary' : 'pluginLint',
       id: msg.id,
       data: { files: [{ path: 'probe.ts' }], rules: {} },
+      ...(msg.kind === 'reverse-bytes'
+        ? { attachments: [{ bytes: 'AP+A' }, { text: '' }] }
+        : {}),
     });
   } else if (
     reverseRequests.has(msg.id) &&

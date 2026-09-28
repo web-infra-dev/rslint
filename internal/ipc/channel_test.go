@@ -6,9 +6,11 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,57 +18,80 @@ import (
 	"time"
 )
 
-func TestChannelAttachmentsPreserveCompleteSnapshots(t *testing.T) {
-	texts := []string{"", "\ufeff" + "const café = '😀';\r\n// \x00", string([]byte{0xff}), strings.Repeat("x", SourceSlotSize+1)}
-	pool := &sourcePool{mapping: sourceMapping{data: make([]byte, SourceHeaderSize+128)}}
+func TestChannelAttachmentsPreserveCompleteValues(t *testing.T) {
+	binary := []byte{0, 0xff, 0xfe, 0xc0, 0xaf, 0x80, '\n', '\r', '"', '\\'}
+	large := bytes.Repeat(binary, MemorySlotSize/len(binary)+1)
+	values := []Attachment{Text(""), Bytes(nil), Text("\ufeff" + "const café = '😀';\r\n// \x00"), Text(string([]byte{0xff, 0xfe, 'x'})), Bytes(binary), Bytes(large), Text("tail")}
+	pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+2*MemorySlotSize)}}
 	msg, err := NewMessage("snapshot", 1, map[string]bool{"unchanged": true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	payload := string(msg.Data)
-	batch := attachTexts(msg, pool, texts)
-	if batch == nil || batch.Length != uint32(len(texts[1])) || string(msg.Data) != payload {
-		t.Fatalf("incorrect attachment batch or modified application payload: %+v", batch)
+	batches := attach(msg, pool, values)
+	if len(batches) != 2 || string(msg.Data) != payload {
+		t.Fatalf("incorrect batches or modified application payload: %+v", batches)
 	}
-	for i := range 2 {
+	if values[3].text != "��x" {
+		t.Fatalf("Text does not match Go JSON's invalid UTF-8 replacement: %q", values[3].text)
+	}
+	for i, value := range values {
 		attachment := msg.Attachments[i]
-		if attachment.Text != nil || attachment.Range == nil {
-			t.Fatalf("snapshot %d was not shared", i)
+		if value.length() == 0 {
+			if attachment.Range != nil || (attachment.Bytes != nil) != value.binary || (attachment.Text != nil) == value.binary {
+				t.Fatalf("empty attachment %d lost its inline type: %+v", i, attachment)
+			}
+			continue
 		}
-		span := attachment.Range
-		start := SourceHeaderSize + int(span.Offset)
-		if string(pool.mapping.data[start:start+int(span.Length)]) != texts[i] {
-			t.Fatalf("snapshot %d changed", i)
+		if attachment.Text != nil || attachment.Bytes != nil || attachment.Range == nil {
+			t.Fatalf("attachment %d was not shared: %+v", i, attachment)
+		}
+		got := readMemoryRange(t, pool, batches, *attachment.Range)
+		want := value.bytes
+		if !value.binary {
+			want = []byte(value.text)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("shared attachment %d changed", i)
 		}
 	}
-	for _, i := range []int{2, 3} {
-		if msg.Attachments[i].Text == nil || *msg.Attachments[i].Text != texts[i] || msg.Attachments[i].Range != nil {
-			t.Fatalf("inline fallback changed snapshot %d", i)
-		}
+	for i := range pool.slots {
+		pool.slots[i].busy = true
 	}
-	for _, backend := range []*sourcePool{nil, pool} {
-		for i := range pool.slots {
-			pool.slots[i].busy = true
-		}
-		inline := &Message{}
-		if attachTexts(inline, backend, texts) != nil || inline.Transport != nil {
+	for _, backend := range []*memoryPool{nil, pool} {
+		inline := &Message{Kind: "binary", ID: 1}
+		if len(attach(inline, backend, values)) != 0 || inline.Transport != nil {
 			t.Fatal("unavailable storage did not preserve inline attachments")
 		}
-		for i, attachment := range inline.Attachments {
-			if attachment.Text == nil || *attachment.Text != texts[i] || attachment.Range != nil {
-				t.Fatalf("fallback lost snapshot %d", i)
+		var wire bytes.Buffer
+		if err := WriteFrame(&wire, inline); err != nil {
+			t.Fatal(err)
+		}
+		decoded, err := ReadFrame(bufio.NewReader(&wire))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, attachment := range decoded.Attachments {
+			value := values[i]
+			if value.binary {
+				if attachment.Bytes == nil || !bytes.Equal(*attachment.Bytes, value.bytes) || attachment.Text != nil || attachment.Range != nil {
+					t.Fatalf("inline binary attachment %d changed", i)
+				}
+			} else if attachment.Text == nil || *attachment.Text != value.text || attachment.Bytes != nil || attachment.Range != nil {
+				t.Fatalf("inline text attachment %d changed", i)
 			}
 		}
 	}
 }
 
 func TestChannelAttachmentReleaseAcknowledgement(t *testing.T) {
-	for _, mode := range []string{"release", "missing", "wrong-slot", "wrong-generation", "wrong-length", "error-release", "error-missing"} {
+	full := Text(strings.Repeat("x", MemorySlotSize))
+	for _, mode := range []string{"release", "missing", "wrong-slot", "wrong-generation", "wrong-length", "partial", "reordered", "duplicate", "extra", "error-release", "error-missing"} {
 		t.Run(mode, func(t *testing.T) {
 			client, peer := newChannelPair(t)
-			pool := &sourcePool{mapping: sourceMapping{data: make([]byte, SourceHeaderSize+64)}}
-			client.sources = pool
-			client.sourcesInitialized = true
+			pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+MemorySlotSize+64)}}
+			client.memory = pool
+			client.memoryInitialized = true
 			client.Start()
 			peerDone := make(chan error, 1)
 			go func() {
@@ -75,23 +100,31 @@ func TestChannelAttachmentReleaseAcknowledgement(t *testing.T) {
 					peerDone <- err
 					return
 				}
-				if request.Transport == nil || request.Transport.Batch == nil || len(request.Attachments) != 1 || request.Attachments[0].Range == nil {
-					peerDone <- errors.New("request did not publish its attachment")
+				if request.Transport == nil || len(request.Transport.Batches) != 2 || len(request.Attachments) != 2 || request.Attachments[1].Range == nil {
+					peerDone <- errors.New("one request did not publish both attachments")
 					_ = client.Close()
 					return
 				}
-				batch := *request.Transport.Batch
+				batches := append([]MemoryBatch(nil), request.Transport.Batches...)
 				response := &Message{Kind: KindResponse, ID: request.ID}
 				switch mode {
 				case "wrong-slot":
-					batch.Slot++
+					batches[1].Slot++
 				case "wrong-generation":
-					batch.Generation++
+					batches[1].Generation++
 				case "wrong-length":
-					batch.Length++
+					batches[1].Length++
+				case "partial":
+					batches = batches[:1]
+				case "reordered":
+					batches[0], batches[1] = batches[1], batches[0]
+				case "duplicate":
+					batches[1] = batches[0]
+				case "extra":
+					batches = append(batches, batches[0])
 				}
 				if mode != "missing" && mode != "error-missing" {
-					response.Transport = &TransportMetadata{Released: &batch}
+					response.Transport = &TransportMetadata{Released: batches}
 				}
 				if strings.HasPrefix(mode, "error-") {
 					response.Kind = KindError
@@ -101,7 +134,7 @@ func TestChannelAttachmentReleaseAcknowledgement(t *testing.T) {
 			}()
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
-			_, err := client.SendRequest(ctx, "attached", nil, "snapshot 😀")
+			_, err := client.SendRequest(ctx, "attached", nil, full, Bytes([]byte{0, 0xff, 0x80}))
 			if strings.HasPrefix(mode, "error-") != (err != nil) {
 				t.Fatalf("unexpected request result: %v", err)
 			}
@@ -109,25 +142,27 @@ func TestChannelAttachmentReleaseAcknowledgement(t *testing.T) {
 				t.Fatal(err)
 			}
 			wantReleased := mode == "release" || mode == "error-release"
-			if pool.slots[0].busy == wantReleased {
-				t.Fatalf("wrong release outcome: busy=%v, mode=%s", pool.slots[0].busy, mode)
+			for i := range 2 {
+				if pool.slots[i].busy == wantReleased {
+					t.Fatalf("wrong release outcome for slot %d: busy=%v, mode=%s", i, pool.slots[i].busy, mode)
+				}
 			}
 		})
 	}
 }
 
-func TestChannelCancelledAttachmentRetainsSlotAfterLateAck(t *testing.T) {
+func TestChannelCancelledAttachmentAcceptsOnlyExactLateAck(t *testing.T) {
 	client, peer := newChannelPair(t)
-	pool := &sourcePool{mapping: sourceMapping{data: make([]byte, SourceHeaderSize+64)}}
-	client.sources = pool
-	client.sourcesInitialized = true
+	pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+64)}}
+	client.memory = pool
+	client.memoryInitialized = true
 	client.SetInboundHandler(func(context.Context, *Message) (any, error) { return struct{}{}, nil })
 	client.Start()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
-		_, err := client.SendRequest(ctx, "attached", nil, "snapshot")
+		_, err := client.SendRequest(ctx, "attached", nil, Text("snapshot"))
 		done <- err
 	}()
 	request, err := ReadFrame(peer.reader)
@@ -138,33 +173,229 @@ func TestChannelCancelledAttachmentRetainsSlotAfterLateAck(t *testing.T) {
 	if err := <-done; !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancel result: %v", err)
 	}
-	if request.Transport == nil || request.Transport.Batch == nil {
-		t.Fatal("request was not shared")
+	if request.Transport == nil || len(request.Transport.Batches) != 1 || !pool.slots[0].busy {
+		t.Fatal("cancelled request prematurely released its memory")
 	}
-	if err := peer.writeFrame(&Message{Kind: KindResponse, ID: request.ID, Transport: &TransportMetadata{Released: request.Transport.Batch}}); err != nil {
+	barrier := func() {
+		t.Helper()
+		if err := peer.writeFrame(&Message{Kind: "barrier", ID: request.ID + 1}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ReadFrame(peer.reader); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// An unsolicited response cannot acknowledge another request's storage.
+	if err := peer.writeFrame(&Message{Kind: KindResponse, ID: request.ID + 100, Transport: &TransportMetadata{Released: request.Transport.Batches}}); err != nil {
 		t.Fatal(err)
 	}
-	// A later request's reply proves the read loop has consumed the orphan ACK.
-	if err := peer.writeFrame(&Message{Kind: "barrier", ID: request.ID + 1}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := ReadFrame(peer.reader); err != nil {
-		t.Fatal(err)
-	}
+	barrier()
 	if !pool.slots[0].busy {
-		t.Fatal("cancellation or orphan ACK released a source slot")
+		t.Fatal("unsolicited ACK released a live slot")
+	}
+	if err := peer.writeFrame(&Message{Kind: KindResponse, ID: request.ID, Transport: &TransportMetadata{Released: request.Transport.Batches}}); err != nil {
+		t.Fatal(err)
+	}
+	barrier()
+	if pool.slots[0].busy {
+		t.Fatal("exact late ACK did not release the cancelled request's slot")
+	}
+	// Reuse advances the generation; a duplicate reply cannot reclaim it.
+	reused, _ := pool.store([]Attachment{Text("next")})
+	if len(reused) != 1 || reused[0].Generation <= request.Transport.Batches[0].Generation {
+		t.Fatal("slot did not become reusable after the late ACK")
+	}
+	if err := peer.writeFrame(&Message{Kind: KindResponse, ID: request.ID, Transport: &TransportMetadata{Released: request.Transport.Batches}}); err != nil {
+		t.Fatal(err)
+	}
+	barrier()
+	if !pool.slots[0].busy {
+		t.Fatal("duplicate ACK released a later generation")
 	}
 }
 
-func TestChannelSourceBootstrapBeforeHandlerAndOnlyOnce(t *testing.T) {
+func TestChannelOversizedInlineFrameRollsBackAndRemainsUsable(t *testing.T) {
+	for _, shared := range []bool{false, true} {
+		t.Run(strconv.FormatBool(shared), func(t *testing.T) {
+			client, peer := newChannelPair(t)
+			pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+MemorySlotSize)}}
+			if shared {
+				for i := 1; i < MemorySlotCount; i++ {
+					pool.slots[i].busy = true
+				}
+				client.memory, client.memoryInitialized = pool, true
+			}
+			client.Start()
+			// Reuse one input buffer to exceed the wire cap without allocating
+			// a >256 MiB test input or letting JSON allocate that rejected frame.
+			chunk := Bytes(make([]byte, 2*1024*1024))
+			values := make([]Attachment, 110)
+			for i := range values {
+				values[i] = chunk
+			}
+			if _, err := client.SendRequest(context.Background(), "oversized", nil, values...); err == nil || !strings.Contains(err.Error(), "frame cap") {
+				t.Fatalf("oversized inline bytes were not rejected: %v", err)
+			}
+			client.mu.Lock()
+			closed, pending, published := client.closed, len(client.pending), len(client.published)
+			client.mu.Unlock()
+			if closed || pending != 0 || published != 0 || pool.slots[0].busy {
+				t.Fatalf("rejected frame retained storage or closed channel: closed=%v pending=%d published=%d busy=%v", closed, pending, published, pool.slots[0].busy)
+			}
+			peerDone := make(chan error, 1)
+			go func() {
+				request, err := ReadFrame(peer.reader)
+				if err != nil {
+					peerDone <- err
+					return
+				}
+				if request.Kind != "ordinary" {
+					peerDone <- errors.New("rejected frame reached the peer")
+					_ = client.Close()
+					return
+				}
+				response := &Message{Kind: KindResponse, ID: request.ID}
+				if request.Transport != nil {
+					response.Transport = &TransportMetadata{Released: request.Transport.Batches}
+				}
+				peerDone <- peer.writeFrame(response)
+			}()
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			if _, err := client.SendRequest(ctx, "ordinary", nil, Text("still works")); err != nil {
+				t.Fatal(err)
+			}
+			if err := <-peerDone; err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestFrameAttachmentPreflightMatchesJSONTextEncoding(t *testing.T) {
+	for _, text := range []string{"", "<>&", "\x00\x01\b\f\n\r\t\"\\", "café😀\u2028\u2029", string([]byte{0xff, 0xfe, 'x'})} {
+		encoded, err := marshalJSON(text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		contents := len(encoded) - 2
+		if consumeJSONText(text, contents) != 0 || contents > 0 && consumeJSONText(text, contents-1) >= 0 {
+			t.Fatalf("preflight differs from JSON encoding for %q: %q", text, encoded)
+		}
+	}
+	text := Text(strings.Repeat("\x00", 1024*1024))
+	msg := &Message{Kind: "escaped", ID: 1}
+	for range 43 {
+		msg.Attachments = append(msg.Attachments, text.inline())
+	}
+	if err := preflightAttachments(msg); err == nil {
+		t.Fatal("JSON escaping expansion bypassed the frame cap")
+	}
+}
+
+func TestReadFrameRejectsMalformedAttachmentEnvelopes(t *testing.T) {
+	for _, body := range []string{
+		`null`,
+		`{"kind":"request","id":1,"attachments":null}`,
+		`{"kind":"request","id":1,"attachments":{}}`,
+		`{"kind":"request","id":1,"attachments":[null]}`,
+		`{"kind":"request","id":1,"attachments":[{}]}`,
+		`{"kind":"request","id":1,"attachments":[{"text":null}]}`,
+		`{"kind":"request","id":1,"attachments":[{"bytes":null}]}`,
+		`{"kind":"request","id":1,"attachments":[{"range":null}]}`,
+		`{"kind":"request","id":1,"attachments":[{"text":"","bytes":""}]}`,
+		`{"kind":"request","id":1,"attachments":[{"text":null,"bytes":"AA=="}]}`,
+		`{"kind":"request","id":1,"attachments":[{"text":"x","range":{"offset":0,"length":1}}]}`,
+		`{"kind":"request","id":1,"attachments":[{"bytes":"AA==","range":null}]}`,
+		`{"kind":"request","id":1,"attachments":[{"text":false}]}`,
+		`{"kind":"request","id":1,"attachments":[{"bytes":[0,255]}]}`,
+		`{"kind":"request","id":1,"attachments":[{"bytes":"AA"}]}`,
+		`{"kind":"request","id":1,"attachments":[{"bytes":"AB=="}]}`,
+		`{"kind":"request","id":1,"attachments":[{"bytes":"AA==\n"}]}`,
+		`{"kind":"request","id":1,"transport":null}`,
+		`{"kind":"request","id":1,"transport":[]}`,
+		`{"kind":"request","id":1,"transport":{"batches":null}}`,
+		`{"kind":"request","id":1,"transport":{"batches":[]}}`,
+	} {
+		t.Run(body, func(t *testing.T) {
+			var wire bytes.Buffer
+			if err := writeEncodedFrame(&wire, []byte(body)); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ReadFrame(bufio.NewReader(&wire)); err == nil {
+				t.Fatal("malformed attachment envelope was accepted")
+			}
+		})
+	}
+}
+
+func TestChannelReceivesInlineAttachmentsAndKeepsPayloadOpaque(t *testing.T) {
+	client, peer := newChannelPair(t)
+	client.SetInboundHandler(func(_ context.Context, msg *Message) (any, error) {
+		if string(msg.Data) != `[true,{"unrelated":[1,"two"]}]` || len(msg.Attachments) != 3 {
+			return nil, errors.New("transport changed the application payload")
+		}
+		if msg.Attachments[0].Text == nil || *msg.Attachments[0].Text != "" || msg.Attachments[1].Bytes == nil || len(*msg.Attachments[1].Bytes) != 0 || msg.Attachments[2].Bytes == nil || !bytes.Equal(*msg.Attachments[2].Bytes, []byte{0, 0xff, 0x80}) {
+			return nil, errors.New("inline attachment contents or types changed")
+		}
+		return true, nil
+	})
+	client.Start()
+	peer.Start()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	response, err := peer.SendRequest(ctx, "opaque", []any{true, map[string]any{"unrelated": []any{1, "two"}}}, Text(""), Bytes(nil), Bytes([]byte{0, 0xff, 0x80}))
+	if err != nil || string(response.Data) != "true" {
+		t.Fatalf("valid inline request failed: response=%+v error=%v", response, err)
+	}
+}
+
+func TestChannelRejectsSharedInboundAttachmentsBeforeRouting(t *testing.T) {
+	for _, kind := range []MessageKind{"request", "notification", KindResponse, KindError} {
+		for _, batch := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/batches=%v", kind, batch), func(t *testing.T) {
+				client, peer := newChannelPair(t)
+				var calls atomic.Int32
+				client.SetInboundHandler(func(context.Context, *Message) (any, error) {
+					calls.Add(1)
+					return struct{}{}, nil
+				})
+				client.RegisterNotification(kind, func(*Message) { calls.Add(1) })
+				client.Start()
+				msg := &Message{Kind: kind, ID: 1}
+				if kind == "notification" {
+					msg.ID = 0
+				}
+				if batch {
+					msg.Transport = &TransportMetadata{Batches: []MemoryBatch{{Slot: 0, Generation: 1, Length: 1}}}
+				} else {
+					msg.Attachments = []AttachmentData{{Range: &MemoryRange{Offset: 0, Length: 1}}}
+				}
+				if err := peer.writeFrame(msg); err != nil {
+					t.Fatal(err)
+				}
+				select {
+				case <-client.Done():
+				case <-time.After(2 * time.Second):
+					t.Fatal("unsupported shared attachment entered application routing")
+				}
+				if calls.Load() != 0 || !strings.Contains(client.closeErr.Error(), "shared inbound attachments") {
+					t.Fatalf("invalid shared input was not rejected at the transport boundary: calls=%d, close=%v", calls.Load(), client.closeErr)
+				}
+			})
+		}
+	}
+}
+
+func TestChannelMemoryBootstrapBeforeHandlerAndOnlyOnce(t *testing.T) {
 	client, peer := newChannelPair(t)
 	var calls atomic.Int32
 	client.SetInboundHandler(func(_ context.Context, _ *Message) (any, error) {
 		calls.Add(1)
 		client.mu.Lock()
-		initialized := client.sourcesInitialized
+		initialized, memory := client.memoryInitialized, client.memory
 		client.mu.Unlock()
-		if !initialized || client.AttachmentLimit() != 0 {
+		if !initialized || memory != nil {
 			return nil, errors.New("unavailable mapping was not initialized before the handler")
 		}
 		return true, nil
@@ -177,16 +408,16 @@ func TestChannelSourceBootstrapBeforeHandlerAndOnlyOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var layout SourceConfiguration
+	var layout MemoryConfiguration
 	if err := configuration.Decode(&layout); err != nil {
 		t.Fatal(err)
 	}
-	if configuration.Kind != KindResponse || configuration.ID != 1 || layout != sourceConfiguration() {
+	if configuration.Kind != KindResponse || configuration.ID != 1 || layout != memoryConfiguration() {
 		t.Fatalf("incorrect runtime storage configuration: %+v, %+v", configuration, layout)
 	}
 	// Even malformed control requests must not install a mapping or dispatch
 	// application work before the actual initialization request.
-	if err := peer.writeFrame(&Message{Kind: KindTransportConfig, ID: 2, Transport: &TransportMetadata{Mapping: &SourceDescriptor{Version: SourceVersion}}}); err != nil {
+	if err := peer.writeFrame(&Message{Kind: KindTransportConfig, ID: 2, Transport: &TransportMetadata{Mapping: &MemoryMapping{Version: MemoryVersion}}}); err != nil {
 		t.Fatal(err)
 	}
 	rejected, err := ReadFrame(peer.reader)
@@ -197,13 +428,13 @@ func TestChannelSourceBootstrapBeforeHandlerAndOnlyOnce(t *testing.T) {
 		t.Fatalf("accepted malformed configuration request: %+v", rejected)
 	}
 	client.mu.Lock()
-	initialized := client.sourcesInitialized
+	initialized := client.memoryInitialized
 	client.mu.Unlock()
 	if initialized || calls.Load() != 0 {
 		t.Fatal("configuration lookup consumed the mapping bootstrap or invoked the application")
 	}
 	// Invalid handles/FDs reject on every OS without closing unrelated handles.
-	descriptor := &SourceDescriptor{Version: SourceVersion, FD: SourceInheritedFD + 1, Handle: "invalid", ProcessID: 1}
+	descriptor := &MemoryMapping{Version: MemoryVersion, FD: MemoryInheritedFD + 1, Handle: "invalid", ProcessID: 1}
 	for id := range 2 {
 		if err := peer.writeFrame(&Message{Kind: "init", ID: id + 3, Transport: &TransportMetadata{Mapping: descriptor}}); err != nil {
 			t.Fatal(err)
@@ -221,7 +452,7 @@ func TestChannelSourceBootstrapBeforeHandlerAndOnlyOnce(t *testing.T) {
 		}
 	}
 	if calls.Load() != 1 {
-		t.Fatal("repeated source bootstrap reached the application handler")
+		t.Fatal("repeated memory bootstrap reached the application handler")
 	}
 }
 
@@ -235,7 +466,7 @@ func TestChannelAbsentInitialMappingCannotBeInstalledLater(t *testing.T) {
 	client.Start()
 	requests := []*Message{
 		{Kind: "init", ID: 1},
-		{Kind: "late", ID: 2, Transport: &TransportMetadata{Mapping: &SourceDescriptor{Version: SourceVersion}}},
+		{Kind: "late", ID: 2, Transport: &TransportMetadata{Mapping: &MemoryMapping{Version: MemoryVersion}}},
 		{Kind: "ordinary", ID: 3},
 	}
 	for i, request := range requests {
@@ -254,16 +485,16 @@ func TestChannelAbsentInitialMappingCannotBeInstalledLater(t *testing.T) {
 			t.Fatalf("response %d: %s", i, response.Kind)
 		}
 	}
-	if calls.Load() != 2 || client.AttachmentLimit() != 0 {
+	if calls.Load() != 2 || client.memory != nil {
 		t.Fatal("late bootstrap reached the handler or changed the inline backend")
 	}
 }
 
-func TestChannelCloseJoinsSourceWriter(t *testing.T) {
+func TestChannelCloseJoinsMemoryWriter(t *testing.T) {
 	entered, finish := make(chan struct{}), make(chan struct{})
 	var unmapped atomic.Bool
-	pool := &sourcePool{mapping: sourceMapping{
-		data: make([]byte, SourceHeaderSize+64),
+	pool := &memoryPool{mapping: memoryMapping{
+		data: make([]byte, MemoryHeaderSize+64),
 		commitSlot: func(int) error {
 			close(entered)
 			<-finish
@@ -272,10 +503,10 @@ func TestChannelCloseJoinsSourceWriter(t *testing.T) {
 		unmap: func() error { unmapped.Store(true); return nil },
 	}}
 	client := NewChannel(strings.NewReader(""), io.Discard)
-	client.sources = pool
+	client.memory = pool
 	sent := make(chan error, 1)
 	go func() {
-		_, err := client.SendRequest(context.Background(), "attached", nil, "snapshot")
+		_, err := client.SendRequest(context.Background(), "attached", nil, Text("snapshot"))
 		sent <- err
 	}()
 	<-entered
@@ -284,18 +515,18 @@ func TestChannelCloseJoinsSourceWriter(t *testing.T) {
 	<-client.Done()
 	select {
 	case <-closed:
-		t.Error("Close returned before the source writer")
+		t.Error("Close returned before the memory writer")
 	default:
 	}
 	if unmapped.Load() {
-		t.Error("mapping was removed during an active source write")
+		t.Error("mapping was removed during an active memory write")
 	}
 	close(finish)
 	<-closed
-	if err := <-sent; err == nil || !unmapped.Load() || client.AttachmentLimit() != 0 {
-		t.Fatalf("source shutdown did not finish: send=%v, unmapped=%v", err, unmapped.Load())
+	if err := <-sent; err == nil || !unmapped.Load() || client.memory != nil {
+		t.Fatalf("memory shutdown did not finish: send=%v, unmapped=%v", err, unmapped.Load())
 	}
-	if err := client.initializeSources(&TransportMetadata{Mapping: &SourceDescriptor{Version: SourceVersion}}); err == nil {
+	if err := client.initializeMemory(&TransportMetadata{Mapping: &MemoryMapping{Version: MemoryVersion}}); err == nil {
 		t.Fatal("closed channel accepted a mapping")
 	}
 }

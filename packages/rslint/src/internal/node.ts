@@ -2,6 +2,9 @@ import type { ChildProcess } from 'node:child_process';
 import { Socket } from 'node:net';
 import { RSLintService } from '../service/service.js';
 import { spawnIpcProcess, type IpcClient } from '../ipc/index.js';
+
+export { readAttachmentBytes } from '../ipc/memory-transport.js';
+export type { ByteInput } from '../native/binding.js';
 import { resolveRslintBinary } from './resolve-binary.js';
 import type {
   RslintServiceInterface,
@@ -27,10 +30,6 @@ export class NodeRslintService implements RslintServiceInterface {
       binPath: options.rslintPath || resolveRslintBinary(),
       goArgs: ['--api'],
       cwd: options.workingDirectory || undefined,
-      // API plugin requests retain their existing files[].text wire contract.
-      // They share framing and lifecycle with CLI without allocating unused
-      // source storage or requiring a new capability from existing API hosts.
-      sharedSources: false,
     });
     this.process = child;
     this.client = client;
@@ -53,6 +52,9 @@ export class NodeRslintService implements RslintServiceInterface {
           id: message.id,
           kind: message.kind,
           data: message.data,
+          ...(message.attachments === undefined
+            ? {}
+            : { attachments: message.attachments }),
         });
       } finally {
         this.activeInboundRequests--;

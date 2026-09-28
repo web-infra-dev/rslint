@@ -6,7 +6,7 @@
  * Wire format and message shape mirror Go's `internal/ipc.Channel`:
  *
  *   `[4 bytes u32 LE length][JSON payload]`
- *   payload = WireMessage, with optional text attachments
+ *   payload = WireMessage, with optional text or byte attachments
  *
  * Go supplies the shared storage layout through an internal runtime request.
  * Cross-language tests exercise the same contract through the real CLI.
@@ -39,16 +39,16 @@ import type { Readable, Writable } from 'node:stream';
 import {
   receiveAttachments,
   type ReceivedAttachments,
-  type SourceTransport,
-} from './source-transport.js';
+  type MemoryTransport,
+} from './memory-transport.js';
 import type {
   IpcMessage,
   MessageKind,
   InboundRequestHandler,
   NotificationHandler,
   ErrorResponseData,
-  SourceBatch,
-  SourceMapping,
+  MemoryBatch,
+  MemoryMapping,
   WireMessage,
 } from './protocol.js';
 
@@ -69,9 +69,9 @@ type WireFrame<T = unknown> = Omit<WireMessage, 'data'> & { data?: T };
 
 export interface IpcClientOptions {
   /** Native reader storage, owned and closed by this IPC session. */
-  readonly sourceTransport?: SourceTransport;
+  readonly memoryTransport?: MemoryTransport;
   /** Child stdio index chosen by spawnIpcProcess for the prepared Unix fd. */
-  readonly inheritedSourceFd?: number;
+  readonly inheritedMemoryFd?: number;
   /**
    * Initial buffer size for the read accumulator. Frames larger than this
    * will simply grow the buffer; this is just a starting hint for typical
@@ -107,8 +107,8 @@ export class IpcClient {
   private nextId = 1;
   private closed = false;
   private started = false;
-  private sources: SourceTransport | undefined;
-  private readonly inheritedSourceFd: number | undefined;
+  private memory: MemoryTransport | undefined;
+  private readonly inheritedMemoryFd: number | undefined;
   private bootstrapPromise: Promise<void> | undefined;
   private mappingSent = false;
   private preparingFirstRequest: Promise<void> | undefined;
@@ -122,8 +122,8 @@ export class IpcClient {
   constructor(input: Readable, output: Writable, opts: IpcClientOptions = {}) {
     this.input = input;
     this.output = output;
-    this.sources = opts.sourceTransport;
-    this.inheritedSourceFd = opts.inheritedSourceFd;
+    this.memory = opts.memoryTransport;
+    this.inheritedMemoryFd = opts.inheritedMemoryFd;
   }
 
   get isClosed(): boolean {
@@ -204,23 +204,23 @@ export class IpcClient {
     this.notificationHandlers.clear();
     for (const [, p] of this.pending) p.reject(error);
     this.pending.clear();
-    this.closeSources();
+    this.closeMemory();
     this.finishClose(error);
   }
 
-  private closeSources(): void {
-    const sources = this.sources;
+  private closeMemory(): void {
+    const memory = this.memory;
     // Clear ownership before calling native code: bootstrap failure and
     // reentrant close calls must not close the same storage a second time.
-    this.sources = undefined;
+    this.memory = undefined;
     try {
-      sources?.close();
+      memory?.close();
     } catch (error) {
       // Cleanup failures cannot replace the request's termination reason or
       // interrupt remaining teardown, including when stderr is closing too.
       try {
         process.stderr.write(
-          `rslint: source transport close error: ${safeErrorMessage(error)}\n`,
+          `rslint: memory transport close error: ${safeErrorMessage(error)}\n`,
         );
       } catch {
         // Teardown must complete even when stderr is unavailable.
@@ -238,7 +238,7 @@ export class IpcClient {
   async sendRequest<TIn = unknown, TOut = unknown>(
     kind: Exclude<MessageKind, 'response' | 'error'>,
     data: TIn,
-    attachments?: readonly string[],
+    attachments?: readonly (string | Uint8Array)[],
   ): Promise<IpcMessage<TOut>> {
     if (kind === TRANSPORT_CONFIG_KIND) {
       throw new Error('IpcClient: transportConfig is an internal request');
@@ -246,13 +246,13 @@ export class IpcClient {
     if (this.closed) {
       throw new Error('IpcClient: cannot sendRequest on closed client');
     }
-    if (this.sources && !this.mappingSent) await this.configureSources();
+    if (this.memory && !this.mappingSent) await this.configureMemory();
     // A payload's toJSON may synchronously call sendRequest again. Keep only
     // bootstrap serialization ordered so the mapping stays on the first frame.
     if (this.preparingFirstRequest) await this.preparingFirstRequest;
     if (this.closed) throw await this.done;
     let finishPreparing: (() => void) | undefined;
-    if (this.sources && !this.mappingSent) {
+    if (this.memory && !this.mappingSent) {
       this.preparingFirstRequest = new Promise<void>((resolve) => {
         finishPreparing = resolve;
       });
@@ -261,7 +261,7 @@ export class IpcClient {
     try {
       const mapping = this.mappingSent
         ? undefined
-        : this.sources?.descriptor(this.inheritedSourceFd);
+        : this.memory?.descriptor(this.inheritedMemoryFd);
       response = this.writeRequest(kind, data, attachments, mapping);
     } finally {
       if (finishPreparing) {
@@ -272,21 +272,21 @@ export class IpcClient {
     return response;
   }
 
-  private async configureSources(): Promise<void> {
+  private async configureMemory(): Promise<void> {
     // Publish the promise before writing: even an in-process peer can reenter.
     // This RPC uses pending/write directly and never waits for its own bootstrap.
     this.bootstrapPromise ??= Promise.resolve().then(async () => {
-      const sources = this.sources;
-      if (!sources || this.closed) return;
+      const memory = this.memory;
+      if (!memory || this.closed) return;
       try {
         const response = await this.writeRequest(
           TRANSPORT_CONFIG_KIND,
           undefined,
         );
         if (this.closed) throw await this.done;
-        sources.configure(response.data);
+        memory.configure(response.data);
       } catch {
-        this.closeSources();
+        this.closeMemory();
         if (this.closed) throw await this.done;
         // Unsupported peers, invalid layouts and allocation failures all keep
         // the session usable with complete inline attachments, without retries.
@@ -298,15 +298,25 @@ export class IpcClient {
   private async writeRequest<TIn = unknown, TOut = unknown>(
     kind: string,
     data: TIn,
-    attachments?: readonly string[],
-    mapping?: SourceMapping,
+    attachments?: readonly (string | Uint8Array)[],
+    mapping?: MemoryMapping,
   ): Promise<IpcMessage<TOut>> {
     const id = this.nextId++; // id > 0 always; notifications use 0
     const frame = encodeFrame({
       kind,
       id,
       data,
-      attachments: attachments?.map((text) => ({ text })),
+      attachments: attachments?.map((value) =>
+        typeof value === 'string'
+          ? { text: value }
+          : {
+              bytes: Buffer.from(
+                value.buffer,
+                value.byteOffset,
+                value.byteLength,
+              ).toString('base64'),
+            },
+      ),
       transport: mapping ? { mapping } : undefined,
     });
     if (this.closed) throw await this.done;
@@ -354,7 +364,7 @@ export class IpcClient {
     kind: string,
     id: number,
     data: unknown,
-    released?: SourceBatch,
+    released?: MemoryBatch[],
   ): void {
     if (this.closed) return;
     this.writeFrameNow(
@@ -622,7 +632,7 @@ export class IpcClient {
     try {
       // This endpoint only writes inline attachments. Shared response ownership
       // would need a separate caller lifetime, so reject it before admitting a lease.
-      if (msg.transport?.batch !== undefined) {
+      if (msg.transport?.batches !== undefined) {
         throw new Error('unexpected shared IPC response attachments');
       }
       const received = receiveAttachments(msg.attachments, undefined);
@@ -650,7 +660,7 @@ export class IpcClient {
     }
     void runSafely(async () => {
       // Notifications have no acknowledgement and cannot own shared storage.
-      if (msg.transport?.batch !== undefined) {
+      if (msg.transport?.batches !== undefined) {
         throw new Error('shared IPC attachments require a request');
       }
       const received = receiveAttachments(msg.attachments, undefined);
@@ -662,7 +672,7 @@ export class IpcClient {
     // Keep the read loop running while handlers await nested IPC or workers.
     void (async () => {
       let received: ReceivedAttachments | undefined;
-      let released: SourceBatch | undefined;
+      let released: MemoryBatch[] | undefined;
       let kind: string = RESPONSE_KIND;
       let result: unknown;
       try {
@@ -678,8 +688,8 @@ export class IpcClient {
         }
         received = receiveAttachments(
           msg.attachments,
-          msg.transport?.batch,
-          this.sources,
+          msg.transport?.batches,
+          this.memory,
         );
         const handler = this.inboundHandler;
         if (!handler) {
@@ -727,10 +737,16 @@ export class IpcClient {
  * Encode an IPC message into the `[4B u32 LE length][JSON]` wire format.
  */
 export function encodeFrame<T = unknown>(msg: WireFrame<T>): Buffer {
-  const body = Buffer.from(JSON.stringify(msg), 'utf8');
-  const out = Buffer.allocUnsafe(HEADER_BYTES + body.length);
-  out.writeUInt32LE(body.length, 0);
-  body.copy(out, HEADER_BYTES);
+  const body = JSON.stringify(msg);
+  const length = Buffer.byteLength(body, 'utf8');
+  if (length > MAX_FRAME_BYTES) {
+    throw new Error(
+      `ipc-client: frame length ${length} exceeds cap ${MAX_FRAME_BYTES}`,
+    );
+  }
+  const out = Buffer.allocUnsafe(HEADER_BYTES + length);
+  out.writeUInt32LE(length, 0);
+  out.write(body, HEADER_BYTES, length, 'utf8');
   return out;
 }
 

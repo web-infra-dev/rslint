@@ -121,7 +121,7 @@ define.lib(() => {
           entry: { host: './src/eslint-plugin/host.ts' },
         },
         // Keep this host bundle limited to worker coordination. The CLI loads
-        // its native source arena separately through the common binding loader.
+        // its native memory arena separately through the common binding loader.
         dts: false,
       },
     ],

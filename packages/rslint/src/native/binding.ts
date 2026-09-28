@@ -1,5 +1,5 @@
 /**
- * Native binding loader shared by the CLI source transport and worker parser.
+ * Native binding loader shared by IPC memory transport and worker parser.
  *
  * Resolves and loads the platform-specific `.node` — the oxc-based JS/TS/JSX
  * parser exposed as `parse` — from the matching `@rslint/native-<tuple>`
@@ -47,14 +47,17 @@ export interface ParseResult {
 }
 
 /** Opaque reader capability; never a pointer or a filesystem path. */
-export interface SharedSource {
+export interface SharedBytes {
   lease: number;
   offset: number;
   length: number;
 }
 
+/** Complete text, owned bytes, or a request-scoped native byte capability. */
+export type ByteInput = string | Uint8Array | SharedBytes;
+
 /** Native arena layout supplied at runtime by Go; no defaults live here. */
-export interface SourceConfiguration {
+export interface MemoryConfiguration {
   version: number;
   slotCount: number;
   slotSize: number;
@@ -62,28 +65,35 @@ export interface SourceConfiguration {
   publicationStride: number;
 }
 
+export interface MemoryBatch {
+  slot: number;
+  generation: number;
+  length: number;
+}
+
 /** N-API optional return values may use null; the wire envelope omits them. */
-export interface NativeSourceMapping {
+export interface NativeMemoryMapping {
   version: number;
   fd?: number | null;
   handle?: string | null;
   processId?: number | null;
 }
 
-export interface SourceArena {
+export interface MemoryArena {
   fd(): number | null | undefined;
-  configure(config: SourceConfiguration): void;
-  descriptor(): NativeSourceMapping;
-  register(slot: number, generation: number, length: number): number;
+  configure(config: MemoryConfiguration): void;
+  descriptor(): NativeMemoryMapping;
+  register(batches: MemoryBatch[]): number;
   release(lease: number): boolean;
   close(): void;
 }
 
 export interface NativeBinding {
-  SourceArena: new () => SourceArena;
-  parseSharedSource(
+  MemoryArena: new () => MemoryArena;
+  readBytes(bytes: SharedBytes): Buffer;
+  parseSharedBytes(
     filename: string,
-    source: SharedSource,
+    source: SharedBytes,
     sourceType: string,
     jsx: boolean,
   ): { parsed: ParseResult; sourceText: string; hadBom: boolean };

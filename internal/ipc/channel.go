@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sync"
 	"time"
 )
@@ -103,16 +104,17 @@ type Channel struct {
 
 	writeMu sync.Mutex // serializes frame writes across goroutines
 
-	mu       sync.Mutex // guards pending, nextID, closed, closeErr, started
-	pending  map[int]chan *Message
-	nextID   int
-	closed   bool
-	closeErr error
-	// Source storage is optional and belongs to this channel. Bootstrap is
+	mu        sync.Mutex // guards requests, storage, and channel lifecycle
+	pending   map[int]chan *Message
+	published map[int][]MemoryBatch
+	nextID    int
+	closed    bool
+	closeErr  error
+	// Shared storage is optional and belongs to this channel. Bootstrap is
 	// serialized with closure; application handlers never own a mapping.
-	sources            *sourcePool
-	sourcesInitialized bool
-	closeDone          chan struct{}
+	memory            *memoryPool
+	memoryInitialized bool
+	closeDone         chan struct{}
 	// writeSealed rejects frames that have not yet passed write admission.
 	// It is published while writeMu is held on a terminal response or write
 	// fault, closing the unlock-before-close race for queued writers.
@@ -146,6 +148,7 @@ func NewChannel(r io.Reader, w io.Writer) *Channel {
 		reader:         bufio.NewReader(r),
 		writer:         w,
 		pending:        make(map[int]chan *Message),
+		published:      make(map[int][]MemoryBatch),
 		nextID:         1, // requests use id > 0; notifications use 0
 		notifyHandlers: make(map[MessageKind]NotificationHandler),
 		done:           make(chan struct{}),
@@ -193,10 +196,10 @@ func (c *Channel) Start() {
 func (c *Channel) Done() <-chan struct{} { return c.done }
 
 // SendRequest sends a request and blocks until the matching response/error
-// arrives, ctx is cancelled, or the channel closes. Optional complete text
-// attachments travel inline or through the channel's negotiated source storage;
+// arrives, ctx is cancelled, or the channel closes. Optional complete
+// attachments travel inline or through the channel's negotiated memory;
 // their transport metadata never changes the application payload.
-func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any, attachments ...string) (*Message, error) {
+func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any, attachments ...Attachment) (*Message, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -224,30 +227,55 @@ func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any
 	id := c.nextID
 	c.nextID++
 	msg.ID = id
+	memory := c.memory
+	c.mu.Unlock()
+	batches := attach(msg, memory, attachments)
+
+	// Encode before write admission. A local size/encoding failure has not
+	// exposed any batch to the peer, so its storage can be reused immediately
+	// and unrelated requests may continue on the same channel.
+	body, err := encodeFrame(msg)
+	if err == nil {
+		err = ctx.Err()
+	}
+	if err != nil {
+		if len(batches) != 0 {
+			memory.release(batches)
+		}
+		return nil, err
+	}
+	c.mu.Lock()
+	if c.closed {
+		err := c.closeErr
+		c.mu.Unlock()
+		if len(batches) != 0 {
+			memory.release(batches)
+		}
+		return nil, err
+	}
 	ch := make(chan *Message, 1) // buffered so dispatch never blocks
 	c.pending[id] = ch
-	sources := c.sources
+	if len(batches) != 0 {
+		c.published[id] = batches
+	}
 	c.mu.Unlock()
-	batch := attachTexts(msg, sources, attachments)
 
 	// Register pending BEFORE writing — a fast peer could respond before
 	// the resolver is in the map otherwise. A write failure cascade-closes
 	// (writeFrame), so the select below wakes via c.done.
-	if err := c.writeFrame(msg); err != nil {
+	if err := c.writePreparedFrame(msg, body, nil, false); err != nil {
 		c.mu.Lock()
 		delete(c.pending, id)
+		delete(c.published, id)
 		c.mu.Unlock()
+		if errors.Is(err, errWriteNotAdmitted) && len(batches) != 0 {
+			memory.release(batches)
+		}
 		return nil, err
 	}
 
 	select {
 	case resp := <-ch:
-		// Both successful and failed application requests can acknowledge a
-		// completed native revocation. Cancellation/orphan replies never do.
-		if batch != nil && resp.Transport != nil && resp.Transport.Released != nil &&
-			*resp.Transport.Released == *batch {
-			sources.release(*batch)
-		}
 		if resp.Kind == KindError {
 			var e ErrorResponseData
 			_ = resp.Decode(&e)
@@ -314,6 +342,10 @@ func (c *Channel) writeFrame(msg *Message) error {
 //   - a terminal response seals admission before its successful receipt is
 //     completed, so the waiter does not need to win a scheduling race to Close.
 func (c *Channel) writeFrameTracked(msg *Message, receipt *ResponseReceipt, terminal bool) error {
+	return c.writePreparedFrame(msg, nil, receipt, terminal)
+}
+
+func (c *Channel) writePreparedFrame(msg *Message, body []byte, receipt *ResponseReceipt, terminal bool) error {
 	c.writeMu.Lock()
 
 	if err := c.writeAdmissionError(); err != nil {
@@ -324,7 +356,7 @@ func (c *Channel) writeFrameTracked(msg *Message, receipt *ResponseReceipt, term
 		return err
 	}
 
-	err := c.writeFrameBytes(msg)
+	err := c.writeFrameBytes(msg, body)
 	if err != nil {
 		c.sealWrites(err)
 	} else if terminal {
@@ -346,7 +378,7 @@ func (c *Channel) writeFrameTracked(msg *Message, receipt *ResponseReceipt, term
 	return err
 }
 
-func (c *Channel) writeFrameBytes(msg *Message) (err error) {
+func (c *Channel) writeFrameBytes(msg *Message, body []byte) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("ipc: writer panicked: %v", recovered)
@@ -356,6 +388,9 @@ func (c *Channel) writeFrameBytes(msg *Message) (err error) {
 		if dw, ok := c.writer.(deadlineWriter); ok {
 			_ = dw.SetWriteDeadline(time.Now().Add(c.writeTimeout))
 		}
+	}
+	if body != nil {
+		return writeEncodedFrame(c.writer, body)
 	}
 	return WriteFrame(c.writer, msg)
 }
@@ -416,6 +451,19 @@ func (c *Channel) readLoop() {
 //     streamed/order-sensitive notification would need a single FIFO worker.
 //     (The Node side preserves order on its single event loop; only Go side.)
 func (c *Channel) dispatch(msg *Message) {
+	// Go currently produces shared bytes and only receives inline attachments.
+	// Enforce that transport direction before routing any request, notification,
+	// or response. Released metadata remains valid for Go's published batches.
+	if msg.Transport != nil && len(msg.Transport.Batches) != 0 {
+		c.closeWith(errors.New("ipc: shared inbound attachments are unsupported"))
+		return
+	}
+	for _, attachment := range msg.Attachments {
+		if attachment.Range != nil {
+			c.closeWith(errors.New("ipc: shared inbound attachments are unsupported"))
+			return
+		}
+	}
 	// Response/error → route to the waiting SendRequest by id.
 	if msg.Kind == KindResponse || msg.Kind == KindError {
 		c.mu.Lock()
@@ -423,10 +471,20 @@ func (c *Channel) dispatch(msg *Message) {
 		if ok {
 			delete(c.pending, msg.ID)
 		}
+		batches := c.published[msg.ID]
+		delete(c.published, msg.ID)
+		memory := c.memory
 		c.mu.Unlock()
+		// Storage ownership outlives its caller's waiter. Only an exact ACK
+		// for this request proves every native view was revoked; late ACKs
+		// may release storage but can never revive a cancelled request.
+		if memory != nil && len(batches) != 0 && msg.Transport != nil &&
+			slices.Equal(msg.Transport.Released, batches) {
+			memory.release(batches)
+		}
 		if ok {
 			ch <- msg
-		} else {
+		} else if len(batches) == 0 {
 			fmt.Fprintf(os.Stderr, "rslint: orphan response id=%d kind=%s\n", msg.ID, msg.Kind)
 		}
 		return
@@ -457,7 +515,7 @@ func (c *Channel) dispatch(msg *Message) {
 		if msg.Transport != nil || len(msg.Attachments) != 0 || len(msg.Data) != 0 {
 			c.sendError(msg.ID, "transport configuration request must be empty")
 		} else {
-			c.sendResponse(msg.ID, sourceConfiguration())
+			c.sendResponse(msg.ID, memoryConfiguration())
 		}
 		return
 	}
@@ -466,7 +524,7 @@ func (c *Channel) dispatch(msg *Message) {
 	// frames (lets an in-handler SendRequest receive its reply). A handler
 	// panic is trapped and surfaced as an error frame, never crashing the
 	// process (mirrors the Node side's runSafely).
-	if err := c.initializeSources(msg.Transport); err != nil {
+	if err := c.initializeMemory(msg.Transport); err != nil {
 		c.sendError(msg.ID, err.Error())
 		return
 	}
@@ -600,7 +658,7 @@ func newResponseMessage(id int, payload any) (msg *Message, err error) {
 // closeErr, c.done, inbound ctx cancellation — is published here regardless,
 // so pending requests wake without waiting for that reader. When readLoop
 // itself originates the close, its reader has already returned and the
-// goroutine exits on its own. Shared-source cleanup waits only for active
+// goroutine exits on its own. Shared-memory cleanup waits only for active
 // memory writers, never for a blocked stream reader or arbitrary io.Writer.
 func (c *Channel) closeWith(cause error) {
 	c.mu.Lock()
@@ -619,16 +677,17 @@ func (c *Channel) closeWith(cause error) {
 		c.writeSealErr = c.closeErr
 	}
 	c.pending = make(map[int]chan *Message) // drop refs; waiters wake via c.done
-	sources := c.sources
-	c.sources = nil
+	c.published = make(map[int][]MemoryBatch)
+	memory := c.memory
+	c.memory = nil
 	c.mu.Unlock()
 
 	c.inCancel()
 	close(c.done)
-	if sources != nil {
+	if memory != nil {
 		// Wait for any copy/publication before releasing the mapping. An in-flight native
 		// reader owns its own retained view in the peer process.
-		_ = sources.close()
+		_ = memory.close()
 	}
 	close(c.closeDone)
 }

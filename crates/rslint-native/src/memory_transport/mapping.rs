@@ -1,15 +1,15 @@
 //! OS handles are local implementation details. The wire carries a descriptor,
-//! never a process address or a source-file path. All supported npm targets use
+//! never a process address or an application-file path. All supported npm targets use
 //! the same fixed-slot protocol above this module.
 // cspell:words munmap syscall memfd CLOEXEC CREAT RDWR fcntl SETFD ftruncate READWRITE EFAULT nonoverlapping fstat
 
-use super::{Layout, SourceMapping};
+use super::{Layout, MemoryMapping};
 use std::io;
 
 unsafe fn publication(control: *mut u8, offset: usize) -> u32 {
     use std::sync::atomic::{AtomicU32, Ordering};
     // AtomicU32::from_ptr requires readable and writable memory, even for loads.
-    // The separate control view satisfies that contract; source slices always
+    // The separate control view satisfies that contract; byte slices always
     // use the read-only data view.
     AtomicU32::from_ptr(control.add(offset).cast()).load(Ordering::Acquire)
 }
@@ -32,7 +32,7 @@ mod platform {
             let raw = unsafe {
                 libc::syscall(
                     libc::SYS_memfd_create,
-                    c"rslint-source".as_ptr(),
+                    c"rslint-memory".as_ptr(),
                     libc::MFD_CLOEXEC | libc::MFD_ALLOW_SEALING,
                 ) as i32
             };
@@ -109,7 +109,7 @@ mod platform {
                 return Err(io::Error::last_os_error());
             }
             // Request only the header. The OS may round this view up to a host
-            // page (for example, 16 KiB on macOS), so never borrow source bytes
+            // page (for example, 16 KiB on macOS), so never borrow payload bytes
             // through it.
             let control = unsafe {
                 libc::mmap(
@@ -153,7 +153,7 @@ mod platform {
 
         pub fn published(&self, slot: usize) -> u32 {
             // The caller bounds slot against the configured count. This control
-            // word is never included in an immutable source slice.
+            // word is never included in an immutable byte slice.
             unsafe { super::publication(self.control, self.layout.publication_offset(slot)) }
         }
 
@@ -163,8 +163,8 @@ mod platform {
         }
 
         #[cfg(any(test, feature = "test-worker-termination"))]
-        pub fn write_for_test(&self, slot: usize, generation: u32, source: &[u8]) {
-            assert!(source.len() <= self.layout.slot_size);
+        pub fn write_for_test(&self, slot: usize, generation: u32, bytes: &[u8]) {
+            assert!(bytes.len() <= self.layout.slot_size);
             unsafe {
                 let view = libc::mmap(
                     ptr::null_mut(),
@@ -176,9 +176,9 @@ mod platform {
                 );
                 assert_ne!(view, libc::MAP_FAILED);
                 ptr::copy_nonoverlapping(
-                    source.as_ptr(),
+                    bytes.as_ptr(),
                     (view as *mut u8).add(self.layout.header_size + slot * self.layout.slot_size),
-                    source.len(),
+                    bytes.len(),
                 );
                 let word = (view as *mut u8)
                     .add(slot * self.layout.publication_stride)
@@ -189,8 +189,8 @@ mod platform {
             }
         }
 
-        pub fn descriptor(&self) -> SourceMapping {
-            SourceMapping {
+        pub fn descriptor(&self) -> MemoryMapping {
+            MemoryMapping {
                 version: self.layout.version,
                 fd: self.fd(),
                 handle: None,
@@ -303,8 +303,8 @@ mod platform {
         }
 
         #[cfg(any(test, feature = "test-worker-termination"))]
-        pub fn write_for_test(&self, slot: usize, generation: u32, source: &[u8]) {
-            assert!(source.len() <= self.layout.slot_size);
+        pub fn write_for_test(&self, slot: usize, generation: u32, bytes: &[u8]) {
+            assert!(bytes.len() <= self.layout.slot_size);
             unsafe {
                 let view = MapViewOfFile(self.handle, FILE_MAP_WRITE, 0, 0, self.layout.capacity);
                 assert!(!view.Value.is_null());
@@ -317,9 +317,9 @@ mod platform {
                 )
                 .is_null());
                 ptr::copy_nonoverlapping(
-                    source.as_ptr(),
+                    bytes.as_ptr(),
                     view.Value.cast::<u8>().add(start),
-                    source.len(),
+                    bytes.len(),
                 );
                 let word = (view.Value as *mut u8)
                     .add(slot * self.layout.publication_stride)
@@ -389,8 +389,8 @@ mod platform {
             })
         }
 
-        pub fn descriptor(&self) -> SourceMapping {
-            SourceMapping {
+        pub fn descriptor(&self) -> MemoryMapping {
+            MemoryMapping {
                 version: self.layout.version,
                 fd: self.fd(),
                 handle: Some((self.handle as usize).to_string()),
@@ -465,7 +465,7 @@ mod platform {
 
 pub(super) use platform::{Backing, Mapping};
 
-// SAFETY: only Lease::bytes exposes a slice. Its lifetime pins the mapping and
+// SAFETY: only Lease::chunks exposes mapped slices. Its lifetime pins the mapping and
 // prevents the Go producer from receiving permission to reuse that slot.
 unsafe impl Send for Mapping {}
 unsafe impl Sync for Mapping {}

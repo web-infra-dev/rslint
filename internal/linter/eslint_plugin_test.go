@@ -655,6 +655,46 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 // start) would drop data on the wire without a compile error, so assert every
 // field explicitly: the request keys via marshal, the result fields via decode
 // of a Node-shaped payload.
+func TestEslintPluginWire_TextAttachmentsPreserveSnapshotsAndMetadata(t *testing.T) {
+	texts := []string{"", "\ufeffconst café = '😀';\r\n// \x00", string([]byte{0xff}), strings.Repeat("x", 32)}
+	files := make([]EslintPluginLintFile, len(texts)+1)
+	for i := range texts {
+		files[i] = EslintPluginLintFile{
+			Path: fmt.Sprintf("/%d.js", i), Text: &texts[i], ConfigKey: "config",
+			LanguageOptions: map[string]any{"ecmaVersion": 2024},
+			Settings:        map[string]any{"plugin": map[string]any{"enabled": true}},
+		}
+	}
+	req := EslintPluginLintRequest{
+		Generation: "generation", Files: files,
+		Rules:        map[string]EslintPluginRuleConfig{"plugin/rule": {Options: []any{true}}},
+		CollectFixes: true, CollectTiming: true, SuggestionsMode: SuggestionsModeEager,
+	}
+	wire, attachments := req.WithTextAttachments()
+	if !reflect.DeepEqual(attachments, texts) {
+		t.Fatalf("snapshot bytes changed: %q", attachments)
+	}
+	for i := range texts {
+		file := wire.Files[i]
+		if file.Text != nil || file.TextAttachment == nil || int(*file.TextAttachment) != i || file.Path != files[i].Path || file.ConfigKey != files[i].ConfigKey {
+			t.Fatalf("incorrect attachment projection for file %d: %+v", i, file)
+		}
+		if !reflect.DeepEqual(file.LanguageOptions, files[i].LanguageOptions) || !reflect.DeepEqual(file.Settings, files[i].Settings) {
+			t.Fatalf("attachment projection changed file %d configuration", i)
+		}
+		if req.Files[i].Text != &texts[i] || req.Files[i].TextAttachment != nil {
+			t.Fatalf("projection modified original file %d", i)
+		}
+	}
+	if wire.Files[len(texts)].TextAttachment != nil || len(wire.Files) != len(files) {
+		t.Fatal("source-less file acquired an attachment or request was split")
+	}
+	wire.Files = req.Files
+	if !reflect.DeepEqual(wire, req) {
+		t.Fatal("attachment projection changed request metadata")
+	}
+}
+
 func TestEslintPluginWire_RoundTrip(t *testing.T) {
 	text := "const x = 1;"
 	req := EslintPluginLintRequest{

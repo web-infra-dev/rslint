@@ -9,12 +9,13 @@ import { fileURLToPath } from 'node:url';
 import { runEngine } from '../src/cli/engine.js';
 import { ConfigModuleHost } from '../src/config/config-loader.js';
 import { resolveRslintBinary } from '../src/internal/resolve-binary.js';
-import { createSourceTransport } from '../src/ipc/source-transport.js';
+import { createMemoryTransport } from '../src/ipc/memory-transport.js';
 import { IpcClient, encodeFrame } from '../src/ipc/client.js';
 import { createPluginLintHost } from '../src/eslint-plugin/host.js';
+import { resolvePluginAttachments } from '../src/eslint-plugin/plugin/attachments.js';
 import {
   parse,
-  parseSharedSource,
+  parseSharedBytes,
 } from '../src/eslint-plugin/native/load-binding.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -47,7 +48,7 @@ describe('CLI shared source integration', () => {
       } }; }
     } } } }, rules: { 'local/rename': 'error' } }];`,
       );
-      const transport = mode === 'inline' ? undefined : createSourceTransport();
+      const transport = mode === 'inline' ? undefined : createMemoryTransport();
       const shared = mode !== 'inline' && mode !== 'configure-failure';
       let configurationCalls = 0;
       if (transport) {
@@ -74,7 +75,7 @@ describe('CLI shared source integration', () => {
           stderr: new PassThrough(),
           runtime: { singleThreaded: true },
           extraInit: { configDiscovery: { explicitConfigPath: config } },
-          createSourceTransport: () => transport,
+          createMemoryTransport: () => transport,
           createPluginLintHost: async (configs, log, singleThreaded) => {
             const host = await createPluginLintHost(
               configs,
@@ -83,12 +84,15 @@ describe('CLI shared source integration', () => {
             );
             return {
               shutdown: () => host.shutdown(),
-              lint: async (request: any) => {
-                for (const input of request.files) {
+              lint: async (request: any, signal, attachments) => {
+                const resolved = resolvePluginAttachments(request, attachments);
+                for (const input of resolved.files) {
                   if (shared) {
                     expect(input.text).toBeUndefined();
                     expect(input.sharedSource).toBeDefined();
-                    const native = parseSharedSource(
+                    if (!input.sharedSource)
+                      throw new Error('missing shared snapshot');
+                    const native = parseSharedBytes(
                       input.path,
                       input.sharedSource,
                       'module',
@@ -100,6 +104,8 @@ describe('CLI shared source integration', () => {
                     snapshots.push(native.sourceText);
                   } else {
                     expect(input.sharedSource).toBeUndefined();
+                    if (typeof input.text !== 'string')
+                      throw new Error('missing inline snapshot');
                     snapshots.push(input.text);
                   }
                 }
@@ -107,7 +113,7 @@ describe('CLI shared source integration', () => {
                 // change what either the native parser or the real worker lints.
                 if (mode === 'snapshot')
                   fs.writeFileSync(file, 'const changedOnDisk = 1;');
-                return host.lint(request);
+                return host.lint(request, signal, attachments);
               },
             };
           },
@@ -134,7 +140,7 @@ describe('CLI shared source integration', () => {
   );
 
   test('configures the inherited empty arena from a non-default peer layout', async () => {
-    const transport = createSourceTransport();
+    const transport = createMemoryTransport();
     const fd = transport.fd();
     if (fd !== undefined) expect(fs.fstatSync(fd).size).toBe(0);
     expect(transport.configuration()).toBeUndefined();
@@ -150,7 +156,7 @@ describe('CLI shared source integration', () => {
         goArgs: [FAKE_BIN, 'require-mapping'],
         stdout: new PassThrough(),
         stderr: new PassThrough(),
-        createSourceTransport: () => transport,
+        createMemoryTransport: () => transport,
       });
       expect(exitCode).toBe(0);
       expect(configurations).toEqual([
@@ -227,7 +233,7 @@ describe('runEngine IPC disconnect cleanup', () => {
         goArgs: [FAKE_BIN, mode],
         stdout: new PassThrough(),
         stderr,
-        createSourceTransport: () => undefined,
+        createMemoryTransport: () => undefined,
       });
     } finally {
       ChildProcess.prototype.once = originalOnce;

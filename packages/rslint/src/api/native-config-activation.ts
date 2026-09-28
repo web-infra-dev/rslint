@@ -4,9 +4,14 @@ import {
   type ActivateConfigsRequest,
   type ActivateConfigsResponse,
 } from '../config/config-loader.js';
+import type { IpcAttachment } from '../ipc/protocol.js';
 
 export interface PluginLintHost {
-  lint(request: unknown): Promise<unknown>;
+  lint(
+    request: unknown,
+    signal?: AbortSignal,
+    attachments?: readonly IpcAttachment[],
+  ): Promise<unknown>;
   shutdown(): Promise<void>;
 }
 

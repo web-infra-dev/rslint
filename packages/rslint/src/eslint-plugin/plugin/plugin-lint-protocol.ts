@@ -20,7 +20,7 @@
 
 import type { LintTask } from '../worker-pool.js';
 import type { LintFileResult } from '../linter/ecma-language-plugin.js';
-import type { SharedSource } from '../native/load-binding.js';
+import type { SharedBytes } from '../native/load-binding.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Inputs
@@ -39,13 +39,13 @@ export interface EslintPluginLintRequest {
   files: ReadonlyArray<{
     path: string;
     /**
-     * Complete source snapshot. The CLI adapter may replace its wire encoding
+     * Complete source snapshot. The plugin host may replace its wire encoding
      * with a native sharedSource capability. Hosts that explicitly permit
      * filesystem reads may omit both; overlays and autofix retain snapshots.
      */
     text?: string;
-    /** Private CLI capability installed by the source transport adapter. */
-    sharedSource?: SharedSource;
+    /** Private native capability installed by the plugin attachment adapter. */
+    sharedSource?: SharedBytes;
     /**
      * Per-file `languageOptions`, computed by Go via `GetConfigForFile`
      * (flat-config files-glob match + deep merge). Opaque here; the
@@ -114,9 +114,9 @@ export function buildPluginLintTasks(
   const collectTiming = input.collectTiming ?? false;
 
   return input.files.map((f) => {
-    // Only the CLI application adapter can resolve attachment references. A
+    // Only the plugin application adapter can resolve attachment references. A
     // missing/older adapter must not turn a shared snapshot into a disk read.
-    if ('sourceIndex' in f || 'sourceRange' in f) {
+    if ('textAttachment' in f || 'sourceRange' in f) {
       throw new Error('unresolved shared plugin source');
     }
     const configKey = f.configKey ?? '';

@@ -10,8 +10,7 @@
  */
 import type { ChildProcess } from 'node:child_process';
 import { spawnIpcProcess, type IpcProcessOptions } from '../ipc/index.js';
-import type { IpcMessage } from '../ipc/index.js';
-import { resolvePluginSources } from './plugin-lint-attachments.js';
+import type { IpcAttachment, IpcMessage } from '../ipc/index.js';
 import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
@@ -22,7 +21,11 @@ import {
 } from '../config/config-loader.js';
 
 interface PluginLintHost {
-  lint(req: unknown): Promise<unknown>;
+  lint(
+    req: unknown,
+    signal?: AbortSignal,
+    attachments?: readonly IpcAttachment[],
+  ): Promise<unknown>;
   shutdown(): Promise<void>;
 }
 
@@ -251,7 +254,7 @@ export interface EngineRunOptions {
   /** @internal Dependency seam for post-prepare lifecycle tests. */
   configModuleHost?: ConfigModuleHost;
   /** @internal Dependency seam for source ownership and fallback tests. */
-  createSourceTransport?: IpcProcessOptions['createSourceTransport'];
+  createMemoryTransport?: IpcProcessOptions['createMemoryTransport'];
 }
 
 export async function runEngine(opts: EngineRunOptions): Promise<number> {
@@ -268,7 +271,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     binPath: opts.binPath,
     goArgs: opts.goArgs,
     cwd: opts.cwd,
-    createSourceTransport: opts.createSourceTransport,
+    createMemoryTransport: opts.createMemoryTransport,
   });
 
   // childExit always RESOLVES (never rejects); awaits race against it so a
@@ -580,9 +583,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
               'engine: pluginLint requested without an activated plugin host',
             );
           }
-          return pluginHost.lint(
-            resolvePluginSources(msg.data, msg.attachments),
-          );
+          return pluginHost.lint(msg.data, undefined, msg.attachments);
         default:
           throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);
       }

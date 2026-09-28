@@ -3,7 +3,10 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { once } from 'node:events';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { NodeRslintService } from '../src/internal/node.js';
+import {
+  NodeRslintService,
+  readAttachmentBytes,
+} from '../src/internal/node.js';
 import type { IpcClient } from '../src/ipc/client.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +25,26 @@ function childOf(svc: NodeRslintService): ChildProcess {
 }
 
 suite('NodeRslintService reject-all-pending on crash/terminate', () => {
+  test('forwards generic binary attachments without interpreting application kinds', async () => {
+    const svc = new NodeRslintService({ rslintPath: FAKE });
+    svc.setInboundHandler((message) => {
+      expect(message.kind).toBe('arbitraryBinary');
+      expect(message.attachments).toEqual([Buffer.from([0, 255, 128]), '']);
+      expect('transport' in message).toBe(false);
+      return {
+        bytes: Array.from(readAttachmentBytes(message.attachments![0])),
+      };
+    });
+    try {
+      await expect(svc.sendMessage('reverse-bytes', {})).resolves.toEqual({
+        reverseKind: 'response',
+        reverseData: { bytes: [0, 255, 128] },
+      });
+    } finally {
+      svc.terminate();
+    }
+  });
+
   test('answers an inbound request without confusing a colliding outbound id', async () => {
     const svc = new NodeRslintService({ rslintPath: FAKE });
     svc.setInboundHandler(async (message) => ({
@@ -73,8 +96,9 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
     const svc = new NodeRslintService({ rslintPath: FAKE });
     const inflight = svc.sendMessage('lint', {});
     childOf(svc).kill('SIGKILL');
+    // Killing before bootstrap writes may surface EPIPE before EOF or exit.
     await expect(inflight).rejects.toThrow(
-      /exited unexpectedly|peer closed input stream/,
+      /exited unexpectedly|peer closed input stream|output write failed: .*EPIPE/,
     );
   });
 

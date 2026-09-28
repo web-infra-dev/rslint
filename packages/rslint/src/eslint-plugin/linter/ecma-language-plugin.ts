@@ -31,8 +31,8 @@
 import { readFileSync } from 'node:fs';
 import {
   parse as nativeParse,
-  parseSharedSource,
-  type SharedSource,
+  parseSharedBytes,
+  type SharedBytes,
 } from '../native/load-binding.js';
 
 import {
@@ -106,8 +106,8 @@ export interface LintFileRequest {
   filePath: string;
   /** Complete source override for overlay or in-memory generations. */
   text?: string;
-  /** Complete immutable CLI snapshot; only the native parser consumes it. */
-  sharedSource?: SharedSource;
+  /** Complete immutable snapshot; only the native parser consumes it. */
+  sharedSource?: SharedBytes;
   /**
    * Forwarded subset of user `languageOptions`. Only the fields the
    * runner actually consumes are typed here; the rest of the user's
@@ -256,7 +256,7 @@ export function lintFile(
   let parsed: ReturnType<typeof nativeParse>;
   try {
     if (req.sharedSource !== undefined) {
-      const source = parseSharedSource(
+      const source = parseSharedBytes(
         req.filePath,
         req.sharedSource,
         sourceTypeRaw,

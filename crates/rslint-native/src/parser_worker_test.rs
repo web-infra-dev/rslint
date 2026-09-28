@@ -1,7 +1,7 @@
 //! Deterministic native-read barrier for the isolated worker integration test.
 //! This entire module is absent from ordinary builds, including its N-API exports.
 
-use super::{SharedSource, SourceArena, SourceConfiguration};
+use crate::memory_transport::{MemoryArena, MemoryBatch, MemoryConfiguration, SharedBytes};
 use napi::{Error, Result};
 use napi_derive::napi;
 use std::sync::{Condvar, Mutex, OnceLock};
@@ -23,15 +23,15 @@ fn barrier() -> &'static (Mutex<State>, Condvar) {
 
 #[napi(object, object_from_js = false)]
 pub struct WorkerTerminationFixture {
-    pub arena: SourceArena,
-    pub source: SharedSource,
+    pub arena: MemoryArena,
+    pub source: SharedBytes,
 }
 
 /// A single fixture per isolated process. The writer uses the native platform
 /// mapping implementation, so the JavaScript test never handles an fd or handle.
 #[napi]
 pub fn create_worker_termination_fixture(text: String) -> Result<WorkerTerminationFixture> {
-    let config = SourceConfiguration {
+    let config = MemoryConfiguration {
         version: 1,
         slot_count: 1,
         slot_size: 64 * 1024,
@@ -49,19 +49,19 @@ pub fn create_worker_termination_fixture(text: String) -> Result<WorkerTerminati
             "worker termination fixture already exists",
         ));
     }
-    let mut arena = SourceArena::new()?;
+    let mut arena = MemoryArena::new()?;
     arena.configure(config)?;
-    arena
-        .mapping
-        .as_ref()
-        .unwrap()
-        .write_for_test(0, 1, text.as_bytes());
+    arena.publish_for_test(0, 1, text.as_bytes())?;
     let length = text.len() as u32;
-    let lease = arena.register(0, 1, length)?;
+    let lease = arena.register(vec![MemoryBatch {
+        slot: 0,
+        generation: 1,
+        length,
+    }])?;
     state.lease = lease;
     Ok(WorkerTerminationFixture {
         arena,
-        source: SharedSource {
+        source: SharedBytes {
             lease,
             offset: 0,
             length,
@@ -72,13 +72,8 @@ pub fn create_worker_termination_fixture(text: String) -> Result<WorkerTerminati
 /// Change only the publication word, leaving the pinned payload untouched. A
 /// rejected second registration must prove retirement, not a stale generation.
 #[napi]
-pub fn republish_worker_fixture(arena: &SourceArena) -> Result<()> {
-    arena
-        .mapping
-        .as_ref()
-        .ok_or_else(|| Error::from_reason("worker termination fixture closed"))?
-        .write_for_test(0, 2, &[]);
-    Ok(())
+pub fn republish_worker_fixture(arena: &MemoryArena) -> Result<()> {
+    arena.publish_for_test(0, 2, &[])
 }
 
 pub(crate) fn before_parse(lease: u32) {

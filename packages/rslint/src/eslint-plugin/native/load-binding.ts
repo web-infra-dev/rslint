@@ -4,9 +4,9 @@ import { getNativeBinding } from '../../native/binding.js';
 export type {
   CommentObj,
   ParseResult,
-  SharedSource,
+  SharedBytes,
 } from '../../native/binding.js';
 
 const binding = getNativeBinding();
 export const parse = binding.parse;
-export const parseSharedSource = binding.parseSharedSource;
+export const parseSharedBytes = binding.parseSharedBytes;

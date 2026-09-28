@@ -14,3 +14,5 @@ export type {
   InboundRequestHandler,
   NotificationHandler,
 } from './protocol.js';
+
+export { readAttachmentBytes } from './memory-transport.js';

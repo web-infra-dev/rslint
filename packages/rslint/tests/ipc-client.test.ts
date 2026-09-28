@@ -1,22 +1,33 @@
-import { describe, test, expect } from 'rstack/test';
+import { describe, test, expect, beforeAll, afterAll } from 'rstack/test';
 import { once } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { IpcClient, encodeFrame, decodeFrame } from '../src/ipc/client.js';
+import { spawnIpcProcess } from '../src/ipc/process.js';
 import type { MessageKind } from '../src/ipc/protocol.js';
 import type { IpcClientOptions } from '../src/ipc/client.js';
-import { createSourceTransport } from '../src/ipc/source-transport.js';
+import {
+  createMemoryTransport,
+  readAttachmentBytes,
+} from '../src/ipc/memory-transport.js';
 import {
   getNativeBinding,
-  type SharedSource,
-  type SourceConfiguration,
+  type SharedBytes,
+  type MemoryConfiguration,
 } from '../src/native/binding.js';
 import type {
   WireMessage as IpcMessage,
-  SourceBatch,
+  MemoryBatch,
 } from '../src/ipc/protocol.js';
 
 // Deliberately differs from Go's production layout. Node consumes peer values.
-const SOURCE_CONFIG: SourceConfiguration = {
+const MEMORY_CONFIG: MemoryConfiguration = {
   version: 1,
   slotCount: 3,
   slotSize: 4096,
@@ -66,10 +77,10 @@ function pairClients(options: IpcClientOptions = {}): {
   };
 }
 
-describe('IPC text attachments', () => {
+describe('IPC byte attachments', () => {
   function receiver(options: IpcClientOptions = {}) {
     // Inbound attachment cases start after the Go configuration exchange.
-    options.sourceTransport?.configure(SOURCE_CONFIG);
+    options.memoryTransport?.configure(MEMORY_CONFIG);
     const pair = pairClients(options);
     let id = 0;
     pair.b.start();
@@ -89,7 +100,7 @@ describe('IPC text attachments', () => {
     };
   }
 
-  function emptyBatch(): SourceBatch {
+  function emptyBatch(): MemoryBatch {
     return { slot: 0, generation: 1, length: 0 };
   }
 
@@ -117,9 +128,68 @@ describe('IPC text attachments', () => {
     }
   });
 
+  test('round trips arbitrary binary and typed-array byte ranges without UTF-8 conversion', async () => {
+    const binary = Buffer.from(Array.from({ length: 256 }, (_, i) => i));
+    const backing = Uint8Array.of(9, 0, 255, 128, 10);
+    const pair = pairClients();
+    pair.b.setInboundHandler((msg) => {
+      expect(msg.data).toEqual({ nested: { format: 'consumer-defined' } });
+      expect(msg.attachments).toEqual([
+        binary,
+        Buffer.from([0, 255, 128]),
+        Buffer.alloc(0),
+        '',
+      ]);
+      expect(readAttachmentBytes(msg.attachments![0])).toEqual(binary);
+      expect(readAttachmentBytes(msg.attachments![3])).toEqual(Buffer.alloc(0));
+      return { size: readAttachmentBytes(msg.attachments![0]).length };
+    });
+    pair.a.start();
+    pair.b.start();
+    try {
+      const response = await pair.a.sendRequest(
+        'customBinaryPayload',
+        { nested: { format: 'consumer-defined' } },
+        [binary, backing.subarray(1, 4), Buffer.alloc(0), ''],
+      );
+      expect(response.data).toEqual({ size: 256 });
+      expect(backing).toEqual(Uint8Array.of(9, 0, 255, 128, 10));
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test.each([
+    'A',
+    'AA',
+    'AAA',
+    '====',
+    'AA=A',
+    'A===',
+    'AAAA=',
+    'AA\n=',
+    '-_==',
+    'AB==',
+    'AAB=',
+  ])('rejects malformed or non-canonical base64 bytes: %j', async (bytes) => {
+    const pair = receiver();
+    let dispatched = false;
+    pair.b.setInboundHandler(() => {
+      dispatched = true;
+    });
+    try {
+      const result = await pair.request({ attachments: [{ bytes }] });
+      expect(result.kind).toBe('error');
+      expect(result.data).toEqual({ message: 'invalid IPC attachment bytes' });
+      expect(dispatched).toBe(false);
+    } finally {
+      pair.cleanup();
+    }
+  });
+
   test('adds the mapping to the first request envelope only', async () => {
-    const sources = createSourceTransport();
-    const pair = pairClients({ sourceTransport: sources });
+    const memory = createMemoryTransport();
+    const pair = pairClients({ memoryTransport: memory });
     const frames: IpcMessage[] = [];
     pair.streams.bToA.on('data', (chunk: Buffer) => {
       const message = decodeFrame(chunk)!.msg;
@@ -129,7 +199,7 @@ describe('IPC text attachments', () => {
           kind: 'response',
           id: message.id,
           data:
-            message.kind === 'transportConfig' ? SOURCE_CONFIG : { ok: true },
+            message.kind === 'transportConfig' ? MEMORY_CONFIG : { ok: true },
         }),
       );
     });
@@ -143,21 +213,21 @@ describe('IPC text attachments', () => {
         'other',
       ]);
       expect(frames[0]).toEqual({ kind: 'transportConfig', id: 1 });
-      expect(frames[1].transport).toEqual({ mapping: sources.descriptor() });
+      expect(frames[1].transport).toEqual({ mapping: memory.descriptor() });
       expect(frames[1].data).toEqual({ runtime: {} });
       expect(frames[2].transport).toBeUndefined();
-      expect(sources.configuration()).toEqual(SOURCE_CONFIG);
+      expect(memory.configuration()).toEqual(MEMORY_CONFIG);
     } finally {
       pair.cleanup();
     }
   });
 
   test('shares one runtime configuration exchange across concurrent first requests', async () => {
-    const sources = createSourceTransport();
-    expect(() => sources.descriptor()).toThrow('not configured');
+    const memory = createMemoryTransport();
+    expect(() => memory.descriptor()).toThrow('not configured');
     const pair = pairClients({
-      sourceTransport: sources,
-      inheritedSourceFd: 7,
+      memoryTransport: memory,
+      inheritedMemoryFd: 7,
     });
     const frames: IpcMessage[] = [];
     pair.streams.bToA.on('data', (chunk: Buffer) => {
@@ -177,7 +247,7 @@ describe('IPC text attachments', () => {
       const config = decodeFrame((await configurationRequest)[0])!.msg;
       expect(frames).toEqual([{ kind: 'transportConfig', id: config.id }]);
       pair.streams.aToB.write(
-        encodeFrame({ kind: 'response', id: config.id, data: SOURCE_CONFIG }),
+        encodeFrame({ kind: 'response', id: config.id, data: MEMORY_CONFIG }),
       );
       await Promise.all([first, second]);
       expect(frames.map(({ kind }) => kind)).toEqual([
@@ -185,7 +255,7 @@ describe('IPC text attachments', () => {
         'first',
         'second',
       ]);
-      expect(frames[1].transport).toEqual({ mapping: sources.descriptor(7) });
+      expect(frames[1].transport).toEqual({ mapping: memory.descriptor(7) });
       expect(frames[2].transport).toBeUndefined();
     } finally {
       pair.cleanup();
@@ -204,21 +274,21 @@ describe('IPC text attachments', () => {
   ])(
     'close during bootstrap rejects every waiter without configuring or sending init: %j',
     async ({ when, closeThrows }) => {
-      const sources = createSourceTransport();
+      const memory = createMemoryTransport();
       let configured = 0;
-      const configure = sources.configure;
-      sources.configure = (value) => {
+      const configure = memory.configure;
+      memory.configure = (value) => {
         configured++;
         configure(value);
       };
       let closeCalls = 0;
-      const closeSources = sources.close;
-      sources.close = () => {
+      const closeMemory = memory.close;
+      memory.close = () => {
         closeCalls++;
-        closeSources();
+        closeMemory();
         if (closeThrows) throw new Error('native cleanup failed');
       };
-      const pair = pairClients({ sourceTransport: sources });
+      const pair = pairClients({ memoryTransport: memory });
       const frames: IpcMessage[] = [];
       pair.streams.bToA.on('data', (chunk: Buffer) => {
         frames.push(decodeFrame(chunk)!.msg);
@@ -243,7 +313,7 @@ describe('IPC text attachments', () => {
               id: config!.id,
               data:
                 when === 'after response'
-                  ? SOURCE_CONFIG
+                  ? MEMORY_CONFIG
                   : { message: 'unsupported transportConfig' },
             }),
           );
@@ -260,7 +330,7 @@ describe('IPC text attachments', () => {
         expect(frames.map(({ kind }) => kind)).toEqual(
           when === 'before request' ? [] : ['transportConfig'],
         );
-        expect(sources.fd()).toBeUndefined();
+        expect(memory.fd()).toBeUndefined();
       } finally {
         pair.cleanup();
       }
@@ -270,14 +340,14 @@ describe('IPC text attachments', () => {
   test.each(['peer error', 'invalid configuration', 'native failure'] as const)(
     'closes the arena and keeps complete inline text after bootstrap %s',
     async (failure) => {
-      const sources = createSourceTransport();
-      const configure = sources.configure;
+      const memory = createMemoryTransport();
+      const configure = memory.configure;
       if (failure === 'native failure') {
-        sources.configure = () => {
+        memory.configure = () => {
           throw new Error('allocation failed');
         };
       }
-      const pair = pairClients({ sourceTransport: sources });
+      const pair = pairClients({ memoryTransport: memory });
       const frames: IpcMessage[] = [];
       const text = '\ufeffconst complete = "😀";\u0000\r\n';
       pair.streams.bToA.on('data', (chunk: Buffer) => {
@@ -293,8 +363,8 @@ describe('IPC text attachments', () => {
               ? failure === 'peer error'
                 ? { message: 'unsupported request' }
                 : failure === 'invalid configuration'
-                  ? { ...SOURCE_CONFIG, slotSize: '4096' }
-                  : SOURCE_CONFIG
+                  ? { ...MEMORY_CONFIG, slotSize: '4096' }
+                  : MEMORY_CONFIG
               : { ok: true },
           }),
         );
@@ -316,8 +386,8 @@ describe('IPC text attachments', () => {
           expect(frame.transport).toBeUndefined();
           expect(frame.attachments).toEqual([{ text }]);
         }
-        expect(sources.configuration()).toBeUndefined();
-        expect(() => configure(SOURCE_CONFIG)).toThrow('closed');
+        expect(memory.configuration()).toBeUndefined();
+        expect(() => configure(MEMORY_CONFIG)).toThrow('closed');
       } finally {
         pair.cleanup();
       }
@@ -346,8 +416,8 @@ describe('IPC text attachments', () => {
   test.each([false, true])(
     'keeps bootstrap first under serialization reentry (outer fails: %s)',
     async (failOuter) => {
-      const sources = createSourceTransport();
-      const pair = pairClients({ sourceTransport: sources });
+      const memory = createMemoryTransport();
+      const pair = pairClients({ memoryTransport: memory });
       const frames: IpcMessage[] = [];
       pair.streams.bToA.on('data', (chunk: Buffer) => {
         const message = decodeFrame(chunk)!.msg;
@@ -356,7 +426,7 @@ describe('IPC text attachments', () => {
           encodeFrame({
             kind: 'response',
             id: message.id,
-            data: message.kind === 'transportConfig' ? SOURCE_CONFIG : {},
+            data: message.kind === 'transportConfig' ? MEMORY_CONFIG : {},
           }),
         );
       });
@@ -380,7 +450,7 @@ describe('IPC text attachments', () => {
             : ['transportConfig', 'outer', 'nested'],
         );
         expect(frames[0].transport).toBeUndefined();
-        expect(frames[1].transport).toEqual({ mapping: sources.descriptor() });
+        expect(frames[1].transport).toEqual({ mapping: memory.descriptor() });
         if (!failOuter) expect(frames[2].transport).toBeUndefined();
       } finally {
         pair.cleanup();
@@ -392,9 +462,9 @@ describe('IPC text attachments', () => {
     'closes native storage when initialization fails: %s',
     (failure) => {
       const binding = getNativeBinding();
-      const SourceArena = binding.SourceArena;
+      const MemoryArena = binding.MemoryArena;
       let closed = false;
-      binding.SourceArena = class {
+      binding.MemoryArena = class {
         fd() {
           if (failure === 'fd') throw new Error('fd unavailable');
           return undefined;
@@ -405,7 +475,7 @@ describe('IPC text attachments', () => {
         descriptor() {
           if (failure === 'descriptor')
             throw new Error('descriptor unavailable');
-          return { version: SOURCE_CONFIG.version + 1 };
+          return { version: MEMORY_CONFIG.version + 1 };
         }
         register(): number {
           throw new Error('must not register');
@@ -418,14 +488,14 @@ describe('IPC text attachments', () => {
         }
       };
       try {
-        expect(() => createSourceTransport().configure(SOURCE_CONFIG)).toThrow(
+        expect(() => createMemoryTransport().configure(MEMORY_CONFIG)).toThrow(
           failure === 'version'
-            ? 'inconsistent shared source version'
+            ? 'inconsistent shared memory version'
             : `${failure} unavailable`,
         );
         expect(closed).toBe(true);
       } finally {
-        binding.SourceArena = SourceArena;
+        binding.MemoryArena = MemoryArena;
       }
     },
   );
@@ -434,18 +504,18 @@ describe('IPC text attachments', () => {
     'normalizes nullable native handle fields before publishing a %s descriptor',
     (platform) => {
       const binding = getNativeBinding();
-      const SourceArena = binding.SourceArena;
+      const MemoryArena = binding.MemoryArena;
       let closed = false;
-      binding.SourceArena = class {
+      binding.MemoryArena = class {
         fd() {
           return platform === 'windows' ? null : 5;
         }
-        configure(config: SourceConfiguration) {
-          expect(config).toEqual(SOURCE_CONFIG);
+        configure(config: MemoryConfiguration) {
+          expect(config).toEqual(MEMORY_CONFIG);
         }
         descriptor() {
           return {
-            version: SOURCE_CONFIG.version,
+            version: MEMORY_CONFIG.version,
             fd: platform === 'windows' ? null : 5,
             handle: platform === 'windows' ? '42' : null,
             processId: platform === 'windows' ? 123 : null,
@@ -461,19 +531,19 @@ describe('IPC text attachments', () => {
           closed = true;
         }
       };
-      let sources: ReturnType<typeof createSourceTransport> | undefined;
+      let memory: ReturnType<typeof createMemoryTransport> | undefined;
       try {
-        sources = createSourceTransport();
-        expect(sources.fd()).toBe(platform === 'windows' ? undefined : 5);
-        sources.configure(SOURCE_CONFIG);
-        expect(JSON.parse(JSON.stringify(sources.descriptor(7)))).toEqual(
+        memory = createMemoryTransport();
+        expect(memory.fd()).toBe(platform === 'windows' ? undefined : 5);
+        memory.configure(MEMORY_CONFIG);
+        expect(JSON.parse(JSON.stringify(memory.descriptor(7)))).toEqual(
           platform === 'windows'
-            ? { version: SOURCE_CONFIG.version, handle: '42', processId: 123 }
-            : { version: SOURCE_CONFIG.version, fd: 7 },
+            ? { version: MEMORY_CONFIG.version, handle: '42', processId: 123 }
+            : { version: MEMORY_CONFIG.version, fd: 7 },
         );
       } finally {
-        sources?.close();
-        binding.SourceArena = SourceArena;
+        memory?.close();
+        binding.MemoryArena = MemoryArena;
       }
       expect(closed).toBe(true);
     },
@@ -483,31 +553,31 @@ describe('IPC text attachments', () => {
     [
       undefined,
       [],
-      { ...SOURCE_CONFIG, version: 0 },
-      { ...SOURCE_CONFIG, slotCount: -1 },
-      { ...SOURCE_CONFIG, slotSize: 1.5 },
-      { ...SOURCE_CONFIG, headerSize: '512' },
-      { ...SOURCE_CONFIG, publicationStride: NaN },
-      { ...SOURCE_CONFIG, slotCount: 2 ** 32 + 3 },
-      { ...SOURCE_CONFIG, slotSize: 2 ** 32 + 4096 },
+      { ...MEMORY_CONFIG, version: 0 },
+      { ...MEMORY_CONFIG, slotCount: -1 },
+      { ...MEMORY_CONFIG, slotSize: 1.5 },
+      { ...MEMORY_CONFIG, headerSize: '512' },
+      { ...MEMORY_CONFIG, publicationStride: NaN },
+      { ...MEMORY_CONFIG, slotCount: 2 ** 32 + 3 },
+      { ...MEMORY_CONFIG, slotSize: 2 ** 32 + 4096 },
     ].map((config) => ({ config })),
   )(
     'rejects an invalid runtime configuration and permanently closes storage: %j',
     ({ config }) => {
-      const sources = createSourceTransport();
-      expect(() => sources.configure(config)).toThrow(
-        'invalid shared source configuration',
+      const memory = createMemoryTransport();
+      expect(() => memory.configure(config)).toThrow(
+        'invalid shared memory configuration',
       );
-      expect(sources.fd()).toBeUndefined();
-      expect(sources.configuration()).toBeUndefined();
-      expect(() => sources.configure(SOURCE_CONFIG)).toThrow('closed');
-      sources.close();
+      expect(memory.fd()).toBeUndefined();
+      expect(memory.configuration()).toBeUndefined();
+      expect(() => memory.configure(MEMORY_CONFIG)).toThrow('closed');
+      memory.close();
     },
   );
 
   test('accepts the final slot in the peer-provided layout', async () => {
-    const pair = receiver({ sourceTransport: createSourceTransport() });
-    const batch = { ...emptyBatch(), slot: SOURCE_CONFIG.slotCount - 1 };
+    const pair = receiver({ memoryTransport: createMemoryTransport() });
+    const batch = { ...emptyBatch(), slot: MEMORY_CONFIG.slotCount - 1 };
     pair.b.setInboundHandler((msg) => {
       expect(msg.attachments).toEqual([
         { offset: 0, length: 0, lease: expect.any(Number) },
@@ -517,10 +587,10 @@ describe('IPC text attachments', () => {
     try {
       const response = await pair.request({
         attachments: [{ range: { offset: 0, length: 0 } }],
-        transport: { batch },
+        transport: { batches: [batch] },
       });
       expect(response.kind).toBe('response');
-      expect(response.transport).toEqual({ released: batch });
+      expect(response.transport).toEqual({ released: [batch] });
     } finally {
       pair.cleanup();
     }
@@ -535,22 +605,15 @@ describe('IPC text attachments', () => {
   ] as const)(
     'revokes native reads before replying and acknowledges release on %s',
     async (outcome) => {
-      const pair = receiver({ sourceTransport: createSourceTransport() });
+      const pair = receiver({ memoryTransport: createMemoryTransport() });
       const batch = emptyBatch();
-      let source: SharedSource | undefined;
+      let capability: SharedBytes | undefined;
       pair.b.setInboundHandler((msg) => {
         const attachment = msg.attachments?.[0];
-        if (typeof attachment !== 'object')
+        if (typeof attachment !== 'object' || attachment instanceof Uint8Array)
           throw new Error('missing capability');
-        source = attachment;
-        expect(
-          getNativeBinding().parseSharedSource(
-            '/missing.ts',
-            source,
-            'module',
-            false,
-          ).sourceText,
-        ).toBe('');
+        capability = attachment;
+        expect(readAttachmentBytes(capability)).toEqual(Buffer.alloc(0));
         expect(msg.data).toEqual({ arbitrary: true });
         expect('transport' in msg).toBe(false);
         if (outcome === 'error') throw new Error('dispatch failed');
@@ -574,24 +637,17 @@ describe('IPC text attachments', () => {
         const wire = {
           data: { arbitrary: true },
           attachments: [{ range: { offset: 0, length: 0 } }],
-          transport: { batch },
+          transport: { batches: [batch] },
         };
         const response = await pair.request(wire);
         expect(response.kind).toBe(
           outcome === 'success' ? 'response' : 'error',
         );
-        expect(response.transport).toEqual({ released: batch });
+        expect(response.transport).toEqual({ released: [batch] });
         if (outcome === 'message-getter' || outcome === 'toString') {
           expect(response.data).toEqual({ message: 'request failed' });
         }
-        expect(() =>
-          getNativeBinding().parseSharedSource(
-            '/missing.ts',
-            source!,
-            'module',
-            false,
-          ),
-        ).toThrow('expired');
+        expect(() => readAttachmentBytes(capability!)).toThrow('expired');
         const replay = await pair.request(wire);
         expect(replay.kind).toBe('error');
         expect(replay.transport).toBeUndefined();
@@ -605,18 +661,18 @@ describe('IPC text attachments', () => {
   );
 
   test('does not acknowledge a native release that cannot prove reuse', async () => {
-    const sources = createSourceTransport();
-    const release = sources.release;
-    sources.release = (lease) => {
+    const memory = createMemoryTransport();
+    const release = memory.release;
+    memory.release = (lease) => {
       release(lease);
       return false;
     };
-    const pair = receiver({ sourceTransport: sources });
+    const pair = receiver({ memoryTransport: memory });
     pair.b.setInboundHandler(() => ({ ok: true }));
     try {
       const response = await pair.request({
         attachments: [{ range: { offset: 0, length: 0 } }],
-        transport: { batch: emptyBatch() },
+        transport: { batches: [emptyBatch()] },
       });
       expect(response.kind).toBe('response');
       expect(response.transport).toBeUndefined();
@@ -625,12 +681,126 @@ describe('IPC text attachments', () => {
     }
   });
 
+  test('registers and acknowledges an ordered batch set as one lease', async () => {
+    const memory = createMemoryTransport();
+    const register = memory.register;
+    const release = memory.release;
+    const registrations: MemoryBatch[][] = [];
+    const releases: number[] = [];
+    memory.register = (batches) => {
+      registrations.push(batches);
+      return register(batches);
+    };
+    memory.release = (lease) => {
+      releases.push(lease);
+      return release(lease);
+    };
+    const pair = receiver({ memoryTransport: memory });
+    const batches = [{ ...emptyBatch(), slot: 2 }, emptyBatch()];
+    let capability: SharedBytes | undefined;
+    pair.b.setInboundHandler((msg) => {
+      const first = msg.attachments![0];
+      const second = msg.attachments![1];
+      if (typeof first !== 'object' || first instanceof Uint8Array)
+        throw new Error('missing capability');
+      capability = first;
+      expect(second).toEqual(first);
+      expect(readAttachmentBytes(first)).toEqual(Buffer.alloc(0));
+      return { ok: true };
+    });
+    try {
+      const response = await pair.request({
+        attachments: [
+          { range: { offset: 0, length: 0 } },
+          { range: { offset: 0, length: 0 } },
+        ],
+        transport: { batches },
+      });
+      expect(response.kind).toBe('response');
+      expect(registrations).toEqual([batches]);
+      expect(releases).toEqual([capability!.lease]);
+      expect(response.transport).toEqual({ released: batches });
+      expect(() => readAttachmentBytes(capability!)).toThrow('expired');
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test('does not partially register or acknowledge when a later batch fails', async () => {
+    const pair = receiver({ memoryTransport: createMemoryTransport() });
+    let calls = 0;
+    pair.b.setInboundHandler(() => {
+      calls++;
+      return {};
+    });
+    const attachments = [{ range: { offset: 0, length: 0 } }];
+    const retired = { ...emptyBatch(), slot: 1 };
+    try {
+      expect(
+        (await pair.request({ attachments, transport: { batches: [retired] } }))
+          .kind,
+      ).toBe('response');
+      const failed = await pair.request({
+        attachments,
+        transport: { batches: [emptyBatch(), retired] },
+      });
+      expect(failed.kind).toBe('error');
+      expect(failed.transport).toBeUndefined();
+      expect(calls).toBe(1);
+      // The valid first slot was not consumed by the rejected multi-slot lease.
+      const valid = await pair.request({
+        attachments,
+        transport: { batches: [emptyBatch()] },
+      });
+      expect(valid.kind).toBe('response');
+      expect(valid.transport).toEqual({ released: [emptyBatch()] });
+      expect(calls).toBe(2);
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test.each(
+    [
+      [],
+      [emptyBatch(), emptyBatch()],
+      [emptyBatch(), { ...emptyBatch(), slot: MEMORY_CONFIG.slotCount }],
+    ].map((batches) => ({ batches })),
+  )(
+    'rejects a malformed batch set before invoking native registration: %j',
+    async ({ batches }) => {
+      const memory = createMemoryTransport();
+      let registrations = 0;
+      const register = memory.register;
+      memory.register = (values) => {
+        registrations++;
+        return register(values);
+      };
+      const pair = receiver({ memoryTransport: memory });
+      pair.b.setInboundHandler(() => {
+        throw new Error('must not dispatch');
+      });
+      try {
+        const result = await pair.request({
+          attachments: [{ range: { offset: 0, length: 0 } }],
+          transport: { batches },
+        });
+        expect(result.kind).toBe('error');
+        expect(result.transport).toBeUndefined();
+        expect(registrations).toBe(0);
+      } finally {
+        pair.cleanup();
+      }
+    },
+  );
+
   test('keeps mixed inline/shared attachments ordered and out of application data', async () => {
-    const pair = receiver({ sourceTransport: createSourceTransport() });
+    const pair = receiver({ memoryTransport: createMemoryTransport() });
     pair.b.setInboundHandler((msg) => {
       expect(msg.attachments).toEqual([
         'inline',
         { offset: 0, length: 0, lease: expect.any(Number) },
+        Buffer.from([0, 255, 128]),
         '',
       ]);
       expect(msg.data).toEqual({ payload: 'unchanged' });
@@ -642,25 +812,26 @@ describe('IPC text attachments', () => {
         attachments: [
           { text: 'inline' },
           { range: { offset: 0, length: 0 } },
+          { bytes: 'AP+A' },
           { text: '' },
         ],
-        transport: { batch: emptyBatch() },
+        transport: { batches: [emptyBatch()] },
       });
-      expect(response.transport).toEqual({ released: emptyBatch() });
+      expect(response.transport).toEqual({ released: [emptyBatch()] });
     } finally {
       pair.cleanup();
     }
   });
 
   test('revokes a valid batch even when no application handler is installed', async () => {
-    const pair = receiver({ sourceTransport: createSourceTransport() });
+    const pair = receiver({ memoryTransport: createMemoryTransport() });
     try {
       const response = await pair.request({
         attachments: [{ range: { offset: 0, length: 0 } }],
-        transport: { batch: emptyBatch() },
+        transport: { batches: [emptyBatch()] },
       });
       expect(response.kind).toBe('error');
-      expect(response.transport).toEqual({ released: emptyBatch() });
+      expect(response.transport).toEqual({ released: [emptyBatch()] });
     } finally {
       pair.cleanup();
     }
@@ -674,7 +845,7 @@ describe('IPC text attachments', () => {
     try {
       const response = await pair.request({
         attachments: [{ range: { offset: 0, length: 0 } }],
-        transport: { batch: emptyBatch() },
+        transport: { batches: [emptyBatch()] },
       });
       expect(response.kind).toBe('error');
       expect(response.data).toEqual({
@@ -687,7 +858,7 @@ describe('IPC text attachments', () => {
   });
 
   test('close revokes a pending handler capability and suppresses a late acknowledgement', async () => {
-    const pair = receiver({ sourceTransport: createSourceTransport() });
+    const pair = receiver({ memoryTransport: createMemoryTransport() });
     let entered!: () => void;
     let finish!: () => void;
     const started = new Promise<void>((resolve) => {
@@ -696,15 +867,16 @@ describe('IPC text attachments', () => {
     const pending = new Promise<void>((resolve) => {
       finish = resolve;
     });
-    let source: SharedSource | undefined;
+    let capability: SharedBytes | undefined;
     let replies = 0;
     pair.streams.bToA.on('data', () => {
       replies++;
     });
     pair.b.setInboundHandler(async (msg) => {
       const value = msg.attachments?.[0];
-      if (typeof value !== 'object') throw new Error('missing capability');
-      source = value;
+      if (typeof value !== 'object' || value instanceof Uint8Array)
+        throw new Error('missing capability');
+      capability = value;
       entered();
       await pending;
       return { ok: true };
@@ -715,19 +887,12 @@ describe('IPC text attachments', () => {
           kind: 'anything',
           id: 1,
           attachments: [{ range: { offset: 0, length: 0 } }],
-          transport: { batch: emptyBatch() },
+          transport: { batches: [emptyBatch()] },
         }),
       );
       await started;
       pair.b.close();
-      expect(() =>
-        getNativeBinding().parseSharedSource(
-          '/missing.ts',
-          source!,
-          'module',
-          false,
-        ),
-      ).toThrow('expired');
+      expect(() => readAttachmentBytes(capability!)).toThrow('expired');
       finish();
       await new Promise<void>((resolve) => setImmediate(resolve));
       expect(replies).toBe(0);
@@ -739,17 +904,17 @@ describe('IPC text attachments', () => {
 
   test.each([
     { slot: -1 },
-    { slot: SOURCE_CONFIG.slotCount },
+    { slot: MEMORY_CONFIG.slotCount },
     { slot: 0.5 },
     { generation: 0 },
     { generation: MAX_GENERATION + 1 },
     { length: NaN },
     { length: Infinity },
-    { length: SOURCE_CONFIG.slotSize + 1 },
+    { length: MEMORY_CONFIG.slotSize + 1 },
   ])(
     'rejects malformed batches before creating a capability: %j',
     async (change) => {
-      const pair = receiver({ sourceTransport: createSourceTransport() });
+      const pair = receiver({ memoryTransport: createMemoryTransport() });
       let calls = 0;
       pair.b.setInboundHandler(() => {
         calls++;
@@ -758,7 +923,7 @@ describe('IPC text attachments', () => {
       try {
         const response = await pair.request({
           attachments: [{ range: { offset: 0, length: 0 } }],
-          transport: { batch: { ...emptyBatch(), ...change } },
+          transport: { batches: [{ ...emptyBatch(), ...change }] },
         });
         expect(response.kind).toBe('error');
         expect(response.data).toEqual({
@@ -768,7 +933,7 @@ describe('IPC text attachments', () => {
         expect(calls).toBe(0);
         const valid = await pair.request({
           attachments: [{ range: { offset: 0, length: 0 } }],
-          transport: { batch: emptyBatch() },
+          transport: { batches: [emptyBatch()] },
         });
         expect(valid.kind).toBe('response');
         expect(calls).toBe(1);
@@ -787,7 +952,7 @@ describe('IPC text attachments', () => {
   ])(
     'rejects malformed ranges before creating a capability: %j',
     async (range) => {
-      const pair = receiver({ sourceTransport: createSourceTransport() });
+      const pair = receiver({ memoryTransport: createMemoryTransport() });
       let calls = 0;
       pair.b.setInboundHandler(() => {
         calls++;
@@ -796,14 +961,14 @@ describe('IPC text attachments', () => {
       try {
         const response = await pair.request({
           attachments: [{ range }],
-          transport: { batch: emptyBatch() },
+          transport: { batches: [emptyBatch()] },
         });
         expect(response.kind).toBe('error');
         expect(response.transport).toBeUndefined();
         expect(calls).toBe(0);
         const valid = await pair.request({
           attachments: [{ range: { offset: 0, length: 0 } }],
-          transport: { batch: emptyBatch() },
+          transport: { batches: [emptyBatch()] },
         });
         expect(valid.kind).toBe('response');
       } finally {
@@ -813,27 +978,36 @@ describe('IPC text attachments', () => {
   );
 
   test.each([
+    { attachments: [{ text: '', bytes: '' }] },
+    {
+      attachments: [{ bytes: '', range: { offset: 0, length: 0 } }],
+      transport: { batches: [emptyBatch()] },
+    },
+    {
+      attachments: [{ text: '', bytes: '', range: { offset: 0, length: 0 } }],
+      transport: { batches: [emptyBatch()] },
+    },
     { attachments: [{ range: { offset: 0, length: 0 } }] },
     {
       attachments: [{ text: '', range: { offset: 0, length: 0 } }],
-      transport: { batch: emptyBatch() },
+      transport: { batches: [emptyBatch()] },
     },
-    { attachments: [{ text: '' }], transport: { batch: emptyBatch() } },
+    { attachments: [{ text: '' }], transport: { batches: [emptyBatch()] } },
     {
       attachments: [{ range: { offset: 0, length: 0 } }],
-      transport: { batch: { ...emptyBatch(), length: 1 } },
+      transport: { batches: [{ ...emptyBatch(), length: 1 }] },
     },
     {
       attachments: [
         { range: { offset: 0, length: 1 } },
         { range: { offset: 0, length: 1 } },
       ],
-      transport: { batch: { ...emptyBatch(), length: 2 } },
+      transport: { batches: [{ ...emptyBatch(), length: 2 }] },
     },
   ])(
     'rejects missing, conflicting or incomplete attachment metadata: %j',
     async (message) => {
-      const pair = receiver({ sourceTransport: createSourceTransport() });
+      const pair = receiver({ memoryTransport: createMemoryTransport() });
       pair.b.setInboundHandler(() => {
         throw new Error('must not dispatch');
       });
@@ -849,7 +1023,151 @@ describe('IPC text attachments', () => {
   );
 });
 
+describe('real Go/Node arbitrary byte attachments', () => {
+  const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
+  let fixtureRoot: string;
+  let binary: string;
+  beforeAll(async () => {
+    fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-binary-peer-'));
+    binary = path.join(
+      fixtureRoot,
+      process.platform === 'win32' ? 'peer.exe' : 'peer',
+    );
+    await promisify(execFile)(
+      'go',
+      ['build', '-o', binary, './internal/ipc/testdata/binary-peer'],
+      { cwd: repoRoot },
+    );
+  }, 120_000);
+  afterAll(() => {
+    if (fixtureRoot) fs.rmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  test.each([true, false])(
+    'preserves binary/text/empty attachments, shared memory: %s',
+    async (sharedMemory) => {
+      type Payload = { round: number; hashes: string[]; lengths: number[] };
+      const { child, client } = spawnIpcProcess({
+        binPath: binary,
+        goArgs: [],
+        sharedMemory,
+      });
+      const childClosed = new Promise<void>((resolve) =>
+        child.once('close', () => resolve()),
+      );
+      child.on('error', (error) => client.close(error));
+      child.once('exit', () => client.close());
+      const capabilities: SharedBytes[] = [];
+      const owned: Buffer[] = [];
+      const hashes: string[] = [];
+      let calls = 0;
+      const digest = (bytes: Buffer) =>
+        createHash('sha256').update(bytes).digest('hex');
+      client.setInboundHandler((message) => {
+        expect(message.kind).toBe('binaryAttachments');
+        const data = message.data as Payload;
+        expect(data.round).toBe(calls++);
+        expect(message.attachments).toHaveLength(4);
+        const buffers = message.attachments!.map(readAttachmentBytes);
+        expect(buffers.map(digest)).toEqual(data.hashes);
+        expect(buffers.map((value) => value.length)).toEqual(data.lengths);
+        expect(buffers[0].toString('utf8')).toBe(
+          '\ufeffarbitrary text: café 😀\r\n\u0000',
+        );
+        expect(buffers[1].length).toBe(0);
+        expect(buffers[2].length).toBe(0);
+        expect(buffers[3].length).toBeGreaterThan(16 * 1024 * 1024);
+        const binaryAttachment = message.attachments![3];
+        if (sharedMemory) {
+          if (
+            typeof binaryAttachment !== 'object' ||
+            binaryAttachment instanceof Uint8Array
+          )
+            throw new Error('real Go peer did not publish shared bytes');
+          capabilities.push(binaryAttachment);
+          // Changing a returned Buffer cannot mutate Go's published snapshot.
+          const changed = readAttachmentBytes(binaryAttachment);
+          changed[0] ^= 255;
+          expect(digest(readAttachmentBytes(binaryAttachment))).toBe(
+            data.hashes[3],
+          );
+          expect(digest(changed)).not.toBe(data.hashes[3]);
+        } else {
+          expect(Buffer.isBuffer(binaryAttachment)).toBe(true);
+          expect(typeof message.attachments![0]).toBe('string');
+        }
+        owned.push(buffers[3]);
+        hashes.push(data.hashes[3]);
+        return {
+          round: data.round,
+          hashes: buffers.map(digest),
+          lengths: buffers.map((value) => value.length),
+        };
+      });
+      client.start();
+      try {
+        for (const round of [0, 1]) {
+          const response = await client.sendRequest<unknown, Payload>(
+            'startBinary',
+            { round },
+          );
+          expect(response.data!.round).toBe(round);
+          expect(calls).toBe(round + 1); // One application call, even across slots.
+          for (const capability of capabilities) {
+            expect(() => readAttachmentBytes(capability)).toThrow('expired');
+          }
+          // Revocation and the next Go publication do not affect owned copies.
+          expect(owned.map(digest)).toEqual(hashes);
+        }
+        expect(hashes[0]).not.toBe(hashes[1]);
+      } finally {
+        client.close();
+        child.kill();
+        await childClosed;
+      }
+      expect(owned.map(digest)).toEqual(hashes);
+    },
+    120_000,
+  );
+});
+
 describe('encode/decode round-trip', () => {
+  test('rejects an oversized outbound frame before writing and keeps the client usable', async () => {
+    const pair = pairClients();
+    const byteLength = Buffer.byteLength;
+    let writes = 0;
+    pair.streams.aToB.on('data', () => {
+      writes++;
+    });
+    pair.b.setInboundHandler(() => ({ ok: true }));
+    pair.a.start();
+    pair.b.start();
+    let rejected: Promise<unknown>;
+    try {
+      // Stub only the size measurement, avoiding a >256 MiB test allocation.
+      // The real serializer, pending map, frame writer and recovery all run.
+      Buffer.byteLength = (value, encoding) =>
+        typeof value === 'string' && value.includes('oversizeProbe')
+          ? 256 * 1024 * 1024 + 1
+          : byteLength(value, encoding);
+      rejected = pair.a.sendRequest('oversizeProbe', {});
+    } finally {
+      Buffer.byteLength = byteLength;
+    }
+    try {
+      await expect(rejected!).rejects.toThrow('exceeds cap');
+      expect(writes).toBe(0);
+      expect(
+        (pair.a as unknown as { pending: Map<number, unknown> }).pending.size,
+      ).toBe(0);
+      expect(pair.a.isClosed).toBe(false);
+      expect((await pair.a.sendRequest('normal', {})).data).toEqual({
+        ok: true,
+      });
+    } finally {
+      pair.cleanup();
+    }
+  });
   test('encodes a basic message', () => {
     const msg: IpcMessage = { kind: 'init', id: 1, data: { hello: 'world' } };
     const frame = encodeFrame(msg);
@@ -1692,26 +2010,26 @@ describe('IpcClient terminal cleanup', () => {
     async ({ ending, closeThrows }) => {
       const input = new PassThrough();
       const output = new PassThrough();
-      const sources = createSourceTransport();
-      const client = new IpcClient(input, output, { sourceTransport: sources });
+      const memory = createMemoryTransport();
+      const client = new IpcClient(input, output, { memoryTransport: memory });
       let completed = 0;
       const completedSession = client.done.then((reason) => {
         completed++;
         // Completion observes fully detached streams and released storage.
         expect(closeCalls).toBe(1);
         expect(input.listenerCount('data')).toBe(0);
-        expect(sources.fd()).toBeUndefined();
+        expect(memory.fd()).toBeUndefined();
         return reason;
       });
       const reason = new Error('test termination');
-      const closeSources = sources.close;
+      const closeMemory = memory.close;
       const write = output.write;
       let closeCalls = 0;
-      sources.close = () => {
+      memory.close = () => {
         closeCalls++;
         // Teardown is already sealed if native cleanup reenters the client.
         client.close(new Error('reentrant close'));
-        closeSources();
+        closeMemory();
         if (closeThrows) throw new Error('native cleanup failed');
       };
       let requests = 0;
@@ -1726,7 +2044,7 @@ describe('IpcClient terminal cleanup', () => {
             encodeFrame({
               kind: 'response',
               id: frame.id,
-              data: SOURCE_CONFIG,
+              data: MEMORY_CONFIG,
             }),
           );
         } else if (++requests === 2) {
@@ -1800,7 +2118,7 @@ describe('IpcClient terminal cleanup', () => {
         expect(completed).toBe(1);
         expect(client.isClosed).toBe(true);
         expect(closeCalls).toBe(1);
-        expect(sources.fd()).toBeUndefined();
+        expect(memory.fd()).toBeUndefined();
         for (const event of ['data', 'end', 'close', 'error']) {
           expect(input.listenerCount(event)).toBe(0);
         }
@@ -1823,7 +2141,7 @@ describe('IpcClient terminal cleanup', () => {
       } finally {
         output.write = write;
         client.close();
-        closeSources();
+        closeMemory();
         input.destroy();
         output.destroy();
       }
