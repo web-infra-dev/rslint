@@ -1,6 +1,7 @@
 // Upstream: https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/jsx-tag-spacing.js
 // Retain the upstream parser cases below. tsgo cannot parse `< /Tag>`, so
 // only those inputs are filtered out; the Go suite records the same skips.
+// Intentional differences for unsafe fixes and proportional spacing are noted below.
 import { RuleTester } from '../rule-tester';
 
 // generate options object that disables checks other than the tested one
@@ -105,14 +106,6 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
           foo={bar}
           blat
         >
-          hello
-        </App>
-      `,
-      options: beforeClosingOptions('proportional-always'),
-    },
-    {
-      code: `
-        <App foo={bar}>
           hello
         </App>
       `,
@@ -273,6 +266,21 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
 
   invalid: [
     {
+      // Upstream accepts this, but single-line opening tags require spacing.
+      code: `
+        <App foo={bar}>
+          hello
+        </App>
+      `,
+      output: `
+        <App foo={bar} >
+          hello
+        </App>
+      `,
+      errors: [{ messageId: 'beforeCloseNeedSpace' }],
+      options: beforeClosingOptions('proportional-always'),
+    },
+    {
       code: '<App/>',
       output: '<App />',
       options: beforeSelfClosingOptions('always'),
@@ -428,7 +436,8 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
     },
     {
       code: '<App prop="foo"></App>',
-      output: '<App prop="foo">< /App>',
+      // Upstream inserts `< /App>`; rslint omits this unparseable fix.
+      output: null,
       errors: [{ messageId: 'closeSlashNeedSpace' }],
       options: closingSlashOptions('always'),
       features: ['no-ts'],

@@ -37,6 +37,14 @@ func TestJsxTagSpacingExtras(t *testing.T) {
 		{Code: "<App /\u2029>", Tsx: true, Options: map[string]any{"closingSlash": "always"}},
 		// A multiline string is a single token even with a `this` member tag name.
 		{Code: "<this.Button value=\"first\nsecond\" ></this.Button>", Tsx: true, Options: map[string]any{"beforeClosing": "never"}},
+		// Proportional spacing is stable once a single-line opening tag has a space.
+		{Code: "<App ></App>", Tsx: true, Options: map[string]any{"beforeClosing": "proportional-always"}},
+		{Code: "<App value={x}  ></App>", Tsx: true, Options: map[string]any{"beforeClosing": "proportional-always"}},
+		// Type arguments do not move the spacing check away from the closing bracket.
+		{Code: "<App<T> />", Tsx: true},
+		{Code: "<App<T>/>", Tsx: true, Options: map[string]any{"beforeSelfClosing": "never"}},
+		{Code: "<App<T>/>", Tsx: true, Options: map[string]any{"beforeSelfClosing": "allow"}},
+		{Code: "<App<\nT>\n/>", Tsx: true, Options: map[string]any{"beforeSelfClosing": "proportional-always"}},
 	}, []rule_tester.InvalidTestCase{
 		// The scanner skips these line separators without returning newline trivia.
 		{Code: "<\u2028App />", Tsx: true, Output: []string{"<App />"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -103,13 +111,15 @@ func TestJsxTagSpacingExtras(t *testing.T) {
 		{Code: "<App value={\n thing\n}></App>", Tsx: true, Options: []any{map[string]any{"closingSlash": "allow", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "proportional-always"}}, Output: []string{"<App value={\n thing\n}\n></App>"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "beforeCloseNeedNewline", Message: "A newline is required before closing bracket", Line: 3, Column: 2, EndLine: 3, EndColumn: 2},
 		}},
-		// Upstream inserts another space on every pass for this single-line
-		// proportional case; preserve its behavior through the ten-pass fix limit.
-		{Code: "<App ></App>", Tsx: true, Options: []any{map[string]any{"closingSlash": "allow", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "proportional-always"}}, Output: []string{"<App  ></App>", "<App   ></App>", "<App    ></App>", "<App     ></App>", "<App      ></App>", "<App       ></App>", "<App        ></App>", "<App         ></App>", "<App          ></App>", "<App           ></App>"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "beforeCloseNeedSpace", Message: "Whitespace is required before closing bracket", Line: 1, Column: 5, EndLine: 1, EndColumn: 6},
+		// A single-line proportional fix inserts one space and then stops.
+		{Code: "<App></App>", Tsx: true, Options: map[string]any{"beforeClosing": "proportional-always"}, Output: []string{"<App ></App>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "beforeCloseNeedSpace", Message: "Whitespace is required before closing bracket", Line: 1, Column: 5, EndLine: 1, EndColumn: 5},
+		}},
+		{Code: "<App value={x}></App>", Tsx: true, Options: map[string]any{"beforeClosing": "proportional-always"}, Output: []string{"<App value={x} ></App>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "beforeCloseNeedSpace", Message: "Whitespace is required before closing bracket", Line: 1, Column: 15, EndLine: 1, EndColumn: 15},
 		}},
 		// Proportional closing tags can require a newline.
-		{Code: "<App></\nApp>", Tsx: true, Options: []any{map[string]any{"closingSlash": "allow", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "proportional-always"}}, Output: []string{"<App></\nApp\n>"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "<App ></\nApp>", Tsx: true, Options: []any{map[string]any{"closingSlash": "allow", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "proportional-always"}}, Output: []string{"<App ></\nApp\n>"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "beforeCloseNeedNewline", Message: "A newline is required before closing bracket", Line: 2, Column: 4, EndLine: 2, EndColumn: 4},
 		}},
 		// Multiline member names use start and end lines separately.
@@ -125,9 +135,24 @@ func TestJsxTagSpacingExtras(t *testing.T) {
 		{Code: "<\u00a0App />", Tsx: true, Options: []any{}, Output: []string{"<App />"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "afterOpenNoSpace", Message: "A space is forbidden after opening bracket", Line: 1, Column: 1, EndLine: 1, EndColumn: 3},
 		}},
-		// Type arguments retain upstream name-to-next-token semantics.
-		{Code: "<App<T>/>", Tsx: true, Options: []any{}, Output: []string{"<App <T>/>"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "beforeSelfCloseNeedSpace", Message: "A space is required before closing bracket", Line: 1, Column: 5, EndLine: 1, EndColumn: 5},
+		// Spacing belongs after type arguments, not between the name and `<T>`.
+		{Code: "<App<T>/>", Tsx: true, Output: []string{"<App<T> />"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "beforeSelfCloseNeedSpace", Message: "A space is required before closing bracket", Line: 1, Column: 8, EndLine: 1, EndColumn: 8},
+		}},
+		{Code: "<App<T> />", Tsx: true, Options: map[string]any{"beforeSelfClosing": "never"}, Output: []string{"<App<T>/>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "beforeSelfCloseNoSpace", Message: "A space is forbidden before closing bracket", Line: 1, Column: 9, EndLine: 1, EndColumn: 9},
+		}},
+		{Code: "<UI.App<Outer<T>>/>", Tsx: true, Output: []string{"<UI.App<Outer<T>> />"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "beforeSelfCloseNeedSpace", Message: "A space is required before closing bracket", Line: 1, Column: 18, EndLine: 1, EndColumn: 18},
+		}},
+		{Code: "<App<T /* > */>/* note *//>", Tsx: true, Output: []string{"<App<T /* > */>/* note */ />"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "beforeSelfCloseNeedSpace", Message: "A space is required before closing bracket", Line: 1, Column: 26, EndLine: 1, EndColumn: 26},
+		}},
+		{Code: "<App<\nT>/>", Tsx: true, Options: map[string]any{"beforeSelfClosing": "proportional-always"}, Output: []string{"<App<\nT>\n/>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "beforeSelfCloseNeedNewline", Message: "A newline is required before closing bracket", Line: 2, Column: 3, EndLine: 2, EndColumn: 3},
+		}},
+		{Code: "<App<T>></App>", Tsx: true, Options: map[string]any{"beforeClosing": "proportional-always"}, Output: []string{"<App<T> ></App>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "beforeCloseNeedSpace", Message: "Whitespace is required before closing bracket", Line: 1, Column: 8, EndLine: 1, EndColumn: 8},
 		}},
 		// Type arguments do not replace the final attribute.
 		{Code: "<App<T> value={(thing as T)}/>", Tsx: true, Options: []any{}, Output: []string{"<App<T> value={(thing as T)} />"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -173,15 +198,15 @@ func collectDiagnostics(t *testing.T, code string, options any, demand rule.Edit
 	return diagnostics
 }
 
-func TestJsxTagSpacingClosingSlashFix(t *testing.T) {
-	// These two upstream cases have a supported input but an output that tsgo
-	// cannot parse. Verify the original diagnostics and edits without parsing the output.
+func TestJsxTagSpacingClosingSlashFixSafety(t *testing.T) {
+	// Keep the diagnostic, but never turn a valid closing tag into `< /Tag>`.
 	for _, test := range []struct {
-		code, output string
-		start        int
+		code  string
+		start int
 	}{
-		{"<App prop=\"foo\"></App>", "<App prop=\"foo\">< /App>", 16},
-		{"<Goodbye></Goodbye>", "<Goodbye>< /Goodbye>", 9},
+		{"<App></App>", 5},
+		{"<App prop=\"foo\"></App>", 16},
+		{"<Goodbye></Goodbye>", 9},
 	} {
 		diagnostics := collectDiagnostics(t, test.code, map[string]any{
 			"closingSlash": "always", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "allow",
@@ -191,10 +216,11 @@ func TestJsxTagSpacingClosingSlashFix(t *testing.T) {
 		assert.Equal(t, diagnostic.Message.Id, "closeSlashNeedSpace")
 		assert.Equal(t, diagnostic.Message.Description, "Whitespace is required between `<` and `/`; write `< /`")
 		assert.Equal(t, diagnostic.Range, core.NewTextRange(test.start, test.start+2))
-		assert.Assert(t, slices.Equal(diagnostic.Fixes(), []rule.RuleFix{{Range: core.NewTextRange(test.start+1, test.start+1), Text: " "}}))
+		assert.Equal(t, len(diagnostic.Fixes()), 0)
 		assert.Assert(t, diagnostic.Suggestions == nil)
-		output, _, _ := linter.ApplyRuleFixes(test.code, diagnostics)
-		assert.Equal(t, output, test.output)
+		output, _, fixed := linter.ApplyRuleFixes(test.code, diagnostics)
+		assert.Equal(t, output, test.code)
+		assert.Assert(t, !fixed)
 	}
 }
 

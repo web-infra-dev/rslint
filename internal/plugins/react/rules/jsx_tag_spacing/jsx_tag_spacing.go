@@ -79,6 +79,11 @@ var JsxTagSpacingRule = rule.Rule{
 				}
 			case "always":
 				if !spaced(left, right) {
+					if prefix == "closeSlash" {
+						// Inserting whitespace into `</` would produce invalid TSX.
+						ctx.ReportRange(loc, rule.RuleMessage{Id: "closeSlashNeedSpace", Description: messages["closeSlashNeedSpace"]})
+						return
+					}
 					report(prefix+"NeedSpace", loc, insert(right.Pos()), " ")
 				}
 			}
@@ -128,6 +133,12 @@ var JsxTagSpacingRule = rule.Rule{
 			left := nameRange
 			if attrs := reactutil.GetJsxElementAttributes(node); len(attrs) > 0 {
 				left = utils.TrimNodeTextRange(sf, attrs[len(attrs)-1])
+			} else if !closing {
+				if typeArgs := node.TypeArgumentList(); typeArgs != nil {
+					// The parser's boundary identifies the outer `>`, including
+					// nested types and comments containing other angle brackets.
+					left = scanner.GetRangeOfTokenAtPosition(sf, typeArgs.End())
+				}
 			}
 			if selfClosing {
 				option = config["beforeSelfClosing"]
@@ -172,10 +183,8 @@ var JsxTagSpacingRule = rule.Rule{
 			}
 			if option == "never" && !adjacent {
 				report(prefix+"NoSpace", loc, core.NewTextRange(left.End(), right.Pos()), "")
-			} else if (option == "always" || selfClosing && option == "proportional-always") && adjacent {
+			} else if (option == "always" || !closing && option == "proportional-always") && adjacent {
 				report(prefix+"NeedSpace", loc, insert(right.Pos()), " ")
-			} else if option == "proportional-always" && !closing && !selfClosing && adjacent == multiline {
-				report("beforeCloseNeedSpace", loc, insert(right.Pos()), " ")
 			}
 		}
 		return rule.RuleListeners{

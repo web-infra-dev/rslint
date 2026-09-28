@@ -36,8 +36,6 @@ func TestJsxTagSpacingUpstream(t *testing.T) {
 		{Code: "<App foo />", Tsx: true, Options: []any{map[string]any{"closingSlash": "allow", "beforeSelfClosing": "proportional-always", "afterOpening": "allow", "beforeClosing": "allow"}}},
 		// Upstream valid 11.
 		{Code: "\n        <App\n          foo={bar}\n          blat\n        >\n          hello\n        </App>\n      ", Tsx: true, Options: []any{map[string]any{"closingSlash": "allow", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "proportional-always"}}},
-		// Upstream valid 12.
-		{Code: "\n        <App foo={bar}>\n          hello\n        </App>\n      ", Tsx: true, Options: []any{map[string]any{"closingSlash": "allow", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "proportional-always"}}},
 		// Upstream valid 13.
 		{Code: "\n        <App\n          foo={bar}\n        />\n      ", Tsx: true, Options: []any{map[string]any{"closingSlash": "allow", "beforeSelfClosing": "proportional-always", "afterOpening": "allow", "beforeClosing": "allow"}}},
 		// Upstream valid 14.
@@ -92,6 +90,11 @@ func TestJsxTagSpacingUpstream(t *testing.T) {
 		// Upstream valid 38.
 		{Code: "< App / >", Tsx: true, Options: []any{map[string]any{"closingSlash": "always", "beforeSelfClosing": "always", "afterOpening": "always", "beforeClosing": "always"}}},
 	}, []rule_tester.InvalidTestCase{
+		// Upstream valid 12: rslint requires spacing on single-line opening tags
+		// instead of preserving upstream's inverted proportional condition.
+		{Code: "\n        <App foo={bar}>\n          hello\n        </App>\n      ", Tsx: true, Options: []any{map[string]any{"closingSlash": "allow", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "proportional-always"}}, Output: []string{"\n        <App foo={bar} >\n          hello\n        </App>\n      "}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "beforeCloseNeedSpace", Message: "Whitespace is required before closing bracket", Line: 2, Column: 23, EndLine: 2, EndColumn: 23},
+		}},
 		// Upstream invalid 1.
 		{Code: "<App/>", Tsx: true, Options: []any{map[string]any{"closingSlash": "allow", "beforeSelfClosing": "always", "afterOpening": "allow", "beforeClosing": "allow"}}, Output: []string{"<App />"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "beforeSelfCloseNeedSpace", Message: "A space is required before closing bracket", Line: 1, Column: 5, EndLine: 1, EndColumn: 5},
@@ -167,9 +170,8 @@ func TestJsxTagSpacingUpstream(t *testing.T) {
 				{MessageId: "closeSlashNoSpace", Message: "Whitespace is forbidden between `<` and `/`; write `</`", Line: 2, Column: 30, EndLine: 3, EndColumn: 10},
 			}},
 		// Upstream invalid 19.
-		// The upstream fix produces `< /Tag>`, which tsgo cannot reparse.
-		// The diagnostic and edit are covered by TestJsxTagSpacingClosingSlashFix.
-		{Code: "<App prop=\"foo\"></App>", Tsx: true, Skip: true, Options: []any{map[string]any{"closingSlash": "always", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "allow"}}, Output: []string{"<App prop=\"foo\">< /App>"}, Errors: []rule_tester.InvalidTestCaseError{
+		// Upstream fixes to `<App prop="foo">< /App>`; rslint omits the unsafe fix.
+		{Code: "<App prop=\"foo\"></App>", Tsx: true, Options: []any{map[string]any{"closingSlash": "always", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "allow"}}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "closeSlashNeedSpace", Message: "Whitespace is required between `<` and `/`; write `< /`", Line: 1, Column: 17, EndLine: 1, EndColumn: 19},
 		}},
 		// Upstream invalid 20.
@@ -320,9 +322,8 @@ func TestJsxTagSpacingDocumentation(t *testing.T) {
 			{MessageId: "selfCloseSlashNeedSpace", Message: "Whitespace is required between `/` and `>`; write `/ >`", Line: 1, Column: 7, EndLine: 1, EndColumn: 9},
 		}},
 		// Documentation invalid 5.
-		// The upstream fix produces `< /Tag>`, which tsgo cannot reparse.
-		// The diagnostic and edit are covered by TestJsxTagSpacingClosingSlashFix.
-		{Code: "<Goodbye></Goodbye>", Tsx: true, Skip: true, Options: []any{map[string]any{"closingSlash": "always", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "allow"}}, Output: []string{"<Goodbye>< /Goodbye>"}, Errors: []rule_tester.InvalidTestCaseError{
+		// Upstream fixes to `<Goodbye>< /Goodbye>`; rslint omits the unsafe fix.
+		{Code: "<Goodbye></Goodbye>", Tsx: true, Options: []any{map[string]any{"closingSlash": "always", "beforeSelfClosing": "allow", "afterOpening": "allow", "beforeClosing": "allow"}}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "closeSlashNeedSpace", Message: "Whitespace is required between `<` and `/`; write `< /`", Line: 1, Column: 10, EndLine: 1, EndColumn: 12},
 		}},
 		// Documentation invalid 6.
