@@ -710,6 +710,7 @@ define.test({
     './tests/eslint-plugin-jest/rules/require-hook.test.ts',
     './tests/eslint-plugin-jest/rules/require-to-throw-message.test.ts',
     './tests/eslint-plugin-jest/rules/require-top-level-describe.test.ts',
+    './tests/eslint-plugin-jest/rules/unbound-method.test.ts',
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
     './tests/eslint-plugin-jest/rules/valid-expect.test.ts',
     './tests/eslint-plugin-jest/rules/valid-expect-in-promise.test.ts',

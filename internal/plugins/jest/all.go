@@ -63,6 +63,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_hook"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_to_throw_message"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_top_level_describe"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/unbound_method"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_describe_callback"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect_in_promise"
@@ -135,6 +136,7 @@ func GetAllRules() []rule.Rule {
 		require_hook.RequireHookRule,
 		require_to_throw_message.RequireToThrowMessageRule,
 		require_top_level_describe.RequireTopLevelDescribeRule,
+		unbound_method.UnboundMethodRule,
 		valid_describe_callback.ValidDescribeCallbackRule,
 		valid_expect.ValidExpectRule,
 		valid_expect_in_promise.ValidExpectInPromiseRule,
