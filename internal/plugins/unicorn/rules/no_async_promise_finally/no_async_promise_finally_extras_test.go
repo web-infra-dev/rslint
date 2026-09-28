@@ -1,7 +1,6 @@
 package no_async_promise_finally_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -34,6 +33,8 @@ func TestNoAsyncPromiseFinallyExtras(t *testing.T) {
 			invalid("const run = async function cleanup() { promise.finally(cleanup); };", "cleanup"),
 			invalid("promise.finally((async () => {}));", "async () => {}"),
 			invalid("const cleanup = async () => {}; promise.finally((cleanup));", "cleanup"),
+			invalidTS("type Callback = () => void; promise.finally(((async () => {}) as Callback));", "(async () => {}) as Callback"),
+			invalidTS("type Callback = () => void; promise.finally(((async () => {}) satisfies Callback));", "(async () => {}) satisfies Callback"),
 			invalidTS("type Callback = () => void; promise.finally((async () => {})!);", "(async () => {})!"),
 			invalidTS("type Callback = () => void; promise.finally(<Callback>(async () => {}));", "<Callback>(async () => {})"),
 			invalidTS("type Callback = () => void; const cleanup = (async () => {}) satisfies Callback; promise.finally(cleanup);", "cleanup"),
@@ -47,7 +48,7 @@ func TestNoAsyncPromiseFinallyExtras(t *testing.T) {
 
 func TestNoAsyncPromiseFinallySourceOnly(t *testing.T) {
 	code := "const method = \"finally\"; const cleanup = async () => {}; promise[method](cleanup); async function declared() {} promise.finally(declared); const run = async function named() { promise.finally(named); };"
-	diagnostics := lintNoAsyncPromiseFinallySourceOnly(t, code)
+	diagnostics := lintNoAsyncPromiseFinally(t, code, false)
 	if len(diagnostics) != 3 {
 		t.Fatalf("project:false diagnostics = %d, want 3: %+v", len(diagnostics), diagnostics)
 	}
@@ -58,35 +59,116 @@ func TestNoAsyncPromiseFinallySourceOnly(t *testing.T) {
 	}
 }
 
-func lintNoAsyncPromiseFinallySourceOnly(t *testing.T, code string) []rule.RuleDiagnostic {
-	t.Helper()
-	dir := tspath.NormalizePath(t.TempDir())
-	fileName := tspath.NormalizePath(filepath.Join(dir, "file.js"))
-	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{fileName: code})
-	program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
-		RootFileNames:   []string{fileName},
-		Host:            utils.CreateCompilerHost(dir, fs),
-		CompilerOptions: &core.CompilerOptions{Target: core.ScriptTargetESNext},
-		SingleThreaded:  true,
-	})
-	if err != nil {
-		t.Fatalf("create project:false program: %v", err)
+func TestNoAsyncPromiseFinallyJSDocRanges(t *testing.T) {
+	for _, mode := range []struct {
+		name      string
+		typeAware bool
+	}{
+		{name: "source-only"},
+		{name: "type-aware", typeAware: true},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			for _, testCase := range []struct {
+				name       string
+				code       string
+				reportText string
+			}{
+				{
+					name:       "type-cast-arrow",
+					code:       "promise.finally(/** @type {() => Promise<void>} */ (((async () => {}))));",
+					reportText: "async () => {}",
+				},
+				{
+					name:       "type-cast-reference",
+					code:       "const cleanup = async () => {}; promise.finally(/** @type {() => Promise<void>} */ ((cleanup)));",
+					reportText: "cleanup",
+				},
+				{
+					name:       "satisfies-cast-arrow",
+					code:       "promise.finally(/** @satisfies {() => Promise<void>} */ (((async () => {}))));",
+					reportText: "async () => {}",
+				},
+				{
+					name: "disabled-type-cast-arrow",
+					code: "promise.finally(\n  /** @type {() => Promise<void>} */ (\n    (\n      // eslint-disable-next-line unicorn/no-async-promise-finally\n      async () => {}\n    )\n  )\n);",
+				},
+				{
+					name: "disabled-type-cast-reference",
+					code: "const cleanup = async () => {};\npromise.finally(\n  /** @type {() => Promise<void>} */ (\n    (\n      // eslint-disable-next-line unicorn/no-async-promise-finally\n      cleanup\n    )\n  )\n);",
+				},
+				{
+					name: "disabled-satisfies-cast-arrow",
+					code: "promise.finally(\n  /** @satisfies {() => Promise<void>} */ (\n    (\n      // eslint-disable-next-line unicorn/no-async-promise-finally\n      async () => {}\n    )\n  )\n);",
+				},
+			} {
+				t.Run(testCase.name, func(t *testing.T) {
+					diagnostics := lintNoAsyncPromiseFinally(t, testCase.code, mode.typeAware)
+					if testCase.reportText == "" {
+						if len(diagnostics) != 0 {
+							t.Fatalf("disabled callback produced %d diagnostics, want 0", len(diagnostics))
+						}
+						return
+					}
+					if len(diagnostics) != 1 {
+						t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+					}
+					diagnostic := diagnostics[0]
+					if diagnostic.Message.Id != "no-async-promise-finally" {
+						t.Fatalf("message id = %q", diagnostic.Message.Id)
+					}
+					if got := testCase.code[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.reportText {
+						t.Errorf("reported text = %q, want %q", got, testCase.reportText)
+					}
+				})
+			}
+		})
 	}
-	if program.CanProvideTypeChecker(program.SourceFiles()[0]) {
-		t.Fatal("project:false fixture unexpectedly received a TypeChecker")
+}
+
+func lintNoAsyncPromiseFinally(t *testing.T, code string, typeAware bool) []rule.RuleDiagnostic {
+	t.Helper()
+	var program *lintprogram.Program
+	var fileName string
+	if typeAware {
+		root := fixtures.GetRootDir()
+		fileName = tspath.ResolvePath(root.Dir, "case.js")
+		fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
+		compiled, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", utils.CreateCompilerHost(root.Dir, fs))
+		if err != nil {
+			t.Fatalf("create type-aware program: %v", err)
+		}
+		program = lintprogram.NewFromCompiler(compiled)
+	} else {
+		dir := tspath.NormalizePath(t.TempDir())
+		fileName = tspath.ResolvePath(dir, "case.js")
+		fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{fileName: code})
+		var err error
+		program, err = lintprogram.NewFromRoots(lintprogram.RootOptions{
+			RootFileNames:   []string{fileName},
+			Host:            utils.CreateCompilerHost(dir, fs),
+			CompilerOptions: &core.CompilerOptions{Target: core.ScriptTargetESNext},
+			SingleThreaded:  true,
+		})
+		if err != nil {
+			t.Fatalf("create project:false program: %v", err)
+		}
+	}
+	if got := program.CanProvideTypeChecker(program.GetSourceFile(fileName)); got != typeAware {
+		t.Fatalf("CanProvideTypeChecker = %v, want %v", got, typeAware)
 	}
 
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program: program,
-		File:    fileName,
+		Program:     program,
+		File:        fileName,
+		HasTypeInfo: typeAware,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     no_async_promise_finally.NoAsyncPromiseFinallyRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
-					if ctx.TypeChecker != nil {
-						t.Fatal("project:false fixture unexpectedly received a TypeChecker")
+					if got := ctx.TypeChecker != nil; got != typeAware {
+						t.Fatalf("TypeChecker available = %v, want %v", got, typeAware)
 					}
 					return no_async_promise_finally.NoAsyncPromiseFinallyRule.Run(ctx, nil)
 				},
