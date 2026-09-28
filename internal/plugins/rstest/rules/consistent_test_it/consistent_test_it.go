@@ -1,73 +1,36 @@
 package consistent_test_it
 
 import (
-	_ "embed"
-	"fmt"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/consistent_test_it"
 )
-
-//go:embed consistent_test_it.schema.json
-var schemaJSON []byte
-
-func parseOptions(options []any) (outside, inside string) {
-	outside, inside = "test", "it"
-	if len(options) == 0 {
-		return
-	}
-	config, _ := options[0].(map[string]any)
-	if value, ok := config["fn"].(string); ok && (value == "test" || value == "it") {
-		outside, inside = value, value
-	}
-	if value, ok := config["withinDescribe"].(string); ok && (value == "test" || value == "it") {
-		inside = value
-	}
-	return
-}
 
 // ConsistentTestItRule follows the option and call-diagnostic contract of
 // eslint-plugin-jest v29.16.1 and @vitest/eslint-plugin v1.6.27. Imports are
 // dependencies of call fixes, not standalone violations: unused imports and
 // references outside registrations do not express a test naming convention.
-var ConsistentTestItRule = rule.Rule{
-	Name:   "rstest/consistent-test-it",
-	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		outside, inside := parseOptions(options)
+var ConsistentTestItRule = shared.NewRule(shared.Config{
+	Name: "rstest/consistent-test-it",
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		scan := &shadowScan{shadowed: utils.NewShadowCache(ctx.SourceFile)}
-		// Both listeners resolve registrations through the same filter so a
-		// shadowed `describe` cannot unbalance the suite depth counter.
-		registration := func(node *ast.Node) *rstestUtils.ParsedRstestFnCall {
-			parsed := analysis.ParseFnCall(node)
-			if parsed == nil || scan.isShadowedRegistration(ctx, parsed) {
-				return nil
-			}
-			return parsed
-		}
-		depth := 0
-		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := registration(node)
-				if parsed == nil {
-					return
+		return shared.Runtime{
+			// Entry and exit resolve registrations through the same filter so a
+			// shadowed `describe` cannot unbalance the suite depth counter.
+			Parse: func(node *ast.Node) *testFramework.ParsedCall {
+				parsed := analysis.ParseFnCall(node)
+				if parsed == nil || scan.isShadowedRegistration(ctx, parsed) {
+					return nil
 				}
-				if parsed.Kind == rstestUtils.RstestFnTypeDescribe {
-					depth++
-					return
-				}
-				if parsed.Kind != rstestUtils.RstestFnTypeTest || parsed.IsPlaywright {
-					return
-				}
-				preferred := outside
-				id, key, suffix := "consistentMethod", "testKeyword", ""
-				if depth > 0 {
-					preferred = inside
-					id, key, suffix = "consistentMethodWithinDescribe", "testKeywordWithinDescribe", " within describe"
+				return &parsed.ParsedCall
+			},
+			Check: func(node *ast.Node, parsed *testFramework.ParsedCall, preferred string) (*ast.Node, string, bool) {
+				if analysis.ParseFnCall(node).IsPlaywright {
+					return nil, "", false
 				}
 				actual := parsed.Name
 				root, original := parsed.Head.Local.Node, parsed.Head.Original.Node
@@ -78,27 +41,18 @@ var ConsistentTestItRule = rule.Rule{
 					actual = parsed.LocalName
 				}
 				if actual == preferred {
-					return
+					return nil, "", false
 				}
-				message := rule.RuleMessage{
-					Id:          id,
-					Description: fmt.Sprintf("Prefer using '%s' instead of '%s'%s", preferred, actual, suffix),
-					Data:        map[string]string{key: preferred, "oppositeTestKeyword": actual},
-				}
-				ctx.ReportNodeWithDeferredFixes(node.AsCallExpression().Expression, message, func() []rule.RuleFix {
-					return callFixes(ctx, node, parsed, preferred)
-				})
+				return node.AsCallExpression().Expression, actual, true
 			},
-			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
-				if parsed := registration(node); parsed != nil && parsed.Kind == rstestUtils.RstestFnTypeDescribe {
-					depth--
-				}
+			Fix: func(node *ast.Node, parsed *testFramework.ParsedCall, preferred string) []rule.RuleFix {
+				return callFixes(ctx, node, parsed, preferred)
 			},
 		}
 	},
-}
+})
 
-func callFixes(ctx rule.RuleContext, node *ast.Node, parsed *rstestUtils.ParsedRstestFnCall, preferred string) []rule.RuleFix {
+func callFixes(ctx rule.RuleContext, node *ast.Node, parsed *testFramework.ParsedCall, preferred string) []rule.RuleFix {
 	root, original := parsed.Head.Local.Node, parsed.Head.Original.Node
 	// Namespace accessors are at this call site. An alias's original node is
 	// in its declaration; rewriting it would affect other registrations too.

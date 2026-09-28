@@ -241,3 +241,55 @@ func TestJestCallAnalysisUsesFileSettings(t *testing.T) {
 		t.Fatalf("aliased global parse = %#v", parsed)
 	}
 }
+
+// TestParseJestFnCallChainBoundaries locks in eslint-plugin-jest v29.16.6's
+// chain checks for non-expect calls. want lists the parsed kind of every call
+// in source order, "" for a call that is not a Jest call.
+func TestParseJestFnCallChainBoundaries(t *testing.T) {
+	for _, test := range []struct {
+		source string
+		want   []JestFnType
+	}{
+		{`describe("a", fn);`, []JestFnType{JestFnTypeDescribe}},
+		{`describe("a", fn).foo;`, []JestFnType{""}},
+		{`(describe("a", fn)).foo;`, []JestFnType{""}},
+		{`describe("a", fn)?.foo;`, []JestFnType{""}},
+		{`describe("a", fn)["foo"];`, []JestFnType{""}},
+		{`wrap(describe("a", fn));`, []JestFnType{"", ""}},
+		{`describe("a", fn)!.foo;`, []JestFnType{JestFnTypeDescribe}},
+		{`(describe("a", fn) as any).foo;`, []JestFnType{JestFnTypeDescribe}},
+		{`describe("a", fn)();`, []JestFnType{JestFnTypeDescribe, ""}},
+		{`describe("a", fn).only("b", fn);`, []JestFnType{"", ""}},
+		{`it("a").only("b");`, []JestFnType{"", ""}},
+		{`beforeEach(fn).foo;`, []JestFnType{""}},
+		{`jest.fn().mockReturnValue(1);`, []JestFnType{JestFnTypeJest, ""}},
+		{`expect(value).toBe(1);`, []JestFnType{JestFnTypeExpect, ""}},
+		{`it.each([])("a", fn);`, []JestFnType{JestFnTypeTest, ""}},
+		{"it.each``(\"a\", fn);", []JestFnType{JestFnTypeTest}},
+		{`it.fails("a", fn);`, []JestFnType{""}},
+		{`test.skip.fails("a", fn);`, []JestFnType{""}},
+		{`it.skip.failing.each([])("a", fn);`, []JestFnType{JestFnTypeTest, ""}},
+		{`xtest.failing.each([])("a", fn);`, []JestFnType{JestFnTypeTest, ""}},
+		{`test.concurrent.failing("a", fn);`, []JestFnType{JestFnTypeTest}},
+	} {
+		t.Run(test.source, func(t *testing.T) {
+			file := parseJestAnalysisFixture(test.source)
+			analysis := GetJestCallAnalysis(rule.RuleContext{
+				SourceFile: file,
+			}.WithFileCache(rule.NewFileCache()))
+			calls := jestAnalysisCalls(file)
+			if len(calls) != len(test.want) {
+				t.Fatalf("fixture has %d calls, want %d", len(calls), len(test.want))
+			}
+			for index, call := range calls {
+				var got JestFnType
+				if parsed := analysis.ParseFnCall(call); parsed != nil {
+					got = parsed.Kind
+				}
+				if got != test.want[index] {
+					t.Errorf("call %d kind = %q, want %q", index, got, test.want[index])
+				}
+			}
+		})
+	}
+}

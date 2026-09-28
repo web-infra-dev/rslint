@@ -72,6 +72,9 @@ func parseJestFnCallWithReason(node *ast.Node, ctx rule.RuleContext) jestCallPar
 	if kind != JestFnTypeExpect && kind != JestFnTypeJest && !isValidJestCall(name, members) {
 		return jestCallParseResult{}
 	}
+	if kind != JestFnTypeExpect && !isOutermostJestCall(node, memberEntries) {
+		return jestCallParseResult{}
+	}
 
 	parsed := &ParsedJestFnCall{
 		ParsedCall: testFramework.ParsedCall{
@@ -319,6 +322,22 @@ func isInvalidTaggedTemplateCall(callExpr *ast.CallExpression, members []string)
 	}
 
 	return len(members) == 0 || members[len(members)-1] != "each"
+}
+
+// isOutermostJestCall reports whether node is a whole Jest call rather than one
+// link of a longer chain, matching the last two checks of eslint-plugin-jest's
+// parseJestFnCall for everything but `expect`. Every link except the last must
+// be accessed as a member, so `describe('a', fn).only('b')` is not a chain, and
+// node itself must not be called or accessed, so `x().y.z()` does not parse
+// `x()`.
+func isOutermostJestCall(node *ast.Node, entries []ParsedJestFnMemberEntry) bool {
+	for _, entry := range entries[:len(entries)-1] {
+		if !IsMemberAccessNode(internalUtils.ESTreeParent(entry.Node)) {
+			return false
+		}
+	}
+	parent := internalUtils.ESTreeParent(node)
+	return parent == nil || (parent.Kind != ast.KindCallExpression && !IsMemberAccessNode(parent))
 }
 
 func isValidJestCall(name string, members []string) bool {
