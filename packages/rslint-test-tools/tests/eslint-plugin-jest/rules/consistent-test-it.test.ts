@@ -94,7 +94,8 @@ ruleTester.run('consistent-test-it', {} as never, {
     },
     {
       code: 'import { it } from \'@jest/globals\';\n\nit("foo")',
-      output: 'import { it } from \'@jest/globals\';\n\ntest("foo")',
+      // Differs from upstream, which calls the new name without importing it.
+      output: 'import { test, it } from \'@jest/globals\';\n\ntest("foo")',
       options: [{ fn: 'test' }],
       errors: [
         {
@@ -109,8 +110,9 @@ ruleTester.run('consistent-test-it', {} as never, {
     },
     {
       code: 'import { it as testThisThing } from \'@jest/globals\';\n\ntestThisThing("foo")',
+      // Differs from upstream, which calls the new name without importing it.
       output:
-        'import { it as testThisThing } from \'@jest/globals\';\n\ntest("foo")',
+        'import { test, it as testThisThing } from \'@jest/globals\';\n\ntest("foo")',
       options: [{ fn: 'test' }],
       errors: [
         {
@@ -487,8 +489,9 @@ ruleTester.run('consistent-test-it', {} as never, {
     },
     {
       code: 'import { xtest as dontTestThis } from \'@jest/globals\';\n\ndescribe("suite", () => { dontTestThis("foo") });',
+      // Differs from upstream, which calls the new name without importing it.
       output:
-        'import { xtest as dontTestThis } from \'@jest/globals\';\n\ndescribe("suite", () => { xit("foo") });',
+        'import { xit, xtest as dontTestThis } from \'@jest/globals\';\n\ndescribe("suite", () => { xit("foo") });',
       options: [{ fn: 'test', withinDescribe: 'it' }],
       errors: [
         {
@@ -503,8 +506,9 @@ ruleTester.run('consistent-test-it', {} as never, {
     },
     {
       code: 'import { describe as context, xtest as dontTestThis } from \'@jest/globals\';\n\ncontext("suite", () => { dontTestThis("foo") });',
+      // Differs from upstream, which calls the new name without importing it.
       output:
-        'import { describe as context, xtest as dontTestThis } from \'@jest/globals\';\n\ncontext("suite", () => { xit("foo") });',
+        'import { describe as context, xit, xtest as dontTestThis } from \'@jest/globals\';\n\ncontext("suite", () => { xit("foo") });',
       options: [{ fn: 'test', withinDescribe: 'it' }],
       errors: [
         {

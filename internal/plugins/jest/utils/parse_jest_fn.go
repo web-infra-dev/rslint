@@ -26,7 +26,7 @@ const (
 	ExpectParseReasonMatcherNotFound  = "matcher-not-found"
 	ExpectParseReasonMatcherNotCalled = "matcher-not-called"
 	ExpectParseReasonModifierUnknown  = "modifier-unknown"
-	jestGlobalsModule                 = "@jest/globals"
+	JestGlobalsModule                 = "@jest/globals"
 )
 
 func parseJestFnCallWithReason(node *ast.Node, ctx rule.RuleContext) jestCallParseResult {
@@ -247,7 +247,7 @@ func findExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
 }
 
 func resolveJestFunctionReference(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
-	return ResolveFunctionReferenceForModule(node, localName, localNode, ctx, jestGlobalsModule)
+	return ResolveFunctionReferenceForModule(node, localName, localNode, ctx, JestGlobalsModule)
 }
 
 // ResolveFunctionReferenceForModule is the Jest-facing adapter for shared

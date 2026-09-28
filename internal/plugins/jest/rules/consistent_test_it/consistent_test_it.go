@@ -31,15 +31,20 @@ var ConsistentTestItRule = shared.NewRule(shared.Config{
 				return utils.ESTreeRuntimeExpression(node.AsCallExpression().Expression), oppositeKeyword(preferred), true
 			},
 			Fix: func(node *ast.Node, parsed *testFramework.ParsedCall, preferred string) []rule.RuleFix {
-				// Replace only the root identifier, whatever it is bound as. A
-				// chain such as `it.only.each` keeps its modifiers; every Jest
-				// chain with more than one member starts with `it` or `test`,
-				// and each one has a counterpart under the other name.
+				// Replace only the root identifier. A chain such as
+				// `it.only.each` keeps its modifiers; every Jest chain with more
+				// than one member starts with `it` or `test`, and each one has a
+				// counterpart under the other name.
 				root := parsed.Head.Local.Node
 				if root == nil || root.Kind != ast.KindIdentifier {
 					return nil
 				}
-				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, root, preferredName(parsed.Name, preferred))}
+				text := preferredName(parsed.Name, preferred)
+				name, _, _ := strings.Cut(text, ".")
+				return shared.RespellFixes(ctx, shared.Respell{
+					Root: root, Symbol: ctx.Refs.Resolve(root), Global: parsed.Head.Type == jestUtils.JEST_GLOBAL_MODE,
+					Text: text, Name: name, IsModule: isJestGlobalsModule,
+				})
 			},
 		}
 	},
@@ -60,4 +65,8 @@ func oppositeKeyword(keyword string) string {
 		return "it"
 	}
 	return "test"
+}
+
+func isJestGlobalsModule(module string) bool {
+	return module == jestUtils.JestGlobalsModule
 }

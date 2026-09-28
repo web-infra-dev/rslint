@@ -33,12 +33,14 @@ func TestConsistentTestItUpstream(t *testing.T) {
 				},
 				{
 					Code: "import { it } from '@jest/globals';\n\nit(\"foo\")", Options: map[string]any{"fn": "test"},
-					Output: []string{"import { it } from '@jest/globals';\n\ntest(\"foo\")"},
+					// Differs from upstream, which calls the new name without importing it.
+					Output: []string{"import { test, it } from '@jest/globals';\n\ntest(\"foo\")"},
 					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 3, Column: 1, EndLine: 3, EndColumn: 3}},
 				},
 				{
 					Code: "import { it as testThisThing } from '@jest/globals';\n\ntestThisThing(\"foo\")", Options: map[string]any{"fn": "test"},
-					Output: []string{"import { it as testThisThing } from '@jest/globals';\n\ntest(\"foo\")"},
+					// Differs from upstream, which calls the new name without importing it.
+					Output: []string{"import { test, it as testThisThing } from '@jest/globals';\n\ntest(\"foo\")"},
 					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 3, Column: 1, EndLine: 3, EndColumn: 14}},
 				},
 				{
@@ -194,12 +196,14 @@ func TestConsistentTestItUpstream(t *testing.T) {
 				},
 				{
 					Code: "import { xtest as dontTestThis } from '@jest/globals';\n\ndescribe(\"suite\", () => { dontTestThis(\"foo\") });", Options: map[string]any{"fn": "test", "withinDescribe": "it"},
-					Output: []string{"import { xtest as dontTestThis } from '@jest/globals';\n\ndescribe(\"suite\", () => { xit(\"foo\") });"},
+					// Differs from upstream, which calls the new name without importing it.
+					Output: []string{"import { xit, xtest as dontTestThis } from '@jest/globals';\n\ndescribe(\"suite\", () => { xit(\"foo\") });"},
 					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethodWithinDescribe", Message: "Prefer using 'it' instead of 'test' within describe", Line: 3, Column: 27, EndLine: 3, EndColumn: 39}},
 				},
 				{
 					Code: "import { describe as context, xtest as dontTestThis } from '@jest/globals';\n\ncontext(\"suite\", () => { dontTestThis(\"foo\") });", Options: map[string]any{"fn": "test", "withinDescribe": "it"},
-					Output: []string{"import { describe as context, xtest as dontTestThis } from '@jest/globals';\n\ncontext(\"suite\", () => { xit(\"foo\") });"},
+					// Differs from upstream, which calls the new name without importing it.
+					Output: []string{"import { describe as context, xit, xtest as dontTestThis } from '@jest/globals';\n\ncontext(\"suite\", () => { xit(\"foo\") });"},
 					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethodWithinDescribe", Message: "Prefer using 'it' instead of 'test' within describe", Line: 3, Column: 26, EndLine: 3, EndColumn: 38}},
 				},
 				{

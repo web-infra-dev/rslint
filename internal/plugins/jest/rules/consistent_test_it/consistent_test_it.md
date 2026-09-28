@@ -78,6 +78,8 @@ describe('foo', function () {
 
 ## Differences from upstream
 
+The diagnostics are the same as upstream. The fix differs in three ways.
+
 When a test call has more than one member after its name, the fix keeps all of them. Upstream drops every member except the last:
 
 ```js
@@ -87,7 +89,25 @@ it.only.each([1])('foo', (n) => {});
 // upstream: test.each([1])('foo', (n) => {});
 ```
 
-The diagnostics are the same as upstream.
+When the call comes from an `@jest/globals` import, the fix also imports the new name, or reuses an existing import of it. Upstream calls the new name without importing it, which fails when `injectGlobals` is `false`:
+
+```js
+/* rslint jest/consistent-test-it: ["error", { "fn": "test" }] */
+import { it } from '@jest/globals';
+it('foo');
+// rslint:   import { test, it } from '@jest/globals'; test('foo');
+// upstream: import { it } from '@jest/globals'; test('foo');
+```
+
+No fix is offered when the new name would not reach the Jest API: when a local variable, parameter or other declaration with that name is in scope, when the file already declares it some other way (such as an import from another module), or when the call comes from a CommonJS `require` of `@jest/globals`. Upstream calls whatever that name refers to:
+
+```js
+/* rslint jest/consistent-test-it: ["error", { "fn": "test" }] */
+function run() {
+  const test = () => {};
+  it('foo'); // reported, not fixed; upstream fixes it to call the local `test`
+}
+```
 
 ## Original Documentation
 

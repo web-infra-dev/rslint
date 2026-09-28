@@ -14,7 +14,8 @@ import (
 )
 
 // Diagnostics below match eslint-plugin-jest v29.16.6 run with
-// @typescript-eslint/parser. Outputs match too, except in the "chain" subtest.
+// @typescript-eslint/parser. Outputs match too, except in the "chain" and
+// "fix" subtests and where a case says otherwise.
 func TestConsistentTestItExtras(t *testing.T) {
 	// ESTree/tsgo shape differences: parentheses, computed and optional access, type arguments, assertions and non-registrations.
 	t.Run("shape", func(t *testing.T) {
@@ -176,27 +177,31 @@ func TestConsistentTestItExtras(t *testing.T) {
 			[]rule_tester.InvalidTestCase{
 				{
 					Code: "import { it } from '@jest/globals';\nit('x')", Options: map[string]any{"fn": "test"},
-					Output: []string{"import { it } from '@jest/globals';\ntest('x')"},
+					// Differs from upstream, which calls the new name without importing it.
+					Output: []string{"import { test, it } from '@jest/globals';\ntest('x')"},
 					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 3}},
 				},
 				{
 					Code: "import { it as t } from '@jest/globals';\nt.only('x')", Options: map[string]any{"fn": "test"},
-					Output: []string{"import { it as t } from '@jest/globals';\ntest.only('x')"},
+					// Differs from upstream, which calls the new name without importing it.
+					Output: []string{"import { test, it as t } from '@jest/globals';\ntest.only('x')"},
 					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 7}},
 				},
 				{
 					Code: "import { fit as t } from '@jest/globals';\nt('x')", Options: map[string]any{"fn": "test"},
-					Output: []string{"import { fit as t } from '@jest/globals';\ntest.only('x')"},
+					// Differs from upstream, which calls the new name without importing it.
+					Output: []string{"import { test, fit as t } from '@jest/globals';\ntest.only('x')"},
 					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 2}},
 				},
 				{
 					Code: "import { xit as t } from '@jest/globals';\nt.each([])('x')", Options: map[string]any{"fn": "test"},
-					Output: []string{"import { xit as t } from '@jest/globals';\nxtest.each([])('x')"},
+					// Differs from upstream, which calls the new name without importing it.
+					Output: []string{"import { xtest, xit as t } from '@jest/globals';\nxtest.each([])('x')"},
 					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 11}},
 				},
 				{
 					Code: "const { it } = require('@jest/globals');\nit('x')", Options: map[string]any{"fn": "test"},
-					Output: []string{"const { it } = require('@jest/globals');\ntest('x')"},
+					// No fix: upstream calls `test` without requiring it.
 					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 3}},
 				},
 				{
@@ -312,6 +317,73 @@ func TestConsistentTestItExtras(t *testing.T) {
 			},
 		)
 	})
+	// The new name must reach the Jest API at the call: a local binding of it,
+	// or a file-level one that is not a plain @jest/globals import, withholds
+	// the fix, and an import gains the name when it is missing.
+	t.Run("fix", func(t *testing.T) {
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &consistent_test_it.ConsistentTestItRule,
+			[]rule_tester.ValidTestCase{},
+			[]rule_tester.InvalidTestCase{
+				{
+					Code:   "function f() {\n  const test = () => {};\n  it('works');\n}",
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 3, Column: 3, EndLine: 3, EndColumn: 5}},
+				},
+				{
+					Code:   "const test = () => {};\nit('works');",
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 3}},
+				},
+				{
+					Code:   "function test() {}\nit('works');",
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 3}},
+				},
+				{
+					Code:   "for (const test of []) {\n  it('works');\n}",
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 3, EndLine: 2, EndColumn: 5}},
+				},
+				{
+					Code:   "{\n  let test;\n  it('works');\n}",
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 3, Column: 3, EndLine: 3, EndColumn: 5}},
+				},
+				{
+					Code:   "const xtest = 1; xit('works');",
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 18, EndLine: 1, EndColumn: 21}},
+				},
+				{
+					Code:   "import { fit } from '@jest/globals';\nfunction g(test) {\n  fit('works');\n}",
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 3, Column: 3, EndLine: 3, EndColumn: 6}},
+				},
+				{
+					Code:   "describe('s', () => {\n  const it = 1;\n  test('works');\n})",
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethodWithinDescribe", Message: "Prefer using 'it' instead of 'test' within describe", Line: 3, Column: 3, EndLine: 3, EndColumn: 7}},
+				},
+				{
+					Code:   "import { test, it } from '@jest/globals';\nit('works');",
+					Output: []string{"import { test, it } from '@jest/globals';\ntest('works');"},
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 3}},
+				},
+				{
+					Code:   "import { it } from '@jest/globals';\nimport { test } from 'vitest';\nit('works');",
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 3, Column: 1, EndLine: 3, EndColumn: 3}},
+				},
+				{
+					Code:   "import { it } from '@jest/globals';\nimport type { test } from '@jest/globals';\nit('works');",
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 3, Column: 1, EndLine: 3, EndColumn: 3}},
+				},
+				{
+					Code: "import { it } from '@jest/globals';\nit('a');\nit('b');",
+					// Both fixes insert at one point, so the second applies in the next pass
+					// and reuses the import the first one added.
+					Output: []string{"import { test, it } from '@jest/globals';\ntest('a');\nit('b');", "import { test, it } from '@jest/globals';\ntest('a');\ntest('b');"},
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 3}, {MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 3, Column: 1, EndLine: 3, EndColumn: 3}},
+				},
+				{
+					Code:   "import { describe, test } from '@jest/globals';\ndescribe('s', () => {\n  test('works');\n});",
+					Output: []string{"import { describe, it, test } from '@jest/globals';\ndescribe('s', () => {\n  it('works');\n});"},
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethodWithinDescribe", Message: "Prefer using 'it' instead of 'test' within describe", Line: 3, Column: 3, EndLine: 3, EndColumn: 7}},
+				},
+			},
+		)
+	})
 	// Chains with more than one member keep every modifier. Upstream rewrites the whole object and drops them (it.only.each becomes test.each); rslint replaces only the root.
 	t.Run("chain", func(t *testing.T) {
 		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &consistent_test_it.ConsistentTestItRule,
@@ -344,7 +416,7 @@ func TestConsistentTestItExtras(t *testing.T) {
 				},
 				{
 					Code: "import { it as t } from '@jest/globals';\nt.only.each([])('x')", Options: map[string]any{"fn": "test"},
-					Output: []string{"import { it as t } from '@jest/globals';\ntest.only.each([])('x')"},
+					Output: []string{"import { test, it as t } from '@jest/globals';\ntest.only.each([])('x')"},
 					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 16}},
 				},
 				{
