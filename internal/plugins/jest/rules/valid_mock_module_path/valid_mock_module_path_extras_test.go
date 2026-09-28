@@ -55,6 +55,16 @@ func TestValidMockModulePathExtras(t *testing.T) {
 			{Code: `jest.mock("node:test")`, FileName: testFile},
 			// Subpath imports come from the package that owns the linted file.
 			{Code: `jest.mock("#fixture-module")`, FileName: testFile},
+			// A fallback array skips every entry that is not a valid target, as Node does.
+			{Code: `jest.mock("x-null-fallback")`, FileName: testFile},
+			{Code: `jest.mock("x-false-fallback")`, FileName: testFile},
+			{Code: `jest.mock("x-nested-null")`, FileName: testFile},
+			{Code: `jest.mock("x-invalid-fallback")`, FileName: testFile},
+			{Code: `jest.mock("x-condition-fallback")`, FileName: testFile},
+			{Code: `jest.mock("x-require-null")`, FileName: testFile},
+			{Code: `jest.mock("x-nested-array")`, FileName: testFile},
+			{Code: `jest.mock("x-pattern/sub/x.js")`, FileName: testFile},
+			{Code: `jest.mock("x-pattern-ext/ext/x")`, FileName: testFile},
 
 			// ---- Only a string literal names the module ----
 			{Code: "jest.mock(`./missing`)", FileName: testFile},
@@ -125,6 +135,24 @@ func TestValidMockModulePathExtras(t *testing.T) {
 			{Code: `jest.mock("")`, FileName: testFile, Errors: invalidAt(1)},
 			{Code: `jest.mock("#absent")`, FileName: testFile, Errors: invalidAt(1)},
 			{Code: `jest.mock("#undefined-import")`, FileName: testFile, Errors: invalidAt(1)},
+			// An `exports` or `imports` target must name an existing file exactly.
+			{Code: `jest.mock("x-extensionless")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("x-pattern/sub/x")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("x-directory")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("x-directory-bare")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("#extensionless")`, FileName: testFile, Errors: invalidAt(1)},
+			// The first valid target is final even when its file is missing.
+			{Code: `jest.mock("x-missing-first")`, FileName: testFile, Errors: invalidAt(1)},
+			// `?` and `#` are part of the path, not a query or fragment.
+			{Code: `jest.mock("fs?raw")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("node:fs#x")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("eslint?x")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("./fixtures/module/foo?x")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("./fixtures/module/foo.ts#x")`, FileName: testFile, Errors: invalidAt(1)},
+			// A POSIX backslash is a filename character, not a separator.
+			{Code: `jest.mock(".\\fixtures\\module\\foo")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("./fixtures\\module")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("legacy-main\\lib\\deep\\file.json")`, FileName: testFile, Errors: invalidAt(1)},
 			// A directory with no index or package entry is not a module.
 			{Code: `jest.mock("/")`, FileName: testFile, Errors: invalidAt(1)},
 

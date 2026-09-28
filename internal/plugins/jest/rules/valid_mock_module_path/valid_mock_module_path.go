@@ -21,10 +21,12 @@ var defaultModuleFileExtensions = []string{".js", ".ts", ".tsx", ".jsx", ".json"
 
 // requireResolveOptions selects what Node's `require.resolve` accepts: its
 // default extensions and the CommonJS export conditions, with package
-// `exports` enforced.
+// `exports` enforced by Node's rules. A `?` or `#` is part of the path.
 var requireResolveOptions = moduleresolver.Options{
-	Extensions: []string{".js", ".json", ".node"},
-	Conditions: []string{"node", "require"},
+	Extensions:   []string{".js", ".json", ".node"},
+	Conditions:   []string{"node", "require"},
+	NodeExports:  true,
+	LiteralPaths: true,
 }
 
 func buildInvalidMockModulePathMessage(moduleName string) rule.RuleMessage {
@@ -161,7 +163,14 @@ func localModuleExists(sourceProgram *program.Program, fileName, specifier strin
 	if fs == nil {
 		return true
 	}
-	base := tspath.ResolvePath(tspath.GetDirectoryPath(fileName), specifier)
+	directory := tspath.GetDirectoryPath(fileName)
+	// A POSIX backslash is a filename character, which the filesystem paths
+	// used here cannot represent: they would read it as a separator and find a
+	// different file.
+	if strings.Contains(specifier, `\`) && tspath.GetRootLength(directory) == 1 {
+		return false
+	}
+	base := tspath.ResolvePath(directory, specifier)
 	if tspath.GetRootLength(base) < len(base) {
 		base = tspath.RemoveTrailingDirectorySeparator(base)
 	}

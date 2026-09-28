@@ -1,6 +1,8 @@
 # Upstream's module fixtures, the three installed packages its cases name
 # (with their published `exports` maps), and extra packages for the extras suite.
 # Tests lint src/rules/__tests__/valid-mock-module-path.test.ts.
+# The x-* packages hold `exports` shapes whose results were checked against Node's
+# require.resolve.
 -- src/rules/__tests__/fixtures/module/bar.css --
 .bar-container {
   padding: 16px;
@@ -66,4 +68,58 @@ export {};
 -- src/rules/node_modules/nested-only/index.js --
 module.exports = {};
 -- package.json --
-{"name":"fixture-root","imports":{"#fixture-module":"./src/rules/__tests__/fixtures/module/foo.js","#absent":"./src/absent.js"}}
+{"name":"fixture-root","imports":{"#fixture-module":"./src/rules/__tests__/fixtures/module/foo.js","#absent":"./src/absent.js","#extensionless":"./src/rules/__tests__/fixtures/module/foo"}}
+-- node_modules/x-extensionless/package.json --
+{"name":"x-extensionless","exports":"./entry"}
+-- node_modules/x-extensionless/entry.js --
+module.exports = {};
+-- node_modules/x-null-fallback/package.json --
+{"name":"x-null-fallback","exports":[null,"./entry.js"]}
+-- node_modules/x-null-fallback/entry.js --
+module.exports = {};
+-- node_modules/x-missing-first/package.json --
+{"name":"x-missing-first","exports":["./missing.js","./entry.js"]}
+-- node_modules/x-missing-first/entry.js --
+module.exports = {};
+-- node_modules/x-condition-fallback/package.json --
+{"name":"x-condition-fallback","exports":[{"import":"./x.mjs"},"./entry.js"]}
+-- node_modules/x-condition-fallback/entry.js --
+module.exports = {};
+-- node_modules/x-false-fallback/package.json --
+{"name":"x-false-fallback","exports":[false,"./entry.js"]}
+-- node_modules/x-false-fallback/entry.js --
+module.exports = {};
+-- node_modules/x-invalid-fallback/package.json --
+{"name":"x-invalid-fallback","exports":["bad","./entry.js"]}
+-- node_modules/x-invalid-fallback/entry.js --
+module.exports = {};
+-- node_modules/x-nested-null/package.json --
+{"name":"x-nested-null","exports":{".":[null,"./entry.js"]}}
+-- node_modules/x-nested-null/entry.js --
+module.exports = {};
+-- node_modules/x-pattern/package.json --
+{"name":"x-pattern","exports":{"./sub/*":"./lib/*"}}
+-- node_modules/x-pattern/lib/x.js --
+module.exports = {};
+-- node_modules/x-directory/package.json --
+{"name":"x-directory","exports":"./dir/"}
+-- node_modules/x-directory/dir/index.js --
+module.exports = {};
+-- node_modules/x-pattern-ext/package.json --
+{"name":"x-pattern-ext","exports":{".":"./entry.js","./ext/*":"./lib/*.js"}}
+-- node_modules/x-pattern-ext/entry.js --
+module.exports = {};
+-- node_modules/x-pattern-ext/lib/x.js --
+module.exports = {};
+-- node_modules/x-require-null/package.json --
+{"name":"x-require-null","exports":[{"require":null},"./entry.js"]}
+-- node_modules/x-require-null/entry.js --
+module.exports = {};
+-- node_modules/x-nested-array/package.json --
+{"name":"x-nested-array","exports":[[null],"./entry.js"]}
+-- node_modules/x-nested-array/entry.js --
+module.exports = {};
+-- node_modules/x-directory-bare/package.json --
+{"name":"x-directory-bare","exports":"./dir"}
+-- node_modules/x-directory-bare/dir/index.js --
+module.exports = {};

@@ -44,6 +44,11 @@ type Options struct {
 	// Local imports disable directory lookup unless entry options enable it.
 	// Require callers retain the ordinary Node directory lookup.
 	NoDirectory bool `json:"noDirectory"`
+	// NodeExports applies Node's own `exports`/`imports` target rules instead
+	// of enhanced-resolve's: a target must name an existing file exactly, with
+	// no extension or directory lookup, and a fallback array skips every entry
+	// that is not a valid target, including null and other non-string values.
+	NodeExports bool `json:"nodeExports,omitempty"`
 }
 
 // DefaultExtensions returns the runtime lookup defaults in search order.
@@ -386,8 +391,14 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 		// Relative imports maps honor extension aliases; package main and
 		// exports targets retain their explicitly selected extensions.
 		applyAlias := strings.HasPrefix(f.request, "#") && f.importsTarget == ""
-		resolved = f.probe(target, applyAlias)
-		if resolved == "" && !f.options.NoDirectory && !f.fullySpecified && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
+		// Node accepts an exports or imports target only as an existing file.
+		exactTarget := f.options.NodeExports && strings.HasSuffix(physical, nodeExportSuffix)
+		if exactTarget {
+			resolved = f.probeFile(target)
+		} else {
+			resolved = f.probe(target, applyAlias)
+		}
+		if resolved == "" && !exactTarget && !f.options.NoDirectory && !f.fullySpecified && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
 			// enhanced-resolve permits directory exports. Ask tsgo to resolve
 			// their main/index using its regular relative-directory traversal.
 			// Guard package main cycles before creating a nested resolver.
@@ -484,7 +495,7 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 		}
 		if imports := value.Find("/imports"); imports != nil {
 			filterNodeConditions(imports, f.options.Conditions)
-			markNodeImportTargets(imports, f.options.Conditions)
+			markNodeImportTargets(imports, f.options)
 			if entries, ok := imports.Value.(*hujson.Object); ok && f.importsFile == "" && strings.HasPrefix(f.request, "#") {
 				f.recordImports(entries, f.physical(name))
 			}
@@ -516,7 +527,7 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 						f.exportsFile = f.physical(name)
 					}
 					filterNodeConditions(&member.Value, f.options.Conditions)
-					if !prepareNodeExports(&member.Value, f.options.Conditions) {
+					if !prepareNodeExports(&member.Value, f.options) {
 						// A blocked selection must retain an exports map: a bare
 						// null field permits tsgo's legacy main/index fallback.
 						member.Value.Value = &hujson.Object{Members: []hujson.ObjectMember{{
@@ -585,7 +596,7 @@ func (f *nodeResolutionFS) recordImports(entries *hujson.Object, fileName string
 
 // Let tsgo select imports-map keys and conditions, including redirects to Node
 // builtins that have no file for a compiler resolver to find.
-func markNodeImportTargets(value *hujson.Value, conditions []string) {
+func markNodeImportTargets(value *hujson.Value, options Options) {
 	switch v := value.Value.(type) {
 	case hujson.Literal:
 		if v.Kind() == '"' {
@@ -602,15 +613,15 @@ func markNodeImportTargets(value *hujson.Value, conditions []string) {
 		}
 	case *hujson.Object:
 		for i := range v.Members {
-			markNodeImportTargets(&v.Members[i].Value, conditions)
+			markNodeImportTargets(&v.Members[i].Value, options)
 		}
 	case *hujson.Array:
-		if !prepareNodeExports(value, conditions) {
+		if !prepareNodeExports(value, options) {
 			value.Value = &hujson.Array{}
 			return
 		}
 		for i := range v.Elements {
-			markNodeImportTargets(&v.Elements[i], conditions)
+			markNodeImportTargets(&v.Elements[i], options)
 			if target, ok := v.Elements[i].Value.(hujson.Literal); ok && target.Kind() == '"' && !tspath.IsExternalModuleNameRelative(target.String()) {
 				// Package targets stop on resolution failure just like the
 				// marked file targets; tsgo must not try a later array entry.
@@ -627,11 +638,13 @@ func markNodeImportTargets(value *hujson.Value, conditions []string) {
 // tsgo owns exports paths, patterns and ordinary condition selection. Only
 // normalize enhanced-resolve's array behavior: primitive entries invalidate an
 // array; nested arrays and unmatched/null conditional entries are skipped.
-func prepareNodeExports(value *hujson.Value, conditions []string) bool {
+// NodeExports skips primitive entries as well, as Node does.
+func prepareNodeExports(value *hujson.Value, options Options) bool {
+	conditions := options.Conditions
 	switch object := value.Value.(type) {
 	case *hujson.Object:
 		for i := range object.Members {
-			if !prepareNodeExports(&object.Members[i].Value, conditions) {
+			if !prepareNodeExports(&object.Members[i].Value, options) {
 				object.Members[i].Value.Value = hujson.Literal("null")
 			}
 		}
@@ -641,6 +654,9 @@ func prepareNodeExports(value *hujson.Value, conditions []string) bool {
 			switch candidate := target.Value.(type) {
 			case hujson.Literal:
 				if candidate.Kind() != '"' {
+					if options.NodeExports {
+						continue
+					}
 					return false
 				}
 			case *hujson.Array:
@@ -655,7 +671,7 @@ func prepareNodeExports(value *hujson.Value, conditions []string) bool {
 					continue
 				}
 			}
-			if !prepareNodeExports(&target, conditions) {
+			if !prepareNodeExports(&target, options) {
 				return false
 			}
 			targets = append(targets, target)
