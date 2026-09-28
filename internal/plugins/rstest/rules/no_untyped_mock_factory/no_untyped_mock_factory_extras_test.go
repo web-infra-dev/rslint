@@ -19,7 +19,7 @@ func TestNoUntypedMockFactoryFixedOutputTypeChecks(t *testing.T) {
 	testCases := []struct {
 		name     string
 		code     string
-		want2347 bool
+		wantCode int
 	}{
 		{
 			name: "generic callee accepts fix",
@@ -30,7 +30,18 @@ rs.mock<typeof import('./async-mock-factories')>('./async-mock-factories', () =>
 			name: "any callee rejects fix",
 			code: `declare const rs: any;
 rs.mock<typeof import('./async-mock-factories')>('./async-mock-factories', () => ({}));`,
-			want2347: true,
+			wantCode: 2347,
+		},
+		{
+			name: "two required type parameters reject fix",
+			code: `declare const rs: { mock<T, U>(path: string, factory: () => Partial<T>): void };
+rs.mock<typeof import('./async-mock-factories')>('./async-mock-factories', () => ({}));`,
+			wantCode: 2558,
+		},
+		{
+			name: "defaulted second type parameter accepts fix",
+			code: `declare const rs: { mock<T, U = unknown>(path: string, factory: () => Partial<T>): void };
+rs.mock<typeof import('./async-mock-factories')>('./async-mock-factories', () => ({}));`,
 		},
 	}
 
@@ -40,14 +51,18 @@ rs.mock<typeof import('./async-mock-factories')>('./async-mock-factories', () =>
 			if err != nil {
 				t.Fatal(err)
 			}
-			found2347 := false
-			for _, diagnostic := range program.GetSemanticDiagnostics(context.Background(), file) {
-				if diagnostic.Code() == 2347 {
-					found2347 = true
+			diagnostics := program.GetSemanticDiagnostics(context.Background(), file)
+			found := false
+			for _, diagnostic := range diagnostics {
+				if int(diagnostic.Code()) == testCase.wantCode {
+					found = true
 				}
 			}
-			if found2347 != testCase.want2347 {
-				t.Fatalf("TS2347 present = %v, want %v", found2347, testCase.want2347)
+			if testCase.wantCode == 0 && len(diagnostics) != 0 {
+				t.Fatalf("unexpected semantic diagnostics: %v", diagnostics)
+			}
+			if testCase.wantCode != 0 && !found {
+				t.Fatalf("TS%d not found in diagnostics: %v", testCase.wantCode, diagnostics)
 			}
 		})
 	}
@@ -175,8 +190,14 @@ func TestNoUntypedMockFactoryExtras(t *testing.T) {
 			{Code: "import { rs } from '@rstest/core'; rs.mock('./service', () => ({}));", Output: []string{"import { rs } from '@rstest/core'; rs.mock<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
 			// Rstest literal receiver transformation
 			{Code: "const rs = { mock() {} }; rs.mock('./service', () => ({}));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
-			// A locally typed generic callee accepts the inserted type argument.
-			{Code: "declare const rs: { mock<T>(path: string, factory: () => T): void }; rs.mock('./service', () => ({}));", Output: []string{"declare const rs: { mock<T>(path: string, factory: () => T): void }; rs.mock<typeof import('./service')>('./service', () => ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
+			// A local receiver is transformed by Rstest, but its authored type
+			// is not the framework contract, so the diagnostic has no fix.
+			{Code: "declare const rs: { mock<T>(path: string, factory: () => T): void }; rs.mock('./service', () => ({}));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
+			{Code: "declare const rs: { mock<T, U>(path: string, factory: () => T): void }; rs.mock('./service', () => ({}));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
+			// Source-only cannot prove the signature left by an assertion.
+			{Code: "import { rs } from '@rstest/core'; (rs.mock as Function)('./service', () => ({}));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
+			{Code: "import { rs } from '@rstest/core'; type Erased = any; (rs.mock as Erased)('./service', () => ({}));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
+			{Code: "import { rs } from '@rstest/core'; (rs as { mock(path: string, factory: Function): void }).mock('./service', () => ({}));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock"}}},
 			// Declared factory
 			{Code: "function factory() { return {}; } rs.doMock('./service', factory);", Output: []string{"function factory() { return {}; } rs.doMock<typeof import('./service')>('./service', factory);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "addTypeParameterToModuleMock", Message: "Add a type parameter to the mock factory such as `typeof import('./service')`"}}},
 			// Callable parameter with type information
@@ -210,6 +231,7 @@ rs.doMockRequire('./early-service', earlyFactory);
 var earlyFactory = () => ({});
 var ordinaryFactory = () => ({});
 rs.mock('./hoisted-service', ordinaryFactory);
+(rs.mock as Function)('./asserted-service', () => ({}));
 rs.mock(modulePath, () => ({}));`, "edit-demand.ts", "tsconfig.json")
 	if err != nil {
 		t.Fatal(err)
@@ -240,7 +262,7 @@ rs.mock(modulePath, () => ({}));`, "edit-demand.ts", "tsconfig.json")
 				},
 				Consumer: rule.DiagnosticConsumer{Demand: demand, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},
 			})
-			if len(diagnostics) != 7 {
+			if len(diagnostics) != 8 {
 				t.Fatalf("typed=%v demand=%d: got %d diagnostics", typed, demand, len(diagnostics))
 			}
 			for i := range diagnostics {

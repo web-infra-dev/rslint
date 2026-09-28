@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_untyped_mock_factory"
 )
@@ -11,7 +12,7 @@ import (
 // Source: eslint-plugin-jest v29.16.6, no-untyped-mock-factory.
 var NoUntypedMockFactoryRule = shared.NewRule(shared.Config{
 	Name: "jest/no-untyped-mock-factory",
-	CanFixWithoutTypeInfo: func(ctx rule.RuleContext, node *ast.Node) bool {
+	CanFixCallee: func(ctx rule.RuleContext, node *ast.Node) bool {
 		parsed := jestUtils.GetJestCallAnalysis(ctx).ParseFnCall(node)
 		if parsed == nil || parsed.Head.Local.Node == nil || ctx.Refs == nil {
 			return false
@@ -20,11 +21,14 @@ var NoUntypedMockFactoryRule = shared.NewRule(shared.Config{
 		if symbol == nil {
 			return true
 		}
-		return testFramework.IsNamedESMImportSymbolModules(
+		if testFramework.IsNamedESMImportSymbolModules(
 			symbol,
 			[]string{"@jest/globals"},
 			[]string{"jest"},
-		)
+		) {
+			return true
+		}
+		return !utils.IsSymbolDeclaredInFile(symbol, ctx.SourceFile)
 	},
 	Candidates: func(ctx rule.RuleContext) func(*ast.Node) bool {
 		analysis := jestUtils.GetJestCallAnalysis(ctx)

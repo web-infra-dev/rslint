@@ -12,7 +12,7 @@ import (
 var NoUntypedMockFactoryRule = shared.NewRule(shared.Config{
 	Name:   "rstest/no-untyped-mock-factory",
 	Unwrap: utils.SkipAssertionsAndParens,
-	CanFixWithoutTypeInfo: func(ctx rule.RuleContext, node *ast.Node) bool {
+	CanFixCallee: func(ctx rule.RuleContext, node *ast.Node) bool {
 		utility := rstestUtils.ParseRstestPluginManagedCall(node)
 		if utility == nil || ctx.Refs == nil {
 			return false
@@ -21,11 +21,14 @@ var NoUntypedMockFactoryRule = shared.NewRule(shared.Config{
 		if symbol == nil {
 			return true
 		}
-		return testFramework.IsNamedESMImportSymbolModules(
+		if testFramework.IsNamedESMImportSymbolModules(
 			symbol,
 			rstestUtils.RstestCoreImportModules,
 			[]string{"rs", "rstest"},
-		)
+		) {
+			return true
+		}
+		return !utils.IsSymbolDeclaredInFile(symbol, ctx.SourceFile)
 	},
 	Candidates: func(ctx rule.RuleContext) func(*ast.Node) bool {
 		checkedWrites := map[*ast.Symbol]bool{}

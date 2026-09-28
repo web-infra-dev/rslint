@@ -13,10 +13,10 @@ type Config struct {
 	Name       string
 	Candidates func(rule.RuleContext) func(*ast.Node) bool
 	Unwrap     func(*ast.Node) *ast.Node
-	// CanFixWithoutTypeInfo proves that the framework callee accepts a type
-	// argument when the checker cannot answer. It runs only when fixes are
-	// requested; nil means diagnostics without source-only fixes.
-	CanFixWithoutTypeInfo func(rule.RuleContext, *ast.Node) bool
+	// CanFixCallee proves that the call reaches a framework binding whose
+	// declared generic contract this rule may edit. It runs only when fixes are
+	// requested; nil means diagnostics without fixes.
+	CanFixCallee func(rule.RuleContext, *ast.Node) bool
 }
 
 func NewRule(config Config) rule.Rule {
@@ -54,7 +54,7 @@ func NewRule(config Config) rule.Rule {
 					}
 					ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
 						if path == nil || path.Kind != ast.KindStringLiteral ||
-							!canInsertTypeArgument(ctx, node, call, config.CanFixWithoutTypeInfo) {
+							!canInsertTypeArgument(ctx, node, call, config.CanFixCallee) {
 							return nil
 						}
 						// An optional call places its type arguments AFTER `?.`.
@@ -75,9 +75,9 @@ func canInsertTypeArgument(
 	ctx rule.RuleContext,
 	node *ast.Node,
 	call *ast.CallExpression,
-	sourceOnly func(rule.RuleContext, *ast.Node) bool,
+	canFixCallee func(rule.RuleContext, *ast.Node) bool,
 ) bool {
-	if hasExplicitAnyAssertion(call.Expression) {
+	if canFixCallee == nil || !canFixCallee(ctx, node) {
 		return false
 	}
 	if ctx.TypeChecker != nil {
@@ -87,29 +87,29 @@ func canInsertTypeArgument(
 				return false
 			}
 			for _, signature := range utils.GetCallSignatures(ctx.TypeChecker, calleeType) {
-				if len(signature.TypeParameters()) > 0 {
+				typeParameters := signature.TypeParameters()
+				if len(typeParameters) >= 1 && ctx.TypeChecker.GetMinTypeArgumentCount(typeParameters) <= 1 {
 					return true
 				}
 			}
 			return false
 		}
 	}
-	return sourceOnly != nil && sourceOnly(ctx, node)
+	return !hasTypeAssertion(call.Expression)
 }
 
-func hasExplicitAnyAssertion(node *ast.Node) bool {
+func hasTypeAssertion(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
 	node = ast.SkipParentheses(node)
 	switch node.Kind {
 	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
-		return (node.Type() != nil && node.Type().Kind == ast.KindAnyKeyword) ||
-			hasExplicitAnyAssertion(node.Expression())
+		return true
 	case ast.KindSatisfiesExpression, ast.KindNonNullExpression:
-		return hasExplicitAnyAssertion(node.Expression())
+		return hasTypeAssertion(node.Expression())
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		return hasExplicitAnyAssertion(node.Expression())
+		return hasTypeAssertion(node.Expression())
 	default:
 		return false
 	}
