@@ -114,6 +114,8 @@ func TestNoUnresolvedExtras(t *testing.T) {
 		{Code: `import 'virtual/generated';`, Options: map[string]any{"ignore": []any{`(?<=virtual/)generated$`}}},
 		{Code: `require('ignored'); define(['ignored'], callback); import('ignored');`, Options: map[string]any{"commonjs": true, "amd": true, "ignore": []any{"^ignored$"}}},
 		{Code: `import 'node:fs/promises'; import '_http_agent'; import 'module';`},
+		{Code: `import '_stream_readable';`},
+		{Code: `import '_stream_readable';`, Settings: map[string]any{"import/resolver": "typescript"}},
 		{Code: `import 'exact/subpath';`, Settings: map[string]any{"import/core-modules": []any{"exact/subpath"}, "import/resolver": "missing"}},
 		{Code: `import 'entry-fallback'; import 'legacy-exports'; import './runtime.node'; import './unparsed.css';`},
 		{Code: `import './only-types';`, Settings: map[string]any{"import/resolver": "typescript"}},
@@ -133,6 +135,8 @@ func TestNoUnresolvedExtras(t *testing.T) {
 	add := func(code string, options any, settings map[string]any, names ...string) {
 		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: options, Settings: settings, Errors: unresolvedErrors(code, names...)})
 	}
+	add(`import '_stream_wrap'; import 'node:_stream_wrap';`, nil, nil, "_stream_wrap", "node:_stream_wrap")
+	add(`import '_stream_wrap'; import 'node:_stream_wrap';`, nil, map[string]any{"import/resolver": "typescript"}, "_stream_wrap", "node:_stream_wrap")
 	add(`(require)(('missing')); require?.('optional');`, map[string]any{"commonjs": true}, nil, "missing", "optional")
 	add(`/** @type {any} */ (require)('cast-callee'); require(/** @type {string} */ ('cast-source'));`, map[string]any{"commonjs": true}, nil, "cast-callee", "cast-source")
 	invalid[len(invalid)-1].FileName = "script.js"
