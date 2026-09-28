@@ -12,11 +12,48 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/api"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestAPIGenerationProviderReleasesInitialOwnership(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	initial := linter.Generation{Native: linter.NativeGeneration{Cwd: root}}
+	provider := &apiGenerationProvider{initial: &initial}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, _, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{}); !errors.Is(err, context.Canceled) || provider.initial == nil {
+		t.Fatalf("canceled acquisition changed initial ownership: %v", err)
+	}
+	generation, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+	if err != nil || release == nil || provider.initial == nil {
+		t.Fatalf("initial acquisition = release:%v error:%v", release != nil, err)
+	}
+	release()
+	release()
+	if provider.initial != nil || generation.Native.Cwd != root || initial.Native.Cwd != root {
+		t.Fatal("release retained initial ownership or changed published data")
+	}
+	var rebuilds int
+	wantErr := errors.New("rebuild failure")
+	provider.rebuild = func(_ context.Context, snapshot linter.SourceSnapshot) (linter.Generation, error) {
+		if !snapshot.Empty() {
+			t.Fatal("unexpected rebuild snapshot")
+		}
+		rebuilds++
+		return initial, wantErr
+	}
+	if _, _, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{}); !errors.Is(err, wantErr) {
+		t.Fatalf("rebuild error = %v", err)
+	}
+	wantErr = nil
+	if _, _, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{}); err != nil || rebuilds != 2 || provider.initial != nil {
+		t.Fatalf("released initial generation was reused: rebuilds=%d error=%v", rebuilds, err)
+	}
+}
 
 func TestHandleLint_FixReturnsFinalGeneration(t *testing.T) {
 	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))

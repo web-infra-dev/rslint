@@ -2,8 +2,10 @@ package utils
 
 import (
 	"context"
+	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
@@ -58,8 +60,10 @@ type localExports struct {
 	// locally re-exported namespace walks all of them, and the order matters
 	// because that walk builds their export maps along the way.
 	Imports []importedModule
-	// ImplicitDefault is available to default-import checks, but is not an
-	// authored name for enumeration or namespace-member checks.
+	// ImplicitDefault represents an `export =` assignment or CommonJS
+	// declaration available to default imports. Interop does not add a
+	// default to ordinary ES module exports.
+	// It is not an authored name for enumeration or namespace-member checks.
 	ImplicitDefault bool
 }
 
@@ -96,6 +100,9 @@ type exportStep struct {
 type exportLink struct {
 	Target   *ast.SourceFile
 	Resolved bool
+	// NodeDefault belongs to this import edge: native ES imports of CommonJS
+	// receive module.exports as default, even without esModuleInterop.
+	NodeDefault bool
 }
 
 type exportSpec struct {
@@ -122,7 +129,6 @@ func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceF
 	if sourceFile == nil || sourceFile.Statements == nil {
 		return local
 	}
-	local.ImplicitDefault = compilerOptionsESModuleInterop(sourceProgram) && sourceFileHasDirectNamespaceExport(sourceFile)
 
 	for _, stmt := range sourceFile.Statements.Nodes {
 		if stmt == nil {
@@ -132,6 +138,25 @@ func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceF
 			local.Imports = append(local.Imports, importBinding(sourceProgram, sourceFile, settings, stmt.AsImportDeclaration()))
 		}
 		local.appendStatement(sourceProgram, sourceFile, settings, stmt)
+	}
+
+	// CommonJS declarations can describe module.exports with named exports,
+	// without declaring a default. Unlike TS implementation files, they do
+	// not imply an emitted __esModule marker. Explicit ES module declarations
+	// and authored default/marker exports do not receive this fallback.
+	if !local.ImplicitDefault && sourceFile.IsDeclarationFile && compilerOptionsESModuleInterop(sourceProgram) &&
+		ast.GetImpliedNodeFormatForEmitWorker(sourceFile.FileName(), sourceProgram.Options().GetEmitModuleKind(), sourceProgram.SourceFileMetadata(sourceFile)) != core.ResolutionModeESM {
+		local.ImplicitDefault = true
+		for _, step := range local.Steps {
+			if step.Kind == exportStepLocalDefault || slices.Contains(step.Names, defaultExportName) || slices.Contains(step.Names, "__esModule") {
+				local.ImplicitDefault = false
+			}
+			for _, spec := range step.Specs {
+				if spec.Exported == defaultExportName || spec.Exported == "__esModule" {
+					local.ImplicitDefault = false
+				}
+			}
+		}
 	}
 
 	return local
@@ -158,7 +183,6 @@ func (local *localExports) appendStatement(sourceProgram *program.Program, sourc
 		// A UMD global alias is not itself a module export. With interop,
 		// upstream exposes the referenced namespace's members instead.
 		if compilerOptionsESModuleInterop(sourceProgram) {
-			local.ImplicitDefault = true
 			local.appendNamespaceAssignment(sourceFile, stmt.Name())
 		}
 	case ast.KindExportDeclaration:
@@ -286,11 +310,25 @@ func resolveExportLink(sourceProgram *program.Program, sourceFile *ast.SourceFil
 	if !sourceProgram.IsValid() || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return exportLink{}
 	}
-	_, target, ok := sourceProgram.ResolveModule(sourceFile, moduleSpecifier)
-	if !ok || target == nil || settings.IsIgnoredPath(target.FileName()) || !ast.IsExternalModule(target) {
+	link := resolveExportLinkForLookup(sourceProgram, sourceFile, settings, moduleSpecifier)
+	if !link.Resolved || !ast.IsExternalModule(link.Target) {
 		return exportLink{}
 	}
-	return exportLink{Target: target, Resolved: true}
+	return link
+}
+
+func hasNodeDefault(sourceProgram *program.Program, origin *ast.SourceFile, moduleSpecifier *ast.Node, target *ast.SourceFile) bool {
+	options := sourceProgram.Options()
+	if options == nil || options.GetEmitModuleKind() < core.ModuleKindNode16 || options.GetEmitModuleKind() > core.ModuleKindNodeNext {
+		return false
+	}
+	// require() reads the CommonJS object itself, not Node's ES namespace.
+	parent := moduleSpecifier.Parent
+	if parent == nil || (parent.Kind != ast.KindImportDeclaration && parent.Kind != ast.KindExportDeclaration) {
+		return false
+	}
+	return sourceProgram.GetModeForUsageLocation(origin, moduleSpecifier) == core.ResolutionModeESM &&
+		sourceProgram.SourceFileMetadata(target).ImpliedNodeFormat == core.ResolutionModeCommonJS
 }
 
 func exportedDeclarationNames(stmt *ast.Node) []string {

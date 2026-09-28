@@ -1,0 +1,8 @@
+-- packages.tsconfig.json --
+{"compilerOptions":{"module":"commonjs","paths":{"local/*":["./app/src/*"],"outside/*":["./shared/*"],"@/*":["./app/src/*"]}},"include":["app/**/*.ts","shared/**/*.ts"]}
+-- app/package.json --
+{}
+-- app/src/dep.ts --
+export const value = 1;
+-- shared/dep.ts --
+export const value = 1;

@@ -664,6 +664,13 @@ Counts, path bases, stderr notices, and protocol empty-array rules stay
 integration-owned; lint/fix observation order and fix-round state belong to the
 core pipeline.
 
+Before an observation is published or its generation released, the pipeline
+replaces diagnostic AST references with immutable text frames. Concurrent
+plugin work must finish, source identity checks must pass, and fix text must be
+frozen first. Frames are shared by source object identity, not by file path, and
+compute ECMAScript line maps lazily. Explicitly requested `LintedFiles` artifacts
+still carry their original ASTs; diagnostic projection does not invalidate them.
+
 ### Severity Levels
 
 - `SeverityError`: lint error
@@ -1661,6 +1668,7 @@ lint and fix execution still await full config activation.
 - **Short-Lived Per-File Structures**: comment stores, disable managers, and rule contexts are allocated per file and dropped after traversal. A comment slice is allocated only if requested
 - **Bounded Listener Retention**: a listener registry lives only for one checker-shard task. After each file it clears every function slot before shortening the slices, so backing capacity can be reused without retaining closures, source files, checker state, or rule contexts. The registry is dropped when that task completes and is never pooled across runs or LSP requests
 - **Source Snapshot Ownership**: snapshot entries hold an immutable source string plus its 128-bit hash without explicitly copying source bytes; on an AST miss, that string is passed directly to the parser. After generation replacement, a retained unchanged AST may still hold the prior equal string while the fresh snapshot owns the new read. Replaced generations are reclaimed after any in-flight lookup releases them. AST retention and source-generation retention remain deliberately separate lifecycles.
+- **Completed Observation Ownership**: CLI/API providers drop their initial generation references when its pipeline lease is released. Retained initial/final autofix observations own diagnostic text and any explicitly requested AST artifacts, so diagnostics alone cannot keep an earlier compiler graph alive. Release never clears shared Program slices, maps, or source objects.
 - **Metadata Snapshot Ownership**: metadata strings and extended-config parse entries live only for one loader session. The cache stores successful reads only, and its scope bounds growth to metadata touched by one CLI invocation or API request; no metadata entry survives into another request or the LSP session.
 - **Fix Application Uses Linear Rebuilds**: `ApplyRuleFixes` sorts fixes, skips overlapping edits, and rebuilds the output with `strings.Builder` rather than mutating source buffers in place
 - **Bounded Queues**: CLI diagnostics use a buffered channel of 4096 items; LSP request/outgoing queues are buffered to 100, and debounce/refresh signals are single-slot channels

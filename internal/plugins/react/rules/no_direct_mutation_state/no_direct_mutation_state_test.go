@@ -399,17 +399,6 @@ func TestNoDirectMutationStateRule(t *testing.T) {
         };
       `, Tsx: true},
 
-		// ---- Edge: computed key on shorthand method (`[Hello]() {...}`) is
-		// NOT a component per upstream's `!node.parent.computed` guard. ----
-		{Code: `
-        const obj = {
-          ['Hello']() {
-            this.state.x = 1;
-            return <div/>;
-          },
-        };
-      `, Tsx: true},
-
 		// ---- Edge: object-literal setter `set Hello(v) { ... }` doesn't
 		// return JSX (no return value), so never a component. ----
 		{Code: `

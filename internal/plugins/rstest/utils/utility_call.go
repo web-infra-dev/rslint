@@ -147,3 +147,43 @@ func ParseRstestPluginManagedCall(node *ast.Node) *RstestPluginManagedCall {
 		API:           api,
 	}
 }
+
+// ParseModuleMockFactory returns the factory argument of a module mock call the
+// build rewrites, together with the member as it is written. It is nil for
+// everything else.
+func ParseModuleMockFactory(node *ast.Node) (*ast.Node, string) {
+	utility := ParseRstestPluginManagedCall(node)
+	if utility == nil || !isModuleMockMethod(utility.Member) || !IsTransformablePosition(node) {
+		return nil, ""
+	}
+
+	call := node.AsCallExpression()
+	if call.Arguments == nil {
+		return nil, ""
+	}
+	// The transform reads the path and the factory positionally. A third
+	// argument fails the build, and a spread's elements are only known at run
+	// time, so neither shape reaches a factory this rule can judge. What the
+	// path itself is written as does not matter: a string, a dynamic import
+	// and a variable all install the same factory. An explicit type argument
+	// only names the mocked module's shape and is no exemption either.
+	arguments := call.Arguments.Nodes
+	if len(arguments) != 2 {
+		return nil, ""
+	}
+	for _, argument := range arguments {
+		if argument == nil || argument.Kind == ast.KindSpreadElement {
+			return nil, ""
+		}
+	}
+	return arguments[1], utility.Member
+}
+
+func isModuleMockMethod(member string) bool {
+	switch member {
+	case "mock", "doMock", "mockRequire", "doMockRequire":
+		return true
+	default:
+		return false
+	}
+}

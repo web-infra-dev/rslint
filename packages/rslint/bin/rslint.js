@@ -4,7 +4,9 @@ import nodeModule from 'node:module';
 // Enable on-disk code caching for modules loaded by Node.js.
 // Available in Node.js >= 22.8.0.
 const { enableCompileCache } = nodeModule;
-if (enableCompileCache) {
+const isCI = Boolean(process.env.CI) && process.env.CI !== 'false';
+// Skip CI, where the cache is unlikely to be reused.
+if (enableCompileCache && !isCI) {
   try {
     enableCompileCache();
   } catch {

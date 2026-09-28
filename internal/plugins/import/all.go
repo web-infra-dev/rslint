@@ -6,9 +6,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/enforce_node_protocol_usage"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/export"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/exports_last"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/extensions"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/first"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/group_exports"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/max_dependencies"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/named"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/namespace"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/newline_after_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_absolute_path"
@@ -26,6 +28,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_named_default"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_named_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_namespace"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_nodejs_modules"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_relative_parent_imports"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_restricted_paths"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_self_import"
@@ -46,9 +49,11 @@ func GetAllRules() []rule.Rule {
 		enforce_node_protocol_usage.EnforceNodeProtocolUsageRule,
 		export.ExportRule,
 		exports_last.ExportsLastRule,
+		extensions.ExtensionsRule,
 		first.FirstRule,
 		group_exports.GroupExportsRule,
 		max_dependencies.MaxDependenciesRule,
+		named.NamedRule,
 		namespace.NamespaceRule,
 		newline_after_import.NewlineAfterImportRule,
 		no_absolute_path.NoAbsolutePathRule,
@@ -66,6 +71,7 @@ func GetAllRules() []rule.Rule {
 		no_named_default.NoNamedDefaultRule,
 		no_named_export.NoNamedExportRule,
 		no_namespace.NoNamespaceRule,
+		no_nodejs_modules.NoNodejsModulesRule,
 		no_relative_parent_imports.NoRelativeParentImportsRule,
 		no_restricted_paths.NoRestrictedPathsRule,
 		no_self_import.NoSelfImportRule,

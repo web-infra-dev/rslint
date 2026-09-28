@@ -33,3 +33,7 @@ export default 1;
 {"exports":"./lib"}
 -- node_modules/custom/node_modules/directory/lib/index.js --
 export default 1;
+-- node_modules/_stream_readable/index.js --
+export default 1;
+-- node_modules/_http_agent/index.js --
+export default 1;
