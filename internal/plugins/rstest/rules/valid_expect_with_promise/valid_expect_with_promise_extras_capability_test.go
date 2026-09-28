@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/valid_expect_with_promise"
 )
 
 func TestValidExpectWithPromiseTypeCapability(t *testing.T) {
@@ -51,7 +52,7 @@ func TestValidExpectWithPromiseTypeCapability(t *testing.T) {
 							t.Errorf("%s IsPromiseLike = %v, want %v", name, got, wantPromise)
 						}
 						if name == "thenable" || name == "chainable" {
-							if got := isStrictThenable(ctx.TypeChecker, subject, typ); got != (name == "thenable") {
+							if got := shared.IsStrictThenable(ctx.TypeChecker, subject, typ); got != (name == "thenable") {
 								t.Errorf("%s strict thenable = %v", name, got)
 							}
 							if !utils.IsThenableType(ctx.TypeChecker, subject, typ) {
