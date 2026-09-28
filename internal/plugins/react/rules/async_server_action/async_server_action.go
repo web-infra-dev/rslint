@@ -35,24 +35,22 @@ var AsyncServerActionRule = rule.Rule{
 					Id:          "asyncServerAction",
 					Description: "Server Actions must be async",
 				}, func() []rule.RuleSuggestion {
-					isMethod := function.Kind == ast.KindMethodDeclaration || function.Kind == ast.KindConstructor ||
-						(ast.IsAccessor(function) &&
-							function.Parent.Kind != ast.KindObjectLiteralExpression)
+					// Unlike upstream, do not suggest async for syntax that forbids it.
+					if ast.IsAccessor(function) || (function.Kind == ast.KindConstructor && !ast.IsStatic(function)) {
+						return nil
+					}
+					isMethod := function.Kind == ast.KindMethodDeclaration
 					key := function.Name()
 					if isMethod && key != nil && key.Kind == ast.KindComputedPropertyName {
 						key = utils.ESTreeRuntimeExpression(key.AsComputedPropertyName().Expression)
 					}
 					name := ""
-					constructorStart := 0
+					insertion := location.Pos()
 					if function.Kind == ast.KindConstructor {
-						start := function.Pos()
-						if modifiers := function.Modifiers(); modifiers != nil {
-							start = modifiers.End()
-						}
-						// tsgo also represents a quoted 'constructor' key as a
-						// constructor, but only an identifier names the suggestion.
-						token := scanner.GetScannerForSourceFile(ctx.SourceFile, start)
-						constructorStart = token.TokenStart()
+						// tsgo also uses constructors for static methods named
+						// constructor. These methods can safely become async.
+						token := scanner.GetScannerForSourceFile(ctx.SourceFile, function.Modifiers().End())
+						insertion = token.TokenStart()
 						if token.Token() != ast.KindStringLiteral {
 							name = "constructor"
 						}
@@ -68,13 +66,10 @@ var AsyncServerActionRule = rule.Rule{
 					if name != "" {
 						description = "Make `" + name + "` an `async` function"
 					}
-					insertion := location.Pos()
-					if function.Kind == ast.KindConstructor {
-						insertion = constructorStart
-					} else if isMethod {
-						// Match upstream's key insertion, including its limitations
-						// for computed methods and accessors documented by this rule.
-						insertion = utils.TrimNodeTextRange(ctx.SourceFile, key).Pos()
+					if isMethod {
+						// Keep computed brackets intact instead of inserting inside
+						// the key expression as upstream does.
+						insertion = utils.TrimNodeTextRange(ctx.SourceFile, function.Name()).Pos()
 					}
 					// Upstream supplies a suggestion description without a message ID.
 					return []rule.RuleSuggestion{{

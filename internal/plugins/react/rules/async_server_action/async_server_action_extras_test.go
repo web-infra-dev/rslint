@@ -1,6 +1,6 @@
 package async_server_action
 
-// cspell:ignore actionasync ction
+// cspell:ignore ction
 
 import (
 	"reflect"
@@ -15,8 +15,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// These AST adaptations were checked against the pinned upstream rule using
-// ESLint 10.9.0 and @typescript-eslint/parser 8.65.0.
+// Diagnostics were checked against the pinned upstream rule using ESLint 10.9.0
+// and @typescript-eslint/parser 8.65.0. Suggestions avoid unsafe upstream edits.
 func TestAsyncServerActionExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &AsyncServerActionRule,
 		[]rule_tester.ValidTestCase{
@@ -96,12 +96,12 @@ async function action() { 'use server'; }`}}}}},
 			// A typed computed key retains its assertion and has no identifier name.
 			{Code: `const obj = { [(action as any)]() { 'use server'; } };`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "asyncServerAction", Message: "Server Actions must be async", Line: 1, Column: 32, EndLine: 1, EndColumn: 52, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `const obj = { [(async action as any)]() { 'use server'; } };`}}}}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "asyncServerAction", Message: "Server Actions must be async", Line: 1, Column: 32, EndLine: 1, EndColumn: 52, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `const obj = { async [(action as any)]() { 'use server'; } };`}}}}},
 
-			// Escapes in quoted constructor keys still select the anonymous suggestion.
+			// Escaped constructor keys cannot safely become async either.
 			{Code: `class C { 'constr\u0075ctor'() { 'use server'; } }`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "asyncServerAction", Message: "Server Actions must be async", Line: 1, Column: 29, EndLine: 1, EndColumn: 49, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `class C { async 'constr\u0075ctor'() { 'use server'; } }`}}}}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "asyncServerAction", Message: "Server Actions must be async", Line: 1, Column: 29, EndLine: 1, EndColumn: 49}}},
 
 			// BOM, CRLF, and a non-BMP comment preserve UTF-16 diagnostic ranges.
 			{Code: "\ufeff// 😀\r\nexport default function action() {\r\n  'use server';\r\n}",
@@ -124,7 +124,7 @@ ver'; }`}}}}},
 			// A function in a computed key and its enclosing method both report.
 			{Code: `const obj = { [function action() { 'use server'; }]() { 'use server'; } };`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "asyncServerAction", Message: "Server Actions must be async", Line: 1, Column: 16, EndLine: 1, EndColumn: 51, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `const obj = { [async function action() { 'use server'; }]() { 'use server'; } };`}}}, {MessageId: "asyncServerAction", Message: "Server Actions must be async", Line: 1, Column: 52, EndLine: 1, EndColumn: 72, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `const obj = { [async function action() { 'use server'; }]() { 'use server'; } };`}}}}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "asyncServerAction", Message: "Server Actions must be async", Line: 1, Column: 16, EndLine: 1, EndColumn: 51, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `const obj = { [async function action() { 'use server'; }]() { 'use server'; } };`}}}, {MessageId: "asyncServerAction", Message: "Server Actions must be async", Line: 1, Column: 52, EndLine: 1, EndColumn: 72, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `const obj = { async [function action() { 'use server'; }]() { 'use server'; } };`}}}}},
 
 			// tsgo folds quoted constructor keys into Constructor declarations.
 			{
@@ -132,7 +132,6 @@ ver'; }`}}}}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "asyncServerAction", Message: "Server Actions must be async",
 					Line: 1, Column: 24, EndLine: 1, EndColumn: 44,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `class C { async 'constructor'() { 'use server'; } }`}},
 				}},
 			},
 			// Parentheses do not hide the first expression, and comments are not statements.
@@ -210,52 +209,47 @@ ver'; }`}}}}},
 					Line: 1, Column: 46, EndLine: 1, EndColumn: 66,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `const obj = { 'action'() { 'use server'; }, async 1() { 'use server'; } };`}},
 				}}},
-			// Preserve upstream insertion before the ESTree key, even inside computed brackets.
+			// Insert before the complete computed key to preserve valid method syntax.
 			{Code: `class C { static [action]() { 'use server'; } [('other')]() { 'use server'; } }`,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: `asyncServerAction`, Message: `Server Actions must be async`,
 					Line: 1, Column: 26, EndLine: 1, EndColumn: 46,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `class C { static [async action]() { 'use server'; } [('other')]() { 'use server'; } }`}},
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `class C { static async [action]() { 'use server'; } [('other')]() { 'use server'; } }`}},
 				}, {
 					MessageId: `asyncServerAction`, Message: `Server Actions must be async`,
 					Line: 1, Column: 58, EndLine: 1, EndColumn: 78,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `class C { static [action]() { 'use server'; } [(async 'other')]() { 'use server'; } }`}},
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `class C { static [action]() { 'use server'; } async [('other')]() { 'use server'; } }`}},
 				}}},
 			{Code: `const obj = { [getKey()]() { 'use server'; } };`,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: `asyncServerAction`, Message: `Server Actions must be async`,
 					Line: 1, Column: 25, EndLine: 1, EndColumn: 45,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `const obj = { [async getKey()]() { 'use server'; } };`}},
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `const obj = { async [getKey()]() { 'use server'; } };`}},
 				}}},
-			// Upstream offers suggestions for constructors and accessors, even though async is invalid here.
+			// Constructors and accessors still report but cannot safely become async.
 			{Code: `class C { constructor() { 'use server'; } get action() { 'use server'; } set action(value) { 'use server'; } }`,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: `asyncServerAction`, Message: `Server Actions must be async`,
 					Line: 1, Column: 22, EndLine: 1, EndColumn: 42,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `class C { async constructor() { 'use server'; } get action() { 'use server'; } set action(value) { 'use server'; } }`}},
 				}, {
 					MessageId: `asyncServerAction`, Message: `Server Actions must be async`,
 					Line: 1, Column: 53, EndLine: 1, EndColumn: 73,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `class C { constructor() { 'use server'; } get async action() { 'use server'; } set action(value) { 'use server'; } }`}},
 				}, {
 					MessageId: `asyncServerAction`, Message: `Server Actions must be async`,
 					Line: 1, Column: 84, EndLine: 1, EndColumn: 109,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `class C { constructor() { 'use server'; } get action() { 'use server'; } set async action(value) { 'use server'; } }`}},
 				}}},
-			// Object accessors have Property.method=false upstream and use the function-value insertion point.
+			// Object accessors must not receive suggestions that rename their properties.
 			{Code: `const obj = { get action() { 'use server'; }, set action(value) { 'use server'; } };`,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: `asyncServerAction`, Message: `Server Actions must be async`,
 					Line: 1, Column: 25, EndLine: 1, EndColumn: 45,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `const obj = { get actionasync () { 'use server'; }, set action(value) { 'use server'; } };`}},
 				}, {
 					MessageId: `asyncServerAction`, Message: `Server Actions must be async`,
 					Line: 1, Column: 57, EndLine: 1, EndColumn: 82,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `const obj = { get action() { 'use server'; }, set actionasync (value) { 'use server'; } };`}},
 				}}},
 			// Export modifiers and trivia stay outside the function range.
 			{Code: `// leading comment
@@ -327,8 +321,17 @@ func TestAsyncServerActionEditDemand(t *testing.T) {
 		{"named", `function action() { 'use server'; }`, "Make `action` an `async` function", `async function action() { 'use server'; }`},
 		{"anonymous", `const action = () => { 'use server'; };`, "Make this function `async`", `const action = async () => { 'use server'; };`},
 		{"method", `class C { static action() { 'use server'; } }`, "Make `action` an `async` function", `class C { static async action() { 'use server'; } }`},
-		{"constructor", `class C { public constructor() { 'use server'; } }`, "Make `constructor` an `async` function", `class C { public async constructor() { 'use server'; } }`},
-		{"quoted constructor", `class C { 'constructor'() { 'use server'; } }`, "Make this function `async`", `class C { async 'constructor'() { 'use server'; } }`},
+		{"computed method", `class C { static /* keep */ [ /* key */ action]() { 'use server'; } }`, "Make `action` an `async` function", `class C { static /* keep */ async [ /* key */ action]() { 'use server'; } }`},
+		{"constructor", `class C { public constructor() { 'use server'; } }`, "", ""},
+		{"quoted constructor", `class C { 'constructor'() { 'use server'; } }`, "", ""},
+		{"class getter", `class C { static get [action]() { 'use server'; } }`, "", ""},
+		{"object setter", `const obj = { set [action](value) { 'use server'; } };`, "", ""},
+		{"private setter", `class C { set #action(value) { 'use server'; } }`, "", ""},
+		// Methods merely named constructor are eligible for safe suggestions.
+		{"object constructor method", `const obj = { constructor() { 'use server'; } };`, "Make `constructor` an `async` function", `const obj = { async constructor() { 'use server'; } };`},
+		{"computed constructor method", `class C { ['constructor']() { 'use server'; } }`, "Make this function `async`", `class C { async ['constructor']() { 'use server'; } }`},
+		{"static constructor method", `class C { static constructor() { 'use server'; } }`, "Make `constructor` an `async` function", `class C { static async constructor() { 'use server'; } }`},
+		{"static quoted constructor method", `class C { static 'constructor'() { 'use server'; } }`, "Make this function `async`", `class C { static async 'constructor'() { 'use server'; } }`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
@@ -359,16 +362,26 @@ func TestAsyncServerActionEditDemand(t *testing.T) {
 				return diagnostics[0]
 			}
 			all := run(rule.EditDemandAll)
-			if all.Suggestions == nil || len(*all.Suggestions) != 1 {
-				t.Fatal("expected one suggestion")
-			}
-			suggestion := (*all.Suggestions)[0]
-			if suggestion.Message.Id != "" || suggestion.Message.Description != test.message {
-				t.Fatalf("unexpected suggestion message: %#v", suggestion.Message)
-			}
-			output, _, _ := linter.ApplyRuleFixes(test.code, []rule.RuleSuggestion{suggestion})
-			if output != test.output {
-				t.Fatalf("suggestion output = %q, want %q", output, test.output)
+			if test.output == "" {
+				if all.Suggestions != nil {
+					t.Fatal("expected no suggestions")
+				}
+			} else {
+				if all.Suggestions == nil || len(*all.Suggestions) != 1 {
+					t.Fatal("expected one suggestion")
+				}
+				suggestion := (*all.Suggestions)[0]
+				if suggestion.Message.Id != "" || suggestion.Message.Description != test.message {
+					t.Fatalf("unexpected suggestion message: %#v", suggestion.Message)
+				}
+				output, _, _ := linter.ApplyRuleFixes(test.code, []rule.RuleSuggestion{suggestion})
+				if output != test.output {
+					t.Fatalf("suggestion output = %q, want %q", output, test.output)
+				}
+				parsed := parser.ParseSourceFile(sourceFile.ParseOptions(), output, core.ScriptKindTS)
+				if len(parsed.Diagnostics()) != 0 {
+					t.Fatalf("suggestion produced invalid syntax: %s", output)
+				}
 			}
 			for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
 				got := run(demand)

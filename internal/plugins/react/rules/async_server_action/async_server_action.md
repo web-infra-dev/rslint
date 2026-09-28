@@ -56,15 +56,15 @@ automatic fix.
 
 This rule has no options.
 
-## Known Limitations
+## Differences from upstream
 
-Editor suggestions for computed methods, constructors, and accessors can produce
-invalid syntax. For example, the suggestion changes `[action]() { 'use server'; }`
-to `[async action]() { 'use server'; }`. Instead, place `async` before the opening
-bracket: `async [action]() { 'use server'; }`.
-
-Constructors, getters, and setters cannot be async. Move the Server Action into
-an ordinary async function or method before applying a suggestion.
+- For computed methods, rslint suggests `async [action]() { 'use server'; }`.
+  Upstream inserts `async` inside the brackets, which can produce invalid syntax
+  or change the method name.
+- Constructors, getters, and setters are reported without suggestions because
+  they cannot be async. Upstream offers edits that can produce invalid syntax or
+  rename an accessor. Move the Server Action into an ordinary async function or
+  method instead.
 
 ## When Not To Use It
 
