@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/first"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/group_exports"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/max_dependencies"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/named"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/namespace"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/newline_after_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_absolute_path"
@@ -51,6 +52,7 @@ func GetAllRules() []rule.Rule {
 		first.FirstRule,
 		group_exports.GroupExportsRule,
 		max_dependencies.MaxDependenciesRule,
+		named.NamedRule,
 		namespace.NamespaceRule,
 		newline_after_import.NewlineAfterImportRule,
 		no_absolute_path.NoAbsolutePathRule,
