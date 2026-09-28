@@ -1,7 +1,6 @@
 package jsx_newline
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -19,33 +18,56 @@ func TestJsxNewlineEditDemand(t *testing.T) {
 		options []any
 		message rule.RuleMessage
 		range_  core.TextRange
-		fix     rule.RuleFix
+		fix     *rule.RuleFix
 	}{
 		{
 			code:    "<><A/>\n<B/></>",
 			message: rule.RuleMessage{Id: "require", Description: "JSX element should start in a new line"},
 			range_:  core.NewTextRange(7, 11),
-			fix:     rule.RuleFix{Range: core.NewTextRange(6, 7), Text: "\n\n"},
+			fix:     &rule.RuleFix{Range: core.NewTextRange(6, 7), Text: "\n\n"},
 		},
 		{
 			code:    "<><A/>\n\n<B/></>",
 			options: []any{map[string]any{"prevent": true}},
 			message: rule.RuleMessage{Id: "prevent", Description: "JSX element should not start in a new line"},
 			range_:  core.NewTextRange(8, 12),
-			fix:     rule.RuleFix{Range: core.NewTextRange(6, 8), Text: "\n"},
+			fix:     &rule.RuleFix{Range: core.NewTextRange(6, 8), Text: "\n"},
 		},
 		{
 			code:    "<><A/>\n<B\n/></>",
 			options: []any{map[string]any{"prevent": true, "allowMultilines": true}},
 			message: rule.RuleMessage{Id: "allowMultilines", Description: "Multiline JSX elements should start in a new line"},
 			range_:  core.NewTextRange(7, 12),
-			fix:     rule.RuleFix{Range: core.NewTextRange(6, 7), Text: "\n\n"},
+			fix:     &rule.RuleFix{Range: core.NewTextRange(6, 7), Text: "\n\n"},
 		},
 		{
 			code:    "<><A/> <B/></>",
 			message: rule.RuleMessage{Id: "require", Description: "JSX element should start in a new line"},
 			range_:  core.NewTextRange(7, 11),
-			fix:     rule.RuleFix{Range: core.NewTextRange(6, 7), Text: " "},
+		},
+		{
+			code:    "<><A/>\r\n\r\n<B/></>",
+			options: []any{map[string]any{"prevent": true}},
+			message: rule.RuleMessage{Id: "prevent", Description: "JSX element should not start in a new line"},
+			range_:  core.NewTextRange(10, 14),
+		},
+		{
+			code:    "<><A/>\n \n<B/></>",
+			options: []any{map[string]any{"prevent": true}},
+			message: rule.RuleMessage{Id: "prevent", Description: "JSX element should not start in a new line"},
+			range_:  core.NewTextRange(9, 13),
+		},
+		{
+			code:    "<><A/>&#10;&#10;<B/></>",
+			options: []any{map[string]any{"prevent": true}},
+			message: rule.RuleMessage{Id: "prevent", Description: "JSX element should not start in a new line"},
+			range_:  core.NewTextRange(16, 20),
+		},
+		{
+			code:    "<><A/> <B\n/></>",
+			options: []any{map[string]any{"prevent": true, "allowMultilines": true}},
+			message: rule.RuleMessage{Id: "allowMultilines", Description: "Multiline JSX elements should start in a new line"},
+			range_:  core.NewTextRange(7, 12),
 		},
 	} {
 		for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
@@ -63,9 +85,9 @@ func TestJsxNewlineEditDemand(t *testing.T) {
 			diagnostic := diagnostics[0]
 			assert.DeepEqual(t, diagnostic.Message, test.message)
 			assert.Equal(t, diagnostic.Range, test.range_)
-			if demand&rule.EditDemandAutofix != 0 {
+			if demand&rule.EditDemandAutofix != 0 && test.fix != nil {
 				assert.Equal(t, len(diagnostic.Fixes()), 1)
-				assert.Equal(t, diagnostic.Fixes()[0], test.fix)
+				assert.Equal(t, diagnostic.Fixes()[0], *test.fix)
 			} else {
 				assert.Equal(t, len(diagnostic.Fixes()), 0)
 			}
@@ -146,7 +168,6 @@ func TestJsxNewlineExtras(t *testing.T) {
 		// U+1000A is a supplementary character, not a line feed. These entity
 		// cases follow JSX semantics and upstream with @typescript-eslint/parser.
 		{Code: "<><A/>&#65546;&#65546;<B/></>", Tsx: true,
-			Output: slices.Repeat([]string{"<><A/>&#65546;&#65546;<B/></>"}, 10),
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "require", Message: "JSX element should start in a new line", Line: 1, Column: 23, EndLine: 1, EndColumn: 27},
 			},
@@ -154,7 +175,6 @@ func TestJsxNewlineExtras(t *testing.T) {
 		// Hexadecimal references preserve the same character in multiline mode.
 		{Code: "<><A/>&#x1000A;&#x1000A;<B\n/></>", Tsx: true,
 			Options: []any{map[string]any{"prevent": true, "allowMultilines": true}},
-			Output:  slices.Repeat([]string{"<><A/>&#x1000A;&#x1000A;<B\n/></>"}, 10),
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "allowMultilines", Message: "Multiline JSX elements should start in a new line", Line: 1, Column: 25, EndLine: 2, EndColumn: 3},
 			},
@@ -170,14 +190,12 @@ func TestJsxNewlineExtras(t *testing.T) {
 		// remove their decoded line feeds, just as with shorter references.
 		{Code: "<><A/>&#00000000010;&#x000000000A;<B/></>", Tsx: true,
 			Options: []any{map[string]any{"prevent": true}},
-			Output:  slices.Repeat([]string{"<><A/>&#00000000010;&#x000000000A;<B/></>"}, 10),
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "prevent", Message: "JSX element should not start in a new line", Line: 1, Column: 35, EndLine: 1, EndColumn: 39},
 			},
 		},
 		// Invalid digits and missing semicolons leave the reference as text.
 		{Code: "<><A/>&#x1two;&#10<B/></>", Tsx: true,
-			Output: slices.Repeat([]string{"<><A/>&#x1two;&#10<B/></>"}, 10),
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "require", Message: "JSX element should start in a new line", Line: 1, Column: 19, EndLine: 1, EndColumn: 23},
 			},
@@ -192,7 +210,6 @@ func TestJsxNewlineExtras(t *testing.T) {
 		},
 		// Entity decoding is not recursive: escaped references remain visible text.
 		{Code: "<><A/>&amp;#10;&amp;#10;<B/></>", Tsx: true,
-			Output: slices.Repeat([]string{"<><A/>&amp;#10;&amp;#10;<B/></>"}, 10),
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "require", Message: "JSX element should start in a new line", Line: 1, Column: 25, EndLine: 1, EndColumn: 29},
 			},
@@ -330,10 +347,8 @@ value!
 				{MessageId: "require", Message: "JSX element should start in a new line", Line: 2, Column: 1, EndLine: 2, EndColumn: 5},
 			},
 		},
-		// A space between children reports without changing text (upstream issue 3296).
+		// A space between children reports without an ineffective fix (upstream issue 3296).
 		{Code: "<p>{t('text')} <span>{email}</span></p>", Tsx: true,
-			// Upstream offers an unchanged fix after the first pass.
-			Output: slices.Repeat([]string{"<p>{t('text')} <span>{email}</span></p>"}, 10),
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "require", Message: "JSX element should start in a new line", Line: 1, Column: 16, EndLine: 1, EndColumn: 36},
 			},
@@ -341,8 +356,6 @@ value!
 		// Entity-only blank lines cannot be removed by the raw-source fixer.
 		{Code: "<><A/>&#10;&#10;<B/></>", Tsx: true,
 			Options: []any{map[string]any{"prevent": true}},
-			// Upstream offers an unchanged fix after the first pass.
-			Output: slices.Repeat([]string{"<><A/>&#10;&#10;<B/></>"}, 10),
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "prevent", Message: "JSX element should not start in a new line", Line: 1, Column: 17, EndLine: 1, EndColumn: 21},
 			},
@@ -361,20 +374,16 @@ value!
 				{MessageId: "require", Message: "JSX element should start in a new line", Line: 2, Column: 1, EndLine: 2, EndColumn: 5},
 			},
 		},
-		// CRLF blank lines are reported but unchanged in prevent mode.
+		// CRLF blank lines are reported without a fix in prevent mode.
 		{Code: "<><A/>\r\n\r\n<B/></>", Tsx: true,
 			Options: []any{map[string]any{"prevent": true}},
-			// Upstream offers an unchanged fix after the first pass.
-			Output: slices.Repeat([]string{"<><A/>\r\n\r\n<B/></>"}, 10),
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "prevent", Message: "JSX element should not start in a new line", Line: 3, Column: 1, EndLine: 3, EndColumn: 5},
 			},
 		},
-		// Indented blank lines are reported but unchanged in prevent mode.
+		// Indented blank lines are reported without a fix in prevent mode.
 		{Code: "<><A/>\n \n<B/></>", Tsx: true,
 			Options: []any{map[string]any{"prevent": true}},
-			// Upstream offers an unchanged fix after the first pass.
-			Output: slices.Repeat([]string{"<><A/>\n \n<B/></>"}, 10),
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "prevent", Message: "JSX element should not start in a new line", Line: 3, Column: 1, EndLine: 3, EndColumn: 5},
 			},
@@ -413,8 +422,6 @@ value!
 		},
 		// Diagnostic columns count UTF-16 units, including supplementary characters.
 		{Code: "<>你好😀<A/> <名字/></>", Tsx: true,
-			// Upstream offers an unchanged fix after the first pass.
-			Output: slices.Repeat([]string{"<>你好😀<A/> <名字/></>"}, 10),
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "require", Message: "JSX element should start in a new line", Line: 1, Column: 12, EndLine: 1, EndColumn: 17},
 			},

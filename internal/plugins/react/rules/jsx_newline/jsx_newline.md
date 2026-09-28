@@ -81,6 +81,10 @@ points. Compared with ESLint's default parser, Espree:
 
 These cases match ESLint configured with `@typescript-eslint/parser`.
 
+rslint also omits fixes that would leave the code unchanged. For example,
+`<><A/> <B/></>` still reports a missing blank line but requires a manual edit.
+Upstream offers an unchanged fix for this input.
+
 ## Original Documentation
 
 - [eslint-plugin-react: jsx-newline](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-newline.md)

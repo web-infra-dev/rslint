@@ -76,7 +76,11 @@ var JsxNewlineRule = rule.Rule{
 					message = rule.RuleMessage{Id: "prevent", Description: "JSX element should not start in a new line"}
 				}
 				ctx.ReportNodeWithDeferredFixes(sibling, message, func() []rule.RuleFix {
-					return []rule.RuleFix{{Range: spacing.Loc, Text: fixNewlines(raw, remove)}}
+					fixed := fixNewlines(raw, remove)
+					if fixed == raw {
+						return nil
+					}
+					return []rule.RuleFix{{Range: spacing.Loc, Text: fixed}}
 				})
 			}
 		}
