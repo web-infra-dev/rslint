@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type JestTestCallbacks struct {
@@ -57,10 +58,7 @@ func resolveJestTestCallback(
 	ctx rule.RuleContext,
 	call *ast.CallExpression,
 ) jestCallbackInfo {
-	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) < 2 {
-		return jestCallbackInfo{}
-	}
-	callback := ast.SkipParentheses(call.Arguments.Nodes[1])
+	callback := jestTestCallbackArgument(call)
 	if callback == nil {
 		return jestCallbackInfo{}
 	}
@@ -68,6 +66,13 @@ func resolveJestTestCallback(
 		return jestCallbackInfo{functionNode: callback}
 	}
 	return resolveNamedTestCallback(ctx, call)
+}
+
+func jestTestCallbackArgument(call *ast.CallExpression) *ast.Node {
+	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) < 2 {
+		return nil
+	}
+	return internalUtils.SkipAssertionsAndParens(call.Arguments.Nodes[1])
 }
 
 func isDoneAmbiguousJestCallback(

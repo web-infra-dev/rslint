@@ -24,13 +24,9 @@ func LocalFunctionBinding(
 		return nil
 	}
 	declaration := symbol.Declarations[0]
-	if declaration == nil || ast.GetSourceFileOfNode(declaration) != sourceFile {
+	if declaration == nil || ast.GetSourceFileOfNode(declaration) != sourceFile ||
+		localFunctionBindingIsWritten(refs, symbol) {
 		return nil
-	}
-	for _, reference := range refs.References(symbol) {
-		if internalUtils.IsWriteReference(reference) {
-			return nil
-		}
 	}
 	switch declaration.Kind {
 	case ast.KindFunctionDeclaration:
@@ -42,4 +38,58 @@ func LocalFunctionBinding(
 		}
 	}
 	return nil
+}
+
+// LocalFunctionImplementation returns the unique same-file implementation a
+// callback symbol always denotes. Bodyless overload signatures are ignored;
+// mutable bindings and ambiguous runtime declarations are rejected.
+func LocalFunctionImplementation(
+	sourceFile *ast.SourceFile,
+	refs *rule.RefStore,
+	symbol *ast.Symbol,
+) *ast.Node {
+	if refs == nil || symbol == nil {
+		return nil
+	}
+	if localFunctionBindingIsWritten(refs, symbol) {
+		return nil
+	}
+
+	var implementation *ast.Node
+	for _, declaration := range symbol.Declarations {
+		if declaration == nil || ast.GetSourceFileOfNode(declaration) != sourceFile {
+			return nil
+		}
+		var candidate *ast.Node
+		switch declaration.Kind {
+		case ast.KindFunctionDeclaration:
+			if declaration.Body() == nil {
+				continue
+			}
+			candidate = declaration
+		case ast.KindVariableDeclaration:
+			candidate = internalUtils.SkipAssertionsAndParens(
+				declaration.AsVariableDeclaration().Initializer,
+			)
+			if candidate == nil || !ast.IsFunctionExpressionOrArrowFunction(candidate) {
+				return nil
+			}
+		default:
+			return nil
+		}
+		if implementation != nil {
+			return nil
+		}
+		implementation = candidate
+	}
+	return implementation
+}
+
+func localFunctionBindingIsWritten(refs *rule.RefStore, symbol *ast.Symbol) bool {
+	for _, reference := range refs.References(symbol) {
+		if internalUtils.IsWriteReference(reference) {
+			return true
+		}
+	}
+	return false
 }

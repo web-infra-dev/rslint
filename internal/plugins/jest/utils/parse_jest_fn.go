@@ -386,7 +386,7 @@ func resolveNamedTestCallback(ctx rule.RuleContext, callExpr *ast.CallExpression
 		return jestCallbackInfo{}
 	}
 
-	callback := ast.SkipParentheses(callExpr.Arguments.Nodes[1])
+	callback := jestTestCallbackArgument(callExpr)
 	if callback == nil || ast.IsFunctionExpressionOrArrowFunction(callback) {
 		return jestCallbackInfo{}
 	}
@@ -395,6 +395,12 @@ func resolveNamedTestCallback(ctx rule.RuleContext, callExpr *ast.CallExpression
 	}
 
 	name := callback.AsIdentifier().Text
+	if ctx.Refs != nil {
+		return jestCallbackInfo{
+			functionNode: testFramework.LocalFunctionImplementation(ctx.SourceFile, ctx.Refs, ctx.Refs.Resolve(callback)),
+			name:         name,
+		}
+	}
 	decl := internalUtils.GetDeclaration(ctx.TypeChecker, callback)
 	if decl == nil {
 		return jestCallbackInfo{name: name}
@@ -425,7 +431,7 @@ func testCallbackInitializerFunction(initializer *ast.Node) *ast.Node {
 	if initializer == nil {
 		return nil
 	}
-	init := ast.SkipParentheses(initializer)
+	init := internalUtils.SkipAssertionsAndParens(initializer)
 	if ast.IsFunctionExpressionOrArrowFunction(init) {
 		return init
 	}

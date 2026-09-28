@@ -54,6 +54,14 @@ func describeParsedExpectChain(parsed *rstestUtils.ParsedRstestExpectCall) strin
 	)
 }
 
+func describeMatcherNegation(parsed *rstestUtils.ParsedRstestExpectCall) string {
+	matchers := make([]string, len(parsed.Matchers))
+	for i, matcher := range parsed.Matchers {
+		matchers[i] = fmt.Sprintf("%s:%t", matcher.Name, matcher.Negated)
+	}
+	return strings.Join(matchers, " ")
+}
+
 func expectExpressionKind(node *ast.Node) string {
 	if node == nil {
 		return "nil"
@@ -105,6 +113,43 @@ var expectChainParseProbe = rule.Rule{
 			},
 		}
 	},
+}
+
+var expectMatcherNegationProbe = rule.Rule{
+	Name:             "rstest/expect-matcher-negation-probe",
+	RequiresTypeInfo: true,
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				parsed := analysis.ParseExpectCall(node)
+				if parsed != nil {
+					ctx.ReportNode(node, probeMessage("parsedExpect", describeMatcherNegation(parsed)))
+				}
+			},
+		}
+	},
+}
+
+func TestParseRstestExpectCallTracksMatcherNegation(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &expectMatcherNegationProbe,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `expect("hello").to.be.a("string").that.does.not.contain("world");`,
+				Errors: parsedExpectError("a:false contain:true"),
+			},
+			{
+				Code:   `expect(value).not.toBe(expected).and.toMatchSnapshot();`,
+				Errors: parsedExpectError("toBe:true toMatchSnapshot:true"),
+			},
+			{
+				Code:   `expect(value).toBe(expected).and.toMatchSnapshot();`,
+				Errors: parsedExpectError("toBe:false toMatchSnapshot:false"),
+			},
+		},
+	)
 }
 
 func parsedExpectError(message string) []rule_tester.InvalidTestCaseError {
