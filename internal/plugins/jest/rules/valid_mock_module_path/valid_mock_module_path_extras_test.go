@@ -65,6 +65,27 @@ func TestValidMockModulePathExtras(t *testing.T) {
 			{Code: `jest.mock("x-nested-array")`, FileName: testFile},
 			{Code: `jest.mock("x-pattern/sub/x.js")`, FileName: testFile},
 			{Code: `jest.mock("x-pattern-ext/ext/x")`, FileName: testFile},
+			// A nested array resolves recursively.
+			{Code: `jest.mock("x-nested-only")`, FileName: testFile},
+			{Code: `jest.mock("x-nested-null-inner")`, FileName: testFile},
+			// A relative target is a URL path: percent-escapes are decoded and a
+			// query is dropped before the file is looked up.
+			{Code: `jest.mock("x-url-space")`, FileName: testFile},
+			{Code: `jest.mock("x-url-hash")`, FileName: testFile},
+			{Code: `jest.mock("x-literal-space")`, FileName: testFile},
+			{Code: `jest.mock("x-target-query")`, FileName: testFile},
+			{Code: `jest.mock("#encoded")`, FileName: testFile},
+			{Code: `jest.mock("#target-query")`, FileName: testFile},
+			{Code: `jest.mock("x-url-percent")`, FileName: testFile},
+			{Code: `jest.mock("x-url-utf8")`, FileName: testFile},
+			{Code: `jest.mock("x-url-dot")`, FileName: testFile},
+			// A pattern match is substituted before the target is decoded.
+			{Code: `jest.mock("x-url-pattern/sub/a%20b")`, FileName: testFile},
+			{Code: `jest.mock("x-url-pattern/sub/a b")`, FileName: testFile},
+			{Code: `jest.mock("x-url-pattern/sub/c%2520d")`, FileName: testFile},
+			// Node's require.resolve rejects an imports target naming a builtin with
+			// an error other than a missing module, which upstream does not report.
+			{Code: `jest.mock("#builtin")`, FileName: testFile},
 
 			// ---- Only a string literal names the module ----
 			{Code: "jest.mock(`./missing`)", FileName: testFile},
@@ -141,8 +162,21 @@ func TestValidMockModulePathExtras(t *testing.T) {
 			{Code: `jest.mock("x-directory")`, FileName: testFile, Errors: invalidAt(1)},
 			{Code: `jest.mock("x-directory-bare")`, FileName: testFile, Errors: invalidAt(1)},
 			{Code: `jest.mock("#extensionless")`, FileName: testFile, Errors: invalidAt(1)},
-			// The first valid target is final even when its file is missing.
+			// The first valid target is final even when its file is missing,
+			// including one selected from a nested array.
 			{Code: `jest.mock("x-missing-first")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("x-nested-missing-first")`, FileName: testFile, Errors: invalidAt(1)},
+			// The decoded target names a different file; an encoded `/` is invalid.
+			{Code: `jest.mock("x-literal-percent")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("x-url-slash")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("x-url-slash-lower")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("x-url-backslash")`, FileName: testFile, Errors: invalidAt(1)},
+			// Node cannot decode a malformed escape.
+			{Code: `jest.mock("x-url-invalid-escape")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("x-url-pattern/sub/c%20d")`, FileName: testFile, Errors: invalidAt(1)},
+			// A bare imports target keeps `?` and `#` as part of the package name.
+			{Code: `jest.mock("#literal-query-dep")`, FileName: testFile, Errors: invalidAt(1)},
+			{Code: `jest.mock("#package-query")`, FileName: testFile, Errors: invalidAt(1)},
 			// `?` and `#` are part of the path, not a query or fragment.
 			{Code: `jest.mock("fs?raw")`, FileName: testFile, Errors: invalidAt(1)},
 			{Code: `jest.mock("node:fs#x")`, FileName: testFile, Errors: invalidAt(1)},

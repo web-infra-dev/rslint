@@ -2,7 +2,9 @@ package moduleresolver
 
 import (
 	"encoding/json"
+	"net/url"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 	"unicode/utf16"
@@ -394,7 +396,9 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 		// Node accepts an exports or imports target only as an existing file.
 		exactTarget := f.options.NodeExports && strings.HasSuffix(physical, nodeExportSuffix)
 		if exactTarget {
-			resolved = f.probeFile(target)
+			if path, ok := f.nodeTargetPath(target); ok {
+				resolved = f.probeFile(path)
+			}
 		} else {
 			resolved = f.probe(target, applyAlias)
 		}
@@ -442,6 +446,38 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 		f.resolved[name] = resolved
 	}
 	return resolved != ""
+}
+
+// encodedSeparator is Node's own check for an escaped path separator. It only
+// folds ASCII letters, which RE2 and JavaScript fold alike.
+var encodedSeparator = regexp.MustCompile(`(?i)%2F|%5C`)
+
+// nodeTargetPath converts an exports or imports target to the file Node
+// reads: the part inside the package is a URL path, so its percent-escapes are
+// decoded, and an escaped `/` or `\` makes the target invalid.
+func (f *nodeResolutionFS) nodeTargetPath(target string) (string, bool) {
+	root := ""
+	for _, owner := range []string{f.exportsFile, f.importsFile} {
+		if owner == "" {
+			continue
+		}
+		directory := tspath.GetDirectoryPath(owner) + "/"
+		if strings.HasPrefix(target, directory) && len(directory) > len(root) {
+			root = directory
+		}
+	}
+	if root == "" {
+		return target, true
+	}
+	inner := target[len(root):]
+	if encodedSeparator.MatchString(inner) {
+		return "", false
+	}
+	decoded, err := url.PathUnescape(inner)
+	if err != nil {
+		return "", false
+	}
+	return root + decoded, true
 }
 
 func (f *nodeResolutionFS) DirectoryExists(name string) bool {
@@ -601,7 +637,7 @@ func markNodeImportTargets(value *hujson.Value, options Options) {
 	case hujson.Literal:
 		if v.Kind() == '"' {
 			target := v.String()
-			if index := strings.IndexAny(target, "?#"); index > 0 {
+			if index := strings.IndexAny(target, "?#"); index > 0 && isURLTarget(target, options) {
 				target = target[:index]
 				value.Value = hujson.String(target)
 			}
@@ -638,7 +674,8 @@ func markNodeImportTargets(value *hujson.Value, options Options) {
 // tsgo owns exports paths, patterns and ordinary condition selection. Only
 // normalize enhanced-resolve's array behavior: primitive entries invalidate an
 // array; nested arrays and unmatched/null conditional entries are skipped.
-// NodeExports skips primitive entries as well, as Node does.
+// NodeExports skips primitive entries as well and flattens a nested array in
+// place, as Node tries its entries in order before moving on.
 func prepareNodeExports(value *hujson.Value, options Options) bool {
 	conditions := options.Conditions
 	switch object := value.Value.(type) {
@@ -660,7 +697,9 @@ func prepareNodeExports(value *hujson.Value, options Options) bool {
 					return false
 				}
 			case *hujson.Array:
-				continue
+				if !options.NodeExports {
+					continue
+				}
 			case *hujson.Object:
 				selected, ok := nodeExportArrayCondition(candidate, conditions)
 				if !ok {
@@ -674,18 +713,29 @@ func prepareNodeExports(value *hujson.Value, options Options) bool {
 			if !prepareNodeExports(&target, options) {
 				return false
 			}
+			if nested, ok := target.Value.(*hujson.Array); ok && options.NodeExports {
+				targets = append(targets, nested.Elements...)
+				continue
+			}
 			targets = append(targets, target)
 		}
 		object.Elements = targets
 	case hujson.Literal:
 		if object.Kind() == '"' {
 			target := object.String()
-			if index := strings.IndexAny(target, "?#"); index > 0 {
+			if index := strings.IndexAny(target, "?#"); index > 0 && isURLTarget(target, options) {
 				value.Value = hujson.String(target[:index])
 			}
 		}
 	}
 	return true
+}
+
+// isURLTarget reports a target whose `?` and `#` start a query or fragment.
+// Node reads only a relative target as a URL; a bare imports target is a
+// package request, taken literally.
+func isURLTarget(target string, options Options) bool {
+	return !options.NodeExports || strings.HasPrefix(target, "./")
 }
 
 // A conditional null inside an exports array is skipped by enhanced-resolve,
