@@ -25,7 +25,7 @@ Examples of **correct** code for this rule:
 ```ts
 expect('hello world'.match('sunshine')).toBeNull();
 
-expect(User.findOrNull(1)).toBeDefined();
+expect(User.findOrNull(1)).toBeNull();
 
 expect(map.get('key')).not.toBeUndefined();
 
