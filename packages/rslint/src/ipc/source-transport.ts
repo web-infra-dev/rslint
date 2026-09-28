@@ -1,9 +1,11 @@
 /** Native storage for generic IPC text attachments. No application payloads. */
-import { getNativeBinding } from '../native/binding.js';
+import {
+  getNativeBinding,
+  type SourceConfiguration,
+} from '../native/binding.js';
 import type {
   IpcAttachment,
   SourceBatch,
-  SourceConfiguration,
   SourceMapping,
   SourceRange,
 } from './protocol.js';

@@ -14,15 +14,6 @@ import type { SharedSource } from '../native/binding.js';
  */
 export type MessageKind = WireMessage['kind'];
 
-/** Shared storage layout supplied by Go before the first application request. */
-export interface SourceConfiguration {
-  version: number;
-  slotCount: number;
-  slotSize: number;
-  headerSize: number;
-  publicationStride: number;
-}
-
 export interface SourceMapping {
   version: number;
   fd?: number;

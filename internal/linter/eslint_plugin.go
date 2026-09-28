@@ -107,9 +107,9 @@ type EslintPluginDispatcher func(ctx context.Context, req EslintPluginLintReques
 // plugin-lint input before wire batching.
 type EslintPluginFileInput struct {
 	Path string
-	// Text is the generation source SENT TO THE WORKER on the wire. Overlay
-	// hosts and later autofix generations set it; the initial CLI generation
-	// leaves it nil so the worker can read disk without a whole-repository clone.
+	// Text is the complete generation source sent to the worker. Production
+	// IPC CLI and overlay hosts supply snapshots; only callers that explicitly
+	// enable HostReadsInitialText may omit it for the initial generation.
 	Text *string
 	// SourceFile is the frame Go REBUILDS diagnostics against (Go-local; never
 	// sent on the wire). The CLI sets it to the ts-go *ast.SourceFile the native

@@ -189,8 +189,8 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return 1
 	}
 
-	// Only the production disk-backed CLI shares its initial source medium with
-	// the Node plugin host. Injected VFS implementations must send exact text.
+	// Direct disk-backed callers may let their plugin host read the initial
+	// text. The production IPC CLI supplies FS and always sends exact snapshots.
 	pluginHostReadsInitialText := args.FS == nil
 	fs := args.FS
 	if fs == nil {

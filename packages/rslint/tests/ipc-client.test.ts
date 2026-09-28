@@ -5,11 +5,14 @@ import { IpcClient, encodeFrame, decodeFrame } from '../src/ipc/client.js';
 import type { MessageKind } from '../src/ipc/protocol.js';
 import type { IpcClientOptions } from '../src/ipc/client.js';
 import { createSourceTransport } from '../src/ipc/source-transport.js';
-import { getNativeBinding, type SharedSource } from '../src/native/binding.js';
+import {
+  getNativeBinding,
+  type SharedSource,
+  type SourceConfiguration,
+} from '../src/native/binding.js';
 import type {
   WireMessage as IpcMessage,
   SourceBatch,
-  SourceConfiguration,
 } from '../src/ipc/protocol.js';
 
 // Deliberately differs from Go's production layout. Node consumes peer values.

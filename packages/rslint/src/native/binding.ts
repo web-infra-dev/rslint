@@ -22,11 +22,6 @@
 import { createRequire } from 'node:module';
 
 import { platformPackageName } from './platform-tuple.js';
-import type {
-  SourceConfiguration,
-  SourceMapping,
-  SourceRange,
-} from '../ipc/protocol.js';
 
 const require = createRequire(import.meta.url);
 
@@ -52,15 +47,24 @@ export interface ParseResult {
 }
 
 /** Opaque reader capability; never a pointer or a filesystem path. */
-export interface SharedSource extends SourceRange {
+export interface SharedSource {
   lease: number;
+  offset: number;
+  length: number;
+}
+
+/** Native arena layout supplied at runtime by Go; no defaults live here. */
+export interface SourceConfiguration {
+  version: number;
+  slotCount: number;
+  slotSize: number;
+  headerSize: number;
+  publicationStride: number;
 }
 
 /** N-API optional return values may use null; the wire envelope omits them. */
-export interface NativeSourceMapping extends Omit<
-  SourceMapping,
-  'fd' | 'handle' | 'processId'
-> {
+export interface NativeSourceMapping {
+  version: number;
   fd?: number | null;
   handle?: string | null;
   processId?: number | null;
