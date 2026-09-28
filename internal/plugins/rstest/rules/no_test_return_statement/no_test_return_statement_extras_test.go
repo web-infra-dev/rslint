@@ -1,9 +1,20 @@
 package no_test_return_statement_test
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_test_return_statement"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // TestNoTestReturnStatementExtras covers Rstest call shapes, API provenance and
@@ -165,4 +176,53 @@ test('page', async ({ page }) => { return page.goto('/'); });`,
 			},
 		},
 	)
+}
+
+// BenchmarkNoTestReturnStatementSharedCallback registers one named callback
+// many times. Every registration resolves the same binding, and the callback's
+// ownership check walks every reference to it, so the time per registration
+// must stay flat as registrations grow.
+func BenchmarkNoTestReturnStatementSharedCallback(b *testing.B) {
+	root := fixtures.GetRootDir()
+	for _, registrations := range []int{2000, 8000} {
+		b.Run(fmt.Sprintf("registrations=%d", registrations), func(b *testing.B) {
+			var code strings.Builder
+			code.WriteString("function callback() { return 1; }\n")
+			for index := range registrations {
+				fmt.Fprintf(&code, "test('case %d', callback);\n", index)
+			}
+			fileName := tspath.ResolvePath(root.Dir, fmt.Sprintf("no-test-return-statement-bench-%d.ts", registrations))
+			fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code.String()})
+			program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+				RootFileNames:   []string{fileName},
+				Host:            utils.CreateCompilerHost(root.Dir, fs),
+				CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext},
+				SingleThreaded:  true,
+			})
+			if err != nil {
+				b.Fatal(err)
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				count := 0
+				linter.LintSingleFile(linter.LintSingleFileOptions{
+					Program: program, File: fileName,
+					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						return []rule.ConfiguredRule{{
+							Name:     no_test_return_statement.NoTestReturnStatementRule.Name,
+							Severity: rule.SeverityError,
+							Run: func(ctx rule.RuleContext) rule.RuleListeners {
+								return no_test_return_statement.NoTestReturnStatementRule.Run(ctx, nil)
+							},
+						}}
+					},
+					Consumer: rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) { count++ }},
+				})
+				if count != 1 {
+					b.Fatalf("got %d diagnostics, want 1", count)
+				}
+			}
+		})
+	}
 }
