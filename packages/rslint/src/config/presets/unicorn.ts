@@ -71,7 +71,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-array-sort-for-min-max': 'error', // not implemented
     // 'unicorn/no-array-splice': 'error', // not implemented
     // 'unicorn/no-asterisk-prefix-in-documentation-comments': 'off', // not implemented
-    // 'unicorn/no-async-promise-finally': 'error', // not implemented
+    'unicorn/no-async-promise-finally': 'error',
     'unicorn/no-await-expression-member': 'error',
     'unicorn/no-await-in-promise-methods': 'error',
     // 'unicorn/no-barrel-files': 'off', // not implemented
