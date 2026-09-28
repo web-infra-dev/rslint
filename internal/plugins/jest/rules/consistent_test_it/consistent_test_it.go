@@ -44,6 +44,7 @@ var ConsistentTestItRule = shared.NewRule(shared.Config{
 				return shared.RespellFixes(ctx, shared.Respell{
 					Root: root, Symbol: ctx.Refs.Resolve(root), Global: parsed.Head.Type == jestUtils.JEST_GLOBAL_MODE,
 					Text: text, Name: name, IsModule: isJestGlobalsModule,
+					Respelled: respelled,
 				})
 			},
 		}
@@ -69,4 +70,21 @@ func oppositeKeyword(keyword string) string {
 
 func isJestGlobalsModule(module string) bool {
 	return module == jestUtils.JestGlobalsModule
+}
+
+// respelled returns the name calls through specifier are fixed to: `it` and
+// `fit` become `test`, `xit` becomes `xtest`, and the reverse.
+func respelled(specifier *ast.Node) string {
+	imported := testFramework.ImportedSpecifierName(specifier)
+	var text string
+	switch imported {
+	case "it", "fit", "xit":
+		text = preferredName(imported, "test")
+	case "test", "xtest":
+		text = preferredName(imported, "it")
+	default:
+		return ""
+	}
+	name, _, _ := strings.Cut(text, ".")
+	return name
 }

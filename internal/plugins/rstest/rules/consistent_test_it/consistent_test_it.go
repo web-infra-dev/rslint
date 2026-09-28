@@ -82,36 +82,27 @@ func callFixes(ctx rule.RuleContext, node *ast.Node, parsed *testFramework.Parse
 	if name != parsed.Name {
 		return nil
 	}
-	// A `let`/`var` CommonJS binding can be reassigned after its declaration
-	// (`it = it.extend({ account: {} })`), so the destructuring pattern no
-	// longer proves which API the call receives. Renaming it to the other base
-	// API would silently drop the fixtures.
-	if isMutableRequireBinding(symbol) {
-		return nil
-	}
 	return shared.RespellFixes(ctx, shared.Respell{
 		Root: root, Symbol: symbol, Global: mode == rstestUtils.RSTEST_GLOBAL_MODE,
 		Text: preferred, Name: preferred, IsModule: rstestUtils.IsRstestCoreImportModule,
+		Respelled: respelled,
 	})
 }
 
-// isMutableRequireBinding reports whether symbol is bound by a destructured
-// `require` declaration that is not `const`. ESM import bindings cannot be
-// reassigned, so only CommonJS reaches this shape.
-func isMutableRequireBinding(symbol *ast.Symbol) bool {
-	if symbol == nil {
-		return false
+// respelled returns the name calls through specifier are fixed to. Calls
+// through an aliased import are never fixed.
+func respelled(specifier *ast.Node) string {
+	imported := testFramework.ImportedSpecifierName(specifier)
+	if specifier.Name().Text() != imported {
+		return ""
 	}
-	for _, declaration := range symbol.Declarations {
-		if declaration == nil || declaration.Kind != ast.KindBindingElement {
-			continue
-		}
-		if declarationList := utils.GetDeclListForSymbolDecl(declaration); declarationList != nil &&
-			!ast.IsVarConst(declarationList) {
-			return true
-		}
+	switch imported {
+	case "test":
+		return "it"
+	case "it":
+		return "test"
 	}
-	return false
+	return ""
 }
 
 // shadowScan filters registrations whose root is really a local binding.

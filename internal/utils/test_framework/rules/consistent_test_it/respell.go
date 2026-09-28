@@ -21,6 +21,9 @@ type Respell struct {
 	Name string
 	// IsModule reports whether an import specifier names the framework's module.
 	IsModule func(string) bool
+	// Respelled returns the Name that calls through a value import specifier of
+	// the framework's module are fixed to, or "" when they are never fixed.
+	Respelled func(specifier *ast.Node) string
 }
 
 // RespellFixes returns the edits that call the registration through Name, or
@@ -30,6 +33,13 @@ type Respell struct {
 // other references may still use it.
 func RespellFixes(ctx rule.RuleContext, respell Respell) []rule.RuleFix {
 	root, name := respell.Root, respell.Name
+	// A `let`/`var` CommonJS binding can be reassigned after its declaration
+	// (`it = it.extend({ account: {} })` or `it = wrap(it)`), so the
+	// destructuring pattern no longer proves which API the call receives.
+	// Renaming it to the other base API would silently drop that wrapper.
+	if isMutableRequireBinding(respell.Symbol) {
+		return nil
+	}
 	fix := rule.RuleFixReplace(ctx.SourceFile, root, respell.Text)
 	if !isNameFreeBelowFile(ctx.SourceFile, root, name) {
 		return nil
@@ -65,9 +75,32 @@ func RespellFixes(ctx rule.RuleContext, respell Respell) []rule.RuleFix {
 		}
 		// Keep the original import for exports, fixture factories, and calls
 		// governed by the other option. Insertion preserves comments/trivia.
-		return []rule.RuleFix{rule.RuleFixInsertBefore(ctx.SourceFile, declaration, name+", "), fix}
+		return []rule.RuleFix{rule.RuleFixInsertBefore(ctx.SourceFile, insertionPoint(ctx.SourceFile, respell, declaration), name+", "), fix}
 	}
 	return nil
+}
+
+// insertionPoint returns the specifier Name is inserted before. Every fix that
+// introduces Name in a file inserts at the same point, the first specifier
+// whose calls are fixed to Name, so fixes applied in one pass cannot import
+// Name twice: after the first, the rest overlap it and are retried in a later
+// pass, which reuses the new import.
+func insertionPoint(sourceFile *ast.SourceFile, respell Respell, fallback *ast.Node) *ast.Node {
+	for _, statement := range sourceFile.Statements.Nodes {
+		if statement.Kind != ast.KindImportDeclaration {
+			continue
+		}
+		declaration := statement.AsImportDeclaration()
+		if !respell.IsModule(declaration.ModuleSpecifier.Text()) {
+			continue
+		}
+		for _, element := range testFramework.NamedImportElements(declaration) {
+			if respell.Respelled(element) == respell.Name {
+				return element
+			}
+		}
+	}
+	return fallback
 }
 
 // isNameFreeBelowFile reports whether no declaration of name sits between root
@@ -97,4 +130,23 @@ func isNameFreeBelowFile(sourceFile *ast.SourceFile, root *ast.Node, name string
 		}
 	}
 	return true
+}
+
+// isMutableRequireBinding reports whether symbol is bound by a destructured
+// `require` declaration that is not `const`. ESM import bindings cannot be
+// reassigned, so only CommonJS reaches this shape.
+func isMutableRequireBinding(symbol *ast.Symbol) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if declaration == nil || declaration.Kind != ast.KindBindingElement {
+			continue
+		}
+		if declarationList := utils.GetDeclListForSymbolDecl(declaration); declarationList != nil &&
+			!ast.IsVarConst(declarationList) {
+			return true
+		}
+	}
+	return false
 }

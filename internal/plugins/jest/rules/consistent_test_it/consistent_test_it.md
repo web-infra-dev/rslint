@@ -99,7 +99,7 @@ it('foo');
 // upstream: import { it } from '@jest/globals'; test('foo');
 ```
 
-No fix is offered when the new name would not reach the Jest API: when a local variable, parameter or other declaration with that name is in scope, when the file already declares it some other way (such as an import from another module), or when the call comes from a CommonJS `require` of `@jest/globals`. Upstream calls whatever that name refers to:
+No fix is offered when the new name would not reach the Jest API: when a local variable, parameter or other declaration with that name is in scope, when the file already declares it some other way (such as an import from another module), when the call comes from a `let` or `var` binding of a CommonJS `require`, which may have been reassigned, or when it comes from any other `require` binding and the file does not already import the new name. Upstream calls whatever that name refers to:
 
 ```js
 /* rslint jest/consistent-test-it: ["error", { "fn": "test" }] */

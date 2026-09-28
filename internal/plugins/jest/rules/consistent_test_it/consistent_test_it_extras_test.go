@@ -381,6 +381,49 @@ func TestConsistentTestItExtras(t *testing.T) {
 					Output: []string{"import { describe, it, test } from '@jest/globals';\ndescribe('s', () => {\n  it('works');\n});"},
 					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethodWithinDescribe", Message: "Prefer using 'it' instead of 'test' within describe", Line: 3, Column: 3, EndLine: 3, EndColumn: 7}},
 				},
+				{
+					// A `let` binding can be reassigned, so an existing `test` import
+					// does not prove the call reaches the same API.
+					Code:   "import { test } from '@jest/globals';\nlet { it } = require('@jest/globals');\nit = wrap(it);\nit('custom');",
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 4, Column: 1, EndLine: 4, EndColumn: 3}},
+				},
+				{
+					Code:   "import { test } from '@jest/globals';\nconst { it } = require('@jest/globals');\nit('custom');",
+					Output: []string{"import { test } from '@jest/globals';\nconst { it } = require('@jest/globals');\ntest('custom');"},
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 3, Column: 1, EndLine: 3, EndColumn: 3}},
+				},
+				{
+					// Calls from different imports that need the same name insert it at one
+					// point, so the second fix is retried in the next pass and reuses the
+					// import the first one added instead of declaring `test` twice.
+					Code:   "import { it } from '@jest/globals';\nit('a');\nimport { fit } from '@jest/globals';\nfit('b');",
+					Output: []string{"import { test, it } from '@jest/globals';\ntest('a');\nimport { fit } from '@jest/globals';\nfit('b');", "import { test, it } from '@jest/globals';\ntest('a');\nimport { fit } from '@jest/globals';\ntest.only('b');"},
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 3}, {MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 4, Column: 1, EndLine: 4, EndColumn: 4}},
+				},
+				{
+					// The point is the first specifier whose calls become `test`, whichever
+					// call is fixed first.
+					Code:   "import { fit } from '@jest/globals';\nfit('b');\nimport { it } from '@jest/globals';\nit('a');",
+					Output: []string{"import { test, fit } from '@jest/globals';\ntest.only('b');\nimport { it } from '@jest/globals';\nit('a');", "import { test, fit } from '@jest/globals';\ntest.only('b');\nimport { it } from '@jest/globals';\ntest('a');"},
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 4}, {MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 4, Column: 1, EndLine: 4, EndColumn: 3}},
+				},
+				{
+					Code:   "import { it as a } from '@jest/globals';\nimport { it as b } from '@jest/globals';\na('x');\nb('y');",
+					Output: []string{"import { test, it as a } from '@jest/globals';\nimport { it as b } from '@jest/globals';\ntest('x');\nb('y');", "import { test, it as a } from '@jest/globals';\nimport { it as b } from '@jest/globals';\ntest('x');\ntest('y');"},
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 3, Column: 1, EndLine: 3, EndColumn: 2}, {MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 4, Column: 1, EndLine: 4, EndColumn: 2}},
+				},
+				{
+					Code:   "import { it, fit } from '@jest/globals';\nit('a');\nfit('b');",
+					Output: []string{"import { test, it, fit } from '@jest/globals';\ntest('a');\nfit('b');", "import { test, it, fit } from '@jest/globals';\ntest('a');\ntest.only('b');"},
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 3}, {MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 3, Column: 1, EndLine: 3, EndColumn: 4}},
+				},
+				{
+					// Each new name is imported once. The first fix spans from its import to
+					// its call, so the second one is retried in the next pass.
+					Code:   "import { it, xit } from '@jest/globals';\nit('a'); xit('b');",
+					Output: []string{"import { test, it, xit } from '@jest/globals';\ntest('a'); xit('b');", "import { test, it, xtest, xit } from '@jest/globals';\ntest('a'); xtest('b');"},
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 1, EndLine: 2, EndColumn: 3}, {MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 2, Column: 10, EndLine: 2, EndColumn: 13}},
+				},
 			},
 		)
 	})
