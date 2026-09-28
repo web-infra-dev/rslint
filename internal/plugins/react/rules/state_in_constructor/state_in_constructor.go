@@ -33,12 +33,13 @@ var StateInConstructorRule = rule.Rule{
 						return
 					}
 					name := node.Name()
+					var staticName string
 					if name != nil && name.Kind == ast.KindComputedPropertyName {
-						name = utils.ESTreeRuntimeExpression(name.AsComputedPropertyName().Expression)
+						staticName, _ = utils.GetStaticExpressionValue(utils.SkipAssertionsAndParens(name.AsComputedPropertyName().Expression))
+					} else if name != nil {
+						staticName, _ = utils.GetStaticPropertyName(name)
 					}
-					// Upstream reads key.name, including private and computed
-					// identifiers, but not string literals such as ['state'].
-					if reactutil.IdentifierOrPrivateName(name) == "state" && inComponent(node) {
+					if staticName == "state" && inComponent(node) {
 						ctx.ReportNode(node, rule.RuleMessage{
 							Id:          "stateInitConstructor",
 							Description: "State initialization should be in a constructor",
@@ -58,13 +59,13 @@ var StateInConstructorRule = rule.Rule{
 				if ast.IsOptionalChain(left) {
 					return
 				}
-				object, property := utils.MemberExpressionParts(left)
-				object = utils.ESTreeRuntimeExpression(object)
-				property = utils.ESTreeRuntimeExpression(property)
-				if object == nil || object.Kind != ast.KindThisKeyword || reactutil.IdentifierOrPrivateName(property) != "state" {
+				object := utils.ESTreeRuntimeExpression(utils.AccessExpressionObject(left))
+				name, _ := utils.AccessExpressionStaticName(left)
+				if object == nil || object.Kind != ast.KindThisKeyword || name != "state" {
 					return
 				}
-				if inConstructor(node) && inComponent(node) {
+				constructor := ast.GetThisContainer(object, false, false)
+				if ast.IsConstructorDeclaration(constructor) && !ast.HasStaticModifier(constructor) && inComponent(constructor) {
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "stateInitClassProp",
 						Description: "State initialization should be in a class property",
@@ -73,12 +74,4 @@ var StateInConstructorRule = rule.Rule{
 			},
 		}
 	},
-}
-
-func inConstructor(node *ast.Node) bool {
-	// Upstream searches all enclosing scopes, including nested functions
-	// and classes, rather than stopping at the nearest function boundary.
-	return ast.FindAncestor(node.Parent, func(parent *ast.Node) bool {
-		return ast.IsConstructorDeclaration(parent) && !ast.HasStaticModifier(parent)
-	}) != nil
 }

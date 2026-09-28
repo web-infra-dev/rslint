@@ -100,7 +100,8 @@ func ExtendsReactComponent(classNode *ast.Node, pragma string) bool {
 		if obj.Kind != ast.KindIdentifier || obj.AsIdentifier().Text != pragma {
 			return false
 		}
-		return isComponentName(IdentifierOrPrivateName(pa.Name()))
+		name := pa.Name()
+		return name != nil && name.Kind == ast.KindIdentifier && isComponentName(name.AsIdentifier().Text)
 	case ast.KindElementAccessExpression:
 		element := expr.AsElementAccessExpression()
 		object := utils.ESTreeRuntimeExpression(element.Expression)

@@ -20,9 +20,9 @@ func TestStateInConstructorExtras(t *testing.T) {
 			Code: `import { Component as Base } from 'react'; class Plain { state = {}; } const Helper = class extends Other { state = {}; }; class Aliased extends Base { state = {}; }`,
 			Tsx:  true,
 		},
-		// Static fields, literal keys, methods, and accessors are not instance state fields.
+		// Static fields, other keys, methods, and accessors are not instance state fields.
 		{
-			Code: `class C extends React.Component { static state = {}; static #state = {}; 'state' = {}; ['state'] = {}; [state + ''] = {}; state() {} get state() { return {}; } set state(value) {} accessor state = {}; }`,
+			Code: `class C extends React.Component { static state = {}; static #state = {}; 'other' = {}; ['other'] = {}; [state + ''] = {}; state() {} get state() { return {}; } set state(value) {} accessor state = {}; }`,
 			Tsx:  true,
 		},
 		// A non-component class blocks the enclosing component.
@@ -58,9 +58,9 @@ class C extends Base { state = {}; }`,
 			Tsx:     true,
 			Options: []any{"never"},
 		},
-		// Never excludes literal keys, nested properties, other receivers, updates, and patterns.
+		// Never excludes other keys, nested properties, other receivers, updates, and patterns.
 		{
-			Code:    `class C extends Component { constructor() { super(); this['state'] = {}; this[state + ''] = {}; this.state.value = 1; other.state = {}; this.state++; ++this.state; ({ state: this.state } = other); [this.state] = other; this.state === other; } }`,
+			Code:    `class C extends Component { constructor() { super(); this['other'] = {}; this[state + ''] = {}; this.state.value = 1; other.state = {}; this.state++; ++this.state; ({ state: this.state } = other); [this.state] = other; this.state === other; } }`,
 			Tsx:     true,
 			Options: []any{"never"},
 		},
@@ -94,17 +94,84 @@ class C extends Base { state = {}; }`,
 			FileName: "case.tsx",
 			Options:  []any{"always"},
 		},
+		// Nested component methods, field initializers, and static blocks have their own this.
+		{
+			Code:    `class Outer extends React.Component { constructor() { super(); class Inner extends Component { reset() { this.state = {}; } value = (this.state = {}); static { this.state = {}; } } } }`,
+			Tsx:     true,
+			Options: []any{"never"},
+		},
+		// Parameter decorators execute outside the decorated constructor.
+		{
+			Code:     `class C extends React.Component { constructor(@dec(this.state = {}) value) { super(); } }`,
+			FileName: "case.tsx",
+			Options:  []any{"never"},
+		},
+		// A private superclass is not the public React component base.
+		{
+			Code:     `class React { static #Component; static make() { return class C extends React.#Component { state = {}; }; } }`,
+			FileName: "case.tsx",
+			Options:  []any{"always"},
+		},
+		// JSDoc casts do not turn dynamic field keys into static names.
+		{
+			Code:     `class C extends Component { [/** @type {string} */ (state)] = {}; }`,
+			FileName: "case.js",
+			Options:  []any{"always"},
+		},
+		// JSDoc casts do not turn dynamic assignment keys into static names.
+		{
+			Code:     `class C extends Component { constructor() { super(); this[/** @type {string} */ (state)] = {}; } }`,
+			FileName: "case.js",
+			Options:  []any{"never"},
+		},
+		// An identifier named state can resolve to another property; private fields are separate.
+		{
+			Code: `const state = 'other'; class C extends Component { [state] = {}; [(state)] = {}; #state = {}; }`,
+			Tsx:  true,
+		},
+		// Computed identifiers and private members are not public state assignments.
+		{
+			Code:    `const state = 'other'; class C extends Component { #state; constructor() { super(); this[state] = {}; this[(state)] = {}; this.#state = {}; } }`,
+			Tsx:     true,
+			Options: []any{"never"},
+		},
+		// Template substitutions are dynamic field names.
+		{
+			Code: "class C extends Component { [`${state}`] = {}; }",
+			Tsx:  true,
+		},
+		// Template substitutions are dynamic assignment keys.
+		{
+			Code:    "class C extends Component { constructor() { super(); this[`${state}`] = {}; } }",
+			Tsx:     true,
+			Options: []any{"never"},
+		},
+		// Ordinary functions and object methods bind their own this, including arrows inside them.
+		{
+			Code:    `class C extends Component { constructor() { super(); function nested() { this.state = {}; (() => { this.state = {}; })(); } run(function () { this.state = {}; }); const obj = { method() { this.state = {}; }, get value() { this.state = {}; }, set value(v) { this.state = {}; } }; } }`,
+			Tsx:     true,
+			Options: []any{"never"},
+		},
+		// Inner field arrows and static initializers do not inherit an outer constructor this.
+		{
+			Code:    `class Outer extends Component { constructor() { super(); class Inner extends Component { value = () => { this.state = {}; }; static value = (this.state = {}); static { (() => { this.state = {}; })(); } } } }`,
+			Tsx:     true,
+			Options: []any{"never"},
+		},
+		// A computed method key uses the outer non-component constructor this.
+		{
+			Code:    `class Outer { constructor() { class Inner extends Component { [this.state = {}]() {} } } }`,
+			Tsx:     true,
+			Options: []any{"never"},
+		},
 	}, []rule_tester.InvalidTestCase{
-		// Always explicitly reports each identifier-shaped instance state field.
+		// Only the direct public field is state; computed identifiers and private fields are not.
 		{
 			Code:    `class C extends Component { state; [state] = {}; [(state)] = {}; #state = {}; }`,
 			Tsx:     true,
 			Options: []any{"always"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 29, EndLine: 1, EndColumn: 35},
-				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 36, EndLine: 1, EndColumn: 49},
-				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 50, EndLine: 1, EndColumn: 65},
-				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 66, EndLine: 1, EndColumn: 78},
 			},
 		},
 		// PureComponent, computed identifier heritage, and class expressions are recognized.
@@ -189,7 +256,7 @@ class C extends Custom.Component { state = {}; }`,
 				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 44, EndLine: 3, EndColumn: 3},
 			},
 		},
-		// Never includes compound, logical, computed identifier, and private assignments.
+		// Compound and logical assignments to public state are checked; dynamic and private names are not.
 		{
 			Code:    `class C extends Component { #state; constructor() { super(); this.state += 1; this.state ??= {}; this[state] = {}; this.#state = {}; } }`,
 			Tsx:     true,
@@ -197,21 +264,18 @@ class C extends Custom.Component { state = {}; }`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 62, EndLine: 1, EndColumn: 77},
 				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 79, EndLine: 1, EndColumn: 96},
-				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 98, EndLine: 1, EndColumn: 114},
-				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 116, EndLine: 1, EndColumn: 132},
 			},
 		},
-		// Parentheses around receivers, keys, targets, and assignments stay transparent.
+		// Parentheses around receivers and targets stay transparent; dynamic keys remain dynamic.
 		{
 			Code:    `class C extends React.Component { constructor() { super(); ((this).state) = {}; ((this[(state)] = {})); } }`,
 			Tsx:     true,
 			Options: []any{"never"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 60, EndLine: 1, EndColumn: 79},
-				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 83, EndLine: 1, EndColumn: 101},
 			},
 		},
-		// Constructor scopes include parameter defaults and nested functions.
+		// Constructor parameter defaults and arrows share this; ordinary nested functions do not.
 		{
 			Code:    `class C extends React.Component { constructor(value = (this.state = {})) { super(); const arrow = () => { this.state = {}; }; function inner() { this.state = {}; } run(function () { this.state = {}; }); } }`,
 			Tsx:     true,
@@ -219,19 +283,6 @@ class C extends Custom.Component { state = {}; }`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 56, EndLine: 1, EndColumn: 71},
 				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 107, EndLine: 1, EndColumn: 122},
-				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 146, EndLine: 1, EndColumn: 161},
-				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 183, EndLine: 1, EndColumn: 198},
-			},
-		},
-		// Constructor search crosses inner component methods, fields, and static blocks.
-		{
-			Code:    `class Outer extends React.Component { constructor() { super(); class Inner extends Component { reset() { this.state = {}; } value = (this.state = {}); static { this.state = {}; } } } }`,
-			Tsx:     true,
-			Options: []any{"never"},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 106, EndLine: 1, EndColumn: 121},
-				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 134, EndLine: 1, EndColumn: 149},
-				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 161, EndLine: 1, EndColumn: 176},
 			},
 		},
 		// String-named constructors count as constructors.
@@ -263,15 +314,6 @@ class C extends Custom.Component { state = {}; }`,
 				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 60, EndLine: 1, EndColumn: 96},
 			},
 		},
-		// decoratedParameter; checked against eslint-plugin-react v7.37.5.
-		{
-			Code:     `class C extends React.Component { constructor(@dec(this.state = {}) value) { super(); } }`,
-			FileName: "case.tsx",
-			Options:  []any{"never"},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 52, EndLine: 1, EndColumn: 67},
-			},
-		},
 		// computedMethodInConstructor; checked against eslint-plugin-react v7.37.5.
 		{
 			Code:     `class Outer extends React.Component { constructor() { super(); class C extends Component { [this.state = {}]() {} } } }`,
@@ -281,15 +323,6 @@ class C extends Custom.Component { state = {}; }`,
 				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 93, EndLine: 1, EndColumn: 108},
 			},
 		},
-		// privateBase; checked against eslint-plugin-react v7.37.5.
-		{
-			Code:     `class React { static #Component; static make() { return class C extends React.#Component { state = {}; }; } }`,
-			FileName: "case.tsx",
-			Options:  []any{"always"},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 92, EndLine: 1, EndColumn: 103},
-			},
-		},
 		// jsdocBase; checked against eslint-plugin-react v7.37.5.
 		{
 			Code:     `class C extends (/** @type {any} */ (React.Component)) { state = {}; }`,
@@ -297,24 +330,6 @@ class C extends Custom.Component { state = {}; }`,
 			Options:  []any{"always"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 58, EndLine: 1, EndColumn: 69},
-			},
-		},
-		// jsdocComputedKey; checked against eslint-plugin-react v7.37.5.
-		{
-			Code:     `class C extends Component { [/** @type {string} */ (state)] = {}; }`,
-			FileName: "case.js",
-			Options:  []any{"always"},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 29, EndLine: 1, EndColumn: 66},
-			},
-		},
-		// jsdocComputedAccess; checked against eslint-plugin-react v7.37.5.
-		{
-			Code:     `class C extends Component { constructor() { super(); this[/** @type {string} */ (state)] = {}; } }`,
-			FileName: "case.js",
-			Options:  []any{"never"},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 54, EndLine: 1, EndColumn: 94},
 			},
 		},
 		// optionalRhs; checked against eslint-plugin-react v7.37.5.
@@ -343,6 +358,87 @@ export default class C { state = {}; }`,
 			Options:  []any{"always"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 68, EndLine: 1, EndColumn: 78},
+			},
+		},
+		// Public string and static template field names denote state.
+		{
+			Code:    "class C extends Component { 'state' = {}; ['state'] = {}; [('state')] = {}; [`state`] = {}; ['st\\u0061te'] = {}; }",
+			Tsx:     true,
+			Options: []any{"always"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 29, EndLine: 1, EndColumn: 42},
+				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 43, EndLine: 1, EndColumn: 58},
+				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 59, EndLine: 1, EndColumn: 76},
+				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 77, EndLine: 1, EndColumn: 92},
+				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 93, EndLine: 1, EndColumn: 113},
+			},
+		},
+		// Public computed string and static template assignments denote state.
+		{
+			Code:    "class C extends Component { constructor() { super(); this['state'] = {}; this[('state')] = {}; this[`state`] = {}; this['st\\u0061te'] = {}; } }",
+			Tsx:     true,
+			Options: []any{"never"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 54, EndLine: 1, EndColumn: 72},
+				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 74, EndLine: 1, EndColumn: 94},
+				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 96, EndLine: 1, EndColumn: 114},
+				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 116, EndLine: 1, EndColumn: 139},
+			},
+		},
+		// JSDoc casts preserve literal field keys.
+		{
+			Code:     `class C extends Component { [/** @type {string} */ ('state')] = {}; }`,
+			FileName: "case.js",
+			Options:  []any{"always"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 29, EndLine: 1, EndColumn: 68},
+			},
+		},
+		// JSDoc casts preserve literal assignment keys.
+		{
+			Code:     `class C extends Component { constructor() { super(); this[/** @type {string} */ ('state')] = {}; } }`,
+			FileName: "case.js",
+			Options:  []any{"never"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 54, EndLine: 1, EndColumn: 96},
+			},
+		},
+		// Computed names use the outer component constructor this even in non-components.
+		{
+			Code:    `class Outer extends Component { constructor() { super(); class Inner { [this.state = {}]() {} } const obj = { [this.state = {}]() {} }; } }`,
+			Tsx:     true,
+			Options: []any{"never"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 73, EndLine: 1, EndColumn: 88},
+				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 112, EndLine: 1, EndColumn: 127},
+			},
+		},
+		// Nested constructors use their own component and nested arrows retain the outer this.
+		{
+			Code:    `class Outer extends Component { constructor() { super(); class Inner extends Component { constructor() { super(); this.state = {}; } } (() => () => { this.state = {}; })(); } }`,
+			Tsx:     true,
+			Options: []any{"never"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 115, EndLine: 1, EndColumn: 130},
+				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 151, EndLine: 1, EndColumn: 166},
+			},
+		},
+		// Type assertions preserve a literal property name.
+		{
+			Code:    `class C extends Component { [('state' as const)] = {}; }`,
+			Tsx:     true,
+			Options: []any{"always"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 29, EndLine: 1, EndColumn: 55},
+			},
+		},
+		// Type assertions preserve a literal property name.
+		{
+			Code:    `class C extends Component { constructor() { super(); this[('state' as const)] = {}; } }`,
+			Tsx:     true,
+			Options: []any{"never"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "stateInitClassProp", Message: "State initialization should be in a class property", Line: 1, Column: 54, EndLine: 1, EndColumn: 83},
 			},
 		},
 	})

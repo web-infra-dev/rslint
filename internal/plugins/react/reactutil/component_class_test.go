@@ -99,7 +99,7 @@ func TestExtendsReactComponent(t *testing.T) {
 		{"JSDoc base cast", `class C extends (/** @type {any} */ (React.Component)) {}`, "", core.ScriptKindJSX, []bool{true}},
 		{"JSDoc receiver cast", `class C extends (/** @type {any} */ (Custom)).Component {}`, "Custom", core.ScriptKindJSX, []bool{true}},
 		{"JSDoc computed key cast", `class C extends React[/** @type {string} */ (Component)] {}`, "", core.ScriptKindJSX, []bool{true}},
-		{"private base", `class React { static #Component; static make() { return class C extends React.#Component {}; } }`, "", core.ScriptKindTSX, []bool{false, true}},
+		{"private base", `class React { static #Component; static make() { return class C extends React.#Component {}; } }`, "", core.ScriptKindTSX, []bool{false, false}},
 		{"authored TypeScript cast", `class C extends (React.Component as any) {}`, "", core.ScriptKindTSX, []bool{false}},
 		{"literal base key", `class C extends React['Component'] {}`, "", core.ScriptKindJSX, []bool{false}},
 		{"optional base with JSDoc", `class C extends (/** @type {any} */ (React?.Component)) {}`, "", core.ScriptKindJSX, []bool{false}},

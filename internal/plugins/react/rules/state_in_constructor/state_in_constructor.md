@@ -54,6 +54,30 @@ The `"always"` mode ignores static fields. Both modes apply only to recognized R
 
 The rule supports `settings.react.pragma` and `@jsx` annotations when identifying React class components.
 
+## Differences from upstream
+
+rslint intentionally differs from eslint-plugin-react 7.37.5 in these cases:
+
+- Public string and static template keys, such as `['state']` and `` [`state`] ``, are checked just like `.state`. Private `#state` and dynamic keys are ignored. For example, with `const state = 'other'`, `[state]` initializes `other` and is not reported. Variable values and template substitutions are not resolved.
+- With `"never"`, assignments must use a component constructor's `this`. Arrow functions retain that `this`; ordinary functions, nested class methods, field initializers, and static blocks have their own `this` and are not attributed to an outer constructor.
+- A private superclass such as `React.#Component` or `React.#PureComponent` does not identify a React component.
+
+For example, with `"never"`, only the arrow's assignment is reported:
+
+```jsx
+class Counter extends React.Component {
+  constructor(props) {
+    super(props);
+    const initialize = () => {
+      this['state'] = {};
+    };
+    function helper() {
+      this.state = {};
+    }
+  }
+}
+```
+
 ## When not to use it
 
 Disable this rule if your project allows both initialization styles.
