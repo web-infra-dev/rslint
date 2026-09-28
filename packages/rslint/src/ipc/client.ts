@@ -234,7 +234,7 @@ export class IpcClient {
     return response;
   }
 
-  private configureSources(): Promise<void> {
+  private async configureSources(): Promise<void> {
     // Publish the promise before writing: even an in-process peer can reenter.
     // This RPC uses pending/write directly and never waits for its own bootstrap.
     this.bootstrapPromise ??= Promise.resolve().then(async () => {
@@ -259,7 +259,7 @@ export class IpcClient {
     return this.bootstrapPromise;
   }
 
-  private writeRequest<TIn = unknown, TOut = unknown>(
+  private async writeRequest<TIn = unknown, TOut = unknown>(
     kind: string,
     data: TIn,
     attachments?: readonly string[],

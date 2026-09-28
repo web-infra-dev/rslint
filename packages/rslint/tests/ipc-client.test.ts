@@ -412,7 +412,9 @@ describe('IPC text attachments', () => {
         fd() {
           return platform === 'windows' ? null : 5;
         }
-        configure() {}
+        configure(config: SourceConfiguration) {
+          expect(config).toEqual(SOURCE_CONFIG);
+        }
         descriptor() {
           return {
             version: SOURCE_CONFIG.version,
