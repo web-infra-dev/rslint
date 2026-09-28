@@ -1,7 +1,6 @@
 package valid_expect_with_promise
 
 import (
-	_ "embed"
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -10,26 +9,19 @@ import (
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/valid_expect_with_promise"
 )
-
-//go:embed valid_expect_with_promise.schema.json
-var schema []byte
 
 var ValidExpectWithPromiseRule = rule.Rule{
 	Name:             "rstest/valid-expect-with-promise",
 	RequiresTypeInfo: true,
-	Schema:           rule.NewSchema(schema),
+	Schema:           shared.Schema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		checkThenables := false
-		if len(options) > 0 {
-			if option, ok := options[0].(map[string]any); ok {
-				checkThenables, _ = option["checkThenables"].(bool)
-			}
-		}
+		checkThenables := shared.ParseOptions(options).CheckThenables
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		isPromise := func(node *ast.Node, typ *checker.Type) bool {
 			return utils.IsPromiseLike(ctx.Program(), ctx.TypeChecker, typ) ||
-				(checkThenables && isStrictThenable(ctx.TypeChecker, node, typ))
+				(checkThenables && shared.IsStrictThenable(ctx.TypeChecker, node, typ))
 		}
 		return rule.RuleListeners{ast.KindCallExpression: func(node *ast.Node) {
 			parsed := analysis.ParseExpectCallThroughTransparentExpressions(node)
@@ -50,7 +42,7 @@ var ValidExpectWithPromiseRule = rule.Rule{
 				},
 			)
 			if poorlyExpected {
-				ctx.ReportNode(parsed.Expression, rule.RuleMessage{Id: "poorlyExpectedPromise", Description: "Subject is a promise so resolve or reject should be used"})
+				ctx.ReportNode(parsed.Expression, shared.PoorlyExpectedPromiseMessage)
 				return
 			}
 			if modifier == nil || !known {
@@ -71,7 +63,7 @@ var ValidExpectWithPromiseRule = rule.Rule{
 				promise = isPromise(subject, typ)
 			}
 			if !promise {
-				ctx.ReportNode(modifier.Node, rule.RuleMessage{Id: "unneededRejectResolve", Description: "Subject is not a promise so " + modifier.Name + " is not needed"})
+				ctx.ReportNode(modifier.Node, shared.UnneededRejectResolveMessage(modifier.Name))
 			}
 		}}
 	},
@@ -177,38 +169,4 @@ func callableReturnType(typeChecker *checker.Checker, subject *ast.Node, typ *ch
 		}
 	}
 	return checker.Checker_getReturnTypeOfSignature(typeChecker, signature), true
-}
-
-// A single-callback chainable is deliberately excluded, unlike utils.IsThenableType.
-func isStrictThenable(typeChecker *checker.Checker, node *ast.Node, typ *checker.Type) bool {
-	if utils.IsIntersectionType(typ) {
-		return slices.ContainsFunc(typ.Types(), func(part *checker.Type) bool { return isStrictThenable(typeChecker, node, part) })
-	}
-	if utils.IsUnionType(typ) {
-		return utils.Every(typ.Types(), func(part *checker.Type) bool { return isStrictThenable(typeChecker, node, part) })
-	}
-	if utils.IsTypeParameter(typ) {
-		constraint := checker.Checker_getBaseConstraintOfType(typeChecker, typ)
-		return constraint != nil && isStrictThenable(typeChecker, node, constraint)
-	}
-	then := checker.Checker_getPropertyOfType(typeChecker, typ, "then")
-	if then == nil {
-		return false
-	}
-	for _, part := range utils.UnionTypeParts(typeChecker.GetTypeOfSymbolAtLocation(then, node)) {
-		for _, signature := range checker.Checker_getSignaturesOfType(typeChecker, part, checker.SignatureKindCall) {
-			parameters := checker.Signature_parameters(signature)
-			if len(parameters) >= 2 && isFunctionParameter(typeChecker, node, parameters[0]) && isFunctionParameter(typeChecker, node, parameters[1]) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func isFunctionParameter(typeChecker *checker.Checker, node *ast.Node, parameter *ast.Symbol) bool {
-	typ := checker.Checker_getApparentType(typeChecker, typeChecker.GetTypeOfSymbolAtLocation(parameter, node))
-	return slices.ContainsFunc(utils.UnionTypeParts(typ), func(part *checker.Type) bool {
-		return len(checker.Checker_getSignaturesOfType(typeChecker, part, checker.SignatureKindCall)) > 0
-	})
 }
