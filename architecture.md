@@ -1565,9 +1565,30 @@ and platform mapping files live in the same IPC package. Closing the channel
 rejects new work, wakes pending calls and waits for a current source writer
 before releasing the mapping; mapped slices never escape the storage implementation.
 
-On Node, `spawnIpcPeer` prepares an empty anonymous Unix descriptor before
-spawning Go; Windows needs no mapping at this point. Before sending the first
-application request, `IpcClient` requests the storage configuration through the
+On Node, CLI and the resident API share `spawnIpcProcess` and `IpcClient` for
+process startup, framing, request matching and reverse-request dispatch. The
+API adapter owns only process lifetime, activity-based `ref`/`unref` and the
+projection from response envelopes to API payloads. Its existing inline plugin
+wire format does not negotiate shared storage. API request serialization and
+configuration generations remain in their application owners.
+
+`IpcClient` has one terminal cleanup path for explicit close, input EOF/close,
+read errors and output errors/close/finish. It detaches its listeners, rejects
+pending requests, clears retained buffers and handlers, closes native storage
+once, and publishes the first terminal error through `done` even if native
+cleanup fails. Request rejection and transport termination remain distinguishable
+when their events arrive together. A stream fault does
+not wait for the child process to exit. The API adapter terminates its child
+when the channel closes, so a pending reverse handler cannot keep a broken
+session alive. The process factory owns pipe error guards until child `close`,
+covering queued write errors after the client has detached its own listeners.
+The CLI allows a disconnected child the existing process-exit grace period,
+preserving its natural exit code. A child that outlives that grace is terminated
+and reported as a host failure.
+
+For CLI source attachments, `spawnIpcProcess` prepares an empty anonymous Unix
+descriptor before spawning Go; Windows needs no mapping at this point. Before
+sending the first application request, `IpcClient` requests the storage configuration through the
 same channel's `transportConfig` request. Go supplies the layout, and Rust
 uses it to size and map the arena. The configuration request is handled inside
 IPC and does not consume the application request's mapping bootstrap. Concurrent
@@ -1580,7 +1601,7 @@ registers a native capability, dispatches the application handler and revokes
 the capability before returning either a result or an error. It acknowledges
 reuse only when native revocation succeeds. Go matches that acknowledgement
 to the exact batch of the pending request; ordinary results, cancellation and
-timeouts never grant reuse. The CLI application codec resolves file attachment
+timeouts never grant reuse. The CLI application adapter resolves file attachment
 indices into inline strings or opaque native capabilities before worker dispatch.
 
 Linux uses a sealed anonymous memory file, macOS an immediately unlinked POSIX
@@ -1601,6 +1622,9 @@ of the required JavaScript SourceCode string; the memory module handles only
 resources and bounded byte access. ESTree JSON is unchanged. If a reader is
 still active at revocation, its slot is permanently retired, so cancellation,
 shutdown and late worker results cannot authorize an overlapping write.
+Worker termination may remain pending until synchronous native parsing returns.
+Both parser entries preserve N-API's pending exception or termination state
+during result conversion instead of trying to throw a second exception.
 
 `internal/ipc/protocol.go` owns the storage settings: slot count, slot size,
 control-region size and publication stride. They travel to Node and Rust at

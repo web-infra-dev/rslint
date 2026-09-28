@@ -192,15 +192,31 @@ describe('IPC text attachments', () => {
     }
   });
 
-  test.each(['before response', 'after response'] as const)(
-    'close during bootstrap rejects every waiter without configuring or sending init: %s',
-    async (when) => {
+  test.each([
+    { when: 'before request', closeThrows: false },
+    { when: 'before response', closeThrows: false },
+    { when: 'after response', closeThrows: false },
+    { when: 'after error response', closeThrows: false },
+    { when: 'before request', closeThrows: true },
+    { when: 'before response', closeThrows: true },
+    { when: 'after response', closeThrows: true },
+    { when: 'after error response', closeThrows: true },
+  ])(
+    'close during bootstrap rejects every waiter without configuring or sending init: %j',
+    async ({ when, closeThrows }) => {
       const sources = createSourceTransport();
       let configured = 0;
       const configure = sources.configure;
       sources.configure = (value) => {
         configured++;
         configure(value);
+      };
+      let closeCalls = 0;
+      const closeSources = sources.close;
+      sources.close = () => {
+        closeCalls++;
+        closeSources();
+        if (closeThrows) throw new Error('native cleanup failed');
       };
       const pair = pairClients({ sourceTransport: sources });
       const frames: IpcMessage[] = [];
@@ -209,29 +225,41 @@ describe('IPC text attachments', () => {
       });
       pair.b.start();
       try {
-        const configurationRequest = once(pair.streams.bToA, 'data');
+        const configurationRequest =
+          when === 'before request'
+            ? undefined
+            : once(pair.streams.bToA, 'data');
         const pending = Promise.allSettled([
           pair.b.sendRequest('init', {}),
           pair.b.sendRequest('other', {}),
         ]);
-        const config = decodeFrame((await configurationRequest)[0])!.msg;
-        if (when === 'after response') {
+        const config = configurationRequest
+          ? decodeFrame((await configurationRequest)[0])!.msg
+          : undefined;
+        if (when === 'after response' || when === 'after error response') {
           pair.streams.aToB.write(
             encodeFrame({
-              kind: 'response',
-              id: config.id,
-              data: SOURCE_CONFIG,
+              kind: when === 'after response' ? 'response' : 'error',
+              id: config!.id,
+              data:
+                when === 'after response'
+                  ? SOURCE_CONFIG
+                  : { message: 'unsupported transportConfig' },
             }),
           );
         }
-        pair.b.close();
+        const reason = new Error('test session closed');
+        pair.b.close(reason);
+        expect(await pair.b.done).toBe(reason);
         for (const result of await pending) {
           expect(result.status).toBe('rejected');
-          if (result.status === 'rejected')
-            expect(result.reason.message).toContain('closed');
+          if (result.status === 'rejected') expect(result.reason).toBe(reason);
         }
         expect(configured).toBe(0);
-        expect(frames.map(({ kind }) => kind)).toEqual(['transportConfig']);
+        expect(closeCalls).toBe(1);
+        expect(frames.map(({ kind }) => kind)).toEqual(
+          when === 'before request' ? [] : ['transportConfig'],
+        );
         expect(sources.fd()).toBeUndefined();
       } finally {
         pair.cleanup();
@@ -1389,7 +1417,7 @@ describe('Schema parity with Go (smoke)', () => {
     // Await the actual teardown outcome. The suite's finite outer bound is the
     // deadlock sentinel if a mutation seals the client but forgets to reject
     // pending requests; no promise-layer count is part of this contract.
-    await expect(pending).rejects.toThrow(/peer closed input stream/);
+    await expect(pending).rejects.toThrow(/input read failed.*exceeds cap/);
 
     // The cap-specific diagnostic — emitted ONLY by the guard — must be
     // present. A deleted/disabled guard leaves stderr empty here.
@@ -1537,4 +1565,268 @@ describe('IpcClient rejects pending on clean output close (no hang)', () => {
     await expect(client.sendRequest('init', {})).rejects.toThrow(/closed/);
     client.close();
   });
+});
+
+describe('IpcClient terminal cleanup', () => {
+  test.each([
+    null,
+    [],
+    'text',
+    true,
+    1,
+    {},
+    { kind: 'log' },
+    { kind: 42, id: 0 },
+    { kind: 'log', id: null },
+    { kind: 'log', id: -1 },
+    { kind: 'log', id: 0.5 },
+    { kind: 'log', id: '0' },
+    { kind: 'log', id: Number.MAX_SAFE_INTEGER + 1 },
+  ])('closes on an invalid envelope before dispatch: %j', async (envelope) => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const client = new IpcClient(input, output);
+    let dispatched = 0;
+    client.setInboundHandler(() => {
+      dispatched++;
+    });
+    client.registerNotification('log', () => {
+      dispatched++;
+    });
+    client.start();
+    const pending = Promise.allSettled([client.sendRequest('lint', {})]);
+    try {
+      const frame = encodeFrame(envelope as IpcMessage);
+      const response = encodeFrame({ kind: 'response', id: 1, data: {} });
+      // Invalid header data must neither escape the data listener nor allow
+      // later frames in the same chunk to resolve a request on this session.
+      expect(() => input.write(Buffer.concat([frame, response]))).not.toThrow();
+      expect(client.isClosed).toBe(true);
+      await client.done;
+      expect(dispatched).toBe(0);
+      const [result] = await pending;
+      expect(result.status).toBe('rejected');
+      if (result.status === 'rejected') {
+        expect(result.reason.message).toContain('invalid message envelope');
+      }
+    } finally {
+      client.close();
+      input.destroy();
+      output.destroy();
+    }
+  });
+
+  test('preserves recovery after malformed JSON with an intact frame boundary', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const client = new IpcClient(input, output);
+    client.start();
+    try {
+      const pending = client.sendRequest('lint', {});
+      const malformed = Buffer.from([1, 0, 0, 0, 0x7b]); // One-byte JSON body: {
+      input.write(
+        Buffer.concat([
+          malformed,
+          encodeFrame({ kind: 'response', id: 1, data: { recovered: true } }),
+        ]),
+      );
+      expect((await pending).data).toEqual({ recovered: true });
+      expect(client.isClosed).toBe(false);
+    } finally {
+      client.close();
+      input.destroy();
+      output.destroy();
+    }
+  });
+
+  test.each(['notification', 'response', 'request'] as const)(
+    'suppresses a %s when serialization closes the client',
+    async (kind) => {
+      const input = new PassThrough();
+      const output = new PassThrough();
+      const client = new IpcClient(input, output);
+      const frames: Buffer[] = [];
+      output.on('data', (chunk: Buffer) => frames.push(chunk));
+      client.start();
+      try {
+        const data = {
+          toJSON() {
+            client.close();
+            return {};
+          },
+        };
+        if (kind === 'notification') client.sendNotification('log', data);
+        else if (kind === 'response') client.sendResponse(1, data);
+        else {
+          const pending = client.sendRequest('init', data);
+          await expect(pending).rejects.toBe(await client.done);
+        }
+        expect(client.isClosed).toBe(true);
+        expect(frames).toEqual([]);
+      } finally {
+        client.close();
+        input.destroy();
+        output.destroy();
+      }
+    },
+  );
+
+  const endings = [
+    'explicit close',
+    'input end',
+    'input close',
+    'input error',
+    'output error',
+    'output close',
+    'output finish',
+    'write throws',
+  ] as const;
+
+  test.each(
+    endings.flatMap((ending) => [
+      { ending, closeThrows: false },
+      { ending, closeThrows: true },
+    ]),
+  )(
+    'cleans the session once and preserves its termination reason: %j',
+    async ({ ending, closeThrows }) => {
+      const input = new PassThrough();
+      const output = new PassThrough();
+      const sources = createSourceTransport();
+      const client = new IpcClient(input, output, { sourceTransport: sources });
+      let completed = 0;
+      const completedSession = client.done.then((reason) => {
+        completed++;
+        // Completion observes fully detached streams and released storage.
+        expect(closeCalls).toBe(1);
+        expect(input.listenerCount('data')).toBe(0);
+        expect(sources.fd()).toBeUndefined();
+        return reason;
+      });
+      const reason = new Error('test termination');
+      const closeSources = sources.close;
+      const write = output.write;
+      let closeCalls = 0;
+      sources.close = () => {
+        closeCalls++;
+        // Teardown is already sealed if native cleanup reenters the client.
+        client.close(new Error('reentrant close'));
+        closeSources();
+        if (closeThrows) throw new Error('native cleanup failed');
+      };
+      let requests = 0;
+      let sent!: () => void;
+      const requestsSent = new Promise<void>((resolve) => {
+        sent = resolve;
+      });
+      output.on('data', (chunk: Buffer) => {
+        const frame = decodeFrame(chunk)!.msg;
+        if (frame.kind === 'transportConfig') {
+          input.write(
+            encodeFrame({
+              kind: 'response',
+              id: frame.id,
+              data: SOURCE_CONFIG,
+            }),
+          );
+        } else if (++requests === 2) {
+          sent();
+        }
+      });
+      client.setInboundHandler(() => undefined);
+      client.registerNotification('log', () => undefined);
+      client.start();
+      try {
+        const pending = Promise.allSettled([
+          client.sendRequest('first', {}),
+          client.sendRequest('second', {}),
+        ]);
+        await requestsSent;
+        expect(completed).toBe(0);
+        // An unfinished frame must stop retaining its buffer after termination.
+        input.write(Buffer.from([0, 1]));
+
+        let expected = 'test termination';
+        if (ending === 'explicit close') {
+          client.close(reason);
+        } else if (ending === 'input end') {
+          expected = 'IpcClient: peer closed input stream';
+          const ended = once(input, 'end');
+          input.end();
+          await ended;
+        } else if (ending === 'input close') {
+          expected = 'IpcClient: peer closed input stream';
+          const closed = once(input, 'close');
+          input.destroy();
+          await closed;
+        } else if (ending === 'input error' || ending === 'output error') {
+          expected =
+            ending === 'input error'
+              ? 'IpcClient: input read failed: test termination'
+              : 'IpcClient: output write failed: test termination';
+          const stream = ending === 'input error' ? input : output;
+          const errored = once(stream, 'error');
+          stream.destroy(reason);
+          await errored;
+        } else if (ending === 'output close' || ending === 'output finish') {
+          expected = 'IpcClient: output stream closed before response received';
+          const ended = once(
+            output,
+            ending === 'output close' ? 'close' : 'finish',
+          );
+          if (ending === 'output close') output.destroy();
+          else output.end();
+          await ended;
+        } else {
+          expected = 'IpcClient: output write failed: test termination';
+          output.write = () => {
+            throw reason;
+          };
+          client.sendNotification('log', {});
+        }
+        client.close(new Error('later close'));
+        client.start();
+
+        const closeReason = await completedSession;
+        for (const result of await pending) {
+          expect(result.status).toBe('rejected');
+          if (result.status === 'rejected') {
+            expect(result.reason.message).toBe(expected);
+            expect(result.reason).toBe(closeReason);
+            if (ending === 'explicit close') expect(result.reason).toBe(reason);
+          }
+        }
+        expect(await client.done).toBe(closeReason);
+        expect(completed).toBe(1);
+        expect(client.isClosed).toBe(true);
+        expect(closeCalls).toBe(1);
+        expect(sources.fd()).toBeUndefined();
+        for (const event of ['data', 'end', 'close', 'error']) {
+          expect(input.listenerCount(event)).toBe(0);
+        }
+        for (const event of ['error', 'close', 'finish']) {
+          expect(output.listenerCount(event)).toBe(0);
+        }
+        const state = client as unknown as {
+          chunks: Buffer[];
+          bufferedBytes: number;
+          pending: Map<number, unknown>;
+          inboundHandler: unknown;
+          notificationHandlers: Map<string, unknown>;
+        };
+        expect(state.chunks).toEqual([]);
+        expect(state.bufferedBytes).toBe(0);
+        expect(state.pending.size).toBe(0);
+        expect(state.inboundHandler).toBeNull();
+        expect(state.notificationHandlers.size).toBe(0);
+        await expect(client.sendRequest('late', {})).rejects.toThrow(/closed/);
+      } finally {
+        output.write = write;
+        client.close();
+        closeSources();
+        input.destroy();
+        output.destroy();
+      }
+    },
+  );
 });

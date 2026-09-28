@@ -5,6 +5,8 @@
 //! No mapped memory or pointer is exposed to JavaScript; AST JSON is unchanged.
 
 mod mapping;
+#[cfg(feature = "test-worker-termination")]
+pub(crate) mod worker_test;
 
 use napi::{Error, Result};
 use napi_derive::napi;
@@ -458,6 +460,7 @@ mod tests {
             |bytes| {
                 assert!(!arena.release(id));
                 assert!(!readers().lock().unwrap().contains_key(&id));
+                arena.mapping.as_ref().unwrap().publish_for_test(0, 2);
                 assert!(arena.register(0, 2, 8).is_err());
                 arena.close();
                 assert!(arena.descriptor().is_err());

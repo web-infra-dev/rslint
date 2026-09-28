@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'rstack/test';
 import { ChildProcess } from 'node:child_process';
+import { once } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import { PassThrough, Writable } from 'node:stream';
@@ -9,6 +10,7 @@ import { runEngine } from '../src/cli/engine.js';
 import { ConfigModuleHost } from '../src/config/config-loader.js';
 import { resolveRslintBinary } from '../src/internal/resolve-binary.js';
 import { createSourceTransport } from '../src/ipc/source-transport.js';
+import { IpcClient, encodeFrame } from '../src/ipc/client.js';
 import { createPluginLintHost } from '../src/eslint-plugin/host.js';
 import {
   parse,
@@ -201,6 +203,165 @@ describe('runEngine init payload TTY fact', () => {
     expect(exitCode).toBe(0);
     expect(payload.runtime?.stdoutIsTTY).toBe(false);
   });
+});
+
+describe('runEngine IPC disconnect cleanup', () => {
+  function start(mode: string) {
+    const stderr = new PassThrough();
+    const state = { stderr: '', timedOut: false };
+    stderr.on('data', (chunk: Buffer) => {
+      state.stderr += chunk.toString();
+    });
+    let child: ChildProcess | undefined;
+    const originalOnce = ChildProcess.prototype.once;
+    ChildProcess.prototype.once = function (event, listener) {
+      // Capture the actual spawned process to control EOF/exit ordering.
+      // rslint-disable-next-line @typescript-eslint/no-this-alias
+      if (event === 'exit' && !child) child = this;
+      return originalOnce.call(this, event, listener);
+    } as typeof ChildProcess.prototype.once;
+    let run: Promise<number>;
+    try {
+      run = runEngine({
+        binPath: process.execPath,
+        goArgs: [FAKE_BIN, mode],
+        stdout: new PassThrough(),
+        stderr,
+        createSourceTransport: () => undefined,
+      });
+    } finally {
+      ChildProcess.prototype.once = originalOnce;
+    }
+    if (!child)
+      throw new Error('engine did not install its child exit handler');
+    const spawned = child;
+    // Only a failed lifecycle reaches this watchdog. Successful tests wait
+    // for actual EOF/process events and never advance via a short sleep.
+    const watchdog = setTimeout(() => {
+      state.timedOut = true;
+      spawned.kill('SIGKILL');
+    }, 15_000);
+    return {
+      child: spawned,
+      run,
+      state,
+      cleanup() {
+        clearTimeout(watchdog);
+        spawned.kill('SIGKILL');
+      },
+    };
+  }
+
+  test.each(['eof-before-init', 'eof-after-init'])(
+    'terminates a child that remains alive after %s and reports host failure',
+    async (mode) => {
+      const fixture = start(mode);
+      try {
+        await once(fixture.child.stdout!, 'end');
+        expect(fixture.child.exitCode).toBeNull();
+        expect(await fixture.run).toBe(2);
+        expect(fixture.state.timedOut).toBe(false);
+        expect(fixture.state.stderr).toContain(
+          'Go IPC closed without process exit; terminating Go process',
+        );
+        expect(fixture.child.killed).toBe(true);
+        expect(
+          fixture.child.exitCode !== null || fixture.child.signalCode !== null,
+        ).toBe(true);
+      } finally {
+        fixture.cleanup();
+      }
+    },
+    20_000,
+  );
+
+  test.each(
+    ['eof-before-init', 'eof-after-init'].flatMap((mode) => [
+      { mode, exitCode: 0 },
+      { mode, exitCode: 23 },
+    ]),
+  )(
+    'preserves the natural child exit code after EOF: %j',
+    async ({ mode, exitCode }) => {
+      const fixture = start(mode);
+      try {
+        await once(fixture.child.stdout!, 'end');
+        expect(fixture.child.exitCode).toBeNull();
+        expect(fixture.child.killed).toBe(false);
+        // This fixture control travels directly over the still-open pipe only
+        // after Node has observed EOF. The closed IpcClient sends no new work.
+        fixture.child.stdin!.write(
+          encodeFrame({
+            kind: 'exit-after-eof',
+            id: 0,
+            data: { code: exitCode },
+          }),
+        );
+        expect(await fixture.run).toBe(exitCode);
+        expect(fixture.state.timedOut).toBe(false);
+        expect(fixture.child.killed).toBe(false);
+        expect(fixture.state.stderr).not.toContain('terminating Go process');
+      } finally {
+        fixture.cleanup();
+      }
+    },
+    20_000,
+  );
+
+  test('terminates an init-rejecting child without treating it as EOF', async () => {
+    const fixture = start('reject-init');
+    try {
+      expect(await fixture.run).toBe(2);
+      expect(fixture.state.timedOut).toBe(false);
+      expect(fixture.state.stderr).toContain(
+        'init failed: injected init failure',
+      );
+      expect(fixture.state.stderr).not.toContain(
+        'IPC closed without process exit',
+      );
+      expect(fixture.child.killed).toBe(true);
+    } finally {
+      fixture.cleanup();
+    }
+  }, 20_000);
+
+  test('keeps an init error as failure when EOF precedes its catch continuation', async () => {
+    const originalSend = IpcClient.prototype.sendRequest;
+    let businessError: unknown;
+    let closeReason: unknown;
+    IpcClient.prototype.sendRequest = function (kind, data, attachments) {
+      const response = originalSend.call(this, kind, data, attachments);
+      if (kind !== 'init') return response;
+      // Hold the already-rejected business request until real EOF, making
+      // this microtask ordering deterministic across process schedulers.
+      return response.catch(async (error: unknown) => {
+        businessError = error;
+        closeReason = await this.done;
+        throw error;
+      });
+    } as typeof IpcClient.prototype.sendRequest;
+    let fixture: ReturnType<typeof start>;
+    try {
+      fixture = start('reject-init-eof');
+    } finally {
+      IpcClient.prototype.sendRequest = originalSend;
+    }
+    try {
+      await once(fixture.child.stdout!, 'end');
+      fixture.child.stdin!.write(
+        encodeFrame({ kind: 'exit-after-eof', id: 0, data: { code: 0 } }),
+      );
+      expect(await fixture.run).toBe(2);
+      expect(businessError).toMatchObject({ message: 'injected init failure' });
+      expect(businessError).not.toBe(closeReason);
+      expect(fixture.state.timedOut).toBe(false);
+      expect(fixture.state.stderr).toContain(
+        'init failed: injected init failure',
+      );
+    } finally {
+      fixture.cleanup();
+    }
+  }, 20_000);
 });
 
 describe('runEngine output write barriers', () => {

@@ -70,7 +70,7 @@ type WireFrame<T = unknown> = Omit<WireMessage, 'data'> & { data?: T };
 export interface IpcClientOptions {
   /** Native reader storage, owned and closed by this IPC session. */
   readonly sourceTransport?: SourceTransport;
-  /** Child stdio index chosen by spawnIpcPeer for the prepared Unix fd. */
+  /** Child stdio index chosen by spawnIpcProcess for the prepared Unix fd. */
   readonly inheritedSourceFd?: number;
   /**
    * Initial buffer size for the read accumulator. Frames larger than this
@@ -112,12 +112,22 @@ export class IpcClient {
   private bootstrapPromise: Promise<void> | undefined;
   private mappingSent = false;
   private preparingFirstRequest: Promise<void> | undefined;
+  private finishClose!: (error: Error) => void;
+
+  /** Resolves after teardown with the first, stable termination reason. */
+  readonly done = new Promise<Error>((resolve) => {
+    this.finishClose = resolve;
+  });
 
   constructor(input: Readable, output: Writable, opts: IpcClientOptions = {}) {
     this.input = input;
     this.output = output;
     this.sources = opts.sourceTransport;
     this.inheritedSourceFd = opts.inheritedSourceFd;
+  }
+
+  get isClosed(): boolean {
+    return this.closed;
   }
 
   /**
@@ -159,6 +169,7 @@ export class IpcClient {
 
     this.input.on('data', this.onChunk);
     this.input.on('end', this.onEnd);
+    this.input.on('close', this.onEnd);
     this.input.on('error', this.onStreamError);
     this.output.on('error', this.onOutputError);
     // A CLEAN output close (peer ended its read side / pipe EOF /
@@ -170,25 +181,51 @@ export class IpcClient {
   }
 
   /**
-   * Stop listening. Pending outbound requests are rejected with a
-   * stable error so callers' `await sendRequest(...)` resolves rather
-   * than hanging forever. Idempotent.
+   * Stop listening and release session resources. Every terminal path uses
+   * this method, so pending requests keep the first termination reason and
+   * native storage is closed once even when stream events arrive afterward.
+   * The stream and child-process lifetimes remain with the caller.
    */
-  close(): void {
+  close(error = new Error('IpcClient: closed')): void {
     if (this.closed) return;
     this.closed = true;
-    this.sources?.close();
 
     this.input.off('data', this.onChunk);
     this.input.off('end', this.onEnd);
+    this.input.off('close', this.onEnd);
     this.input.off('error', this.onStreamError);
     this.output.off('error', this.onOutputError);
     this.output.off('close', this.onOutputClose);
     this.output.off('finish', this.onOutputClose);
 
-    const err = new Error('IpcClient: closed');
-    for (const [, p] of this.pending) p.reject(err);
+    this.chunks.length = 0;
+    this.bufferedBytes = 0;
+    this.inboundHandler = null;
+    this.notificationHandlers.clear();
+    for (const [, p] of this.pending) p.reject(error);
     this.pending.clear();
+    this.closeSources();
+    this.finishClose(error);
+  }
+
+  private closeSources(): void {
+    const sources = this.sources;
+    // Clear ownership before calling native code: bootstrap failure and
+    // reentrant close calls must not close the same storage a second time.
+    this.sources = undefined;
+    try {
+      sources?.close();
+    } catch (error) {
+      // Cleanup failures cannot replace the request's termination reason or
+      // interrupt remaining teardown, including when stderr is closing too.
+      try {
+        process.stderr.write(
+          `rslint: source transport close error: ${safeErrorMessage(error)}\n`,
+        );
+      } catch {
+        // Teardown must complete even when stderr is unavailable.
+      }
+    }
   }
 
   /**
@@ -206,13 +243,14 @@ export class IpcClient {
     if (kind === TRANSPORT_CONFIG_KIND) {
       throw new Error('IpcClient: transportConfig is an internal request');
     }
+    if (this.closed) {
+      throw new Error('IpcClient: cannot sendRequest on closed client');
+    }
     if (this.sources && !this.mappingSent) await this.configureSources();
     // A payload's toJSON may synchronously call sendRequest again. Keep only
     // bootstrap serialization ordered so the mapping stays on the first frame.
     if (this.preparingFirstRequest) await this.preparingFirstRequest;
-    if (this.closed) {
-      throw new Error('IpcClient: cannot sendRequest on closed client');
-    }
+    if (this.closed) throw await this.done;
     let finishPreparing: (() => void) | undefined;
     if (this.sources && !this.mappingSent) {
       this.preparingFirstRequest = new Promise<void>((resolve) => {
@@ -245,13 +283,11 @@ export class IpcClient {
           TRANSPORT_CONFIG_KIND,
           undefined,
         );
-        if (this.closed)
-          throw new Error('IpcClient: closed during source configuration');
+        if (this.closed) throw await this.done;
         sources.configure(response.data);
-      } catch (error) {
-        sources.close();
-        this.sources = undefined;
-        if (this.closed) throw error;
+      } catch {
+        this.closeSources();
+        if (this.closed) throw await this.done;
         // Unsupported peers, invalid layouts and allocation failures all keep
         // the session usable with complete inline attachments, without retries.
       }
@@ -273,8 +309,7 @@ export class IpcClient {
       attachments: attachments?.map((text) => ({ text })),
       transport: mapping ? { mapping } : undefined,
     });
-    if (this.closed)
-      throw new Error('IpcClient: closed during request serialization');
+    if (this.closed) throw await this.done;
     // Only a successfully serialized application envelope publishes the mapping.
     if (mapping) this.mappingSent = true;
     const response = new Promise<IpcMessage<TOut>>((resolve, reject) => {
@@ -337,6 +372,8 @@ export class IpcClient {
   // ─────────────────────────────────────────────────────────────────
 
   private writeFrameNow(frame: Buffer): void {
+    // User data can close the session from toJSON during frame serialization.
+    if (this.closed) return;
     // Node's stream.write returns false under backpressure but accepts
     // more data; we don't pause here because (a) IPC frames are small,
     // and (b) callers serialize their own logical pacing. If profiling
@@ -359,21 +396,9 @@ export class IpcClient {
    */
   private readonly onOutputError = (err: Error): void => {
     if (this.closed) return;
-    process.stderr.write(`rslint: output write error: ${err.message}\n`);
     const wrapped = new Error(`IpcClient: output write failed: ${err.message}`);
-    for (const [, p] of this.pending) p.reject(wrapped);
-    this.pending.clear();
-    this.closed = true;
-    this.sources?.close();
-    // Detach listeners to mirror close() — close() itself is a no-op
-    // now (closed=true) but we should not leave the input listeners
-    // dangling.
-    this.input.off('data', this.onChunk);
-    this.input.off('end', this.onEnd);
-    this.input.off('error', this.onStreamError);
-    this.output.off('error', this.onOutputError);
-    this.output.off('close', this.onOutputClose);
-    this.output.off('finish', this.onOutputClose);
+    this.close(wrapped);
+    process.stderr.write(`rslint: output write error: ${err.message}\n`);
   };
 
   /**
@@ -386,20 +411,9 @@ export class IpcClient {
    * `onOutputError`. Idempotent.
    */
   private readonly onOutputClose = (): void => {
-    if (this.closed) return;
-    const err = new Error(
-      'IpcClient: output stream closed before response received',
+    this.close(
+      new Error('IpcClient: output stream closed before response received'),
     );
-    for (const [, p] of this.pending) p.reject(err);
-    this.pending.clear();
-    this.closed = true;
-    this.sources?.close();
-    this.input.off('data', this.onChunk);
-    this.input.off('end', this.onEnd);
-    this.input.off('error', this.onStreamError);
-    this.output.off('error', this.onOutputError);
-    this.output.off('close', this.onOutputClose);
-    this.output.off('finish', this.onOutputClose);
   };
 
   /**
@@ -416,6 +430,7 @@ export class IpcClient {
    * arrived (`consumeFront`). Total copying is O(total bytes), linear.
    */
   private readonly onChunk = (chunk: Buffer): void => {
+    if (this.closed) return;
     this.chunks.push(chunk);
     this.bufferedBytes += chunk.length;
 
@@ -457,6 +472,18 @@ export class IpcClient {
           `rslint: malformed JSON in frame (len=${len}): ${(err as Error).message}\n`,
         );
         continue;
+      }
+
+      if (
+        msg === null ||
+        typeof msg !== 'object' ||
+        Array.isArray(msg) ||
+        typeof msg.kind !== 'string' ||
+        !Number.isSafeInteger(msg.id) ||
+        msg.id < 0
+      ) {
+        this.onStreamError(new Error('ipc-client: invalid message envelope'));
+        return;
       }
 
       this.dispatch(msg);
@@ -538,36 +565,14 @@ export class IpcClient {
   }
 
   private readonly onEnd = (): void => {
-    // Peer closed the input stream. We can't get any more responses,
-    // so seal the client: reject pending requests + set closed=true
-    // + detach listeners. Without setting closed=true, a subsequent
-    // sendRequest would silently enqueue into pending and wait
-    // forever for a response that can never arrive (the peer's write
-    // end is gone). The output side is left as-is — the underlying
-    // stream may still be writable from our perspective, but we
-    // surface "closed" so callers get a deterministic error
-    // immediately instead of an indefinite hang.
-    if (this.closed) return;
-    this.closed = true;
-    this.sources?.close();
-    const err = new Error('IpcClient: peer closed input stream');
-    for (const [, p] of this.pending) p.reject(err);
-    this.pending.clear();
-    this.input.off('data', this.onChunk);
-    this.input.off('end', this.onEnd);
-    this.input.off('error', this.onStreamError);
-    this.output.off('error', this.onOutputError);
-    // Mirror close(): also detach the output 'close'/'finish' listeners
-    // (added for the Windows clean-close fix). onStreamError delegates
-    // here, so without this both teardown paths would leak the
-    // onOutputClose listener on the output stream.
-    this.output.off('close', this.onOutputClose);
-    this.output.off('finish', this.onOutputClose);
+    // EOF and clean destruction both make every future response impossible.
+    this.close(new Error('IpcClient: peer closed input stream'));
   };
 
   private readonly onStreamError = (err: Error): void => {
+    if (this.closed) return;
+    this.close(new Error(`IpcClient: input read failed: ${err.message}`));
     process.stderr.write(`rslint: stream error: ${err.message}\n`);
-    this.onEnd();
   };
 
   /** Route a fully decoded frame. */

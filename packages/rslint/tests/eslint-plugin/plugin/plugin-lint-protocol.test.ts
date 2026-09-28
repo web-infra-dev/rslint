@@ -22,7 +22,7 @@ import {
   type EslintPluginLintRequest,
 } from '../../../src/eslint-plugin/plugin/plugin-lint-protocol.js';
 import type { LintFileResult } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
-import { resolvePluginSources } from '../../../src/cli/plugin-lint-codec.js';
+import { resolvePluginSources } from '../../../src/cli/plugin-lint-attachments.js';
 
 describe('CLI plugin attachment references', () => {
   test('preserves complete text, native capabilities and file metadata', () => {

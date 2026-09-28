@@ -12,6 +12,7 @@
 let buf = Buffer.alloc(0);
 let remainingText = '';
 let configured = false;
+const mode = process.argv[2];
 
 function send(msg) {
   const body = Buffer.from(JSON.stringify(msg), 'utf8');
@@ -43,7 +44,25 @@ function onMessage(msg) {
     return;
   }
   if (msg.kind === 'init') {
-    if (process.argv[2] === 'require-mapping') {
+    if (mode === 'eof-before-init' || mode === 'eof-after-init') {
+      if (mode === 'eof-after-init') {
+        send({ kind: 'response', id: msg.id, data: { ok: true } });
+      }
+      // Remain alive on stdin after EOF. Tests either let the host terminate
+      // this disconnected child or explicitly release a natural exit below.
+      process.stdout.end();
+      return;
+    }
+    if (mode === 'reject-init' || mode === 'reject-init-eof') {
+      send({
+        kind: 'error',
+        id: msg.id,
+        data: { message: 'injected init failure' },
+      });
+      if (mode === 'reject-init-eof') process.stdout.end();
+      return;
+    }
+    if (mode === 'require-mapping') {
       const assert = require('node:assert/strict');
       assert.equal(configured, true);
       assert.equal(msg.transport?.mapping?.version, 1);
@@ -65,6 +84,15 @@ function onMessage(msg) {
       id: 999,
       data: { stream: 'stdout', text: text.slice(0, split) },
     });
+  } else if (
+    (mode === 'eof-before-init' ||
+      mode === 'eof-after-init' ||
+      mode === 'reject-init-eof') &&
+    msg.kind === 'exit-after-eof'
+  ) {
+    // The parent sends this only after observing its readable EOF, making the
+    // EOF-before-exit ordering deterministic without a timing-based sleep.
+    process.exit(msg.data.code);
   } else if (msg.id === 999) {
     if (msg.kind !== 'response') process.exit(2);
     send({

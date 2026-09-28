@@ -27,10 +27,13 @@ import { platformTuple } from '../../src/native/platform-tuple.js';
  *
  * The complete CLI case additionally proves that its arena and worker parser
  * share the staged native registry, preserving Go's snapshot after a disk edit.
- * It does not exercise termination during a native read.
+ * The termination case builds a separate feature-only addon to stop a real
+ * worker inside parseSharedSource while its native reader holds the mapping.
  *
  * Requires `dist/`, the host Go binary (built by `pnpm build`) and the host
  * platform package's `.node` (built by `pnpm --filter @rslint/native build`).
+ * The termination cases also require Cargo; their debug/release feature addons
+ * use a separate target directory and never replace the platform package.
  */
 
 const require = createRequire(import.meta.url);
@@ -145,13 +148,80 @@ assert.equal(fs.readFileSync(file, 'utf8'), changed);
 console.log('PACKAGED_SHARED_OK');
 `;
 
-function stageNative(root: string, withBinary = false): void {
+const TERMINATION_RUNNER = `import assert from 'node:assert/strict';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
+const entry = path.join(here, 'eslint-plugin', 'index.js');
+const require = createRequire(entry);
+const nativePath = require.resolve(${JSON.stringify(`@rslint/${PKG_BASE}`)});
+const native = require(nativePath);
+const { WorkerPool } = await import(pathToFileURL(entry).href);
+const cfgDir = path.join(here, 'cfg');
+const text = '\\ufeffconst pinned = null; // café 😀 retained through arena.close()\\r\\n';
+const expected = native.parse('pinned.ts', text.slice(1), 'module', false).program;
+const { arena, source } = native.createWorkerTerminationFixture(text);
+const logs = [];
+const pool = new WorkerPool({
+  configs: [{ configPath: path.join(cfgDir, 'rslint.config.mjs'), configDirectory: cfgDir }],
+  workerCount: 1,
+  warmupWorkerCount: 1,
+  taskTimeoutMs: 1,
+  retryCap: 0,
+  onLog: (record) => logs.push(record),
+});
+try {
+  await pool.init();
+  const response = pool.lintBatch([{
+    filePath: 'pinned.ts',
+    sharedSource: source,
+    configKey: cfgDir,
+    rules: { 'pkg/no-null': { options: [] } },
+    collectFixes: false,
+    suggestionsMode: 'off',
+  }]);
+  // This event is emitted only after with_bytes has pinned the lease and the
+  // real native parser entry has decoded UTF-8/BOM. Blocking this JS thread
+  // keeps the task timer from firing until the worker has entered the barrier.
+  native.waitForWorkerParse();
+  // The pool timeout callback requests Worker.terminate() before this promise
+  // continuation runs. The worker is still blocked inside the native call.
+  const result = await response;
+  assert.equal(result.length, 1);
+  assert.equal(result[0].parseError, 'task_timeout');
+  assert.deepEqual(result[0].diagnostics, []);
+  assert.equal(arena.release(source.lease), false, 'an active native reader must prevent reuse');
+  assert.throws(() => native.parseSharedSource('pinned.ts', source, 'module', false), /invalid or expired/);
+  native.republishWorkerFixture(arena);
+  assert.throws(() => arena.register(0, 2, source.length), /invalid or expired/);
+  arena.close();
+  assert.throws(() => arena.descriptor(), /invalid or expired/);
+  // Node termination is pending while synchronous native code runs. Releasing
+  // this barrier lets the real Oxc parser read the bytes AFTER arena.close().
+  native.resumeWorkerParse();
+  await pool.shutdown();
+  assert.equal(native.workerParsedProgram(), expected, 'Oxc must finish from the pinned bytes');
+  assert.equal(logs.some((record) => record.level === 'error'), false);
+  console.log('PACKAGED_TERMINATION_OK');
+} finally {
+  arena.close();
+  native.resumeWorkerParse();
+  await pool.shutdown();
+}
+`;
+
+function stageNative(
+  root: string,
+  withBinary = false,
+  testAddon?: string,
+): void {
   const nativeDir = path.join(root, 'node_modules', '@rslint', PKG_BASE);
   fs.mkdirSync(nativeDir, { recursive: true });
   const srcPkgDir = path.dirname(
     require.resolve(`@rslint/${PKG_BASE}/package.json`),
   );
-  const srcNode = path.join(srcPkgDir, NODE_FILE);
+  const srcNode = testAddon ?? path.join(srcPkgDir, NODE_FILE);
   if (!fs.existsSync(srcNode)) {
     throw new Error(
       `no built ${NODE_FILE} in ${srcPkgDir} — run ` +
@@ -170,6 +240,48 @@ function stageNative(root: string, withBinary = false): void {
     path.join(nativeDir, 'package.json'),
     JSON.stringify({ name: `@rslint/${PKG_BASE}`, exports }),
   );
+}
+
+/** A feature addon never enters the platform package used by production builds. */
+function buildTerminationAddon(profile: 'debug' | 'release'): string {
+  const repoRoot = path.resolve(__dirname, '../../../..');
+  const target = path.join(repoRoot, 'target', 'worker-termination-test');
+  const build = spawnSync(
+    'cargo',
+    [
+      'build',
+      '--locked',
+      ...(profile === 'release' ? ['--release'] : []),
+      '-p',
+      'rslint-native',
+      '--features',
+      'test-worker-termination',
+      '--target-dir',
+      target,
+    ],
+    {
+      cwd: repoRoot,
+      // A release job may export a cross-compilation target. This addon must
+      // use Cargo's host build and its ordinary debug/release output directory.
+      env: { ...process.env, CARGO_BUILD_TARGET: undefined },
+      encoding: 'utf8',
+      timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+      killSignal: 'SIGKILL',
+      maxBuffer: 16 * 1024 * 1024,
+    },
+  );
+  if (build.error || build.signal || build.status !== 0) {
+    throw new Error(
+      `worker termination addon build failed: ${build.error ?? build.signal ?? build.status}\n${build.stderr}`,
+    );
+  }
+  const library =
+    process.platform === 'win32'
+      ? 'rslint_native.dll'
+      : process.platform === 'darwin'
+        ? 'librslint_native.dylib'
+        : 'librslint_native.so';
+  return path.join(target, profile, library);
 }
 
 /** Stage a packaged layout under `root`; omit the nested native for the negative control. */
@@ -219,6 +331,39 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     afterAll(() => {
       if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
     });
+
+    test.each(['debug', 'release'] as const)(
+      '%s: terminating a real worker preserves its in-flight native source reader',
+      (profile) => {
+        const root = path.join(tmp, `worker-termination-${profile}`);
+        fs.mkdirSync(root, { recursive: true });
+        stage(root, { withNative: false });
+        stageNative(
+          path.join(root, 'eslint-plugin'),
+          false,
+          buildTerminationAddon(profile),
+        );
+        fs.writeFileSync(path.join(root, 'runner.mjs'), TERMINATION_RUNNER);
+        const result = spawnSync(
+          process.execPath,
+          [path.join(root, 'runner.mjs')],
+          {
+            cwd: root,
+            encoding: 'utf8',
+            timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+            killSignal: 'SIGKILL',
+            maxBuffer: 16 * 1024 * 1024,
+            env: { ...process.env, NODE_PATH: '' },
+          },
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.signal, result.stderr).toBeNull();
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout.trim()).toBe('PACKAGED_TERMINATION_OK');
+        expect(result.stderr.trim()).toBe('');
+      },
+      PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
+    );
 
     test(
       'complete CLI and worker share the staged native source registry',

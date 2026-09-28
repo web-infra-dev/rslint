@@ -32,6 +32,20 @@ function onMessage(msg) {
     });
   } else if (msg.kind === 'crash') {
     process.exit(42);
+  } else if (msg.kind === 'close-output') {
+    // Keep stdin open and the process alive. Transport EOF alone must reject
+    // requests instead of waiting indefinitely for the child's exit event.
+    process.stdout.end();
+  } else if (msg.kind === 'reverse-close-output') {
+    // This command is a notification: there is no outstanding host request.
+    // The host handler deliberately never settles; EOF must still retire the
+    // connection and stop the resident child from keeping its host alive.
+    send({
+      kind: 'pluginLint',
+      id: 1,
+      data: { files: [{ path: 'probe.ts' }], rules: {} },
+    });
+    process.stdout.end();
   } else if (msg.kind === 'reverse') {
     // Deliberately reuse the outer request ID. Request IDs are independent in
     // each direction, so Node must route by frame kind rather than treating
@@ -53,6 +67,11 @@ function onMessage(msg) {
       data: { reverseKind: msg.kind, reverseData: msg.data },
     });
   } else if (msg.kind === 'exit') {
+    if (msg.data?.reject) {
+      send({ kind: 'error', id: msg.id, data: { message: 'exit rejected' } });
+      process.stdout.end();
+      return;
+    }
     // Silent mode: exit WITHOUT sending the ack, simulating the peer exiting
     // before its 'exit' response is read — the close() race that must settle
     // the pending without an unhandledRejection.

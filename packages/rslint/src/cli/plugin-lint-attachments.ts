@@ -1,4 +1,4 @@
-/** The CLI application adapter connects file identities to IPC attachments. */
+/** Associate plugin files with the complete source attachments received by IPC. */
 import type { SharedSource } from '../native/binding.js';
 
 function record(value: unknown): value is Record<string, unknown> {

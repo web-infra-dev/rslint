@@ -9,9 +9,9 @@
  * Exit codes propagate from the Go child (or 2 on a host-level failure).
  */
 import type { ChildProcess } from 'node:child_process';
-import { spawnIpcPeer, type IpcPeerOptions } from '../ipc/index.js';
+import { spawnIpcProcess, type IpcProcessOptions } from '../ipc/index.js';
 import type { IpcMessage } from '../ipc/index.js';
-import { resolvePluginSources } from './plugin-lint-codec.js';
+import { resolvePluginSources } from './plugin-lint-attachments.js';
 import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
@@ -251,7 +251,7 @@ export interface EngineRunOptions {
   /** @internal Dependency seam for post-prepare lifecycle tests. */
   configModuleHost?: ConfigModuleHost;
   /** @internal Dependency seam for source ownership and fallback tests. */
-  createSourceTransport?: IpcPeerOptions['createSourceTransport'];
+  createSourceTransport?: IpcProcessOptions['createSourceTransport'];
 }
 
 export async function runEngine(opts: EngineRunOptions): Promise<number> {
@@ -264,13 +264,12 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const stdoutIsTTY = (stdout as Partial<NodeJS.WriteStream>).isTTY === true;
 
-  const peer = spawnIpcPeer({
+  const { child, client: ipc } = spawnIpcProcess({
     binPath: opts.binPath,
     goArgs: opts.goArgs,
     cwd: opts.cwd,
     createSourceTransport: opts.createSourceTransport,
   });
-  const { child, client: ipc } = peer;
 
   // childExit always RESOLVES (never rejects); awaits race against it so a
   // child that drops out mid-handshake unwinds cleanly instead of hanging.
@@ -300,6 +299,38 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     });
   });
 
+  const waitForExit = async (): Promise<ChildExit> => {
+    const exited = await Promise.race([
+      childExit,
+      ipc.done.then(() => undefined),
+    ]);
+    if (exited) return exited;
+
+    // EOF may arrive before the child's exit event, including successful fast
+    // paths. Preserve that exit code, but bound a disconnected child's lifetime.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const naturalExit = await Promise.race([
+        childExit,
+        new Promise<undefined>((resolve) => {
+          timer = setTimeout(() => {
+            resolve(undefined);
+          }, KILL_GRACE_MS);
+          timer.unref();
+        }),
+      ]);
+      if (naturalExit) return naturalExit;
+      stderr.write(
+        'rslint: Go IPC closed without process exit; terminating Go process\n',
+      );
+      safeKillGo(child);
+      await childExit;
+      return { code: 2 };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+
   type RaceResult<T> =
     { kind: 'task'; value: T } | { kind: 'exit'; state: ChildExit };
   const raceWithExit = async <T>(task: Promise<T>): Promise<RaceResult<T>> =>
@@ -314,7 +345,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   // src/eslint-plugin/**) from type-checking the worker module, and
   // `webpackIgnore` keeps rslib from bundling it into the engine chunk — it
   // must stay a sibling so the worker's `import.meta.url` resolution finds
-  // lint-worker.js. Resolves at runtime to dist/eslint-plugin/index.js.
+  // lint-worker.js. Resolves at runtime to dist/eslint-plugin/host.js.
   let pluginHost: PluginLintHost | null = null;
   const configModuleHost = opts.configModuleHost ?? new ConfigModuleHost();
   const configTransactions = new Set<string>();
@@ -578,16 +609,20 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
             },
           }),
         );
-      } catch {
-        // The init request can reject when the Go child exits cleanly before we
-        // read its init ack: a fast path (--help / --init) closes the pipe the
-        // moment its work is done, and the stdout-EOF seal that rejects the
-        // pending request can beat the child 'exit' event into the race above
-        // (observed on Linux, where stdout 'end' tends to precede 'exit'). The
-        // child's exit code is the source of truth — a clean (0) exit means Go
-        // finished its job, so honor it; only a non-zero exit is a real failure.
-        safeKillGo(child);
-        const state = await childExit;
+      } catch (error) {
+        const closedByTransport = ipc.isClosed && error === (await ipc.done);
+        if (!closedByTransport) {
+          // A rejected init is an application failure, not the normal EOF/exit
+          // race, even if EOF arrived before this catch continuation ran.
+          // Stop promptly instead of granting the disconnect grace.
+          stderr.write(`rslint: init failed: ${asError(error).message}\n`);
+          safeKillGo(child);
+          await childExit;
+          return 2;
+        }
+        // Fast paths can close stdout without an init acknowledgement. Their
+        // natural exit remains authoritative within the disconnect grace.
+        const state = await waitForExit();
         if (state.code === 0) return 0;
         stderr.write(`rslint: init failed (Go exited ${state.code})\n`);
         return state.code;
@@ -611,10 +646,9 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       }
     }
 
-    // Output forwarding + shutdown ack happen in the handlers above; just wait
-    // for the Go child to finish (it exits with its own lint exit code).
-    const finalExit = await childExit;
-    ipc.close();
+    // Output forwarding + shutdown ack happen in the handlers above. A closed
+    // IPC session must not leave us waiting forever for a disconnected child.
+    const finalExit = await waitForExit();
     return finalExit.code;
   } finally {
     // Single cleanup site for every return above: drop the process-level
@@ -630,7 +664,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       shutdownPluginHost(pluginHost),
       ...[...stagedPluginHosts].map(shutdownPluginHost),
     ]);
-    peer.close();
+    ipc.close();
     for (const transactionId of configTransactions) {
       configModuleHost.deleteSession(transactionId);
     }

@@ -8,6 +8,10 @@ publish = false
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+# Built only into the isolated native addon used by the worker termination test.
+test-worker-termination = []
+
 [dependencies]
 napi = "3.12.1"
 napi-derive = "3.5.6"

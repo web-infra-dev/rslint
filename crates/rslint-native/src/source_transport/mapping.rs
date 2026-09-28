@@ -162,7 +162,7 @@ mod platform {
             self.write_for_test(slot, generation, &[]);
         }
 
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-worker-termination"))]
         pub fn write_for_test(&self, slot: usize, generation: u32, source: &[u8]) {
             assert!(source.len() <= self.layout.slot_size);
             unsafe {
@@ -302,7 +302,7 @@ mod platform {
             self.write_for_test(slot, generation, &[]);
         }
 
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-worker-termination"))]
         pub fn write_for_test(&self, slot: usize, generation: u32, source: &[u8]) {
             assert!(source.len() <= self.layout.slot_size);
             unsafe {

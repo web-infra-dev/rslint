@@ -774,3 +774,5 @@ cerebro
 jquery
 warningcomments
 pluginlint
+Condvar
+librslint
