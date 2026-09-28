@@ -3,6 +3,7 @@ package reactutil
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
@@ -325,8 +326,8 @@ func GetParentStatelessComponent(node *ast.Node, pragma string, wrappers []Compo
 //     upstream: VariableDeclarator/PropertyAssignment use the binding name;
 //     `Id = fn` assignments use the LHS Identifier; MemberExpression LHS
 //     uses the rightmost property name (with `module.exports = ...` as a
-//     special blanket-true case); a named FunctionExpression defers to its
-//     own Identifier.
+//     special blanket-true case). A named FunctionExpression uses its own
+//     Identifier only after these position-specific checks.
 //
 // Pass the empty string for `pragma` to default to `DefaultReactPragma`.
 //
@@ -386,10 +387,8 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 	switch fn.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 		// Object-literal shorthand method / accessor. Upstream's Property
-		// branch (method && !computed) | (!id && !computed) classifies the
-		// inner FE as a component when the property key is a capitalized
-		// Identifier AND the function returns strict JSX (isReturningJSX).
-		// Setters naturally fail functionReturnsJSX (no return value).
+		// branch requires a capitalized Identifier and a JSX return for
+		// non-computed keys. Computed keys reach the later name/null gates.
 		// Class-body occurrences have a ClassLike parent — NOT
 		// ObjectLiteralExpression — and are excluded so they continue to go
 		// through the ES6-class path.
@@ -398,6 +397,16 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 			return false
 		}
 		name := fn.Name()
+		if name != nil && name.Kind == ast.KindComputedPropertyName {
+			key := utils.ESTreeRuntimeExpression(name.AsComputedPropertyName().Expression)
+			if key.Kind == ast.KindIdentifier && IsLowercaseFirstLetter(key.Text()) && len(utils.ESTreeParameters(fn)) > 0 {
+				return false
+			}
+			if ast.IsAccessExpression(key) && !ast.IsOptionalChain(key) {
+				return functionReturnsJSXInternal(fn, false, pragma, tc, scopes)
+			}
+			return functionReturnsJSXInternal(fn, true, pragma, tc, scopes) && !functionReturnsOnlyNull(fn)
+		}
 		if name == nil || name.Kind != ast.KindIdentifier {
 			return false
 		}
@@ -419,7 +428,7 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 		return false
 	}
 
-	parent := fn.Parent
+	parent := utils.ESTreeParent(fn)
 	if parent == nil {
 		return false
 	}
@@ -428,17 +437,16 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 	// `isModuleExportsAssignment`.
 	isMEAssign := false
 	isModuleExportsAssign := false
+	var assignedProperty *ast.Node
 	if parent.Kind == ast.KindBinaryExpression {
 		bin := parent.AsBinaryExpression()
-		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == fn {
+		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && utils.ESTreeRuntimeExpression(bin.Right) == fn {
 			left := ast.SkipParentheses(bin.Left)
-			if left.Kind == ast.KindPropertyAccessExpression {
+			if object, property := utils.MemberExpressionParts(left); object != nil {
 				isMEAssign = true
-				pa := left.AsPropertyAccessExpression()
-				obj := ast.SkipParentheses(pa.Expression)
-				name := pa.Name()
-				if obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "module" &&
-					name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "exports" {
+				obj := utils.ESTreeRuntimeExpression(object)
+				assignedProperty = utils.ESTreeRuntimeExpression(property)
+				if IdentifierOrPrivateName(obj) == "module" && IdentifierOrPrivateName(assignedProperty) == "exports" {
 					isModuleExportsAssign = true
 				}
 			}
@@ -465,7 +473,7 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 	// Branch 3 — early-reject in ReturnStatement / arrow-expression-body
 	// when not strictly returning JSX.
 	if parent.Kind == ast.KindReturnStatement ||
-		(parent.Kind == ast.KindArrowFunction && parent.AsArrowFunction().Body == fn) {
+		(parent.Kind == ast.KindArrowFunction && utils.ESTreeRuntimeExpression(parent.AsArrowFunction().Body) == fn) {
 		if !functionReturnsJSXInternal(fn, false, pragma, tc, scopes) {
 			return false
 		}
@@ -475,18 +483,9 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 	// (handled; Identifier LHS path).
 	if parent.Kind == ast.KindBinaryExpression && !isMEAssign {
 		bin := parent.AsBinaryExpression()
-		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == fn {
+		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && utils.ESTreeRuntimeExpression(bin.Right) == fn {
 			if !functionReturnsJSXInternal(fn, true, pragma, tc, scopes) {
 				return false
-			}
-			// Named FE defers to its own id (matches upstream's final
-			// `if (node.id)` check, which runs before the lowercase-LHS
-			// reject in the property-assignment tail).
-			if fn.Kind == ast.KindFunctionExpression {
-				name := fn.Name()
-				if name != nil && name.Kind == ast.KindIdentifier {
-					return isFirstLetterCapitalized(name.AsIdentifier().Text)
-				}
 			}
 			left := ast.SkipParentheses(bin.Left)
 			if left.Kind == ast.KindIdentifier {
@@ -498,13 +497,13 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 
 	// Branches 5 & 6 — nested Arrow whose outer Arrow is itself in an
 	// AssignmentExpression / PropertyAssignment position.
-	if parent.Kind == ast.KindArrowFunction && parent.AsArrowFunction().Body == fn {
-		grand := parent.Parent
+	if parent.Kind == ast.KindArrowFunction && utils.ESTreeRuntimeExpression(parent.AsArrowFunction().Body) == fn {
+		grand := utils.ESTreeParent(parent)
 		if grand != nil && !isMEAssign && functionReturnsJSXInternal(fn, true, pragma, tc, scopes) {
 			switch grand.Kind {
 			case ast.KindBinaryExpression:
 				bin := grand.AsBinaryExpression()
-				if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == parent {
+				if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && utils.ESTreeRuntimeExpression(bin.Right) == parent {
 					left := ast.SkipParentheses(bin.Left)
 					if left.Kind == ast.KindIdentifier {
 						return isFirstLetterCapitalized(left.AsIdentifier().Text)
@@ -645,17 +644,9 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 	}
 
 	// Branch 15 — isPropertyAssignment (MemberExpression LHS) but not
-	// module.exports: reject when rightmost property name is lowercase.
-	if isMEAssign && !isModuleExportsAssign {
-		bin := parent.AsBinaryExpression()
-		left := ast.SkipParentheses(bin.Left)
-		if left.Kind == ast.KindPropertyAccessExpression {
-			pa := left.AsPropertyAccessExpression()
-			name := pa.Name()
-			if name != nil && name.Kind == ast.KindIdentifier && !isFirstLetterCapitalized(name.AsIdentifier().Text) {
-				return false
-			}
-		}
+	// module.exports: compare property.name, not a computed string's value.
+	if isMEAssign && !isModuleExportsAssign && !isFirstLetterCapitalized(IdentifierOrPrivateName(assignedProperty)) {
+		return false
 	}
 
 	// Branch 16 — Property parent + returns only null ⇒ undefined.
@@ -703,6 +694,8 @@ func functionReturnsOnlyNull(fn *ast.Node) bool {
 		body = fn.AsMethodDeclaration().Body
 	case ast.KindGetAccessor:
 		body = fn.AsGetAccessorDeclaration().Body
+	case ast.KindSetAccessor:
+		body = fn.AsSetAccessorDeclaration().Body
 	}
 	if body == nil {
 		return false
@@ -759,7 +752,7 @@ func isExportDefaultAssignment(node *ast.Node) bool {
 // `const Hello = (init(), arrow)` — whose comma Sequence sits inside parens —
 // still reaches the VariableDeclaration ancestor.
 func isInAllowedPositionForComponent(fn *ast.Node) bool {
-	parent := skipParenParents(fn)
+	parent := utils.ESTreeParent(fn)
 	if parent == nil {
 		return false
 	}
@@ -779,26 +772,16 @@ func isInAllowedPositionForComponent(fn *ast.Node) bool {
 		switch bin.OperatorToken.Kind {
 		case ast.KindEqualsToken:
 			// AssignmentExpression — always allowed when `fn` is the RHS.
-			return bin.Right == fn
+			return utils.ESTreeRuntimeExpression(bin.Right) == fn
 		case ast.KindCommaToken:
 			// SequenceExpression — only the last operand inherits its parent's
 			// allowed-ness.
-			if bin.Right == fn {
+			if utils.ESTreeRuntimeExpression(bin.Right) == fn {
 				return isInAllowedPositionForComponent(parent)
 			}
 		}
 	}
 	return false
-}
-
-// skipParenParents walks up through ParenthesizedExpression wrappers and
-// returns the first non-paren ancestor of `node`, or nil.
-func skipParenParents(node *ast.Node) *ast.Node {
-	p := node.Parent
-	for p != nil && p.Kind == ast.KindParenthesizedExpression {
-		p = p.Parent
-	}
-	return p
 }
 
 // isPragmaComponentWrapperCall reports whether `call` is a React

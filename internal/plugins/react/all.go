@@ -1,6 +1,7 @@
 package react_plugin
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/async_server_action"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/boolean_prop_naming"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/button_has_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/checked_requires_onchange_or_readonly"
@@ -28,7 +29,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_key"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_max_depth"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_max_props_per_line"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_newline"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_bind"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_constructed_context_values"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_duplicate_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_target_blank"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_undef"
@@ -38,6 +41,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_spread_multi"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_spreading"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_sort_props"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_tag_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
@@ -57,6 +61,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_multi_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_namespace"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_object_type_as_default_prop"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_redundant_should_component_update"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_render_return_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_set_state"
@@ -99,6 +104,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		async_server_action.AsyncServerActionRule,
 		boolean_prop_naming.BooleanPropNamingRule,
 		button_has_type.ButtonHasTypeRule,
 		checked_requires_onchange_or_readonly.CheckedRequiresOnchangeOrReadonlyRule,
@@ -126,7 +132,9 @@ func GetAllRules() []rule.Rule {
 		jsx_key.JsxKeyRule,
 		jsx_max_depth.JsxMaxDepthRule,
 		jsx_max_props_per_line.JsxMaxPropsPerLineRule,
+		jsx_newline.JsxNewlineRule,
 		jsx_no_bind.JsxNoBindRule,
+		jsx_no_constructed_context_values.JsxNoConstructedContextValuesRule,
 		jsx_no_duplicate_props.JsxNoDuplicatePropsRule,
 		jsx_no_target_blank.JsxNoTargetBlankRule,
 		jsx_no_undef.JsxNoUndefRule,
@@ -136,6 +144,7 @@ func GetAllRules() []rule.Rule {
 		jsx_props_no_spreading.JsxPropsNoSpreadingRule,
 		jsx_props_no_spread_multi.JsxPropsNoSpreadMultiRule,
 		jsx_sort_props.JsxSortPropsRule,
+		jsx_tag_spacing.JsxTagSpacingRule,
 		jsx_uses_react.JsxUsesReactRule,
 		jsx_uses_vars.JsxUsesVarsRule,
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
@@ -155,6 +164,7 @@ func GetAllRules() []rule.Rule {
 		no_invalid_html_attribute.NoInvalidHtmlAttributeRule,
 		no_multi_comp.NoMultiCompRule,
 		no_namespace.NoNamespaceRule,
+		no_object_type_as_default_prop.NoObjectTypeAsDefaultPropRule,
 		no_unstable_nested_components.NoUnstableNestedComponentsRule,
 		no_unused_class_component_methods.NoUnusedClassComponentMethodsRule,
 		no_unused_prop_types.NoUnusedPropTypesRule,

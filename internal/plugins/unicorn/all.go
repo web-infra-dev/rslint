@@ -3,6 +3,7 @@ package unicorn_plugin
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/catch_error_name"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_date_clone"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_template_literal_escape"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_tuple_labels"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/empty_brace_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/error_message"
@@ -15,6 +16,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_front_mutation"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_reverse"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_sort"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_async_promise_finally"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_expression_member"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_document_cookie"
@@ -39,6 +41,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_iife"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_new_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_continue"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_error_capture_stack_trace"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_switch_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_xor_as_exponentiation"
@@ -76,6 +79,7 @@ func GetAllRules() []rule.Rule {
 		prefer_optional_catch_binding.PreferOptionalCatchBindingRule,
 		catch_error_name.CatchErrorNameRule,
 		consistent_date_clone.ConsistentDateCloneRule,
+		consistent_template_literal_escape.ConsistentTemplateLiteralEscapeRule,
 		consistent_tuple_labels.ConsistentTupleLabelsRule,
 		empty_brace_spaces.EmptyBraceSpacesRule,
 		error_message.ErrorMessageRule,
@@ -88,6 +92,7 @@ func GetAllRules() []rule.Rule {
 		no_array_front_mutation.NoArrayFrontMutationRule,
 		no_array_reverse.NoArrayReverseRule,
 		no_array_sort.NoArraySortRule,
+		no_async_promise_finally.NoAsyncPromiseFinallyRule,
 		no_await_expression_member.NoAwaitExpressionMemberRule,
 		no_await_in_promise_methods.NoAwaitInPromiseMethodsRule,
 		no_document_cookie.NoDocumentCookieRule,
@@ -112,6 +117,7 @@ func GetAllRules() []rule.Rule {
 		no_unreadable_iife.NoUnreadableIifeRule,
 		no_unreadable_new_expression.NoUnreadableNewExpressionRule,
 		no_unsafe_string_replacement.NoUnsafeStringReplacementRule,
+		no_useless_continue.NoUselessContinueRule,
 		no_useless_error_capture_stack_trace.NoUselessErrorCaptureStackTraceRule,
 		no_useless_switch_case.NoUselessSwitchCaseRule,
 		no_xor_as_exponentiation.NoXorAsExponentiationRule,

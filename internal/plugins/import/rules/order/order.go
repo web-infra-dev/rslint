@@ -69,13 +69,11 @@ type namedOptions struct {
 }
 
 type pathGroup struct {
-	pattern           string
-	patternOptions    minimatch3.Options
-	patternOptionsSet bool
-	matcher           *minimatch3.Matcher
-	group             string
-	positionRaw       string // "before" | "after" | ""
-	position          float64
+	pattern     string
+	matcher     *minimatch3.Matcher
+	group       string
+	positionRaw string // "before" | "after" | ""
+	position    float64
 }
 
 type ranks struct {
@@ -257,25 +255,7 @@ func parsePathGroups(raw []any) []pathGroup {
 		if s, ok := m["position"].(string); ok {
 			pg.positionRaw = s
 		}
-		if rawOptions, ok := m["patternOptions"].(map[string]any); ok {
-			pg.patternOptionsSet = true
-			pg.patternOptions.NoNegate, _ = rawOptions["nonegate"].(bool)
-			pg.patternOptions.NoComment, _ = rawOptions["nocomment"].(bool)
-			pg.patternOptions.NoCase, _ = rawOptions["nocase"].(bool)
-			pg.patternOptions.MatchBase, _ = rawOptions["matchBase"].(bool)
-			pg.patternOptions.NoGlobStar, _ = rawOptions["noglobstar"].(bool)
-			pg.patternOptions.NoExt, _ = rawOptions["noext"].(bool)
-			pg.patternOptions.NoBrace, _ = rawOptions["nobrace"].(bool)
-			pg.patternOptions.Dot, _ = rawOptions["dot"].(bool)
-			pg.patternOptions.Partial, _ = rawOptions["partial"].(bool)
-			pg.patternOptions.FlipNegate, _ = rawOptions["flipNegate"].(bool)
-			pg.patternOptions.NoNull, _ = rawOptions["nonull"].(bool)
-		}
-		matcherOptions := pg.patternOptions
-		if !pg.patternOptionsSet {
-			matcherOptions.NoComment = true
-		}
-		pg.matcher = minimatch3.New(pg.pattern, matcherOptions)
+		pg.matcher = import_utils.NewPathGroupMatcher(pg.pattern, m["patternOptions"])
 		out = append(out, pg)
 	}
 	return out

@@ -35,7 +35,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/consistent-function-style': 'off', // not implemented
     // 'unicorn/consistent-json-file-read': 'error', // not implemented
     // 'unicorn/consistent-optional-chaining': 'error', // not implemented
-    // 'unicorn/consistent-template-literal-escape': 'error', // not implemented
+    'unicorn/consistent-template-literal-escape': 'error',
     'unicorn/consistent-tuple-labels': 'error',
     // 'unicorn/custom-error-definition': 'off', // not implemented
     // 'unicorn/default-export-style': 'error', // not implemented
@@ -71,7 +71,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-array-sort-for-min-max': 'error', // not implemented
     // 'unicorn/no-array-splice': 'error', // not implemented
     // 'unicorn/no-asterisk-prefix-in-documentation-comments': 'off', // not implemented
-    // 'unicorn/no-async-promise-finally': 'error', // not implemented
+    'unicorn/no-async-promise-finally': 'error',
     'unicorn/no-await-expression-member': 'error',
     'unicorn/no-await-in-promise-methods': 'error',
     // 'unicorn/no-barrel-files': 'off', // not implemented
@@ -182,7 +182,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-useless-collection-argument': 'error', // not implemented
     // 'unicorn/no-useless-compound-assignment': 'error', // not implemented
     // 'unicorn/no-useless-concat': 'error', // not implemented
-    // 'unicorn/no-useless-continue': 'error', // not implemented
+    'unicorn/no-useless-continue': 'error',
     // 'unicorn/no-useless-delete-check': 'error', // not implemented
     // 'unicorn/no-useless-else': 'error', // not implemented
     'unicorn/no-useless-error-capture-stack-trace': 'error',
