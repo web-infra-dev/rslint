@@ -105,11 +105,11 @@ func ExtendsReactComponent(classNode *ast.Node, pragma string) bool {
 	case ast.KindElementAccessExpression:
 		element := expr.AsElementAccessExpression()
 		object := utils.ESTreeRuntimeExpression(element.Expression)
-		name := utils.ESTreeRuntimeExpression(element.ArgumentExpression)
-		if object.Kind != ast.KindIdentifier || object.AsIdentifier().Text != pragma || name == nil || name.Kind != ast.KindIdentifier {
+		if object.Kind != ast.KindIdentifier || object.AsIdentifier().Text != pragma {
 			return false
 		}
-		return isComponentName(name.AsIdentifier().Text)
+		name, _ := utils.AccessExpressionStaticName(expr)
+		return isComponentName(name)
 	}
 	return false
 }

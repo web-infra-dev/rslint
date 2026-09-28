@@ -61,6 +61,7 @@ rslint intentionally differs from eslint-plugin-react 7.37.5 in these cases:
 - Public string and static template keys, such as `['state']` and `` [`state`] ``, are checked just like `.state`. Private `#state` and dynamic keys are ignored. For example, with `const state = 'other'`, `[state]` initializes `other` and is not reported. Variable values and template substitutions are not resolved.
 - With `"never"`, assignments must use a component constructor's `this`. Arrow functions retain that `this`; ordinary functions, nested class methods, field initializers, and static blocks have their own `this` and are not attributed to an outer constructor.
 - A private superclass such as `React.#Component` or `React.#PureComponent` does not identify a React component.
+- Static superclass keys such as `React['Component']` and `` React[`PureComponent`] `` identify React components. Variable keys such as `React[Component]` are ignored: with `const Component = 'Other'`, the superclass is `React.Other`.
 
 For example, with `"never"`, only the arrow's assignment is reported:
 

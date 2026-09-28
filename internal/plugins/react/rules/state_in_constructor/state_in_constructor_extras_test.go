@@ -30,10 +30,15 @@ func TestStateInConstructorExtras(t *testing.T) {
 			Code: `class Outer extends React.Component { render() { return class Inner { state = {}; }; } }`,
 			Tsx:  true,
 		},
-		// Computed string, optional, and asserted base expressions are not recognized.
+		// Dynamic superclass keys are not resolved from their variable names.
 		{
-			Code: `class A extends React['Component'] { state = {}; } class B extends (React?.Component) { state = {}; } class C extends (React.Component as any) { state = {}; }`,
+			Code: `const Component = 'Other'; class C extends React[Component] { state = {}; }`,
 			Tsx:  true,
+		},
+		{
+			Code:    `const Component = 'Other'; class C extends React[Component] { constructor() { super(); this.state = {}; } }`,
+			Tsx:     true,
+			Options: []any{"never"},
 		},
 		// Type signatures and constructor parameter properties are not class fields.
 		{
@@ -174,13 +179,36 @@ class C extends Base { state = {}; }`,
 				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 29, EndLine: 1, EndColumn: 35},
 			},
 		},
-		// PureComponent, computed identifier heritage, and class expressions are recognized.
+		// Literal bases are recognized; optional and asserted bases remain ignored.
+		{
+			Code: `class A extends React['Component'] { state = {}; } class B extends (React?.Component) { state = {}; } class C extends (React.Component as any) { state = {}; }`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "stateInitConstructor", Line: 1, Column: 38, EndLine: 1, EndColumn: 49},
+			},
+		},
+		// Static template superclass keys work in both modes.
+		{
+			Code: "class C extends React[`PureComponent`] { state = {}; }",
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "stateInitConstructor", Line: 1, Column: 42, EndLine: 1, EndColumn: 53},
+			},
+		},
+		{
+			Code:    "class C extends React[`Component`] { constructor() { super(); this.state = {}; } }",
+			Tsx:     true,
+			Options: []any{"never"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "stateInitClassProp", Line: 1, Column: 63, EndLine: 1, EndColumn: 78},
+			},
+		},
+		// PureComponent and class expressions are recognized, but dynamic bases are not.
 		{
 			Code: `class A extends PureComponent { state = {}; } class B extends React[Component] { state = {}; } const C = class extends ((React).PureComponent) { state = {}; };`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 33, EndLine: 1, EndColumn: 44},
-				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 82, EndLine: 1, EndColumn: 93},
 				{MessageId: "stateInitConstructor", Message: "State initialization should be in a constructor", Line: 1, Column: 146, EndLine: 1, EndColumn: 157},
 			},
 		},
