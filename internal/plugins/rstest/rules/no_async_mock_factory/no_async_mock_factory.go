@@ -110,7 +110,7 @@ var NoAsyncMockFactoryRule = rule.Rule{
 		scan := &fileScan{ctx: ctx, shadowed: utils.NewShadowCache(ctx.SourceFile)}
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				argument, member := mockFactoryArgument(node)
+				argument, member := rstestUtils.ParseModuleMockFactory(node)
 				if argument == nil {
 					return
 				}
@@ -138,7 +138,7 @@ var NoAsyncMockFactoryRule = rule.Rule{
 // sourceMayContainMockFactory rejects, from the source file's shared identifier
 // index, every file that cannot hold a call this rule reports.
 //
-// mockFactoryArgument matches only `rs.<member>(…)` and `rstest.<member>(…)`
+// ParseModuleMockFactory matches only `rs.<member>(…)` and `rstest.<member>(…)`
 // with member one of the four mock APIs, all written out: none of those four
 // carries PluginManagedAPI.ReadsComputedMember, and the receiver has to be an
 // identifier spelled `rs` or `rstest` because that is how the build matches it.
@@ -188,37 +188,6 @@ type fileScan struct {
 	declarations map[*ast.Symbol]verdict
 	// written maps a symbol onto whether anything in the file assigns to it.
 	written map[*ast.Symbol]bool
-}
-
-// mockFactoryArgument returns the factory argument of a module mock call the
-// build rewrites, together with the member as it is written. It is nil for
-// everything else.
-func mockFactoryArgument(node *ast.Node) (*ast.Node, string) {
-	utility := rstestUtils.ParseRstestPluginManagedCall(node)
-	if utility == nil || !mockAPIs[utility.Member] || !rstestUtils.IsTransformablePosition(node) {
-		return nil, ""
-	}
-
-	call := node.AsCallExpression()
-	if call.Arguments == nil {
-		return nil, ""
-	}
-	// The transform reads the path and the factory positionally. A third
-	// argument fails the build, and a spread's elements are only known at run
-	// time, so neither shape reaches a factory this rule can judge. What the
-	// path itself is written as does not matter: a string, a dynamic import
-	// and a variable all install the same factory. An explicit type argument
-	// only names the mocked module's shape and is no exemption either.
-	arguments := call.Arguments.Nodes
-	if len(arguments) != 2 {
-		return nil, ""
-	}
-	for _, argument := range arguments {
-		if argument == nil || argument.Kind == ast.KindSpreadElement {
-			return nil, ""
-		}
-	}
-	return arguments[1], utility.Member
 }
 
 // classify walks the three layers in order: what the syntax settles on its own,
