@@ -670,6 +670,7 @@ define.test({
     './tests/eslint-plugin-jest/rules/no-standalone-expect.test.ts',
     './tests/eslint-plugin-jest/rules/no-test-prefixes.test.ts',
     './tests/eslint-plugin-jest/rules/no-test-return-statement.test.ts',
+    './tests/eslint-plugin-jest/rules/no-unnecessary-assertion.test.ts',
     './tests/eslint-plugin-jest/rules/no-unneeded-async-expect-function.test.ts',
     './tests/eslint-plugin-jest/rules/no-untyped-mock-factory.test.ts',
     './tests/eslint-plugin-jest/rules/no-duplicate-hooks.test.ts',
