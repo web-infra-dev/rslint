@@ -51,6 +51,26 @@ func TestResolveSourceFileFromSourceFileInvalidInput(t *testing.T) {
 	}
 }
 
+func TestResolveModuleAlternateSpecifier(t *testing.T) {
+	t.Parallel()
+	program, sourceFile, specifier := programForImport(t, map[string]string{
+		"/import-fixture/file.ts": `import value from "./bar.js?raw";`,
+		"/import-fixture/bar.ts":  "export default 1;",
+	}, "/import-fixture/file.ts")
+	for _, name := range []string{"./bar", "./bar.js", "./bar.ts"} {
+		resolved, target, ok := program.ResolveModuleNameAt(sourceFile, name, specifier)
+		if !ok || resolved != "/import-fixture/bar.ts" || target == nil {
+			t.Fatalf("ResolveModuleNameAt(%q) = (%q, %v, %v)", name, resolved, target, ok)
+		}
+	}
+	if specifier.Text() != "./bar.js?raw" {
+		t.Fatal("resolving an alternate spelling mutated the source AST")
+	}
+	if _, _, ok := program.ResolveModuleNameAt(sourceFile, "./bar", nil); ok {
+		t.Fatal("alternate resolution accepted a missing source reference")
+	}
+}
+
 // TestResolveFromSourceFileRequire covers the three `require()` shapes that
 // differ in how their specifier reaches a file: TypeScript's own resolution
 // records the call in a JavaScript file, while the same call in a TypeScript

@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/enforce_node_protocol_usage"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/export"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/exports_last"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/extensions"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/first"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/group_exports"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/max_dependencies"
@@ -46,6 +47,7 @@ func GetAllRules() []rule.Rule {
 		enforce_node_protocol_usage.EnforceNodeProtocolUsageRule,
 		export.ExportRule,
 		exports_last.ExportsLastRule,
+		extensions.ExtensionsRule,
 		first.FirstRule,
 		group_exports.GroupExportsRule,
 		max_dependencies.MaxDependenciesRule,

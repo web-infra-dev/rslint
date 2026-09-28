@@ -216,6 +216,7 @@ define.test({
     './tests/eslint-plugin-import/rules/enforce-node-protocol-usage.test.ts',
     './tests/eslint-plugin-import/rules/export.test.ts',
     './tests/eslint-plugin-import/rules/exports-last.test.ts',
+    './tests/eslint-plugin-import/rules/extensions.test.ts',
     './tests/eslint-plugin-import/rules/first.test.ts',
     './tests/eslint-plugin-import/rules/group-exports.test.ts',
     './tests/eslint-plugin-import/rules/max-dependencies.test.ts',
