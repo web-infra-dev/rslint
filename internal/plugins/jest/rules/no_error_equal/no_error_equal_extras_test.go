@@ -18,6 +18,9 @@ func TestNoErrorEqualExtras(t *testing.T) {
 		t,
 		&no_error_equal.NoErrorEqualRule,
 		[]rule_tester.ValidTestCase{
+			// no_error_equal.md: correct examples.
+			{Code: "class NotFoundError extends Error {}\ndeclare function loadUser(id: string): void;\ndeclare const id: string;\nexpect(() => loadUser(id)).toThrow(NotFoundError);\nexpect(() => loadUser(id)).toThrow('user not found');"},
+			{Code: "declare const error: AggregateError;\nexpect(error).toBeInstanceOf(AggregateError);\nexpect(error).toHaveProperty('message', 'hello world');"},
 			// A missing expect argument has no type to inspect.
 			{Code: `expect().toEqual(new Error());`},
 			// The head must be called directly, not through a member.
@@ -69,6 +72,14 @@ expect(new Error()).toEqual(1);`},
 expect(new Error()).toEqual(1);`},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				// no_error_equal.md: incorrect examples.
+				Code: "expect(new AggregateError([], 'hello world')).toEqual(new Error('hello world'));\n\nexpect(new Error('hello world')).toStrictEqual('hello sunshine');",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "equalError", Message: msg, Line: 1, Column: 1, EndLine: 1, EndColumn: 80},
+					{MessageId: "equalError", Message: msg, Line: 3, Column: 1, EndLine: 3, EndColumn: 65},
+				},
+			},
 			// Parentheses around the head, the argument or the head call.
 			{
 				Code: `declare const e: Error;

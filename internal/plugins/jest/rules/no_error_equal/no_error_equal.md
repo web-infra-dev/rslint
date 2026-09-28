@@ -4,16 +4,16 @@
 
 Disallow using equality matchers on error types.
 
-When comparing errors, `toEqual` and `toStrictEqual` only compare the `message` properties, so a test can pass even if the errors are of different types. Use `toThrow` instead, which checks the error type along with its message.
+Jest's equality matchers compare errors mostly by their `message`. `toEqual` ignores the error type, so `new TypeError('x')` equals `new RangeError('x')`. `toStrictEqual` checks the type, but still ignores other properties such as `code` and `cause`. Passing an error instance to `toThrow` does not help either: `toThrow(new Error('x'))` compares only the message and passes even when the thrown value is not an `Error`.
+
+Check the error type and the message separately instead. For a thrown error, pass the expected class to `toThrow` and assert the message in a second call. For an error value, use `toBeInstanceOf` and assert the properties you care about.
 
 This rule reports `toEqual` and `toStrictEqual` assertions whose `expect()` subject has an `Error` type: the built-in `Error`, a built-in or user-defined class or interface that extends it, or a union whose members are all such types. It requires type information.
 
 Examples of **incorrect** code for this rule:
 
 ```ts
-expect(new AggregateError([], expect.any(String))).toEqual(
-  new Error(expect.any(String)),
-);
+expect(new AggregateError([], 'hello world')).toEqual(new Error('hello world'));
 
 expect(new Error('hello world')).toStrictEqual('hello sunshine');
 ```
@@ -21,13 +21,11 @@ expect(new Error('hello world')).toStrictEqual('hello sunshine');
 Examples of **correct** code for this rule:
 
 ```ts
-expect(() => {
-  throw new AggregateError([], expect.any(String));
-}).toThrow(new Error(expect.any(String)));
+expect(() => loadUser(id)).toThrow(NotFoundError);
+expect(() => loadUser(id)).toThrow('user not found');
 
-expect(() => {
-  throw new Error('hello world');
-}).toThrow('hello sunshine');
+expect(error).toBeInstanceOf(AggregateError);
+expect(error).toHaveProperty('message', 'hello world');
 ```
 
 ## Original Documentation
