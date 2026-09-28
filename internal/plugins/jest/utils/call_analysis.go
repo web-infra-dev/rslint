@@ -206,8 +206,7 @@ func (analysis *JestCallAnalysis) indexSourceFile() {
 			if declaration != nil && declaration.Name() != nil &&
 				declaration.Name().Kind == ast.KindIdentifier &&
 				declaration.Initializer != nil {
-				initializer := ast.SkipParentheses(declaration.Initializer)
-				if ast.IsFunctionExpressionOrArrowFunction(initializer) {
+				if initializer := testCallbackInitializerFunction(declaration.Initializer); initializer != nil {
 					analysis.recordFunction(declaration.Name().Text(), initializer)
 				}
 			}

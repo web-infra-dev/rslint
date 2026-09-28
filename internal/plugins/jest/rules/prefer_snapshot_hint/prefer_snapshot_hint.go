@@ -23,7 +23,11 @@ var PreferSnapshotHintRule = shared.NewRule(shared.Config{
 					(parsed.Matcher != "toMatchSnapshot" && parsed.Matcher != "toThrowErrorMatchingSnapshot") {
 					return nil
 				}
-				return []shared.Snapshot{{Matcher: parsed.MatcherEntry.Node, Args: node.Arguments(), Properties: parsed.Matcher == "toMatchSnapshot"}}
+				matcherCall := parsed.MatcherEntry.Call
+				if matcherCall == nil || matcherCall != node {
+					return nil
+				}
+				return []shared.Snapshot{{Matcher: parsed.MatcherEntry.Node, Args: matcherCall.Arguments(), Properties: parsed.Matcher == "toMatchSnapshot"}}
 			},
 		}
 	},

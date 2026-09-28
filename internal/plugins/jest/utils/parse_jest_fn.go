@@ -386,7 +386,7 @@ func resolveNamedTestCallback(ctx rule.RuleContext, callExpr *ast.CallExpression
 		return jestCallbackInfo{}
 	}
 
-	callback := ast.SkipParentheses(callExpr.Arguments.Nodes[1])
+	callback := jestTestCallbackArgument(callExpr)
 	if callback == nil || ast.IsFunctionExpressionOrArrowFunction(callback) {
 		return jestCallbackInfo{}
 	}
@@ -431,7 +431,7 @@ func testCallbackInitializerFunction(initializer *ast.Node) *ast.Node {
 	if initializer == nil {
 		return nil
 	}
-	init := ast.SkipParentheses(initializer)
+	init := internalUtils.SkipAssertionsAndParens(initializer)
 	if ast.IsFunctionExpressionOrArrowFunction(init) {
 		return init
 	}

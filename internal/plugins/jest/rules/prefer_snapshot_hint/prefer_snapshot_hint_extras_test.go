@@ -64,6 +64,14 @@ func TestPreferSnapshotHintExtras(t *testing.T) {
 		{Code: "test('case', callback); function callback() { expect('test').toMatchSnapshot(); } function helper() { expect('helper').toMatchSnapshot(); }", Options: []any{"multi"}},
 		// A TypeScript overload set resolves to its unique implementation body.
 		{Code: "test('case', callback); function callback(): void; function callback() { expect('test').toMatchSnapshot(); } function helper() { expect('helper').toMatchSnapshot(); }", Options: []any{"multi"}},
+		// Runtime-transparent TypeScript wrappers preserve callback identity.
+		{Code: "describe('suite', () => { const a = () => expect(1).toMatchSnapshot(); const b = () => expect(2).toMatchSnapshot(); test('a', a as () => void); test('b', b as () => void); });", Options: []any{"multi"}},
+		{Code: "describe('suite', () => { const a = () => expect(1).toMatchSnapshot(); const b = () => expect(2).toMatchSnapshot(); test('a', a!); test('b', b satisfies () => void); });", Options: []any{"multi"}},
+		// Promise continuations do not duplicate a hinted snapshot matcher.
+		{Code: "await expect(Promise.resolve(1)).resolves.toMatchSnapshot('named').then(() => {});", Options: []any{"always"}},
+		{Code: "await expect(Promise.resolve(1)).resolves.toMatchSnapshot('named').catch(() => {});", Options: []any{"always"}},
+		{Code: "await expect(Promise.resolve(1)).resolves.toMatchSnapshot('named').finally(() => {});", Options: []any{"always"}},
+		{Code: "await expect(Promise.resolve(1)).resolves.toMatchSnapshot().then(() => {});", Options: []any{"multi"}},
 	}, []rule_tester.InvalidTestCase{
 		// The upstream parser treats this static-looking call as an expect matcher.
 		{Code: "expect.toMatchSnapshot();", Options: []any{"always"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingHint", Line: 1, Column: 8, EndLine: 1, EndColumn: 23}}},
@@ -162,6 +170,10 @@ func TestPreferSnapshotHintExtras(t *testing.T) {
 			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 2, Column: 20, EndLine: 2, EndColumn: 35},
 			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 5, Column: 19, EndLine: 5, EndColumn: 34},
 		}},
+		// The real matcher remains without a hint when followed by a continuation.
+		{Code: "await expect(Promise.resolve(1))\n  .resolves.toMatchSnapshot()\n  .then(() => {});", Options: []any{"always"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 2, Column: 13, EndLine: 2, EndColumn: 28},
+		}},
 		// Locks in registration: parameterized tests
 		{Code: "test.each([1, 2])(\"row\", value => { expect(value).toMatchSnapshot(); expect(value).toThrowErrorMatchingSnapshot(); });", Options: []any{"multi"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "missingHint", Message: "You should provide a hint for this snapshot", Line: 1, Column: 51, EndLine: 1, EndColumn: 66},
@@ -220,6 +232,15 @@ test('case', callback);
 function callback(): void;
 function callback() { expect('test').toMatchSnapshot(); }
 function helper() { expect('helper').toMatchSnapshot(); }`, []any{"multi"}, 0)
+	})
+	t.Run("registered callback unwraps TypeScript expressions", func(t *testing.T) {
+		runPreferSnapshotHintSourceOnly(t, `
+describe('suite', () => {
+  const a = () => expect(1).toMatchSnapshot();
+  const b = () => expect(2).toMatchSnapshot();
+  test('a', a as () => void);
+  test('b', b satisfies () => void);
+});`, []any{"multi"}, 0)
 	})
 }
 

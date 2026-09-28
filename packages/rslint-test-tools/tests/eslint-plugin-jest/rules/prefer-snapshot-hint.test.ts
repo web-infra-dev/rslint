@@ -258,8 +258,39 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       code: "test('case', callback);\nfunction callback(): void;\nfunction callback() { expect('test').toMatchSnapshot(); }\nfunction helper() { expect('helper').toMatchSnapshot(); }",
       options: ['multi'],
     },
+    {
+      code: "describe('suite', () => {\n  const a = () => expect(1).toMatchSnapshot();\n  const b = () => expect(2).toMatchSnapshot();\n  test('a', a as () => void);\n  test('b', b satisfies () => void);\n});",
+      options: ['multi'],
+    },
+    {
+      code: "await expect(Promise.resolve(1)).resolves.toMatchSnapshot('named').then(() => {});",
+      options: ['always'],
+    },
+    {
+      code: "await expect(Promise.resolve(1)).resolves.toMatchSnapshot('named').catch(() => {});",
+      options: ['always'],
+    },
+    {
+      code: "await expect(Promise.resolve(1)).resolves.toMatchSnapshot('named').finally(() => {});",
+      options: ['always'],
+    },
+    {
+      code: 'await expect(Promise.resolve(1)).resolves.toMatchSnapshot().then(() => {});',
+      options: ['multi'],
+    },
   ],
   invalid: [
+    {
+      code: 'await expect(Promise.resolve(1))\n  .resolves.toMatchSnapshot()\n  .then(() => {});',
+      options: ['always'],
+      errors: [
+        {
+          messageId: 'missingHint',
+          line: 2,
+          column: 13,
+        },
+      ],
+    },
     {
       code: "const outer = () => {\n  expect('before').toMatchSnapshot();\n  let callback = () => { expect('stale').toMatchSnapshot(); };\n  callback = () => {};\n  test('case', callback);\n  expect('after').toMatchSnapshot();\n};",
       options: ['multi'],
