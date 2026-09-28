@@ -33,6 +33,9 @@ func mockModuleRoot(t *testing.T) rule_tester.Root {
 		}
 		files[tspath.ResolvePath(directory, name)] = string(data)
 	}
+	// Windows forbids `?` in file names, so this one stays out of the archive,
+	// which the JavaScript suite writes to disk.
+	files[tspath.ResolvePath(directory, "node_modules/s-star/lib/entry?x.js")] = "module.exports = {};\n"
 	return rule_tester.Root{Dir: directory, FS: utils.NewOverlayVFS(base.FS, files)}
 }
 

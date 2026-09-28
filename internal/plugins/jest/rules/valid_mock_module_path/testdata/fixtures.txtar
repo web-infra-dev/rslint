@@ -3,6 +3,8 @@
 # Tests lint src/rules/__tests__/valid-mock-module-path.test.ts.
 # The x-* packages hold `exports` shapes whose results were checked against Node's
 # require.resolve.
+# The remaining packages, the root package.json's imports and exports, and src/
+# back the Node resolution table in valid_mock_module_path_extras_node_test.go.
 -- src/rules/__tests__/fixtures/module/bar.css --
 .bar-container {
   padding: 16px;
@@ -68,7 +70,7 @@ export {};
 -- src/rules/node_modules/nested-only/index.js --
 module.exports = {};
 -- package.json --
-{"name":"fixture-root","imports":{"#fixture-module":"./src/rules/__tests__/fixtures/module/foo.js","#absent":"./src/absent.js","#extensionless":"./src/rules/__tests__/fixtures/module/foo","#encoded":"./src/rules/__tests__/fixtures/module/a%20b.js","#target-query":"./src/rules/__tests__/fixtures/module/foo.js?x","#literal-query-dep":"fs?raw","#package-query":"legacy-main?x","#builtin":"fs"}}
+{"name":"fixture-root","imports":{"#fixture-module":"./src/rules/__tests__/fixtures/module/foo.js","#absent":"./src/absent.js","#extensionless":"./src/rules/__tests__/fixtures/module/foo","#encoded":"./src/rules/__tests__/fixtures/module/a%20b.js","#target-query":"./src/rules/__tests__/fixtures/module/foo.js?x","#literal-query-dep":"fs?raw","#package-query":"legacy-main?x","#builtin":"fs","#p/*":"./src/*","#b/*":"m-star/*","#bad":"./src/%2e%2e/src/entry.js","#arr":["./src/%2e%2e/x.js","./src/entry.js"],"#dep2":"m-star/entry.js?raw","#dep3":"m-star/entry.js#frag"},"exports":{"./*":"./src/*"}}
 -- node_modules/x-extensionless/package.json --
 {"name":"x-extensionless","exports":"./entry"}
 -- node_modules/x-extensionless/entry.js --
@@ -190,4 +192,154 @@ module.exports = {};
 -- node_modules/x-url-backslash/package.json --
 {"name":"x-url-backslash","exports":"./entry%5Cx.js"}
 -- node_modules/x-url-backslash/entry%5Cx.js --
+module.exports = {};
+-- node_modules/m-star/package.json --
+{"name":"m-star","exports":{"./*":"./lib/*"}}
+-- node_modules/m-star/lib/a b.js --
+module.exports = {};
+-- node_modules/m-star/lib/entry.js --
+module.exports = {};
+-- node_modules/m-star/lib/entry.js#hash --
+module.exports = {};
+-- node_modules/m-star/lib/sub/x.js --
+module.exports = {};
+-- node_modules/m-star-js/package.json --
+{"name":"m-star-js","exports":{"./*":"./lib/*.js"}}
+-- node_modules/m-star-js/lib/entry.js --
+module.exports = {};
+-- node_modules/m-star-js/lib/entry#hash.js --
+module.exports = {};
+-- node_modules/m-star-js/lib/sub/x.js --
+module.exports = {};
+-- node_modules/m-multi-star/package.json --
+{"name":"m-multi-star","exports":{"./*":"./lib/*/*.js"}}
+-- node_modules/m-multi-star/lib/x/x.js --
+module.exports = {};
+-- node_modules/m-multi-star/lib/x.js --
+module.exports = {};
+-- node_modules/m-target-back/package.json --
+{"name":"m-target-back","exports":"./lib\\entry.js"}
+-- node_modules/m-target-back/lib/entry.js --
+module.exports = {};
+-- node_modules/m-target-double-slash/package.json --
+{"name":"m-target-double-slash","exports":"./lib//entry.js"}
+-- node_modules/m-target-double-slash/lib/entry.js --
+module.exports = {};
+-- node_modules/m-target-parent-segment/package.json --
+{"name":"m-target-parent-segment","exports":"./lib/../entry.js"}
+-- node_modules/m-target-parent-segment/entry.js --
+module.exports = {};
+-- node_modules/m-target-encoded-parent/package.json --
+{"name":"m-target-encoded-parent","exports":"./lib/%2e%2e/entry.js"}
+-- node_modules/m-target-encoded-parent/entry.js --
+module.exports = {};
+-- node_modules/m-target-nm/package.json --
+{"name":"m-target-nm","exports":"./node_modules/x.js"}
+-- node_modules/m-target-nm/node_modules/x.js --
+module.exports = {};
+-- node_modules/m-arr-parent-segment/package.json --
+{"name":"m-arr-parent-segment","exports":["./lib/../entry.js","./ok.js"]}
+-- node_modules/m-arr-parent-segment/entry.js --
+module.exports = {};
+-- node_modules/m-arr-parent-segment/ok.js --
+module.exports = {};
+-- node_modules/m-arr-encoded-parent/package.json --
+{"name":"m-arr-encoded-parent","exports":["./lib/%2e%2e/entry.js","./ok.js"]}
+-- node_modules/m-arr-encoded-parent/entry.js --
+module.exports = {};
+-- node_modules/m-arr-encoded-parent/ok.js --
+module.exports = {};
+-- node_modules/m-arr-nm/package.json --
+{"name":"m-arr-nm","exports":["./node_modules/x.js","./ok.js"]}
+-- node_modules/m-arr-nm/node_modules/x.js --
+module.exports = {};
+-- node_modules/m-arr-nm/ok.js --
+module.exports = {};
+-- node_modules/m-arr-parent/package.json --
+{"name":"m-arr-parent","exports":["../x.js","./ok.js"]}
+-- node_modules/m-arr-parent/ok.js --
+module.exports = {};
+-- node_modules/m-target-q-star/package.json --
+{"name":"m-target-q-star","exports":{"./*":"./lib/*.js?v=1"}}
+-- node_modules/m-target-q-star/lib/entry.js --
+module.exports = {};
+-- node_modules/t-query-separator/package.json --
+{"name":"t-query-separator","exports":"./entry.js?%2F"}
+-- node_modules/t-query-separator/entry.js --
+module.exports = {};
+-- node_modules/t-fragment-separator/package.json --
+{"name":"t-fragment-separator","exports":"./entry.js#%5C"}
+-- node_modules/t-fragment-separator/entry.js --
+module.exports = {};
+-- node_modules/t-arr-query-separator/package.json --
+{"name":"t-arr-query-separator","exports":["./entry.js?%2f","./ok.js"]}
+-- node_modules/t-arr-query-separator/entry.js --
+module.exports = {};
+-- node_modules/t-arr-query-separator/ok.js --
+module.exports = {};
+-- node_modules/t-upper-dot/package.json --
+{"name":"t-upper-dot","exports":"./lib/%2E%2E/entry.js"}
+-- node_modules/t-upper-dot/entry.js --
+module.exports = {};
+-- node_modules/t-enc-nm/package.json --
+{"name":"t-enc-nm","exports":"./%6eode_modules/x.js"}
+-- node_modules/t-enc-nm/node_modules/x.js --
+module.exports = {};
+-- node_modules/t-bad-utf8/package.json --
+{"name":"t-bad-utf8","exports":"./caf%C3.js"}
+-- node_modules/t-bad-utf8/cafÃ.js --
+module.exports = {};
+-- node_modules/t-trunc-utf8/package.json --
+{"name":"t-trunc-utf8","exports":"./x%E2%82.js"}
+-- node_modules/t-trunc-utf8/x.js --
+module.exports = {};
+-- node_modules/t-cond-bad/package.json --
+{"name":"t-cond-bad","exports":[{"require":"./lib/%2e%2e/entry.js"},"./ok.js"]}
+-- node_modules/t-cond-bad/entry.js --
+module.exports = {};
+-- node_modules/t-cond-bad/ok.js --
+module.exports = {};
+-- node_modules/s-star/package.json --
+{"name":"s-star","exports":{"./*":"./lib/*","./x":"./lib/entry.js"}}
+-- node_modules/s-star/lib/entry.js --
+module.exports = {};
+-- node_modules/s-star/lib/sub/x.js --
+module.exports = {};
+-- node_modules/s-star/lib/a b.js --
+module.exports = {};
+-- node_modules/s-multi/package.json --
+{"name":"s-multi","exports":{"./*":"./lib/*/*.js"}}
+-- node_modules/s-multi/lib/x/x.js --
+module.exports = {};
+-- node_modules/s-multi/lib/x.js --
+module.exports = {};
+-- node_modules/s-trailing/package.json --
+{"name":"s-trailing","exports":"./entry.js"}
+-- node_modules/s-trailing/entry.js --
+module.exports = {};
+-- node_modules/u-legacy/package.json --
+{"name":"u-legacy","main":"./index.js"}
+-- node_modules/u-legacy/index.js --
+module.exports = {};
+-- node_modules/u-legacy/lib/a b.js --
+module.exports = {};
+-- node_modules/u-legacy/lib/c%20d.js --
+module.exports = {};
+-- node_modules/u-legacy/lib/q.js --
+module.exports = {};
+-- node_modules/@s/pkg/package.json --
+{"name":"@s/pkg","exports":{"./*":"./lib/*"}}
+-- node_modules/@s/pkg/lib/entry.js --
+module.exports = {};
+-- node_modules/cond/package.json --
+{"name":"cond","exports":{"./*":{"import":"./esm/*","require":"./lib/*"}}}
+-- node_modules/cond/lib/entry.js --
+module.exports = {};
+-- node_modules/cond/esm/entry.js --
+module.exports = {};
+-- src/a b.js --
+module.exports = {};
+-- src/entry.js --
+module.exports = {};
+-- src/sub/x.js --
 module.exports = {};
