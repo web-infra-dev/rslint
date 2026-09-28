@@ -4,20 +4,18 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
-	unboundMethod "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/unbound_method"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/unbound_method"
 )
 
-var UnboundMethodRule = rule.Rule{
-	Name:             "rstest/unbound-method",
-	Schema:           unboundMethod.UnboundMethodRule.Schema,
-	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+var UnboundMethodRule = shared.NewRule(shared.Config{
+	Name: "rstest/unbound-method",
+	Prepare: func(ctx rule.RuleContext) func(*ast.Node) bool {
 		var analysis *rstestUtils.RstestCallAnalysis
 		stableRoots := map[*ast.Symbol]bool{}
 		var asymmetricMatchers *asymmetricMatcherAnalysis
-		return unboundMethod.CreateListeners(ctx, options, func(node *ast.Node) bool {
+		return func(node *ast.Node) bool {
 			argument := node
 			for argument.Parent != nil && utils.SkipAssertionsAndParens(argument.Parent) == node {
 				argument = argument.Parent
@@ -105,9 +103,9 @@ var UnboundMethodRule = rule.Rule{
 				}
 			}
 			return true
-		})
+		}
 	},
-}
+})
 
 type asymmetricMatcherAnalysis struct {
 	ctx                rule.RuleContext
