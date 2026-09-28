@@ -230,40 +230,11 @@ func resolveRstestCallbackBinding(
 	symbol *ast.Symbol,
 	name string,
 ) rstestCallbackInfo {
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	function := testFramework.LocalFunctionBinding(analysis.ctx.SourceFile, analysis.ctx.Refs, symbol)
+	if function == nil {
 		return rstestCallbackInfo{}
 	}
-	declaration := symbol.Declarations[0]
-	if declaration == nil || ast.GetSourceFileOfNode(declaration) != analysis.ctx.SourceFile ||
-		rstestCallbackBindingIsWritten(analysis, symbol) {
-		return rstestCallbackInfo{}
-	}
-	switch declaration.Kind {
-	case ast.KindFunctionDeclaration:
-		return rstestCallbackInfo{functionNode: declaration, name: name}
-	case ast.KindVariableDeclaration:
-		initializer := declaration.AsVariableDeclaration().Initializer
-		if initializer == nil {
-			return rstestCallbackInfo{}
-		}
-		initializer = internalUtils.SkipAssertionsAndParens(initializer)
-		if ast.IsFunctionExpressionOrArrowFunction(initializer) {
-			return rstestCallbackInfo{functionNode: initializer, name: name}
-		}
-	}
-	return rstestCallbackInfo{}
-}
-
-func rstestCallbackBindingIsWritten(
-	analysis *RstestCallAnalysis,
-	symbol *ast.Symbol,
-) bool {
-	for _, reference := range analysis.ctx.Refs.References(symbol) {
-		if internalUtils.IsWriteReference(reference) {
-			return true
-		}
-	}
-	return false
+	return rstestCallbackInfo{functionNode: function, name: name}
 }
 
 func recordRstestTestCallback(
