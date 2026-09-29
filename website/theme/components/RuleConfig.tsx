@@ -6,7 +6,14 @@ const GROUP_CONFIG: Record<string, { importName: string; preset: string }> =
   Object.fromEntries(
     PLUGIN_REGISTRY.filter((p) => p.presets.length > 0).map((p) => [
       p.group,
-      { importName: p.importName, preset: p.presets[0]!.name },
+      {
+        importName: p.importName,
+        preset: (
+          p.presets.find((preset) =>
+            preset.name.endsWith('.configs.recommended'),
+          ) ?? p.presets[0]!
+        ).name,
+      },
     ]),
   );
 
