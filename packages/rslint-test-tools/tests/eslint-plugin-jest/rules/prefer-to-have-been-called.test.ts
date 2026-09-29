@@ -41,7 +41,7 @@ ruleTester.run('prefer-to-have-been-called', {} as never, {
     },
     {
       code: 'expect(method).not.toHaveBeenCalledTimes(0, 1, 2);',
-      output: 'expect(method).toHaveBeenCalled();',
+      output: null,
       errors: [{ messageId: 'preferMatcher', column: 20, line: 1 }],
     },
 
