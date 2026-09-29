@@ -69,6 +69,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect_in_promise"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect_with_promise"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_mock_module_path"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_title"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -143,6 +144,7 @@ func GetAllRules() []rule.Rule {
 		valid_expect.ValidExpectRule,
 		valid_expect_in_promise.ValidExpectInPromiseRule,
 		valid_expect_with_promise.ValidExpectWithPromiseRule,
+		valid_mock_module_path.ValidMockModulePathRule,
 		valid_title.ValidTitleRule,
 	}
 }

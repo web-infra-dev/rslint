@@ -1,0 +1,18 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "moduleFileExtensions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "additionalItems": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

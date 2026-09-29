@@ -717,6 +717,7 @@ define.test({
     './tests/eslint-plugin-jest/rules/valid-expect-in-promise.test.ts',
     './tests/eslint-plugin-jest/rules/valid-expect-in-promise.upstream.test.ts',
     './tests/eslint-plugin-jest/rules/valid-expect-with-promise.test.ts',
+    './tests/eslint-plugin-jest/rules/valid-mock-module-path.test.ts',
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
