@@ -116,24 +116,6 @@ var rstestChaiPropertyMatchers = map[string]bool{
 	"undefined":    true,
 }
 
-// RSTEST_MATCHER_ALIASES maps alias matchers to their canonical names.
-// Source: @vitest/expect@4.1.10 dist/index.d.ts (JestAssertion), cross-checked
-// against eslint-plugin-vitest@1.6.26 no-alias-methods; the 11 pairs are
-// identical to Jest's.
-var RSTEST_MATCHER_ALIASES = map[string]string{
-	"toBeCalled":       "toHaveBeenCalled",
-	"toBeCalledTimes":  "toHaveBeenCalledTimes",
-	"toBeCalledWith":   "toHaveBeenCalledWith",
-	"lastCalledWith":   "toHaveBeenLastCalledWith",
-	"nthCalledWith":    "toHaveBeenNthCalledWith",
-	"toReturn":         "toHaveReturned",
-	"toReturnTimes":    "toHaveReturnedTimes",
-	"toReturnWith":     "toHaveReturnedWith",
-	"lastReturnedWith": "toHaveLastReturnedWith",
-	"nthReturnedWith":  "toHaveNthReturnedWith",
-	"toThrowError":     "toThrow",
-}
-
 // RSTEST_INLINE_SNAPSHOT_MATCHERS lists the snapshot matchers whose expected
 // value lives inline in the test file.
 // Source: rstest c4b67c72 packages/core/src/types/expect.ts:86-127; identical
