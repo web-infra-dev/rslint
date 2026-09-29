@@ -32,10 +32,11 @@ const (
 // Runtime is the framework adapter for one file.
 type Runtime struct {
 	Classify func(*ast.Node) CallKind
-	// Callbacks returns the functions the framework resolved as test
-	// callbacks, including ones referenced by name. It is called at most once,
-	// on the first function the traversal enters.
-	Callbacks func() map[*ast.Node]bool
+	// TestCallbacks and HookCallbacks return the functions the framework
+	// resolved as test and hook callbacks, including ones referenced by name.
+	// Each is called at most once, on the first function the traversal enters.
+	TestCallbacks func() map[*ast.Node]bool
+	HookCallbacks func() map[*ast.Node]bool
 }
 
 type Config struct {
@@ -150,11 +151,11 @@ func (stack *frameStack) increment() int {
 	return top.count
 }
 
-func functionPushForNode(node *ast.Node, callbacks map[*ast.Node]bool) functionPushKind {
+func functionPushForNode(node *ast.Node, testCallbacks, hookCallbacks map[*ast.Node]bool) functionPushKind {
 	if node == nil || node.Body() == nil {
 		return functionPushNone
 	}
-	if callbacks[node] {
+	if testCallbacks[node] || hookCallbacks[node] {
 		return functionPushTestCallback
 	}
 
@@ -293,18 +294,18 @@ func NewRule(config Config) rule.Rule {
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			opts := parseOptions(options)
 			runtime := config.Prepare(ctx)
-			var callbacks map[*ast.Node]bool
+			var testCallbacks, hookCallbacks map[*ast.Node]bool
+			callbacksResolved := false
 
 			stack := newFrameStack()
 
 			enterFunction := func(node *ast.Node) {
-				if callbacks == nil {
-					callbacks = runtime.Callbacks()
-					if callbacks == nil {
-						callbacks = map[*ast.Node]bool{}
-					}
+				if !callbacksResolved {
+					testCallbacks = runtime.TestCallbacks()
+					hookCallbacks = runtime.HookCallbacks()
+					callbacksResolved = true
 				}
-				kind := functionPushForNode(node, callbacks)
+				kind := functionPushForNode(node, testCallbacks, hookCallbacks)
 				// A callback the parser could not resolve is recognised by position:
 				// any function inside the registration's callback argument activates
 				// the registration frame. That has to be checked on the detached

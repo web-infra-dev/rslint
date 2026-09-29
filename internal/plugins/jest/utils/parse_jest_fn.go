@@ -405,7 +405,12 @@ func resolveNamedTestCallback(ctx rule.RuleContext, callExpr *ast.CallExpression
 		return jestCallbackInfo{}
 	}
 
-	callback := jestTestCallbackArgument(callExpr)
+	return resolveNamedCallback(ctx, jestTestCallbackArgument(callExpr))
+}
+
+// resolveNamedCallback resolves an identifier passed as a callback to the
+// same-file function it names.
+func resolveNamedCallback(ctx rule.RuleContext, callback *ast.Node) jestCallbackInfo {
 	if callback == nil || ast.IsFunctionExpressionOrArrowFunction(callback) {
 		return jestCallbackInfo{}
 	}

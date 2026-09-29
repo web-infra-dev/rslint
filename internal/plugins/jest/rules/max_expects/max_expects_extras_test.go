@@ -116,6 +116,42 @@ expect(2).toBe(2);`,
 					{MessageId: "exceededMaxAssertion", Line: 3, Column: 3},
 				},
 			},
+			// A hook callback passed by name is still the hook body.
+			{
+				Code: `const setup = () => {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+};
+beforeEach(setup);`,
+				Options: max1Option,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "exceededMaxAssertion", Line: 3, Column: 3},
+				},
+			},
+			{
+				Code: `function setup() {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+}
+beforeEach(setup);`,
+				Options: max1Option,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "exceededMaxAssertion", Line: 3, Column: 3},
+				},
+			},
+			// A renamed hook import still spells the hook's name in the file.
+			{
+				Code: `import { beforeEach as setupEach } from '@jest/globals';
+const setup = () => {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+};
+setupEach(setup);`,
+				Options: max1Option,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "exceededMaxAssertion", Line: 4, Column: 3},
+				},
+			},
 			// A callback passed by name is still the test body.
 			{
 				Code: `const body = () => {

@@ -172,6 +172,45 @@ beforeEach(wrap(() => {
 					exceededMaxError(2, 1, 4, 3, 20),
 				},
 			},
+			// A hook callback passed by name is still the hook body.
+			{
+				Code: `
+const setup = () => {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+};
+beforeEach(setup);`,
+				Options: max1Option,
+				Errors: []rule_tester.InvalidTestCaseError{
+					exceededMaxError(2, 1, 4, 3, 20),
+				},
+			},
+			{
+				Code: `
+function setup() {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+}
+beforeEach(setup);`,
+				Options: max1Option,
+				Errors: []rule_tester.InvalidTestCaseError{
+					exceededMaxError(2, 1, 4, 3, 20),
+				},
+			},
+			// A renamed hook import still spells the hook's name in the file.
+			{
+				Code: `
+import { beforeEach as setupEach } from '@rstest/core';
+const setup = () => {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+};
+setupEach(setup);`,
+				Options: max1Option,
+				Errors: []rule_tester.InvalidTestCaseError{
+					exceededMaxError(2, 1, 5, 3, 20),
+				},
+			},
 			// ---- Any function-valued expression between two assertions is a
 			// boundary: it takes its own count and hands the enclosing count
 			// back. Upstream resets to zero instead and stops reporting the

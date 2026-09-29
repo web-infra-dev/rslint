@@ -44,9 +44,10 @@ var MaxExpectsRule = shared.NewRule(shared.Config{
 				}
 				return shared.CallNone
 			},
-			Callbacks: func() map[*ast.Node]bool {
+			TestCallbacks: func() map[*ast.Node]bool {
 				return analysis.Callbacks().Functions
 			},
+			HookCallbacks: analysis.HookCallbacks,
 		}
 	},
 })
