@@ -14,12 +14,14 @@ export default defineConfig([
 ```
 
 `jestPlugin.configs.recommended` does not declare `files`; the example scopes it to test and spec files.
+All Jest presets include the globals exposed by the Jest runtime.
 
 ## Presets
 
-| Preset                           | Description      | View rules                                                    | Source                                                                                                                               |
-| -------------------------------- | ---------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `jestPlugin.configs.recommended` | Jest rules       | [View rules →](/rules/?preset=jestPlugin.configs.recommended) | [`eslint-plugin-jest` `configs["flat/recommended"]`](https://github.com/jest-community/eslint-plugin-jest/tree/v29.16.0#recommended) |
-| `jestPlugin.configs.style`       | Jest style rules | [View rules →](/rules/?preset=jestPlugin.configs.style)       | [`eslint-plugin-jest` `configs["flat/style"]`](https://github.com/jest-community/eslint-plugin-jest/tree/v29.16.0#style)             |
+| Preset                           | Description              | View rules                                                    | Source                                                                                                                               |
+| -------------------------------- | ------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `jestPlugin.configs.all`         | All supported Jest rules | [View rules →](/rules/?preset=jestPlugin.configs.all)         | [`eslint-plugin-jest` `configs["flat/all"]`](https://github.com/jest-community/eslint-plugin-jest/tree/v29.16.0#all)                 |
+| `jestPlugin.configs.recommended` | Recommended Jest rules   | [View rules →](/rules/?preset=jestPlugin.configs.recommended) | [`eslint-plugin-jest` `configs["flat/recommended"]`](https://github.com/jest-community/eslint-plugin-jest/tree/v29.16.0#recommended) |
+| `jestPlugin.configs.style`       | Jest style rules         | [View rules →](/rules/?preset=jestPlugin.configs.style)       | [`eslint-plugin-jest` `configs["flat/style"]`](https://github.com/jest-community/eslint-plugin-jest/tree/v29.16.0#style)             |
 
 See [Rules & Presets](/config/rules-and-presets) for guidance on choosing and layering presets.

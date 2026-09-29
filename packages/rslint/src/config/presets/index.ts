@@ -17,7 +17,11 @@ import {
   recommendedScript as nodeRecommendedScript,
 } from './node.js';
 import { recommended as promiseRecommended } from './promise.js';
-import { recommended as jestRecommended, style as jestStyle } from './jest.js';
+import {
+  all as jestAll,
+  recommended as jestRecommended,
+  style as jestStyle,
+} from './jest.js';
 import { recommended as rstestRecommended } from './rstest.js';
 import { recommended as unicornRecommended } from './unicorn.js';
 import { recommended as jsxA11yRecommended } from './jsx-a11y.js';
@@ -77,7 +81,7 @@ export const promisePlugin = {
 };
 
 export const jestPlugin = {
-  configs: { recommended: jestRecommended, style: jestStyle },
+  configs: { all: jestAll, recommended: jestRecommended, style: jestStyle },
 };
 
 export const rstestPlugin = {

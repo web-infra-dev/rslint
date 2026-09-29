@@ -12,6 +12,7 @@ import {
   reactPlugin,
   importPlugin,
   nodePlugin,
+  jestPlugin,
   rstestPlugin,
   unicornPlugin,
 } from '@rslint/core';
@@ -44,6 +45,10 @@ describe('defineConfig and config presets', () => {
     expect(nodePlugin.configs.recommended).toBeDefined();
     expect(nodePlugin.configs.recommendedModule).toBeDefined();
     expect(nodePlugin.configs.recommendedScript).toBeDefined();
+    expect(jestPlugin).toBeDefined();
+    expect(jestPlugin.configs.all).toBeDefined();
+    expect(jestPlugin.configs.recommended).toBeDefined();
+    expect(jestPlugin.configs.style).toBeDefined();
     expect(rstestPlugin).toBeDefined();
     expect(rstestPlugin.configs.recommended).toBeDefined();
     expect(unicornPlugin).toBeDefined();
@@ -57,6 +62,7 @@ describe('defineConfig and config presets', () => {
       reactPlugin,
       importPlugin,
       nodePlugin,
+      jestPlugin,
       rstestPlugin,
       unicornPlugin,
     ]) {
@@ -150,6 +156,48 @@ describe('defineConfig and config presets', () => {
     const rec = reactPlugin.configs.recommended;
     expect(rec.plugins).toBeDefined();
     expect(rec.plugins).toContain('react');
+  });
+
+  test('jestPlugin presets should match the supported upstream presets', () => {
+    expect(jestPlugin.configs.style.rules).toEqual({
+      'jest/prefer-to-be': 'error',
+      'jest/prefer-to-contain': 'error',
+      'jest/prefer-to-have-length': 'error',
+    });
+
+    expect(Object.keys(jestPlugin.configs.all.rules ?? {})).toHaveLength(70);
+    expect(
+      Object.values(jestPlugin.configs.all.rules ?? {}).every(
+        (severity) => severity === 'error',
+      ),
+    ).toBe(true);
+
+    for (const preset of Object.values(jestPlugin.configs)) {
+      expect(preset.plugins).toContain('jest');
+      expect(preset.languageOptions?.globals).toEqual(globals.jest);
+    }
+  });
+
+  test('jestPlugin presets should expose Jest globals to core rules', async () => {
+    const directory = import.meta.dirname;
+
+    for (const [name, preset] of Object.entries(jestPlugin.configs)) {
+      const result = await lint({
+        config: normalizeConfig([preset, { rules: { 'no-undef': 'error' } }]),
+        configDirectory: directory,
+        workingDirectory: directory,
+        fileContents: {
+          [path.join(directory, `${name}.test.js`)]:
+            "test('works', () => expect(true).toBe(true));",
+        },
+      });
+
+      expect(
+        result.diagnostics.filter(
+          (diagnostic) => diagnostic.ruleName === 'no-undef',
+        ),
+      ).toHaveLength(0);
+    }
   });
 
   test('import.configs.recommended should declare import plugin and report unresolved imports', async () => {
