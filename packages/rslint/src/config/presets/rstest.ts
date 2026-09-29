@@ -1,4 +1,5 @@
 import type { RslintConfigEntry } from '../define-config.js';
+import { globals } from '../globals/index.js';
 
 const recommended: RslintConfigEntry = {
   plugins: ['rstest'],
@@ -23,4 +24,109 @@ const recommended: RslintConfigEntry = {
   },
 };
 
-export { recommended };
+// The common style subset provided by eslint-plugin-jest and implemented by
+// both @vitest/eslint-plugin and Rslint's Rstest plugin.
+const style: RslintConfigEntry = {
+  plugins: ['rstest'],
+  rules: {
+    'rstest/prefer-to-be': 'error',
+    'rstest/prefer-to-contain': 'error',
+    'rstest/prefer-to-have-length': 'error',
+  },
+};
+
+// Follow @vitest/eslint-plugin's `all` severities for corresponding rules.
+// Rstest-specific and additional supported rules default to warnings.
+const all: RslintConfigEntry = {
+  plugins: ['rstest'],
+  rules: {
+    'rstest/consistent-each-for': 'warn',
+    'rstest/consistent-rstest-namespace': 'warn',
+    'rstest/consistent-test-filename': 'warn',
+    'rstest/consistent-test-it': 'warn',
+    'rstest/expect-expect': 'warn',
+    'rstest/hoisted-apis-on-top': 'warn',
+    'rstest/max-expects': 'warn',
+    'rstest/max-nested-describe': 'warn',
+    'rstest/no-alias-methods': 'warn',
+    'rstest/no-async-mock-factory': 'warn',
+    'rstest/no-commented-out-tests': 'warn',
+    'rstest/no-conditional-expect': 'warn',
+    'rstest/no-conditional-in-test': 'warn',
+    'rstest/no-conditional-tests': 'warn',
+    'rstest/no-disabled-tests': 'warn',
+    'rstest/no-duplicate-hooks': 'warn',
+    'rstest/no-focused-tests': 'warn',
+    'rstest/no-hooks': 'warn',
+    'rstest/no-identical-title': 'warn',
+    'rstest/no-import-node-test': 'warn',
+    'rstest/no-importing-rstest-globals': 'off',
+    'rstest/no-interpolation-in-snapshots': 'warn',
+    'rstest/no-mocks-import': 'warn',
+    'rstest/no-restricted-matchers': 'warn',
+    'rstest/no-restricted-rstest-methods': 'warn',
+    'rstest/no-standalone-expect': 'warn',
+    'rstest/no-test-return-statement': 'warn',
+    'rstest/no-unnecessary-assertion': 'warn',
+    'rstest/no-unneeded-async-expect-function': 'warn',
+    'rstest/no-untyped-mock-factory': 'warn',
+    'rstest/padding-around-after-all-blocks': 'warn',
+    'rstest/padding-around-after-each-blocks': 'warn',
+    'rstest/padding-around-all': 'warn',
+    'rstest/padding-around-before-all-blocks': 'warn',
+    'rstest/padding-around-before-each-blocks': 'warn',
+    'rstest/padding-around-describe-blocks': 'warn',
+    'rstest/padding-around-expect-groups': 'warn',
+    'rstest/padding-around-test-blocks': 'warn',
+    'rstest/prefer-called-exactly-once-with': 'warn',
+    'rstest/prefer-called-once': 'off',
+    'rstest/prefer-called-times': 'warn',
+    'rstest/prefer-called-with': 'warn',
+    'rstest/prefer-comparison-matcher': 'warn',
+    'rstest/prefer-each': 'warn',
+    'rstest/prefer-ending-with-an-expect': 'warn',
+    'rstest/prefer-equality-matcher': 'warn',
+    'rstest/prefer-expect-assertions': 'warn',
+    'rstest/prefer-expect-resolves': 'warn',
+    'rstest/prefer-expect-type-of': 'warn',
+    'rstest/prefer-hooks-in-order': 'warn',
+    'rstest/prefer-hooks-on-top': 'warn',
+    'rstest/prefer-import-in-mock': 'warn',
+    'rstest/prefer-importing-rstest-globals': 'warn',
+    'rstest/prefer-lowercase-title': 'warn',
+    'rstest/prefer-mock-promise-shorthand': 'warn',
+    'rstest/prefer-mock-return-shorthand': 'warn',
+    'rstest/prefer-rs-mocked': 'warn',
+    'rstest/prefer-snapshot-hint': 'warn',
+    'rstest/prefer-spy-on': 'warn',
+    'rstest/prefer-strict-boolean-matchers': 'warn',
+    'rstest/prefer-strict-equal': 'warn',
+    'rstest/prefer-to-be': 'warn',
+    'rstest/prefer-to-be-falsy': 'off',
+    'rstest/prefer-to-be-truthy': 'off',
+    'rstest/prefer-to-contain': 'warn',
+    'rstest/prefer-to-have-been-called': 'warn',
+    'rstest/prefer-to-have-been-called-times': 'warn',
+    'rstest/prefer-to-have-length': 'warn',
+    'rstest/prefer-todo': 'warn',
+    'rstest/require-awaited-expect-poll': 'warn',
+    'rstest/require-hook': 'warn',
+    'rstest/require-local-test-context-for-concurrent-snapshots': 'warn',
+    'rstest/require-mock-type-parameters': 'warn',
+    'rstest/require-test-timeout': 'off',
+    'rstest/require-to-throw-message': 'warn',
+    'rstest/require-top-level-describe': 'warn',
+    'rstest/unbound-method': 'warn',
+    'rstest/valid-expect': 'warn',
+    'rstest/valid-expect-in-promise': 'warn',
+    'rstest/valid-expect-with-promise': 'warn',
+    'rstest/valid-title': 'warn',
+    'rstest/warn-todo': 'warn',
+  },
+};
+
+const env: RslintConfigEntry = {
+  languageOptions: { globals: globals.rstest },
+};
+
+export { all, env, recommended, style };

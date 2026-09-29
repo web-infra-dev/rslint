@@ -22,7 +22,12 @@ import {
   recommended as jestRecommended,
   style as jestStyle,
 } from './jest.js';
-import { recommended as rstestRecommended } from './rstest.js';
+import {
+  all as rstestAll,
+  env as rstestEnv,
+  recommended as rstestRecommended,
+  style as rstestStyle,
+} from './rstest.js';
 import { recommended as unicornRecommended } from './unicorn.js';
 import { recommended as jsxA11yRecommended } from './jsx-a11y.js';
 
@@ -85,7 +90,12 @@ export const jestPlugin = {
 };
 
 export const rstestPlugin = {
-  configs: { recommended: rstestRecommended },
+  configs: {
+    all: rstestAll,
+    env: rstestEnv,
+    recommended: rstestRecommended,
+    style: rstestStyle,
+  },
 };
 
 export const unicornPlugin = {
