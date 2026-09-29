@@ -1,11 +1,15 @@
-import type { RslintConfigEntry } from '../define-config.js';
+import type { GlobalsConfig, RslintConfigEntry } from '../define-config.js';
 import { globals } from '../globals/index.js';
 
 // Aligned with official eslint-plugin-jest@29.x flat presets.
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 const recommended: RslintConfigEntry = {
   plugins: ['jest'],
-  languageOptions: { globals: globals.jest },
+  languageOptions: {
+    get globals(): GlobalsConfig {
+      return globals.jest;
+    },
+  },
   rules: {
     'jest/expect-expect': 'warn',
     'jest/no-alias-methods': 'error',
@@ -31,7 +35,11 @@ const recommended: RslintConfigEntry = {
 
 const style: RslintConfigEntry = {
   plugins: ['jest'],
-  languageOptions: { globals: globals.jest },
+  languageOptions: {
+    get globals(): GlobalsConfig {
+      return globals.jest;
+    },
+  },
   rules: {
     'jest/prefer-to-be': 'error',
     'jest/prefer-to-contain': 'error',
@@ -115,7 +123,11 @@ const allRuleNames = [
 
 const all: RslintConfigEntry = {
   plugins: ['jest'],
-  languageOptions: { globals: globals.jest },
+  languageOptions: {
+    get globals(): GlobalsConfig {
+      return globals.jest;
+    },
+  },
   rules: Object.fromEntries(allRuleNames.map((name) => [name, 'error'])),
 };
 
