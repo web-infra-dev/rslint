@@ -1,4 +1,4 @@
-import type { RslintConfigEntry } from '../define-config.js';
+import type { GlobalsConfig, RslintConfigEntry } from '../define-config.js';
 import { globals } from '../globals/index.js';
 
 const recommended: RslintConfigEntry = {
@@ -126,7 +126,11 @@ const all: RslintConfigEntry = {
 };
 
 const env: RslintConfigEntry = {
-  languageOptions: { globals: globals.rstest },
+  languageOptions: {
+    get globals(): GlobalsConfig {
+      return globals.rstest;
+    },
+  },
 };
 
 export { all, env, recommended, style };
