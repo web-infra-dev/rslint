@@ -324,8 +324,12 @@ func NewRule(config Config) rule.Rule {
 				case functionPushDetached:
 					stack.push(frameDetachedFunction, stack.top().active, node, nil)
 				case functionActivateRegistrationFallback:
+					// Each activating function is a separate candidate callback,
+					// such as either branch of a conditional, so it starts its own
+					// count instead of continuing a sibling's.
 					top := stack.top()
 					top.active = true
+					top.count = 0
 					top.activationOwner = node
 				}
 			}

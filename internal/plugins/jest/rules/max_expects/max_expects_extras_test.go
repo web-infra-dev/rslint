@@ -68,6 +68,21 @@ expect(2).toBe(2);`,
 };`,
 				Options: max1Option,
 			},
+			// Each branch of a conditional is a separate candidate callback.
+			{
+				Code: `test('a', flag
+  ? () => { expect(1).toBe(1); }
+  : () => { expect(2).toBe(2); }
+);`,
+				Options: max1Option,
+			},
+			{
+				Code: `beforeEach(flag
+  ? () => { expect(1).toBe(1); }
+  : () => { expect(2).toBe(2); }
+);`,
+				Options: max1Option,
+			},
 			// `test.each(table, fn)` registers no test, so its function is not a
 			// test body.
 			{

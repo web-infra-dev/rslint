@@ -47,6 +47,24 @@ test('a', { retry: 2 }, () => {
 });`,
 				Options: max1Option,
 			},
+			// Each branch of a conditional is a separate candidate callback, so
+			// one branch's assertions do not add to the other's.
+			{
+				Code: `
+test('a', flag
+  ? () => { expect(1).toBe(1); }
+  : () => { expect(2).toBe(2); }
+);`,
+				Options: max1Option,
+			},
+			{
+				Code: `
+beforeEach(flag
+  ? () => { expect(1).toBe(1); }
+  : () => { expect(2).toBe(2); }
+);`,
+				Options: max1Option,
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- An unresolved callback counts wherever it sits inside the
