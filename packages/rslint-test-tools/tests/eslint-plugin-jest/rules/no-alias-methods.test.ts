@@ -19,7 +19,9 @@ ruleTester.run('no-alias-methods', {} as never, {
     { code: 'expect(a);' },
     // A computed identifier key names the matcher by the variable's value, not
     // its name.
-    { code: "const toBeCalled = 'toHaveBeenCalled';\nexpect(a)[toBeCalled]();" },
+    {
+      code: "const toBeCalled = 'toHaveBeenCalled';\nexpect(a)[toBeCalled]();",
+    },
   ],
 
   invalid: [
