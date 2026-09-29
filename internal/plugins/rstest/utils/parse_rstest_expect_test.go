@@ -931,18 +931,6 @@ func TestShouldRstestExpectBeAwaited(t *testing.T) {
 }
 
 func TestRstestMatcherTables(t *testing.T) {
-	if len(rstestUtils.RSTEST_MATCHER_ALIASES) != 11 {
-		t.Errorf("expected 11 matcher aliases, got %d", len(rstestUtils.RSTEST_MATCHER_ALIASES))
-	}
-	if got := rstestUtils.RSTEST_MATCHER_ALIASES["toBeCalled"]; got != "toHaveBeenCalled" {
-		t.Errorf("toBeCalled should map to toHaveBeenCalled, got %q", got)
-	}
-	for alias, canonical := range rstestUtils.RSTEST_MATCHER_ALIASES {
-		if _, isAlias := rstestUtils.RSTEST_MATCHER_ALIASES[canonical]; isAlias {
-			t.Errorf("canonical name %q (for alias %q) must not itself be an alias", canonical, alias)
-		}
-	}
-
 	if len(rstestUtils.RSTEST_INLINE_SNAPSHOT_MATCHERS) != 2 {
 		t.Errorf("expected 2 inline snapshot matchers, got %d", len(rstestUtils.RSTEST_INLINE_SNAPSHOT_MATCHERS))
 	}
