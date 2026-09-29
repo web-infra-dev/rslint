@@ -65,6 +65,8 @@ func TestPreferExactPropsExtras(t *testing.T) {
 		{Code: `const props = { foo: P }; function assign() { const props = {}; Component.propTypes = props; }`, Settings: exactSettings, Tsx: true},
 		// ---- Intentional divergence: mutable bindings are unknown instead of using a stale initializer ----
 		{Code: `let before = {}; before = { foo: P }; A.propTypes = before; let after = { bar: P }; after = exact(after); B.propTypes = after;`, Settings: exactSettings, Tsx: true},
+		// ---- Known limitation: later property additions to a const-backed object are not tracked ----
+		{Code: `const props = {}; props.foo = P; Component.propTypes = props;`, Settings: exactSettings, Tsx: true},
 		// ---- Intentional divergence: lexical resolution cannot select an inaccessible child binding ----
 		{Code: `/* global props */ function hidden() { const props = { foo: P }; } Component.propTypes = props;`, Settings: exactSettings, Tsx: true},
 		// ---- Real-user: PR #3190 local type annotations inside a component are not component props ----
@@ -86,6 +88,10 @@ func TestPreferExactPropsExtras(t *testing.T) {
 		{Code: `Component.propTypes = props; const props = { foo: P };`, Settings: exactSettings, Tsx: true, Errors: errorAtStart},
 		// Locks in MemberExpression branch 3b: identifier initializers that are non-exact calls report.
 		{Code: `const props = other(); Component.propTypes = props;`, Settings: exactSettings, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propTypes", Message: propTypesError, Line: 1, Column: 24}}},
+		// ---- Intentional divergence: a type-space merge does not hide the runtime const declaration ----
+		{Code: `const Props = { foo: P }; type Props = { foo: string }; Component.propTypes = Props;`, Settings: exactSettings, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propTypes", Message: propTypesError, Line: 1, Column: 57}}},
+		// ---- Known limitation: later property deletion from a const-backed object is not tracked ----
+		{Code: `const props = { foo: P }; delete props.foo; Component.propTypes = props;`, Settings: exactSettings, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propTypes", Message: propTypesError, Line: 1, Column: 45}}},
 		// Locks in the absence of component-name validation on runtime declarations.
 		{Code: `NotAComponent.propTypes = { foo: P };`, Settings: exactSettings, Tsx: true, Errors: errorAtStart},
 		// ---- Dimension 4: single and multi-level parenthesized receivers remain visible ----

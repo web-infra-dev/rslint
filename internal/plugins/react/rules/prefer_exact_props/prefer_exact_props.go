@@ -154,10 +154,10 @@ func resolveDirectConstInitializer(ctx rule.RuleContext, identifier *ast.Node) *
 		return nil
 	}
 	symbol := ctx.Refs.Resolve(identifier)
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	if symbol == nil {
 		return nil
 	}
-	declarationNode := symbol.Declarations[0]
+	declarationNode := symbol.ValueDeclaration
 	if declarationNode == nil || declarationNode.Kind != ast.KindVariableDeclaration ||
 		ast.GetSourceFileOfNode(declarationNode) != ctx.SourceFile {
 		return nil

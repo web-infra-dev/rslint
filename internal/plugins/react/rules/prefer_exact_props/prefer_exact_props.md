@@ -68,7 +68,8 @@ class Component extends React.Component {
   are ignored.
 - A `propTypes` value referenced through a variable is checked only when the
   variable is a directly initialized `const`. Mutable and destructured
-  bindings are treated as unknown.
+  bindings are treated as unknown. Later property mutations of the referenced
+  `const` object are not tracked.
 
 ## Original Documentation
 
