@@ -21,14 +21,13 @@ var PreferExactPropsRule = rule.Rule{
 			return rule.RuleListeners{}
 		}
 
-		definitions := reactutil.NewVariableDefinitionLookup(ctx)
 		message := rule.RuleMessage{
 			Id:          "propTypes",
 			Description: fmt.Sprintf(propTypesMessage, formatExactPropWrappers(exactWrappers)),
 		}
 
 		reportIfNonExact := func(reportNode, value *ast.Node, resolveIdentifier bool) {
-			if isNonExactPropTypesValue(ctx, definitions, value, exactWrappers, resolveIdentifier) {
+			if isNonExactPropTypesValue(ctx, value, exactWrappers, resolveIdentifier) {
 				ctx.ReportNode(reportNode, message)
 			}
 		}
@@ -36,7 +35,7 @@ var PreferExactPropsRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				property := node.AsPropertyDeclaration()
-				if property == nil || !isPropTypesPropertyDeclaration(property) {
+				if property == nil || !isPropTypesPropertyDeclaration(node) {
 					return
 				}
 				// The upstream class-property listener only inspects direct object
@@ -47,6 +46,9 @@ var PreferExactPropsRule = rule.Rule{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
 				if binary == nil {
+					return
+				}
+				if binary.OperatorToken == nil || !ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
 					return
 				}
 				left := utils.ESTreeRuntimeExpression(binary.Left)
@@ -93,7 +95,6 @@ func formatExactPropWrappers(wrappers []reactutil.PropWrapperEntry) string {
 
 func isNonExactPropTypesValue(
 	ctx rule.RuleContext,
-	definitions *reactutil.VariableDefinitionLookup,
 	value *ast.Node,
 	exactWrappers []reactutil.PropWrapperEntry,
 	resolveIdentifier bool,
@@ -116,31 +117,18 @@ func isNonExactPropTypesValue(
 		if !resolveIdentifier {
 			return false
 		}
-		definition := definitions.First(value, value.AsIdentifier().Text)
-		return isNonExactPropTypesDefinition(ctx, definition, exactWrappers)
+		initializer := resolveDirectConstInitializer(ctx, value)
+		return isNonExactPropTypesInitializer(ctx.SourceFile, initializer, exactWrappers)
 	default:
 		return false
 	}
 }
 
-func isNonExactPropTypesDefinition(
-	ctx rule.RuleContext,
-	definition *ast.Node,
+func isNonExactPropTypesInitializer(
+	sourceFile *ast.SourceFile,
+	initializer *ast.Node,
 	exactWrappers []reactutil.PropWrapperEntry,
 ) bool {
-	if definition == nil {
-		return false
-	}
-	var initializer *ast.Node
-	switch definition.Kind {
-	case ast.KindVariableDeclaration:
-		initializer = definition.AsVariableDeclaration().Initializer
-	case ast.KindBindingElement:
-		root := ast.GetRootDeclaration(definition)
-		if root != nil && root.Kind == ast.KindVariableDeclaration {
-			initializer = root.AsVariableDeclaration().Initializer
-		}
-	}
 	initializer = utils.ESTreeRuntimeExpression(initializer)
 	if initializer == nil {
 		return false
@@ -152,10 +140,39 @@ func isNonExactPropTypesDefinition(
 		if ast.IsOptionalChain(initializer) {
 			return false
 		}
-		return !isExactPropWrapperCall(ctx.SourceFile, initializer, exactWrappers)
+		return !isExactPropWrapperCall(sourceFile, initializer, exactWrappers)
 	default:
 		return false
 	}
+}
+
+// resolveDirectConstInitializer resolves only an identifier's own, directly
+// initialized const declaration. Mutable and destructured bindings are kept
+// unknown instead of guessing which runtime value reaches this use.
+func resolveDirectConstInitializer(ctx rule.RuleContext, identifier *ast.Node) *ast.Node {
+	if ctx.Refs == nil || identifier == nil || identifier.Kind != ast.KindIdentifier {
+		return nil
+	}
+	symbol := ctx.Refs.Resolve(identifier)
+	if symbol == nil || len(symbol.Declarations) != 1 {
+		return nil
+	}
+	declarationNode := symbol.Declarations[0]
+	if declarationNode == nil || declarationNode.Kind != ast.KindVariableDeclaration ||
+		ast.GetSourceFileOfNode(declarationNode) != ctx.SourceFile {
+		return nil
+	}
+	declarationList := declarationNode.Parent
+	if declarationList == nil || declarationList.Kind != ast.KindVariableDeclarationList ||
+		!ast.IsVarConst(declarationList) {
+		return nil
+	}
+	declaration := declarationNode.AsVariableDeclaration()
+	name := declaration.Name()
+	if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != identifier.AsIdentifier().Text {
+		return nil
+	}
+	return declaration.Initializer
 }
 
 func isExactPropWrapperCall(sourceFile *ast.SourceFile, node *ast.Node, wrappers []reactutil.PropWrapperEntry) bool {
@@ -178,33 +195,19 @@ func isExactPropWrapperCall(sourceFile *ast.SourceFile, node *ast.Node, wrappers
 	return false
 }
 
-func isPropTypesPropertyDeclaration(property *ast.PropertyDeclaration) bool {
-	if property == nil {
+func isPropTypesPropertyDeclaration(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindPropertyDeclaration ||
+		!ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
 		return false
 	}
-	if isAuthoredPropertyName(property.Name(), "propTypes") {
-		return true
-	}
-	// propsUtil.isPropTypesDeclaration treats an annotated class field named
-	// `props` as a props declaration before checking the annotation language.
-	return property.Type != nil && isAuthoredPropertyName(property.Name(), "props")
-}
-
-func isAuthoredPropertyName(name *ast.Node, expected string) bool {
-	if name == nil {
-		return false
-	}
-	if name.Kind == ast.KindComputedPropertyName {
-		name = utils.ESTreeRuntimeExpression(name.AsComputedPropertyName().Expression)
-	}
-	return reactutil.IdentifierOrPrivateName(name) == expected
+	name, ok := utils.GetStaticPropertyName(node.AsPropertyDeclaration().Name())
+	return ok && name == "propTypes"
 }
 
 func isPropTypesMember(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	_, property := utils.MemberExpressionParts(node)
-	property = utils.ESTreeRuntimeExpression(property)
-	return reactutil.IdentifierOrPrivateName(property) == "propTypes"
+	name, ok := utils.AccessExpressionStaticName(node)
+	return ok && name == "propTypes"
 }

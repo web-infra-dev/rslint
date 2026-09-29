@@ -58,8 +58,17 @@ class Component extends React.Component {
 
 ## Differences from ESLint
 
-- Standalone and optional-chain reads of `.propTypes` are ignored. Version
-  7.37.5 of eslint-plugin-react throws while evaluating those expressions.
+- Only assignments to `.propTypes` are checked. Other reads are ignored;
+  eslint-plugin-react 7.37.5 may report them or throw while evaluating them.
+- Class fields are checked only when they are static and their runtime name is
+  `propTypes`. Instance fields, `#private` fields, and TypeScript `props`
+  fields are ignored.
+- Computed member names are checked only when written as a string or static
+  template literal, such as `Component['propTypes']`. Variables used as keys
+  are ignored.
+- A `propTypes` value referenced through a variable is checked only when the
+  variable is a directly initialized `const`. Mutable and destructured
+  bindings are treated as unknown.
 
 ## Original Documentation
 
