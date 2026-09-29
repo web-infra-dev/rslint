@@ -58,11 +58,11 @@ To use different rule settings for dedicated test files and in-source tests, cre
 
 ## Presets
 
-| Preset                             | Description                                            | View rules                                                      |
-| ---------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------- |
-| `rstestPlugin.configs.all`         | All supported Rstest rules, with 5 disabled by default | [View rules →](/rules/?preset=rstestPlugin.configs.all)         |
-| `rstestPlugin.configs.env`         | Rstest globals                                         |                                                                 |
-| `rstestPlugin.configs.recommended` | Recommended Rstest rules                               | [View rules →](/rules/?preset=rstestPlugin.configs.recommended) |
-| `rstestPlugin.configs.style`       | Rstest style rules                                     | [View rules →](/rules/?preset=rstestPlugin.configs.style)       |
+| Preset                             | Description                                  | View rules                                                      |
+| ---------------------------------- | -------------------------------------------- | --------------------------------------------------------------- |
+| `rstestPlugin.configs.all`         | All Rstest rules, with 5 disabled by default | [View rules →](/rules/?preset=rstestPlugin.configs.all)         |
+| `rstestPlugin.configs.env`         | Rstest globals                               |                                                                 |
+| `rstestPlugin.configs.recommended` | Recommended Rstest rules                     | [View rules →](/rules/?preset=rstestPlugin.configs.recommended) |
+| `rstestPlugin.configs.style`       | Rstest style rules                           | [View rules →](/rules/?preset=rstestPlugin.configs.style)       |
 
 See [Rules & Presets](/config/rules-and-presets) for guidance on choosing and layering presets.
