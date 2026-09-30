@@ -420,11 +420,6 @@ ruleTester.run('no-lonely-if', {} as never, {
 });
 
 // Preserve the upstream integration regressions, including companion rules.
-const t = {
-  is: assert.strictEqual,
-  false: (value: boolean) => assert.strictEqual(value, false),
-};
-
 function createLinter(rules: RslintConfigEntry['rules'] = {}) {
   return new Rslint({
     overrideConfigFile: path.resolve(
@@ -460,8 +455,8 @@ test('fix should not produce invalid code when another rule replaces the origina
     (message) => message.ruleId === null,
   );
 
-  t.false(fatalMessages.length > 0);
-  t.is(
+  assert.strictEqual(fatalMessages.length > 0, false);
+  assert.strictEqual(
     result.output,
     "function some(value) {\n  if (value < 10 && value < 5) {\n    console.log(\n      'this is a long string this is a long string this is a long string this is a long string',\n      value,\n    );\n  }\n  return 0;\n}",
   );
@@ -472,25 +467,25 @@ test('fix should preserve text between the outer condition and block', async () 
     'if (a) /* comment */ { if (b) { foo(); } }',
   );
 
-  t.is(result.output, '/* comment */ if (a && b) { foo(); }');
+  assert.strictEqual(result.output, '/* comment */ if (a && b) { foo(); }');
 });
 
 test('fix should preserve text between the outer condition and non-block consequent', async () => {
   const result = await lintFixture('if (a) /* comment */ { if (b) foo(); }');
 
-  t.is(result.output, '/* comment */ if (a && b) foo();');
+  assert.strictEqual(result.output, '/* comment */ if (a && b) foo();');
 });
 
 test('fix should preserve comments before the inner if inside the outer block', async () => {
   const result = await lintFixture('if (a) { /* before */ if (b) foo(); }');
 
-  t.is(result.output, '/* before */ if (a && b) foo();');
+  assert.strictEqual(result.output, '/* before */ if (a && b) foo();');
 });
 
 test('fix should preserve comments after the inner if inside the outer block', async () => {
   const result = await lintFixture('if (a) { if (b) foo(); /* after */ }');
 
-  t.is(result.output, 'if (a && b) foo(); /* after */ ');
+  assert.strictEqual(result.output, 'if (a && b) foo(); /* after */ ');
 });
 
 test('fix should keep pragma comments from before the inner if attached to the merged if', async () => {
@@ -499,8 +494,8 @@ test('fix should keep pragma comments from before the inner if attached to the m
     { 'fake/pragma-attachment': 'error' },
   );
 
-  t.is(result.output, '/* @keep-next */ if (a && b) foo();');
-  t.false(hasRuleMessage(result, 'fake/pragma-attachment'));
+  assert.strictEqual(result.output, '/* @keep-next */ if (a && b) foo();');
+  assert.strictEqual(hasRuleMessage(result, 'fake/pragma-attachment'), false);
 });
 
 test('fix should keep pragma comments from the outer condition gap attached to the merged if', async () => {
@@ -509,8 +504,8 @@ test('fix should keep pragma comments from the outer condition gap attached to t
     { 'fake/pragma-attachment': 'error' },
   );
 
-  t.is(result.output, '/* @keep-next */ if (a && b) foo();');
-  t.false(hasRuleMessage(result, 'fake/pragma-attachment'));
+  assert.strictEqual(result.output, '/* @keep-next */ if (a && b) foo();');
+  assert.strictEqual(hasRuleMessage(result, 'fake/pragma-attachment'), false);
 });
 
 test('fix should preserve eslint-disable-next-line before the inner if', async () => {
@@ -519,11 +514,11 @@ test('fix should preserve eslint-disable-next-line before the inner if', async (
     { 'no-console': 'error' },
   );
 
-  t.is(
+  assert.strictEqual(
     result.output,
     "// eslint-disable-next-line no-console\n\tif (a && b) console.log('foo');",
   );
-  t.false(hasRuleMessage(result, 'no-console'));
+  assert.strictEqual(hasRuleMessage(result, 'no-console'), false);
 });
 
 test('fix should preserve block eslint-disable-next-line before the inner if', async () => {
@@ -532,11 +527,11 @@ test('fix should preserve block eslint-disable-next-line before the inner if', a
     { 'no-console': 'error' },
   );
 
-  t.is(
+  assert.strictEqual(
     result.output,
     "/* eslint-disable-next-line no-console */\n\tif (a && b) console.log('foo');",
   );
-  t.false(hasRuleMessage(result, 'no-console'));
+  assert.strictEqual(hasRuleMessage(result, 'no-console'), false);
 });
 
 test('fix should preserve eslint-disable-line between the outer condition and block', async () => {
@@ -545,11 +540,11 @@ test('fix should preserve eslint-disable-line between the outer condition and bl
     { 'no-constant-condition': 'error' },
   );
 
-  t.is(
+  assert.strictEqual(
     result.output,
     'if (true && true) // eslint-disable-line no-constant-condition\n foo();',
   );
-  t.false(hasRuleMessage(result, 'no-constant-condition'));
+  assert.strictEqual(hasRuleMessage(result, 'no-constant-condition'), false);
 });
 
 test('fix should preserve comments inside merged conditions', async () => {
@@ -557,13 +552,16 @@ test('fix should preserve comments inside merged conditions', async () => {
     'if (/* outer */ a) { if (b /* inner */) foo(); }',
   );
 
-  t.is(result.output, 'if (/* outer */ a && b /* inner */) foo();');
+  assert.strictEqual(
+    result.output,
+    'if (/* outer */ a && b /* inner */) foo();',
+  );
 });
 
 test('fix should preserve comments between if and opening parenthesis', async () => {
   const result = await lintFixture('if/* outer */(a) if/* inner */(b) foo();');
 
-  t.is(result.output, 'if/* outer */(a && /* inner */b) foo();');
+  assert.strictEqual(result.output, 'if/* outer */(a && /* inner */b) foo();');
 });
 
 test('fix should preserve ASI-safe semicolon insertion when keeping outer-gap text', async () => {
@@ -571,8 +569,14 @@ test('fix should preserve ASI-safe semicolon insertion when keeping outer-gap te
     'if (a) /* comment */ { if (b) foo() } [].forEach(bar)',
   );
 
-  t.is(result.output, '/* comment */ if (a && b) foo();[].forEach(bar)');
-  t.false(result.messages.some((message) => message.ruleId === null));
+  assert.strictEqual(
+    result.output,
+    '/* comment */ if (a && b) foo();[].forEach(bar)',
+  );
+  assert.strictEqual(
+    result.messages.some((message) => message.ruleId === null),
+    false,
+  );
 });
 
 test('fix should preserve ASI-safe semicolon insertion when keeping trailing text from the outer block', async () => {
@@ -580,6 +584,12 @@ test('fix should preserve ASI-safe semicolon insertion when keeping trailing tex
     'if (a) { if (b) foo() /* after */ } [].forEach(bar)',
   );
 
-  t.is(result.output, 'if (a && b) foo() /* after */ ;[].forEach(bar)');
-  t.false(result.messages.some((message) => message.ruleId === null));
+  assert.strictEqual(
+    result.output,
+    'if (a && b) foo() /* after */ ;[].forEach(bar)',
+  );
+  assert.strictEqual(
+    result.messages.some((message) => message.ruleId === null),
+    false,
+  );
 });
