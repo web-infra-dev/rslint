@@ -4,7 +4,7 @@ import { RSLintService } from '../service/service.js';
 import { spawnIpcProcess, type IpcClient } from '../ipc/index.js';
 
 export { readAttachmentBytes } from '../ipc/memory-transport.js';
-export type { ByteInput } from '../native/binding.js';
+export type { ByteInput } from '../native/types.js';
 import { resolveRslintBinary } from './resolve-binary.js';
 import type {
   RslintServiceInterface,

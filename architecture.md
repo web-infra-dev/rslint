@@ -1664,8 +1664,11 @@ protocol code generator or generated binding build step. Each language validates
 inputs at its own boundary. Platform handles, native reader leases and
 application scheduling remain implementation details of their owners.
 
-The Node native binding owns its N-API input and capability types without
-importing IPC. IPC owns the wire envelope and converts nullable native mapping
+The native layer owns its N-API input and capability types without importing
+IPC. These value types live in `native/types.ts`, which has no Node dependencies;
+browser and WASM protocol consumers do not import the Node binding loader.
+The loader and its Buffer-returning API stay in `native/binding.ts`.
+IPC owns the wire envelope and converts nullable native mapping
 fields at that boundary. Worker parser types therefore do not depend on the
 IPC protocol or its build inputs.
 

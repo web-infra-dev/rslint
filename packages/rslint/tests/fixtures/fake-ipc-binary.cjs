@@ -9,6 +9,14 @@
 // This mirrors the real binary's happy-path frame sequence so runEngine can
 // be exercised end-to-end without Go.
 
+// Own fd 1 so end() flushes the frames and closes the actual pipe. Node's
+// special stdout can finish without producing EOF on Windows. Do not access
+// process.stdout first: its lazy getter duplicates the Windows pipe handle.
+const stdout = require('node:fs').createWriteStream(null, {
+  fd: 1,
+  autoClose: true,
+});
+
 let buf = Buffer.alloc(0);
 let remainingText = '';
 let configured = false;
@@ -18,7 +26,7 @@ function send(msg) {
   const body = Buffer.from(JSON.stringify(msg), 'utf8');
   const head = Buffer.alloc(4);
   head.writeUInt32LE(body.length, 0);
-  process.stdout.write(Buffer.concat([head, body]));
+  stdout.write(Buffer.concat([head, body]));
 }
 
 function onMessage(msg) {
@@ -50,7 +58,7 @@ function onMessage(msg) {
       }
       // Remain alive on stdin after EOF. Tests either let the host terminate
       // this disconnected child or explicitly release a natural exit below.
-      process.stdout.end();
+      stdout.end();
       return;
     }
     if (mode === 'reject-init' || mode === 'reject-init-eof') {
@@ -59,7 +67,7 @@ function onMessage(msg) {
         id: msg.id,
         data: { message: 'injected init failure' },
       });
-      if (mode === 'reject-init-eof') process.stdout.end();
+      if (mode === 'reject-init-eof') stdout.end();
       return;
     }
     if (mode === 'require-mapping') {

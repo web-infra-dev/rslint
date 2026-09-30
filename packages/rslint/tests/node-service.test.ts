@@ -163,6 +163,17 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
     );
   });
 
+  test('receives the normal exit acknowledgement before output closes', async () => {
+    const svc = new NodeRslintService({ rslintPath: FAKE });
+    try {
+      // A lost final frame would instead resolve to the best-effort null
+      // result used for an unacknowledged exit.
+      await expect(svc.sendMessage('exit', {})).resolves.toEqual({});
+    } finally {
+      svc.terminate();
+    }
+  });
+
   test('silent exit resolves only the exit request and rejects other pending work', async () => {
     // The peer exits without acknowledging shutdown. The API adapter retains
     // the best-effort exit result, while IPC still rejects unfinished linting.

@@ -10,7 +10,7 @@ import { runEngine } from '../src/cli/engine.js';
 import { ConfigModuleHost } from '../src/config/config-loader.js';
 import { resolveRslintBinary } from '../src/internal/resolve-binary.js';
 import { createMemoryTransport } from '../src/ipc/memory-transport.js';
-import { IpcClient, encodeFrame } from '../src/ipc/client.js';
+import { IpcClient, decodeFrame, encodeFrame } from '../src/ipc/client.js';
 import { createPluginLintHost } from '../src/eslint-plugin/host.js';
 import { resolvePluginAttachments } from '../src/eslint-plugin/plugin/attachments.js';
 import {
@@ -212,7 +212,7 @@ describe('runEngine init payload TTY fact', () => {
 });
 
 describe('runEngine IPC disconnect cleanup', () => {
-  function start(mode: string) {
+  function start(mode: string, stdoutDoesNotHalfClose = false) {
     const stderr = new PassThrough();
     const state = { stderr: '', timedOut: false };
     stderr.on('data', (chunk: Buffer) => {
@@ -230,7 +230,26 @@ describe('runEngine IPC disconnect cleanup', () => {
     try {
       run = runEngine({
         binPath: process.execPath,
-        goArgs: [FAKE_BIN, mode],
+        goArgs: stdoutDoesNotHalfClose
+          ? [
+              '-e',
+              // Like Node's special stdout on Windows, this stream finishes
+              // its writes without closing the pipe's underlying descriptor.
+              // Install it without touching the original lazy stdout getter.
+              `const fs = require('node:fs');
+              const { Writable } = require('node:stream');
+              Object.defineProperty(process, 'stdout', {
+                value: new Writable({
+                  write(chunk, encoding, callback) {
+                    fs.write(1, chunk, callback);
+                  },
+                }),
+              });
+              require(process.argv[1]);`,
+              FAKE_BIN,
+              mode,
+            ]
+          : [FAKE_BIN, mode],
         stdout: new PassThrough(),
         stderr,
         createMemoryTransport: () => undefined,
@@ -313,6 +332,32 @@ describe('runEngine IPC disconnect cleanup', () => {
     },
     20_000,
   );
+
+  test('flushes init before EOF when stdout does not half-close', async () => {
+    const fixture = start('eof-after-init', true);
+    const chunks: Buffer[] = [];
+    fixture.child.stdout!.on('data', (chunk: Buffer) => chunks.push(chunk));
+    try {
+      await once(fixture.child.stdout!, 'end');
+      const output = Buffer.concat(chunks);
+      const frame = decodeFrame(output);
+      expect(frame?.msg).toMatchObject({
+        kind: 'response',
+        data: { ok: true },
+      });
+      expect(frame?.consumed).toBe(output.length);
+      expect(fixture.child.exitCode).toBeNull();
+      expect(fixture.child.killed).toBe(false);
+      fixture.child.stdin!.write(
+        encodeFrame({ kind: 'exit-after-eof', id: 0, data: { code: 23 } }),
+      );
+      expect(await fixture.run).toBe(23);
+      expect(fixture.state.timedOut).toBe(false);
+      expect(fixture.state.stderr).not.toContain('terminating Go process');
+    } finally {
+      fixture.cleanup();
+    }
+  }, 20_000);
 
   test('terminates an init-rejecting child without treating it as EOF', async () => {
     const fixture = start('reject-init');

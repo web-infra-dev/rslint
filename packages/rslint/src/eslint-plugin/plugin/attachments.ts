@@ -1,6 +1,6 @@
 /** Project plugin file indices into inline text or a native byte capability. */
 import { TextDecoder } from 'node:util';
-import type { ByteInput } from '../../native/binding.js';
+import type { ByteInput } from '../../native/types.js';
 import type { EslintPluginLintRequest } from './plugin-lint-protocol.js';
 
 // Match the native parser's UTF-8 rejection while leaving BOM handling to parsing.

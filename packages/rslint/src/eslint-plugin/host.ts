@@ -17,7 +17,7 @@ import {
   type EslintPluginLintResult,
 } from './plugin/plugin-lint-protocol.js';
 import type { ConfigDescriptor } from './types.js';
-import type { ByteInput } from '../native/binding.js';
+import type { ByteInput } from '../native/types.js';
 import { resolvePluginAttachments } from './plugin/attachments.js';
 
 export interface PluginLintHost {

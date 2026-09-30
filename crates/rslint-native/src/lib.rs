@@ -17,7 +17,15 @@ use napi::{Env, JsString};
 use napi_derive::napi;
 
 use memory_transport::SharedBytes;
+// N-API registration is disabled in Rust test targets. Keep the native entry
+// points reachable through this crate's facade in those builds as well.
+pub use memory_transport::read_bytes;
 pub use parse::{CommentObj, ParseResult};
+#[cfg(feature = "test-worker-termination")]
+pub use parser_worker_test::{
+    create_worker_termination_fixture, republish_worker_fixture, resume_worker_parse,
+    wait_for_worker_parse, worker_parsed_program,
+};
 
 /// Reject sources whose serialized ESTree JSON would exceed V8's ~512MB single-string
 /// cap (the JSON is ~9-26x the source size). This is the JSON-transfer ceiling

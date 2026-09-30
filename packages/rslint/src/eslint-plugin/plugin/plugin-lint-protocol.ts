@@ -20,7 +20,7 @@
 
 import type { LintTask } from '../worker-pool.js';
 import type { LintFileResult } from '../linter/ecma-language-plugin.js';
-import type { SharedBytes } from '../native/load-binding.js';
+import type { SharedBytes } from '../../native/types.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Inputs

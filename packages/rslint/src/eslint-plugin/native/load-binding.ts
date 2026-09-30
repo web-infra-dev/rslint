@@ -5,7 +5,7 @@ export type {
   CommentObj,
   ParseResult,
   SharedBytes,
-} from '../../native/binding.js';
+} from '../../native/types.js';
 
 const binding = getNativeBinding();
 export const parse = binding.parse;

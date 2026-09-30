@@ -1,4 +1,4 @@
-import type { ByteInput } from '../native/binding.js';
+import type { ByteInput } from '../native/types.js';
 
 /**
  * Wire and handler-facing types for Go↔Node IPC. Go provides shared storage
