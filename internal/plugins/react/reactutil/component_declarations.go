@@ -1,6 +1,8 @@
 package reactutil
 
 import (
+	"slices"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -70,6 +72,24 @@ func ReactGenericArgument(name *ast.Node, arguments *ast.NodeList, resolve func(
 	if name == nil || arguments == nil || resolve == nil {
 		return nil
 	}
+	return reactGenericArgumentAtIndex(reactImportedName(name, resolve, false), arguments)
+}
+
+// ReactGenericArgumentWithAmbient is ReactGenericArgument with support for the
+// configured default React namespace supplied by an external ambient declaration.
+func ReactGenericArgumentWithAmbient(name *ast.Node, arguments *ast.NodeList, resolve func(*ast.Node) *ast.Symbol) *ast.Node {
+	if name == nil || arguments == nil || resolve == nil {
+		return nil
+	}
+	return reactGenericArgumentAtIndex(reactImportedName(name, resolve, true), arguments)
+}
+
+// reactImportedName returns the exported React name referenced by an imported
+// identifier or namespace/default member expression.
+func reactImportedName(name *ast.Node, resolve func(*ast.Node) *ast.Symbol, allowAmbient bool) string {
+	if name == nil || resolve == nil {
+		return ""
+	}
 	root, member := name, ""
 	switch name.Kind {
 	case ast.KindQualifiedName:
@@ -80,14 +100,13 @@ func ReactGenericArgument(name *ast.Node, arguments *ast.NodeList, resolve func(
 		member = componentPropertyName(name.AsPropertyAccessExpression().Name())
 	}
 	if root.Kind != ast.KindIdentifier {
-		return nil
+		return ""
 	}
 	binding := resolve(root)
-	if binding == nil {
-		if member == "" || root.Text() != "React" {
-			return nil
-		}
-		return reactGenericArgumentAtIndex(member, arguments)
+	sourceFile := ast.GetSourceFileOfNode(name)
+	if member != "" && root.Text() == DefaultReactPragma &&
+		(binding == nil || allowAmbient && sourceFile != nil && !utils.IsSymbolDeclaredInFile(binding, sourceFile)) {
+		return member
 	}
 	imported := ""
 	for _, statement := range ast.GetSourceFileOfNode(name).Statements.Nodes {
@@ -100,16 +119,17 @@ func ReactGenericArgument(name *ast.Node, arguments *ast.NodeList, resolve func(
 		}
 		clause := declaration.ImportClause.AsImportClause()
 		if member != "" {
-			if clause.Name() != nil && utils.BindingNameSymbol(clause.Name()) == binding {
+			if clause.Name() != nil && (utils.BindingNameSymbol(clause.Name()) == binding || binding == nil && clause.Name().Text() == root.Text()) {
 				imported = member
 			}
-			if bindings := clause.NamedBindings; bindings != nil && bindings.Kind == ast.KindNamespaceImport && utils.BindingNameSymbol(bindings.Name()) == binding {
+			if bindings := clause.NamedBindings; bindings != nil && bindings.Kind == ast.KindNamespaceImport &&
+				(utils.BindingNameSymbol(bindings.Name()) == binding || binding == nil && bindings.Name().Text() == root.Text()) {
 				imported = member
 			}
 		} else if bindings := clause.NamedBindings; bindings != nil && bindings.Kind == ast.KindNamedImports {
 			for _, element := range bindings.AsNamedImports().Elements.Nodes {
 				specifier := element.AsImportSpecifier()
-				if utils.BindingNameSymbol(specifier.Name()) == binding {
+				if utils.BindingNameSymbol(specifier.Name()) == binding || binding == nil && specifier.Name().Text() == root.Text() {
 					imported = root.Text()
 					if specifier.PropertyName != nil {
 						imported = specifier.PropertyName.Text()
@@ -118,7 +138,7 @@ func ReactGenericArgument(name *ast.Node, arguments *ast.NodeList, resolve func(
 			}
 		}
 	}
-	return reactGenericArgumentAtIndex(imported, arguments)
+	return imported
 }
 
 func reactGenericArgumentAtIndex(imported string, arguments *ast.NodeList) *ast.Node {
@@ -168,6 +188,108 @@ func FunctionComponentType(node *ast.Node, resolve func(*ast.Node) *ast.Symbol) 
 		}
 	}
 	return nil
+}
+
+// FunctionComponentTypeDetails reports the props type and whether a function
+// is the first argument of React.forwardRef. A forwardRef call with type
+// arguments but no props argument is distinguished from an untyped call.
+func FunctionComponentTypeDetails(node *ast.Node, resolve func(*ast.Node) *ast.Symbol) (propsType *ast.Node, isForwardRef, hasTypeArguments bool) {
+	return functionComponentTypeDetails(node, DefaultReactPragma, resolve, false)
+}
+
+// FunctionComponentTypeDetailsWithPragma opts into configured pragma support
+// without changing the upstream-compatible contract used by existing rules.
+func FunctionComponentTypeDetailsWithPragma(node *ast.Node, pragma string, resolve func(*ast.Node) *ast.Symbol) (propsType *ast.Node, isForwardRef, hasTypeArguments bool) {
+	if pragma == "" {
+		pragma = DefaultReactPragma
+	}
+	return functionComponentTypeDetails(node, pragma, resolve, true)
+}
+
+func functionComponentTypeDetails(node *ast.Node, pragma string, resolve func(*ast.Node) *ast.Symbol, honorConfiguredPragma bool) (propsType *ast.Node, isForwardRef, hasTypeArguments bool) {
+	for current := node; current != nil && current.Parent != nil; current = current.Parent {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindSatisfiesExpression,
+			ast.KindNonNullExpression, ast.KindTypeAssertionExpression:
+			continue
+		case ast.KindCallExpression:
+			call := parent.AsCallExpression()
+			if call.Arguments == nil || len(call.Arguments.Nodes) == 0 || SkipExpressionWrappers(call.Arguments.Nodes[0]) != SkipExpressionWrappers(current) {
+				return nil, false, false
+			}
+			callee := SkipExpressionWrappers(call.Expression)
+			matchesForwardRef := callee != nil && callee.Kind == ast.KindIdentifier &&
+				reactImportedName(callee, resolve, false) == "forwardRef"
+			if receiver, name, ok := PropMemberIdentifier(callee); ok &&
+				name == "forwardRef" && receiver != nil && receiver.Kind == ast.KindIdentifier {
+				receiverBinding := resolve(receiver)
+				sourceFile := ast.GetSourceFileOfNode(receiver)
+				unshadowedPragma := receiverBinding == nil ||
+					sourceFile != nil && !utils.IsSymbolDeclaredInFile(receiverBinding, sourceFile)
+				matchesForwardRef = receiver.Text() == DefaultReactPragma ||
+					honorConfiguredPragma && (reactImportedName(callee, resolve, false) == "forwardRef" ||
+						receiver.Text() == pragma && unshadowedPragma)
+			}
+			if !matchesForwardRef {
+				return nil, false, false
+			}
+			if call.TypeArguments == nil || len(call.TypeArguments.Nodes) == 0 {
+				return nil, true, false
+			}
+			if len(call.TypeArguments.Nodes) >= 2 {
+				return call.TypeArguments.Nodes[1], true, true
+			}
+			return nil, true, true
+		default:
+			return nil, false, false
+		}
+	}
+	return nil, false, false
+}
+
+// ComponentTypeAnnotation returns the authored variable annotation around a
+// component initializer. It keeps the outer React generic intact.
+func ComponentTypeAnnotation(node *ast.Node) *ast.Node {
+	for current := node; current != nil && current.Parent != nil; {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindSatisfiesExpression,
+			ast.KindNonNullExpression, ast.KindTypeAssertionExpression, ast.KindCallExpression:
+			current = parent
+			continue
+		case ast.KindVariableDeclaration:
+			if parent.AsVariableDeclaration().Initializer == current && parent.AsVariableDeclaration().Type != nil {
+				return parent.AsVariableDeclaration().Type.AsNode()
+			}
+		}
+		return nil
+	}
+	return nil
+}
+
+// ReactFunctionComponentArgument returns the props argument of a recognized
+// React function-component annotation.
+func ReactFunctionComponentArgument(typeNode *ast.Node, resolve func(*ast.Node) *ast.Symbol) *ast.Node {
+	return reactFunctionComponentArgument(typeNode, resolve, false)
+}
+
+// ReactFunctionComponentArgumentWithAmbient opts into ambient React namespace
+// recognition for rules that intentionally improve on upstream behavior.
+func ReactFunctionComponentArgumentWithAmbient(typeNode *ast.Node, resolve func(*ast.Node) *ast.Symbol) *ast.Node {
+	return reactFunctionComponentArgument(typeNode, resolve, true)
+}
+
+func reactFunctionComponentArgument(typeNode *ast.Node, resolve func(*ast.Node) *ast.Symbol, allowAmbient bool) *ast.Node {
+	if typeNode == nil || typeNode.Kind != ast.KindTypeReference {
+		return nil
+	}
+	reference := typeNode.AsTypeReferenceNode()
+	imported := reactImportedName(reference.TypeName, resolve, allowAmbient)
+	if !slices.Contains([]string{"FC", "FunctionComponent", "SFC", "StatelessComponent", "VFC", "VoidFunctionComponent", "ForwardRefRenderFunction"}, imported) {
+		return nil
+	}
+	return reactGenericArgumentAtIndex(imported, reference.TypeArguments)
 }
 
 // PropertyAccessParts splits a dotted identifier path into its names.

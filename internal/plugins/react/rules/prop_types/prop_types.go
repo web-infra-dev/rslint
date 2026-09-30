@@ -119,34 +119,6 @@ func parseOptions(raw []any) options {
 	return o
 }
 
-func keyName(n *ast.Node) string {
-	if n == nil {
-		return ""
-	}
-	if name, ok := utils.GetStaticPropertyName(n); ok {
-		return name
-	}
-	return ""
-}
-
-func elementName(n *ast.Node) string {
-	n = unwrap(n)
-	if n == nil {
-		return ""
-	}
-	switch n.Kind {
-	case ast.KindStringLiteral,
-		ast.KindNumericLiteral,
-		ast.KindNoSubstitutionTemplateLiteral,
-		ast.KindNullKeyword,
-		ast.KindTrueKeyword,
-		ast.KindFalseKeyword,
-		ast.KindRegularExpressionLiteral:
-		return keyName(n)
-	}
-	return ""
-}
-
 func unwrap(n *ast.Node) *ast.Node { return reactutil.SkipExpressionWrappers(n) }
 
 func propMap(n *ast.Node, customValidators []string, resolve initializerResolver) (map[string]propType, bool) {
@@ -180,9 +152,9 @@ func propMapSeen(n *ast.Node, customValidators []string, seen map[*ast.Node]bool
 			default:
 				continue
 			}
-			k := keyName(name)
+			k := reactutil.StaticPropertyName(name)
 			if k == "" && name != nil && name.Kind == ast.KindComputedPropertyName {
-				k = keyName(name.AsComputedPropertyName().Expression)
+				k = reactutil.StaticPropertyName(name.AsComputedPropertyName().Expression)
 			}
 			if k == "" {
 				continue
@@ -230,7 +202,7 @@ func validatorTypeSeen(n *ast.Node, customValidators []string, seen map[*ast.Nod
 		}
 		return propType{open: true}
 	}
-	if n.Kind == ast.KindPropertyAccessExpression && keyName(n.AsPropertyAccessExpression().Name()) == "isRequired" {
+	if n.Kind == ast.KindPropertyAccessExpression && reactutil.StaticPropertyName(n.AsPropertyAccessExpression().Name()) == "isRequired" {
 		return validatorTypeSeen(n.AsPropertyAccessExpression().Expression, customValidators, seen, compositeDepth, resolve)
 	}
 	if n.Kind != ast.KindCallExpression {
@@ -242,7 +214,7 @@ func validatorTypeSeen(n *ast.Node, customValidators []string, seen map[*ast.Nod
 	callee := unwrap(call.Expression)
 	name := ""
 	if callee != nil && callee.Kind == ast.KindPropertyAccessExpression {
-		name = keyName(callee.AsPropertyAccessExpression().Name())
+		name = reactutil.StaticPropertyName(callee.AsPropertyAccessExpression().Name())
 		if object := unwrap(callee.AsPropertyAccessExpression().Expression); object != nil && object.Kind == ast.KindIdentifier && slices.Contains(customValidators, object.AsIdentifier().Text) {
 			return propType{open: true}
 		}
@@ -512,7 +484,12 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 		return declaredType(n.AsTypeAliasDeclaration().Type, aliases, aliasesBySymbol, seen, resolve)
 	case ast.KindTypeReference:
 		ref := n.AsTypeReferenceNode()
-		if _, propsType := importedReactGenericPropsType(n); propsType != nil {
+		if propsType := reactutil.ReactGenericArgument(ref.TypeName, ref.TypeArguments, func(node *ast.Node) *ast.Symbol {
+			if node == nil {
+				return nil
+			}
+			return node.Symbol()
+		}); propsType != nil {
 			declared, ok := declaredType(propsType, aliases, aliasesBySymbol, seen, resolve)
 			if ok {
 				declared.props["children"] = propType{open: true}
@@ -615,7 +592,7 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 		case ast.KindPropertySignature:
 			property := member.AsPropertySignatureDeclaration()
 			if property != nil {
-				if name := keyName(property.Name()); name != "" {
+				if name := reactutil.StaticPropertyName(property.Name()); name != "" {
 					if property.Type != nil {
 						declared[name] = propTypeFromType(property.Type.AsNode(), aliases, aliasesBySymbol, seen)
 					} else {
@@ -626,7 +603,7 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 				}
 			}
 		case ast.KindMethodSignature:
-			if name := keyName(member.AsMethodSignatureDeclaration().Name()); name != "" {
+			if name := reactutil.StaticPropertyName(member.AsMethodSignatureDeclaration().Name()); name != "" {
 				declared[name] = propType{open: true}
 			}
 		}
@@ -685,43 +662,6 @@ func collectComponentTypeDeclaration(n *ast.Node, aliases map[string][]*ast.Node
 	}
 }
 
-func classPropsType(class *ast.Node) *ast.Node {
-	if class == nil {
-		return nil
-	}
-	var clauses *ast.HeritageClauseList
-	switch class.Kind {
-	case ast.KindClassDeclaration:
-		clauses = class.AsClassDeclaration().HeritageClauses
-	case ast.KindClassExpression:
-		clauses = class.AsClassExpression().HeritageClauses
-	default:
-		return nil
-	}
-	if clauses == nil {
-		return nil
-	}
-	for _, clause := range clauses.Nodes {
-		if clause == nil || clause.Kind != ast.KindHeritageClause || clause.AsHeritageClause().Token != ast.KindExtendsKeyword {
-			continue
-		}
-		types := clause.AsHeritageClause().Types
-		if types == nil {
-			continue
-		}
-		for _, typ := range types.Nodes {
-			if typ == nil || typ.Kind != ast.KindExpressionWithTypeArguments {
-				continue
-			}
-			arguments := typ.AsExpressionWithTypeArguments().TypeArguments
-			if arguments != nil && len(arguments.Nodes) > 0 {
-				return arguments.Nodes[0]
-			}
-		}
-	}
-	return nil
-}
-
 // extendsComponent accepts the pragma-independent `Foo.Component` form and
 // JSDoc's explicit component marker, both of which eslint-plugin-react treats
 // as React component classes.
@@ -774,298 +714,12 @@ func jsDocComponentName(node *ast.Node) bool {
 		return jsDocComponentName(node.AsExpressionWithTypeArguments().Expression)
 	}
 	if node.Kind == ast.KindPropertyAccessExpression {
-		return keyName(node.AsPropertyAccessExpression().Name()) == "Component" || keyName(node.AsPropertyAccessExpression().Name()) == "PureComponent"
+		return reactutil.StaticPropertyName(node.AsPropertyAccessExpression().Name()) == "Component" || reactutil.StaticPropertyName(node.AsPropertyAccessExpression().Name()) == "PureComponent"
 	}
 	if node.Kind == ast.KindIdentifier {
 		return node.AsIdentifier().Text == "Component" || node.AsIdentifier().Text == "PureComponent"
 	}
 	return false
-}
-
-func componentVariableType(n *ast.Node) *ast.Node {
-	for current := n; current != nil && current.Parent != nil; {
-		parent := current.Parent
-		switch parent.Kind {
-		case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression, ast.KindTypeAssertionExpression, ast.KindCallExpression:
-			current = parent
-			continue
-		case ast.KindVariableDeclaration:
-			if parent.AsVariableDeclaration().Initializer == current && parent.AsVariableDeclaration().Type != nil {
-				return parent.AsVariableDeclaration().Type.AsNode()
-			}
-		}
-		return nil
-	}
-	return nil
-}
-
-func importedReactGenericPropsType(typeNode *ast.Node) (string, *ast.Node) {
-	if typeNode == nil || typeNode.Kind != ast.KindTypeReference {
-		return "", nil
-	}
-	name := reactutil.EntityNameRightmost(typeNode.AsTypeReferenceNode().TypeName)
-	if name == nil {
-		return "", nil
-	}
-	arguments := typeNode.AsTypeReferenceNode().TypeArguments
-	if arguments == nil || len(arguments.Nodes) == 0 {
-		return "", nil
-	}
-	typeName := importedReactTypeName(name)
-	// An unqualified component type is React-specific only when it is a
-	// named import.  A project-local `FC<Props>` must not suppress this rule.
-	if typeName == "" && typeNode.AsTypeReferenceNode().TypeName.Kind == ast.KindIdentifier {
-		return "", nil
-	}
-	if typeName == "" {
-		qualified := typeNode.AsTypeReferenceNode().TypeName
-		if qualified == nil || qualified.Kind != ast.KindQualifiedName || qualified.AsQualifiedName().Left == nil || qualified.AsQualifiedName().Left.Kind != ast.KindIdentifier {
-			return "", nil
-		}
-		qualifier := qualified.AsQualifiedName().Left.AsIdentifier().Text
-		if !importedReactNamespace(name, qualifier) {
-			return "", nil
-		}
-		typeName = name.AsIdentifier().Text
-	}
-	index := 0
-	switch typeName {
-	case "ForwardRefRenderFunction", "forwardRef":
-		index = 1
-	case "ComponentProps", "ComponentPropsWithRef", "ComponentPropsWithoutRef", "VFC", "VoidFunctionComponent", "PropsWithChildren", "SFC", "StatelessComponent", "FunctionComponent", "FC":
-	default:
-		return "", nil
-	}
-	if len(arguments.Nodes) <= index {
-		return "", nil
-	}
-	return typeName, arguments.Nodes[index]
-}
-
-func reactComponentTypeArgument(typeNode *ast.Node) *ast.Node {
-	typeName, propsType := importedReactGenericPropsType(typeNode)
-	if !slices.Contains([]string{"FC", "FunctionComponent", "SFC", "StatelessComponent", "VFC", "VoidFunctionComponent", "ForwardRefRenderFunction"}, typeName) {
-		return nil
-	}
-	return propsType
-}
-
-func importedReactNamespace(name *ast.Node, localName string) bool {
-	if name == nil || localName == "" {
-		return false
-	}
-	root := ast.GetSourceFileOfNode(name)
-	if root == nil {
-		return false
-	}
-	found := false
-	var visit ast.Visitor
-	visit = func(n *ast.Node) bool {
-		if n == nil || found {
-			return false
-		}
-		if n.Kind == ast.KindImportDeclaration {
-			importDecl := n.AsImportDeclaration()
-			module := importDecl.ModuleSpecifier
-			if module == nil || module.Kind != ast.KindStringLiteral || module.Text() != "react" || importDecl.ImportClause == nil {
-				n.ForEachChild(visit)
-				return false
-			}
-			clause := importDecl.ImportClause.AsImportClause()
-			defaultName := clause.Name()
-			if defaultName != nil && defaultName.Kind == ast.KindIdentifier && defaultName.AsIdentifier().Text == localName {
-				found = true
-				return false
-			}
-			if clause.NamedBindings != nil && clause.NamedBindings.Kind == ast.KindNamespaceImport {
-				ns := clause.NamedBindings.AsNamespaceImport()
-				found = ns != nil && ns.Name() != nil && ns.Name().Kind == ast.KindIdentifier && ns.Name().AsIdentifier().Text == localName
-			}
-		}
-		n.ForEachChild(visit)
-		return false
-	}
-	root.Node.ForEachChild(visit)
-	return found
-}
-
-// importedReactTypeName returns the exported name for a locally aliased React
-// type (for example `import { FC as X } from "react"`).
-func importedReactTypeName(name *ast.Node) string {
-	if name == nil || name.Kind != ast.KindIdentifier {
-		return ""
-	}
-	localName := name.AsIdentifier().Text
-	root := ast.GetSourceFileOfNode(name)
-	if root == nil {
-		return ""
-	}
-	var imported string
-	var visit ast.Visitor
-	visit = func(n *ast.Node) bool {
-		if n == nil || imported != "" {
-			return false
-		}
-		if n.Kind == ast.KindImportSpecifier {
-			specifier := n.AsImportSpecifier()
-			if specifier.Name() != nil && specifier.Name().Kind == ast.KindIdentifier && specifier.Name().AsIdentifier().Text == localName {
-				for parent := n.Parent; parent != nil; parent = parent.Parent {
-					if parent.Kind == ast.KindImportDeclaration {
-						module := parent.AsImportDeclaration().ModuleSpecifier
-						if module != nil && module.Kind == ast.KindStringLiteral && module.Text() == "react" {
-							imported = localName
-							if specifier.PropertyName != nil && specifier.PropertyName.Kind == ast.KindIdentifier {
-								imported = specifier.PropertyName.AsIdentifier().Text
-							}
-						}
-						break
-					}
-				}
-			}
-		}
-		n.ForEachChild(visit)
-		return false
-	}
-	root.Node.ForEachChild(visit)
-	return imported
-}
-
-func forwardRefPropsType(n *ast.Node) (*ast.Node, bool, bool) {
-	for current := n; current != nil && current.Parent != nil; current = current.Parent {
-		parent := current.Parent
-		if parent.Kind == ast.KindCallExpression {
-			call := parent.AsCallExpression()
-			if call.Arguments == nil || len(call.Arguments.Nodes) == 0 || unwrap(call.Arguments.Nodes[0]) != unwrap(current) {
-				return nil, false, false
-			}
-			callee := unwrap(call.Expression)
-			isForwardRef := callee != nil && callee.Kind == ast.KindIdentifier && importedReactTypeName(callee) == "forwardRef"
-			if receiver, name, ok := estreeMember(callee); ok {
-				isForwardRef = name == "forwardRef" && receiver != nil && receiver.Kind == ast.KindIdentifier && receiver.AsIdentifier().Text == "React"
-			}
-			if !isForwardRef {
-				return nil, false, false
-			}
-			arguments := call.TypeArguments
-			if arguments == nil || len(arguments.Nodes) == 0 {
-				return nil, true, false
-			}
-			if len(arguments.Nodes) >= 2 {
-				return arguments.Nodes[1], true, true
-			}
-			// A single forwardRef type argument selects the ref type. Upstream
-			// treats the missing props argument as an explicit empty declaration,
-			// which takes precedence over an annotation on the callback parameter.
-			return nil, true, true
-		}
-		if parent.Kind != ast.KindParenthesizedExpression && parent.Kind != ast.KindAsExpression && parent.Kind != ast.KindSatisfiesExpression && parent.Kind != ast.KindNonNullExpression && parent.Kind != ast.KindTypeAssertionExpression {
-			return nil, false, false
-		}
-	}
-	return nil, false, false
-}
-
-func componentName(n *ast.Node) string {
-	var suffix []string
-	if n != nil && n.Kind == ast.KindMethodDeclaration && n.Parent != nil && n.Parent.Kind == ast.KindObjectLiteralExpression {
-		if name := keyName(n.Name()); name != "" {
-			suffix = append(suffix, name)
-		}
-	}
-	for current := n; current != nil && current.Parent != nil; {
-		parent := current.Parent
-		switch parent.Kind {
-		case ast.KindParenthesizedExpression,
-			ast.KindAsExpression,
-			ast.KindSatisfiesExpression,
-			ast.KindNonNullExpression,
-			ast.KindTypeAssertionExpression,
-			ast.KindCallExpression:
-			current = parent
-			continue
-		case ast.KindVariableDeclaration:
-			if parent.AsVariableDeclaration().Initializer == current {
-				name := parent.AsVariableDeclaration().Name()
-				if name != nil && name.Kind == ast.KindIdentifier {
-					return strings.Join(append([]string{name.AsIdentifier().Text}, suffix...), ".")
-				}
-			}
-		case ast.KindBinaryExpression:
-			assignment := parent.AsBinaryExpression()
-			if assignment.OperatorToken != nil && assignment.OperatorToken.Kind == ast.KindEqualsToken && assignment.Right == current {
-				if name := componentReference(assignment.Left); name != "" {
-					return strings.Join(append([]string{name}, suffix...), ".")
-				}
-			}
-		case ast.KindPropertyAssignment:
-			assignment := parent.AsPropertyAssignment()
-			if assignment.Initializer == current {
-				if name := keyName(assignment.Name()); name != "" {
-					suffix = append([]string{name}, suffix...)
-					current = parent
-					continue
-				}
-			}
-		case ast.KindObjectLiteralExpression:
-			current = parent
-			continue
-		}
-		break
-	}
-	return reactutil.BindingIdentifierName(n)
-}
-
-func componentBinding(n *ast.Node, resolve func(*ast.Node) *ast.Symbol) *ast.Symbol {
-	if n == nil {
-		return nil
-	}
-	if n.Kind == ast.KindFunctionDeclaration || n.Kind == ast.KindClassDeclaration {
-		return n.Symbol()
-	}
-	return componentRootBinding(n, resolve)
-}
-
-func componentRootBinding(n *ast.Node, resolve func(*ast.Node) *ast.Symbol) *ast.Symbol {
-	for current := n; current != nil && current.Parent != nil; {
-		parent := current.Parent
-		switch parent.Kind {
-		case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression, ast.KindTypeAssertionExpression, ast.KindCallExpression, ast.KindPropertyAssignment, ast.KindObjectLiteralExpression:
-			current = parent
-			continue
-		case ast.KindVariableDeclaration:
-			if parent.AsVariableDeclaration().Initializer == current {
-				name := parent.AsVariableDeclaration().Name()
-				if name != nil && name.Kind == ast.KindIdentifier {
-					return utils.BindingNameSymbol(name)
-				}
-			}
-		case ast.KindBinaryExpression:
-			assignment := parent.AsBinaryExpression()
-			if assignment.OperatorToken != nil && assignment.OperatorToken.Kind == ast.KindEqualsToken && assignment.Right == current {
-				root, _, ok := memberNames(assignment.Left)
-				if ok && root != nil && root.Kind == ast.KindIdentifier {
-					if resolve != nil {
-						if symbol := resolve(root); symbol != nil {
-							return symbol
-						}
-					}
-					return root.Symbol()
-				}
-			}
-		}
-		return nil
-	}
-	return nil
-}
-
-func componentScope(n *ast.Node) *ast.Node {
-	for current := n; current != nil; current = current.Parent {
-		switch current.Kind {
-		case ast.KindBlock, ast.KindSourceFile, ast.KindModuleBlock:
-			return current
-		}
-	}
-	return nil
 }
 
 func setDeclaredExisting(m map[string]propType, names []string, value propType) bool {
@@ -1120,9 +774,9 @@ func addDestructured(c *component, pattern *ast.Node, prefix []string, aliases m
 		if be.PropertyName != nil && be.PropertyName.Kind == ast.KindComputedPropertyName {
 			break
 		}
-		key := keyName(be.PropertyName)
+		key := reactutil.StaticPropertyName(be.PropertyName)
 		if key == "" {
-			key = keyName(be.Name())
+			key = reactutil.StaticPropertyName(be.Name())
 		}
 		if key == "" || be.Name() == nil {
 			continue
@@ -1156,9 +810,9 @@ func addThisPropsDestructured(c *component, pattern *ast.Node, aliases map[*ast.
 			continue
 		}
 		be := e.AsBindingElement()
-		key := keyName(be.PropertyName)
+		key := reactutil.StaticPropertyName(be.PropertyName)
 		if key == "" {
-			key = keyName(be.Name())
+			key = reactutil.StaticPropertyName(be.Name())
 		}
 		if key != "props" || be.Name() == nil {
 			continue
@@ -1197,22 +851,6 @@ func estreeKeyName(name *ast.Node) string {
 		name = ast.SkipParentheses(name.AsComputedPropertyName().Expression)
 	}
 	return reactutil.EsTreeName(name)
-}
-
-func estreeMember(n *ast.Node) (*ast.Node, string, bool) {
-	n = unwrap(n)
-	if n == nil {
-		return nil, "", false
-	}
-	switch n.Kind {
-	case ast.KindPropertyAccessExpression:
-		member := n.AsPropertyAccessExpression()
-		return unwrap(member.Expression), reactutil.EsTreeName(member.Name()), true
-	case ast.KindElementAccessExpression:
-		member := n.AsElementAccessExpression()
-		return unwrap(member.Expression), reactutil.EsTreeName(ast.SkipParentheses(member.ArgumentExpression)), true
-	}
-	return nil, "", false
 }
 
 func lifecycleFunctionName(fn *ast.Node) string {
@@ -1263,7 +901,7 @@ func isInsideLifecycle(ident *ast.Node, c *component, checkAsyncSafe bool) bool 
 
 func estreeFirstMemberName(root *ast.Node) string {
 	member := reactutil.SkipExpressionWrappersUp(root)
-	receiver, name, ok := estreeMember(member)
+	receiver, name, ok := reactutil.PropMemberIdentifier(member)
 	if ok && receiver == unwrap(root) {
 		return name
 	}
@@ -1343,7 +981,7 @@ func isSetStateCallback(fn *ast.Node) bool {
 	if invocation.Arguments == nil || len(invocation.Arguments.Nodes) == 0 || unwrap(invocation.Arguments.Nodes[0]) != fn {
 		return false
 	}
-	_, name, ok := estreeMember(invocation.Expression)
+	_, name, ok := reactutil.PropMemberIdentifier(invocation.Expression)
 	return ok && name == "setState"
 }
 
@@ -1368,22 +1006,6 @@ func isGeneratorFunction(n *ast.Node) bool {
 		return n.AsMethodDeclaration().AsteriskToken != nil
 	}
 	return false
-}
-
-func getterReturn(body *ast.Node) (*ast.Node, bool) {
-	if body == nil || body.Kind != ast.KindBlock {
-		return nil, false
-	}
-	stmts := body.AsBlock().Statements
-	if stmts == nil {
-		return nil, false
-	}
-	for i := len(stmts.Nodes) - 1; i >= 0; i-- {
-		if stmt := stmts.Nodes[i]; stmt != nil && stmt.Kind == ast.KindReturnStatement {
-			return stmt.AsReturnStatement().Expression, true
-		}
-	}
-	return nil, false
 }
 
 func componentFor(node *ast.Node, byNode map[*ast.Node]*component) *component {
@@ -1488,92 +1110,6 @@ func memberReportNode(n *ast.Node) *ast.Node {
 	default:
 		return n
 	}
-}
-
-func memberNames(n *ast.Node) (*ast.Node, []string, bool) {
-	return memberNamesWithMode(n, false)
-}
-
-func propTypesAssignmentNames(n *ast.Node) (*ast.Node, []string, bool) {
-	return memberNamesWithMode(n, true)
-}
-
-func finishMemberNames(names []string, estreePropertyNames bool) []string {
-	slices.Reverse(names)
-	if estreePropertyNames {
-		return names
-	}
-	for i, name := range names {
-		if !strings.HasPrefix(name, "__NUMERIC_PROP__:") {
-			continue
-		}
-		if i == 0 {
-			names[i] = strings.TrimPrefix(name, "__NUMERIC_PROP__:")
-		} else {
-			names[i] = "__COMPUTED_PROP__"
-		}
-	}
-	return names
-}
-
-func memberNamesWithMode(n *ast.Node, estreePropertyNames bool) (*ast.Node, []string, bool) {
-	var names []string
-	cur := unwrap(n)
-	var report *ast.Node
-	for cur != nil {
-		switch cur.Kind {
-		case ast.KindPropertyAccessExpression:
-			pa := cur.AsPropertyAccessExpression()
-			k := keyName(pa.Name())
-			if k == "" {
-				return nil, nil, false
-			}
-			names = append(names, k)
-			if report == nil {
-				report = pa.Name()
-			}
-			cur = unwrap(pa.Expression)
-		case ast.KindElementAccessExpression:
-			ea := cur.AsElementAccessExpression()
-			argument := unwrap(ea.ArgumentExpression)
-			k := ""
-			if estreePropertyNames {
-				argument = ast.SkipParentheses(ea.ArgumentExpression)
-				if argument == nil || argument.Kind != ast.KindIdentifier {
-					return nil, nil, false
-				}
-				k = argument.AsIdentifier().Text
-			} else {
-				k = elementName(ea.ArgumentExpression)
-				if argument != nil && argument.Kind == ast.KindNumericLiteral {
-					k = "__NUMERIC_PROP__:" + k
-				}
-				if k == "" {
-					if argument != nil && argument.Kind == ast.KindBigIntLiteral {
-						return nil, nil, false
-					}
-					k = "__COMPUTED_PROP__"
-				}
-			}
-			names = append(names, k)
-			if report == nil {
-				report = ea.ArgumentExpression
-			}
-			cur = unwrap(ea.Expression)
-		default:
-			return cur, finishMemberNames(names, estreePropertyNames), true
-		}
-	}
-	return report, finishMemberNames(names, estreePropertyNames), false
-}
-
-func componentReference(n *ast.Node) string {
-	root, names, ok := memberNames(n)
-	if !ok || root == nil || root.Kind != ast.KindIdentifier {
-		return ""
-	}
-	parts := append([]string{root.AsIdentifier().Text}, names...)
-	return strings.Join(parts, ".")
 }
 
 func isAssignmentTarget(n *ast.Node) bool {
@@ -1707,7 +1243,7 @@ var PropTypesRule = rule.Rule{
 			if c.binding != nil {
 				byComponentKey[componentKey{name: name, binding: c.binding}] = c
 			} else {
-				byComponentKey[componentKey{name: name, scope: componentScope(c.node)}] = c
+				byComponentKey[componentKey{name: name, scope: reactutil.ComponentScope(c.node)}] = c
 			}
 		}
 		lookupComponent := func(root *ast.Node, name string) *component {
@@ -1717,12 +1253,12 @@ var PropTypesRule = rule.Rule{
 			if symbol := resolveSymbol(root); symbol != nil {
 				return byComponentKey[componentKey{name: name, binding: symbol}]
 			}
-			return byComponentKey[componentKey{name: name, scope: componentScope(root)}]
+			return byComponentKey[componentKey{name: name, scope: reactutil.ComponentScope(root)}]
 		}
 		var propTypeAssignments []*ast.Node
 		queuePropTypeAssignment := func(assignment *ast.Node) {
 			binary := assignment.AsBinaryExpression()
-			root, names, ok := propTypesAssignmentNames(binary.Left)
+			root, names, ok := reactutil.PropAssignmentNames(binary.Left)
 			if !ok || root == nil || root.Kind != ast.KindIdentifier {
 				return
 			}
@@ -1750,8 +1286,8 @@ var PropTypesRule = rule.Rule{
 			c := &component{node: node, declared: map[string]propType{}}
 			comps = append(comps, c)
 			byNode[node] = c
-			c.binding = componentBinding(node, resolveSymbol)
-			if name := componentName(node); name != "" {
+			c.binding = reactutil.ComponentBinding(node, resolveSymbol)
+			if name := strings.Join(reactutil.ComponentTarget(node), "."); name != "" {
 				registerComponent(c, name)
 			}
 			if node.Kind == ast.KindFunctionExpression || node.Kind == ast.KindClassExpression {
@@ -1762,7 +1298,7 @@ var PropTypesRule = rule.Rule{
 						// Keep the historical text fallback for an unresolved reference to
 						// an expression's inner name, but constrain it to the declaration
 						// scope so unrelated blocks cannot claim the declaration.
-						byComponentKey[componentKey{name: innerName, scope: componentScope(node)}] = c
+						byComponentKey[componentKey{name: innerName, scope: reactutil.ComponentScope(node)}] = c
 					}
 				}
 			}
@@ -1785,7 +1321,7 @@ var PropTypesRule = rule.Rule{
 			case ast.KindClassDeclaration, ast.KindClassExpression:
 				if reactutil.ExtendsReactComponent(n, pragma) || extendsComponent(n) {
 					c := newComponent(n)
-					propsType := classPropsType(n)
+					propsType := reactutil.ClassPropsType(n)
 					if propsType != nil {
 						declarationEvents = append(declarationEvents, componentDeclarationEvent{
 							source: propsType, typeNode: propsType, component: c,
@@ -1808,7 +1344,7 @@ var PropTypesRule = rule.Rule{
 						if name != nil && name.Kind == ast.KindObjectBindingPattern {
 							addDestructured(findUsageComponent(name), name, nil, aliases, true)
 						}
-						propsType, isForwardRef, typedForwardRef := forwardRefPropsType(n)
+						propsType, isForwardRef, typedForwardRef := reactutil.FunctionComponentTypeDetails(n, resolveSymbol)
 						if typedForwardRef {
 							if propsType == nil {
 								queueDeclaration(n, c, concreteDeclaration(map[string]propType{}), true, false)
@@ -1824,10 +1360,10 @@ var PropTypesRule = rule.Rule{
 								source: propsType, typeNode: propsType, component: c,
 							})
 						} else if !isForwardRef {
-							variableType := componentVariableType(n)
-							if reactComponentTypeArgument(variableType) != nil {
+							componentType := reactutil.ComponentTypeAnnotation(n)
+							if reactutil.ReactFunctionComponentArgument(componentType, resolveSymbol) != nil {
 								declarationEvents = append(declarationEvents, componentDeclarationEvent{
-									source: variableType, typeNode: variableType, component: c,
+									source: componentType, typeNode: componentType, component: c,
 								})
 							}
 						}
@@ -1850,9 +1386,9 @@ var PropTypesRule = rule.Rule{
 				}
 				if n.Kind == ast.KindGetAccessor {
 					ga := n.AsGetAccessorDeclaration()
-					if ast.HasSyntacticModifier(n, ast.ModifierFlagsStatic) && keyName(ga.Name()) == "propTypes" {
+					if ast.HasSyntacticModifier(n, ast.ModifierFlagsStatic) && reactutil.StaticPropertyName(ga.Name()) == "propTypes" {
 						if c := componentFor(n.Parent, byNode); c != nil {
-							if expression, found := getterReturn(ga.Body); found {
+							if expression, found := reactutil.LastDirectReturnedExpression(ga.Body); found {
 								queueRuntimeDeclaration(n, c, expression)
 							}
 						}
@@ -1860,14 +1396,14 @@ var PropTypesRule = rule.Rule{
 				}
 			case ast.KindPropertyAssignment:
 				pa := n.AsPropertyAssignment()
-				if keyName(pa.Name()) == "propTypes" {
+				if reactutil.StaticPropertyName(pa.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, byNode); c != nil {
 						queueRuntimeDeclaration(n, c, pa.Initializer)
 					}
 				}
 			case ast.KindPropertyDeclaration:
 				pd := n.AsPropertyDeclaration()
-				if keyName(pd.Name()) == "props" && !ast.HasSyntacticModifier(n, ast.ModifierFlagsStatic) {
+				if reactutil.StaticPropertyName(pd.Name()) == "props" && !ast.HasSyntacticModifier(n, ast.ModifierFlagsStatic) {
 					if c := componentFor(n.Parent, byNode); c != nil && pd.Type != nil {
 						propsType := pd.Type.AsNode()
 						declarationEvents = append(declarationEvents, componentDeclarationEvent{
@@ -1875,7 +1411,7 @@ var PropTypesRule = rule.Rule{
 						})
 					}
 				}
-				if keyName(pd.Name()) == "propTypes" {
+				if reactutil.StaticPropertyName(pd.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, byNode); c != nil {
 						queueRuntimeDeclaration(n, c, pd.Initializer)
 					}
@@ -1883,7 +1419,7 @@ var PropTypesRule = rule.Rule{
 			case ast.KindVariableDeclaration:
 				vd := n.AsVariableDeclaration()
 				if vd.Name() != nil {
-					if root, names, ok := memberNames(vd.Initializer); ok && root != nil {
+					if root, names, ok := reactutil.PropMemberNames(vd.Initializer); ok && root != nil {
 						if c := findUsageComponent(n); c != nil {
 							if root.Kind == ast.KindThisKeyword && len(names) == 0 && vd.Name().Kind == ast.KindObjectBindingPattern {
 								addThisPropsDestructured(c, vd.Name(), aliases)
@@ -1913,7 +1449,7 @@ var PropTypesRule = rule.Rule{
 				b := n.AsBinaryExpression()
 				left := unwrap(b.Left)
 				if b.OperatorToken != nil && b.OperatorToken.Kind == ast.KindEqualsToken && left != nil && (left.Kind == ast.KindPropertyAccessExpression || left.Kind == ast.KindElementAccessExpression) {
-					root, names, ok := propTypesAssignmentNames(b.Left)
+					root, names, ok := reactutil.PropAssignmentNames(b.Left)
 					if ok && root != nil && root.Kind == ast.KindIdentifier {
 						propTypesIndex := slices.Index(names, "propTypes")
 						if propTypesIndex < 0 {
@@ -1926,7 +1462,7 @@ var PropTypesRule = rule.Rule{
 				if isAssignmentTarget(n) {
 					break
 				}
-				root, names, ok := memberNames(n)
+				root, names, ok := reactutil.PropMemberNames(n)
 				if !ok || root == nil {
 					break
 				}
