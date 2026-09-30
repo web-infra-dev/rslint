@@ -118,6 +118,18 @@ func TestRequireHookExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useHook", Line: 2, Column: 3}},
 			},
 			{
+				Code: `describe('suite', (() => {
+  setup();
+}) satisfies () => void);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useHook", Line: 2, Column: 3}},
+			},
+			{
+				Code: `describe('suite', <() => void>(() => {
+  setup();
+}));`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useHook", Line: 2, Column: 3}},
+			},
+			{
 				Code: `(condition ? setup : teardown)();`,
 				Options: []interface{}{
 					map[string]interface{}{"allowedFunctionCalls": []interface{}{""}},
