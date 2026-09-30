@@ -23,7 +23,7 @@ var MaxNestedCallsRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		max := parseMax(options)
 		check := func(node *ast.Node) {
-			if nestedCallDepth(node) <= max {
+			if ast.IsImportCall(node) || nestedCallDepth(node) <= max {
 				return
 			}
 			maxText := strconv.Itoa(max)
@@ -45,7 +45,10 @@ func parseMax(options []any) int {
 		return defaultMax
 	}
 	config, _ := options[0].(map[string]any)
-	value, _ := utils.CoerceIntegral(config["max"])
+	value, ok := utils.CoerceIntegral(config["max"])
+	if !ok {
+		return defaultMax
+	}
 	return value
 }
 
@@ -54,7 +57,7 @@ func nestedCallDepth(node *ast.Node) int {
 	child := node
 
 	for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
-		if isNestedCallBoundary(ancestor) {
+		if isNestedCallBoundary(ancestor, child) {
 			return depth
 		}
 		if isCallOrNewExpression(ancestor) && hasArgument(ancestor, child) {
@@ -67,7 +70,8 @@ func nestedCallDepth(node *ast.Node) int {
 }
 
 func isCallOrNewExpression(node *ast.Node) bool {
-	return node.Kind == ast.KindCallExpression || node.Kind == ast.KindNewExpression
+	return node != nil && !ast.IsImportCall(node) &&
+		(node.Kind == ast.KindCallExpression || node.Kind == ast.KindNewExpression)
 }
 
 func hasArgument(node, target *ast.Node) bool {
@@ -79,8 +83,12 @@ func hasArgument(node, target *ast.Node) bool {
 	return false
 }
 
-func isNestedCallBoundary(node *ast.Node) bool {
+func isNestedCallBoundary(node, child *ast.Node) bool {
 	if utils.IsFunctionLikeContainer(node) {
+		name := node.Name()
+		if name != nil && name.Kind == ast.KindComputedPropertyName && name == child {
+			return false
+		}
 		return true
 	}
 	switch node.Kind {
