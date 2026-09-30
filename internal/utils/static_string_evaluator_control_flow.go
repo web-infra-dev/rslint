@@ -43,6 +43,58 @@ func (staticEvaluator *StaticStringEvaluator) EvalControlFlowTruthiness(node *as
 	return staticValueTruthy(value)
 }
 
+// EvalSideEffectFreeValue mirrors Unicorn's getStaticValueIfNoSideEffects.
+// Unlike branch evaluation it permits stable let/var initializers.
+func (staticEvaluator *StaticStringEvaluator) EvalSideEffectFreeValue(node *ast.Node) (any, bool) {
+	if staticEvaluator == nil || node == nil {
+		return nil, false
+	}
+	safety := staticControlFlowSafety{evaluator: staticEvaluator, visiting: make(map[*ast.Symbol]bool)}
+	if !safety.safeValue(node, false) {
+		return nil, false
+	}
+	return staticEvaluator.EvalValue(node)
+}
+
+// EvalSideEffectFreePropertyValue reads a property of a folded value without
+// constructing an AST member access or exposing the private aggregate types.
+func (staticEvaluator *StaticStringEvaluator) EvalSideEffectFreePropertyValue(node *ast.Node, key string) (any, bool) {
+	object, ok := staticEvaluator.EvalSideEffectFreeValue(node)
+	if !ok {
+		return nil, false
+	}
+	if text, ok := staticValueAsString(object); ok && key == "length" {
+		return staticNumberValue(ecmascript.StringCodeUnitCount(text)), true
+	}
+	result := staticMemberValue(object, key)
+	if !result.ok {
+		return nil, false
+	}
+	if text, ok := staticValueAsString(result.value); ok {
+		return text, true
+	}
+	return result.value, true
+}
+
+// EvalControlFlowArrayElements returns a caller-owned slice using EvalValue's
+// representation for each element. Holes retain JavaScript undefined values.
+func (staticEvaluator *StaticStringEvaluator) EvalControlFlowArrayElements(node *ast.Node) ([]any, bool) {
+	value, ok := staticEvaluator.EvalControlFlowValue(node)
+	array, isArray := value.(*staticArrayValue)
+	if !ok || !isArray {
+		return nil, false
+	}
+	values := make([]any, array.length)
+	for i := range values {
+		value := array.element(i)
+		if text, ok := staticValueAsString(value); ok {
+			value = text
+		}
+		values[i] = value
+	}
+	return values, true
+}
+
 type staticControlFlowSafety struct {
 	evaluator *StaticStringEvaluator
 	visiting  map[*ast.Symbol]bool
@@ -134,7 +186,7 @@ func (safety *staticControlFlowSafety) safeMember(node *ast.Node) bool {
 	if object == nil {
 		return false
 	}
-	if safeControlFlowGlobalMember(node, object, key) {
+	if safety.safeGlobalMember(node, object, key) {
 		return true
 	}
 	switch object.Kind {
@@ -183,25 +235,27 @@ func (safety *staticControlFlowSafety) safeMember(node *ast.Node) bool {
 	return ok && index < ecmascript.StringCodeUnitCount(object.Text())
 }
 
-func safeControlFlowGlobalMember(node, object *ast.Node, key string) bool {
-	if !ast.IsIdentifier(object) || ast.IsOptionalChainRoot(node) || IsShadowed(object, object.Text()) {
+func (safety *staticControlFlowSafety) safeGlobalMember(node, object *ast.Node, key string) bool {
+	if !ast.IsIdentifier(object) || ast.IsOptionalChainRoot(node) {
 		return false
 	}
 	if node.Kind == ast.KindElementAccessExpression &&
 		node.AsElementAccessExpression().ArgumentExpression.Kind != ast.KindStringLiteral {
 		return false
 	}
-	if _, ok := staticGlobalNumber(object, key); ok {
-		return true
+	// Classify the property before resolving a global. Ordinary member reads
+	// must not trigger a fallback scan of every enclosing scope.
+	if _, ok := staticGlobalNumbers[object.Text()][key]; ok {
+		return safety.evaluator.isBuiltinIdentifier(object, object.Text())
 	}
 	if object.Text() == "String" {
-		return key == "raw"
+		return key == "raw" && safety.evaluator.isBuiltinIdentifier(object, "String")
 	}
 	if object.Text() == "Symbol" {
 		switch key {
 		case "asyncIterator", "hasInstance", "isConcatSpreadable", "iterator", "match", "matchAll",
 			"replace", "search", "species", "split", "toPrimitive", "toStringTag", "unscopables":
-			return true
+			return safety.evaluator.isBuiltinIdentifier(object, "Symbol")
 		}
 	}
 	return false

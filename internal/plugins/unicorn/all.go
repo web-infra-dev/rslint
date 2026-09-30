@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/empty_brace_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/error_message"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/expiring_todo_comments"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/explicit_length_check"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/explicit_timer_delay"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
@@ -88,6 +89,7 @@ func GetAllRules() []rule.Rule {
 		consistent_tuple_labels.ConsistentTupleLabelsRule,
 		empty_brace_spaces.EmptyBraceSpacesRule,
 		error_message.ErrorMessageRule,
+		explicit_length_check.ExplicitLengthCheckRule,
 		explicit_timer_delay.ExplicitTimerDelayRule,
 		expiring_todo_comments.ExpiringTodoCommentsRule,
 		filename_case.FilenameCaseRule,

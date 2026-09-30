@@ -433,7 +433,7 @@ func TestStaticStringEvaluator(t *testing.T) {
 func TestStaticStringEvaluatorConfiguredGlobals(t *testing.T) {
 	for _, expression := range []string{
 		"String.raw`\\n`", `String("x")`, `Array.of("x")[0]`,
-		`Object.freeze(["x"])[0]`, `undefined`, `Math.PI`, `Number.EPSILON`,
+		`Object.freeze(["x"])[0]`, `undefined`, `NaN`, `Infinity`, `Math.PI`, `Number.EPSILON`,
 	} {
 		t.Run(expression, func(t *testing.T) {
 			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/globals.js", Path: "/globals.js"}, "const value = "+expression, core.ScriptKindJS)
@@ -813,5 +813,87 @@ func TestStaticStringEvaluatorBinaryExpressions(t *testing.T) {
 				t.Fatalf("EvalToString = (%q, %v), want %q", got, known, test.want)
 			}
 		})
+	}
+}
+
+func TestStaticStringEvaluatorGlobalNumbers(t *testing.T) {
+	for _, test := range []struct {
+		code, want string
+		known      bool
+	}{
+		{"const value = NaN;", "NaN", true},
+		{"const value = -Infinity;", "-Infinity", true},
+		{"const value = String(Infinity);", "Infinity", true},
+		{"const value = [NaN, Infinity].join(',');", "NaN,Infinity", true},
+		{"function f(NaN) { const value = NaN; }", "", false},
+		{"function f(Infinity) { const value = Infinity; }", "", false},
+	} {
+		t.Run(test.code, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/globals.js", Path: "/globals.js"}, test.code, core.ScriptKindJS)
+			node := findVariableInitializer(t, source, "value")
+			got, known := NewStaticStringEvaluatorWithSourceFile(nil, source).EvalToString(node)
+			assert.Equal(t, known, test.known)
+			assert.Equal(t, got, test.want)
+			_, known = NewStaticStringEvaluatorWithoutScope().EvalValue(node)
+			assert.Assert(t, !known, "scope-free evaluation resolved a global")
+		})
+	}
+}
+
+func TestStaticStringEvaluatorAggregateInspection(t *testing.T) {
+	for _, test := range []struct {
+		expression, key string
+		want            any
+		known           bool
+	}{
+		{`({size: "mini"})`, "size", "mini", true},
+		{`({size: 1, size: 2})`, "size", staticNumberValue(2), true},
+		{`({})`, "size", staticUndefinedValue{}, true},
+		{`({get size() { return 1; }})`, "size", nil, false},
+		{`({size: unknown})`, "size", nil, false},
+		{`({size: read()})`, "size", nil, false},
+		{`"😀"`, "length", staticNumberValue(2), true},
+		{`["x"]`, "0", "x", true},
+	} {
+		t.Run(test.expression, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/value.js", Path: "/value.js"}, "const value = "+test.expression, core.ScriptKindJS)
+			node := findVariableInitializer(t, source, "value")
+			got, known := NewStaticStringEvaluatorWithSourceFile(nil, source).EvalSideEffectFreePropertyValue(node, test.key)
+			assert.Equal(t, known, test.known)
+			assert.DeepEqual(t, got, test.want)
+		})
+	}
+	for _, test := range []struct {
+		expression string
+		want       []any
+		known      bool
+	}{
+		{`[1, "x", , true]`, []any{staticNumberValue(1), "x", staticUndefinedValue{}, true}, true},
+		{`[]`, []any{}, true},
+		{`[unknown]`, nil, false},
+		{`[read()]`, nil, false},
+		{`({length: 1})`, nil, false},
+	} {
+		t.Run(test.expression, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/array.js", Path: "/array.js"}, "const value = "+test.expression, core.ScriptKindJS)
+			node := findVariableInitializer(t, source, "value")
+			evaluator := NewStaticStringEvaluatorWithSourceFile(nil, source)
+			got, known := evaluator.EvalControlFlowArrayElements(node)
+			assert.Equal(t, known, test.known)
+			assert.DeepEqual(t, got, test.want)
+			if len(got) > 0 {
+				got[0] = "changed"
+				again, _ := evaluator.EvalControlFlowArrayElements(node)
+				assert.DeepEqual(t, again, test.want)
+			}
+		})
+	}
+	for _, evaluator := range []*StaticStringEvaluator{nil, NewStaticStringEvaluator(nil)} {
+		_, known := evaluator.EvalSideEffectFreeValue(nil)
+		assert.Assert(t, !known)
+		_, known = evaluator.EvalSideEffectFreePropertyValue(nil, "length")
+		assert.Assert(t, !known)
+		_, known = evaluator.EvalControlFlowArrayElements(nil)
+		assert.Assert(t, !known)
 	}
 }
