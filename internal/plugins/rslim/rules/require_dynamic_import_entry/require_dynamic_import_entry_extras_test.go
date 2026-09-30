@@ -15,6 +15,8 @@ func TestRequireDynamicImportEntry(t *testing.T) {
 			{Code: `import { value } from './module';`},
 			{Code: `type Module = typeof import('./module');`},
 			{Code: `import.meta.resolve('./module');`},
+			{Code: `require.resolve('./module');`},
+			{Code: `loader.require('./module');`},
 			{Code: "// rslint-disable-next-line test -- Checked all target modules and Rslim entries.\nimport('./module');"},
 			{Code: "// rslint-disable-next-line test -- Checked all target modules and Rslim entries.\nconst mod = await import(\n  path\n);"},
 		},
@@ -51,6 +53,10 @@ func TestRequireDynamicImportEntry(t *testing.T) {
 					MessageId: "reviewDynamicImport", Line: 1, Column: 1, EndLine: 1, EndColumn: 9,
 				}},
 			},
+			{Code: `require('./module');`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "reviewRequire"}}},
+			{Code: `require(path);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "reviewRequire"}}},
+			{Code: `require();`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "reviewRequire"}}},
+			{Code: `import dep = require('./module');`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "reviewRequire"}}},
 		},
 	)
 }
