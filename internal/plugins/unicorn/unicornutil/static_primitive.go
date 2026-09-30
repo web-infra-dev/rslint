@@ -8,6 +8,9 @@ import (
 // IsStaticPrimitiveArgument reports whether an expression has a statically known
 // primitive value whose numeric coercion cannot invoke user code.
 func IsStaticPrimitiveArgument(evaluator *utils.StaticStringEvaluator, node *ast.Node) bool {
+	if evaluator == nil || node == nil {
+		return false
+	}
 	value, known := evaluator.EvalValue(node)
 	if known {
 		switch value.(type) {
@@ -17,9 +20,6 @@ func IsStaticPrimitiveArgument(evaluator *utils.StaticStringEvaluator, node *ast
 	}
 
 	node = ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions)
-	if node == nil {
-		return false
-	}
 	switch node.Kind {
 	case ast.KindNullKeyword, ast.KindUndefinedKeyword, ast.KindVoidExpression:
 		return true

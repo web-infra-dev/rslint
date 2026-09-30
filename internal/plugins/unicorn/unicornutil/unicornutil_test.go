@@ -71,6 +71,40 @@ func findTestCall(t *testing.T, sourceFile *ast.SourceFile, text string) *ast.No
 	return found
 }
 
+func TestIsStaticPrimitiveArgument(t *testing.T) {
+	sourceFile := parseTestSource(`
+consume("value");
+consume(1);
+consume(null);
+consume({});
+consume(value);
+`)
+	evaluator := utils.NewStaticStringEvaluatorWithoutScope()
+
+	for _, test := range []struct {
+		text string
+		want bool
+	}{
+		{text: `"value"`, want: true},
+		{text: "1", want: true},
+		{text: "null", want: true},
+		{text: "{}", want: false},
+		{text: "value", want: false},
+	} {
+		node := findTestNode(t, sourceFile, test.text)
+		if got := IsStaticPrimitiveArgument(evaluator, node); got != test.want {
+			t.Fatalf("IsStaticPrimitiveArgument(%q) = %v, want %v", test.text, got, test.want)
+		}
+	}
+
+	if IsStaticPrimitiveArgument(evaluator, nil) {
+		t.Fatal("nil expression must not be treated as a static primitive")
+	}
+	if IsStaticPrimitiveArgument(nil, findTestNode(t, sourceFile, "1")) {
+		t.Fatal("nil evaluator must not treat an expression as a static primitive")
+	}
+}
+
 func TestPlainParameterIdentifierAndIsSameIdentifier(t *testing.T) {
 	sourceFile := parseTestSource(`
 array.flatMap((value?: unknown) => ((value)));
