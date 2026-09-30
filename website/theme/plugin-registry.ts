@@ -172,8 +172,20 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     importName: 'rstestPlugin',
     presets: [
       {
+        name: 'rstestPlugin.configs.all',
+        description: 'All supported Rstest rules',
+      },
+      {
+        name: 'rstestPlugin.configs.env',
+        description: 'Rstest globals',
+      },
+      {
         name: 'rstestPlugin.configs.recommended',
         description: 'Rstest rules',
+      },
+      {
+        name: 'rstestPlugin.configs.style',
+        description: 'Rstest style rules',
       },
     ],
   },
