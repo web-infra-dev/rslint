@@ -62,6 +62,7 @@ type componentKey struct {
 }
 
 type diagnosticKey struct {
+	component  componentKey
 	contract   *ast.Node
 	fallback   *ast.Node
 	id         string
@@ -427,7 +428,7 @@ func (a *analyzer) initialize(c *component) {
 	}
 	if c.fn != nil {
 		typ := reactutil.FunctionComponentType(c.fn, a.ctx.Refs.Resolve)
-		params := c.fn.Parameters()
+		params := utils.ESTreeParameters(c.fn)
 		if len(params) > 0 && params[0].AsParameterDeclaration().Type != nil {
 			typ = params[0].AsParameterDeclaration().Type
 		}
@@ -513,6 +514,7 @@ func (a *analyzer) report(c *component, n, contract *ast.Node, occurrence int, i
 	// share one contract node, so report that contract once while keeping distinct
 	// inline contracts and repeated binding elements independent.
 	key := diagnosticKey{
+		component:  componentKey{binding: c.binding, target: c.target},
 		contract:   contract,
 		id:         id,
 		name:       name,
@@ -553,7 +555,7 @@ func (c *component) check(a *analyzer, opts options) {
 		if c.hasDefaults {
 			a.report(c, c.node, c.defaultSource, 0, "noDefaultPropsWithFunction", "")
 		}
-		params := c.fn.Parameters()
+		params := utils.ESTreeParameters(c.fn)
 		if len(params) == 0 {
 			return
 		}
@@ -673,6 +675,17 @@ var RequireDefaultPropsRule = rule.Rule{
 			fn := (*ast.Node)(nil)
 			if reactutil.IsFunctionLikeForComponent(n) {
 				fn = n
+			} else if n.Kind == ast.KindCallExpression {
+				call := n.AsCallExpression()
+				if call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
+					candidate := reactutil.SkipExpressionWrappers(call.Arguments.Nodes[0])
+					if reactutil.IsFunctionLikeForComponent(candidate) {
+						// IsDetectedComponent has already established that the call is
+						// a configured component wrapper. Retain its function even when
+						// it returns a plain value and is not independently detected.
+						fn = candidate
+					}
+				}
 			}
 			if fn != nil || n.Kind == ast.KindCallExpression {
 				if outer := reactutil.OutermostComponentWrapperCall(n, pragma, wrappers, ctx.TypeChecker, scopes); outer != nil {
