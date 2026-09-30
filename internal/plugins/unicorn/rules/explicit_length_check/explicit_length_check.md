@@ -58,6 +58,22 @@ comparison explicitly.
 
 ## Differences from upstream
 
+Checks on locally declared object literals are left unchanged when their
+properties are written to, their methods are called, or the object is passed
+to a function, aliased, or used through nested properties.
+This applies even when the write appears after the check. Upstream can report
+some of these cases when it determines the value after the write:
+
+```javascript
+const box = { length: -1 };
+box.length = 2;
+if (box.length) {} // Left unchanged by rslint.
+```
+
+Use an explicit comparison such as `box.length > 0` for these custom objects.
+An unmodified object initialized with `{ length: 2 }` is still checked.
+Array, string, and collection checks are unaffected by this restriction.
+
 Automatic fixes preserve grouping and add a semicolon when removing a negation
 could join two statements. For example, `1 + !items.length` becomes
 `1 + (items.length === 0)`, and `Boolean(items.length).valueOf()` becomes

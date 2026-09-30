@@ -3,6 +3,7 @@ package explicit_length_check
 
 import (
 	_ "embed"
+	"math"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
@@ -24,7 +25,8 @@ var ExplicitLengthCheckRule = rule.Rule{
 				nonZeroOperator = ast.KindExclamationEqualsEqualsToken
 			}
 		}
-		values := lengthValues{ctx: ctx}
+		var evaluator *utils.StaticStringEvaluator
+		var unsafeObjects map[*ast.Node]bool
 		return rule.RuleListeners{
 			ast.KindPropertyAccessExpression: func(length *ast.Node) {
 				if !isLengthOrSize(length) || utils.ESTreeRuntimeExpression(length.Expression()).Kind == ast.KindThisKeyword {
@@ -56,7 +58,15 @@ var ExplicitLengthCheckRule = rule.Rule{
 				if compareRight(node, operator, 0) {
 					return
 				}
-				if isGuarded(ctx, node, length) || values.knownNonCollection(length) {
+				if isGuarded(ctx, node, length) {
+					return
+				}
+				if evaluator == nil {
+					evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
+					evaluator.GlobalAccess = ctx.Globals.Access
+					unsafeObjects = make(map[*ast.Node]bool)
+				}
+				if shouldSkipLengthCheck(ctx, evaluator, unsafeObjects, length) {
 					return
 				}
 				property := length.Name().Text()
@@ -95,6 +105,59 @@ var ExplicitLengthCheckRule = rule.Rule{
 			},
 		}
 	},
+}
+
+func shouldSkipLengthCheck(ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, unsafeObjects map[*ast.Node]bool, member *ast.Node) bool {
+	object := utils.SkipAssertionsAndParens(member.Expression())
+	if ast.IsIdentifier(object) {
+		initializer, known := evaluator.ResolveIdentifierInitializer(object)
+		if !known {
+			return false
+		}
+		if utils.SkipAssertionsAndParens(initializer).Kind != ast.KindObjectLiteralExpression || ctx.Refs == nil {
+			value, known := evaluator.EvalValue(member)
+			return known && !isCardinality(value)
+		}
+		if skip, checked := unsafeObjects[initializer]; checked {
+			if skip {
+				return true
+			}
+		} else {
+			// A local object can use these names for non-collection properties.
+			// Only trust its initializer while every reference is a property read.
+			// Check each object once; do not reconstruct values after writes or calls.
+			unsafeObjects[initializer] = true
+			for _, reference := range ctx.Refs.References(ctx.Refs.ResolveInFile(object)) {
+				if !utils.IsReadReference(reference) {
+					continue
+				}
+				access := ast.FindAncestor(reference.Parent, func(parent *ast.Node) bool {
+					return !ast.IsOuterExpression(parent, ast.OEKAll)
+				})
+				if access == nil || !ast.IsAccessExpression(access) || utils.SkipAssertionsAndParens(access.Expression()) != reference {
+					return true
+				}
+				parent := ast.FindAncestor(access.Parent, func(parent *ast.Node) bool {
+					return !ast.IsOuterExpression(parent, ast.OEKAll)
+				})
+				if utils.IsWriteReference(access) || utils.IsCallee(access) || ast.IsTaggedTemplateTag(access, false, true) ||
+					(parent != nil && (parent.Kind == ast.KindDeleteExpression || ast.IsAccessExpression(parent))) {
+					return true
+				}
+			}
+			unsafeObjects[initializer] = false
+		}
+	}
+	value, known := evaluator.EvalValue(member)
+	if !known {
+		return false
+	}
+	return !isCardinality(value)
+}
+
+func isCardinality(value any) bool {
+	number, numeric := value.(jsnum.Number)
+	return numeric && number >= 0 && number <= jsnum.MaxSafeInteger && math.Trunc(float64(number)) == float64(number)
 }
 
 func isLengthOrSize(node *ast.Node) bool {

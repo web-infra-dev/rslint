@@ -1208,6 +1208,102 @@ ruleTester.run('explicit-length-check', {} as never, {
       filename: 'case.js',
       languageOptions: { sourceType: 'module' },
     },
+    // Upstream invalid #4: conservative local-object handling.
+    {
+      code: 'const foo = {length: -1}; foo.length = 123; if (foo.length) {}',
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #5: conservative local-object handling.
+    {
+      code: 'const foo = {length: -1}; Object.assign(foo, {length: 123}); if (foo.length) {}',
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #6: conservative local-object handling.
+    {
+      code: "const foo = {length: -1}; Object.defineProperty(foo, 'length', {value: 123}); if (foo.length) {}",
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #7: conservative local-object handling.
+    {
+      code: 'const foo = {length: -1}; [foo.length] = [123]; if (foo.length) {}',
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #8: conservative local-object handling.
+    {
+      code: 'const foo = {length: -1}; ({length: foo.length} = {length: 123}); if (foo.length) {}',
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #9: conservative local-object handling.
+    {
+      code: 'const foo = {length: -1}; for (foo.length of [123]) {} if (foo.length) {}',
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #49: conservative local-object handling.
+    {
+      code: 'const foo = {length: -1}; if (true) foo.length = 123; if (foo.length) {}',
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #50: conservative local-object handling.
+    {
+      code: 'const foo = {length: -1}; if (false) {} else foo.length = 123; if (foo.length) {}',
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #51: conservative local-object handling.
+    {
+      code: 'const foo = {length: -1}; true ? foo.length = 123 : 0; if (foo.length) {}',
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #52: conservative local-object handling.
+    {
+      code: 'const foo = {length: -1}; false ? 0 : foo.length = 123; if (foo.length) {}',
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #53: conservative local-object handling.
+    {
+      code: "const foo = {length: -1}; Object.assign(foo, {length: 'x', length: 123}); if (foo.length) {}",
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #54: conservative local-object handling.
+    {
+      code: "const foo = {length: -1}; Object.defineProperty(foo, 'length', {value: 'x', value: 123}); if (foo.length) {}",
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #55: conservative local-object handling.
+    {
+      code: "const foo = {length: -1}; Object.defineProperties(foo, {length: {value: 'x'}, length: {value: 123}}); if (foo.length) {}",
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #56: conservative local-object handling.
+    {
+      code: "const foo = {length: -1}; ({length: foo.length} = {length: 'x', length: 123}); if (foo.length) {}",
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #57: conservative local-object handling.
+    {
+      code: 'const foo = {length: 123}; Object.assign(foo); if (foo.length) {}',
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
+    // Upstream invalid #58: conservative local-object handling.
+    {
+      code: 'const foo = {length: -1}; switch (value) { default: foo.length = 123; } if (foo.length) {}',
+      filename: 'case.js',
+      languageOptions: { sourceType: 'module' },
+    },
   ],
   invalid: [
     // Snapshots invalid #1
@@ -1484,126 +1580,6 @@ ruleTester.run('explicit-length-check', {} as never, {
         },
       ],
       output: 'const foo = { length: 123 }; if (foo.length !== 0) {}',
-    },
-    // Snapshots invalid #4
-    {
-      code: 'const foo = {length: -1}; foo.length = 123; if (foo.length) {}',
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 49,
-          endLine: 1,
-          endColumn: 59,
-          suggestions: [],
-        },
-      ],
-      output:
-        'const foo = {length: -1}; foo.length = 123; if (foo.length > 0) {}',
-    },
-    // Snapshots invalid #5
-    {
-      code: 'const foo = {length: -1}; Object.assign(foo, {length: 123}); if (foo.length) {}',
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 66,
-          endLine: 1,
-          endColumn: 76,
-          suggestions: [],
-        },
-      ],
-      output:
-        'const foo = {length: -1}; Object.assign(foo, {length: 123}); if (foo.length > 0) {}',
-    },
-    // Snapshots invalid #6
-    {
-      code: "const foo = {length: -1}; Object.defineProperty(foo, 'length', {value: 123}); if (foo.length) {}",
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 83,
-          endLine: 1,
-          endColumn: 93,
-          suggestions: [],
-        },
-      ],
-      output:
-        "const foo = {length: -1}; Object.defineProperty(foo, 'length', {value: 123}); if (foo.length > 0) {}",
-    },
-    // Snapshots invalid #7
-    {
-      code: 'const foo = {length: -1}; [foo.length] = [123]; if (foo.length) {}',
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 53,
-          endLine: 1,
-          endColumn: 63,
-          suggestions: [],
-        },
-      ],
-      output:
-        'const foo = {length: -1}; [foo.length] = [123]; if (foo.length > 0) {}',
-    },
-    // Snapshots invalid #8
-    {
-      code: 'const foo = {length: -1}; ({length: foo.length} = {length: 123}); if (foo.length) {}',
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 71,
-          endLine: 1,
-          endColumn: 81,
-          suggestions: [],
-        },
-      ],
-      output:
-        'const foo = {length: -1}; ({length: foo.length} = {length: 123}); if (foo.length > 0) {}',
-    },
-    // Snapshots invalid #9
-    {
-      code: 'const foo = {length: -1}; for (foo.length of [123]) {} if (foo.length) {}',
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 60,
-          endLine: 1,
-          endColumn: 70,
-          suggestions: [],
-        },
-      ],
-      output:
-        'const foo = {length: -1}; for (foo.length of [123]) {} if (foo.length > 0) {}',
     },
     // Snapshots invalid #10
     {
@@ -2354,206 +2330,6 @@ ruleTester.run('explicit-length-check', {} as never, {
         },
       ],
       output: 'for(const a in foo.length === 0);',
-    },
-    // Snapshots invalid #49
-    {
-      code: 'const foo = {length: -1}; if (true) foo.length = 123; if (foo.length) {}',
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 59,
-          endLine: 1,
-          endColumn: 69,
-          suggestions: [],
-        },
-      ],
-      output:
-        'const foo = {length: -1}; if (true) foo.length = 123; if (foo.length > 0) {}',
-    },
-    // Snapshots invalid #50
-    {
-      code: 'const foo = {length: -1}; if (false) {} else foo.length = 123; if (foo.length) {}',
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 68,
-          endLine: 1,
-          endColumn: 78,
-          suggestions: [],
-        },
-      ],
-      output:
-        'const foo = {length: -1}; if (false) {} else foo.length = 123; if (foo.length > 0) {}',
-    },
-    // Snapshots invalid #51
-    {
-      code: 'const foo = {length: -1}; true ? foo.length = 123 : 0; if (foo.length) {}',
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 60,
-          endLine: 1,
-          endColumn: 70,
-          suggestions: [],
-        },
-      ],
-      output:
-        'const foo = {length: -1}; true ? foo.length = 123 : 0; if (foo.length > 0) {}',
-    },
-    // Snapshots invalid #52
-    {
-      code: 'const foo = {length: -1}; false ? 0 : foo.length = 123; if (foo.length) {}',
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 61,
-          endLine: 1,
-          endColumn: 71,
-          suggestions: [],
-        },
-      ],
-      output:
-        'const foo = {length: -1}; false ? 0 : foo.length = 123; if (foo.length > 0) {}',
-    },
-    // Snapshots invalid #53
-    {
-      code: "const foo = {length: -1}; Object.assign(foo, {length: 'x', length: 123}); if (foo.length) {}",
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 79,
-          endLine: 1,
-          endColumn: 89,
-          suggestions: [],
-        },
-      ],
-      output:
-        "const foo = {length: -1}; Object.assign(foo, {length: 'x', length: 123}); if (foo.length > 0) {}",
-    },
-    // Snapshots invalid #54
-    {
-      code: "const foo = {length: -1}; Object.defineProperty(foo, 'length', {value: 'x', value: 123}); if (foo.length) {}",
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 95,
-          endLine: 1,
-          endColumn: 105,
-          suggestions: [],
-        },
-      ],
-      output:
-        "const foo = {length: -1}; Object.defineProperty(foo, 'length', {value: 'x', value: 123}); if (foo.length > 0) {}",
-    },
-    // Snapshots invalid #55
-    {
-      code: "const foo = {length: -1}; Object.defineProperties(foo, {length: {value: 'x'}, length: {value: 123}}); if (foo.length) {}",
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 107,
-          endLine: 1,
-          endColumn: 117,
-          suggestions: [],
-        },
-      ],
-      output:
-        "const foo = {length: -1}; Object.defineProperties(foo, {length: {value: 'x'}, length: {value: 123}}); if (foo.length > 0) {}",
-    },
-    // Snapshots invalid #56
-    {
-      code: "const foo = {length: -1}; ({length: foo.length} = {length: 'x', length: 123}); if (foo.length) {}",
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 84,
-          endLine: 1,
-          endColumn: 94,
-          suggestions: [],
-        },
-      ],
-      output:
-        "const foo = {length: -1}; ({length: foo.length} = {length: 'x', length: 123}); if (foo.length > 0) {}",
-    },
-    // Snapshots invalid #57
-    {
-      code: 'const foo = {length: 123}; Object.assign(foo); if (foo.length) {}',
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 52,
-          endLine: 1,
-          endColumn: 62,
-          suggestions: [],
-        },
-      ],
-      output:
-        'const foo = {length: 123}; Object.assign(foo); if (foo.length > 0) {}',
-    },
-    // Snapshots invalid #58
-    {
-      code: 'const foo = {length: -1}; switch (value) { default: foo.length = 123; } if (foo.length) {}',
-      options: [],
-      filename: 'case.js',
-      languageOptions: { sourceType: 'module' },
-      errors: [
-        {
-          messageId: 'non-zero',
-          message: 'Use `.length > 0` when checking length is not zero.',
-          line: 1,
-          column: 77,
-          endLine: 1,
-          endColumn: 87,
-          suggestions: [],
-        },
-      ],
-      output:
-        'const foo = {length: -1}; switch (value) { default: foo.length = 123; } if (foo.length > 0) {}',
     },
   ],
 });
