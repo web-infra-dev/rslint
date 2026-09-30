@@ -7,6 +7,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -27,14 +28,24 @@ var PreferUnicodeCodePointEscapesRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		checkString := func(node *ast.Node) {
-			isTemplate := node.Kind != ast.KindStringLiteral
-			if isTemplate && utils.IsTaggedTemplateElement(node) {
-				return
+			isTemplate := ast.IsTemplateLiteralKind(node.Kind)
+			if isTemplate {
+				template := ast.FindAncestor(node, func(parent *ast.Node) bool {
+					return parent.Kind == ast.KindNoSubstitutionTemplateLiteral || parent.Kind == ast.KindTemplateExpression || parent.Kind == ast.KindTemplateLiteralType
+				})
+				if template != nil && template.Parent != nil && ast.IsTaggedTemplateExpression(template.Parent) && template.Parent.AsTaggedTemplateExpression().Template == template {
+					return
+				}
 			}
 			var raw string
-			if isTemplate {
-				raw, _ = utils.TemplateElementRaw(ctx.SourceFile, node)
-			} else {
+			switch node.Kind {
+			case ast.KindTemplateHead, ast.KindTemplateMiddle, ast.KindTemplateTail:
+				raw = node.RawText()
+			case ast.KindNoSubstitutionTemplateLiteral:
+				// Unlike template heads and spans, these nodes do not store RawText.
+				raw = utils.TrimmedNodeText(ctx.SourceFile, node)
+				raw = raw[1 : len(raw)-1]
+			default:
 				raw = utils.TrimmedNodeText(ctx.SourceFile, node)
 			}
 			if !strings.ContainsRune(raw, '\\') || !scanEscapes(raw, false, false, nil) {
@@ -48,7 +59,11 @@ var PreferUnicodeCodePointEscapesRule = rule.Rule{
 					if ast.IsSourceFileJS(ctx.SourceFile) {
 						fixed = strings.ReplaceAll(strings.ReplaceAll(fixed, "\r\n", "\n"), "\r", "\n")
 					}
-					_, contentRange := utils.TemplateElementRaw(ctx.SourceFile, node)
+					end := node.End() - 1
+					if node.Kind == ast.KindTemplateHead || node.Kind == ast.KindTemplateMiddle {
+						end-- // Heads and middles end with ${.
+					}
+					contentRange := core.NewTextRange(end-len(raw), end)
 					return []rule.RuleFix{rule.RuleFixReplaceRange(contentRange, fixed)}
 				}
 				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, fixed)}

@@ -34,6 +34,8 @@ func TestPreferUnicodeCodePointEscapesExtras(t *testing.T) {
 			{Code: "const p = /(a)\\1\\0/;", Tsx: true},
 		},
 		[]rule_tester.InvalidTestCase{
+			// A tagged template's type argument is not its tagged content.
+			{Code: "const t = tag<`\\x61${string}\\x62`>`\\x63`;", FileName: "test.ts", Output: []string{"const t = tag<`\\u{61}${string}\\u{62}`>`\\x63`;"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-unicode-code-point-escapes", Message: "Prefer Unicode code point escapes.", Line: 1, Column: 15, EndLine: 1, EndColumn: 22}, {MessageId: "prefer-unicode-code-point-escapes", Message: "Prefer Unicode code point escapes.", Line: 1, Column: 28, EndLine: 1, EndColumn: 34}}},
 			// Espree normalizes raw template line endings in JavaScript.
 			{Code: "const t = `a\r\n\\x61\r\\u0062`;", FileName: "test.js", Output: []string{"const t = `a\n\\u{61}\n\\u{62}`;"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-unicode-code-point-escapes", Message: "Prefer Unicode code point escapes.", Line: 1, Column: 11, EndLine: 3, EndColumn: 8}}},
 			// surrogates and following escapes

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -20,11 +21,11 @@ var ConsistentTemplateLiteralEscapeRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		check := func(node *ast.Node) {
-			if utils.IsTaggedTemplateElement(node) {
+			if isInsideTaggedTemplate(node) {
 				return
 			}
 
-			raw, contentRange := utils.TemplateElementRaw(ctx.SourceFile, node)
+			raw, contentRange := templateElementRaw(ctx.SourceFile, node)
 			fixed, changed := normalizeTemplateEscape(raw)
 			if !changed {
 				return
@@ -42,6 +43,19 @@ var ConsistentTemplateLiteralEscapeRule = rule.Rule{
 			ast.KindTemplateTail:                  check,
 		}
 	},
+}
+
+func templateElementRaw(sourceFile *ast.SourceFile, node *ast.Node) (string, core.TextRange) {
+	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
+	endOffset := 1
+	if node.Kind == ast.KindTemplateHead || node.Kind == ast.KindTemplateMiddle {
+		endOffset = 2
+	}
+
+	start := nodeRange.Pos() + 1
+	end := nodeRange.End() - endOffset
+	contentRange := core.NewTextRange(start, end)
+	return sourceFile.Text()[start:end], contentRange
 }
 
 func normalizeTemplateEscape(raw string) (string, bool) {
@@ -69,4 +83,19 @@ func normalizeTemplateEscape(raw string) (string, bool) {
 	}
 
 	return string(output), true
+}
+
+func isInsideTaggedTemplate(node *ast.Node) bool {
+	if node.Kind == ast.KindNoSubstitutionTemplateLiteral {
+		return node.Parent != nil && node.Parent.Kind == ast.KindTaggedTemplateExpression
+	}
+	if node.Kind == ast.KindTemplateHead {
+		return node.Parent != nil &&
+			node.Parent.Parent != nil &&
+			node.Parent.Parent.Kind == ast.KindTaggedTemplateExpression
+	}
+	return node.Parent != nil &&
+		node.Parent.Parent != nil &&
+		node.Parent.Parent.Parent != nil &&
+		node.Parent.Parent.Parent.Kind == ast.KindTaggedTemplateExpression
 }
