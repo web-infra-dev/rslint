@@ -768,21 +768,6 @@ florp
 nocomment
 
 Guestlist
-agola
-alpic
-appcircle
-bitrise
-codefresh
-codemagic
-codeship
-dsari
-gitea
-ghprb
-layerci
-nevercode
-sailci
-sourcehut
-vercel
 lubien
 popura
 cerebro

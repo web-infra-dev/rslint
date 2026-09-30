@@ -45,7 +45,7 @@ conditions on the same line are reported regardless of `checkDates`.
 | `terms` | `["todo", "fixme", "xxx"]` | Comment terms to check; replaces the defaults. |
 | `ignore` | `[]` | Regular expression strings that exclude matching comment lines. |
 | `checkDates` | `false` | Enable expiration-date checks. |
-| `checkDatesOnPullRequests` | `false` | Also check dates on recognized CI pull requests. Requires `checkDates`. |
+| `checkDatesOnPullRequests` | `false` | Accepted for compatibility; use `checkDates` to control date checks. |
 | `allowWarningComments` | `true` | Allow warning comments without recognized conditions. |
 | `date` | Today in UTC | Reference date in `YYYY-MM-DD` format. |
 
@@ -71,10 +71,11 @@ one of its parents. Comparisons use the package.json nearest the linted file.
 
 ## Differences from upstream
 
-- This rule checks JavaScript, JSX, TypeScript, and TSX files. It does not check
-  TODO comments in CSS, HTML, JSONC/JSON5, Markdown, YAML, or TOML files.
+- `checkDatesOnPullRequests` does not change date checking. For example, with
+  `checkDates: true` and `checkDatesOnPullRequests: false`, expired dates still
+  report. Set `checkDates: false` to disable these diagnostics.
 - Write `ignore` entries as pattern strings. JavaScript `RegExp` objects do not
-  preserve their pattern or flags. For example, replace `/issue-\d+/i` with
+  work as ignore patterns. For example, replace `/issue-\d+/i` with
   `'[iI][sS][sS][uU][eE]-\\d+'` to ignore both `ISSUE-123` and `issue-123`.
 - Invalid or unsupported ignore patterns are ignored. For example,
   `'\\p{Script=Han}+'` does not suppress an expired comment containing `中`,

@@ -47,7 +47,6 @@ var ExpiringTodoCommentsRule = rule.Rule{
 				patterns = append(patterns, warningcomments.Pattern(term, "anywhere", ""))
 			}
 		}
-		checkDates := opts.checkDates && (opts.checkDatesOnPullRequests || !isPullRequest())
 		for _, comment := range comments {
 			value := utils.CommentValue(ctx.SourceFile.Text(), comment)
 			trimmed := ecmascript.StringTrim(value)
@@ -77,7 +76,7 @@ var ExpiringTodoCommentsRule = rule.Rule{
 				report := func(id, message string) {
 					ctx.ReportRange(core.NewTextRange(comment.Pos(), comment.End()), rule.RuleMessage{Id: id, Description: message})
 				}
-				if processComment(line, opts, checkDates, hasPackage, pkg, report) || opts.allowWarningComments {
+				if processComment(line, opts, hasPackage, pkg, report) || opts.allowWarningComments {
 					continue
 				}
 				if utils.IsDirectiveComment(comment.Kind, ecmascript.StringTrim(line)) && selfConfig.Test(line) {
@@ -103,10 +102,10 @@ var ExpiringTodoCommentsRule = rule.Rule{
 }
 
 type ruleOptions struct {
-	terms                                                      []string
-	ignore                                                     []*esregexp.RegExp
-	date                                                       string
-	checkDates, checkDatesOnPullRequests, allowWarningComments bool
+	terms                            []string
+	ignore                           []*esregexp.RegExp
+	date                             string
+	checkDates, allowWarningComments bool
 }
 
 func parseOptions(options []any) ruleOptions {
@@ -130,7 +129,6 @@ func parseOptions(options []any) ruleOptions {
 		opts.allowWarningComments = value
 	}
 	opts.checkDates, _ = object["checkDates"].(bool)
-	opts.checkDatesOnPullRequests, _ = object["checkDatesOnPullRequests"].(bool)
 	patterns, _ := object["ignore"].([]any)
 	for _, value := range patterns {
 		pattern := ecmascript.JSONValueToString(value)
@@ -197,7 +195,7 @@ func parseArgument(text string, hasPackage bool) argument {
 	return argument{kind: "unknowns", name: text}
 }
 
-func processComment(text string, opts ruleOptions, checkDates, hasPackage bool, pkg *packagejson.Package, report func(string, string)) bool {
+func processComment(text string, opts ruleOptions, hasPackage bool, pkg *packagejson.Package, report func(string, string)) bool {
 	if !strings.Contains(text, "[") {
 		return false
 	}
@@ -237,7 +235,7 @@ func processComment(text string, opts ruleOptions, checkDates, hasPackage bool, 
 			values[i] = date.version
 		}
 		emit("avoidMultipleDates", "Avoid using multiple expiration dates: "+strings.Join(values, ", "))
-	} else if len(dates) == 1 && checkDates && reachedDate(dates[0].version, opts.date) {
+	} else if len(dates) == 1 && opts.checkDates && reachedDate(dates[0].version, opts.date) {
 		emit("expiredTodo", "Past due date: "+dates[0].version)
 	}
 	if versions := groups["packageVersions"]; len(versions) > 1 {

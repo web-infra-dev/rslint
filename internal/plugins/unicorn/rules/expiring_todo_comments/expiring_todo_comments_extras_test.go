@@ -2,7 +2,6 @@
 package expiring_todo_comments
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -620,63 +619,51 @@ func TestExpiringTodoCommentsUnsupportedIgnorePattern(t *testing.T) {
 	)
 }
 
-func TestExpiringTodoCommentsPullRequests(t *testing.T) {
-	// Isolate all ci-info detection variables from the host and preserve them.
-	for _, key := range []string{"AC_APPCIRCLE", "AC_GIT_PR", "AGOLA_GIT_REF", "AGOLA_PULL_REQUEST_ID", "ALPIC_HOST", "APPCENTER_BUILD_ID", "APPVEYOR", "APPVEYOR_PULL_REQUEST_NUMBER", "BITBUCKET_COMMIT", "BITBUCKET_PR_ID", "BITRISE_IO", "BITRISE_PULL_REQUEST", "BUDDY_EXECUTION_PULL_REQUEST_ID", "BUDDY_WORKSPACE_ID", "BUILDER_OUTPUT", "BUILDKITE", "BUILDKITE_PULL_REQUEST", "BUILD_ID", "BUILD_REASON", "CF_BUILD_ID", "CF_PAGES", "CF_PULL_REQUEST_ID", "CF_PULL_REQUEST_NUMBER", "CHANGE_ID", "CI", "CIRCLECI", "CIRCLE_PULL_REQUEST", "CIRRUS_CI", "CIRRUS_PR", "CI_BUILD_EVENT", "CI_MERGE_REQUEST_ID", "CI_NAME", "CI_PULL_REQUEST_NUMBER", "CI_XCODE_PROJECT", "CM_BUILD_ID", "CM_PULL_REQUEST", "CODEBUILD_BUILD_ARN", "CODEBUILD_WEBHOOK_EVENT", "DRONE", "DRONE_BUILD_EVENT", "DSARI", "EARTHLY_CI", "EAS_BUILD", "GERRIT_PROJECT", "GITEA_ACTIONS", "GITHUB_ACTIONS", "GITHUB_EVENT_NAME", "GITLAB_CI", "GO_PIPELINE_LABEL", "HARNESS_BUILD_ID", "HUDSON_URL", "IS_PULL_REQUEST", "JENKINS_URL", "LAYERCI", "LAYERCI_PULL_REQUEST", "MAGNUM", "NETLIFY", "NEVERCODE", "NEVERCODE_PULL_REQUEST", "NODE", "NOW_BUILDER", "PROW_JOB_ID", "PULL_REQUEST", "PULL_REQUEST_NUMBER", "RELEASE_BUILD_ID", "RENDER", "RUN_ID", "SAILCI", "SAIL_PULL_REQUEST_NUMBER", "SCREWDRIVER", "SD_PULL_REQUEST", "SEMAPHORE", "STRIDER", "TASK_ID", "TEAMCITY_VERSION", "TF_BUILD", "TRAVIS", "TRAVIS_PULL_REQUEST", "VELA", "VELA_PULL_REQUEST", "VERCEL", "VERCEL_GIT_PULL_REQUEST_ID", "WORKERS_CI", "XCS", "bamboo_planKey", "ghprbPullId"} {
-		t.Setenv(key, "")
-		if err := os.Unsetenv(key); err != nil {
-			t.Fatal(err)
-		}
+func TestExpiringTodoCommentsDateOptions(t *testing.T) {
+	// Date checks depend on the rule options even in a pull-request job.
+	t.Setenv("CI", "true")
+	t.Setenv("GITHUB_ACTIONS", "true")
+	t.Setenv("GITHUB_EVENT_NAME", "pull_request")
+	root := fixtures.GetRootDir()
+	helper := rule_tester.NewProgramHelper(root)
+	const code = "// TODO [2000-01-01]: remove fallback"
+	raw, source, err := helper.CreateTestProgram(code, "input.ts", "tsconfig.json")
+	if err != nil {
+		t.Fatal(err)
 	}
+	ctx := (rule.RuleContext{SourceFile: source, Comments: rule.NewCommentStore(source)}).
+		WithProgram(program.NewFromCompiler(raw)).
+		WithFileCache(rule.NewFileCacheWithProcessCurrentDirectory(root.Dir))
 	for _, tc := range []struct {
-		name string
-		env  map[string]string
-		want bool
+		name                string
+		checkDates          bool
+		checkOnPullRequests any
+		want                int
 	}{
-		{"no CI", map[string]string{}, false},
-		{"orphan PR number", map[string]string{"CIRCLE_PULL_REQUEST": "42"}, false},
-		{"CI disabled", map[string]string{"CI": "false", "GITHUB_ACTIONS": "1", "GITHUB_EVENT_NAME": "pull_request"}, false},
-		{"GitHub push", map[string]string{"GITHUB_ACTIONS": "1", "GITHUB_EVENT_NAME": "push"}, false},
-		{"GitHub target event", map[string]string{"GITHUB_ACTIONS": "1", "GITHUB_EVENT_NAME": "pull_request_target"}, false},
-		{"Jenkins needs both markers", map[string]string{"JENKINS_URL": "1", "CHANGE_ID": "1"}, false},
-		{"Buildkite false", map[string]string{"BUILDKITE": "1", "BUILDKITE_PULL_REQUEST": "false"}, false},
-		{"later vendor wins", map[string]string{"GITHUB_ACTIONS": "1", "GITHUB_EVENT_NAME": "pull_request", "XCS": "1"}, false},
-		{"Agola CI", map[string]string{"AGOLA_GIT_REF": "1", "AGOLA_PULL_REQUEST_ID": "1"}, true},
-		{"Appcircle", map[string]string{"AC_APPCIRCLE": "1", "AC_GIT_PR": "1"}, true},
-		{"AppVeyor", map[string]string{"APPVEYOR": "1", "APPVEYOR_PULL_REQUEST_NUMBER": "1"}, true},
-		{"AWS CodeBuild", map[string]string{"CODEBUILD_BUILD_ARN": "1", "CODEBUILD_WEBHOOK_EVENT": "PULL_REQUEST_CREATED"}, true},
-		{"Azure Pipelines", map[string]string{"TF_BUILD": "1", "BUILD_REASON": "PullRequest"}, true},
-		{"Bitbucket Pipelines", map[string]string{"BITBUCKET_COMMIT": "1", "BITBUCKET_PR_ID": "1"}, true},
-		{"Bitrise", map[string]string{"BITRISE_IO": "1", "BITRISE_PULL_REQUEST": "1"}, true},
-		{"Buddy", map[string]string{"BUDDY_WORKSPACE_ID": "1", "BUDDY_EXECUTION_PULL_REQUEST_ID": "1"}, true},
-		{"Buildkite", map[string]string{"BUILDKITE": "1", "BUILDKITE_PULL_REQUEST": "1"}, true},
-		{"CircleCI", map[string]string{"CIRCLECI": "1", "CIRCLE_PULL_REQUEST": "1"}, true},
-		{"Cirrus CI", map[string]string{"CIRRUS_CI": "1", "CIRRUS_PR": "1"}, true},
-		{"Codefresh", map[string]string{"CF_BUILD_ID": "1", "CF_PULL_REQUEST_NUMBER": "1"}, true},
-		{"Codemagic", map[string]string{"CM_BUILD_ID": "1", "CM_PULL_REQUEST": "1"}, true},
-		{"Drone", map[string]string{"DRONE": "1", "DRONE_BUILD_EVENT": "pull_request"}, true},
-		{"GitHub Actions", map[string]string{"GITHUB_ACTIONS": "1", "GITHUB_EVENT_NAME": "pull_request"}, true},
-		{"GitLab CI", map[string]string{"GITLAB_CI": "1", "CI_MERGE_REQUEST_ID": "1"}, true},
-		{"Jenkins", map[string]string{"JENKINS_URL": "1", "BUILD_ID": "1", "ghprbPullId": "1"}, true},
-		{"LayerCI", map[string]string{"LAYERCI": "1", "LAYERCI_PULL_REQUEST": "1"}, true},
-		{"Netlify CI", map[string]string{"NETLIFY": "1", "PULL_REQUEST": "1"}, true},
-		{"Nevercode", map[string]string{"NEVERCODE": "1", "NEVERCODE_PULL_REQUEST": "1"}, true},
-		{"Render", map[string]string{"RENDER": "1", "IS_PULL_REQUEST": "true"}, true},
-		{"Sail CI", map[string]string{"SAILCI": "1", "SAIL_PULL_REQUEST_NUMBER": "1"}, true},
-		{"Screwdriver", map[string]string{"SCREWDRIVER": "1", "SD_PULL_REQUEST": "1"}, true},
-		{"Semaphore", map[string]string{"SEMAPHORE": "1", "PULL_REQUEST_NUMBER": "1"}, true},
-		{"Travis CI", map[string]string{"TRAVIS": "1", "TRAVIS_PULL_REQUEST": "1"}, true},
-		{"Vela", map[string]string{"VELA": "1", "VELA_PULL_REQUEST": "1"}, true},
-		{"Vercel", map[string]string{"NOW_BUILDER": "1", "VERCEL_GIT_PULL_REQUEST_ID": "1"}, true},
-		{"Woodpecker", map[string]string{"CI": "woodpecker", "CI_BUILD_EVENT": "pull_request"}, true},
-		{"Xcode Cloud", map[string]string{"CI_XCODE_PROJECT": "1", "CI_PULL_REQUEST_NUMBER": "1"}, true},
+		{"disabled", false, nil, 0},
+		{"enabled", true, nil, 1},
+		{"compatibility false", true, false, 1},
+		{"compatibility true", true, true, 1},
+		{"compatibility cannot enable dates", false, true, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			for key, value := range tc.env {
-				t.Setenv(key, value)
+			options := map[string]any{"date": "2026-09-30", "checkDates": tc.checkDates}
+			if tc.checkOnPullRequests != nil {
+				options["checkDatesOnPullRequests"] = tc.checkOnPullRequests
 			}
-			if got := isPullRequest(); got != tc.want {
-				t.Fatalf("isPullRequest() = %v; want %v", got, tc.want)
+			var diagnostics []rule.RuleDiagnostic
+			ruleCtx := ctx.WithReporter(ExpiringTodoCommentsRule.Name, rule.SeverityError, func(d rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, d)
+			})
+			ExpiringTodoCommentsRule.Run(ruleCtx, rule_tester.ResolveTestCaseOptions(t, &ExpiringTodoCommentsRule, options))
+			if len(diagnostics) != tc.want {
+				t.Fatalf("got %d diagnostics, want %d", len(diagnostics), tc.want)
+			}
+			if tc.want > 0 {
+				d := diagnostics[0]
+				if d.Message.Id != "unicorn/expiredTodo" || d.Message.Description != "Past due date: 2000-01-01. remove fallback" || d.Range.Pos() != 0 || d.Range.End() != len(code) {
+					t.Fatalf("unexpected diagnostic: %#v", d)
+				}
 			}
 		})
 	}
