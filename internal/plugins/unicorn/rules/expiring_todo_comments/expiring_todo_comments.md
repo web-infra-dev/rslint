@@ -45,7 +45,7 @@ conditions on the same line are reported regardless of `checkDates`.
 | `terms` | `["todo", "fixme", "xxx"]` | Comment terms to check; replaces the defaults. |
 | `ignore` | `[]` | Regular expression strings that exclude matching comment lines. |
 | `checkDates` | `false` | Enable expiration-date checks. |
-| `checkDatesOnPullRequests` | `false` | Accepted for compatibility; use `checkDates` to control date checks. |
+| `checkDatesOnPullRequests` | — | **Unsupported.** Accepted only for configuration compatibility; its value is ignored. Use `checkDates` to control date checks. |
 | `allowWarningComments` | `true` | Allow warning comments without recognized conditions. |
 | `date` | Today in UTC | Reference date in `YYYY-MM-DD` format. |
 
@@ -71,7 +71,8 @@ one of its parents. Comparisons use the package.json nearest the linted file.
 
 ## Differences from upstream
 
-- `checkDatesOnPullRequests` does not change date checking. For example, with
+- `checkDatesOnPullRequests` is unsupported. Its value is accepted for
+  configuration compatibility but ignored. For example, with
   `checkDates: true` and `checkDatesOnPullRequests: false`, expired dates still
   report. Set `checkDates: false` to disable these diagnostics.
 - Write `ignore` entries as pattern strings. JavaScript `RegExp` objects do not
@@ -81,8 +82,6 @@ one of its parents. Comparisons use the package.json nearest the linted file.
   `'\\p{Script=Han}+'` does not suppress an expired comment containing `中`,
   while upstream suppresses it. Use a supported expression such as `'[\\u4E00-\\u9FFF]+'`
   for that character range.
-- If an `ignore` pattern takes too long to match a comment, that comment is
-  skipped. Upstream keeps trying to match the pattern.
 
 ## Original documentation
 

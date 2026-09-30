@@ -11,7 +11,7 @@
         },
         "checkDatesOnPullRequests": {
           "type": "boolean",
-          "description": "Accepted for compatibility. Use checkDates to control expiration-date checks."
+          "description": "Unsupported. Accepted only for configuration compatibility; its value is ignored. Use checkDates to control expiration-date checks."
         },
         "allowWarningComments": {
           "type": "boolean",
