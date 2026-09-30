@@ -82,6 +82,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_stateless_function"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/react_in_jsx_scope"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_default_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_optimization"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
@@ -184,6 +185,7 @@ func GetAllRules() []rule.Rule {
 		prefer_es6_class.PreferEs6ClassRule,
 		prefer_exact_props.PreferExactPropsRule,
 		prefer_read_only_props.PreferReadOnlyPropsRule,
+		require_default_props.RequireDefaultPropsRule,
 		prefer_stateless_function.PreferStatelessFunctionRule,
 		prop_types.PropTypesRule,
 		react_in_jsx_scope.ReactInJsxScopeRule,

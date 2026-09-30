@@ -251,6 +251,7 @@ define.test({
     './tests/eslint-plugin-import/rules/unambiguous.test.ts',
 
     // eslint-plugin-react
+    './tests/eslint-plugin-react/rules/require-default-props.test.ts',
     './tests/eslint-plugin-react/rules/destructuring-assignment.test.ts',
     './tests/eslint-plugin-react/rules/async-server-action.test.ts',
     './tests/eslint-plugin-react/rules/boolean-prop-naming.test.ts',
