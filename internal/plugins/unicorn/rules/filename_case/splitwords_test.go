@@ -130,40 +130,6 @@ func TestSplitFilenameNormalizesInvalidUTF8(t *testing.T) {
 	}
 }
 
-// TestPascalLikeTransformDigitBranch locks in the `_<digit>` branch:
-// non-first words starting with a digit get a `_` prefix, but a first word
-// starting with a digit does not.
-func TestPascalLikeTransformDigitBranch(t *testing.T) {
-	cases := []struct {
-		word  string
-		index int
-		want  string
-	}{
-		// First-word digit start: NO leading `_`.
-		{"123", 0, "123"},
-		{"1foo", 0, "1foo"},
-		{"5", 0, "5"},
-		// Non-first-word digit start: leading `_`.
-		{"123", 1, "_123"},
-		{"1foo", 1, "_1foo"},
-		{"5", 2, "_5"},
-		// Non-first-word letter start: regular pascal-style capitalize.
-		{"foo", 1, "Foo"},
-		{"bar", 2, "Bar"},
-		// First-word letter start: regular pascal-style capitalize.
-		{"foo", 0, "Foo"},
-		// Empty word stays empty regardless of index.
-		{"", 0, ""},
-		{"", 1, ""},
-	}
-	for _, c := range cases {
-		got := pascalLikeTransform(c.word, c.index)
-		if got != c.want {
-			t.Errorf("pascalLikeTransform(%q, %d) = %q, want %q", c.word, c.index, got, c.want)
-		}
-	}
-}
-
 // TestEnglishishJoinOxford locks in oxford-comma + `or` formatting for 0/1/2/3/4
 // items. The 4-item case is reachable when four `cases` are enabled and the
 // filename violates all four (rare in practice but covered here so

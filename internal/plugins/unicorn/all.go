@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/explicit_timer_delay"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_anonymous_default_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_concat_in_loop"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_fill_with_reference_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_from_fill"
@@ -86,6 +87,7 @@ func GetAllRules() []rule.Rule {
 		explicit_timer_delay.ExplicitTimerDelayRule,
 		filename_case.FilenameCaseRule,
 		new_for_builtins.NewForBuiltinsRule,
+		no_anonymous_default_export.NoAnonymousDefaultExportRule,
 		no_array_concat_in_loop.NoArrayConcatInLoopRule,
 		no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule,
 		no_array_from_fill.NoArrayFromFillRule,
