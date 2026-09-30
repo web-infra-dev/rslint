@@ -299,8 +299,8 @@ jobs:
       - name: Build napi parser (native)
         run: pnpm --filter @rslint/native run build
 
-      - name: Test Windows shared memory mapping
-        run: cargo test -p rslint-native --release memory_transport
+      - name: Test native Rust crate on Windows
+        run: cargo test -p rslint-native --release
 
       - name: Build rslint.exe
         shell: pwsh
