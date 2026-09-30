@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/explicit_timer_delay"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_accidental_bitwise_operator"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_anonymous_default_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_concat_in_loop"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_fill_with_reference_type"
@@ -90,6 +91,7 @@ func GetAllRules() []rule.Rule {
 		expiring_todo_comments.ExpiringTodoCommentsRule,
 		filename_case.FilenameCaseRule,
 		new_for_builtins.NewForBuiltinsRule,
+		no_accidental_bitwise_operator.NoAccidentalBitwiseOperatorRule,
 		no_anonymous_default_export.NoAnonymousDefaultExportRule,
 		no_array_concat_in_loop.NoArrayConcatInLoopRule,
 		no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule,
