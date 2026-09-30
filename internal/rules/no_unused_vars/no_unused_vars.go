@@ -2220,14 +2220,15 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 // used. This legacy script-only directive is intentionally outside the initial
 // port scope.
 func newRule() rule.Rule {
-	return rule.Rule{
+	return rule.WithPreparation(rule.Rule{
 		Name:   "no-unused-vars",
 		Schema: rule.NewSchema(schemaJSON),
-		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	}, func(options []any) rule.FileRunner {
+		parsedOptions := parseOptions(options)
+		return func(ctx rule.RuleContext) rule.RuleListeners {
 			if ctx.SourceFile == nil {
 				return rule.RuleListeners{}
 			}
-			parsedOptions := parseOptions(options)
 			opts := &parsedOptions
 			reporter := &diagnosticReporter{ctx: ctx}
 			inlineGlobals := ctx.Globals.InlineDeclarations()
@@ -2609,8 +2610,8 @@ func newRule() rule.Rule {
 			}
 
 			return listeners
-		},
-	}
+		}
+	})
 }
 
 // NoUnusedVarsRule implements ESLint core's no-unused-vars rule.

@@ -34,15 +34,16 @@ import (
 //go:embed no_restricted_imports.schema.json
 var schemaJSON []byte
 
-var NoRestrictedImportsRule = rule.CreateRule(rule.Rule{
+var NoRestrictedImportsRule = rule.CreateRule(rule.WithPreparation(rule.Rule{
 	Name:   "no-restricted-imports",
 	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		engine := core.NewEngine(options)
+}, func(options []any) rule.FileRunner {
+	engine := core.NewEngine(options)
+	isAllowedTypeSource := engine.AllowTypeImportSourceFilter()
+	return func(ctx rule.RuleContext) rule.RuleListeners {
 		if !engine.IsActive() {
 			return rule.RuleListeners{}
 		}
-		isAllowedTypeSource := core.BuildAllowTypeImportSourceFilter(options)
 
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
@@ -107,5 +108,5 @@ var NoRestrictedImportsRule = rule.CreateRule(rule.Rule{
 				engine.Check(&ctx, node, source, names)
 			},
 		}
-	},
-})
+	}
+}))

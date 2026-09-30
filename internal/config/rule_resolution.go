@@ -64,19 +64,10 @@ func ConfiguredRules(
 				Globals:         ExtractGlobals(mergedConfig.LanguageOptions),
 			}
 		}
-		ruleConfigCopy := ruleConfig
-		options := rule.NormalizeOptions(ruleConfigCopy.Options)
-		enabledRules = append(enabledRules, rule.ConfiguredRule{
-			Name:               ruleName,
-			Environment:        environment,
-			Severity:           ruleConfig.GetSeverity(),
-			RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
-			IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
-			Options:            options,
-			Run: func(ctx rule.RuleContext) rule.RuleListeners {
-				return ruleImpl.Run(ctx, options)
-			},
-		})
+		configured := ruleImpl.Configure(rule.NormalizeOptions(ruleConfig.Options))
+		configured.Environment = environment
+		configured.Severity = ruleConfig.GetSeverity()
+		enabledRules = append(enabledRules, configured)
 	}
 
 	// mergedConfig.Rules is a map, so collection order is random per process.

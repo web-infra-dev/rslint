@@ -73,7 +73,7 @@ func TestAllRules_NilTypeCheckerEarlyReturnImpliesRequiresTypeInfo(t *testing.T)
 		if impl.RequiresTypeInfo {
 			continue
 		}
-		body, file, err := parser.runBodyFor(impl.Run)
+		bodies, file, err := parser.executionBodiesFor(impl)
 		if err != nil {
 			// We require an unambiguous file:line for every registered Run
 			// so the static check can never silently skip a rule. If the
@@ -81,11 +81,13 @@ func TestAllRules_NilTypeCheckerEarlyReturnImpliesRequiresTypeInfo(t *testing.T)
 			// negative we should hide.
 			t.Fatalf("rule %q: %v", key, err)
 		}
-		if hasNilTCEarlyReturn(body) {
-			failures = append(failures, fmt.Sprintf(
-				"%s: rule %q returns rule.RuleListeners{} when ctx.TypeChecker == nil but does not declare RequiresTypeInfo: true",
-				file, key,
-			))
+		for _, body := range bodies {
+			if hasNilTCEarlyReturn(body) {
+				failures = append(failures, fmt.Sprintf(
+					"%s: rule %q returns rule.RuleListeners{} when ctx.TypeChecker == nil but does not declare RequiresTypeInfo: true",
+					file, key,
+				))
+			}
 		}
 	}
 
@@ -93,6 +95,58 @@ func TestAllRules_NilTypeCheckerEarlyReturnImpliesRequiresTypeInfo(t *testing.T)
 		t.Fatalf("rules return rule.RuleListeners{} on nil TypeChecker but do not declare RequiresTypeInfo: true (LSP would still run them with an inferred-project checker, producing false positives that CLI hides):\n  %s",
 			strings.Join(failures, "\n  "))
 	}
+}
+
+func TestPreparedRuleTypeCheckerGuardInspection(t *testing.T) {
+	impl := rule.WithPreparation(rule.Rule{Name: "guarded"}, func([]any) rule.FileRunner {
+		return func(ctx rule.RuleContext) rule.RuleListeners {
+			if ctx.TypeChecker == nil {
+				return rule.RuleListeners{}
+			}
+			return nil
+		}
+	})
+	bodies, _, err := newRuleSourceParser().executionBodiesFor(impl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bodies) != 1 || !hasNilTCEarlyReturn(bodies[0]) {
+		t.Fatal("preparation adapter hid the file runner's type-checker guard")
+	}
+}
+
+// executionBodiesFor follows preparation to its file runners, rather than
+// inspecting WithPreparation's compatibility adapter and silently losing the
+// architectural check. Listener bodies remain outside this top-level guard.
+func (p *ruleSourceParser) executionBodiesFor(impl rule.Rule) ([]*ast.BlockStmt, string, error) {
+	var hook any = impl.Run
+	if impl.Prepare != nil {
+		hook = impl.Prepare
+	}
+	body, file, err := p.runBodyFor(hook)
+	if err != nil {
+		return nil, file, err
+	}
+	if impl.Prepare == nil {
+		return []*ast.BlockStmt{body}, file, nil
+	}
+	var runners []*ast.BlockStmt
+	ast.Inspect(body, func(node ast.Node) bool {
+		fn, ok := node.(*ast.FuncLit)
+		if !ok {
+			return true
+		}
+		if len(fn.Type.Params.List) == 1 {
+			if param, ok := fn.Type.Params.List[0].Type.(*ast.SelectorExpr); ok && param.Sel.Name == "RuleContext" {
+				runners = append(runners, fn.Body)
+			}
+		}
+		return false
+	})
+	if len(runners) == 0 {
+		return nil, file, errors.New("could not locate prepared file runners")
+	}
+	return runners, file, nil
 }
 
 // ruleSourceParser maps a rule's runtime Run function back to its source-tree
@@ -195,7 +249,7 @@ func (p *ruleSourceParser) runBodyFor(run any) (*ast.BlockStmt, string, error) {
 	if err != nil {
 		return nil, file, err
 	}
-	body := findFuncLitBodyAtLine(p.fset, parsed, line)
+	body := findFuncLitBodyAtLine(p.fset, parsed, line, rv.Type())
 	if body == nil {
 		return nil, file, fmt.Errorf("could not locate FuncLit at %s:%d", file, line)
 	}
@@ -217,15 +271,31 @@ func (p *ruleSourceParser) parseFile(path string) (*ast.File, error) {
 // findFuncLitBodyAtLine walks the file and returns the body of the smallest
 // function-like node whose body brackets contain the given line. Both
 // FuncLits (used for inline `Run: func(...) {...}`) and FuncDecls (used for
-// `Run: run` references to a top-level function) are considered. Smallest-wins
-// because outer Run bodies can themselves contain inner FuncLits (listener
-// closures); we want the outer Run.
-func findFuncLitBodyAtLine(fset *token.FileSet, file *ast.File, line int) *ast.BlockStmt {
+// `Run: run` references to a top-level function) are considered. Parameter shape
+// disambiguates an option factory from a returned file runner: an optimized
+// factory's entry PC can point at the returned closure's opening line.
+func findFuncLitBodyAtLine(fset *token.FileSet, file *ast.File, line int, signature reflect.Type) *ast.BlockStmt {
 	var found *ast.BlockStmt
 	var foundSpan int
-	consider := func(body *ast.BlockStmt) {
+	consider := func(fn *ast.FuncType, body *ast.BlockStmt) {
 		if body == nil {
 			return
+		}
+		var params []ast.Expr
+		for _, field := range fn.Params.List {
+			for range max(1, len(field.Names)) {
+				params = append(params, field.Type)
+			}
+		}
+		if len(params) != signature.NumIn() {
+			return
+		}
+		for i, param := range params {
+			if signature.In(i).Kind() == reflect.Slice {
+				if array, ok := param.(*ast.ArrayType); !ok || array.Len != nil {
+					return
+				}
+			}
 		}
 		startLine := fset.Position(body.Lbrace).Line
 		endLine := fset.Position(body.Rbrace).Line
@@ -241,9 +311,9 @@ func findFuncLitBodyAtLine(fset *token.FileSet, file *ast.File, line int) *ast.B
 	ast.Inspect(file, func(n ast.Node) bool {
 		switch v := n.(type) {
 		case *ast.FuncLit:
-			consider(v.Body)
+			consider(v.Type, v.Body)
 		case *ast.FuncDecl:
-			consider(v.Body)
+			consider(v.Type, v.Body)
 		}
 		return true
 	})

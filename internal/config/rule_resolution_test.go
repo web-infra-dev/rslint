@@ -1,12 +1,58 @@
 package config
 
 import (
+	"reflect"
 	"sync"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestFileConfigResolverPreparedRuleLifetimes(t *testing.T) {
+	preparations := 0
+	var events []string
+	r := rule.WithPreparation(rule.Rule{Name: "prepared"}, func(options []any) rule.FileRunner {
+		preparations++
+		label := options[0].(string)
+		return func(ctx rule.RuleContext) rule.RuleListeners {
+			return rule.RuleListeners{ast.KindSourceFile: func(*ast.Node) {
+				events = append(events, label+":"+ctx.Settings["label"].(string))
+			}}
+		}
+	})
+	catalog := rule.NewCatalog(r)
+	cfg := RslintConfig{
+		{Rules: Rules{"prepared": []any{"error", "base"}}, Settings: map[string]any{"label": "base"}},
+		{Files: []string{"special/**"}, Rules: Rules{"prepared": []any{"warn", "special"}}, Settings: map[string]any{"label": "special"}},
+	}
+	resolver := NewFileConfigResolver(cfg, "/repo", catalog)
+	var executor rule.Executor
+	run := func(resolver *FileConfigResolver, path string, severity rule.DiagnosticSeverity) {
+		t.Helper()
+		rules, _ := resolver.EnabledRulesForFile(path)
+		if len(rules) != 1 || rules[0].Severity != severity {
+			t.Fatalf("unexpected resolved rules for %s: %+v", path, rules)
+		}
+		filtered := rule.FilterNonTypeAwareRules(rules)
+		ctx := rule.RuleContext{Settings: filtered[0].Environment.Settings}
+		executor.Run(filtered[0], ctx)[ast.KindSourceFile](nil)
+	}
+	// Same shape shares preparation even after eligibility filtering copies the
+	// descriptors; a different shape or refreshed resolver must not share it.
+	run(resolver, "/repo/first.ts", rule.SeverityError)
+	run(resolver, "/repo/second.ts", rule.SeverityError)
+	run(resolver, "/repo/special/third.ts", rule.SeverityWarning)
+	run(NewFileConfigResolver(cfg, "/repo", catalog), "/repo/fourth.ts", rule.SeverityError)
+	if preparations != 3 {
+		t.Fatalf("prepared %d runners, want three configuration identities", preparations)
+	}
+	if want := []string{"base:base", "base:base", "special:special", "base:base"}; !reflect.DeepEqual(events, want) {
+		t.Fatalf("configuration environments leaked: got %v, want %v", events, want)
+	}
+	executor.Release()
+}
 
 func TestResolveEnabledRules_MultiSlashNames(t *testing.T) {
 	for _, tc := range []struct {
