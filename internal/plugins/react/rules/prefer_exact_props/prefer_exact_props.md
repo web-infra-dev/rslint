@@ -67,9 +67,10 @@ class Component extends React.Component {
   template literal, such as `Component['propTypes']`. Variables used as keys
   are ignored.
 - A `propTypes` value referenced through a variable is checked only when the
-  variable is a directly initialized `const`. Mutable and destructured
-  bindings are treated as unknown. Later property mutations of the referenced
-  `const` object are not tracked.
+  variable is a directly initialized `const`. For object literals, every value
+  reference must be another `propTypes` assignment; property mutations,
+  escapes, other reads, mutable bindings, and destructured bindings are treated
+  as unknown.
 
 ## Original Documentation
 

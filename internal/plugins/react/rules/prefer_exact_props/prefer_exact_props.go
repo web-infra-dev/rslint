@@ -25,9 +25,10 @@ var PreferExactPropsRule = rule.Rule{
 			Id:          "propTypes",
 			Description: fmt.Sprintf(propTypesMessage, formatExactPropWrappers(exactWrappers)),
 		}
+		aliasInitializers := make(map[*ast.Symbol]*ast.Node)
 
 		reportIfNonExact := func(reportNode, value *ast.Node, resolveIdentifier bool) {
-			if isNonExactPropTypesValue(ctx, value, exactWrappers, resolveIdentifier) {
+			if isNonExactPropTypesValue(ctx, value, exactWrappers, resolveIdentifier, aliasInitializers) {
 				ctx.ReportNode(reportNode, message)
 			}
 		}
@@ -98,6 +99,7 @@ func isNonExactPropTypesValue(
 	value *ast.Node,
 	exactWrappers []reactutil.PropWrapperEntry,
 	resolveIdentifier bool,
+	aliasInitializers map[*ast.Symbol]*ast.Node,
 ) bool {
 	value = utils.ESTreeRuntimeExpression(value)
 	if value == nil {
@@ -117,7 +119,7 @@ func isNonExactPropTypesValue(
 		if !resolveIdentifier {
 			return false
 		}
-		initializer := resolveDirectConstInitializer(ctx, value)
+		initializer := resolveDirectConstInitializer(ctx, value, aliasInitializers)
 		return isNonExactPropTypesInitializer(ctx.SourceFile, initializer, exactWrappers)
 	default:
 		return false
@@ -147,9 +149,14 @@ func isNonExactPropTypesInitializer(
 }
 
 // resolveDirectConstInitializer resolves only an identifier's own, directly
-// initialized const declaration. Mutable and destructured bindings are kept
-// unknown instead of guessing which runtime value reaches this use.
-func resolveDirectConstInitializer(ctx rule.RuleContext, identifier *ast.Node) *ast.Node {
+// initialized const declaration. Object-literal aliases remain known only
+// while every runtime reference is another propTypes assignment RHS; mutable,
+// destructured, mutated, and escaped bindings are kept unknown.
+func resolveDirectConstInitializer(
+	ctx rule.RuleContext,
+	identifier *ast.Node,
+	aliasInitializers map[*ast.Symbol]*ast.Node,
+) *ast.Node {
 	if ctx.Refs == nil || identifier == nil || identifier.Kind != ast.KindIdentifier {
 		return nil
 	}
@@ -157,6 +164,15 @@ func resolveDirectConstInitializer(ctx rule.RuleContext, identifier *ast.Node) *
 	if symbol == nil {
 		return nil
 	}
+	if initializer, ok := aliasInitializers[symbol]; ok {
+		return initializer
+	}
+	initializer := classifyDirectConstInitializer(ctx, identifier, symbol)
+	aliasInitializers[symbol] = initializer
+	return initializer
+}
+
+func classifyDirectConstInitializer(ctx rule.RuleContext, identifier *ast.Node, symbol *ast.Symbol) *ast.Node {
 	declarationNode := symbol.ValueDeclaration
 	if declarationNode == nil || declarationNode.Kind != ast.KindVariableDeclaration ||
 		ast.GetSourceFileOfNode(declarationNode) != ctx.SourceFile {
@@ -172,7 +188,43 @@ func resolveDirectConstInitializer(ctx rule.RuleContext, identifier *ast.Node) *
 	if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != identifier.AsIdentifier().Text {
 		return nil
 	}
-	return declaration.Initializer
+	initializer := declaration.Initializer
+	runtimeInitializer := utils.ESTreeRuntimeExpression(initializer)
+	if runtimeInitializer != nil && runtimeInitializer.Kind == ast.KindObjectLiteralExpression &&
+		!hasOnlyPropTypesAssignmentReferences(ctx, symbol) {
+		return nil
+	}
+	return initializer
+}
+
+// hasOnlyPropTypesAssignmentReferences keeps object-literal aliases
+// conservative without introducing a second reference index. RefStore builds
+// and caches the file's identifier buckets once; this rule only classifies the
+// cached references for each symbol once through aliasInitializers.
+func hasOnlyPropTypesAssignmentReferences(ctx rule.RuleContext, symbol *ast.Symbol) bool {
+	for _, reference := range ctx.Refs.References(symbol) {
+		if !utils.IsReadReference(reference) {
+			continue
+		}
+		if !isPropTypesAssignmentValueReference(reference) {
+			return false
+		}
+	}
+	return true
+}
+
+func isPropTypesAssignmentValueReference(reference *ast.Node) bool {
+	parent := utils.ESTreeParent(reference)
+	if parent == nil || parent.Kind != ast.KindBinaryExpression {
+		return false
+	}
+	binary := parent.AsBinaryExpression()
+	if binary == nil || binary.OperatorToken == nil || !ast.IsAssignmentOperator(binary.OperatorToken.Kind) ||
+		utils.ESTreeRuntimeExpression(binary.Right) != reference {
+		return false
+	}
+	left := utils.ESTreeRuntimeExpression(binary.Left)
+	return left != nil && !ast.IsOptionalChain(left) && isPropTypesMember(left)
 }
 
 func isExactPropWrapperCall(sourceFile *ast.SourceFile, node *ast.Node, wrappers []reactutil.PropWrapperEntry) bool {
