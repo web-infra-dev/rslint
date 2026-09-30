@@ -63,6 +63,28 @@ func NeedsSemicolonBefore(
 	if !ok {
 		return false
 	}
+	return NeedsSemicolonAfter(sourceFile, previous, replacement, false)
+}
+
+// NeedsSemicolonAfter reports whether a completed statement's last token can
+// absorb following source text. sameLine is true when no line terminator will
+// separate the statements after editing.
+func NeedsSemicolonAfter(sourceFile *ast.SourceFile, previous utils.SourceToken, following string, sameLine bool) bool {
+	if previous.Kind == ast.KindSemicolonToken || following == "" || following[0] == ';' || following[0] == '}' ||
+		(!sameLine && !startsWithSemicolonHazard(following)) {
+		return false
+	}
+	for node := ast.GetNodeAtPosition(sourceFile, previous.Start, false); node != nil && node.End() == previous.End; node = node.Parent {
+		switch node.Kind {
+		case ast.KindExpressionStatement, ast.KindVariableStatement,
+			ast.KindReturnStatement, ast.KindThrowStatement, ast.KindExportAssignment:
+			return true
+		case ast.KindBreakStatement, ast.KindContinueStatement, ast.KindDebuggerStatement:
+			if sameLine {
+				return true
+			}
+		}
+	}
 
 	switch previous.Kind {
 	case ast.KindCloseBracketToken,
