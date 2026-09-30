@@ -46,7 +46,27 @@ func TestPreferEachRule(t *testing.T) {
         }
       });
     `},
+			// A loop that registers nothing is business logic, also after a nested
+			// registration in the same callback.
 			{Code: `
+        test("outer", () => {
+          test("inner", () => {});
+          for (const row of rows) {
+            consume(row);
+          }
+        });
+      `},
+			// Registrations in for-in/of iterables and classic for control clauses
+			// run once, not once per iteration.
+			{Code: "for (const row of getRows(it('one', () => {}))) {}"},
+			{Code: "for (let i = register(it('once', () => {})); i < 2; i++) {}"},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Each loop is judged from its own frame. The outer loop registers an
+			// `it` on every iteration, so the business loop nested inside it does
+			// not cancel the outer report (eslint-plugin-jest's flat list would).
+			{
+				Code: `
         for (const suite of suites) {
           it(` + "`runs ${suite.name}`" + `, () => {
             expect(runSuite(suite)).toBe(true)
@@ -56,9 +76,131 @@ func TestPreferEachRule(t *testing.T) {
             setupItem(item);
           }
         }
-      `},
-		},
-		[]rule_tester.InvalidTestCase{
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "preferEach",
+						Message:   "prefer using `it.each` rather than a manual loop",
+						Line:      2,
+						Column:    9,
+						EndLine:   10,
+						EndColumn: 10,
+					},
+				},
+			},
+			// The same loop with the business loop written first: reported by
+			// eslint-plugin-jest too, so both orders now agree.
+			{
+				Code: `
+        for (const suite of suites) {
+          for (const item of suite.items) {
+            setupItem(item);
+          }
+
+          it(` + "`runs ${suite.name}`" + `, () => {});
+        }
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "preferEach",
+						Message:   "prefer using `it.each` rather than a manual loop",
+						Line:      2,
+						Column:    9,
+						EndLine:   8,
+						EndColumn: 10,
+					},
+				},
+			},
+			// Hooks and describes registered by a loop inside a test callback:
+			// eslint-plugin-jest skips every loop while its in-test flag is set.
+			{
+				Code: `
+        test("outer", () => {
+          for (const row of rows) {
+            beforeEach(() => {});
+          }
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "preferEach",
+						Message:   "prefer using `describe.each` rather than a manual loop",
+						Line:      3,
+						Column:    11,
+						EndLine:   5,
+						EndColumn: 12,
+					},
+				},
+			},
+			{
+				Code: `
+        test("outer", () => {
+          for (const row of rows) {
+            describe(row.name, () => {});
+          }
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "preferEach",
+						Message:   "prefer using `describe.each` rather than a manual loop",
+						Line:      3,
+						Column:    11,
+						EndLine:   5,
+						EndColumn: 12,
+					},
+				},
+			},
+			// A registering loop inside a test callback is still a registering loop.
+			{
+				Code: `
+        test("outer", () => {
+          for (const row of rows) {
+            test(row.name, () => {});
+          }
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "preferEach",
+						Message:   "prefer using `it.each` rather than a manual loop",
+						Line:      3,
+						Column:    11,
+						EndLine:   5,
+						EndColumn: 12,
+					},
+				},
+			},
+			// Both loops report: the inner registers `it`, the outer registers `describe`.
+			{
+				Code: `
+        for (const suite of suites) {
+          describe(suite.name, () => {
+            for (const row of suite.rows) {
+              it(row.name, () => {});
+            }
+          });
+        }
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "preferEach",
+						Message:   "prefer using `it.each` rather than a manual loop",
+						Line:      4,
+						Column:    13,
+						EndLine:   6,
+						EndColumn: 14,
+					},
+					{
+						MessageId: "preferEach",
+						Message:   "prefer using `describe.each` rather than a manual loop",
+						Line:      2,
+						Column:    9,
+						EndLine:   8,
+						EndColumn: 10,
+					},
+				},
+			},
 			{
 				Code: `
         for (const [input, expected] of data) {
