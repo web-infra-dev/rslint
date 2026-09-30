@@ -21,12 +21,12 @@ var MaxNestedCallsRule = rule.Rule{
 	Name:   "unicorn/max-nested-calls",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		max := parseMax(options)
+		maxDepth := parseMax(options)
 		check := func(node *ast.Node) {
-			if ast.IsImportCall(node) || nestedCallDepth(node) <= max {
+			if ast.IsImportCall(node) || nestedCallDepth(node) <= maxDepth {
 				return
 			}
-			maxText := strconv.Itoa(max)
+			maxText := strconv.Itoa(maxDepth)
 			ctx.ReportNode(node, rule.RuleMessage{
 				Id:          messageID,
 				Description: "Call is nested too deeply. Maximum allowed is " + maxText + ".",
