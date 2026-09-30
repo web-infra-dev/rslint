@@ -1064,6 +1064,28 @@ func TestValidTitleRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidEachSpecifier"}},
 		})
 	}
+	// A parenthesized `.each` callee still formats its title with printf; ESTree
+	// has no parenthesis node, so the reference plugin reports these too.
+	invalid = append(invalid,
+		rule_tester.InvalidTestCase{
+			Code:   `(test.each)([1])("%O", () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidEachSpecifier"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   `(test.each([1]))("%c", () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidEachSpecifier"}},
+		},
+		// A title that is exactly the function name has no prefix to remove, so
+		// it is reported without an edit.
+		rule_tester.InvalidTestCase{
+			Code:   `xtest("test", () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicatePrefix"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   `fit("it", () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicatePrefix"}},
+		},
+	)
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
