@@ -164,12 +164,16 @@ func BenchmarkNonTypeAwareRuleViews(b *testing.B) {
 					views := make([][]rule.ConfiguredRule, files)
 					b.ReportAllocs()
 					b.ResetTimer()
-					for b.Loop() {
-						var cache nonTypeAwareRuleCache
-						for file, rules := range inputs {
-							if cached {
+					if cached {
+						for b.Loop() {
+							var cache nonTypeAwareRuleCache
+							for file, rules := range inputs {
 								views[file] = cache.filter(rules)
-							} else {
+							}
+						}
+					} else {
+						for b.Loop() {
+							for file, rules := range inputs {
 								views[file] = rule.FilterNonTypeAwareRules(rules)
 							}
 						}
