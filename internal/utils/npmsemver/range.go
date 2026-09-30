@@ -37,6 +37,10 @@ var versionPrerelease = regexp.MustCompile(`^(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-
 
 // Parse reuses tsgo range expansion with npm whitespace, integer and prerelease semantics.
 func Parse(text string) (Range, bool) {
+	return parse(text, false)
+}
+
+func parse(text string, includePrerelease bool) (Range, bool) {
 	text = strings.Map(func(r rune) rune {
 		if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			return ' '
@@ -152,7 +156,7 @@ func Parse(text string) (Range, bool) {
 				operator := strings.TrimSuffix(token, version)
 				// tsgo includes prereleases in wildcard lower bounds. npm starts
 				// those at the stable version, unless -0 was explicitly requested.
-				if operator == ">=" && !strings.Contains(term, version) {
+				if !includePrerelease && operator == ">=" && !strings.Contains(term, version) {
 					version = strings.TrimSuffix(version, "-0")
 				}
 				if operator == "<" && (hyphenRange || strings.HasPrefix(term, "^") || strings.HasPrefix(term, "~")) {

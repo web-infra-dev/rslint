@@ -1,0 +1,46 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "checkDates": {
+          "type": "boolean",
+          "description": "Whether to check expiration dates."
+        },
+        "checkDatesOnPullRequests": {
+          "type": "boolean",
+          "description": "Unsupported. Accepted only for configuration compatibility; its value is ignored. Use checkDates to control expiration-date checks."
+        },
+        "allowWarningComments": {
+          "type": "boolean",
+          "description": "Whether to allow warning comments."
+        },
+        "terms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Comment terms to check."
+        },
+        "ignore": {
+          "type": "array",
+          "items": {
+            "type": ["string", "object"],
+            "additionalProperties": true
+          },
+          "uniqueItems": true,
+          "description": "Patterns to ignore."
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "The reference date."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

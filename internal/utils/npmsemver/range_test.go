@@ -312,3 +312,74 @@ func TestGeneratedBounds(t *testing.T) {
 		})
 	}
 }
+
+// npm semver 7.8.5 reference results for coercion, membership and range floors.
+func TestVersionOperations(t *testing.T) {
+	for _, tc := range []struct{ input, want string }{
+		{"1", "1.0.0"},
+		{"v1.2.3", "1.2.3"},
+		{"1.2.3-beta.1", "1.2.3-beta.1"},
+		{"01.2.3", ""},
+		{"foo2.3bar", "2.3.0"},
+		{"1.2.3+build", "1.2.3"},
+		{"9007199254740991.0.0", "9007199254740991.0.0"},
+		{"9007199254740992.0.0", ""},
+		{"12345678901234567", ""},
+		{"1.2.3.4", "1.2.3"},
+		{"v1.2", "1.2.0"},
+		{"workspace:*", ""},
+		{"\t1.2.3-beta.1\uFEFF", "1.2.3-beta.1"},
+		{"\u00851.2.3-beta.1", "1.2.3"},
+	} {
+		got, ok := CoerceVersion(tc.input)
+		if got != tc.want || ok != (tc.want != "") {
+			t.Errorf("CoerceVersion(%q) = %q, %v; want %q", tc.input, got, ok, tc.want)
+		}
+	}
+	for _, tc := range []struct {
+		version, condition string
+		want               bool
+	}{
+		{"1.0.0-beta.1", ">0.9", true},
+		{"1.0.0-beta.1", ">=1", true},
+		{"1.0.0-beta.1", ">=1.0.0", false},
+		{"1.0.0-beta.1", ">=1.0.0-alfa.1", true},
+		{"1.0.1", ">1", false},
+		{"22.0.0", ">22", false},
+		{"1.2.4", ">1.2.3", true},
+		{"1.2.3", ">=1.2.3+build", true},
+		{"1.2.3", "invalid", false},
+		{"1.2.3", "^1", false},
+		{"1.2.3", ">=1 || ^2", false},
+		{"invalid", ">=1", false},
+	} {
+		if got := SatisfiesComparison(tc.version, tc.condition); got != tc.want {
+			t.Errorf("SatisfiesComparison(%q,%q) = %v", tc.version, tc.condition, got)
+		}
+	}
+	for _, tc := range []struct{ input, want string }{
+		{"^8 || ^9", "8.0.0"},
+		{">=10.4", "10.4.0"},
+		{">1.2.3", "1.2.4"},
+		{">1.2.3-beta.1", "1.2.3-beta.1.0"},
+		{">=1.0.0-beta", "1.0.0-beta"},
+		{"*", "0.0.0"},
+		{"<0.0.0", ""},
+		{">1 <1", ""},
+		{"workspace:*", ""},
+		{"^0.2", "0.2.0"},
+		{"~1.2", "1.2.0"},
+		{"1.2 - 3", "1.2.0"},
+		{">=2 <1 || >=3", ""},
+		{">=1.0.0-beta.2 <1.0.0", "1.0.0-beta.2"},
+	} {
+		r, ok := Parse(tc.input)
+		got := ""
+		if ok {
+			got, _ = r.MinVersion()
+		}
+		if got != tc.want {
+			t.Errorf("MinVersion(%q) = %q; want %q", tc.input, got, tc.want)
+		}
+	}
+}
