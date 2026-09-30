@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/max_nested_calls"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_anonymous_default_export"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_callback_reference"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_concat_in_loop"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_fill_with_reference_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_from_fill"
@@ -97,6 +98,7 @@ func GetAllRules() []rule.Rule {
 		max_nested_calls.MaxNestedCallsRule,
 		new_for_builtins.NewForBuiltinsRule,
 		no_anonymous_default_export.NoAnonymousDefaultExportRule,
+		no_array_callback_reference.NoArrayCallbackReferenceRule,
 		no_array_concat_in_loop.NoArrayConcatInLoopRule,
 		no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule,
 		no_array_from_fill.NoArrayFromFillRule,

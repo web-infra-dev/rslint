@@ -839,6 +839,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/max-nested-calls.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-anonymous-default-export.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-array-callback-reference.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-concat-in-loop.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-fill-with-reference-type.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-from-fill.test.ts',

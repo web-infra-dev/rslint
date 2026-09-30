@@ -16,8 +16,17 @@ import (
 // visible. ast.IsDottedName is intentionally not used because it also accepts
 // property accesses containing optional-chain links.
 func NodeMatchesPath(node *ast.Node, path string) bool {
-	parts := strings.Split(ecmascript.StringTrim(path), ".")
-	return nodeMatchesPathParts(utils.ESTreeRuntimeExpression(node), parts)
+	node = utils.ESTreeRuntimeExpression(node)
+	path = ecmascript.StringTrim(path)
+	// Simple names need no split, and only member/meta expressions can match
+	// dotted paths. Avoid allocating path segments for the common cases.
+	if !strings.Contains(path, ".") {
+		return nodeMatchesPathParts(node, []string{path})
+	}
+	if node == nil || (!ast.IsPropertyAccessExpression(node) && node.Kind != ast.KindMetaProperty) {
+		return false
+	}
+	return nodeMatchesPathParts(node, strings.Split(path, "."))
 }
 
 func nodeMatchesPathParts(node *ast.Node, parts []string) bool {

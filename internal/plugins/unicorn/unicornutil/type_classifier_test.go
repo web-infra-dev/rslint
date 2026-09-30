@@ -31,6 +31,7 @@ class ClassText extends String {}
 interface Map<T> extends Array<T> {}
 function inheritedMapTarget(xs: Map<number>) { return xs; }
 declare const inheritedClassString: ClassText;
+declare const inheritedClassConstructor: typeof ClassText;
 void stringValue;
 void numberValue;
 void unknownValue;
@@ -40,6 +41,7 @@ void nullableString;
 void stringIntersection;
 void inheritedString;
 void inheritedClassString;
+void inheritedClassConstructor;
 `
 	fs := utils.NewOverlayVFS(root.FS, map[string]string{filePath: code})
 	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", utils.CreateCompilerHost(root.Dir, fs))
@@ -71,6 +73,7 @@ void inheritedClassString;
 		{name: "value", want: TypeTarget},
 		{name: "inheritedString", want: TypeTarget},
 		{name: "inheritedClassString", want: TypeTarget},
+		{name: "inheritedClassConstructor", want: TypeNonTarget},
 	}
 
 	for _, test := range tests {
@@ -82,6 +85,13 @@ void inheritedClassString;
 			}
 		})
 	}
+
+	options.TreatMixedUnionAsNonTarget = true
+	mixed := findReferenceIdentifier(t, sourceFile, "mixedValue")
+	assert.Equal(t, ClassifyType(ctx, typeChecker.GetTypeAtLocation(mixed), options), TypeNonTarget)
+	options.AllowNullishInMixedUnion = true
+	nullable := findReferenceIdentifier(t, sourceFile, "nullableString")
+	assert.Equal(t, ClassifyType(ctx, typeChecker.GetTypeAtLocation(nullable), options), TypeTarget)
 
 	arrayOptions := TypeClassifierOptions{
 		TargetTypeNames:          utils.NewSetFromItems("Array", "ReadonlyArray"),

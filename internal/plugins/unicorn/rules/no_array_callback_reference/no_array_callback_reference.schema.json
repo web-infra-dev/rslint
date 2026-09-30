@@ -1,0 +1,19 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ignore": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string" },
+          "description": "Callees to ignore."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
