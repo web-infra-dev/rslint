@@ -2,101 +2,16 @@ package linter
 
 import (
 	"fmt"
-	"reflect"
 	"slices"
-	"sync"
 	"sync/atomic"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_cycle"
-	tsrestricted "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_restricted_imports"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/rules/id_match"
-	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
-	"github.com/web-infra-dev/rslint/internal/rules/no_unused_vars"
 )
-
-func TestPreparedRulesPreserveDiagnosticsAcrossFilesAndTasks(t *testing.T) {
-	sources := make(map[string]string)
-	for i := range 24 {
-		sources[fmt.Sprintf("input%d.ts", i)] = `
-import type { Blocked } from "@private/types";
-import { secret as bad_name } from "@private/runtime";
-const _ignored = 1;
-const unused_name = bad_name;
-// eslint-disable-next-line id-match
-export const allowed_name = 1;
-`
-	}
-	raw, paths := createTestProgramWithFiles(t, sources)
-	var files []*ast.SourceFile
-	var targets []string
-	for _, path := range paths {
-		file := raw.GetSourceFile(path)
-		if file == nil {
-			t.Fatalf("fixture file is missing: %s", path)
-		}
-		files = append(files, file)
-		targets = append(targets, path)
-	}
-	program := mustSourceOnlyTestProgram(t, raw, files)
-	configured := []rule.ConfiguredRule{
-		id_match.IdMatchRule.Configure([]any{"^[a-zA-Z][a-zA-Z0-9]*$"}),
-		no_restricted_imports.NoRestrictedImportsRule.Configure([]any{map[string]any{
-			"patterns": []any{map[string]any{"regex": "^@private/(?!allowed)", "importNamePattern": "^(?:secret|Blocked)$"}},
-		}}),
-		tsrestricted.NoRestrictedImportsRule.Configure([]any{map[string]any{
-			"patterns": []any{map[string]any{"regex": "^@private/(?!allowed)", "allowTypeImports": true}},
-		}}),
-		no_unused_vars.NoUnusedVarsRule.Configure([]any{map[string]any{"varsIgnorePattern": "^_"}}),
-	}
-	// Rebuild only the execution descriptor for the direct baseline: the same
-	// rule's Run prepares per file, exercising the compatibility path too.
-	direct := make([]rule.ConfiguredRule, len(configured))
-	for i, r := range configured {
-		direct[i] = rule.ConfiguredRule{Name: r.Name, Severity: r.Severity, Run: r.Run}
-	}
-	run := func(rules []rule.ConfiguredRule, serial bool, demand rule.EditDemand) []rule.RuleDiagnostic {
-		t.Helper()
-		plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
-			Programs:         testPrograms(program),
-			TargetsByProgram: [][]string{targets},
-			SingleThreaded:   serial,
-			GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return rules },
-		})
-		var mu sync.Mutex
-		var diagnostics []rule.RuleDiagnostic
-		_, err := RunLinter(RunLinterOptions{
-			LintPlan:       plan,
-			SingleThreaded: serial,
-			Consumer: rule.DiagnosticConsumer{Demand: demand, Report: func(d rule.RuleDiagnostic) {
-				mu.Lock()
-				diagnostics = append(diagnostics, d)
-				mu.Unlock()
-			}},
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		StableSortDiagnosticsByFileAndStart(diagnostics)
-		if len(diagnostics) == 0 {
-			t.Fatal("empty diagnostics would not exercise prepared rules")
-		}
-		return diagnostics
-	}
-	for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAll} {
-		want := run(direct, true, demand)
-		for _, serial := range []bool{true, false, true} {
-			got := run(configured, serial, demand)
-			if !reflect.DeepEqual(got, want) {
-				t.Fatalf("prepared execution changed diagnostics/edits: serial=%v demand=%v\ngot: %#v\nwant: %#v", serial, demand, got, want)
-			}
-		}
-	}
-}
 
 func mustPrepareLintPlan(t *testing.T, opts PrepareLintPlanOptions) *LintPlan {
 	t.Helper()

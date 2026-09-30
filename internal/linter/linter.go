@@ -136,7 +136,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	// comments, DisableManager, and rule contexts are per-file. The listener
 	// registry belongs to the calling checker-shard task and is empty on entry;
 	// reset clears all captured per-file state before the next serial file.
-	lintFile := func(filePlan *lintFilePlan, rules []rule.ConfiguredRule, chk *checker.Checker, registeredListeners *listenerRegistry, executor *rule.Executor) {
+	lintFile := func(filePlan *lintFilePlan, rules []rule.ConfiguredRule, chk *checker.Checker, registeredListeners *listenerRegistry) {
 		file := filePlan.file
 
 		// Per-rule durations for this file, parallel to rules. Listeners are
@@ -209,7 +209,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			if ruleDurations != nil {
 				runStart = time.Now()
 			}
-			ruleListeners := executor.Run(r, ctx)
+			ruleListeners := r.Run(ctx)
 			if ruleDurations != nil {
 				ruleDurations[ruleIndex] += time.Since(runStart)
 			}
@@ -388,18 +388,14 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	queueFiles := func(chk *checker.Checker, tasks []lintFileTask) {
 		wg.Queue(func() {
 			registeredListeners := newListenerRegistry()
-			var executor rule.Executor
 			if chk != nil {
 				var done func()
 				chk, done = sourceProgram.TypeCheckerForFileExclusive(ctx, tasks[0].plan.file)
 				defer done()
 			}
 			for _, task := range tasks {
-				lintFile(task.plan, task.rules, chk, &registeredListeners, &executor)
+				lintFile(task.plan, task.rules, chk, &registeredListeners)
 			}
-			// Only completed tasks return their runners. If a rule panics,
-			// discard its potentially interrupted matching state with the task.
-			executor.Release()
 		})
 	}
 	for chk, tasks := range checkerGroups {

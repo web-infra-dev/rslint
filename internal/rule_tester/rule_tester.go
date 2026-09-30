@@ -243,15 +243,20 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 			TargetsByProgram: [][]string{allowedFiles},
 			SingleThreaded:   true,
 			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-				configured := r.Configure(options)
-				configured.Name = "test"
-				configured.Environment = &rule.RuleEnvironment{
-					Settings:        settings,
-					LanguageOptions: languageOptions,
-					Globals:         globals,
+				return []rule.ConfiguredRule{
+					{
+						Name: "test",
+						Environment: &rule.RuleEnvironment{
+							Settings:        settings,
+							LanguageOptions: languageOptions,
+							Globals:         globals,
+						},
+						Severity: rule.SeverityError,
+						Run: func(ctx rule.RuleContext) rule.RuleListeners {
+							return r.Run(ctx, options)
+						},
+					},
 				}
-				configured.Severity = rule.SeverityError
-				return []rule.ConfiguredRule{configured}
 			},
 		})
 		assert.NilError(t, err, "error preparing lint plan. code:\n", code)

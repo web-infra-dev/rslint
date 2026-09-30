@@ -94,11 +94,6 @@ func ListenerOnNotAllowPattern(kind ast.Kind) ast.Kind {
 
 type RuleListeners map[ast.Kind](func(node *ast.Node))
 
-// FileRunner creates fresh listeners for one file. A prepared runner may reuse
-// option-derived state across serial files, but must not retain their contexts,
-// AST nodes, checkers, diagnostics, or listeners after those listeners finish.
-type FileRunner func(ctx RuleContext) RuleListeners
-
 type Rule struct {
 	Name             string
 	RequiresTypeInfo bool
@@ -117,33 +112,13 @@ type Rule struct {
 	// own ESLint validates) leave it nil.
 	Schema *Schema
 	Run    func(ctx RuleContext, options []any) RuleListeners
-
-	// Prepare is the file-independent factory installed by WithPreparation.
-	// Use that constructor to keep direct Run and configured execution equivalent.
-	Prepare func(options []any) FileRunner
-}
-
-// WithPreparation defines a rule whose option-derived state can be reused.
-// prepare receives only resolved options, never a file context. Each result is
-// exclusively owned by one Executor until Release, including while its file
-// listeners run. It may own mutable matching machinery, but file-specific
-// analysis must remain in the listeners returned by each FileRunner call.
-//
-// Run remains available for direct callers and prepares a fresh runner per call.
-// Configure enables lazy reuse for production lint tasks. Prepare must return a
-// non-nil runner and must not mutate options, which are shared configuration.
-func WithPreparation(r Rule, prepare func(options []any) FileRunner) Rule {
-	if prepare == nil {
-		panic("rule preparation is required")
-	}
-	r.Prepare = prepare
-	r.Run = func(ctx RuleContext, options []any) RuleListeners {
-		return prepare(options)(ctx)
-	}
-	return r
 }
 
 func CreateRule(r Rule) Rule {
-	r.Name = "@typescript-eslint/" + r.Name
-	return r
+	return Rule{
+		Name:             "@typescript-eslint/" + r.Name,
+		RequiresTypeInfo: r.RequiresTypeInfo,
+		Schema:           r.Schema,
+		Run:              r.Run,
+	}
 }

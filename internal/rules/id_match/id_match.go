@@ -22,13 +22,12 @@ const constructorKeyword = "constructor"
 
 // IdMatchRule requires identifiers to match a specified regular expression.
 // https://eslint.org/docs/latest/rules/id-match
-var IdMatchRule = rule.WithPreparation(rule.Rule{
+var IdMatchRule = rule.Rule{
 	Name:   "id-match",
 	Schema: rule.NewSchema(schemaJSON),
-}, func(options []any) rule.FileRunner {
-	opts := parseOptions(options)
-	pattern, err := esregexp.Compile(opts.pattern, "u")
-	return func(ctx rule.RuleContext) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
+		pattern, err := esregexp.Compile(opts.pattern, "u")
 		if err != nil {
 			// The configured pattern is not a regexp; nothing can be checked
 			// against it.
@@ -41,8 +40,8 @@ var IdMatchRule = rule.WithPreparation(rule.Rule{
 			ast.KindPrivateIdentifier: r.checkPrivateIdentifier,
 			ast.KindConstructor:       r.checkConstructor,
 		}
-	}
-})
+	},
+}
 
 type idMatchOptions struct {
 	pattern             string

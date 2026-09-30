@@ -47,48 +47,6 @@ func TestAutofixPipelineOwnsMemoryRoundsAndReobservesSnapshots(t *testing.T) {
 	}
 }
 
-func TestAutofixPreparedRuleUsesEachGenerationContext(t *testing.T) {
-	configured := rule.WithPreparation(rule.Rule{Name: "prepared/fix"}, func([]any) rule.FileRunner {
-		next := map[string]string{"a": "b", "b": "c"}
-		return func(ctx rule.RuleContext) rule.RuleListeners {
-			before := ctx.SourceFile.Text()
-			after, ok := next[before]
-			if !ok {
-				return nil
-			}
-			return rule.RuleListeners{ast.KindIdentifier: func(*ast.Node) {
-				ctx.ReportRangeWithDeferredFixes(core.NewTextRange(0, len(before)), rule.RuleMessage{Description: "advance"}, func() []rule.RuleFix {
-					return []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(0, len(before)), after)}
-				})
-			}}
-		}
-	}).Configure(nil)
-	root := tspath.NormalizePath(t.TempDir())
-	provider := &pipelineAutofixProvider{
-		t:        t,
-		root:     root,
-		fileName: tspath.ResolvePath(root, "source.ts"),
-		initial:  "a",
-		rules:    func(string) []rule.ConfiguredRule { return []rule.ConfiguredRule{configured} },
-	}
-	result, err := RunPipeline(context.Background(), NewAutofixRequest(
-		provider,
-		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{},
-		nil,
-	))
-	if err != nil {
-		t.Fatal(err)
-	}
-	applied, ok := result.AppliedFixes()
-	if !ok || !applied.Verified || len(applied.Rounds) != 2 || strings.Join(provider.observed, ",") != "a,b,c" {
-		t.Fatalf("prepared runner retained an earlier generation: result=%+v snapshots=%v", applied, provider.observed)
-	}
-	if len(applied.FinalChanges) != 1 || applied.FinalChanges[0].Before != "a" || applied.FinalChanges[0].After != "c" {
-		t.Fatalf("prepared runner changed final fixes: %+v", applied.FinalChanges)
-	}
-}
-
 func TestAutofixSyntaxGateStopsBeforeAfterNativePluginDispatch(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	provider := &pipelineAutofixProvider{

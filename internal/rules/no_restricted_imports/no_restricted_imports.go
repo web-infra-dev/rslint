@@ -251,7 +251,7 @@ func IsTypeOnlyDeclaration(node *ast.Node) bool {
 	return isTypeOnlyDeclaration(node)
 }
 
-// AllowTypeImportSourceFilter returns a predicate reporting whether an
+// BuildAllowTypeImportSourceFilter returns a predicate reporting whether an
 // import source matches any path entry or pattern entry that has
 // allowTypeImports=true. The predicate is nil if no such entry exists.
 //
@@ -261,8 +261,8 @@ func IsTypeOnlyDeclaration(node *ast.Node) bool {
 // Without this short-circuit, conflicting duplicate entries (e.g. two `paths`
 // for the same name with allowTypeImports both true and false) would diverge
 // from upstream — upstream skips on any "true", rslint core checks per-entry.
-func (e *Engine) AllowTypeImportSourceFilter() func(source string) bool {
-	grouped, patterns := e.grouped, e.patterns
+func BuildAllowTypeImportSourceFilter(options []any) func(source string) bool {
+	grouped, patterns := parseOptions(options)
 	if len(grouped) == 0 && len(patterns) == 0 {
 		return nil
 	}
@@ -430,12 +430,11 @@ func parseOptions(arr []any) (groupedPaths map[string][]restrictedPathEntry, pat
 
 // --- Rule Definition ---
 
-var NoRestrictedImportsRule = rule.WithPreparation(rule.Rule{
+var NoRestrictedImportsRule = rule.Rule{
 	Name:   "no-restricted-imports",
 	Schema: rule.NewSchema(schemaJSON),
-}, func(options []any) rule.FileRunner {
-	groupedPaths, patternGroups := parseOptions(options)
-	return func(ctx rule.RuleContext) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		groupedPaths, patternGroups := parseOptions(options)
 
 		if len(groupedPaths) == 0 && len(patternGroups) == 0 {
 			return rule.RuleListeners{}
@@ -495,8 +494,8 @@ var NoRestrictedImportsRule = rule.WithPreparation(rule.Rule{
 				checkNode(node, importSource, newOrderedImportNames())
 			},
 		}
-	}
-})
+	},
+}
 
 // --- Import/Export Name Extraction ---
 

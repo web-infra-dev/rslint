@@ -159,6 +159,13 @@ collector's existing glob projection, while `NewMatcher` and
 JavaScript matching engine. Explicit matching keeps array entries intact,
 including embedded newlines; configuration collection retains its existing Git
 character-class and case behavior. No matcher discovers files or imports config.
+RegExp compilation reuses a process-wide, bounded cache keyed by the exact
+source and flags. The regexp package owns rewriting, validation and backend
+reuse; rule definitions and per-file initialization do not participate in the
+cache lifecycle. Each match borrows an independent backend from the pattern's
+pool, avoiding a shared backend's runner lock under concurrent rule execution.
+`Unwrap` permanently assigns a private backend to that handle, so mutations stay
+local and later operations on that handle keep using the exposed backend.
 Shared package metadata queries live in `internal/utils/packagejson`. `Read`
 decodes one package object; `FindNearest` preserves the nearest package boundary,
 while `FindNearestValid` explicitly skips invalid objects for Node's policy.
@@ -396,10 +403,8 @@ type Rule struct {
     Name             string
     RequiresTypeInfo bool
     Run              func(ctx RuleContext, options []any) RuleListeners
-    Prepare          func(options []any) FileRunner
 }
 
-type FileRunner func(ctx RuleContext) RuleListeners
 type RuleListeners map[ast.Kind]func(node *ast.Node)
 ```
 
@@ -413,30 +418,6 @@ Within `internal/rule`, ownership is split by concern: `rule.go` owns rule metad
 runtime context and reporting pipeline. `DiagnosticConsumer` and `EditDemand`
 are canonical rule-framework types; `internal/linter` consumes them directly
 instead of re-exporting aliases.
-
-Rules with reusable option-derived state use `rule.WithPreparation`. Its factory
-receives only resolved options and returns a `FileRunner`; ordinary rules keep
-their existing `Run` function. `Rule.Configure` binds normalized, immutable options
-after configuration resolution and validation. Each configured descriptor owns a
-lazy pool of prepared runners. Descriptor copies preserve that identity, while a
-new configuration gets a new pool even if its rule name and options are equal.
-Neither the catalog nor a process-wide cache owns prepared instances.
-
-One `rule.Executor` belongs to each serial lint task. It borrows a runner on that
-configuration's first use, keeps it exclusively through every file's listeners,
-and returns it only after the task finishes successfully. Concurrent tasks borrow
-different instances, so regex matchers do not acquire a shared instance's locks.
-The runtime may discard idle pooled runners; reuse is an optimization, not a
-guarantee of exactly one initialization per configuration. Interrupted tasks
-discard their instances instead of pooling partially executed state.
-
-Prepared state may contain parsed options, lookup tables, and matching machinery.
-It must not mutate the shared options or retain a file context, AST, checker,
-diagnostic, or listener. Each `FileRunner` call creates fresh file state and
-listeners. `RuleContext` has no preparation cache, and the linter knows nothing
-about option parsing or regex implementation. Direct `Rule.Run` and
-`ConfiguredRule.Run` calls remain valid and prepare an independent instance per
-call. The rule tester uses `Configure` to exercise the production path.
 
 Rule IDs remain complete strings throughout configuration, diagnostics and
 plugin dispatch. `rule.Namespace` owns their ESLint-compatible interpretation:
@@ -624,15 +605,12 @@ Rules do not walk the AST themselves. Instead:
 
 1. `rules.All()` from `internal/rules` supplies the shared immutable Go rule catalog; an entry point derives a catalog for the exact object-form ESLint-plugin set required by its CLI run, API request, or committed LSP config generation
 2. config merge resolves enabled rule names against that explicitly supplied catalog
-3. the task's executor runs each enabled rule with that file's context, borrowing
-   its prepared instance if the rule opted in
-4. the rule returns fresh listeners keyed by `ast.Kind`
+3. each enabled rule runs `Run(ctx)`
+4. `Run(ctx)` returns listeners keyed by `ast.Kind`
 5. the linter appends them, in rule order, to the checker-shard task's sparse
    dispatch registry
 6. after traversing a file, the task clears every listener slot and reuses the
    registry's map and per-kind backing slices for its next serial file
-7. after all files finish, the task returns borrowed prepared runners to their
-   configuration pools
 
 This allows one AST traversal to serve many rules.
 
@@ -1701,7 +1679,7 @@ lint and fix execution still await full config activation.
 - **Metadata Snapshot Ownership**: metadata strings and extended-config parse entries live only for one loader session. The cache stores successful reads only, and its scope bounds growth to metadata touched by one CLI invocation or API request; no metadata entry survives into another request or the LSP session.
 - **Fix Application Uses Linear Rebuilds**: `ApplyRuleFixes` sorts fixes, skips overlapping edits, and rebuilds the output with `strings.Builder` rather than mutating source buffers in place
 - **Bounded Queues**: CLI diagnostics use a buffered channel of 4096 items; LSP request/outgoing queues are buffered to 100, and debounce/refresh signals are single-slot channels
-- **Configuration-Owned Prepared Runners**: opted-in rules keep idle option-derived runners in a `sync.Pool` owned by each configured descriptor. Active runners belong exclusively to one lint task. Idle instances may be collected; file contexts, ASTs, listeners, and checker state never enter these pools. New configuration identities do not reuse old pools
+- **Bounded RegExp Retention**: the regexp cache retains at most 256 compilation results, including errors, in FIFO order. Sources plus flags over 4 KiB or successful rewrites over 64 KiB bypass retention. Cached strings are copied so a small pattern cannot retain a source file's backing storage. Idle matching backends live in per-pattern `sync.Pool` instances and can be discarded by GC; concurrent demand or collection can require recompiling the validated backend pattern. Live handles remain valid after eviction. The cache retains no AST, rule context, options object or linted subject; pool size follows concurrent demand rather than a fixed heap bound. Backends exposed by `Unwrap` belong to their handle and never return to a shared pool.
 - **Fresh ESM Entry Lifetime**: fresh JS/TS config loads use a unique entry-module URL so rewritten bytes and module side effects are evaluated per transaction. Node retains those ESM module namespaces for the process lifetime, so a long-lived native API process can grow this cache slowly across repeated lint requests; static transitive imports continue to use Node's ordinary cache. Bounding this without weakening freshness requires a disposable evaluator realm or worker and remains a future optimization.
 - **Garbage Collection Handles Cycles**: the repository does not implement custom cycle breaking for AST/checker graphs; lifecycle cleanup relies on Go GC and on dropping references after each run
 
