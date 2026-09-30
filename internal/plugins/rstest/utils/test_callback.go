@@ -99,6 +99,41 @@ func collectRstestTestCallbacks(analysis *RstestCallAnalysis) RstestTestCallback
 	return result
 }
 
+// collectRstestHookCallbacks resolves each hook's first argument the way a test
+// callback argument is resolved, including the guarded name fallback of
+// walkRstestCallbackRegistrations.
+func collectRstestHookCallbacks(analysis *RstestCallAnalysis) map[*ast.Node]bool {
+	callbacks := map[*ast.Node]bool{}
+	if !testFramework.SourceFileMentionsHook(analysis.ctx.SourceFile) {
+		return callbacks
+	}
+	pending := map[string]bool{}
+	for _, node := range analysis.calls {
+		parsed := analysis.ParseFnCall(node)
+		if parsed == nil || parsed.Kind != RstestFnTypeHook {
+			continue
+		}
+		arguments := node.Arguments()
+		if len(arguments) == 0 {
+			continue
+		}
+		info := resolveRstestCallbackArgument(analysis, arguments[0])
+		if info.functionNode != nil {
+			callbacks[info.functionNode] = true
+		} else if info.name != "" {
+			pending[info.name] = true
+		}
+	}
+	for name := range pending {
+		entry := analysis.functions[name]
+		if entry.node == nil || entry.ambiguous || !isModuleTopLevelFunction(entry.node) {
+			continue
+		}
+		callbacks[entry.node] = true
+	}
+	return callbacks
+}
+
 // collectRstestCallbackOwnership indexes both test and describe callbacks by
 // the registrations that run them, which is what an execution mode is
 // inherited through.

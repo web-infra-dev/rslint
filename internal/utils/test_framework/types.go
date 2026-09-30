@@ -62,6 +62,29 @@ func IsHookName(name string) bool {
 	return slices.Contains(HooksOrder, name)
 }
 
+// SourceFileMentionsHook reports whether any HooksOrder name, or any of
+// aliases, appears in sourceFile. A hook registration spells its name somewhere
+// in the file even through an import rename, a const alias or a namespace
+// member; aliases are the extra names a framework's configuration maps to a
+// hook, which need not appear alongside the hook's own name. A file that
+// mentions none of them has no hook registrations.
+func SourceFileMentionsHook(sourceFile *ast.SourceFile, aliases ...string) bool {
+	if sourceFile == nil {
+		return false
+	}
+	for _, name := range HooksOrder {
+		if sourceFile.HasIdentifier(name) {
+			return true
+		}
+	}
+	for _, name := range aliases {
+		if sourceFile.HasIdentifier(name) {
+			return true
+		}
+	}
+	return false
+}
+
 // HookOrderIndex returns the expected declaration order index for a hook name,
 // or -1 if it is not a hook.
 func HookOrderIndex(name string) int {

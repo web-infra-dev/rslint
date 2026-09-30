@@ -103,7 +103,7 @@ func TestMaxExpectsRule(t *testing.T) {
       });
     `},
 			{Code: `
-      test.each(['should', 'pass'], () => {
+      test.each(['should', 'pass'])('case', () => {
         expect(true).toBeDefined();
         expect(true).toBeDefined();
         expect(true).toBeDefined();
@@ -539,7 +539,7 @@ func TestMaxExpectsRule(t *testing.T) {
 			},
 			{
 				Code: `
-        test.each(['should', 'not', 'pass'], () => {
+        test.each(['should', 'not', 'pass'])('case', () => {
           expect(true).toBeDefined();
           expect(true).toBeDefined();
           expect(true).toBeDefined();

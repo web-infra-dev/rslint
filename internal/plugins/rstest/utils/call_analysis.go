@@ -58,6 +58,8 @@ type RstestCallAnalysis struct {
 	ownershipOK             bool
 	registrationCallbacks   map[*ast.Node]bool
 	registrationCallbacksOK bool
+	hookCallbacks           map[*ast.Node]bool
+	hookCallbacksOK         bool
 	hasTests                bool
 }
 
@@ -404,6 +406,16 @@ func (analysis *RstestCallAnalysis) HasImportMetaRstestWrites() bool {
 
 func (analysis *RstestCallAnalysis) Callbacks() RstestTestCallbacks {
 	return *analysis.callbacksRef()
+}
+
+// HookCallbacks returns every function that a lifecycle hook registration
+// runs as its callback, including one passed by name.
+func (analysis *RstestCallAnalysis) HookCallbacks() map[*ast.Node]bool {
+	if !analysis.hookCallbacksOK {
+		analysis.hookCallbacks = collectRstestHookCallbacks(analysis)
+		analysis.hookCallbacksOK = true
+	}
+	return analysis.hookCallbacks
 }
 
 func (analysis *RstestCallAnalysis) callbacksRef() *RstestTestCallbacks {
