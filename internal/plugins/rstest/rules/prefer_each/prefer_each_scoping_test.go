@@ -30,6 +30,10 @@ func TestPreferEachLoopScoping(t *testing.T) {
 		t,
 		&prefer_each.PreferEachRule,
 		[]rule_tester.ValidTestCase{
+			// Registrations in a loop header run once, not once per iteration, so a
+			// loop whose header alone registers is not a candidate for `.each`.
+			{Code: `for (const r of (beforeEach(() => {}), rows)) {}`},
+			{Code: `for (const r of (function () { it("x", () => {}); return rows; })()) {}`},
 			// Registrations in classic for control clauses do not belong to the
 			// loop body and cannot be replaced with `.each`.
 			{Code: `for (let i = register(it('once', () => {})); i < 2; i++) {}`},
@@ -59,6 +63,31 @@ test('a', cb);`},
 }`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Only the body registers once per iteration, so the header's `it` does
+			// not turn the recommendation into `describe.each`.
+			{
+				Code: `for (const r of (function () { it("x", () => {}); return rows; })()) { it(r, () => {}); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferEach", Message: "prefer using `it.each` rather than a manual loop", Line: 1, Column: 1, EndLine: 1, EndColumn: 90},
+				},
+			},
+			// The inner loop's body registers nothing; the loop that registers on
+			// every iteration is the outer one, through the inner loop's header.
+			{
+				Code: `for (const a of as) { for (const b of (function () { it("x", () => {}); return bs; })()) { consume(b); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferEach", Message: "prefer using `it.each` rather than a manual loop", Line: 1, Column: 1, EndLine: 1, EndColumn: 107},
+				},
+			},
+			// Two directly nested loops that each register are each reported; the
+			// inner loop starting does not discard what the outer loop registered.
+			{
+				Code: `for (const a of as) { it("p", () => {}); for (const b of bs) { it("q", () => {}); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferEach", Message: "prefer using `it.each` rather than a manual loop", Line: 1, Column: 42, EndLine: 1, EndColumn: 84},
+					{MessageId: "preferEach", Message: "prefer using `it.each` rather than a manual loop", Line: 1, Column: 1, EndLine: 1, EndColumn: 86},
+				},
+			},
 			// ---- a registering loop inside a test callback is still a registering loop ----
 			{
 				Code: `test('outer', () => {

@@ -56,12 +56,37 @@ func TestPreferEachRule(t *testing.T) {
           }
         });
       `},
-			// Registrations in for-in/of iterables and classic for control clauses
-			// run once, not once per iteration.
-			{Code: "for (const row of getRows(it('one', () => {}))) {}"},
-			{Code: "for (let i = register(it('once', () => {})); i < 2; i++) {}"},
+			// Registrations in a loop header run once, not once per iteration, so a
+			// loop whose header alone registers is not a candidate for `.each`.
+			{Code: `for (const r of (beforeEach(() => {}), rows)) {}`},
+			{Code: `for (const r of (function () { it("x", () => {}); return rows; })()) {}`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Only the body registers once per iteration, so the header's `it` does
+			// not turn the recommendation into `describe.each`.
+			{
+				Code: `for (const r of (function () { it("x", () => {}); return rows; })()) { it(r, () => {}); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferEach", Message: "prefer using `it.each` rather than a manual loop", Line: 1, Column: 1, EndLine: 1, EndColumn: 90},
+				},
+			},
+			// The inner loop's body registers nothing; the loop that registers on
+			// every iteration is the outer one, through the inner loop's header.
+			{
+				Code: `for (const a of as) { for (const b of (function () { it("x", () => {}); return bs; })()) { consume(b); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferEach", Message: "prefer using `it.each` rather than a manual loop", Line: 1, Column: 1, EndLine: 1, EndColumn: 107},
+				},
+			},
+			// Two directly nested loops that each register are each reported; the
+			// inner loop starting does not discard what the outer loop registered.
+			{
+				Code: `for (const a of as) { it("p", () => {}); for (const b of bs) { it("q", () => {}); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferEach", Message: "prefer using `it.each` rather than a manual loop", Line: 1, Column: 42, EndLine: 1, EndColumn: 84},
+					{MessageId: "preferEach", Message: "prefer using `it.each` rather than a manual loop", Line: 1, Column: 1, EndLine: 1, EndColumn: 86},
+				},
+			},
 			// Each loop is judged from its own frame. The outer loop registers an
 			// `it` on every iteration, so the business loop nested inside it does
 			// not cancel the outer report (eslint-plugin-jest's flat list would).
