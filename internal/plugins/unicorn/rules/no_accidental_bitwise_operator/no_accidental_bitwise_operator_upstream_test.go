@@ -20,19 +20,22 @@ func valid(code, filename string) rule_tester.ValidTestCase {
 	return rule_tester.ValidTestCase{Code: code, FileName: filename}
 }
 
-func replaceOnce(code, old, replacement string) string {
-	index := strings.Index(code, old)
-	if index < 0 {
-		panic("operator not found in no-accidental-bitwise-operator fixture: " + old)
+func operatorIndex(code, operator string, occurrence int) int {
+	searchFrom := 0
+	index := -1
+	for range occurrence + 1 {
+		relative := strings.Index(code[searchFrom:], operator)
+		if relative < 0 {
+			panic("operator not found in no-accidental-bitwise-operator fixture: " + operator)
+		}
+		index = searchFrom + relative
+		searchFrom = index + len(operator)
 	}
-	return code[:index] + replacement + code[index+len(old):]
+	return index
 }
 
-func invalid(code, operator, logicalOperator, filename string) rule_tester.InvalidTestCase {
-	index := strings.Index(code, operator)
-	if index < 0 {
-		panic("operator not found in no-accidental-bitwise-operator fixture: " + operator)
-	}
+func invalidAt(code, operator, logicalOperator, filename string, occurrence int) rule_tester.InvalidTestCase {
+	index := operatorIndex(code, operator, occurrence)
 	return rule_tester.InvalidTestCase{
 		Code:     code,
 		FileName: filename,
@@ -42,10 +45,14 @@ func invalid(code, operator, logicalOperator, filename string) rule_tester.Inval
 			Line: 1, Column: index + 1, EndLine: 1, EndColumn: index + len(operator) + 1,
 			Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 				MessageId: suggestionMessageID,
-				Output:    replaceOnce(code, operator, logicalOperator),
+				Output:    code[:index] + logicalOperator + code[index+len(operator):],
 			}},
 		}},
 	}
+}
+
+func invalid(code, operator, logicalOperator, filename string) rule_tester.InvalidTestCase {
+	return invalidAt(code, operator, logicalOperator, filename, 0)
 }
 
 func TestNoAccidentalBitwiseOperatorUpstream(t *testing.T) {
@@ -99,7 +106,7 @@ func TestNoAccidentalBitwiseOperatorUpstream(t *testing.T) {
 		invalid(`x | class {};`, `|`, `||`, "file.js"),
 		invalid(`foo() | {};`, `|`, `||`, "file.js"),
 		invalid(`a.b | {};`, `|`, `||`, "file.js"),
-		invalid(`a | b | {};`, `|`, `||`, "file.js"),
+		invalidAt(`a | b | {};`, `|`, `||`, "file.js", 1),
 		invalid(`input |= '';`, `|=`, `||=`, "file.js"),
 		invalid(`input |= {};`, `|=`, `||=`, "file.js"),
 		invalid(`input |= false;`, `|=`, `||=`, "file.js"),
