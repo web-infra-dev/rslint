@@ -136,6 +136,7 @@ func PrepareLintPlanContext(ctx context.Context, opts PrepareLintPlanOptions) (*
 		}
 	}
 
+	var filteredRules nonTypeAwareRuleCache
 	resolve := func(resolveCtx context.Context, ref lintPlanFileRef) []rule.RuleDiagnostic {
 		if resolveCtx.Err() != nil {
 			return nil
@@ -144,7 +145,7 @@ func PrepareLintPlanContext(ctx context.Context, opts PrepareLintPlanOptions) (*
 		return resolveProgramLintPlanFile(programRulePlanOptions{
 			Program:         programPlan.program,
 			GetRulesForFile: opts.GetRulesForFile,
-		}, programPlan, ref.fileIndex, resolveCtx)
+		}, programPlan, ref.fileIndex, resolveCtx, &filteredRules)
 	}
 
 	workerCount := min(runtime.GOMAXPROCS(0), len(refs))
@@ -258,11 +259,12 @@ func prepareProgramLintPlanForFiles(opts programRulePlanOptions, files []*ast.So
 		return programLintPlan{}, err
 	}
 	ctx := context.Background()
+	var filteredRules nonTypeAwareRuleCache
 	for fileIndex := range plan.files {
 		// Compatibility callers consume only the execution projection. Syntax
 		// diagnostics still gate rule resolution, but their presentation remains
 		// owned by the caller.
-		_ = resolveProgramLintPlanFile(opts, &plan, fileIndex, ctx)
+		_ = resolveProgramLintPlanFile(opts, &plan, fileIndex, ctx, &filteredRules)
 	}
 	return plan, nil
 }
@@ -272,6 +274,7 @@ func resolveProgramLintPlanFile(
 	plan *programLintPlan,
 	fileIndex int,
 	ctx context.Context,
+	filteredRules *nonTypeAwareRuleCache,
 ) []rule.RuleDiagnostic {
 	filePlan := &plan.files[fileIndex]
 	file := filePlan.file
@@ -292,10 +295,41 @@ func resolveProgramLintPlanFile(
 	if filePlan.hasTypeChecker {
 		filePlan.rules = rules
 	} else {
-		filePlan.rules = rule.FilterNonTypeAwareRules(rules)
+		filePlan.rules = filteredRules.filter(rules)
 	}
 	filePlan.environment = firstNativeRuleEnvironment(filePlan.rules)
 	return nil
+}
+
+// nonTypeAwareRuleCache shares a derived view of immutable configured rules
+// only while preparing one plan. The cache is discarded after workers join;
+// file plans retain the published slices without retaining this lookup table.
+type nonTypeAwareRuleCache struct {
+	values sync.Map // nonTypeAwareRuleKey -> []rule.ConfiguredRule
+}
+
+type nonTypeAwareRuleKey struct {
+	// Keep the input allocation alive and distinguish slice ranges by their exact
+	// start and length. Equal rule names do not imply equal configuration.
+	first  *rule.ConfiguredRule
+	length int
+}
+
+func (cache *nonTypeAwareRuleCache) filter(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
+	if len(rules) == 0 {
+		return rule.FilterNonTypeAwareRules(rules)
+	}
+	key := nonTypeAwareRuleKey{first: &rules[0], length: len(rules)}
+	if cached, ok := cache.values.Load(key); ok {
+		filtered, _ := cached.([]rule.ConfiguredRule)
+		return filtered
+	}
+	// Filtering is pure and inexpensive. Concurrent cold misses may compute
+	// duplicates, but only one complete immutable slice is published and used.
+	filtered := rule.FilterNonTypeAwareRules(rules)
+	actual, _ := cache.values.LoadOrStore(key, filtered)
+	filtered, _ = actual.([]rule.ConfiguredRule)
+	return filtered
 }
 
 // SyntacticDiagnostics returns diagnostics frozen by this plan. Project-backed

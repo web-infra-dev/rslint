@@ -1604,6 +1604,12 @@ lint and fix execution still await full config activation.
   file's complete rule set once into immutable rslint Program slots. Native
   execution and optional third-party plugin dispatch consume projections of the
   same plan instead of repeating target collection or rule resolution
+- **Plan-Scoped Rule Filtering**: while preparing one lint plan, checker-free
+  files sharing the same immutable rule slice reuse its non-type-aware subset.
+  A concurrent lookup keyed by the input slice's exact start and length publishes
+  complete results without changing per-file checker eligibility. The lookup is
+  discarded after preparation; the plan retains only the shared rule views.
+  New plans, including autofix observations, prepare independent views
 
 ### Performance Optimizations
 
