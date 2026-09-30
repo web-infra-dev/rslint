@@ -30,6 +30,7 @@ var NoGlobalObjectPropertyAssignmentRule = rule.Rule{
 			ctx.SourceFile,
 			ctx.Refs,
 		)
+		propertyNames.GlobalAccess = ctx.Globals.Access
 
 		check := func(node *ast.Node) {
 			object := utils.SkipAssertionsAndParens(utils.AccessExpressionObject(node))

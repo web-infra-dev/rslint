@@ -15,8 +15,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
-// StaticStringEvaluator folds expressions to string constants. It wraps tsgo's
-// evaluator and adds stable local variable resolution through the TypeChecker.
+// StaticStringEvaluator folds expressions to static JavaScript values and exposes
+// string/property-name conversions to callers. It wraps tsgo's evaluator and adds
+// stable local variable resolution through the TypeChecker. Internal values such
+// as Symbols stay typed until a conversion boundary instead of being stringified.
 // Create one evaluator per linted file; it keeps write-reference and recursion
 // state for that file.
 type StaticStringEvaluator struct {
@@ -333,10 +335,16 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 			return result
 		}
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		if result := staticEvaluator.evalWellKnownSymbolMember(node); result.ok {
+			return result
+		}
 		if result := staticEvaluator.evalMemberAccess(node); result.ok {
 			return result
 		}
 	case ast.KindCallExpression:
+		if result := staticEvaluator.evalSymbolCall(node); result.ok {
+			return result
+		}
 		if result := staticEvaluator.evalBuiltinStaticCall(node); result.ok {
 			return result
 		}
@@ -1640,7 +1648,11 @@ func (staticEvaluator *StaticStringEvaluator) isStringRawTag(tag *ast.Node) bool
 	return staticEvaluator.isBuiltinStringValue(AccessExpressionObject(tag), map[*ast.Symbol]bool{})
 }
 
-func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Node, resolvingAliases map[*ast.Symbol]bool) bool {
+func (staticEvaluator *StaticStringEvaluator) isBuiltinValue(
+	node *ast.Node,
+	name string,
+	resolvingAliases map[*ast.Symbol]bool,
+) bool {
 	if !staticEvaluator.resolveIdentifiers {
 		return false
 	}
@@ -1648,7 +1660,7 @@ func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Nod
 	if node == nil {
 		return false
 	}
-	if staticEvaluator.isBuiltinIdentifier(node, "String") {
+	if staticEvaluator.isBuiltinIdentifier(node, name) {
 		return true
 	}
 	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
@@ -1657,24 +1669,15 @@ func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Nod
 	}
 	resolvingAliases[symbol] = true
 	defer delete(resolvingAliases, symbol)
-	return staticEvaluator.isBuiltinStringValue(initializer, resolvingAliases)
+	return staticEvaluator.isBuiltinValue(initializer, name, resolvingAliases)
+}
+
+func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Node, resolvingAliases map[*ast.Symbol]bool) bool {
+	return staticEvaluator.isBuiltinValue(node, "String", resolvingAliases)
 }
 
 func (staticEvaluator *StaticStringEvaluator) isBuiltinArrayValue(node *ast.Node, resolvingAliases map[*ast.Symbol]bool) bool {
-	node = SkipAssertionsAndParens(node)
-	if node == nil {
-		return false
-	}
-	if staticEvaluator.isBuiltinIdentifier(node, "Array") {
-		return true
-	}
-	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
-	if !ok || resolvingAliases[symbol] {
-		return false
-	}
-	resolvingAliases[symbol] = true
-	defer delete(resolvingAliases, symbol)
-	return staticEvaluator.isBuiltinArrayValue(initializer, resolvingAliases)
+	return staticEvaluator.isBuiltinValue(node, "Array", resolvingAliases)
 }
 
 func (staticEvaluator *StaticStringEvaluator) isBuiltinIdentifier(node *ast.Node, name string) bool {
@@ -1846,7 +1849,7 @@ func isMutatingArrayMethod(name string) bool {
 
 func staticValueIsTsgoSafe(value any) bool {
 	switch value.(type) {
-	case bool, staticNullValue, staticUndefinedValue, staticNumberValue, *big.Int, *staticStringNode, *staticRegExpNode, *staticObjectValue, *staticArrayValue:
+	case bool, staticNullValue, staticUndefinedValue, staticNumberValue, staticSymbolValue, *big.Int, *staticStringNode, *staticRegExpNode, *staticObjectValue, *staticArrayValue:
 		return false
 	default:
 		return value != nil
@@ -1898,6 +1901,7 @@ const (
 	staticKindNumber
 	staticKindBigInt
 	staticKindBoolean
+	staticKindSymbol
 	staticKindNull
 	staticKindUndefined
 )
@@ -1908,6 +1912,8 @@ func staticValueKindOf(value any) staticValueKind {
 		return staticKindBigInt
 	case bool:
 		return staticKindBoolean
+	case staticSymbolValue:
+		return staticKindSymbol
 	case staticNullValue:
 		return staticKindNull
 	case staticUndefinedValue:
@@ -1964,6 +1970,10 @@ func staticValuesStrictEqual(left any, right any) (equal bool, ok bool) {
 			return false, false
 		}
 		return leftFlag == rightFlag, true
+	case staticKindSymbol:
+		leftSymbol := left.(staticSymbolValue)
+		rightSymbol := right.(staticSymbolValue)
+		return leftSymbol == rightSymbol, true
 	}
 	return true, true
 }
@@ -1990,6 +2000,8 @@ func staticValueTruthy(value any) (truthy bool, ok bool) {
 		return stringValue != "", true
 	case bool:
 		return value, true
+	case staticSymbolValue:
+		return true, true
 	case staticNullValue, staticUndefinedValue:
 		return false, true
 	case *staticRegExpNode, *staticObjectValue, *staticArrayValue:
@@ -2020,6 +2032,10 @@ func staticValueToString(value any) (string, bool) {
 		return "null", true
 	case staticUndefinedValue:
 		return "undefined", true
+	case staticSymbolValue:
+		// JavaScript's implicit ToString(Symbol) throws. Symbol keys remain
+		// first-class values and are never coerced into invented string names.
+		return "", false
 	case *staticArrayValue:
 		return staticArrayToString(value)
 	case *staticObjectValue:
