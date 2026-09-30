@@ -84,11 +84,12 @@ Disable this rule when optional props may intentionally remain `undefined`.
   `"defaultArguments"`; eslint-plugin-react v7.37.5 treats their wrappers separately.
 - Optional props named `toString`, `constructor`, or other inherited object names
   need explicit defaults. Upstream can mistake inherited properties for defaults.
-
 - Inline class props types and props types declared inside functions are checked;
   upstream can skip these optional props.
 - Reading `Component.defaultProps` does not suppress missing-default diagnostics;
   upstream can treat that read as an unresolved default declaration.
+- Multiple component values assigned to the same binding produce one diagnostic
+  per prop contract. A later component is still checked after a non-component value.
 
 ## Original Documentation
 

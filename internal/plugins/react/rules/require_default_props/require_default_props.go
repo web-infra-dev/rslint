@@ -60,6 +60,13 @@ type componentKey struct {
 	target  string
 }
 
+type diagnosticKey struct {
+	component componentKey
+	fallback  *ast.Node
+	id        string
+	name      string
+}
+
 type analyzer struct {
 	ctx         rule.RuleContext
 	lookup      *reactutil.VariableDefinitionLookup
@@ -68,6 +75,7 @@ type analyzer struct {
 	byNode      map[*ast.Node]*component
 	assignments []*ast.Node
 	byTarget    map[componentKey][]*component
+	reported    map[diagnosticKey]struct{}
 }
 
 func propertyName(n *ast.Node) string {
@@ -456,17 +464,6 @@ func (a *analyzer) applyAssignment(n *ast.Node) {
 		parts = append(parts, key.Text())
 	}
 	slices.Reverse(parts)
-	index := -1
-	for i, part := range parts {
-		if i > 0 && (part == "propTypes" || part == "defaultProps" || part == "getDefaultProps") {
-			index = i
-			break
-		}
-	}
-	if index < 0 {
-		return
-	}
-	target := strings.Join(parts[:index], ".")
 	if root == nil || root.Kind != ast.KindIdentifier {
 		return
 	}
@@ -474,27 +471,56 @@ func (a *analyzer) applyAssignment(n *ast.Node) {
 	if binding == nil {
 		return
 	}
-	for _, c := range a.byTarget[componentKey{binding: binding, target: target}] {
-		if index == len(parts)-1 {
-			if parts[index] == "propTypes" {
-				a.addProps(c, bin.Right)
+
+	// A marker can also be part of the component namespace, as in
+	// `ns.propTypes.C.propTypes`. Match only markers at the declaration end
+	// whose preceding path identifies a detected component. Iterating all
+	// matches preserves the rare case where both paths identify components.
+	for i, part := range parts {
+		if i == 0 || i < len(parts)-2 ||
+			(part != "propTypes" && part != "defaultProps" && part != "getDefaultProps") {
+			continue
+		}
+		target := strings.Join(parts[:i], ".")
+		for _, c := range a.byTarget[componentKey{binding: binding, target: target}] {
+			if i == len(parts)-1 {
+				if parts[i] == "propTypes" {
+					a.addProps(c, bin.Right)
+				} else {
+					a.addDefaults(c, bin.Right, true)
+				}
 			} else {
-				a.addDefaults(c, bin.Right, true)
-			}
-		} else if index == len(parts)-2 {
-			name := parts[index+1]
-			if parts[index] == "propTypes" {
-				c.declared = true
-				c.props[name] = prop{node: n, required: isRequired(bin.Right)}
-			} else {
-				c.hasDefaults = true
-				c.defaults[name] = true
+				name := parts[i+1]
+				if parts[i] == "propTypes" {
+					c.declared = true
+					c.props[name] = prop{node: n, required: isRequired(bin.Right)}
+				} else {
+					c.hasDefaults = true
+					c.defaults[name] = true
+				}
 			}
 		}
 	}
 }
 
-func report(ctx rule.RuleContext, n *ast.Node, id, name string) {
+func (a *analyzer) report(c *component, n *ast.Node, id, name string) {
+	// Component detection may retain multiple component-producing assignments
+	// for one binding and property path. Their external prop/default declarations
+	// form one contract, so report each contract issue once while retaining every
+	// candidate for conditional and later assignments.
+	key := diagnosticKey{
+		component: componentKey{binding: c.binding, target: c.target},
+		id:        id,
+		name:      name,
+	}
+	if c.binding == nil {
+		key.fallback = c.node
+	}
+	if _, exists := a.reported[key]; exists {
+		return
+	}
+	a.reported[key] = struct{}{}
+
 	descriptions := map[string]string{
 		"noDefaultWithRequired":      `propType "%s" is required and should not have a defaultProps declaration.`,
 		"shouldHaveDefault":          `propType "%s" is not required, but has no corresponding defaultProps declaration.`,
@@ -507,10 +533,10 @@ func report(ctx rule.RuleContext, n *ast.Node, id, name string) {
 		message.Description = fmt.Sprintf(message.Description, name)
 		message.Data = map[string]string{"name": name}
 	}
-	ctx.ReportNode(n, message)
+	a.ctx.ReportNode(n, message)
 }
 
-func (c *component) check(ctx rule.RuleContext, opts options) {
+func (c *component) check(a *analyzer, opts options) {
 	// NOTE: Unlike ESLint v7.37.5, wrappers retain their function identity so
 	// functions: ignore/defaultArguments also applies to memo and forwardRef.
 	function := c.fn != nil
@@ -520,7 +546,7 @@ func (c *component) check(ctx rule.RuleContext, opts options) {
 	}
 	if function && opts.functions == "defaultArguments" {
 		if c.hasDefaults {
-			report(ctx, c.node, "noDefaultPropsWithFunction", "")
+			a.report(c, c.node, "noDefaultPropsWithFunction", "")
 		}
 		params := c.fn.Parameters()
 		if len(params) == 0 {
@@ -537,7 +563,7 @@ func (c *component) check(ctx rule.RuleContext, opts options) {
 		if name.Kind == ast.KindIdentifier {
 			for _, p := range c.props {
 				if !p.required {
-					report(ctx, params[0], "destructureInSignature", "")
+					a.report(c, params[0], "destructureInSignature", "")
 					break
 				}
 			}
@@ -565,10 +591,10 @@ func (c *component) check(ctx rule.RuleContext, opts options) {
 					continue
 				}
 				if p.required && binding.Initializer != nil {
-					report(ctx, element, "noDefaultWithRequired", key.Text())
+					a.report(c, element, "noDefaultWithRequired", key.Text())
 				}
 				if !p.required && binding.Initializer == nil {
-					report(ctx, element, "shouldAssignObjectDefault", key.Text())
+					a.report(c, element, "shouldAssignObjectDefault", key.Text())
 				}
 			}
 		}
@@ -598,13 +624,13 @@ func (c *component) check(ctx rule.RuleContext, opts options) {
 		}
 		if p.required {
 			if opts.forbidDefaultForRequired && c.defaults[name] {
-				report(ctx, p.node, "noDefaultWithRequired", name)
+				a.report(c, p.node, "noDefaultWithRequired", name)
 			}
 			continue
 		}
 		// NOTE: Unlike ESLint, inherited Object.prototype keys are not defaults.
 		if !c.defaults[name] {
-			report(ctx, p.node, "shouldHaveDefault", name)
+			a.report(c, p.node, "shouldHaveDefault", name)
 		}
 	}
 }
@@ -618,7 +644,14 @@ var RequireDefaultPropsRule = rule.Rule{
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		scopes := scopeAnalysis.For(ctx)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
-		a := &analyzer{ctx: ctx, lookup: reactutil.NewVariableDefinitionLookup(ctx, scopes), wrappers: reactutil.GetPropWrapperFunctions(ctx.Settings), byNode: map[*ast.Node]*component{}, byTarget: map[componentKey][]*component{}}
+		a := &analyzer{
+			ctx:      ctx,
+			lookup:   reactutil.NewVariableDefinitionLookup(ctx, scopes),
+			wrappers: reactutil.GetPropWrapperFunctions(ctx.Settings),
+			byNode:   map[*ast.Node]*component{},
+			byTarget: map[componentKey][]*component{},
+			reported: map[diagnosticKey]struct{}{},
+		}
 		collect := func(n *ast.Node) {
 			if reactutil.IsAsyncGeneratorFunction(n) || !reactutil.IsDetectedComponent(n, pragma, createClass, wrappers, ctx.TypeChecker, scopes) {
 				return
@@ -670,7 +703,7 @@ var RequireDefaultPropsRule = rule.Rule{
 				}
 			}
 			for _, c := range a.components {
-				c.check(ctx, opts)
+				c.check(a, opts)
 			}
 		}
 		return listeners

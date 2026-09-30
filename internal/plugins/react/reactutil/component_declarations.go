@@ -257,12 +257,17 @@ func ComponentTarget(node *ast.Node) []string {
 			if parent.AsPropertyAssignment().Initializer != current || parent.Parent == nil {
 				return target
 			}
-			memberTarget = true
 			member := componentPropertyName(parent.AsPropertyAssignment().Name())
 			if member == "" {
 				return target
 			}
-			if len(target) == 0 || target[0] != member {
+			if !memberTarget {
+				// A named function/class expression's own name is local to the
+				// expression. External declarations address the containing object
+				// property: `{ C: function Named() {} }` is `C`, not `C.Named`.
+				target = []string{member}
+				memberTarget = true
+			} else if len(target) == 0 || target[0] != member {
 				target = append([]string{member}, target...)
 			}
 			current = parent.Parent
