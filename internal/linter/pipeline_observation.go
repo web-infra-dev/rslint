@@ -31,7 +31,18 @@ func executeObservation(
 	if err != nil {
 		return observationExecution{}, err
 	}
-	lease := &releaseLease{release: release}
+	execution := observationExecution{
+		observation: ObservationResult{Index: index},
+	}
+	// Keep diagnostic ownership tied to the generation lease on every exit,
+	// including failed fix validation. Successful fix text reads and joined
+	// plugin work must finish before explicitly closing this boundary.
+	lease := &releaseLease{release: func() {
+		execution.observation.detachDiagnosticSources()
+		if release != nil {
+			release()
+		}
+	}}
 	defer lease.close()
 	if err := ctx.Err(); err != nil {
 		return observationExecution{}, err
@@ -71,12 +82,10 @@ func executeObservation(
 	if len(pluginWork.inputs) > 0 && policy.Plugin != pluginProgressiveAfterNative && dispatcher == nil {
 		return observationExecution{}, errors.New("linter pipeline: joined plugin work requires a dispatcher")
 	}
-	execution := observationExecution{
-		observation: ObservationResult{Index: index},
-	}
 	switch policy.Plugin {
 	case PluginConcurrentJoined:
-		execution, runErr := executeConcurrentObservation(
+		var runErr error
+		execution, runErr = executeConcurrentObservation(
 			ctx,
 			generation,
 			plan,
@@ -95,20 +104,17 @@ func executeObservation(
 				diagnostics,
 			)
 		}
-		execution.observation.detachDiagnosticSources()
 		lease.close()
 		return execution, joinContextError(runErr, ctx)
 	case PluginAfterNativeJoined:
 		native, nativeErr := runNativeObservation(ctx, generation, plan, policy.Demand.Native, lintedFiles)
 		execution.observation.Native = native
 		if nativeErr != nil {
-			execution.observation.detachDiagnosticSources()
 			lease.close()
 			return execution, nativeErr
 		}
 		if stopOnTargetSyntaxErrors && native.HasTargetSyntaxErrors {
 			pluginWork.fixCandidates = nil
-			execution.observation.detachDiagnosticSources()
 			lease.close()
 			execution.observation.pluginKind = pluginObservationNone
 			return execution, ctx.Err()
@@ -135,7 +141,6 @@ func executeObservation(
 			}
 		}
 		pluginWork.fixCandidates = nil
-		execution.observation.detachDiagnosticSources()
 		// Detached plugin inputs and frozen fix text no longer reference generation
 		// state, so watcher/Program resources are released before a reverse request
 		// can block.
@@ -168,7 +173,6 @@ func executeObservation(
 	case pluginProgressiveAfterNative:
 		native, nativeErr := runNativeObservation(ctx, generation, plan, policy.Demand.Native, lintedFiles)
 		execution.observation.Native = native
-		execution.observation.detachDiagnosticSources()
 		// Clear the last SourceFile-bearing side channel before releasing the
 		// generation. The detached input itself was already deep-frozen above.
 		pluginWork.fixCandidates = nil

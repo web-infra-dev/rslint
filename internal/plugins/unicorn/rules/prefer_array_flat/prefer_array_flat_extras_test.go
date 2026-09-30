@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat"
@@ -467,7 +466,7 @@ func TestPreferArrayFlatEditDemand(t *testing.T) {
 			Program:     lintprogram.NewFromCompiler(program),
 			File:        sourceFile.FileName(),
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:     prefer_array_flat.PreferArrayFlatRule.Name,
 					Severity: rule.SeverityError,

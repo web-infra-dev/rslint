@@ -27,7 +27,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -854,7 +853,7 @@ let visibleAgain: number;
 				Programs:         programs,
 				TargetsByProgram: [][]string{{sourceFile.FileName()}},
 				SingleThreaded:   true,
-				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				GetRulesForFile: func(string) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{
 						Name:     "@typescript-eslint/init-declarations",
 						Severity: rule.SeverityWarning,

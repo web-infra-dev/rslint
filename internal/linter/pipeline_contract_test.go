@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 
 	"github.com/web-infra-dev/rslint/internal/program"
@@ -22,7 +21,7 @@ func TestPipelineReleasesGenerationOnPreparationFailureAndPanic(t *testing.T) {
 		_, err := RunPipeline(context.Background(), NewLintRequest(
 			pipelineTestProvider(Generation{Native: NativeGeneration{
 				Programs: []*program.Program{nil},
-				RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				RulesForFile: func(string) []rule.ConfiguredRule {
 					return nil
 				},
 			}}, func() {
@@ -40,7 +39,7 @@ func TestPipelineReleasesGenerationOnPreparationFailureAndPanic(t *testing.T) {
 		root := tspath.NormalizePath(t.TempDir())
 		fileName := tspath.ResolvePath(root, "source.ts")
 		generation := pipelineTestGeneration(t, root, fileName, "const value = 1;", nil, nil)
-		generation.Native.RulesForFile = func(*ast.SourceFile) []rule.ConfiguredRule {
+		generation.Native.RulesForFile = func(string) []rule.ConfiguredRule {
 			panic("resolver failed")
 		}
 		var releases atomic.Int32
@@ -64,7 +63,7 @@ func TestPipelineReleasesGenerationOnPreparationFailureAndPanic(t *testing.T) {
 
 		var arrivals atomic.Int32
 		releaseResolvers := make(chan struct{})
-		recovered, releases := runPipelineWithParallelRuleResolver(t, func(source *ast.SourceFile) []rule.ConfiguredRule {
+		recovered, releases := runPipelineWithParallelRuleResolver(t, func(source string) []rule.ConfiguredRule {
 			if arrivals.Add(1) == 2 {
 				close(releaseResolvers)
 			}
@@ -73,7 +72,7 @@ func TestPipelineReleasesGenerationOnPreparationFailureAndPanic(t *testing.T) {
 			case <-time.After(5 * time.Second):
 				panic("timed out waiting for both parallel resolvers")
 			}
-			panic(source.FileName())
+			panic(source)
 		})
 		firstPanic, firstOK := recovered.(string)
 		if !firstOK ||
@@ -88,7 +87,7 @@ func TestPipelineReleasesGenerationOnPreparationFailureAndPanic(t *testing.T) {
 		defer runtime.GOMAXPROCS(previousProcs)
 
 		var calls atomic.Int32
-		recovered, releases := runPipelineWithParallelRuleResolver(t, func(*ast.SourceFile) []rule.ConfiguredRule {
+		recovered, releases := runPipelineWithParallelRuleResolver(t, func(string) []rule.ConfiguredRule {
 			if calls.Add(1) == 1 {
 				runtime.Goexit()
 			}

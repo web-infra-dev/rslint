@@ -5,7 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -249,7 +248,7 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 		Programs:         programs,
 		TargetsByProgram: [][]string{{sourceFile.FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(_ *ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(_ string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     "test",
 				Severity: rule.SeverityError,

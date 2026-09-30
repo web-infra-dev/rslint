@@ -3,7 +3,6 @@ package no_import_assign
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -772,7 +771,7 @@ func lintNoImportAssignForComparison(
 		Program:     lintprogram.NewFromCompiler(program),
 		File:        sourceFile.FileName(),
 		HasTypeInfo: true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     NoImportAssignRule.Name,
 				Severity: rule.SeverityError,

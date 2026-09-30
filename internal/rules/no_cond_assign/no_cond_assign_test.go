@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -410,7 +409,7 @@ func runNoCondAssign(t *testing.T, code string, options []any, demand rule.EditD
 		Programs:         programs,
 		TargetsByProgram: [][]string{{sourceFile.FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     NoCondAssignRule.Name,
 				Severity: rule.SeverityError,

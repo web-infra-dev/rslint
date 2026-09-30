@@ -526,11 +526,7 @@ func (s *Session) appendRootPrograms(
 			return err
 		}
 		binding.Programs = append(binding.Programs, rootProgram)
-		files := rootProgram.SourceFiles()
-		targets := make([]string, len(files))
-		for index, file := range files {
-			targets[index] = file.FileName()
-		}
+		targets := append([]string(nil), rootProgram.RootFileNames()...)
 		binding.TargetsByProgram = append(binding.TargetsByProgram, targets)
 	}
 	return nil

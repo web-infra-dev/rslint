@@ -442,8 +442,8 @@ func createNoUnusedVarsProgram(t testing.TB, fileName string, code string) (*com
 	return program, sourceFile
 }
 
-func noUnusedVarsConfiguredRules(options []any) func(*ast.SourceFile) []rule.ConfiguredRule {
-	return func(*ast.SourceFile) []rule.ConfiguredRule {
+func noUnusedVarsConfiguredRules(options []any) linter.RuleHandler {
+	return func(string) []rule.ConfiguredRule {
 		return []rule.ConfiguredRule{{
 			Name:             NoUnusedVarsRule.Name,
 			Severity:         rule.SeverityError,

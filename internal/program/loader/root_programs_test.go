@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -205,7 +205,7 @@ func TestRootProgramSupportsCrossFileImportRules(t *testing.T) {
 			plan.Files[1].Path,
 		}},
 		SingleThreaded: true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{
 				{
 					Name:     no_cycle.NoCycleRule.Name,
@@ -230,6 +230,9 @@ func TestRootProgramSupportsCrossFileImportRules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrepareLintPlan: %v", err)
 	}
+	// Rules must see the complete graph even after every unreferenced AST is collected.
+	runtime.GC()
+	runtime.GC()
 	result, err := linter.RunLinter(linter.RunLinterOptions{
 		SingleThreaded: true,
 		LintPlan:       lintPlan,

@@ -462,9 +462,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		var rulesForFile linter.RuleHandler
 		if !typeCheckOnly {
 			fileConfigResolver = configResolver.WithSourceMappings(binding.LintTargetBySourcePath, generationFS, true)
-			rulesForFile = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-				return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
-			}
+			rulesForFile = fileConfigResolver.EnabledRulesForSourcePath
 		}
 		targetPath := func(sourcePath string) string {
 			if lintTarget, ok := target.LookupSourceTarget(binding.LintTargetBySourcePath, sourcePath, generationFS); ok {

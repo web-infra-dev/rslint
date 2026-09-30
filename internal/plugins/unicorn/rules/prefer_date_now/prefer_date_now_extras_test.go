@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
@@ -112,7 +111,7 @@ func testPreferDateNowEditDemand(t *testing.T, source, fixedSource string, messa
 		var got []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: program.NewFromCompiler(compilerProgram), File: fileName,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name: prefer_date_now.PreferDateNowRule.Name, Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {

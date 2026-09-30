@@ -5,7 +5,6 @@ package display_name
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -122,7 +121,7 @@ func TestDisplayNameExtrasPragma(t *testing.T) {
 				var diagnostics []rule.RuleDiagnostic
 				plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 					Programs: []*lintprogram.Program{program}, TargetsByProgram: [][]string{{fileName}}, SingleThreaded: true,
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: DisplayNameRule.Name, Severity: rule.SeverityError,
 							Environment: &rule.RuleEnvironment{Settings: test.settings},
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {

@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	no_new_buffer "github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_new_buffer"
@@ -138,7 +137,7 @@ func TestNoNewBufferEditDemand(t *testing.T) {
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: lintprogram.NewFromCompiler(program),
 			File:    sourceFile.FileName(),
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:     no_new_buffer.NoNewBufferRule.Name,
 					Severity: rule.SeverityError,

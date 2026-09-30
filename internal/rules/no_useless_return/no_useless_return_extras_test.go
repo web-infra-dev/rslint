@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -464,7 +463,7 @@ function third() { g(); return /* keep */; }`,
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: lintprogram.NewFromCompiler(program),
 			File:    sourceFile.FileName(),
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:     NoUselessReturnRule.Name,
 					Severity: rule.SeverityError,

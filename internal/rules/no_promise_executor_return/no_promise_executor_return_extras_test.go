@@ -954,8 +954,8 @@ func lintNoPromiseExecutorReturnWithDemand(
 	return diagnostics
 }
 
-func noPromiseExecutorReturnConfiguredRules(options []any) func(*ast.SourceFile) []rule.ConfiguredRule {
-	return func(*ast.SourceFile) []rule.ConfiguredRule {
+func noPromiseExecutorReturnConfiguredRules(options []any) linter.RuleHandler {
+	return func(string) []rule.ConfiguredRule {
 		return []rule.ConfiguredRule{{
 			Name:     NoPromiseExecutorReturnRule.Name,
 			Severity: rule.SeverityError,

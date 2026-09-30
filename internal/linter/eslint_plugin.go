@@ -179,36 +179,37 @@ type EslintPluginFileConfigResolver func(filePath string) EslintPluginFileConfig
 
 // BuildEslintPluginFileInputs projects third-party plugin inputs from the same
 // prepared file/rule plan consumed by native linting. Pure-native targets do
-// not invoke resolveConfig.
+// not invoke resolveConfig or materialize their ASTs.
 func BuildEslintPluginFileInputs(
 	plan *LintPlan,
 	resolveConfig EslintPluginFileConfigResolver,
 ) []EslintPluginFileInput {
-	targets := plan.Targets()
-	if len(targets) == 0 {
+	if plan == nil {
 		return nil
 	}
 	var inputs []EslintPluginFileInput
-	for _, target := range targets {
-		if !hasEslintPluginRule(target.Rules) {
-			continue
-		}
-		filePath := target.File.FileName()
-		var fileConfig EslintPluginFileConfig
-		if resolveConfig != nil {
-			fileConfig = resolveConfig(filePath)
-		}
-		input, ok := BuildEslintPluginFileInput(
-			filePath,
-			fileConfig.ConfigKey,
-			target.Rules,
-			fileConfig.LanguageOptions,
-			fileConfig.Settings,
-			nil,
-			target.File,
-		)
-		if ok {
-			inputs = append(inputs, input)
+	for _, programPlan := range plan.programs {
+		for _, filePlan := range programPlan.files {
+			if !hasEslintPluginRule(filePlan.rules) {
+				continue
+			}
+			filePath := filePlan.source.FileName()
+			var fileConfig EslintPluginFileConfig
+			if resolveConfig != nil {
+				fileConfig = resolveConfig(filePath)
+			}
+			input, ok := BuildEslintPluginFileInput(
+				filePath,
+				fileConfig.ConfigKey,
+				filePlan.rules,
+				fileConfig.LanguageOptions,
+				fileConfig.Settings,
+				nil,
+				filePlan.source.AST(),
+			)
+			if ok {
+				inputs = append(inputs, input)
+			}
 		}
 	}
 	return inputs

@@ -91,7 +91,7 @@ func TestPreferStrictEqualSharedEditDemand(t *testing.T) {
 			Program:     lintprogram.NewFromCompiler(program),
 			File:        sourceFile.FileName(),
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name: r.Name, Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners { return r.Run(ctx, nil) },

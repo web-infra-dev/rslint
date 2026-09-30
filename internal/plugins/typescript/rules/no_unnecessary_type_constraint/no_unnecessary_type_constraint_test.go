@@ -1753,7 +1753,7 @@ func createNoUnnecessaryTypeConstraintProgram(
 	return program, sourceFile
 }
 
-func noUnnecessaryTypeConstraintConfiguredRules(*ast.SourceFile) []rule.ConfiguredRule {
+func noUnnecessaryTypeConstraintConfiguredRules(string) []rule.ConfiguredRule {
 	return []rule.ConfiguredRule{{
 		Name:     NoUnnecessaryTypeConstraintRule.Name,
 		Severity: rule.SeverityError,

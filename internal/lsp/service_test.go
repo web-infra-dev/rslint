@@ -1638,8 +1638,8 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: lintprogram.NewFromCompiler(program),
 			File:    file,
-			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-				targetPath := sourceFile.FileName()
+			GetRulesForFile: func(sourceFile string) []rule.ConfiguredRule {
+				targetPath := sourceFile
 				return configuredRulesForLSPTest(
 					cfg,
 					target.File{

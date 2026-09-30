@@ -568,7 +568,7 @@ func lintNoEmptyInterfaceForTest(
 		Program:     program,
 		File:        sourceFile.FileName(),
 		HasTypeInfo: hasTypeInfo,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     "@typescript-eslint/no-empty-interface",
 				Severity: rule.SeverityError,

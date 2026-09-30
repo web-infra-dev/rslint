@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -275,7 +274,7 @@ func lintNoUnsafeEnumComparisonFiles(t testing.TB, files map[string]string, targ
 		Program:     lintprogram.NewFromCompiler(compilerProgram),
 		File:        sourceFile.FileName(),
 		HasTypeInfo: true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:             NoUnsafeEnumComparisonRule.Name,
 				Severity:         rule.SeverityError,

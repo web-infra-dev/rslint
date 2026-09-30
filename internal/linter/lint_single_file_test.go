@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -24,7 +23,7 @@ func TestLintSingleFileLeavesSyntaxGateToCaller(t *testing.T) {
 	LintSingleFile(LintSingleFileOptions{
 		Program: programs[0],
 		File:    targetPath,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name: "caller-owned-syntax-gate",
 				Run: func(rule.RuleContext) rule.RuleListeners {
@@ -54,7 +53,7 @@ func TestLintSingleFileRejectsFileOutsideProgram(t *testing.T) {
 	LintSingleFile(LintSingleFileOptions{
 		Program: lintprogram.NewFromCompiler(raw),
 		File:    missing,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			t.Fatal("missing single-file target resolved rules")
 			return nil
 		},

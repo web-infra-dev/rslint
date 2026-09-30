@@ -168,7 +168,7 @@ func TestTypeCheckOnly_BaselineLintWouldFire(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{paths["a.ts"]}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return triggerOnIdentifierRule()
 		},
 	})
@@ -201,7 +201,7 @@ func TestTypeCheckOnly_EmptyLintPlanDoesNotConstrainTypeCheck(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{nil},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			t.Fatal("empty target projection resolved rules")
 			return nil
 		},
@@ -235,7 +235,7 @@ func TestTypeCheck_IncludesZeroTargetProgramFromLintPlan(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{lintPaths["lint.ts"]}, nil},
 		SingleThreaded:   true,
-		GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
+		GetRulesForFile:  func(string) []rule.ConfiguredRule { return noopRule() },
 	})
 
 	var diagnostics []rule.RuleDiagnostic

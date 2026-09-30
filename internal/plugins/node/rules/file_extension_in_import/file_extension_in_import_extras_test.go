@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -206,7 +205,7 @@ func TestFileExtensionInImportUnterminatedLiteral(t *testing.T) {
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: p, File: filename,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{Name: FileExtensionInImportRule.Name, Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners { return FileExtensionInImportRule.Run(ctx, nil) },
 			}}
@@ -306,7 +305,7 @@ func TestFileExtensionInImportEditDemand(t *testing.T) {
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: p, File: file.FileName(),
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: FileExtensionInImportRule.Name, Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {
 								return FileExtensionInImportRule.Run(ctx, []any{test.style})

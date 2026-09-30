@@ -2,9 +2,11 @@ package linter
 
 import (
 	"fmt"
+	"runtime"
 	"slices"
 	"sync/atomic"
 	"testing"
+	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
@@ -22,7 +24,7 @@ func mustPrepareLintPlan(t *testing.T, opts PrepareLintPlanOptions) *LintPlan {
 	return plan
 }
 
-func TestExactLintProjectionReusesUnchangedProgramUniverse(t *testing.T) {
+func TestExactLintProjectionPreservesFileIdentities(t *testing.T) {
 	raw, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "export const a = 1;",
 		"b.ts": "export const b = 1;",
@@ -35,19 +37,19 @@ func TestExactLintProjectionReusesUnchangedProgramUniverse(t *testing.T) {
 	sourceProgram := mustSourceOnlyTestProgram(t, raw, []*ast.SourceFile{a, b})
 	universe := sourceProgram.SourceFiles()
 
-	exact, err := resolveExactProgramFiles(sourceProgram, []string{a.FileName(), b.FileName()})
+	exact, err := resolveExactProgramSources(sourceProgram, []string{a.FileName(), b.FileName()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(exact) != len(universe) || &exact[0] != &universe[0] {
-		t.Fatal("unchanged exact projection copied the Program source universe")
+	if len(exact) != len(universe) || exact[0].source.FileName() != a.FileName() || exact[1].source.FileName() != b.FileName() {
+		t.Fatal("exact projection lost the Program file identities")
 	}
 
-	subset, err := resolveExactProgramFiles(sourceProgram, []string{a.FileName()})
+	subset, err := resolveExactProgramSources(sourceProgram, []string{a.FileName()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(subset) != 1 || subset[0] != a || len(universe) != 2 || universe[1] != b {
+	if len(subset) != 1 || subset[0].source.FileName() != a.FileName() || len(universe) != 2 || universe[1] != b {
 		t.Fatalf("subset projection=%v corrupted universe=%v", subset, universe)
 	}
 }
@@ -71,9 +73,9 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 	}
 
 	newRuleHandler := func(calls map[string]int) RuleHandler {
-		return func(file *ast.SourceFile) []rule.ConfiguredRule {
-			calls[file.FileName()]++
-			switch file.FileName() {
+		return func(file string) []rule.ConfiguredRule {
+			calls[file]++
+			switch file {
 			case paths["a.ts"]:
 				rules := noopRule()
 				return append(rules, rule.ConfiguredRule{
@@ -145,7 +147,7 @@ func TestLintPlanRunsSourceOnlyProgramWithoutChecker(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{file.FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{
 				{
 					Name:     "source-only-native",
@@ -232,10 +234,10 @@ func TestSourceOnlyPlanSeparatesUniverseFromExecutionProjection(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{a.FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(file string) []rule.ConfiguredRule {
 			resolved.Add(1)
-			if file != a {
-				t.Fatalf("resolved rules for %q, want only a.ts", file.FileName())
+			if file != a.FileName() {
+				t.Fatalf("resolved rules for %q, want only a.ts", file)
 			}
 			return []rule.ConfiguredRule{{
 				Name:     "source-only-projection",
@@ -251,7 +253,7 @@ func TestSourceOnlyPlanSeparatesUniverseFromExecutionProjection(t *testing.T) {
 	if !slices.Equal(plan.program.SourceFiles(), []*ast.SourceFile{a, b}) {
 		t.Fatalf("source universe = %v, want [a.ts b.ts]", plan.program.SourceFiles())
 	}
-	if len(plan.files) != 1 || plan.files[0].file != a {
+	if len(plan.files) != 1 || plan.files[0].source.FileName() != a.FileName() {
 		t.Fatalf("execution projection = %v, want [a.ts]", plan.files)
 	}
 	result, err := RunLinter(RunLinterOptions{
@@ -295,7 +297,7 @@ func TestSourceOnlyProgramSharesModuleGraphAndDerivedCache(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{files[0].FileName(), files[1].FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     "source-only-modules",
 				Severity: rule.SeverityError,
@@ -360,7 +362,7 @@ func TestSourceOnlyProgramRunsProgramIndexedImportRule(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{files[0].FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     no_cycle.NoCycleRule.Name,
 				Severity: rule.SeverityError,
@@ -425,7 +427,7 @@ func checkerFreeExecutionTestOptions(
 		Programs:         programs,
 		TargetsByProgram: [][]string{targets},
 		SingleThreaded:   singleThreaded,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     "checker-free-concurrency",
 				Severity: rule.SeverityError,
@@ -454,4 +456,39 @@ func wrapTestPrograms(programs ...*compiler.Program) []*lintprogram.Program {
 
 func testPrograms(programs ...*lintprogram.Program) []*lintprogram.Program {
 	return programs
+}
+
+func TestPreparedRootPlanSurvivesASTCollectionWithoutResolvingRulesAgain(t *testing.T) {
+	var resolved, executed int
+	var source weak.Pointer[ast.SourceFile]
+	generation := pipelineRootTestGeneration(t, map[string]string{"one.ts": "const one = 1;"}, func(string) []rule.ConfiguredRule {
+		resolved++
+		return []rule.ConfiguredRule{{Name: "test", Run: func(ctx rule.RuleContext) rule.RuleListeners {
+			executed++
+			source = weak.Make(ctx.SourceFile)
+			if !ctx.Program().OwnsSourceFile(ctx.SourceFile) || ctx.Program().GetSourceFile(ctx.SourceFile.FileName()) != ctx.SourceFile {
+				t.Error("execution lost exact generation identity")
+			}
+			return nil
+		}}}
+	})
+	native := generation.Native
+	source = weak.Make(native.Programs[0].GetSourceFile(native.TargetsByProgram[0][0]))
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs: native.Programs, TargetsByProgram: native.TargetsByProgram,
+		GetRulesForFile: native.RulesForFile, SingleThreaded: true,
+	})
+	for range 2 {
+		runtime.GC()
+		runtime.GC()
+		if source.Value() != nil {
+			t.Fatal("immutable plan retains an AST between executions")
+		}
+		if _, err := RunLinter(RunLinterOptions{LintPlan: plan, SingleThreaded: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if resolved != 1 || executed != 2 {
+		t.Fatalf("resolved/executed = %d/%d, want 1/2", resolved, executed)
+	}
 }

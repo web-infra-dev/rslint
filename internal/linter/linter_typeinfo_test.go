@@ -49,7 +49,7 @@ func TestCompilerCapableProgramProvidesTypeChecker(t *testing.T) {
 		"a.ts": "const x = 1;",
 	})
 	var checkerWasNil bool
-	runProgramCapabilityProbe(t, lintprogram.NewFromCompiler(raw), func(*ast.SourceFile) []rule.ConfiguredRule {
+	runProgramCapabilityProbe(t, lintprogram.NewFromCompiler(raw), func(string) []rule.ConfiguredRule {
 		return checkerProbeRule(&checkerWasNil)
 	})
 	if checkerWasNil {
@@ -67,7 +67,7 @@ func TestSourceOnlyProgramWithholdsTypeChecker(t *testing.T) {
 	}
 	sourceOnly := mustSourceOnlyTestProgram(t, raw, []*ast.SourceFile{file})
 	var checkerWasNil bool
-	result := runProgramCapabilityProbe(t, sourceOnly, func(*ast.SourceFile) []rule.ConfiguredRule {
+	result := runProgramCapabilityProbe(t, sourceOnly, func(string) []rule.ConfiguredRule {
 		return checkerProbeRule(&checkerWasNil)
 	})
 	if !checkerWasNil || result.LintedFileCount != 1 {
@@ -85,7 +85,7 @@ func TestSourceOnlyProgramFiltersTypeAwareRule(t *testing.T) {
 	}
 	sourceOnly := mustSourceOnlyTestProgram(t, raw, []*ast.SourceFile{file})
 	ruleRan := false
-	result := runProgramCapabilityProbe(t, sourceOnly, func(*ast.SourceFile) []rule.ConfiguredRule {
+	result := runProgramCapabilityProbe(t, sourceOnly, func(string) []rule.ConfiguredRule {
 		return []rule.ConfiguredRule{{
 			Name:             "type-aware-probe",
 			Severity:         rule.SeverityWarning,
@@ -109,7 +109,7 @@ func TestCompilerCapableProgramRunsTypeAwareRule(t *testing.T) {
 		"a.ts": "const x = 1;",
 	})
 	ruleRan := false
-	result := runProgramCapabilityProbe(t, lintprogram.NewFromCompiler(raw), func(*ast.SourceFile) []rule.ConfiguredRule {
+	result := runProgramCapabilityProbe(t, lintprogram.NewFromCompiler(raw), func(string) []rule.ConfiguredRule {
 		return []rule.ConfiguredRule{{
 			Name:             "type-aware-probe",
 			Severity:         rule.SeverityWarning,

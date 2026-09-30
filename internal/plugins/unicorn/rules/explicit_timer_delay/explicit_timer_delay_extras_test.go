@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/explicit_timer_delay"
@@ -144,7 +143,7 @@ func TestExplicitTimerDelayArtifactsFollowDemand(t *testing.T) {
 				var got []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: explicit_timer_delay.ExplicitTimerDelayRule.Name, Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {
 								return explicit_timer_delay.ExplicitTimerDelayRule.Run(ctx, testCase.options)

@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_type_error"
@@ -119,7 +118,7 @@ func TestPreferTypeErrorArtifactsFollowDemand(t *testing.T) {
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: lintprogram.NewFromCompiler(program),
 					File:    sourceFile.FileName(),
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{
 							Name:     prefer_type_error.PreferTypeErrorRule.Name,
 							Severity: rule.SeverityError,

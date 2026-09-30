@@ -171,7 +171,7 @@ func lintDeferredEdits(t *testing.T, test deferredEditCase, program *lintprogram
 	options := rule_tester.ResolveTestCaseOptions(t, &test.rule, test.options)
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: program, File: sourceFile.FileName(), HasTypeInfo: typed,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{Name: test.rule.Name, Severity: rule.SeverityWarning,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners { return test.rule.Run(ctx, options) },
 			}}

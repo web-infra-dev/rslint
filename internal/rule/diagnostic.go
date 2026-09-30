@@ -81,8 +81,8 @@ type RuleDiagnostic struct {
 	// ast.SourceFileLike interface (Text + ECMALineMap) rather than a
 	// concrete *ast.SourceFile so completed pipeline observations and
 	// ESLint-plugin diagnostics can retain only text and still render
-	// line/column through the scanner. During execution, native diagnostics
-	// retain their source identity until fix text has been frozen.
+	// line/column through the scanner. Diagnostics carrying autofix edits
+	// retain their AST identity until fix validation finishes or fails.
 	SourceFile ast.SourceFileLike
 	// FilePath is the diagnostic's file name. Stored separately because
 	// ast.SourceFileLike exposes no FileName(); native diagnostics set it

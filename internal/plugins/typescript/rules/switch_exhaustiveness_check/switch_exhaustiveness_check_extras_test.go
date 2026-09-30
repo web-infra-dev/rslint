@@ -9,8 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
-
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -450,7 +448,7 @@ func testSwitchExhaustivenessCheckEditDemand(t *testing.T) {
 			Program:     sourceProgram,
 			File:        sourceFile.FileName(),
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:             SwitchExhaustivenessCheckRule.Name,
 					Severity:         rule.SeverityError,

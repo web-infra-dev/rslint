@@ -8,7 +8,6 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -307,8 +306,8 @@ func lintOffTheEditorPath(program *compiler.Program, file string, resolver *conf
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: lintprogram.NewFromCompiler(program),
 		File:    file,
-		GetRulesForFile: func(f *ast.SourceFile) []rule.ConfiguredRule {
-			rules, _ := resolver.EnabledRulesForFile(f.FileName())
+		GetRulesForFile: func(f string) []rule.ConfiguredRule {
+			rules, _ := resolver.EnabledRulesForFile(f)
 			return rules
 		},
 		Consumer: rule.DiagnosticConsumer{

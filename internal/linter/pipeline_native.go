@@ -3,7 +3,9 @@ package linter
 import (
 	"context"
 	"sync"
+	"weak"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -55,6 +57,24 @@ func runNativeObservation(
 	var finishOnce sync.Once
 	finish := func() { finishOnce.Do(finishDiagnostics) }
 	defer finish()
+	// Only fix-bearing diagnostics participate in source-identity validation.
+	// Project all others before queueing so ordinary files can be collected
+	// during the same observation, including an autofix observation.
+	report := consumer.Report
+	var projections sync.Map // weak.Pointer[ast.SourceFile] -> *diagnosticSource
+	consumer.Report = func(diagnostic rule.RuleDiagnostic) {
+		if source, ok := diagnostic.SourceFile.(*ast.SourceFile); ok && source != nil && len(diagnostic.Fixes()) == 0 {
+			key := weak.Make(source)
+			projection, found := projections.Load(key)
+			if !found {
+				projection, _ = projections.LoadOrStore(key, newDiagnosticSource(source))
+			}
+			if projected, ok := projection.(*diagnosticSource); ok {
+				diagnostic.SourceFile = projected
+			}
+		}
+		report(diagnostic)
+	}
 	runOptions.Consumer = consumer
 	lintResult, err := RunLinter(runOptions)
 	finish()

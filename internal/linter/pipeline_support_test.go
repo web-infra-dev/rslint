@@ -3,6 +3,7 @@ package linter
 import (
 	"context"
 	"errors"
+	"sort"
 	"sync/atomic"
 	"testing"
 
@@ -47,7 +48,7 @@ func pipelineTestGeneration(
 			TargetsByProgram: [][]string{{fileName}},
 			SingleThreaded:   true,
 			Cwd:              root,
-			RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			RulesForFile: func(string) []rule.ConfiguredRule {
 				return configuredRules
 			},
 		},
@@ -79,7 +80,7 @@ func autofixPolicyForTest(maxRounds int, policy AutofixPolicy) AutofixPolicy {
 
 func runPipelineWithParallelRuleResolver(
 	t *testing.T,
-	resolver func(*ast.SourceFile) []rule.ConfiguredRule,
+	resolver RuleHandler,
 ) (recovered any, releases int32) {
 	t.Helper()
 	root := tspath.NormalizePath(t.TempDir())
@@ -206,4 +207,34 @@ func (r *pipelineFinalChangeRecorder) CommitFinalChanges(
 		paths[index] = change.Path
 	}
 	return CommitResult{ConfirmedPaths: paths}, nil
+}
+
+func pipelineRootTestGeneration(t *testing.T, files map[string]string, rules RuleHandler) Generation {
+	t.Helper()
+	root := tspath.NormalizePath(t.TempDir())
+	contents := make(map[string]string, len(files))
+	names := make([]string, 0, len(files))
+	for name, text := range files {
+		path := tspath.ResolvePath(root, name)
+		contents[path] = text
+		names = append(names, path)
+	}
+	sort.Strings(names)
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), contents)
+	sources, err := program.NewFromRoots(program.RootOptions{
+		RootFileNames: names, Host: utils.CreateCompilerHost(root, fs),
+		CompilerOptions: program.SourceOnlyCompilerOptions(), SingleThreaded: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return Generation{
+		Native: NativeGeneration{
+			Programs: []*program.Program{sources}, TargetsByProgram: [][]string{names},
+			RulesForFile: rules, SingleThreaded: true, Cwd: root,
+		},
+		Target: TargetProjection{
+			ReadText: func(_ string, source ast.SourceFileLike) (string, error) { return source.Text(), nil },
+		},
+	}
 }

@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -242,7 +241,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 			Programs:         programs,
 			TargetsByProgram: [][]string{allowedFiles},
 			SingleThreaded:   true,
-			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(sourceFile string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{
 					{
 						Name: "test",

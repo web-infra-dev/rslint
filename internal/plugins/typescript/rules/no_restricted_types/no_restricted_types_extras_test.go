@@ -1130,8 +1130,8 @@ func createNoRestrictedTypesProgram(t testing.TB, fileName string, code string) 
 	return program, sourceFile
 }
 
-func noRestrictedTypesConfiguredRules(options []any) func(*ast.SourceFile) []rule.ConfiguredRule {
-	return func(*ast.SourceFile) []rule.ConfiguredRule {
+func noRestrictedTypesConfiguredRules(options []any) linter.RuleHandler {
+	return func(string) []rule.ConfiguredRule {
 		return []rule.ConfiguredRule{{
 			Name:     NoRestrictedTypesRule.Name,
 			Severity: rule.SeverityError,

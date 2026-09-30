@@ -6,12 +6,15 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync"
+	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/module"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
@@ -50,6 +53,8 @@ type parsedBackend struct {
 	options                    *core.CompilerOptions
 	resolver                   *module.Resolver
 	files                      []*ast.SourceFile
+	roots                      []string
+	snapshots                  map[tspath.Path]*rootSnapshot
 	metadataByPath             map[tspath.Path]ast.SourceFileMetaData
 	sourcesByPath              map[tspath.Path]*ast.SourceFile
 	resolvedModules            map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule]
@@ -57,16 +62,49 @@ type parsedBackend struct {
 }
 
 type parsedResult struct {
-	file                 *ast.SourceFile
+	snapshot             *rootSnapshot
 	metadata             ast.SourceFileMetaData
 	resolvedModules      module.ModeAwareCache[*module.ResolvedModule]
 	syntacticDiagnostics []*ast.Diagnostic
 	err                  error
 }
 
-// NewFromRoots parses, resolves direct imports for, and binds one immutable
-// source universe. The returned Program owns its source-file slice
-// and AST generation; callers must build a new Program after source changes.
+// rootSnapshot keeps the source generation independently of its AST. A live
+// borrower always gets the same AST; after its last reference is collected,
+// parsing the frozen text recreates it without consulting a newer filesystem.
+// The mutex prevents concurrent readers from publishing different live ASTs.
+type rootSnapshot struct {
+	options ast.SourceFileParseOptions
+	text    string
+	kind    core.ScriptKind
+	mu      sync.Mutex
+	file    weak.Pointer[ast.SourceFile]
+}
+
+func (s *rootSnapshot) sourceFile() *ast.SourceFile {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	file := s.file.Value()
+	if file == nil {
+		file = parser.ParseSourceFile(s.options, s.text, s.kind)
+		s.file = weak.Make(file)
+	}
+	// Construction needs syntax and imports, but no symbols or scopes. Bind
+	// only when an AST is borrowed, including a surviving construction parse.
+	binder.BindSourceFile(file)
+	return file
+}
+
+func (s *rootSnapshot) owns(file *ast.SourceFile) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.file.Value() == file
+}
+
+// NewFromRoots parses and resolves direct imports for one immutable source
+// universe. Text, parse options, and module answers remain frozen; unreferenced
+// ASTs may be collected. AST access binds the file before returning it. Source
+// changes require a new Program.
 func NewFromRoots(opts RootOptions) (*Program, error) {
 	if isNilInterface(opts.Host) {
 		return nil, errors.New("program: root construction requires a compiler host")
@@ -89,9 +127,10 @@ func NewFromRoots(opts RootOptions) (*Program, error) {
 		fs:               fs,
 		currentDirectory: currentDirectory,
 		options:          opts.CompilerOptions,
+		roots:            make([]string, 0, len(rootFileNames)),
+		snapshots:        make(map[tspath.Path]*rootSnapshot, len(rootFileNames)),
 		resolver:         module.NewResolver(opts.Host, opts.CompilerOptions, "", "", nil),
 		metadataByPath:   make(map[tspath.Path]ast.SourceFileMetaData, len(rootFileNames)),
-		sourcesByPath:    make(map[tspath.Path]*ast.SourceFile, len(rootFileNames)),
 		resolvedModules:  make(map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule], len(rootFileNames)),
 	}
 	results := make([]parsedResult, len(rootFileNames))
@@ -105,9 +144,11 @@ func NewFromRoots(opts RootOptions) (*Program, error) {
 		}
 		syntacticDiagnostics := backend.computeSyntacticDiagnostics(file)
 		resolvedModules := backend.resolveImports(file, metadata)
-		binder.BindSourceFile(file)
 		results[index] = parsedResult{
-			file:                 file,
+			snapshot: &rootSnapshot{
+				options: file.ParseOptions(), text: file.Text(), kind: file.ScriptKind,
+				file: weak.Make(file),
+			},
 			metadata:             metadata,
 			resolvedModules:      resolvedModules,
 			syntacticDiagnostics: syntacticDiagnostics,
@@ -137,22 +178,27 @@ func NewFromRoots(opts RootOptions) (*Program, error) {
 		work.RunAndWait()
 	}
 
-	backend.files = make([]*ast.SourceFile, 0, len(results))
 	for _, result := range results {
 		if result.err != nil {
 			return nil, result.err
 		}
-		if previous := backend.sourcesByPath[result.file.Path()]; previous != nil {
-			if previous != result.file {
-				return nil, fmt.Errorf(
-					"program: source universe contains different ASTs for path %q",
-					result.file.Path(),
-				)
+		path := result.snapshot.options.Path
+		if previous := backend.snapshots[path]; previous != nil {
+			if previous.file != result.snapshot.file {
+				return nil, fmt.Errorf("program: source universe contains different ASTs for path %q", path)
 			}
 			continue
 		}
-		backend.install(result.file, result.metadata, result.resolvedModules, result.syntacticDiagnostics)
-		backend.files = append(backend.files, result.file)
+		backend.roots = append(backend.roots, result.snapshot.options.FileName)
+		backend.snapshots[path] = result.snapshot
+		backend.metadataByPath[path] = result.metadata
+		backend.resolvedModules[path] = result.resolvedModules
+		if len(result.syntacticDiagnostics) > 0 {
+			if backend.syntacticDiagnosticsByPath == nil {
+				backend.syntacticDiagnosticsByPath = make(map[tspath.Path][]*ast.Diagnostic)
+			}
+			backend.syntacticDiagnosticsByPath[path] = result.syntacticDiagnostics
+		}
 	}
 	return &Program{source: backend, cache: &derivedCache{}}, nil
 }
@@ -377,5 +423,19 @@ func (p *parsedBackend) computeSyntacticDiagnostics(file *ast.SourceFile) []*ast
 
 func (p *parsedBackend) sourceFile(fileName string) *ast.SourceFile {
 	path := tspath.ToPath(fileName, p.currentDirectory, p.fs.UseCaseSensitiveFileNames())
+	if snapshot := p.snapshots[path]; snapshot != nil {
+		return snapshot.sourceFile()
+	}
 	return p.sourcesByPath[path]
+}
+
+func (p *parsedBackend) sourceFileName(fileName string) string {
+	path := tspath.ToPath(fileName, p.currentDirectory, p.fs.UseCaseSensitiveFileNames())
+	if snapshot := p.snapshots[path]; snapshot != nil {
+		return snapshot.options.FileName
+	}
+	if file := p.sourcesByPath[path]; file != nil {
+		return file.FileName()
+	}
+	return ""
 }

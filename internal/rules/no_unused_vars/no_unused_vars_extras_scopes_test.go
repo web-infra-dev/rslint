@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -559,8 +558,8 @@ consume(outer);
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program:                sourceProgram,
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-			if sourceFile.FileName() != filePath {
+		GetRulesForFile: func(sourceFile string) []rule.ConfiguredRule {
+			if sourceFile != filePath {
 				return nil
 			}
 			return []rule.ConfiguredRule{{
@@ -843,8 +842,8 @@ consume(data);`,
 				testutil.LintProgram(t, testutil.LintProgramOptions{
 					Program:                sourceProgram,
 					ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-					GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-						if sourceFile.FileName() != filePath {
+					GetRulesForFile: func(sourceFile string) []rule.ConfiguredRule {
+						if sourceFile != filePath {
 							return nil
 						}
 						return []rule.ConfiguredRule{{
@@ -931,7 +930,7 @@ assigned = 2;
 			Program:     lintprogram.NewFromCompiler(program),
 			File:        filePath,
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:     NoUnusedVarsRule.Name,
 					Severity: rule.SeverityError,

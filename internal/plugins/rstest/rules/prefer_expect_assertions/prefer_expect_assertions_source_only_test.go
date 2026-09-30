@@ -3,7 +3,6 @@ package prefer_expect_assertions_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -59,7 +58,7 @@ scenario('options overload missing', { timeout: 100 }, () => { run(); });`
 		Programs:         []*lintprogram.Program{sourceProgram},
 		TargetsByProgram: [][]string{{fileName}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     prefer_expect_assertions.PreferExpectAssertionsRule.Name,
 				Severity: rule.SeverityError,

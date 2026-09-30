@@ -3,7 +3,6 @@ package require_top_level_describe_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -57,7 +56,7 @@ setup(() => {});`
 		Programs:         []*lintprogram.Program{sourceProgram},
 		TargetsByProgram: [][]string{{fileName}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     require_top_level_describe.RequireTopLevelDescribeRule.Name,
 				Severity: rule.SeverityError,

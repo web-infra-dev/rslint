@@ -350,7 +350,7 @@ test.concurrent("destructured", destructured);`
 		Programs:         []*lintprogram.Program{sourceProgram},
 		TargetsByProgram: [][]string{{fileName}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     concurrentOwnershipProbe.Name,
 				Severity: rule.SeverityError,

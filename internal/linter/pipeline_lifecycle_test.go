@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -185,6 +188,133 @@ func TestPipelineDetachesTypeCheckOnlyDiagnostics(t *testing.T) {
 		if _, retained := diagnostic.SourceFile.(*ast.SourceFile); retained {
 			t.Fatal("type-check-only diagnostic retained a compiler AST")
 		}
+	}
+}
+
+func TestPipelineDiagnosticSourcesDetachAcrossPublicationModes(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		kind PluginExecution
+	}{
+		{"concurrent", PluginConcurrentJoined},
+		{"after-native", PluginAfterNativeJoined},
+		{"progressive", pluginProgressiveAfterNative},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			root := tspath.NormalizePath(t.TempDir())
+			path := tspath.ResolvePath(root, "source.ts")
+			text := "const face = '😀';\r\nlet value = face;\u2028value;\u2029value;"
+			start := strings.LastIndex(text, "value")
+			textRange := core.NewTextRange(start, start+len("value"))
+			fixes := []rule.RuleFix{{Range: textRange, Text: "face"}}
+			suggestions := []rule.RuleSuggestion{{
+				Message:  rule.RuleMessage{Id: "suggest", Description: "use face", Data: map[string]string{"name": "face"}},
+				FixesArr: fixes,
+			}}
+			generation := pipelineTestGeneration(t, root, path, text, []rule.ConfiguredRule{
+				{
+					Name: "native/check", Severity: rule.SeverityWarning,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						ctx.ReportRangeWithFixesAndSuggestions(textRange, rule.RuleMessage{Id: "check", Description: "check value"}, fixes, suggestions)
+						ctx.ReportRange(textRange, rule.RuleMessage{Description: "second diagnostic"})
+						return nil
+					},
+				},
+				{Name: "plugin/check", IsEslintPluginRule: true, Severity: rule.SeverityError},
+			}, &EslintPluginFileConfig{})
+			original := generation.Native.Programs[0].SourceFiles()[0]
+			var releases int
+			provider := pipelineTestProvider(generation, func() { releases++ })
+			demand := ArtifactDemand{Native: rule.EditDemandAll, Plugin: rule.EditDemandAll, LintedFiles: true}
+			presentation := &pipelineProgressiveDiagnostics{}
+			var result PipelineResult
+			var err error
+			if mode.kind == pluginProgressiveAfterNative {
+				result, err = RunPipeline(context.Background(), NewProgressiveLintRequest(provider, demand, presentation))
+			} else {
+				result, err = RunPipeline(context.Background(), NewLintRequest(provider, ObservationPolicy{
+					Demand: demand, Plugin: mode.kind,
+				}, func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+					return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+						FilePath:    request.Files[0].Path,
+						Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/check", Message: "plugin", StartPos: 0, EndPos: 1}},
+					}}}, nil
+				}))
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			diagnostics := result.Observation.Native.Diagnostics
+			if releases != 1 || len(diagnostics) != 2 {
+				t.Fatalf("releases/diagnostics = %d/%d", releases, len(diagnostics))
+			}
+			source := diagnostics[0].SourceFile
+			if _, retainedAST := source.(*ast.SourceFile); retainedAST {
+				t.Fatal("published diagnostic retained its AST")
+			}
+			if source != diagnostics[1].SourceFile || source.Text() != text || !slices.Equal(source.ECMALineMap(), original.ECMALineMap()) {
+				t.Fatal("diagnostics lost shared source text or line metadata")
+			}
+			for offset := range text {
+				wantLine, wantColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(original, offset)
+				line, column := scanner.GetECMALineAndUTF16CharacterOfPosition(source, offset)
+				if line != wantLine || column != wantColumn {
+					t.Fatalf("position at byte %d = %d:%d, want %d:%d", offset, line, column, wantLine, wantColumn)
+				}
+			}
+			if diagnostics[0].Range != textRange || diagnostics[0].FilePath != path ||
+				diagnostics[0].Severity != rule.SeverityWarning || diagnostics[0].Message.Id != "check" ||
+				!reflect.DeepEqual(diagnostics[0].Fixes(), fixes) || !reflect.DeepEqual(*diagnostics[0].Suggestions, suggestions) {
+				t.Fatalf("diagnostic payload changed: %+v", diagnostics[0])
+			}
+			if len(result.Observation.Native.Files) != 1 || result.Observation.Native.Files[0].SourceFile != original {
+				t.Fatal("explicit source-file demand lost its AST")
+			}
+			if mode.kind == pluginProgressiveAfterNative {
+				if len(presentation.baseline) != 2 || presentation.baseline[0].SourceFile != source || presentation.run == nil {
+					t.Fatal("progressive presentation did not receive the detached baseline")
+				}
+			} else {
+				joined, ok := result.Observation.JoinedPluginOutcome()
+				if !ok || len(joined.Diagnostics) != 1 {
+					t.Fatalf("joined plugin outcome = %+v", joined)
+				}
+				if _, retainedAST := joined.Diagnostics[0].SourceFile.(*ast.SourceFile); retainedAST {
+					t.Fatal("joined plugin diagnostic retained its AST")
+				}
+				if mode.kind == PluginConcurrentJoined && joined.Diagnostics[0].SourceFile != source {
+					t.Fatal("concurrent native and plugin diagnostics lost shared source identity")
+				}
+			}
+		})
+	}
+}
+
+func TestObservationDiagnosticSourcesPreserveDistinctGenerations(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	path := tspath.ResolvePath(root, "source.ts")
+	first := pipelineTestProgram(t, root, path, "a").SourceFiles()[0]
+	second := pipelineTestProgram(t, root, path, "a").SourceFiles()[0]
+	textOnly := newTextSourceFile("plugin")
+	observation := ObservationResult{Native: NativeObservation{Diagnostics: []rule.RuleDiagnostic{
+		{FilePath: path, SourceFile: first},
+		{FilePath: path, SourceFile: second},
+		{FilePath: path, SourceFile: first},
+		{FilePath: path, SourceFile: textOnly},
+		{FilePath: path},
+	}}}
+	observation.detachDiagnosticSources()
+	diagnostics := observation.Native.Diagnostics
+	if diagnostics[0].SourceFile == diagnostics[1].SourceFile || diagnostics[0].SourceFile != diagnostics[2].SourceFile {
+		t.Fatal("source identity was replaced by path or text equality")
+	}
+	if diagnostics[3].SourceFile != textOnly || diagnostics[4].SourceFile != nil {
+		t.Fatal("non-AST diagnostic source was replaced")
+	}
+	firstProjection := diagnostics[0].SourceFile
+	observation.detachDiagnosticSources()
+	if diagnostics[0].SourceFile != firstProjection {
+		t.Fatal("detaching an existing projection changed its identity")
 	}
 }
 
@@ -440,5 +570,61 @@ func TestConcurrentPipelineCancelsAndJoinsPluginBeforeReleaseOnNativePanic(t *te
 	}()
 	if recovered == nil || releases.Load() != 1 {
 		t.Fatalf("panic/releases = %v/%d, want panic/1", recovered, releases.Load())
+	}
+}
+
+func TestPipelineReleasesCompletedRootASTBeforeNextFile(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		demand rule.EditDemand
+	}{{"lint", rule.EditDemandNone}, {"fix", rule.EditDemandAutofix}, {"all-edits", rule.EditDemandAll}} {
+		t.Run(test.name, func(t *testing.T) {
+			var first weak.Pointer[ast.SourceFile]
+			var calls int
+			configured := []rule.ConfiguredRule{{Name: "native/check", Run: func(ctx rule.RuleContext) rule.RuleListeners {
+				calls++
+				if calls == 1 {
+					first = weak.Make(ctx.SourceFile)
+				} else {
+					runtime.GC()
+					runtime.GC()
+					if first.Value() != nil {
+						t.Error("completed AST remains reachable during the next file")
+					}
+					// Cross-file access stays available without a rule capability flag.
+					files := ctx.Program().SourceFiles()
+					if len(files) != 2 || !ctx.Program().OwnsSourceFile(files[0]) || files[1] != ctx.SourceFile {
+						t.Error("collection changed the complete Program universe")
+					}
+				}
+				return rule.RuleListeners{ast.KindIdentifier: func(node *ast.Node) {
+					ctx.ReportNode(node, rule.RuleMessage{Description: "identifier"})
+				}}
+			}}}
+			generation := pipelineRootTestGeneration(t, map[string]string{
+				"first.ts": "const first = '😀';\r\nfirst;", "second.ts": "const second = 2; second;",
+			}, func(string) []rule.ConfiguredRule { return configured })
+			var releases int
+			result, err := RunPipeline(context.Background(), NewLintRequest(
+				pipelineTestProvider(generation, func() { releases++ }), ObservationPolicy{Demand: ArtifactDemand{Native: test.demand}}, nil,
+			))
+			if err != nil || calls != 2 || releases != 1 {
+				t.Fatalf("error/calls/releases = %v/%d/%d", err, calls, releases)
+			}
+			diagnostics := result.Observation.Native.Diagnostics
+			if result.Observation.Native.Lint.LintedFileCount != 2 || len(diagnostics) != 4 {
+				t.Fatalf("unexpected observation: %+v", result.Observation.Native)
+			}
+			if diagnostics[0].SourceFile != diagnostics[1].SourceFile {
+				t.Fatal("diagnostics for the same AST lost their shared text projection")
+			}
+			for _, diagnostic := range diagnostics {
+				if _, retained := diagnostic.SourceFile.(*ast.SourceFile); retained {
+					t.Fatal("completed diagnostic retained its AST")
+				}
+			}
+			runtime.KeepAlive(generation)
+
+		})
 	}
 }

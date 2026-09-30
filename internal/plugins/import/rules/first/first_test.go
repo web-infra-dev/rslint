@@ -823,7 +823,7 @@ func createFirstProgram(t testing.TB, fileName string, code string) (*compiler.P
 	return program, sourceFile
 }
 
-func firstConfiguredRules(*ast.SourceFile) []rule.ConfiguredRule {
+func firstConfiguredRules(string) []rule.ConfiguredRule {
 	return []rule.ConfiguredRule{{
 		Name:     first.FirstRule.Name,
 		Severity: rule.SeverityError,

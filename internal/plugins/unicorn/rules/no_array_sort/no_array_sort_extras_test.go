@@ -2,7 +2,6 @@
 package no_array_sort_test
 
 import (
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_sort"
@@ -174,7 +173,7 @@ func TestNoArraySortEditDemand(t *testing.T) {
 				var got []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: no_array_sort.NoArraySortRule.Name, Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners { return no_array_sort.NoArraySortRule.Run(ctx, nil) },
 						}}

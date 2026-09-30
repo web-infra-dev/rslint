@@ -12,7 +12,6 @@ package id_match_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -224,7 +223,7 @@ func lintWithoutProject(t *testing.T, code string, options []any) []string {
 		Program:                sourceProgram,
 		Files:                  []string{fileName},
 		ExcludedPathSubstrings: []string{},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:        "id-match",
 				Environment: &rule.RuleEnvironment{},

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -47,7 +46,7 @@ func TestPreferComparisonMatcherSourceOnlyReferences(t *testing.T) {
 			count := 0
 			linter.LintSingleFile(linter.LintSingleFileOptions{
 				Program: program, File: fileName,
-				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				GetRulesForFile: func(string) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{Name: target.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						if ctx.TypeChecker != nil {
 							t.Fatal("expected no type checker")
@@ -77,7 +76,7 @@ func TestPreferComparisonMatcherEditDemand(t *testing.T) {
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: lintprogram.NewFromCompiler(program), File: source.FileName(),
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: target.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners { return target.Run(ctx, nil) }}}
 					},
 					Consumer: rule.DiagnosticConsumer{Demand: demand, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},

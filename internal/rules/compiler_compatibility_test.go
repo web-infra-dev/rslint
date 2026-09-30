@@ -87,7 +87,7 @@ function unreachableForOf() { for (const value of (() => { throw 1; })()) { cons
 		Programs:         []*program.Program{program.NewFromCompiler(compilerProgram)},
 		TargetsByProgram: [][]string{{fileName}},
 		SingleThreaded:   true,
-		GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return configured },
+		GetRulesForFile:  func(string) []rule.ConfiguredRule { return configured },
 	})
 	if err != nil {
 		t.Fatal(err)

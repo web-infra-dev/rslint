@@ -3,7 +3,6 @@ package no_top_level_await_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
@@ -151,7 +150,7 @@ func TestNoTopLevelAwaitPathCasing(t *testing.T) {
 			count := 0
 			testutil.LintProgram(t, testutil.LintProgramOptions{
 				Program: p,
-				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				GetRulesForFile: func(string) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{Name: no_top_level_await.NoTopLevelAwaitRule.Name, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return no_top_level_await.NoTopLevelAwaitRule.Run(ctx, options)
 					}}}

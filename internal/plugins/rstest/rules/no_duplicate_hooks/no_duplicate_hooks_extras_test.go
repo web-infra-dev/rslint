@@ -6,7 +6,6 @@ package no_duplicate_hooks_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -165,7 +164,7 @@ describe('suite', () => { afterAll(() => {}); afterAll(() => {}); });`
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: program,
 		File:    fileName,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name: no_duplicate_hooks.NoDuplicateHooksRule.Name, Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {

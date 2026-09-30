@@ -316,7 +316,7 @@ and cannot observe which construction path supplied it.
 
    Service construction clones the parsed command line and options before enabling `allowNonTsExtensions`, preserving config identity, complete roots and authored `allowJs`. This admits explicitly listed JS roots without changing config glob expansion or ordinary project options. Unmatched files retain source-only gap capabilities even if another selected Program imports them.
 
-3. **Lexical + Syntax Parsing**: ts-go tokenizes and parses source files into TypeScript-native AST nodes. Source-only roots additionally run the ts-go binder so syntax-only rules retain symbols and lexical scopes before their rslint Program is published.
+3. **Lexical + Syntax Parsing**: ts-go tokenizes and parses source files into TypeScript-native AST nodes. Source-only roots run the ts-go binder before an AST is returned to a consumer, so syntax-only rules retain symbols and lexical scopes. Root construction freezes source text, parse options, package metadata, and direct-import resolution. The Program caches those roots' ASTs weakly: live readers share one bound AST, while an unreferenced AST can be recreated from the same snapshot without reading newer source text. The complete source universe and generation identity remain available to cross-file rules.
 
    Already-selected gap roots share `program.SourceOnlyCompilerOptions`: ESNext target and modules, preserved JSX, JavaScript admission, no default libraries, and no dependency expansion. Direct imports can still resolve to paths; resolution does not add their sources to the root universe. Each construction receives fresh options.
 
@@ -664,12 +664,14 @@ Counts, path bases, stderr notices, and protocol empty-array rules stay
 integration-owned; lint/fix observation order and fix-round state belong to the
 core pipeline.
 
-Before an observation is published or its generation released, the pipeline
-replaces diagnostic AST references with immutable text frames. Concurrent
-plugin work must finish, source identity checks must pass, and fix text must be
-frozen first. Frames are shared by source object identity, not by file path, and
-compute ECMAScript line maps lazily. Explicitly requested `LintedFiles` artifacts
-still carry their original ASTs; diagnostic projection does not invalidate them.
+Native diagnostics without autofix edits use immutable text frames before
+aggregation. Remaining diagnostic AST references are converted at the generation
+release boundary, including failure exits. Concurrent plugin work must finish
+first; successful fix planning also requires source identity checks and frozen
+fix text before release. Frames are shared by source object identity, not by
+file path, and compute ECMAScript line maps lazily. Explicitly requested
+`LintedFiles` artifacts still carry their original ASTs; diagnostic projection
+does not invalidate them.
 
 ### Severity Levels
 
@@ -1612,7 +1614,7 @@ lint and fix execution still await full config activation.
 - **Shared Type Checker**: `runLintRulesInProgram` acquires one checker for the lint phase and reuses it across files and rules in the same `Program`. The subsequent type-check phase (when `--type-check` is enabled) lets `GetSemanticDiagnostics` reacquire its own checker so the lint-phase checker can be released first
 - **Checker Phase Separation**: the checker is released before TypeScript semantic diagnostics run, so `GetSemanticDiagnostics` can reacquire its own checker cleanly
 - **File Filtering**: Skip node_modules and bundled files automatically
-- **Source-Only Programs**: project-unbound CLI roots use the ts-go parser, binder, package/module metadata, and direct-import resolution to construct the same rslint Program facade without a synthetic project graph or checker; capability gating excludes type-aware rules
+- **Source-Only Programs**: project-unbound CLI roots use the ts-go parser, binder, package/module metadata, and direct-import resolution to construct the same rslint Program facade without a synthetic project graph or checker; capability gating excludes type-aware rules. The loader returns the same Program/target projection as other construction paths. AST cache ownership is internal to Program and does not require CLI options or rule capability declarations
 - **Shared Cross-File Rule Structures**: module edges, export maps, and whole-Program indexes are immutable derived values cached by Program generation. Project adapters preserve the underlying ts-go generation's weak lifetime; root-parsed Programs own the same cache directly. Rules do not select either strategy
 - **Buffered Diagnostic Collection**: CLI mode funnels diagnostics through a buffered channel before formatting, which reduces contention between lint tasks and output handling
 - **On-Demand AST Encoding**: API/WASM responses only include encoded source files when `IncludeEncodedSourceFiles` is requested
@@ -1664,7 +1666,7 @@ lint and fix execution still await full config activation.
 
 ### Memory Management
 
-- **ts-go Owns the Heavy Graphs**: AST nodes, checker state, compiler project graphs, and session state are primarily owned by ts-go; an rslint Program adds a small immutable facade and generation cache, while listeners, diagnostics, lint selection, and configuration stay outside that object
+- **Program Owns Source Lifetimes**: compiler graphs retain their ASTs through ts-go. Parser-built root Programs retain immutable source snapshots and weak AST caches, synchronized per file to preserve one identity for all live borrowers. Cross-file queries still see the complete universe; derived module/export caches may retain the ASTs their answers require. Recreating collected ASTs costs parsing and binding, so lower retention does not imply lower CPU cost
 - **Short-Lived Per-File Structures**: comment stores, disable managers, and rule contexts are allocated per file and dropped after traversal. A comment slice is allocated only if requested
 - **Bounded Listener Retention**: a listener registry lives only for one checker-shard task. After each file it clears every function slot before shortening the slices, so backing capacity can be reused without retaining closures, source files, checker state, or rule contexts. The registry is dropped when that task completes and is never pooled across runs or LSP requests
 - **Source Snapshot Ownership**: snapshot entries hold an immutable source string plus its 128-bit hash without explicitly copying source bytes; on an AST miss, that string is passed directly to the parser. After generation replacement, a retained unchanged AST may still hold the prior equal string while the fresh snapshot owns the new read. Replaced generations are reclaimed after any in-flight lookup releases them. AST retention and source-generation retention remain deliberately separate lifecycles.
@@ -1674,6 +1676,8 @@ lint and fix execution still await full config activation.
 - **Bounded Queues**: CLI diagnostics use a buffered channel of 4096 items; LSP request/outgoing queues are buffered to 100, and debounce/refresh signals are single-slot channels
 - **No Repo-Local Pooling Layer Today**: there is no explicit `sync.Pool`-based object pooling strategy in the main lint path at the moment
 - **Fresh ESM Entry Lifetime**: fresh JS/TS config loads use a unique entry-module URL so rewritten bytes and module side effects are evaluated per transaction. Node retains those ESM module namespaces for the process lifetime, so a long-lived native API process can grow this cache slowly across repeated lint requests; static transitive imports continue to use Node's ordinary cache. Bounding this without weakening freshness requires a disposable evaluator realm or worker and remains a future optimization.
+- **Plans Retain File Identities**: a lint plan stores a `program.Source` handle within its immutable Program together with its resolved rules, syntax result, environment, and checker policy. The handle exposes membership, cached syntax results, and checker capability without materializing root ASTs. Rule configuration receives only the canonical source file name. Rule resolution still finishes before execution; native workers acquire each AST for its traversal, while requested source artifacts and plugin inputs retain their own references. Plan reuse never reruns configuration resolution.
+- **Diagnostics Retain Presentation Text**: native diagnostics without autofix edits are projected to text before aggregation, including during `--fix`. Fix-bearing diagnostics retain source identity until fix text validation completes; published observations then contain text projections. Weak origin identities let early and late projections share text without retaining ASTs. Explicit `LintedFiles` artifacts continue to hold their requested sources.
 - **Garbage Collection Handles Cycles**: the repository does not implement custom cycle breaking for AST/checker graphs; lifecycle cleanup relies on Go GC and on dropping references after each run
 
 ## 11. Extensibility & Future Directions
@@ -1827,7 +1831,7 @@ repeat it under a second source of truth.
 
 - **Targets and config**: target selection and config ownership are frozen before Program binding (`target.Plan` for CLI/API and a document snapshot for LSP). Later stages do not add lint targets, rediscover configs, or reassign owners
 - **Program generation**: each published `program.Program` is one logically immutable source, module-resolution, filesystem, and optional-checker generation. CLI/API build it through `internal/program/loader`; LSP adapts its session or isolated overlay without exposing the private backend
-- **Lint plan**: `PrepareLintPlan` accepts only files already bound to those Programs and freezes each file's rules, shared environment, and checker eligibility. Execution does not scan Program roots or resolve config and rules again
+- **Lint plan**: `PrepareLintPlan` accepts only file identities already bound to those Programs and freezes each file's syntax result, rules, shared environment, and checker eligibility through `program.Source` handles. Rule resolution uses source file names; planning does not need an AST for a valid parser-built root. Execution acquires the source from the same Program; it does not scan roots or resolve config and rules again
 - **Pipeline**: `RunPipeline` is the production orchestration boundary. CLI, API, and LSP choose a complete request and provide generation, plugin transport, presentation, or commit adapters; raw preparation, native lint, plugin dispatch, and fix stages are not product integration APIs
 - **Autofix**: fix rounds advance only pipeline-owned in-memory snapshots. Integrations receive the final in-memory delta for the operation, and optional persistence is one terminal commit rather than a series of intermediate writes
 - **Rules**: `RuleContext` exposes the bound Program and only the checker granted to that file. Shared structures such as module graphs derive from the Program generation rather than becoming a second authority

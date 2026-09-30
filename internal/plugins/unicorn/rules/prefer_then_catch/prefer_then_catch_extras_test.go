@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	prefer_then_catch "github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_then_catch"
@@ -142,7 +141,7 @@ func TestPreferThenCatchEditDemand(t *testing.T) {
 			Program:     lintprogram.NewFromCompiler(program),
 			File:        sourceFile.FileName(),
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			GetRulesForFile: func(string) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:     prefer_then_catch.PreferThenCatchRule.Name,
 					Severity: rule.SeverityError,

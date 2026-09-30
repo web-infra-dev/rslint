@@ -392,7 +392,7 @@ createElement("ns:Panel");`,
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program: lintprogram.NewFromCompiler(program),
 		Files:   []string{usageFile},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     NoNamespaceRule.Name,
 				Severity: rule.SeverityError,
@@ -429,7 +429,7 @@ func TestNoNamespaceDoesNotUseCrossFileCheckerBinding(t *testing.T) {
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program: lintprogram.NewFromCompiler(program),
 		Files:   []string{usageFile},
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     NoNamespaceRule.Name,
 				Severity: rule.SeverityError,

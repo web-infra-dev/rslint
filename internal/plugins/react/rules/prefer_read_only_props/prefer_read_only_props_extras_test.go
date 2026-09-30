@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -475,7 +474,7 @@ func runSourceOnlyPreferReadOnlyProps(t *testing.T, code string) []rule.RuleDiag
 		Programs:         []*lintprogram.Program{sourceProgram},
 		TargetsByProgram: [][]string{{fileName}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     PreferReadOnlyPropsRule.Name,
 				Severity: rule.SeverityError,

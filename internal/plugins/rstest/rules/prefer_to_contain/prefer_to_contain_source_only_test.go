@@ -4,7 +4,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -53,7 +52,7 @@ interface Number {} expect([Number.NaN].includes(Number.NaN)).toBe(true);
 	}
 	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 		Programs: []*lintprogram.Program{sourceProgram}, TargetsByProgram: [][]string{{fileName}}, SingleThreaded: true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{Name: PreferToContainRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 				return PreferToContainRule.Run(ctx, nil)
 			}}}

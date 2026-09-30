@@ -5,7 +5,6 @@ package no_unnecessary_array_splice_count_test
 import (
 	"path/filepath"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -145,7 +144,7 @@ func TestNoUnnecessaryArraySpliceCountArtifactsFollowDemand(t *testing.T) {
 				var found []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					GetRulesForFile: func(string) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule.Run(ctx, nil)
 						}}}
@@ -312,7 +311,7 @@ func lintNoUnnecessaryArraySpliceCountSourceOnly(t *testing.T, code string) []ru
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: program,
 		File:    fileName,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule.Name,
 				Severity: rule.SeverityError,

@@ -596,8 +596,8 @@ func lintPreserveCaughtErrorWithDemand(
 	return diagnostics
 }
 
-func preserveCaughtErrorConfiguredRules(options []any) func(*ast.SourceFile) []rule.ConfiguredRule {
-	return func(*ast.SourceFile) []rule.ConfiguredRule {
+func preserveCaughtErrorConfiguredRules(options []any) linter.RuleHandler {
+	return func(string) []rule.ConfiguredRule {
 		return []rule.ConfiguredRule{{
 			Name:     PreserveCaughtErrorRule.Name,
 			Severity: rule.SeverityError,

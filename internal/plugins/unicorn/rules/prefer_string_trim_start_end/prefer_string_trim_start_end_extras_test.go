@@ -476,7 +476,7 @@ func lintPreferStringTrimStartEndSourceOnly(t *testing.T, baseName, code string)
 		Programs:         []*lintprogram.Program{sourceProgram},
 		TargetsByProgram: [][]string{{fileName}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     prefer_string_trim_start_end.PreferStringTrimStartEndRule.Name,
 				Severity: rule.SeverityError,

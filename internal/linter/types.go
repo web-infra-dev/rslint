@@ -1,12 +1,13 @@
 package linter
 
 import (
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-type RuleHandler = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule
+// RuleHandler resolves configuration by the exact file name exposed by Program.
+// Configuration does not need to materialize or retain the file's AST.
+type RuleHandler = func(fileName string) []rule.ConfiguredRule
 type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 
 // LintResult holds the outcome of a RunLinter invocation.

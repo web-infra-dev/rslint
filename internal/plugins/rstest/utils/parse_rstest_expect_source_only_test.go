@@ -102,7 +102,7 @@ function localAssertion() {
 		Programs:         []*lintprogram.Program{sourceProgram},
 		TargetsByProgram: [][]string{{fileName}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     probe.Name,
 				Severity: rule.SeverityError,
@@ -196,7 +196,7 @@ func sourceOnlyParsedExpectCount(t *testing.T, code string) int {
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: program,
 		File:    fileName,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name: "rstest/source-only-expect-write-probe",
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -271,7 +271,7 @@ probe();
 		Programs:         []*lintprogram.Program{sourceProgram},
 		TargetsByProgram: [][]string{{fileName}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+		GetRulesForFile: func(string) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     probe.Name,
 				Severity: rule.SeverityError,

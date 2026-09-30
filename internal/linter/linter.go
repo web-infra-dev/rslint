@@ -137,7 +137,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	// registry belongs to the calling checker-shard task and is empty on entry;
 	// reset clears all captured per-file state before the next serial file.
 	lintFile := func(filePlan *lintFilePlan, rules []rule.ConfiguredRule, chk *checker.Checker, registeredListeners *listenerRegistry) {
-		file := filePlan.file
+		file := filePlan.source.AST()
 
 		// Per-rule durations for this file, parallel to rules. Listeners are
 		// wrapped at registration time, so when timing is off the traversal
@@ -357,7 +357,6 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	checkerFreeGeneration := true
 	for fileIndex := range filesToLint {
 		filePlan := &filesToLint[fileIndex]
-		file := filePlan.file
 		rules := filePlan.rules
 		if filePlan.hasTypeChecker {
 			checkerFreeGeneration = false
@@ -379,7 +378,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			checkerGroups[nil] = append(checkerGroups[nil], task)
 			continue
 		}
-		chk, release := sourceProgram.TypeCheckerForFile(ctx, file)
+		chk, release := sourceProgram.TypeCheckerForFile(ctx, filePlan.source.AST())
 		release()
 		checkerGroups[chk] = append(checkerGroups[chk], task)
 	}
@@ -390,7 +389,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			registeredListeners := newListenerRegistry()
 			if chk != nil {
 				var done func()
-				chk, done = sourceProgram.TypeCheckerForFileExclusive(ctx, tasks[0].plan.file)
+				chk, done = sourceProgram.TypeCheckerForFileExclusive(ctx, tasks[0].plan.source.AST())
 				defer done()
 			}
 			for _, task := range tasks {
@@ -569,8 +568,8 @@ func LintSingleFile(opts LintSingleFileOptions) {
 	}
 	if !opts.HasTypeInfo {
 		base := getRulesForFile
-		getRulesForFile = func(file *ast.SourceFile) []rule.ConfiguredRule {
-			return rule.FilterNonTypeAwareRules(base(file))
+		getRulesForFile = func(fileName string) []rule.ConfiguredRule {
+			return rule.FilterNonTypeAwareRules(base(fileName))
 		}
 	}
 	plan, err := prepareProgramLintPlanForFiles(programRulePlanOptions{
