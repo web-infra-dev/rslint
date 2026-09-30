@@ -21,17 +21,24 @@ func TestPreferFlatMathMinMaxExtras(t *testing.T) {
 		&prefer_flat_math_min_max.PreferFlatMathMinMaxRule,
 		[]rule_tester.ValidTestCase{
 			{Code: "Math.max(Math.min(a, b), Math.max?.(c, d));"},
+			{Code: "function f(Math) { return Math.max(Math.max(1, 2), 3); }"},
+			{Code: "Math.max(Math.max(1, 2), 3);", Globals: map[string]any{"Math": "off"}},
 		},
 		[]rule_tester.InvalidTestCase{
-			{Code: "Math.max((Math.max(a, b)), Math.min(c, d));", Output: []string{"Math.max(a, b, Math.min(c, d));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls.", Line: 1, Column: 1, EndLine: 1, EndColumn: 43}}},
-			{Code: "Math.max((Math.max(Math.max(a, b), c)), d);", Output: []string{"Math.max(a, b, c, d);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls.", Line: 1, Column: 1, EndLine: 1, EndColumn: 43}}},
+			{Code: "Math.max((Math.max(a, b)), Math.min(c, d));", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls.", Line: 1, Column: 1, EndLine: 1, EndColumn: 43}}},
+			{Code: "Math.max((Math.max(Math.max(a, b), c)), d);", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls.", Line: 1, Column: 1, EndLine: 1, EndColumn: 43}}},
+			{Code: "Math.max(Math.max((100, 1), 2), 3);", Output: []string{"Math.max((100, 1), 2, 3);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls."}}},
+			{Code: "Math.min(Math.min((1, 100), 2), 3);", Output: []string{"Math.min((1, 100), 2, 3);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.min()` call instead of nested calls."}}},
+			{Code: "Math.max(Math.max(Math.max(1, 2), 3), 4);", Output: []string{"Math.max(1, 2, 3, 4);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls."}}},
+			{Code: "let state = 0; const value = {valueOf() { return state; }}; Math.max(Math.max(value), state = -1);", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls."}}},
+			{Code: "Math.max(Math.max(void sideEffect()), state = -1);", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls."}}},
 		},
 	)
 }
 
 func TestPreferFlatMathMinMaxEditDemand(t *testing.T) {
-	const source = "Math.max(Math.max(a, b), c);"
-	const fixedSource = "Math.max(a, b, c);"
+	const source = "Math.max(Math.max(1, 2), 3);"
+	const fixedSource = "Math.max(1, 2, 3);"
 	program, sourceFile, err := rule_tester.NewProgramHelper(fixtures.GetRootDir()).CreateTestProgram(source, "edit-demand.js", "tsconfig.json")
 	if err != nil {
 		t.Fatal(err)

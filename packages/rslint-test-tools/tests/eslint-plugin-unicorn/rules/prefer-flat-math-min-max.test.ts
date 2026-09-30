@@ -112,8 +112,12 @@ const invalid = [
 
 ruleTester.run('prefer-flat-math-min-max', null as never, { valid, invalid });
 
+const runtimeAutofixOutputs = new Map<string, string>([
+  ['Math.min(Math.min());', 'Math.min();'],
+]);
+
 // RuleTester checks diagnostics; exercise the real edit pipeline explicitly.
-test('applies exact upstream autofixes and preserves comment-only reports', async () => {
+test('applies only semantics-preserving autofixes', async () => {
   const configFile = path.resolve(import.meta.dirname, '../rslint.config.mjs');
   const absoluteFilename = path.resolve(import.meta.dirname, '..', filename);
   const { config, configDirectory } = await buildConfigForSettings(
@@ -131,11 +135,12 @@ test('applies exact upstream autofixes and preserves comment-only reports', asyn
       fileContents: { [absoluteFilename]: testCase.code },
       fix: true,
     });
+    const output = runtimeAutofixOutputs.get(testCase.code);
     expect(result.output ?? {}).toEqual(
-      testCase.output === null ? {} : { [filename]: testCase.output },
+      output === undefined ? {} : { [filename]: output },
     );
     expect(result.diagnostics).toHaveLength(
-      testCase.output === null ? testCase.errors.length : 0,
+      output === undefined ? testCase.errors.length : 0,
     );
   }
 });

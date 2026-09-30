@@ -277,11 +277,11 @@ func classifySourceOnlyStaticCall(
 			}
 		case method == "" && root == "parseInt":
 			if (len(arguments) == 0 || canStaticallyConvertToString(evaluator, arguments[0])) &&
-				(len(arguments) < 2 || isStaticPrimitiveArgument(evaluator, arguments[1])) {
+				(len(arguments) < 2 || IsStaticPrimitiveArgument(evaluator, arguments[1])) {
 				return arrayClassNonTarget
 			}
 		case method == "" && (root == "isFinite" || root == "isNaN"):
-			if len(arguments) == 0 || isStaticPrimitiveArgument(evaluator, arguments[0]) {
+			if len(arguments) == 0 || IsStaticPrimitiveArgument(evaluator, arguments[0]) {
 				return arrayClassNonTarget
 			}
 		case method == "" && root == "BigInt":
@@ -420,28 +420,9 @@ func canStaticallyConvertToString(evaluator *utils.StaticStringEvaluator, node *
 	return ok
 }
 
-func isStaticPrimitiveArgument(evaluator *utils.StaticStringEvaluator, node *ast.Node) bool {
-	value, known := evaluator.EvalValue(node)
-	if known {
-		switch value.(type) {
-		case string, bool, interface{ IsNaN() bool }:
-			return true
-		}
-	}
-	node = ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions)
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindNullKeyword, ast.KindUndefinedKeyword, ast.KindVoidExpression:
-		return true
-	}
-	return false
-}
-
 func staticPrimitiveArguments(evaluator *utils.StaticStringEvaluator, arguments []*ast.Node) bool {
 	for _, argument := range arguments {
-		if !isStaticPrimitiveArgument(evaluator, argument) {
+		if !IsStaticPrimitiveArgument(evaluator, argument) {
 			return false
 		}
 	}
