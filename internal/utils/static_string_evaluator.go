@@ -2016,9 +2016,10 @@ func staticValuesStrictEqual(left any, right any) (equal bool, ok bool) {
 		}
 		return leftFlag == rightFlag, true
 	case staticKindSymbol:
-		leftSymbol := left.(staticSymbolValue)
-		rightSymbol := right.(staticSymbolValue)
-		return leftSymbol == rightSymbol, true
+		leftSymbol, leftOK := left.(staticSymbolValue)
+		rightSymbol, rightOK := right.(staticSymbolValue)
+		known := leftOK && rightOK
+		return known && leftSymbol == rightSymbol, known
 	}
 	return true, true
 }
