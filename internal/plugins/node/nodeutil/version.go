@@ -2,6 +2,7 @@ package nodeutil
 
 import (
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/npmsemver"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
@@ -13,7 +14,7 @@ func ConfiguredNodeVersion(ctx rule.RuleContext, options map[string]any) npmsemv
 		if raw == nil || raw == "" || raw == false || raw == float64(0) {
 			continue
 		}
-		if version, ok := npmsemver.Parse(settingString(raw)); ok {
+		if version, ok := npmsemver.Parse(ecmascript.JSONValueToString(raw)); ok {
 			return version
 		}
 	}

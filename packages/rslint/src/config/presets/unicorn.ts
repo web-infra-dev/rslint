@@ -43,7 +43,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/empty-brace-spaces': 'error',
     'unicorn/error-message': 'error',
     // 'unicorn/escape-case': 'error', // not implemented
-    // 'unicorn/expiring-todo-comments': 'error', // not implemented
+    'unicorn/expiring-todo-comments': 'error',
     // 'unicorn/explicit-length-check': 'error', // not implemented
     'unicorn/explicit-timer-delay': 'error',
     'unicorn/filename-case': 'error',

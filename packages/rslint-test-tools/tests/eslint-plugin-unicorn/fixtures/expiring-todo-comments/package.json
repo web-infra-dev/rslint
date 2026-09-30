@@ -1,0 +1,17 @@
+{
+  "name": "expiring-todo-fixture",
+  "version": "76.0.0",
+  "dependencies": {
+    "find-up-simple": "^1.0.1",
+    "semver": "^7.8.5"
+  },
+  "devDependencies": {
+    "@lubien/fixture-beta-package": "^1.0.0-beta.1"
+  },
+  "peerDependencies": {
+    "eslint": ">=10.4"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
