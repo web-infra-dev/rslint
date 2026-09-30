@@ -751,39 +751,7 @@ func functionBodyReturnExpression(body *ast.Node) *ast.Node {
 	if block == nil || block.Statements == nil {
 		return nil
 	}
-	return lastReturnExpression(block.Statements.Nodes)
-}
-
-// lastReturnExpression mirrors eslint-plugin-react's ast.loopNodes helper:
-// scan statements backwards, and when the trailing relevant statement is a
-// switch, recurse only into its final case.
-func lastReturnExpression(statements []*ast.Node) *ast.Node {
-	for i := len(statements) - 1; i >= 0; i-- {
-		statement := statements[i]
-		if statement == nil {
-			continue
-		}
-		if statement.Kind == ast.KindReturnStatement {
-			return statement.AsReturnStatement().Expression
-		}
-		if statement.Kind != ast.KindSwitchStatement {
-			continue
-		}
-		switchStatement := statement.AsSwitchStatement()
-		if switchStatement == nil || switchStatement.CaseBlock == nil {
-			continue
-		}
-		caseBlock := switchStatement.CaseBlock.AsCaseBlock()
-		if caseBlock == nil || caseBlock.Clauses == nil || len(caseBlock.Clauses.Nodes) == 0 {
-			continue
-		}
-		lastClause := caseBlock.Clauses.Nodes[len(caseBlock.Clauses.Nodes)-1].AsCaseOrDefaultClause()
-		if lastClause == nil || lastClause.Statements == nil {
-			return nil
-		}
-		return lastReturnExpression(lastClause.Statements.Nodes)
-	}
-	return nil
+	return reactutil.LastReturnedExpression(block.Statements.Nodes)
 }
 
 func topLevelVariableValues(source *ast.SourceFile, name string) []*ast.Node {
