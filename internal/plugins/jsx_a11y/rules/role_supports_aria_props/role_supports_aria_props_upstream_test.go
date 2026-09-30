@@ -19,7 +19,6 @@
 package role_supports_aria_props
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
@@ -65,17 +64,12 @@ func generatedCases() ([]rule_tester.ValidTestCase, []rule_tester.InvalidTestCas
 	var valid []rule_tester.ValidTestCase
 	var invalid []rule_tester.InvalidTestCase
 	for _, role := range jsxa11yutil.AriaRoleNonAbstract {
-		supported, ok := jsxa11yutil.AriaRolePropsMap[role]
+		supported, ok := jsxa11yutil.LookupRoleAriaProps(role)
 		if !ok {
 			continue
 		}
 		// Sorted iteration so the generator is deterministic.
-		supportedNames := make([]string, 0, len(supported))
-		for k := range supported {
-			supportedNames = append(supportedNames, k)
-		}
-		sort.Strings(supportedNames)
-		for _, prop := range supportedNames {
+		for _, prop := range supported.Names() {
 			valid = append(valid, rule_tester.ValidTestCase{
 				Code: `<div role="` + role + `" ` + prop + ` />`,
 				Tsx:  true,
@@ -84,7 +78,7 @@ func generatedCases() ([]rule_tester.ValidTestCase, []rule_tester.InvalidTestCas
 		// Invalid: every ARIA name NOT in supported. Walk
 		// AriaPropertyNames so the order matches `aria.keys()`.
 		for _, prop := range jsxa11yutil.AriaPropertyNames {
-			if _, ok := supported[prop]; ok {
+			if supported.Supports(prop) {
 				continue
 			}
 			invalid = append(invalid, rule_tester.InvalidTestCase{

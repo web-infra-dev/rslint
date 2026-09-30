@@ -55,7 +55,7 @@ func TestRoleSupportsAriaPropsExtras(t *testing.T) {
 			{Code: `<div role={true} aria-checked />`, Tsx: true},
 			// `<div role={null} />` — Literal null; LITERAL_TYPES.Literal
 			// returns the magic string "null" — IS a string, but "null"
-			// isn't in AriaRolePropsMap → skip via the membership check.
+			// isn't in LookupRoleAriaProps → skip via the membership check.
 			{Code: `<div role={null} aria-checked />`, Tsx: true},
 			// `<div role={undefined} />` — Identifier "undefined" →
 			// LITERAL_TYPES.Identifier returns undefined (not a string) → skip.
@@ -174,7 +174,7 @@ func TestRoleSupportsAriaPropsExtras(t *testing.T) {
 
 			// ============================================================
 			// Empty role attribute string — splits into "", which is not in
-			// AriaRolePropsMap → skip.
+			// LookupRoleAriaProps → skip.
 			// ============================================================
 			{Code: `<div role="" aria-checked />`, Tsx: true},
 
@@ -208,7 +208,7 @@ func TestRoleSupportsAriaPropsExtras(t *testing.T) {
 
 			// ============================================================
 			// Abstract role — `role="command"` is a valid key in
-			// AriaRolePropsMap (we include abstract roles per upstream's
+			// LookupRoleAriaProps (we include abstract roles per upstream's
 			// `roles.get(roleValue)`). The `command` props set includes
 			// aria-label, so this passes. Locks in the include-abstract behavior.
 			// ============================================================
