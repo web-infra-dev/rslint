@@ -35,13 +35,12 @@ type programLintPlan struct {
 	files   []lintFilePlan
 }
 
-// lintFilePlan freezes one AST generation, its resolved rules, shared rule
-// environment, and checker policy as a coherent execution unit. Parallel
+// lintFilePlan freezes one AST generation, its shared prepared rule set, and
+// checker policy as a coherent execution unit. Parallel
 // slices would allow these decisions to drift by index across plan reuse.
 type lintFilePlan struct {
 	file           *ast.SourceFile
-	rules          []rule.ConfiguredRule
-	environment    *rule.RuleEnvironment
+	rules          *preparedRuleSet
 	hasTypeChecker bool
 }
 
@@ -136,6 +135,7 @@ func PrepareLintPlanContext(ctx context.Context, opts PrepareLintPlanOptions) (*
 		}
 	}
 
+	var ruleSets ruleSetBuilder
 	resolve := func(resolveCtx context.Context, ref lintPlanFileRef) []rule.RuleDiagnostic {
 		if resolveCtx.Err() != nil {
 			return nil
@@ -144,7 +144,7 @@ func PrepareLintPlanContext(ctx context.Context, opts PrepareLintPlanOptions) (*
 		return resolveProgramLintPlanFile(programRulePlanOptions{
 			Program:         programPlan.program,
 			GetRulesForFile: opts.GetRulesForFile,
-		}, programPlan, ref.fileIndex, resolveCtx)
+		}, programPlan, ref.fileIndex, resolveCtx, &ruleSets)
 	}
 
 	workerCount := min(runtime.GOMAXPROCS(0), len(refs))
@@ -258,11 +258,12 @@ func prepareProgramLintPlanForFiles(opts programRulePlanOptions, files []*ast.So
 		return programLintPlan{}, err
 	}
 	ctx := context.Background()
+	var ruleSets ruleSetBuilder
 	for fileIndex := range plan.files {
 		// Compatibility callers consume only the execution projection. Syntax
 		// diagnostics still gate rule resolution, but their presentation remains
 		// owned by the caller.
-		_ = resolveProgramLintPlanFile(opts, &plan, fileIndex, ctx)
+		_ = resolveProgramLintPlanFile(opts, &plan, fileIndex, ctx, &ruleSets)
 	}
 	return plan, nil
 }
@@ -272,6 +273,7 @@ func resolveProgramLintPlanFile(
 	plan *programLintPlan,
 	fileIndex int,
 	ctx context.Context,
+	ruleSets *ruleSetBuilder,
 ) []rule.RuleDiagnostic {
 	filePlan := &plan.files[fileIndex]
 	file := filePlan.file
@@ -289,12 +291,7 @@ func resolveProgramLintPlanFile(
 	// a narrower request policy, such as LSP HasTypeInfo=false, filter the
 	// configured rule set before planning without inspecting Program adapters.
 	filePlan.hasTypeChecker = opts.Program.CanProvideTypeChecker(file)
-	if filePlan.hasTypeChecker {
-		filePlan.rules = rules
-	} else {
-		filePlan.rules = rule.FilterNonTypeAwareRules(rules)
-	}
-	filePlan.environment = firstNativeRuleEnvironment(filePlan.rules)
+	filePlan.rules = ruleSets.prepare(rules, filePlan.hasTypeChecker)
 	return nil
 }
 
@@ -335,15 +332,6 @@ func (p *LintPlan) HasSyntacticDiagnostics() bool {
 	return p != nil && len(p.syntacticDiagnosticGroups) > 0
 }
 
-func firstNativeRuleEnvironment(rules []rule.ConfiguredRule) *rule.RuleEnvironment {
-	for _, configuredRule := range rules {
-		if !configuredRule.IsEslintPluginRule && configuredRule.Environment != nil {
-			return configuredRule.Environment
-		}
-	}
-	return nil
-}
-
 // Targets returns the plan's plugin-facing projection in stable Program/file
 // order. The rule slices are shared immutable plan state and must be read-only.
 func (p *LintPlan) Targets() []LintTarget {
@@ -353,11 +341,10 @@ func (p *LintPlan) Targets() []LintTarget {
 	var targets []LintTarget
 	for _, programPlan := range p.programs {
 		for _, filePlan := range programPlan.files {
-			rules := filePlan.rules
-			if len(rules) == 0 {
+			if filePlan.rules == nil {
 				continue
 			}
-			targets = append(targets, LintTarget{File: filePlan.file, Rules: rules})
+			targets = append(targets, LintTarget{File: filePlan.file, Rules: filePlan.rules.all})
 		}
 	}
 	return targets

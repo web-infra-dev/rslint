@@ -3,6 +3,7 @@ package linter
 import (
 	"reflect"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -10,6 +11,31 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+func TestPreparedRuleSetsPublishCompleteConcurrentViews(t *testing.T) {
+	input := make([]rule.ConfiguredRule, 100)
+	for index := range input {
+		input[index] = rule.ConfiguredRule{Name: "rule", RequiresTypeInfo: index%2 == 0, IsEslintPluginRule: index%3 == 0}
+	}
+	var builder ruleSetBuilder
+	var workers sync.WaitGroup
+	start := make(chan struct{})
+	results := make([]*preparedRuleSet, 32)
+	for index := range results {
+		workers.Go(func() {
+			<-start
+			results[index] = builder.prepare(input, index%2 == 0)
+		})
+	}
+	close(start)
+	workers.Wait()
+	for index, got := range results {
+		want := prepareRuleSet(input, index%2 == 0)
+		if !reflect.DeepEqual(got, want) || got != results[index%2] {
+			t.Fatal("concurrent cold readers did not receive one complete immutable result")
+		}
+	}
+}
 
 func TestCheckerFreeLintWorkerCountKeepsSmallSetsSerial(t *testing.T) {
 	tests := []struct {

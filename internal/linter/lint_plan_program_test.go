@@ -2,6 +2,8 @@ package linter
 
 import (
 	"fmt"
+	"reflect"
+	"runtime"
 	"slices"
 	"sync/atomic"
 	"testing"
@@ -20,6 +22,219 @@ func mustPrepareLintPlan(t *testing.T, opts PrepareLintPlanOptions) *LintPlan {
 		t.Fatalf("PrepareLintPlan: %v", err)
 	}
 	return plan
+}
+
+func TestPreparedRuleSetsPreserveExactInputs(t *testing.T) {
+	environment := &rule.RuleEnvironment{Settings: map[string]any{"setting": "value"}}
+	input := []rule.ConfiguredRule{
+		{Name: "first", Environment: environment, Severity: rule.SeverityWarning, Options: []any{"option"}},
+		{Name: "typed", RequiresTypeInfo: true},
+		{Name: "plugin", IsEslintPluginRule: true, Options: []any{map[string]any{"flag": true}}},
+	}
+	original := slices.Clone(input)
+	var builder ruleSetBuilder
+	filtered := builder.prepare(input, false)
+	if !reflect.DeepEqual(filtered.all, []rule.ConfiguredRule{input[0], input[2]}) {
+		t.Fatalf("filtered descriptors changed: %+v", filtered)
+	}
+	if !reflect.DeepEqual(input, original) {
+		t.Fatal("filtering changed the shared input")
+	}
+	if got := builder.prepare(input, false); got != filtered {
+		t.Fatal("same input did not reuse the filtered slice")
+	}
+	// Capacity is not part of a read-only view's identity.
+	short := builder.prepare(input[:1], false)
+	if got := builder.prepare(input[:1:1], false); got != short {
+		t.Fatal("same range with a different capacity did not reuse its view")
+	}
+	if !reflect.DeepEqual(short.all, input[:1]) {
+		t.Fatal("a shorter range reused the full input's result")
+	}
+	if got := builder.prepare(input[1:], false); !reflect.DeepEqual(got.all, input[2:]) {
+		t.Fatal("a shifted range reused another input's result")
+	}
+	separate := slices.Clone(input)
+	separate[0].Severity = rule.SeverityError
+	separate[0].Options = []any{"different"}
+	separate[0].Environment = &rule.RuleEnvironment{}
+	if got := builder.prepare(separate, false); !reflect.DeepEqual(got.all, []rule.ConfiguredRule{separate[0], separate[2]}) {
+		t.Fatal("equal rule names conflated distinct configurations")
+	}
+	for _, rules := range [][]rule.ConfiguredRule{nil, {}, input[1:2], input[:1]} {
+		got, want := builder.prepare(rules, false), rule.FilterNonTypeAwareRules(rules)
+		if (got == nil) != (len(want) == 0) || got != nil && !reflect.DeepEqual(got.all, want) {
+			t.Fatalf("empty, fully excluded, or syntax-only input changed: got %#v, want %#v", got, want)
+		}
+	}
+}
+
+func TestPreparedRuleSetsPreserveExecutorMetadata(t *testing.T) {
+	nativeEnvironment := &rule.RuleEnvironment{LanguageOptions: rule.LanguageOptions{ECMAVersion: 2018, SourceType: "script"}}
+	pluginEnvironment := &rule.RuleEnvironment{LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020, SourceType: "module"}}
+	typedEnvironment := &rule.RuleEnvironment{LanguageOptions: rule.LanguageOptions{ECMAVersion: 2022, SourceType: "commonjs"}}
+	input := []rule.ConfiguredRule{
+		{Name: "native/nil"},
+		{Name: "plugin/first", IsEslintPluginRule: true},
+		{Name: "native/first", Environment: nativeEnvironment, Severity: rule.SeverityWarning, Options: []any{"first"}},
+		{Name: "plugin/last", IsEslintPluginRule: true, Environment: pluginEnvironment},
+		{Name: "native/typed", RequiresTypeInfo: true, Environment: typedEnvironment},
+		{Name: "plugin/typed", IsEslintPluginRule: true, RequiresTypeInfo: true},
+	}
+	var builder ruleSetBuilder
+	full := builder.prepare(input, true)
+	limited := builder.prepare(input, false)
+	if full == limited || &full.all[0] != &input[0] || !reflect.DeepEqual(limited.all, input[:4]) {
+		t.Fatal("checker capabilities did not select separate coherent rule sets")
+	}
+	if !reflect.DeepEqual(full.native, []rule.ConfiguredRule{input[0], input[2], input[4]}) ||
+		!reflect.DeepEqual(full.plugins, []rule.ConfiguredRule{input[1], input[3], input[5]}) ||
+		!reflect.DeepEqual(limited.native, []rule.ConfiguredRule{input[0], input[2]}) ||
+		!reflect.DeepEqual(limited.plugins, []rule.ConfiguredRule{input[1], input[3]}) {
+		t.Fatal("executor projections changed rule order or descriptors")
+	}
+	if full.environment != nativeEnvironment || limited.environment != nativeEnvironment ||
+		full.pluginLanguageOptions != typedEnvironment.LanguageOptions || limited.pluginLanguageOptions != pluginEnvironment.LanguageOptions {
+		t.Fatal("preparation changed native or plugin environment selection")
+	}
+	for _, index := range []int{0, 1} {
+		uniform := builder.prepare(input[index:index+1], true)
+		projection := uniform.native
+		if index == 1 {
+			projection = uniform.plugins
+		}
+		if len(projection) != 1 || &projection[0] != &input[index] {
+			t.Fatal("uniform executor projection did not reuse its input")
+		}
+	}
+	if got := builder.prepare(input[4:], false); got != nil || builder.prepare(input[4:], false) != nil {
+		t.Fatal("a fully excluded rule set did not remain empty on reuse")
+	}
+}
+
+func TestPreparedLintPlanSharesExecutorRuleViews(t *testing.T) {
+	raw, paths := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "export const a = 1;",
+		"b.ts": "export const b = 2;",
+	})
+	files := []*ast.SourceFile{raw.GetSourceFile(paths["a.ts"]), raw.GetSourceFile(paths["b.ts"])}
+	sourceOnly := mustSourceOnlyTestProgram(t, raw, files)
+	typed := lintprogram.NewFromCompiler(raw)
+	environment := &rule.RuleEnvironment{Settings: map[string]any{"setting": "value"}}
+	var nativeRuns, typedRuns, pluginRuns, resolutions atomic.Int32
+	input := []rule.ConfiguredRule{
+		{Name: "native", Environment: environment, Severity: rule.SeverityWarning, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+			nativeRuns.Add(1)
+			if (ctx.TypeChecker != nil) != ctx.Program().CanProvideTypeChecker(ctx.SourceFile) {
+				t.Error("shared rules changed per-file checker authorization")
+			}
+			return nil
+		}},
+		{Name: "typed", RequiresTypeInfo: true, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+			typedRuns.Add(1)
+			if ctx.TypeChecker == nil {
+				t.Error("type-aware rule ran without a checker")
+			}
+			return nil
+		}},
+		{Name: "external/rule", IsEslintPluginRule: true, Severity: rule.SeverityWarning, Options: []any{"option"}, Run: func(rule.RuleContext) rule.RuleListeners {
+			pluginRuns.Add(1)
+			return nil
+		}},
+	}
+	opts := PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{sourceOnly, typed},
+		TargetsByProgram: [][]string{{paths["a.ts"], paths["b.ts"]}, {paths["a.ts"], paths["b.ts"]}},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			resolutions.Add(1)
+			return input
+		},
+	}
+	plan := mustPrepareLintPlan(t, opts)
+	shared := plan.programs[0].files[0].rules
+	for _, filePlan := range plan.programs[0].files {
+		if len(filePlan.rules.all) != 2 || filePlan.rules != shared || filePlan.hasTypeChecker || filePlan.rules.environment != environment {
+			t.Fatal("checker-free files did not share one coherent rule view")
+		}
+	}
+	for _, filePlan := range plan.programs[1].files {
+		if len(filePlan.rules.all) != len(input) || &filePlan.rules.all[0] != &input[0] || filePlan.rules != plan.programs[1].files[0].rules || !filePlan.hasTypeChecker || filePlan.rules.environment != environment {
+			t.Fatal("sharing filtered rules changed checker-capable files")
+		}
+	}
+	if resolutions.Load() != 4 || len(plan.Targets()) != 4 {
+		t.Fatal("sharing rules changed target projection or per-file resolution")
+	}
+	pluginInputs := BuildEslintPluginFileInputs(plan, nil)
+	if len(pluginInputs) != 4 {
+		t.Fatalf("plugin targets = %d, want 4", len(pluginInputs))
+	}
+	for i, pluginInput := range pluginInputs {
+		if pluginInput.SourceFile != files[i%2] || len(pluginInput.Rules) != 1 ||
+			pluginInput.Rules[0].Name != input[2].Name || pluginInput.Rules[0].Severity != input[2].Severity ||
+			!reflect.DeepEqual(pluginInput.Rules[0].Options, input[2].Options) {
+			t.Fatal("sharing rules changed the ordered plugin projection")
+		}
+		if &pluginInput.Rules[0] != &plan.programs[i/2].files[0].rules.plugins[0] {
+			t.Fatal("plugin input construction copied the prepared rule projection")
+		}
+	}
+	if _, err := RunLinter(RunLinterOptions{LintPlan: plan}); err != nil {
+		t.Fatal(err)
+	}
+	if nativeRuns.Load() != 4 || typedRuns.Load() != 2 || pluginRuns.Load() != 0 {
+		t.Fatalf("unexpected execution: native=%d typed=%d plugin=%d", nativeRuns.Load(), typedRuns.Load(), pluginRuns.Load())
+	}
+	next := mustPrepareLintPlan(t, opts)
+	if next.programs[0].files[0].rules == shared || resolutions.Load() != 8 {
+		t.Fatal("a new plan reused the previous plan's rule cache")
+	}
+}
+
+func BenchmarkPreparedRuleSets(b *testing.B) {
+	for _, files := range []int{1, 1000} {
+		for _, shared := range []bool{true, false} {
+			for _, mixed := range []bool{false, true} {
+				inputs := make([][]rule.ConfiguredRule, files)
+				for file := range inputs {
+					if shared && file > 0 {
+						inputs[file] = inputs[0]
+						continue
+					}
+					inputs[file] = make([]rule.ConfiguredRule, 100)
+					for index := range inputs[file] {
+						inputs[file][index] = rule.ConfiguredRule{Name: "rule", RequiresTypeInfo: index%2 == 0, IsEslintPluginRule: mixed && index%3 == 0}
+					}
+				}
+				for _, checker := range []bool{false, true} {
+					for _, cached := range []bool{false, true} {
+						b.Run(fmt.Sprintf("files=%d/shared=%t/mixed=%t/checker=%t/cached=%t", files, shared, mixed, checker, cached), func(b *testing.B) {
+							// Compare per-file preparation with shared preparation, retaining
+							// every file's complete set of projections for the whole plan.
+							views := make([]*preparedRuleSet, files)
+							b.ReportAllocs()
+							b.ResetTimer()
+							if cached {
+								for b.Loop() {
+									var builder ruleSetBuilder
+									for file, rules := range inputs {
+										views[file] = builder.prepare(rules, checker)
+									}
+								}
+							} else {
+								for b.Loop() {
+									for file, rules := range inputs {
+										views[file] = prepareRuleSet(rules, checker)
+									}
+								}
+							}
+							runtime.KeepAlive(views)
+						})
+					}
+				}
+			}
+		}
+	}
 }
 
 func TestExactLintProjectionReusesUnchangedProgramUniverse(t *testing.T) {
