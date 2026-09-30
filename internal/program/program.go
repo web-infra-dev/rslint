@@ -47,6 +47,7 @@ type sourceBackend interface {
 	resolveModuleName(moduleName string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule
 	sourceFileForResolvedModule(fileName string) *ast.SourceFile
 	sourceFile(fileName string) *ast.SourceFile
+	projectReferenceSource(path string) (string, bool, bool)
 	sourceFileMetadata(file *ast.SourceFile) ast.SourceFileMetaData
 	syntacticDiagnostics(ctx context.Context, file *ast.SourceFile) []*ast.Diagnostic
 	isSourceFileDefaultLibrary(file *ast.SourceFile) bool
@@ -212,6 +213,16 @@ func (p *Program) GetSourceFile(fileName string) *ast.SourceFile {
 		return nil
 	}
 	return p.source.sourceFile(fileName)
+}
+
+// ProjectReferenceSource returns the source file behind a project reference
+// source or declaration path, and whether its project uses noCheck. The third
+// result is false for paths outside project references.
+func (p *Program) ProjectReferenceSource(path string) (string, bool, bool) {
+	if !p.IsValid() || path == "" {
+		return "", false, false
+	}
+	return p.source.projectReferenceSource(path)
 }
 
 func (p *Program) SourceFileMetadata(file *ast.SourceFile) ast.SourceFileMetaData {
@@ -388,6 +399,17 @@ func (b *compilerBackend) sourceFileForResolvedModule(fileName string) *ast.Sour
 func (b *compilerBackend) sourceFile(fileName string) *ast.SourceFile {
 	return b.raw.GetSourceFile(fileName)
 }
+func (b *compilerBackend) projectReferenceSource(path string) (string, bool, bool) {
+	canonical := tspath.ToPath(path, b.raw.GetCurrentDirectory(), b.raw.UseCaseSensitiveFileNames())
+	reference := b.raw.GetProjectReferenceFromOutputDts(canonical)
+	if reference == nil {
+		reference = b.raw.GetProjectReferenceFromSource(canonical)
+	}
+	if reference == nil || reference.Resolved == nil {
+		return "", false, false
+	}
+	return reference.Source, reference.Resolved.CompilerOptions().NoCheck.IsTrue(), true
+}
 func (b *compilerBackend) sourceFileMetadata(file *ast.SourceFile) ast.SourceFileMetaData {
 	return b.raw.GetSourceFileMetaData(file.Path())
 }
@@ -458,6 +480,9 @@ func (s *parsedBackend) resolveModuleName(name string, containingFile string, mo
 }
 func (s *parsedBackend) sourceFileForResolvedModule(fileName string) *ast.SourceFile {
 	return s.sourceFile(fileName)
+}
+func (s *parsedBackend) projectReferenceSource(string) (string, bool, bool) {
+	return "", false, false
 }
 func (s *parsedBackend) sourceFileMetadata(file *ast.SourceFile) ast.SourceFileMetaData {
 	return s.metadataByPath[file.Path()]
