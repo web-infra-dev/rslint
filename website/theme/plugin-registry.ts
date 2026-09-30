@@ -153,6 +153,10 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     importName: 'jestPlugin',
     presets: [
       {
+        name: 'jestPlugin.configs.all',
+        description: 'All supported Jest rules',
+      },
+      {
         name: 'jestPlugin.configs.recommended',
         description: 'Jest rules',
       },
