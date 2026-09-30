@@ -240,25 +240,10 @@ func JestVersionMajor(v string) int {
 // ApplyGlobalJestAlias maps settings.jest.globalAliases so that e.g. `context` is treated as
 // `describe`, matching eslint-plugin-jest.
 func ApplyGlobalJestAlias(name string, settings map[string]interface{}) string {
-	if name == "" || settings == nil {
+	if name == "" {
 		return name
 	}
-	raw, ok := settings["jest"]
-	if !ok {
-		return name
-	}
-	jm, ok := raw.(map[string]interface{})
-	if !ok {
-		return name
-	}
-	rawGA, ok := jm["globalAliases"]
-	if !ok {
-		return name
-	}
-	ga, ok := rawGA.(map[string]interface{})
-	if !ok {
-		return name
-	}
+	ga := globalJestAliases(settings)
 	for canonStr, aliasesVal := range ga {
 		if !JEST_METHOD_NAMES[canonStr] {
 			continue
@@ -275,6 +260,38 @@ func ApplyGlobalJestAlias(name string, settings map[string]interface{}) string {
 		}
 	}
 	return name
+}
+
+// globalJestAliases returns settings.jest.globalAliases, or nil when it is
+// absent or malformed.
+func globalJestAliases(settings map[string]interface{}) map[string]interface{} {
+	if settings == nil {
+		return nil
+	}
+	jm, ok := settings["jest"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	ga, _ := jm["globalAliases"].(map[string]interface{})
+	return ga
+}
+
+// hookGlobalAliases returns the names settings.jest.globalAliases maps to a
+// lifecycle hook.
+func hookGlobalAliases(settings map[string]interface{}) []string {
+	var aliases []string
+	for canonical, aliasesVal := range globalJestAliases(settings) {
+		if !testFramework.IsHookName(canonical) {
+			continue
+		}
+		list, _ := aliasesVal.([]interface{})
+		for _, a := range list {
+			if alias, ok := a.(string); ok && alias != "" {
+				aliases = append(aliases, alias)
+			}
+		}
+	}
+	return aliases
 }
 
 // jestVersionFromSettings returns the Jest version from rslint settings (ESLint style settings.jest.version).

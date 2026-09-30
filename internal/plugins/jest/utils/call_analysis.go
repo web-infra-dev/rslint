@@ -168,7 +168,10 @@ func (analysis *JestCallAnalysis) HookCallbacks() map[*ast.Node]bool {
 		return analysis.hookCallbacks
 	}
 	callbacks := map[*ast.Node]bool{}
-	if !testFramework.SourceFileMentionsHook(analysis.ctx.SourceFile) {
+	if !testFramework.SourceFileMentionsHook(
+		analysis.ctx.SourceFile,
+		hookGlobalAliases(analysis.ctx.Settings)...,
+	) {
 		analysis.hookCallbacks = callbacks
 		analysis.hookCallbacksOK = true
 		return analysis.hookCallbacks

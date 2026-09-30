@@ -14,6 +14,14 @@ import (
 
 var max1Option = []any{map[string]any{"max": 1}}
 
+var setupEachAliasSettings = map[string]any{
+	"jest": map[string]any{
+		"globalAliases": map[string]any{
+			"beforeEach": []any{"setupEach"},
+		},
+	},
+}
+
 func TestMaxExpectsExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -150,6 +158,32 @@ setupEach(setup);`,
 				Options: max1Option,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxAssertion", Line: 4, Column: 3},
+				},
+			},
+			// A hook configured through settings.jest.globalAliases need not
+			// spell the hook's own name anywhere in the file.
+			{
+				Code: `const setup = () => {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+};
+setupEach(setup);`,
+				Options:  max1Option,
+				Settings: setupEachAliasSettings,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "exceededMaxAssertion", Line: 3, Column: 3},
+				},
+			},
+			{
+				Code: `function setup() {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+}
+setupEach(setup);`,
+				Options:  max1Option,
+				Settings: setupEachAliasSettings,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "exceededMaxAssertion", Line: 3, Column: 3},
 				},
 			},
 			// A callback passed by name is still the test body.
