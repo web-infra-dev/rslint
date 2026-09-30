@@ -3,7 +3,9 @@
 ## Rule Details
 
 Prefer `.each` over wrapping `describe`/`test`/`it` in native `for` loops, for
-clearer output and easier filtering. Loops inside a test function are ignored.
+clearer output and easier filtering. A loop that only runs logic inside a test
+function is ignored; a loop that registers tests, suites, or hooks is reported
+wherever it sits.
 
 Examples of **incorrect** code for this rule:
 
@@ -41,8 +43,9 @@ describe.each(data)('when input is %s', ([input, expected]) => {
   });
 });
 
-// we don't warn on loops _in_ test functions because those typically involve
-// complex setup that is better done in the test function itself
+// we don't warn on loops _in_ test functions that register nothing because
+// those typically involve complex setup that is better done in the test
+// function itself
 it('returns numbers that are greater than five', () => {
   for (const number of getNumbers()) {
     expect(number).toBeGreaterThan(5);
