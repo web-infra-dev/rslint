@@ -131,8 +131,12 @@ func isGlobalDocumentAll(ctx rule.RuleContext, node *ast.Node) bool {
 	if globalObject == nil || !ast.IsIdentifier(globalObject) {
 		return false
 	}
-	name := globalObject.Text()
-	return (name == "globalThis" || name == "window") && ctx.Refs.IsGlobalReference(globalObject)
+	switch globalObject.Text() {
+	case "globalThis", "window", "self", "frames", "top", "parent":
+		return ctx.Refs.IsGlobalReference(globalObject)
+	default:
+		return false
+	}
 }
 
 func checkGlobalVariables(rawOptions []any) bool {

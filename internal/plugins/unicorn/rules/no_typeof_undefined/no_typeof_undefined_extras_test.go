@@ -71,6 +71,22 @@ func TestNoTypeofUndefinedReviewBoundaries(t *testing.T) {
 	windowDocumentAll.Output = []string{}
 	windowDocumentAll.Globals = map[string]any{"window": "readonly"}
 
+	selfDocumentAll := invalidFixed("typeof self.document.all === \"undefined\"", "self.document.all === undefined")
+	selfDocumentAll.Output = []string{}
+	selfDocumentAll.Globals = map[string]any{"self": "readonly"}
+
+	framesDocumentAll := invalidFixed("typeof frames.document.all === \"undefined\"", "frames.document.all === undefined")
+	framesDocumentAll.Output = []string{}
+	framesDocumentAll.Globals = map[string]any{"frames": "readonly"}
+
+	topDocumentAll := invalidFixed("typeof top.document.all === \"undefined\"", "top.document.all === undefined")
+	topDocumentAll.Output = []string{}
+	topDocumentAll.Globals = map[string]any{"top": "readonly"}
+
+	parentDocumentAll := invalidFixed("typeof parent.document.all === \"undefined\"", "parent.document.all === undefined")
+	parentDocumentAll.Output = []string{}
+	parentDocumentAll.Globals = map[string]any{"parent": "readonly"}
+
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
@@ -94,17 +110,26 @@ func TestNoTypeofUndefinedReviewBoundaries(t *testing.T) {
 			invalidFixed("typeof object.all === \"undefined\"", "object.all === undefined"),
 			invalidFixed("typeof getObject().all === \"undefined\"", "getObject().all === undefined"),
 			invalidFixed("typeof getGlobal().document.all === \"undefined\"", "getGlobal().document.all === undefined"),
+			invalidFixed("typeof foo.document.all === \"undefined\"", "foo.document.all === undefined"),
 			invalidFixed("typeof {} === \"undefined\" && consume()", "({}) === undefined && consume()"),
 			invalidFixed("typeof function() {} === \"undefined\", consume()", "(function() {}) === undefined, consume()"),
 			invalidFixed("typeof class {} === \"undefined\" ? yes() : no()", "(class {}) === undefined ? yes() : no()"),
 			invalidFixed("function f(globalThis) { return typeof globalThis.document.all === \"undefined\"; }", "function f(globalThis) { return globalThis.document.all === undefined; }"),
 			invalidFixed("function f(window) { return typeof window.document.all === \"undefined\"; }", "function f(window) { return window.document.all === undefined; }"),
+			invalidFixed("function f(self) { return typeof self.document.all === \"undefined\"; }", "function f(self) { return self.document.all === undefined; }"),
+			invalidFixed("function f(frames) { return typeof frames.document.all === \"undefined\"; }", "function f(frames) { return frames.document.all === undefined; }"),
+			invalidFixed("function f(top) { return typeof top.document.all === \"undefined\"; }", "function f(top) { return top.document.all === undefined; }"),
+			invalidFixed("function f(parent) { return typeof parent.document.all === \"undefined\"; }", "function f(parent) { return parent.document.all === undefined; }"),
 			shadowedUndefined,
 			shadowedUndefinedGlobal,
 			documentAll,
 			documentAllComputed,
 			globalThisDocumentAll,
 			windowDocumentAll,
+			selfDocumentAll,
+			framesDocumentAll,
+			topDocumentAll,
+			parentDocumentAll,
 		},
 	)
 }
