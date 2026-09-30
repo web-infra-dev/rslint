@@ -2,8 +2,6 @@ package utils
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
@@ -63,47 +61,4 @@ func ReplaceMemberNameFix(
 	default:
 		return rule.RuleFix{}, false
 	}
-}
-
-// InsertMemberBeforeAccessorFix inserts a property before entry while keeping
-// an optional boundary on the original receiver.
-func InsertMemberBeforeAccessorFix(
-	ctx rule.RuleContext,
-	entry *ParsedJestFnMemberEntry,
-	name string,
-) (rule.RuleFix, bool) {
-	textRange, text, ok := testFramework.InsertMemberBeforeAccessor(entry, name)
-	if !ok {
-		return rule.RuleFix{}, false
-	}
-	return rule.RuleFixReplaceRange(textRange, text), true
-}
-
-// ReplaceCallSuffixFix replaces a call's type arguments and arguments while
-// preserving an optional-call token owned by the call.
-//
-// The range is derived from the call node alone: it starts at the first token
-// after the callee (or after the call's optional token), so a comment sitting
-// between the callee and the type/argument list is preserved rather than
-// swallowed.
-func ReplaceCallSuffixFix(
-	sourceFile *ast.SourceFile,
-	callNode *ast.Node,
-	replacement string,
-) (rule.RuleFix, bool) {
-	callExpr := callNode.AsCallExpression()
-	if callExpr == nil {
-		return rule.RuleFix{}, false
-	}
-
-	start := callExpr.Expression.End()
-	if callExpr.QuestionDotToken != nil {
-		start = callExpr.QuestionDotToken.End()
-	}
-	// Advance past trivia to the `<` or `(` that actually opens the suffix.
-	start = scanner.GetRangeOfTokenAtPosition(sourceFile, start).Pos()
-	return rule.RuleFixReplaceRange(
-		core.NewTextRange(start, callNode.End()),
-		replacement,
-	), true
 }

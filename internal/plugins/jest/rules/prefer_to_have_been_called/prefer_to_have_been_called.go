@@ -4,116 +4,32 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_to_have_been_called"
 )
 
-// Message Builders
-
-func buildPreferMatcherErrorMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "preferMatcher",
-		Description: "Use `toHaveBeenCalled`",
-	}
-}
-
-func isZeroLiteral(node *ast.Node) bool {
-	node = jestUtils.UnwrapBasicTypeAssertions(node)
-	if node == nil {
-		return false
-	}
-
-	return node.Kind == ast.KindNumericLiteral && node.AsNumericLiteral().Text == "0"
-}
-
-var PreferToHaveBeenCalledRule = rule.Rule{
-	Name:   "jest/prefer-to-have-been-called",
-	Schema: rule.EmptyArraySchema,
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+var PreferToHaveBeenCalledRule = shared.NewRule(shared.Config{
+	Name: "jest/prefer-to-have-been-called",
+	Prepare: func(ctx rule.RuleContext) func(*ast.Node) []shared.Assertion {
 		analysis := jestUtils.GetJestCallAnalysis(ctx)
-		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := analysis.ParseExpectCall(node)
-				if jestFnCall == nil ||
-					(jestFnCall.Matcher != "toBeCalledTimes" && jestFnCall.Matcher != "toHaveBeenCalledTimes") {
-					return
+		return func(node *ast.Node) []shared.Assertion {
+			parsed := analysis.ParseExpectCall(node)
+			// An outer call on the matcher result parses to the same matcher.
+			if parsed == nil || parsed.MatcherEntry == nil || testFramework.InvokedAccessorCall(parsed.MatcherEntry) != node {
+				return nil
+			}
+			var not *testFramework.MemberEntry
+			for i := range parsed.ModifierEntries {
+				if parsed.ModifierEntries[i].Name == "not" {
+					not = &parsed.ModifierEntries[i]
+					break
 				}
-
-				matcherCall := node.AsCallExpression()
-				if matcherCall == nil || matcherCall.Arguments == nil || len(matcherCall.Arguments.Nodes) == 0 {
-					return
-				}
-
-				if !isZeroLiteral(matcherCall.Arguments.Nodes[0]) {
-					return
-				}
-
-				reportNode := node
-				if jestFnCall.MatcherEntry != nil && jestFnCall.MatcherEntry.Node != nil {
-					reportNode = jestFnCall.MatcherEntry.Node
-				}
-				message := buildPreferMatcherErrorMessage()
-				reportWithoutFix := func() {
-					ctx.ReportNode(reportNode, message)
-				}
-
-				_, matcherAccessor := jestUtils.GetAccessorReceiverAndParent(jestFnCall.MatcherEntry)
-				if matcherAccessor == nil {
-					reportWithoutFix()
-					return
-				}
-
-				var notModifier *jestUtils.ParsedJestFnMemberEntry
-				for i := range jestFnCall.ModifierEntries {
-					if jestFnCall.ModifierEntries[i].Name == "not" {
-						notModifier = &jestFnCall.ModifierEntries[i]
-						break
-					}
-				}
-
-				fixes := make([]rule.RuleFix, 0, 4)
-				matcherFix, ok := jestUtils.ReplaceMemberNameFix(
-					ctx,
-					jestFnCall.MatcherEntry,
-					"toHaveBeenCalled",
-				)
-				if !ok {
-					reportWithoutFix()
-					return
-				}
-				fixes = append(fixes, matcherFix)
-
-				callFix, ok := jestUtils.ReplaceCallSuffixFix(ctx.SourceFile, node, "()")
-				if !ok {
-					reportWithoutFix()
-					return
-				}
-				fixes = append(fixes, callFix)
-
-				if notModifier != nil {
-					removeNotFixes, ok := jestUtils.RemoveMemberAccessorFixes(ctx, notModifier)
-					if !ok {
-						reportWithoutFix()
-						return
-					}
-					fixes = append(fixes, removeNotFixes...)
-				} else {
-					insertNotFix, ok := jestUtils.InsertMemberBeforeAccessorFix(
-						ctx,
-						jestFnCall.MatcherEntry,
-						"not",
-					)
-					if !ok {
-						reportWithoutFix()
-						return
-					}
-					fixes = append(fixes, insertNotFix)
-				}
-
-				ctx.ReportNodeWithFixes(
-					reportNode,
-					message,
-					fixes...,
-				)
-			},
+			}
+			return []shared.Assertion{{
+				Matcher: *parsed.MatcherEntry,
+				Not:     not,
+				CanFix:  true,
+			}}
 		}
 	},
-}
+})
