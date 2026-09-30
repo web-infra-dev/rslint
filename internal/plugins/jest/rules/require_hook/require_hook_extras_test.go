@@ -100,6 +100,58 @@ func TestRequireHookExtras(t *testing.T) {
 				},
 			},
 			{
+				Code: `describe('suite', (() => {
+  setup();
+}));`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useHook", Line: 2, Column: 3}},
+			},
+			{
+				Code: `describe('suite', (() => {
+  setup();
+}) as () => void);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useHook", Line: 2, Column: 3}},
+			},
+			{
+				Code: `describe('suite', (function () {
+  setup();
+})!);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useHook", Line: 2, Column: 3}},
+			},
+			{
+				Code: `describe('suite', (() => {
+  setup();
+}) satisfies () => void);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useHook", Line: 2, Column: 3}},
+			},
+			{
+				Code: `describe('suite', <() => void>(() => {
+  setup();
+}));`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useHook", Line: 2, Column: 3}},
+			},
+			{
+				Code: `(condition ? setup : teardown)();`,
+				Options: []interface{}{
+					map[string]interface{}{"allowedFunctionCalls": []interface{}{""}},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useHook", Line: 1, Column: 1}},
+			},
+			{
+				Code: `helper[key.value]();`,
+				Options: []interface{}{
+					map[string]interface{}{"allowedFunctionCalls": []interface{}{""}},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useHook", Line: 1, Column: 1}},
+			},
+			{
+				Code: `first();
+describe('suite', () => {
+  inner();
+});
+last();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useHook", Line: 1, Column: 1}, {MessageId: "useHook", Line: 3, Column: 3}, {MessageId: "useHook", Line: 5, Column: 1}},
+			},
+			{
 				Code: `new NodeExtensionTester()
   .shouldMatch()
   .runTests();`,
