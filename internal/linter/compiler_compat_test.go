@@ -265,9 +265,9 @@ func prepareLegacyProgramLintPlan(opts legacyProgramPlanOptions) (programLintPla
 		SkipSyntaxCheck: opts.skipSyntaxCheck,
 		GetRulesForFile: opts.getRulesForFile,
 	}
-	var filteredRules nonTypeAwareRuleCache
+	var ruleSets ruleSetBuilder
 	for fileIndex := range plan.files {
-		resolveProgramLintPlanFile(ruleOpts, &plan, fileIndex, context.Background(), &filteredRules)
+		resolveProgramLintPlanFile(ruleOpts, &plan, fileIndex, context.Background(), &ruleSets)
 	}
 	return plan, nil
 }

@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -63,10 +65,7 @@ func TestBuildEslintPluginFileInput_EffectiveLanguageOptions(t *testing.T) {
 		Environment:        &rule.RuleEnvironment{},
 	}}
 
-	input, ok := BuildEslintPluginFileInput("/repo/file.cjs", "/repo", rules, raw, nil, nil, nil)
-	if !ok {
-		t.Fatal("plugin rule should produce an input")
-	}
+	input := buildEslintPluginFileInput("/repo/file.cjs", "/repo", prepareRuleSet(rules, true), raw, nil, nil, nil)
 	if got := input.LanguageOptions["sourceType"]; got != "commonjs" {
 		t.Errorf(".cjs sourceType = %v, want commonjs", got)
 	}
@@ -87,15 +86,41 @@ func TestBuildEslintPluginFileInput_EffectiveLanguageOptions(t *testing.T) {
 		ECMAVersion: 2020,
 		SourceType:  "script",
 	}}
-	input, ok = BuildEslintPluginFileInput("/repo/file.unknown", "/repo", rules, raw, nil, nil, nil)
-	if !ok {
-		t.Fatal("plugin rule should produce an input")
-	}
+	input = buildEslintPluginFileInput("/repo/file.unknown", "/repo", prepareRuleSet(rules, true), raw, nil, nil, nil)
 	if got := input.LanguageOptions["sourceType"]; got != "script" {
 		t.Errorf("authored sourceType = %v, want script", got)
 	}
 	if got := input.LanguageOptions["ecmaVersion"]; got != 2020 {
 		t.Errorf("authored ecmaVersion = %v, want 2020", got)
+	}
+}
+
+func TestBuildEslintPluginFileInputsSharedRulesKeepFileDefaults(t *testing.T) {
+	compilerProgram, paths := createTestProgramWithFilesAndCompilerOptions(t, map[string]string{
+		"one.cjs": "exports.value = 1;",
+		"two.mjs": "export const value = 1;",
+	}, `{"allowJs":true}`)
+	program := lintprogram.NewFromCompiler(compilerProgram)
+	rules := []rule.ConfiguredRule{pluginRule("external/rule", nil, rule.SeverityWarning)}
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{program},
+		TargetsByProgram: [][]string{{paths["one.cjs"], paths["two.mjs"]}},
+		GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return rules },
+	})
+	raw := map[string]any{"parserOptions": map[string]any{"ecmaFeatures": map[string]any{"jsx": true}}}
+	inputs := BuildEslintPluginFileInputs(plan, func(path string) EslintPluginFileConfig {
+		return EslintPluginFileConfig{ConfigKey: path, LanguageOptions: raw}
+	})
+	if len(inputs) != 2 || &inputs[0].Rules[0] != &inputs[1].Rules[0] {
+		t.Fatal("files did not share their prepared plugin projection")
+	}
+	if inputs[0].LanguageOptions["sourceType"] != "commonjs" || inputs[1].LanguageOptions["sourceType"] != "module" ||
+		inputs[0].ConfigKey != paths["one.cjs"] || inputs[1].ConfigKey != paths["two.mjs"] {
+		t.Fatal("shared rules conflated file defaults or plugin routing")
+	}
+	inputs[0].LanguageOptions["sourceType"] = "script"
+	if inputs[1].LanguageOptions["sourceType"] != "module" || raw["sourceType"] != nil {
+		t.Fatal("a file's effective language options mutated another file or the config input")
 	}
 }
 
@@ -929,8 +954,8 @@ func TestBuildEslintPluginFileInputsUsesPreparedPlan(t *testing.T) {
 	nativeRule := rule.ConfiguredRule{Name: "native/rule", Severity: rule.SeverityError}
 	pluginConfiguredRule := pluginRule("external/rule", []any{"option"}, rule.SeverityWarning)
 	plan := &LintPlan{programs: []programLintPlan{{files: []lintFilePlan{
-		{file: nativeFile, rules: []rule.ConfiguredRule{nativeRule}},
-		{file: pluginFile, rules: []rule.ConfiguredRule{nativeRule, pluginConfiguredRule}},
+		{file: nativeFile, rules: prepareRuleSet([]rule.ConfiguredRule{nativeRule}, true)},
+		{file: pluginFile, rules: prepareRuleSet([]rule.ConfiguredRule{nativeRule, pluginConfiguredRule}, true)},
 	}}}}
 
 	resolveCalls := 0

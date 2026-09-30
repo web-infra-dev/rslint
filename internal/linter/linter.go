@@ -136,8 +136,9 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	// comments, DisableManager, and rule contexts are per-file. The listener
 	// registry belongs to the calling checker-shard task and is empty on entry;
 	// reset clears all captured per-file state before the next serial file.
-	lintFile := func(filePlan *lintFilePlan, rules []rule.ConfiguredRule, chk *checker.Checker, registeredListeners *listenerRegistry) {
+	lintFile := func(filePlan *lintFilePlan, chk *checker.Checker, registeredListeners *listenerRegistry) {
 		file := filePlan.file
+		rules := filePlan.rules.native
 
 		// Per-rule durations for this file, parallel to rules. Listeners are
 		// wrapped at registration time, so when timing is off the traversal
@@ -161,8 +162,8 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
 		inlineExported, inlineExportedDeclarations := rule.ParseInlineExported(file, comments)
 		var environment rule.RuleEnvironment
-		if filePlan.environment != nil {
-			environment = *filePlan.environment
+		if filePlan.rules.environment != nil {
+			environment = *filePlan.rules.environment
 		}
 
 		// Resolve immutable language initialization once per file. Globals and
@@ -349,52 +350,49 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	// Correctness never depends on the grouping: each task only uses the
 	// checker it acquired exclusively for its own shard.
 	ctx := context.Background()
-	type lintFileTask struct {
-		plan  *lintFilePlan
-		rules []rule.ConfiguredRule
-	}
-	checkerGroups := make(map[*checker.Checker][]lintFileTask)
+	checkerGroups := make(map[*checker.Checker][]*lintFilePlan)
 	checkerFreeGeneration := true
 	for fileIndex := range filesToLint {
 		filePlan := &filesToLint[fileIndex]
 		file := filePlan.file
-		rules := filePlan.rules
 		if filePlan.hasTypeChecker {
 			checkerFreeGeneration = false
 		}
-		if opts.CollectExecutedRules && len(rules) > 0 {
+		if filePlan.rules == nil {
+			continue
+		}
+		rules := filePlan.rules
+		if opts.CollectExecutedRules {
 			if result.executedRules == nil {
-				result.executedRules = make(map[string]struct{}, len(rules))
+				result.executedRules = make(map[string]struct{}, len(rules.all))
 			}
-			for _, configuredRule := range rules {
+			for _, configuredRule := range rules.all {
 				result.executedRules[configuredRule.Name] = struct{}{}
 			}
 		}
-		rules = filterNativeRules(rules)
-		if len(rules) == 0 {
+		if len(rules.native) == 0 {
 			continue
 		}
-		task := lintFileTask{plan: filePlan, rules: rules}
 		if !filePlan.hasTypeChecker {
-			checkerGroups[nil] = append(checkerGroups[nil], task)
+			checkerGroups[nil] = append(checkerGroups[nil], filePlan)
 			continue
 		}
 		chk, release := sourceProgram.TypeCheckerForFile(ctx, file)
 		release()
-		checkerGroups[chk] = append(checkerGroups[chk], task)
+		checkerGroups[chk] = append(checkerGroups[chk], filePlan)
 	}
 
 	wg := core.NewWorkGroup(opts.SingleThreaded)
-	queueFiles := func(chk *checker.Checker, tasks []lintFileTask) {
+	queueFiles := func(chk *checker.Checker, tasks []*lintFilePlan) {
 		wg.Queue(func() {
 			registeredListeners := newListenerRegistry()
 			if chk != nil {
 				var done func()
-				chk, done = sourceProgram.TypeCheckerForFileExclusive(ctx, tasks[0].plan.file)
+				chk, done = sourceProgram.TypeCheckerForFileExclusive(ctx, tasks[0].file)
 				defer done()
 			}
 			for _, task := range tasks {
-				lintFile(task.plan, task.rules, chk, &registeredListeners)
+				lintFile(task, chk, &registeredListeners)
 			}
 		})
 	}
@@ -423,31 +421,6 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	wg.RunAndWait()
 
 	return result
-}
-
-// filterNativeRules removes Node-dispatched ESLint plugin placeholders from
-// the native pass without mutating the resolver's shared cached slice. The
-// prepared plan retains the original list for host-side plugin dispatch.
-func filterNativeRules(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
-	firstPlugin := -1
-	for i, configuredRule := range rules {
-		if configuredRule.IsEslintPluginRule {
-			firstPlugin = i
-			break
-		}
-	}
-	if firstPlugin < 0 {
-		return rules
-	}
-
-	nativeRules := make([]rule.ConfiguredRule, 0, len(rules)-1)
-	nativeRules = append(nativeRules, rules[:firstPlugin]...)
-	for _, configuredRule := range rules[firstPlugin+1:] {
-		if !configuredRule.IsEslintPluginRule {
-			nativeRules = append(nativeRules, configuredRule)
-		}
-	}
-	return nativeRules
 }
 
 // RunLinter runs all configured lint rules across the given programs in

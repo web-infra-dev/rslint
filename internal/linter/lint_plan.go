@@ -35,13 +35,12 @@ type programLintPlan struct {
 	files   []lintFilePlan
 }
 
-// lintFilePlan freezes one AST generation, its resolved rules, shared rule
-// environment, and checker policy as a coherent execution unit. Parallel
+// lintFilePlan freezes one AST generation, its shared prepared rule set, and
+// checker policy as a coherent execution unit. Parallel
 // slices would allow these decisions to drift by index across plan reuse.
 type lintFilePlan struct {
 	file           *ast.SourceFile
-	rules          []rule.ConfiguredRule
-	environment    *rule.RuleEnvironment
+	rules          *preparedRuleSet
 	hasTypeChecker bool
 }
 
@@ -136,7 +135,7 @@ func PrepareLintPlanContext(ctx context.Context, opts PrepareLintPlanOptions) (*
 		}
 	}
 
-	var filteredRules nonTypeAwareRuleCache
+	var ruleSets ruleSetBuilder
 	resolve := func(resolveCtx context.Context, ref lintPlanFileRef) []rule.RuleDiagnostic {
 		if resolveCtx.Err() != nil {
 			return nil
@@ -145,7 +144,7 @@ func PrepareLintPlanContext(ctx context.Context, opts PrepareLintPlanOptions) (*
 		return resolveProgramLintPlanFile(programRulePlanOptions{
 			Program:         programPlan.program,
 			GetRulesForFile: opts.GetRulesForFile,
-		}, programPlan, ref.fileIndex, resolveCtx, &filteredRules)
+		}, programPlan, ref.fileIndex, resolveCtx, &ruleSets)
 	}
 
 	workerCount := min(runtime.GOMAXPROCS(0), len(refs))
@@ -259,12 +258,12 @@ func prepareProgramLintPlanForFiles(opts programRulePlanOptions, files []*ast.So
 		return programLintPlan{}, err
 	}
 	ctx := context.Background()
-	var filteredRules nonTypeAwareRuleCache
+	var ruleSets ruleSetBuilder
 	for fileIndex := range plan.files {
 		// Compatibility callers consume only the execution projection. Syntax
 		// diagnostics still gate rule resolution, but their presentation remains
 		// owned by the caller.
-		_ = resolveProgramLintPlanFile(opts, &plan, fileIndex, ctx, &filteredRules)
+		_ = resolveProgramLintPlanFile(opts, &plan, fileIndex, ctx, &ruleSets)
 	}
 	return plan, nil
 }
@@ -274,7 +273,7 @@ func resolveProgramLintPlanFile(
 	plan *programLintPlan,
 	fileIndex int,
 	ctx context.Context,
-	filteredRules *nonTypeAwareRuleCache,
+	ruleSets *ruleSetBuilder,
 ) []rule.RuleDiagnostic {
 	filePlan := &plan.files[fileIndex]
 	file := filePlan.file
@@ -292,44 +291,8 @@ func resolveProgramLintPlanFile(
 	// a narrower request policy, such as LSP HasTypeInfo=false, filter the
 	// configured rule set before planning without inspecting Program adapters.
 	filePlan.hasTypeChecker = opts.Program.CanProvideTypeChecker(file)
-	if filePlan.hasTypeChecker {
-		filePlan.rules = rules
-	} else {
-		filePlan.rules = filteredRules.filter(rules)
-	}
-	filePlan.environment = firstNativeRuleEnvironment(filePlan.rules)
+	filePlan.rules = ruleSets.prepare(rules, filePlan.hasTypeChecker)
 	return nil
-}
-
-// nonTypeAwareRuleCache shares a derived view of immutable configured rules
-// only while preparing one plan. The cache is discarded after workers join;
-// file plans retain the published slices without retaining this lookup table.
-type nonTypeAwareRuleCache struct {
-	values sync.Map // nonTypeAwareRuleKey -> []rule.ConfiguredRule
-}
-
-type nonTypeAwareRuleKey struct {
-	// Keep the input allocation alive and distinguish slice ranges by their exact
-	// start and length. Equal rule names do not imply equal configuration.
-	first  *rule.ConfiguredRule
-	length int
-}
-
-func (cache *nonTypeAwareRuleCache) filter(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
-	if len(rules) == 0 {
-		return rule.FilterNonTypeAwareRules(rules)
-	}
-	key := nonTypeAwareRuleKey{first: &rules[0], length: len(rules)}
-	if cached, ok := cache.values.Load(key); ok {
-		filtered, _ := cached.([]rule.ConfiguredRule)
-		return filtered
-	}
-	// Filtering is pure and inexpensive. Concurrent cold misses may compute
-	// duplicates, but only one complete immutable slice is published and used.
-	filtered := rule.FilterNonTypeAwareRules(rules)
-	actual, _ := cache.values.LoadOrStore(key, filtered)
-	filtered, _ = actual.([]rule.ConfiguredRule)
-	return filtered
 }
 
 // SyntacticDiagnostics returns diagnostics frozen by this plan. Project-backed
@@ -369,15 +332,6 @@ func (p *LintPlan) HasSyntacticDiagnostics() bool {
 	return p != nil && len(p.syntacticDiagnosticGroups) > 0
 }
 
-func firstNativeRuleEnvironment(rules []rule.ConfiguredRule) *rule.RuleEnvironment {
-	for _, configuredRule := range rules {
-		if !configuredRule.IsEslintPluginRule && configuredRule.Environment != nil {
-			return configuredRule.Environment
-		}
-	}
-	return nil
-}
-
 // Targets returns the plan's plugin-facing projection in stable Program/file
 // order. The rule slices are shared immutable plan state and must be read-only.
 func (p *LintPlan) Targets() []LintTarget {
@@ -387,11 +341,10 @@ func (p *LintPlan) Targets() []LintTarget {
 	var targets []LintTarget
 	for _, programPlan := range p.programs {
 		for _, filePlan := range programPlan.files {
-			rules := filePlan.rules
-			if len(rules) == 0 {
+			if filePlan.rules == nil {
 				continue
 			}
-			targets = append(targets, LintTarget{File: filePlan.file, Rules: rules})
+			targets = append(targets, LintTarget{File: filePlan.file, Rules: filePlan.rules.all})
 		}
 	}
 	return targets

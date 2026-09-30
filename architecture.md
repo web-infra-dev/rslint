@@ -478,8 +478,8 @@ copied into every per-rule context.
 
 Configuration is resolved once per file shape into one immutable
 `RuleEnvironment` shared by that file's `ConfiguredRule` entries. During
-planning that environment is frozen beside the file's rules and checker grant;
-execution constructs settings and globals once per file and copies the resulting
+planning that environment belongs to the shared prepared rule set, while each
+file retains its own checker grant. Execution constructs settings and globals once per file and copies the resulting
 base context for each rule. Module references and whole-Program indexes are not
 context fields: generic source references come from `Program().ModuleGraph()`,
 while rule-specific derived indexes use `CachedByProgram`. Both remain keyed by
@@ -1413,7 +1413,7 @@ and mutation sequencing do not.
 5. **Project Loading**: `program/loader.Session` accepts raw project declarations, frozen targets, and sparse service/root/reset policies projected from the shared file resolver. It assembles one project plan and adds service-selected config metadata before construction. Ordinary lint shares target-driven construction while preserving broad/focused validation and binding semantics; program-wide checking retains complete declarations. Explicit and service construction modes remain separate; per-target candidate lists carry scoped root choices and explicit gaps
 6. **Target Binding**: the loader locates the selected project's AST by lexical or frozen canonical identity without changing project policy or target scope. Disabled and unmatched targets, including explicit import-only files and service misses, receive source-only Programs. They cannot borrow a Program selected by another target's parser policy. CLI/API receive one Program sequence and exact parallel target projections; they never construct compiler hosts or implement ownership
 7. **Core Request**: CLI/API/LSP choose a sealed `RunPipeline` request kind and provide semantic adapters. They do not call `PrepareLintPlan`, `RunLinter`, plugin dispatch, or fix application as separate stages.
-8. **Rule Plan Preparation**: for each acquired generation, the core calls `PrepareLintPlan()` with one ordered Program sequence, its exact parallel target projection, and the generation's rule resolver. Planning never discovers, excludes, or scans for fallback targets; a target absent from its bound Program is an invariant error. The immutable result owns that Program sequence, freezes rare syntax diagnostics in a sparse plan-level projection, and keeps each hot per-file execution unit limited to its source, resolved rules, shared rule environment, and checker capability. Syntax-error and zero-rule files remain selected, and the same non-empty file/rule projection feeds third-party plugin dispatch. Worker results are joined in stable Program/file order; cancellation cannot publish a partial plan, and callback panics return through the caller so the enclosing generation lifecycle remains exact-once.
+8. **Rule Plan Preparation**: for each acquired generation, the core calls `PrepareLintPlan()` with one ordered Program sequence, its exact parallel target projection, and the generation's rule resolver. Planning never discovers, excludes, or scans for fallback targets; a target absent from its bound Program is an invariant error. The immutable result owns that Program sequence, freezes rare syntax diagnostics in a sparse plan-level projection, and keeps each hot per-file execution unit limited to its source, a shared prepared rule set, and checker capability. Prepared sets own eligibility, ordered native/plugin projections and rule-derived environments; execution consumes these views without filtering rules again. Syntax-error and zero-rule files remain selected, and the same non-empty file/rule projection feeds third-party plugin dispatch. Worker results are joined in stable Program/file order; cancellation cannot publish a partial plan, and callback panics return through the caller so the enclosing generation lifecycle remains exact-once.
 9. **Rule Execution**: the core invokes `RunLinter()` only with the prepared plan plus scheduling, diagnostic, timing, and optional program-wide type-check concerns. A nil plan explicitly skips lint for `--type-check-only`. Execution never recollects files, re-resolves rules, or accepts a second Program authority alongside a plan. Plans bind exact Program pointers, so every autofix re-observation constructs a fresh Program and plan over the current in-memory snapshot. When `--type-check` is enabled, Phase 2 schedules only Programs that expose complete program diagnostics.
 10. **Fix Rounds and Aggregation**: `RunPipeline` joins native/plugin results, projects stable target paths, computes whole-file changes, applies them to private memory, and reacquires a generation until stable or bounded. A file may move between Program generations when its import graph changes, but the target plan remains stable. Once memory differs from the initial generation, every plugin target is frozen inline from that generation even when the initial CLI host could read disk. CLI independently supplies a terminal committer and therefore touches disk only once after the last successful observation; API and LSP consume the returned memory delta without a committer. Integrations retain only presentation policy for structured plugin notices, path conversion, and output/protocol mapping.
 11. **Report Assembly**: the CLI's concrete, side-effect-free report projection validates final post-fix diagnostics and converts them from rule-domain values to output-owned values. It computes error/warning/type-error counts and one outcome from the same snapshot plus `--max-warnings`; the completed `Report` supplies that outcome to both status rendering and exit policy. Only the default format requests a `Summary` and immutable source snapshots for code frames. Before `RunPipeline`, the loader freezes roots from the actual type-capable Programs selected for the run, combines their identities with already-frozen lint-target identities, and immediately reduces them to the canonical-union file count consumed after execution. Machine formats consume projected positions, do not request root identities, and do not construct fake zero-valued summaries. `--quiet` filters rendering only.
@@ -1604,12 +1604,14 @@ lint and fix execution still await full config activation.
   file's complete rule set once into immutable rslint Program slots. Native
   execution and optional third-party plugin dispatch consume projections of the
   same plan instead of repeating target collection or rule resolution
-- **Plan-Scoped Rule Filtering**: while preparing one lint plan, checker-free
-  files sharing the same immutable rule slice reuse its non-type-aware subset.
-  A concurrent lookup keyed by the input slice's exact start and length publishes
-  complete results without changing per-file checker eligibility. The lookup is
-  discarded after preparation; the plan retains only the shared rule views.
-  New plans, including autofix observations, prepare independent views
+- **Shared Prepared Rule Sets**: plan preparation owns rule eligibility and the
+  ordered native/plugin projections together. Files with the same immutable
+  input slice and checker capability share one completely prepared rule set;
+  native execution and plugin input construction consume its views directly.
+  A preparation-local lookup uses the input's exact start, length and capability,
+  and is discarded after workers join. File contexts, checker instances, language
+  defaults and plugin routing remain per-file. Each new plan, including autofix
+  observations, prepares independent sets
 
 ### Performance Optimizations
 

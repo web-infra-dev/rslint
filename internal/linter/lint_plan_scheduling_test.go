@@ -12,26 +12,26 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-func TestNonTypeAwareRuleCachePublishesCompleteConcurrentViews(t *testing.T) {
+func TestPreparedRuleSetsPublishCompleteConcurrentViews(t *testing.T) {
 	input := make([]rule.ConfiguredRule, 100)
 	for index := range input {
-		input[index] = rule.ConfiguredRule{Name: "rule", RequiresTypeInfo: index%2 == 0}
+		input[index] = rule.ConfiguredRule{Name: "rule", RequiresTypeInfo: index%2 == 0, IsEslintPluginRule: index%3 == 0}
 	}
-	var cache nonTypeAwareRuleCache
+	var builder ruleSetBuilder
 	var workers sync.WaitGroup
 	start := make(chan struct{})
-	results := make([][]rule.ConfiguredRule, 32)
+	results := make([]*preparedRuleSet, 32)
 	for index := range results {
 		workers.Go(func() {
 			<-start
-			results[index] = cache.filter(input)
+			results[index] = builder.prepare(input, index%2 == 0)
 		})
 	}
 	close(start)
 	workers.Wait()
-	want := rule.FilterNonTypeAwareRules(input)
-	for _, got := range results {
-		if !reflect.DeepEqual(got, want) || &got[0] != &results[0][0] {
+	for index, got := range results {
+		want := prepareRuleSet(input, index%2 == 0)
+		if !reflect.DeepEqual(got, want) || got != results[index%2] {
 			t.Fatal("concurrent cold readers did not receive one complete immutable result")
 		}
 	}

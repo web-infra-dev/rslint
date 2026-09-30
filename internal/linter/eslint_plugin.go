@@ -126,26 +126,10 @@ type EslintPluginFileInput struct {
 	Rules []rule.ConfiguredRule
 }
 
-// BuildEslintPluginFileInput assembles one file's plugin-lint input from its
-// enabled rules and config projection. It returns ok=false when the file has no
-// plugin rules. Product execution reaches this primitive through
-// BuildEslintPluginFileInputs and RunPipeline; direct callers must supply a
-// coherent text/source frame themselves.
-func BuildEslintPluginFileInput(filePath, configKey string, rules []rule.ConfiguredRule, languageOptions, settings map[string]any, text *string, sourceFile ast.SourceFileLike) (EslintPluginFileInput, bool) {
-	var pluginRules []rule.ConfiguredRule
-	var normalizedLanguageOptions rule.LanguageOptions
-	for _, r := range rules {
-		if r.Environment != nil {
-			normalizedLanguageOptions = r.Environment.LanguageOptions
-		}
-		if r.IsEslintPluginRule {
-			pluginRules = append(pluginRules, r)
-		}
-	}
-	if len(pluginRules) == 0 {
-		return EslintPluginFileInput{}, false
-	}
-	_, _, normalizedLanguageOptions = rule.ResolveLanguageDefaults(filePath, normalizedLanguageOptions)
+// buildEslintPluginFileInput adds file-specific defaults and routing to an
+// already prepared plugin projection. It never selects or copies rules.
+func buildEslintPluginFileInput(filePath, configKey string, rules *preparedRuleSet, languageOptions, settings map[string]any, text *string, sourceFile ast.SourceFileLike) EslintPluginFileInput {
+	_, _, normalizedLanguageOptions := rule.ResolveLanguageDefaults(filePath, rules.pluginLanguageOptions)
 	effectiveLanguageOptions := make(map[string]any, len(languageOptions)+2)
 	for name, value := range languageOptions {
 		effectiveLanguageOptions[name] = value
@@ -159,8 +143,8 @@ func BuildEslintPluginFileInput(filePath, configKey string, rules []rule.Configu
 		ConfigKey:       configKey,
 		LanguageOptions: effectiveLanguageOptions,
 		Settings:        settings,
-		Rules:           pluginRules,
-	}, true
+		Rules:           rules.plugins,
+	}
 }
 
 // EslintPluginFileConfig is the config projection required to dispatch one
@@ -184,43 +168,32 @@ func BuildEslintPluginFileInputs(
 	plan *LintPlan,
 	resolveConfig EslintPluginFileConfigResolver,
 ) []EslintPluginFileInput {
-	targets := plan.Targets()
-	if len(targets) == 0 {
+	if plan == nil {
 		return nil
 	}
 	var inputs []EslintPluginFileInput
-	for _, target := range targets {
-		if !hasEslintPluginRule(target.Rules) {
-			continue
-		}
-		filePath := target.File.FileName()
-		var fileConfig EslintPluginFileConfig
-		if resolveConfig != nil {
-			fileConfig = resolveConfig(filePath)
-		}
-		input, ok := BuildEslintPluginFileInput(
-			filePath,
-			fileConfig.ConfigKey,
-			target.Rules,
-			fileConfig.LanguageOptions,
-			fileConfig.Settings,
-			nil,
-			target.File,
-		)
-		if ok {
-			inputs = append(inputs, input)
+	for _, programPlan := range plan.programs {
+		for _, filePlan := range programPlan.files {
+			if filePlan.rules == nil || len(filePlan.rules.plugins) == 0 {
+				continue
+			}
+			filePath := filePlan.file.FileName()
+			var fileConfig EslintPluginFileConfig
+			if resolveConfig != nil {
+				fileConfig = resolveConfig(filePath)
+			}
+			inputs = append(inputs, buildEslintPluginFileInput(
+				filePath,
+				fileConfig.ConfigKey,
+				filePlan.rules,
+				fileConfig.LanguageOptions,
+				fileConfig.Settings,
+				nil,
+				filePlan.file,
+			))
 		}
 	}
 	return inputs
-}
-
-func hasEslintPluginRule(rules []rule.ConfiguredRule) bool {
-	for _, configuredRule := range rules {
-		if configuredRule.IsEslintPluginRule {
-			return true
-		}
-	}
-	return false
 }
 
 // eslintPluginShutdownSentinel is the ONLY benign parseError the worker emits:
