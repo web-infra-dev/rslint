@@ -159,6 +159,13 @@ collector's existing glob projection, while `NewMatcher` and
 JavaScript matching engine. Explicit matching keeps array entries intact,
 including embedded newlines; configuration collection retains its existing Git
 character-class and case behavior. No matcher discovers files or imports config.
+RegExp compilation reuses a process-wide, bounded cache keyed by the exact
+source and flags. The regexp package owns rewriting, validation and backend
+reuse; rule definitions and per-file initialization do not participate in the
+cache lifecycle. Each match borrows an independent backend from the pattern's
+pool, avoiding a shared backend's runner lock under concurrent rule execution.
+`Unwrap` permanently assigns a private backend to that handle, so mutations stay
+local and later operations on that handle keep using the exposed backend.
 Shared package metadata queries live in `internal/utils/packagejson`. `Read`
 decodes one package object; `FindNearest` preserves the nearest package boundary,
 while `FindNearestValid` explicitly skips invalid objects for Node's policy.
@@ -1672,7 +1679,7 @@ lint and fix execution still await full config activation.
 - **Metadata Snapshot Ownership**: metadata strings and extended-config parse entries live only for one loader session. The cache stores successful reads only, and its scope bounds growth to metadata touched by one CLI invocation or API request; no metadata entry survives into another request or the LSP session.
 - **Fix Application Uses Linear Rebuilds**: `ApplyRuleFixes` sorts fixes, skips overlapping edits, and rebuilds the output with `strings.Builder` rather than mutating source buffers in place
 - **Bounded Queues**: CLI diagnostics use a buffered channel of 4096 items; LSP request/outgoing queues are buffered to 100, and debounce/refresh signals are single-slot channels
-- **No Repo-Local Pooling Layer Today**: there is no explicit `sync.Pool`-based object pooling strategy in the main lint path at the moment
+- **Bounded RegExp Retention**: the regexp cache retains at most 256 compilation results, including errors, in FIFO order. Sources plus flags over 4 KiB or successful rewrites over 64 KiB bypass retention. Cached strings are copied so a small pattern cannot retain a source file's backing storage. Idle matching backends live in per-pattern `sync.Pool` instances and can be discarded by GC; concurrent demand or collection can require recompiling the validated backend pattern. Live handles remain valid after eviction. The cache retains no AST, rule context, options object or linted subject; pool size follows concurrent demand rather than a fixed heap bound. Backends exposed by `Unwrap` belong to their handle and never return to a shared pool.
 - **Fresh ESM Entry Lifetime**: fresh JS/TS config loads use a unique entry-module URL so rewritten bytes and module side effects are evaluated per transaction. Node retains those ESM module namespaces for the process lifetime, so a long-lived native API process can grow this cache slowly across repeated lint requests; static transitive imports continue to use Node's ordinary cache. Bounding this without weakening freshness requires a disposable evaluator realm or worker and remains a future optimization.
 - **Garbage Collection Handles Cycles**: the repository does not implement custom cycle breaking for AST/checker graphs; lifecycle cleanup relies on Go GC and on dropping references after each run
 

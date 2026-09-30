@@ -10,11 +10,16 @@ import "strings"
 // Matching uses the same engine semantics as TestOrError. A timeout returns the
 // unchanged input and an error, so callers can skip a transformation safely.
 func (r *RegExp) ReplaceFirst(input, replacement string) (string, error) {
-	if r == nil || r.re == nil {
+	re, pooled := r.borrow()
+	if re == nil {
 		return input, nil
 	}
+	if pooled {
+		defer r.pattern.backends.Put(re)
+	}
+	captures := r.pattern.captures
 	runes := []rune(input)
-	match, err := r.re.FindRunesMatch(runes)
+	match, err := re.FindRunesMatch(runes)
 	if err != nil || match == nil {
 		return input, err
 	}
@@ -44,12 +49,12 @@ func (r *RegExp) ReplaceFirst(input, replacement string) (string, error) {
 			result.WriteString(suffix)
 		case '<':
 			end := strings.IndexByte(replacement[index+2:], '>')
-			if !r.captures.named || end < 0 {
+			if !captures.named || end < 0 {
 				result.WriteByte('$')
 				continue
 			}
-			if number, ok := r.captures.names[replacement[index+2:index+2+end]]; ok {
-				result.WriteString(match.GroupByNumber(r.captures.number(number)).String())
+			if number, ok := captures.names[replacement[index+2:index+2+end]]; ok {
+				result.WriteString(match.GroupByNumber(captures.number(number)).String())
 			}
 			index += end + 1
 		default:
@@ -60,16 +65,16 @@ func (r *RegExp) ReplaceFirst(input, replacement string) (string, error) {
 			number := int(next - '0')
 			if index+2 < len(replacement) && replacement[index+2] >= '0' && replacement[index+2] <= '9' {
 				two := number*10 + int(replacement[index+2]-'0')
-				if two > 0 && two <= r.captures.count {
+				if two > 0 && two <= captures.count {
 					number = two
 					index++
 				}
 			}
-			if number == 0 || number > r.captures.count {
+			if number == 0 || number > captures.count {
 				result.WriteByte('$')
 				continue
 			}
-			result.WriteString(match.GroupByNumber(r.captures.number(number)).String())
+			result.WriteString(match.GroupByNumber(captures.number(number)).String())
 		}
 		index++
 	}

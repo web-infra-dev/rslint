@@ -2,6 +2,8 @@ package regexp
 
 import (
 	"errors"
+	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -473,6 +475,156 @@ func TestReplaceFirstConcurrent(t *testing.T) {
 	workers.Wait()
 }
 
+func TestCompileHandlesAreIndependent(t *testing.T) {
+	first := MustCompile(`^original$`, "i")
+	second := MustCompile(`^original$`, "i")
+	backend := first.Unwrap()
+	backend.MatchTimeout = time.Nanosecond
+	if second.Unwrap().MatchTimeout != MatchTimeout {
+		t.Fatal("changing one handle's timeout affected another")
+	}
+	if err := backend.UnmarshalText([]byte(`^modified$`)); err != nil {
+		t.Fatal(err)
+	}
+	if first.Unwrap() != backend || !first.Test("modified") || first.Test("ORIGINAL") {
+		t.Fatal("Unwrap mutations did not persist on the original handle")
+	}
+	for _, re := range []*RegExp{second, MustCompile(`^original$`, "i")} {
+		if !re.Test("ORIGINAL") || re.Test("modified") {
+			t.Fatal("Unwrap mutations escaped to another compilation")
+		}
+		if got, err := re.ReplaceFirst("ORIGINAL", "replaced"); err != nil || got != "replaced" {
+			t.Fatalf("independent replacement = %q, %v", got, err)
+		}
+	}
+	if first.Source() != `^original$` || first.Flags() != "i" {
+		t.Fatal("Unwrap changed the written form")
+	}
+}
+
+func TestCompileConcurrentHandles(t *testing.T) {
+	const source = `^(?<prefix>worker)-(\d+)$`
+	shared := MustCompile(source, "")
+	var workers sync.WaitGroup
+	for worker := range 24 {
+		workers.Go(func() {
+			re := MustCompile(source, "")
+			input := fmt.Sprintf("worker-%d", worker)
+			want := fmt.Sprintf("%d:worker:worker", worker)
+			for i := range 50 {
+				if !re.Test(input) || re.Test("unrelated") || !shared.Test(input) {
+					t.Error("concurrent test disagreed")
+				}
+				if got, err := re.ReplaceFirst(input, "$2:$1:$<prefix>"); got != want || err != nil {
+					t.Errorf("concurrent replacement = %q, %v; want %q", got, err, want)
+				}
+				if i == 25 {
+					// Pin both private and shared handles while other matches run.
+					sharedBackend, privateBackend := shared.Unwrap(), re.Unwrap()
+					if sharedBackend != shared.Unwrap() || privateBackend != re.Unwrap() {
+						t.Error("concurrent Unwrap returned different backends")
+					}
+				}
+			}
+		})
+	}
+	workers.Wait()
+}
+
+func TestPatternCacheConcurrentMisses(t *testing.T) {
+	var cache patternCache
+	start := make(chan struct{})
+	var workers sync.WaitGroup
+	for range 24 {
+		workers.Go(func() {
+			<-start
+			for range 20 {
+				pattern, err := cache.compile(patternKey{source: `^(?<name>cold)-\1$`, flags: "i"})
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				re := &RegExp{pattern: pattern}
+				if got, err := re.ReplaceFirst("COLD-COLD", "$1:$<name>"); err != nil || got != "COLD:COLD" {
+					t.Errorf("cold concurrent replacement = %q, %v", got, err)
+				}
+			}
+		})
+	}
+	close(start)
+	workers.Wait()
+}
+
+func TestPatternCacheEvictionAndCollection(t *testing.T) {
+	var cache patternCache
+	key := patternKey{source: `(?<name>retain)(ed)`, flags: "i"}
+	pattern, err := cache.compile(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	re := &RegExp{pattern: pattern}
+	for i := range patternCacheCapacity + 1 {
+		if _, err := cache.compile(patternKey{source: fmt.Sprintf("pattern%d", i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(cache.entries) != patternCacheCapacity {
+		t.Fatal("cache capacity was not enforced")
+	}
+	if _, ok := cache.entries[key]; ok {
+		t.Fatal("old pattern was not evicted")
+	}
+	// Pools may discard all idle backends; recreation must keep JS captures,
+	// flags and timeout semantics, and eviction must not invalidate live handles.
+	runtime.GC()
+	runtime.GC()
+	if !re.Test("RETAINED") || re.Unwrap().MatchTimeout != MatchTimeout {
+		t.Fatal("live handle lost its matching semantics after eviction/GC")
+	}
+	if got, err := re.ReplaceFirst("RETAINED", "$2:$<name>:$1"); err != nil || got != "ED:RETAIN:RETAIN" {
+		t.Fatalf("replacement after eviction/GC = %q, %v", got, err)
+	}
+}
+
+func TestPatternCacheAdmissionAndErrors(t *testing.T) {
+	var cache patternCache
+	for _, key := range []patternKey{
+		{source: strings.Repeat("a", maxCachedSourceBytes+1)},
+		{source: strings.Repeat(".", maxCachedSourceBytes)},
+	} {
+		if _, err := cache.compile(key); err != nil {
+			t.Fatal(err)
+		}
+		if len(cache.entries) != 0 {
+			t.Fatal("oversized source or rewrite was retained")
+		}
+	}
+	for _, key := range []patternKey{
+		{source: `ok`, flags: "ii"},
+		{source: `ok`, flags: "v"},
+		{source: `(?<0>a)`},
+		{source: `(`, flags: "i"},
+	} {
+		_, cold := cache.compile(key)
+		_, warm := cache.compile(key)
+		if cold == nil || warm == nil || cold.Error() != warm.Error() ||
+			errors.Is(cold, ErrUnsupportedFlag) != errors.Is(warm, ErrUnsupportedFlag) ||
+			errors.Is(cold, ErrUnsupportedSyntax) != errors.Is(warm, ErrUnsupportedSyntax) {
+			t.Fatalf("compile error changed for %+v: %v -> %v", key, cold, warm)
+		}
+	}
+	for _, flags := range []string{"", "i", "ig", "gi"} {
+		pattern, err := cache.compile(patternKey{source: "a", flags: flags})
+		if err != nil {
+			t.Fatal(err)
+		}
+		re := &RegExp{pattern: pattern}
+		if re.Flags() != flags || re.Test("A") != strings.Contains(flags, "i") {
+			t.Fatalf("flags were conflated: %q", flags)
+		}
+	}
+}
+
 func FuzzCompileAndReplace(f *testing.F) {
 	for _, source := range []string{`(?<a>a)(b)\1`, `(?<3>a)(b)`, `(?<0>a)`, `(?<a>a)(?<b-a>b)`, `(?<x>a)|(?<x>b)`, `\((a)[()]`, `(?<=a)(b)`} {
 		f.Add(source, "ab", "$1:$2:$<a>:$<0>:$99")
@@ -537,5 +689,38 @@ func BenchmarkRegExp(b *testing.B) {
 				}
 			})
 		})
+	}
+}
+
+func BenchmarkRegExpParallel(b *testing.B) {
+	const source = `^(?!legacy_)[A-Za-z_$][A-Za-z0-9_$]*$`
+	for _, compile := range []bool{false, true} {
+		b.Run(fmt.Sprintf("compile_%t", compile), func(b *testing.B) {
+			re := MustCompile(source, "")
+			b.ReportAllocs()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					current := re
+					if compile {
+						current = MustCompile(source, "")
+					}
+					for range 8 {
+						if !current.Test("identifier") || current.Test("legacy_identifier") {
+							b.Error("unexpected match")
+						}
+					}
+				}
+			})
+		})
+	}
+}
+
+func BenchmarkRegExpDistinctPatterns(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; b.Loop(); i++ {
+		re := MustCompile(fmt.Sprintf(`^pattern%d$`, i), "")
+		if !re.Test(fmt.Sprintf("pattern%d", i)) {
+			b.Fatal("unexpected match")
+		}
 	}
 }
