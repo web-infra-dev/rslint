@@ -4,11 +4,10 @@
     {
       "type": "object",
       "properties": {
-        "allowedFunctionCalls": {
+        "allow": {
           "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "uniqueItems": true,
+          "items": { "type": "string" }
         }
       },
       "additionalProperties": false

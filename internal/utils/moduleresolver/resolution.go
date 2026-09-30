@@ -2,7 +2,9 @@ package moduleresolver
 
 import (
 	"encoding/json"
+	"net/url"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 	"unicode/utf16"
@@ -16,6 +18,7 @@ import (
 	"github.com/tailscale/hujson"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
@@ -44,6 +47,12 @@ type Options struct {
 	// Local imports disable directory lookup unless entry options enable it.
 	// Require callers retain the ordinary Node directory lookup.
 	NoDirectory bool `json:"noDirectory"`
+	// NodeExports applies Node's own `exports`/`imports` target rules instead
+	// of enhanced-resolve's: a target must name an existing file exactly, with
+	// no extension or directory lookup, and is read as a URL after any pattern
+	// is substituted. A fallback array skips every entry that is not a valid
+	// target, including null and other non-string values.
+	NodeExports bool `json:"nodeExports,omitempty"`
 }
 
 // DefaultExtensions returns the runtime lookup defaults in search order.
@@ -107,6 +116,13 @@ func (resolver *nodeResolver) resolveRequest(name string) Result {
 	if index := strings.IndexAny(name, "?#"); index > 0 && !resolver.mainTarget && !options.LiteralPaths {
 		name = name[:index]
 	}
+	if options.NodeExports && !tspath.IsExternalModuleNameRelative(name) {
+		// Node lets a pattern match an empty segment and reads it as a single
+		// separator, as a plain path lookup does.
+		for strings.Contains(name, "//") {
+			name = strings.ReplaceAll(name, "//", "/")
+		}
+	}
 	folders := options.Modules
 	if len(folders) == 0 {
 		// Package imports and self-references do not use module directories.
@@ -138,8 +154,11 @@ bases:
 			}
 		}
 		// A POSIX backslash is a filename character. Do not let tsgo's
-		// separator normalization select a different file or package.
-		if strings.Contains(name, `\`) && tspath.GetRootLength(base) == 1 && !tspath.IsRootedDiskPath(name) {
+		// separator normalization select a different file or package. Node
+		// reads a backslash after the package name as `/` only once an exports
+		// or imports target turns the request into a URL.
+		literalBackslash := strings.Contains(name, `\`) && tspath.GetRootLength(base) == 1 && !tspath.IsRootedDiskPath(name)
+		if literalBackslash && (!options.NodeExports || !nodeURLBackslash(name)) {
 			continue
 		}
 		// Explicit fallbacks replace the default builtin exemption and must
@@ -183,6 +202,9 @@ bases:
 				break
 			}
 			if !view.unresolved && result != nil && result.IsResolved() {
+				if literalBackslash && !view.nodeTarget {
+					continue bases
+				}
 				if view.builtin {
 					resolveError = ""
 					continue bases
@@ -258,6 +280,12 @@ type nodeResolutionFS struct {
 	importsMatched    bool
 	importsTarget     string
 	builtin           bool
+	// nodeTarget records that an exports or imports target was selected, and
+	// exportsKeys and importsKeys the keys that match a request without a
+	// pattern. NodeExports only.
+	nodeTarget  bool
+	exportsKeys map[string]bool
+	importsKeys map[string]bool
 }
 
 func (f *nodeResolutionFS) newResolver(cwd string) *module.Resolver {
@@ -386,8 +414,17 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 		// Relative imports maps honor extension aliases; package main and
 		// exports targets retain their explicitly selected extensions.
 		applyAlias := strings.HasPrefix(f.request, "#") && f.importsTarget == ""
-		resolved = f.probe(target, applyAlias)
-		if resolved == "" && !f.options.NoDirectory && !f.fullySpecified && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
+		// Node accepts an exports or imports target only as an existing file.
+		exactTarget := f.options.NodeExports && strings.HasSuffix(physical, nodeExportSuffix)
+		if exactTarget {
+			if path, ok := f.nodeTargetPath(target); ok {
+				resolved = f.probeFile(path)
+			}
+			f.nodeTarget = f.nodeTarget || resolved != ""
+		} else {
+			resolved = f.probe(target, applyAlias)
+		}
+		if resolved == "" && !exactTarget && !f.options.NoDirectory && !f.fullySpecified && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
 			// enhanced-resolve permits directory exports. Ask tsgo to resolve
 			// their main/index using its regular relative-directory traversal.
 			// Guard package main cycles before creating a nested resolver.
@@ -431,6 +468,130 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 		f.resolved[name] = resolved
 	}
 	return resolved != ""
+}
+
+// encodedSeparator is Node's own check for an escaped path separator. It only
+// folds ASCII letters, which RE2 and JavaScript fold alike.
+var encodedSeparator = regexp.MustCompile(`(?i)%2F|%5C`)
+
+// invalidSegment is Node's check for a `.`, `..` or `node_modules` segment,
+// spelled with or without percent-escapes, between either separator. Node
+// rejects an exports or imports target, or a request's pattern match, that
+// contains one.
+var invalidSegment = esregexp.MustCompile(`(^|\\|\/)((\.|%2e)(\.|%2e)?|(n|%6e|%4e)(o|%6f|%4f)(d|%64|%44)(e|%65|%45)(_|%5f)(m|%6d|%4d)(o|%6f|%4f)(d|%64|%44)(u|%75|%55)(l|%6c|%4c)(e|%65|%45)(s|%73|%53))(\\|\/|$)`, "i")
+
+// nodeValidTarget reports whether Node accepts a relative target's segments.
+// Other target shapes are validated by tsgo.
+func nodeValidTarget(target string) bool {
+	return !strings.HasPrefix(target, "./") || !invalidSegment.Test(target[2:])
+}
+
+// nodeURLBackslash reports a request whose backslashes Node may read as
+// separators: one that goes through an imports map, or one whose package name
+// has none, so that only the package's exports can see them.
+func nodeURLBackslash(name string) bool {
+	if strings.HasPrefix(name, "#") {
+		return true
+	}
+	packageName, _ := module.ParsePackageName(strings.ReplaceAll(name, `\`, "/"))
+	return !strings.Contains(name[:min(len(packageName), len(name))], `\`)
+}
+
+// nodeExactKeys collects the keys of an exports or imports map that Node
+// matches without a pattern. A string or array exports only a package's root.
+func nodeExactKeys(value hujson.Value) map[string]bool {
+	keys := map[string]bool{".": true}
+	if object, ok := value.Value.(*hujson.Object); ok {
+		for _, member := range object.Members {
+			if key := nodePackageMemberName(member); !strings.Contains(key, "*") {
+				keys[key] = true
+			}
+		}
+	}
+	return keys
+}
+
+// invalidPatternMatch reports a request whose pattern match Node rejects.
+// Node checks only the text a pattern matched; the key's own text comes from
+// the package and names valid segments, so the whole subpath is checked.
+func (f *nodeResolutionFS) invalidPatternMatch() bool {
+	if strings.HasPrefix(f.request, "#") && !f.importsKeys[f.request] && invalidSegment.Test(f.request) {
+		return true
+	}
+	request := f.request
+	if f.importsTarget != "" {
+		request = f.importsTarget
+	}
+	if strings.HasPrefix(request, "#") || tspath.IsExternalModuleNameRelative(request) {
+		return false
+	}
+	packageName, _ := module.ParsePackageName(request)
+	subpath := request[min(len(packageName), len(request)):]
+	return subpath != "" && !f.exportsKeys["."+subpath] && invalidSegment.Test(subpath)
+}
+
+// nodeTargetPath converts an exports or imports target, after any pattern is
+// substituted, to the file Node reads. The part inside the package is a URL:
+// an escaped `/` or `\` anywhere in it is invalid, a query or fragment is
+// dropped, a backslash separates segments, and percent-escapes are decoded to
+// UTF-8 before the path is normalized.
+func (f *nodeResolutionFS) nodeTargetPath(target string) (string, bool) {
+	root := ""
+	for _, owner := range []string{f.exportsFile, f.importsFile} {
+		if owner == "" {
+			continue
+		}
+		directory := tspath.GetDirectoryPath(owner) + "/"
+		if strings.HasPrefix(target, directory) && len(directory) > len(root) {
+			root = directory
+		}
+	}
+	if root == "" {
+		return target, true
+	}
+	if f.invalidPatternMatch() || f.unexportedDirectory() {
+		return "", false
+	}
+	inner := target[len(root):]
+	if encodedSeparator.MatchString(inner) {
+		return "", false
+	}
+	if index := strings.IndexAny(inner, "?#"); index >= 0 {
+		inner = inner[:index]
+	}
+	decoded, err := url.PathUnescape(strings.ReplaceAll(inner, `\`, "/"))
+	// A file path cannot end in a separator.
+	if err != nil || !utf8.ValidString(decoded) || strings.HasSuffix(decoded, "/") {
+		return "", false
+	}
+	return tspath.NormalizePath(root + decoded), true
+}
+
+// unexportedDirectory reports a request ending in `/`, such as `pkg/` or
+// `pkg/sub/`, that no exact key exports. In Node a pattern never matches an
+// empty string, and one that matches such a request names a directory rather
+// than a file, so neither resolves.
+func (f *nodeResolutionFS) unexportedDirectory() bool {
+	// A `/` in a query or fragment is not part of the path.
+	endsInSeparator := func(request string) bool {
+		if index := strings.IndexAny(request, "?#"); index >= 0 {
+			request = request[:index]
+		}
+		return strings.HasSuffix(request, "/")
+	}
+	if strings.HasPrefix(f.request, "#") && endsInSeparator(f.request[1:]) && !f.importsKeys[f.request] {
+		return true
+	}
+	request := f.request
+	if f.importsTarget != "" {
+		request = f.importsTarget
+	}
+	if strings.HasPrefix(request, "#") || tspath.IsExternalModuleNameRelative(request) {
+		return false
+	}
+	packageName, _ := module.ParsePackageName(request)
+	subpath := request[min(len(packageName), len(request)):]
+	return endsInSeparator(subpath) && !f.exportsKeys["."+subpath]
 }
 
 func (f *nodeResolutionFS) DirectoryExists(name string) bool {
@@ -484,7 +645,7 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 		}
 		if imports := value.Find("/imports"); imports != nil {
 			filterNodeConditions(imports, f.options.Conditions)
-			markNodeImportTargets(imports, f.options.Conditions)
+			markNodeImportTargets(imports, f.options)
 			if entries, ok := imports.Value.(*hujson.Object); ok && f.importsFile == "" && strings.HasPrefix(f.request, "#") {
 				f.recordImports(entries, f.physical(name))
 			}
@@ -514,9 +675,10 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 					}
 					if selfReference || strings.HasSuffix(name, "/"+packageName+"/package.json") {
 						f.exportsFile = f.physical(name)
+						f.exportsKeys = nodeExactKeys(member.Value)
 					}
 					filterNodeConditions(&member.Value, f.options.Conditions)
-					if !prepareNodeExports(&member.Value, f.options.Conditions) {
+					if !prepareNodeExports(&member.Value, f.options) {
 						// A blocked selection must retain an exports map: a bare
 						// null field permits tsgo's legacy main/index fallback.
 						member.Value.Value = &hujson.Object{Members: []hujson.ObjectMember{{
@@ -549,6 +711,7 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 // Remember the selected request for diagnostics; tsgo still resolves its target.
 func (f *nodeResolutionFS) recordImports(entries *hujson.Object, fileName string) {
 	f.importsFile = fileName
+	f.importsKeys = nodeExactKeys(hujson.Value{Value: entries})
 	var best string
 	for _, entry := range entries.Members {
 		key := nodePackageMemberName(entry)
@@ -585,12 +748,16 @@ func (f *nodeResolutionFS) recordImports(entries *hujson.Object, fileName string
 
 // Let tsgo select imports-map keys and conditions, including redirects to Node
 // builtins that have no file for a compiler resolver to find.
-func markNodeImportTargets(value *hujson.Value, conditions []string) {
+func markNodeImportTargets(value *hujson.Value, options Options) {
 	switch v := value.Value.(type) {
 	case hujson.Literal:
 		if v.Kind() == '"' {
 			target := v.String()
-			if index := strings.IndexAny(target, "?#"); index > 0 {
+			if options.NodeExports && !nodeValidTarget(target) {
+				value.Value = hujson.Literal("null")
+				return
+			}
+			if index := strings.IndexAny(target, "?#"); index > 0 && isURLTarget(target, options) {
 				target = target[:index]
 				value.Value = hujson.String(target)
 			}
@@ -602,15 +769,15 @@ func markNodeImportTargets(value *hujson.Value, conditions []string) {
 		}
 	case *hujson.Object:
 		for i := range v.Members {
-			markNodeImportTargets(&v.Members[i].Value, conditions)
+			markNodeImportTargets(&v.Members[i].Value, options)
 		}
 	case *hujson.Array:
-		if !prepareNodeExports(value, conditions) {
+		if !prepareNodeExports(value, options) {
 			value.Value = &hujson.Array{}
 			return
 		}
 		for i := range v.Elements {
-			markNodeImportTargets(&v.Elements[i], conditions)
+			markNodeImportTargets(&v.Elements[i], options)
 			if target, ok := v.Elements[i].Value.(hujson.Literal); ok && target.Kind() == '"' && !tspath.IsExternalModuleNameRelative(target.String()) {
 				// Package targets stop on resolution failure just like the
 				// marked file targets; tsgo must not try a later array entry.
@@ -627,11 +794,14 @@ func markNodeImportTargets(value *hujson.Value, conditions []string) {
 // tsgo owns exports paths, patterns and ordinary condition selection. Only
 // normalize enhanced-resolve's array behavior: primitive entries invalidate an
 // array; nested arrays and unmatched/null conditional entries are skipped.
-func prepareNodeExports(value *hujson.Value, conditions []string) bool {
+// NodeExports skips primitive entries as well and flattens a nested array in
+// place, as Node tries its entries in order before moving on.
+func prepareNodeExports(value *hujson.Value, options Options) bool {
+	conditions := options.Conditions
 	switch object := value.Value.(type) {
 	case *hujson.Object:
 		for i := range object.Members {
-			if !prepareNodeExports(&object.Members[i].Value, conditions) {
+			if !prepareNodeExports(&object.Members[i].Value, options) {
 				object.Members[i].Value.Value = hujson.Literal("null")
 			}
 		}
@@ -641,10 +811,18 @@ func prepareNodeExports(value *hujson.Value, conditions []string) bool {
 			switch candidate := target.Value.(type) {
 			case hujson.Literal:
 				if candidate.Kind() != '"' {
+					if options.NodeExports {
+						continue
+					}
 					return false
 				}
+				if options.NodeExports && !nodeValidTarget(candidate.String()) {
+					continue
+				}
 			case *hujson.Array:
-				continue
+				if !options.NodeExports {
+					continue
+				}
 			case *hujson.Object:
 				selected, ok := nodeExportArrayCondition(candidate, conditions)
 				if !ok {
@@ -654,9 +832,16 @@ func prepareNodeExports(value *hujson.Value, conditions []string) bool {
 				if literal, ok := target.Value.(hujson.Literal); ok && (literal.Kind() != '"' || literal.String() == "") {
 					continue
 				}
+				if literal, ok := target.Value.(hujson.Literal); ok && options.NodeExports && !nodeValidTarget(literal.String()) {
+					continue
+				}
 			}
-			if !prepareNodeExports(&target, conditions) {
+			if !prepareNodeExports(&target, options) {
 				return false
+			}
+			if nested, ok := target.Value.(*hujson.Array); ok && options.NodeExports {
+				targets = append(targets, nested.Elements...)
+				continue
 			}
 			targets = append(targets, target)
 		}
@@ -664,12 +849,23 @@ func prepareNodeExports(value *hujson.Value, conditions []string) bool {
 	case hujson.Literal:
 		if object.Kind() == '"' {
 			target := object.String()
-			if index := strings.IndexAny(target, "?#"); index > 0 {
+			if options.NodeExports && !nodeValidTarget(target) {
+				return false
+			}
+			if index := strings.IndexAny(target, "?#"); index > 0 && isURLTarget(target, options) {
 				value.Value = hujson.String(target[:index])
 			}
 		}
 	}
 	return true
+}
+
+// isURLTarget reports a target whose `?` and `#` are removed before tsgo
+// sees it. NodeExports keeps them: a bare imports target is a package request,
+// taken literally, and a relative target is read as a URL only once a pattern
+// has been substituted into it.
+func isURLTarget(_ string, options Options) bool {
+	return !options.NodeExports
 }
 
 // A conditional null inside an exports array is skipped by enhanced-resolve,

@@ -1,6 +1,7 @@
 package jest
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/consistent_test_it"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/expect_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/max_expects"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/max_nested_describe"
@@ -13,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_done_callback"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_duplicate_hooks"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_error_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_focused_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_hooks"
@@ -24,7 +26,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_restricted_matchers"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_test_prefixes"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_test_return_statement"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_unnecessary_assertion"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_unneeded_async_expect_function"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_untyped_mock_factory"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/padding_around_after_all_blocks"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/padding_around_after_each_blocks"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/padding_around_all"
@@ -47,6 +52,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_lowercase_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_mock_promise_shorthand"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_mock_return_shorthand"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_snapshot_hint"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_spy_on"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_be"
@@ -58,15 +64,19 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_hook"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_to_throw_message"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_top_level_describe"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/unbound_method"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_describe_callback"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect_in_promise"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect_with_promise"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_mock_module_path"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_title"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		consistent_test_it.ConsistentTestItRule,
 		expect_expect.ExpectExpectRule,
 		max_expects.MaxExpectsRule,
 		max_nested_describe.MaxNestedDescribeRule,
@@ -79,6 +89,7 @@ func GetAllRules() []rule.Rule {
 		no_disabled_tests.NoDisabledTestsRule,
 		no_done_callback.NoDoneCallbackRule,
 		no_duplicate_hooks.NoDuplicateHooksRule,
+		no_error_equal.NoErrorEqualRule,
 		no_export.NoExportRule,
 		no_focused_tests.NoFocusedTestsRule,
 		no_hooks.NoHooksRule,
@@ -90,7 +101,10 @@ func GetAllRules() []rule.Rule {
 		no_restricted_matchers.NoRestrictedMatchersRule,
 		no_standalone_expect.NoStandaloneExpectRule,
 		no_test_prefixes.NoTestPrefixesRule,
+		no_test_return_statement.NoTestReturnStatementRule,
+		no_unnecessary_assertion.NoUnnecessaryAssertionRule,
 		no_unneeded_async_expect_function.NoUnneededAsyncExpectFunctionRule,
+		no_untyped_mock_factory.NoUntypedMockFactoryRule,
 		padding_around_after_all_blocks.PaddingAroundAfterAllBlocksRule,
 		padding_around_after_each_blocks.PaddingAroundAfterEachBlocksRule,
 		padding_around_all.PaddingAroundAllRule,
@@ -115,6 +129,7 @@ func GetAllRules() []rule.Rule {
 		prefer_mock_return_shorthand.PreferMockReturnShorthandRule,
 		prefer_spy_on.PreferSpyOnRule,
 		prefer_strict_equal.PreferStrictEqualRule,
+		prefer_snapshot_hint.PreferSnapshotHintRule,
 		prefer_to_be.PreferToBeRule,
 		prefer_to_contain.PreferToContainRule,
 		prefer_to_have_been_called_times.PreferToHaveBeenCalledTimesRule,
@@ -124,9 +139,12 @@ func GetAllRules() []rule.Rule {
 		require_hook.RequireHookRule,
 		require_to_throw_message.RequireToThrowMessageRule,
 		require_top_level_describe.RequireTopLevelDescribeRule,
+		unbound_method.UnboundMethodRule,
 		valid_describe_callback.ValidDescribeCallbackRule,
 		valid_expect.ValidExpectRule,
 		valid_expect_in_promise.ValidExpectInPromiseRule,
+		valid_expect_with_promise.ValidExpectWithPromiseRule,
+		valid_mock_module_path.ValidMockModulePathRule,
 		valid_title.ValidTitleRule,
 	}
 }

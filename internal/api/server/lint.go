@@ -431,8 +431,9 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			Plugin: plugin,
 		}
 	}
+	initialGeneration := generationForBinding(binding, programSession.FS())
 	provider := &apiGenerationProvider{
-		initial: generationForBinding(binding, programSession.FS()),
+		initial: &initialGeneration,
 		rebuild: func(ctx context.Context, snapshot linter.SourceSnapshot) (linter.Generation, error) {
 			if err := ctx.Err(); err != nil {
 				return linter.Generation{}, err

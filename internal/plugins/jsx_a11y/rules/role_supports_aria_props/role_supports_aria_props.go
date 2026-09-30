@@ -23,12 +23,12 @@
 //  4. isImplicit = (no explicit role attribute AND implicit role found).
 //     Used only to switch error message phrasing.
 //  5. Skip if roleValue is not a string OR is not a key in
-//     [jsxa11yutil.AriaRolePropsMap] (= `roles.get(roleValue) === undefined`).
+//     [jsxa11yutil.LookupRoleAriaProps] (= `roles.get(roleValue) === undefined`).
 //     The membership check is CASE-SENSITIVE on the raw extracted value —
 //     `<div role="BUTTON" aria-checked />` skips silently because aria-query's
 //     keys are lowercase.
 //  6. Compute the role's supported-props set from
-//     [jsxa11yutil.AriaRolePropsMap]; the invalid set is every ARIA name in
+//     [jsxa11yutil.LookupRoleAriaProps]; the invalid set is every ARIA name in
 //     [jsxa11yutil.AriaPropertyNames] that is NOT in the supported set.
 //  7. For each non-spread JsxAttribute on the element:
 //     - Skip when getPropValue is nullish (= null or undefined).
@@ -104,7 +104,7 @@ var RoleSupportsAriaPropsRule = rule.Rule{
 			if !hasRoleValue {
 				return
 			}
-			supportedProps, ok := jsxa11yutil.AriaRolePropsMap[roleValue]
+			supportedProps, ok := jsxa11yutil.LookupRoleAriaProps(roleValue)
 			if !ok {
 				return
 			}
@@ -132,7 +132,7 @@ var RoleSupportsAriaPropsRule = rule.Rule{
 				if _, isAria := jsxa11yutil.AriaPropertySet[name]; !isAria {
 					continue
 				}
-				if _, isSupported := supportedProps[name]; isSupported {
+				if supportedProps.Supports(name) {
 					continue
 				}
 				ctx.ReportNode(node, rule.RuleMessage{

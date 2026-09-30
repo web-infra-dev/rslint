@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"context"
+	"slices"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/program"
@@ -8,10 +11,112 @@ import (
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// This file answers whether a module statically exports one name, by walking
-// the target's statements directly. It is the looser counterpart of the export
-// map in export_map.go: it synthesizes default exports from compiler interop
-// settings, which the map deliberately does not.
+// This file provides name lookups, including the re-export path needed when a
+// declared name does not resolve. ExportMap separately enumerates declared names
+// and namespace metadata, even for broken re-exports.
+
+// FindExport follows a name through explicit and star re-exports. The path
+// contains resolved filenames, starting with the imported module; a nil path
+// means that module cannot be inspected. Missing explicit re-exports preserve
+// their failure path, while an unsuccessful star search reports the barrel.
+// Resolution and local export collection reuse the Program's import index.
+func FindExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, name string) (bool, []string) {
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
+		return false, nil
+	}
+	index := IndexFor(ctx)
+	link := resolveExportLink(ctx.Program(), ctx.SourceFile, index.settings, moduleSpecifier)
+	if !link.Resolved {
+		return false, nil
+	}
+	return newExportBuilder(index, ctx.Program()).findExport(link, name, ctx.Settings)
+}
+
+func (builder *exportBuilder) findExport(link exportLink, name string, settings map[string]interface{}) (bool, []string) {
+	file := link.Target
+	// File extensions and moduleDetection can make tsgo mark a CommonJS file
+	// as external. Upstream requires an authored import/export declaration;
+	// neither a forced SourceFile marker nor import.meta establishes that.
+	if file.ExternalModuleIndicator == nil || !ast.IsExternalModuleIndicator(file.ExternalModuleIndicator) {
+		return true, nil
+	}
+	// As with other import rules, dependency parser errors are not translated
+	// into ESLint parser messages. Do not diagnose exports from a partial AST.
+	if !exportExtensionAllowed(settings, file.FileName()) || len(builder.program().SyntacticDiagnostics(context.Background(), file)) != 0 {
+		return true, nil
+	}
+	path := []string{file.FileName()}
+	if name == defaultExportName && link.NodeDefault {
+		return true, path
+	}
+	key := exportKey{file: file, name: name}
+	if builder.seen[key] {
+		return false, path
+	}
+	if builder.seen == nil {
+		builder.seen = make(map[exportKey]bool)
+	}
+	builder.seen[key] = true
+	// Keep visited pairs for this entire lookup. An unsuccessful star branch
+	// cannot reveal a new export when reached again through another barrel.
+	// This bounds traversal of shared dependencies as well as cycles.
+
+	local := builder.index.localExportsOf(builder.program(), file)
+	if name == defaultExportName && local.ImplicitDefault {
+		return true, path
+	}
+	// Upstream prioritizes local names over explicit re-exports, and explicit
+	// re-exports over stars, independently of statement order.
+	var reexport *exportStep
+	var importedName string
+	for i := range local.Steps {
+		step := &local.Steps[i]
+		switch step.Kind {
+		case exportStepNames:
+			if slices.Contains(step.Names, name) {
+				return true, path
+			}
+		case exportStepLocalDefault:
+			if name == defaultExportName {
+				return true, path
+			}
+		case exportStepNamed:
+			for _, spec := range step.Specs {
+				if spec.Exported != name {
+					continue
+				}
+				if !step.FromModule {
+					return true, path
+				}
+				reexport, importedName = step, spec.Local
+			}
+		}
+	}
+	if reexport != nil {
+		if !reexport.Link.Resolved {
+			return true, path
+		}
+		if reexport.Link.Target == file && importedName == name {
+			return false, path
+		}
+		found, dependencyPath := builder.findExport(reexport.Link, importedName, settings)
+		return found, append(path, dependencyPath...)
+	}
+	if name != defaultExportName {
+		for _, step := range local.Steps {
+			if step.Kind != exportStepStar {
+				continue
+			}
+			if !step.Link.Resolved {
+				return true, path
+			}
+			if found, dependencyPath := builder.findExport(step.Link, name, settings); found {
+				return true, append(path, dependencyPath...)
+			}
+		}
+	}
+	return false, path
+}
 
 // HasDefaultExport resolves moduleSpecifier from ctx.SourceFile and reports
 // whether the resolved module has a statically visible default export. The
@@ -31,7 +136,7 @@ func HasExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, exportName strin
 	return hasExport(ctx.SourceFile, moduleSpecifier, exportName, newExportBuilder(IndexFor(ctx), ctx.Program()))
 }
 
-// exportKey is one (file, name) lookup in flight, so a re-export chain that
+// exportKey identifies one (file, name) lookup, so a re-export chain that
 // reaches the same question again is answered "not found" instead of recursing
 // forever.
 type exportKey struct {
@@ -44,6 +149,9 @@ func hasExport(origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName str
 	if link.Target == nil {
 		return false, false
 	}
+	if exportName == defaultExportName && link.NodeDefault {
+		return true, true
+	}
 	return sourceFileHasExport(link.Target, exportName, builder)
 }
 
@@ -55,12 +163,15 @@ func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.Sour
 	if !ok || sourceFile == nil || settings.IsIgnoredPath(sourceFile.FileName()) {
 		return exportLink{}
 	}
-	return exportLink{Target: sourceFile, Resolved: true}
+	return exportLink{Target: sourceFile, Resolved: true, NodeDefault: hasNodeDefault(sourceProgram, origin, moduleSpecifier, sourceFile)}
 }
 
 func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder *exportBuilder) (bool, bool) {
 	if sourceFile == nil || !ast.IsExternalModule(sourceFile) {
 		return false, false
+	}
+	if exportName == defaultExportName && sourceFile.IsDeclarationFile && builder.index.localExportsOf(builder.program(), sourceFile).ImplicitDefault {
+		return true, true
 	}
 
 	key := exportKey{file: sourceFile, name: exportName}
@@ -92,20 +203,12 @@ func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder 
 			if exportName == defaultExportName && exportAssignmentHasDefault(builder.program(), sourceFile, stmt.AsExportAssignment()) {
 				return true, true
 			}
-		case ast.KindNamespaceExportDeclaration:
-			if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.program()) {
-				return true, true
-			}
 		case ast.KindExportDeclaration:
 			found, done := exportDeclarationHasName(sourceFile, stmt.AsExportDeclaration(), exportName, builder)
 			if done {
 				return found, true
 			}
 		}
-	}
-
-	if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.program()) && sourceFileHasDirectNamespaceExport(sourceFile) {
-		return true, true
 	}
 
 	return false, true
@@ -263,55 +366,6 @@ func variableStatementDeclaresName(stmt *ast.Node, name string) bool {
 		if matched {
 			return true
 		}
-	}
-	return false
-}
-
-func sourceFileHasDirectNamespaceExport(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Statements == nil {
-		return false
-	}
-	for _, stmt := range sourceFile.Statements.Nodes {
-		if stmt == nil {
-			continue
-		}
-		if exportedDeclarationAddsNamespaceExport(stmt) {
-			return true
-		}
-		if stmt.Kind == ast.KindExportDeclaration && exportDeclarationAddsNamespaceExport(stmt.AsExportDeclaration()) {
-			return true
-		}
-	}
-	return false
-}
-
-func exportedDeclarationAddsNamespaceExport(stmt *ast.Node) bool {
-	if !ast.HasSyntacticModifier(stmt, ast.ModifierFlagsExport) {
-		return false
-	}
-	switch stmt.Kind {
-	case ast.KindVariableStatement,
-		ast.KindFunctionDeclaration,
-		ast.KindClassDeclaration,
-		ast.KindInterfaceDeclaration,
-		ast.KindTypeAliasDeclaration,
-		ast.KindEnumDeclaration,
-		ast.KindModuleDeclaration:
-		return true
-	}
-	return false
-}
-
-func exportDeclarationAddsNamespaceExport(exportDecl *ast.ExportDeclaration) bool {
-	if exportDecl == nil || exportDecl.ExportClause == nil {
-		return false
-	}
-	switch exportDecl.ExportClause.Kind {
-	case ast.KindNamedExports:
-		namedExports := exportDecl.ExportClause.AsNamedExports()
-		return exportDecl.ModuleSpecifier == nil && namedExports.Elements != nil && len(namedExports.Elements.Nodes) > 0
-	case ast.KindNamespaceExport:
-		return true
 	}
 	return false
 }

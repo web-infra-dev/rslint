@@ -65,7 +65,8 @@ window.MonacoEnvironment = {
 
 export type EditorTabType = 'code' | 'rslint' | 'tsconfig';
 
-const sourceFileTriggerClassName = 'h-8 px-3 py-0 font-medium leading-none';
+const sourceFileTriggerClassName =
+  'h-8 px-3 py-0 font-medium leading-none *:data-[slot=select-value]:overflow-visible';
 
 function configureMonacoTypeScriptDefaults() {
   const compilerOptions = {
@@ -629,7 +630,7 @@ export const EditorTabs = ({
               }
               className={`${sourceFileTriggerClassName} ${
                 activeTab === 'code'
-                  ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/90'
+                  ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90'
                   : ''
               }`}
             >

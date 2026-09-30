@@ -3,6 +3,8 @@ package utils
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 type jestCallAnalysisFileCacheKey struct{}
@@ -17,14 +19,18 @@ type jestCallParseResult struct {
 // larger Rstest analysis has framework-specific provenance and execution-mode
 // responsibilities that do not belong here.
 type JestCallAnalysis struct {
-	ctx           rule.RuleContext
-	fnCalls       map[*ast.Node]jestCallParseResult
-	calls         []*ast.Node
-	functions     map[string]*ast.Node
-	indexed       bool
-	callbackInfos map[*ast.Node]jestCallbackInfo
-	callbacks     JestTestCallbacks
-	callbacksOK   bool
+	ctx                     rule.RuleContext
+	fnCalls                 map[*ast.Node]jestCallParseResult
+	calls                   []*ast.Node
+	functions               map[string]*ast.Node
+	indexed                 bool
+	callbackInfos           map[*ast.Node]jestCallbackInfo
+	callbacks               JestTestCallbacks
+	callbacksOK             bool
+	registrationCallbacks   map[*ast.Node]bool
+	registrationCallbacksOK bool
+	hookCallbacks           map[*ast.Node]bool
+	hookCallbacksOK         bool
 }
 
 // GetJestCallAnalysis returns the analysis shared by every Jest rule
@@ -128,6 +134,83 @@ func (analysis *JestCallAnalysis) Callbacks() JestTestCallbacks {
 	return analysis.callbacks
 }
 
+// RegistrationCallbacks returns every function that a test or describe
+// registration invokes as its callback. It includes inline and named
+// callbacks, and reuses the analysis's cached call and function indexes.
+func (analysis *JestCallAnalysis) RegistrationCallbacks() map[*ast.Node]bool {
+	if analysis.registrationCallbacksOK {
+		return analysis.registrationCallbacks
+	}
+	callbacks := map[*ast.Node]bool{}
+	analysis.indexSourceFile()
+	for _, node := range analysis.calls {
+		parsed := analysis.ParseFnCall(node)
+		if parsed == nil || (parsed.Kind != JestFnTypeTest && parsed.Kind != JestFnTypeDescribe) {
+			continue
+		}
+		info := analysis.testCallbackInfo(node)
+		if info.functionNode == nil && analysis.ctx.Refs == nil {
+			info.functionNode = analysis.fallbackCallbackFunction(info.name)
+		}
+		if info.functionNode != nil {
+			callbacks[info.functionNode] = true
+		}
+	}
+	analysis.registrationCallbacks = callbacks
+	analysis.registrationCallbacksOK = true
+	return analysis.registrationCallbacks
+}
+
+// HookCallbacks returns every function that a lifecycle hook registration
+// runs as its callback, including one passed by name.
+func (analysis *JestCallAnalysis) HookCallbacks() map[*ast.Node]bool {
+	if analysis.hookCallbacksOK {
+		return analysis.hookCallbacks
+	}
+	callbacks := map[*ast.Node]bool{}
+	if !testFramework.SourceFileMentionsHook(
+		analysis.ctx.SourceFile,
+		hookGlobalAliases(analysis.ctx.Settings)...,
+	) {
+		analysis.hookCallbacks = callbacks
+		analysis.hookCallbacksOK = true
+		return analysis.hookCallbacks
+	}
+	analysis.indexSourceFile()
+	for _, node := range analysis.calls {
+		parsed := analysis.ParseFnCall(node)
+		if parsed == nil || parsed.Kind != JestFnTypeHook {
+			continue
+		}
+		if function := analysis.hookCallbackFunction(node.AsCallExpression()); function != nil {
+			callbacks[function] = true
+		}
+	}
+	analysis.hookCallbacks = callbacks
+	analysis.hookCallbacksOK = true
+	return analysis.hookCallbacks
+}
+
+// hookCallbackFunction resolves a hook's first argument. The scope-blind name
+// fallback is used only without a reference index, as in RegistrationCallbacks.
+func (analysis *JestCallAnalysis) hookCallbackFunction(call *ast.CallExpression) *ast.Node {
+	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
+		return nil
+	}
+	callback := internalUtils.SkipAssertionsAndParens(call.Arguments.Nodes[0])
+	if callback == nil {
+		return nil
+	}
+	if ast.IsFunctionExpressionOrArrowFunction(callback) {
+		return callback
+	}
+	info := resolveNamedCallback(analysis.ctx, callback)
+	if info.functionNode == nil && analysis.ctx.Refs == nil {
+		info.functionNode = analysis.fallbackCallbackFunction(info.name)
+	}
+	return info.functionNode
+}
+
 func (analysis *JestCallAnalysis) testCallbackInfo(node *ast.Node) jestCallbackInfo {
 	if info, ok := analysis.callbackInfos[node]; ok {
 		return info
@@ -177,8 +260,7 @@ func (analysis *JestCallAnalysis) indexSourceFile() {
 			if declaration != nil && declaration.Name() != nil &&
 				declaration.Name().Kind == ast.KindIdentifier &&
 				declaration.Initializer != nil {
-				initializer := ast.SkipParentheses(declaration.Initializer)
-				if ast.IsFunctionExpressionOrArrowFunction(initializer) {
+				if initializer := testCallbackInitializerFunction(declaration.Initializer); initializer != nil {
 					analysis.recordFunction(declaration.Name().Text(), initializer)
 				}
 			}

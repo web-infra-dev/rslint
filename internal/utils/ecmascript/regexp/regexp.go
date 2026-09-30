@@ -52,6 +52,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dlclark/regexp2"
@@ -72,13 +74,17 @@ var ErrUnsupportedSyntax = errors.New("unsupported regexp syntax")
 
 // RegExp is a compiled JavaScript regexp.
 type RegExp struct {
-	source   string
-	flags    string
-	re       *regexp2.Regexp
-	captures captureLayout
-	// exact is false when the pattern fell back to regexp2's own
-	// case-insensitivity, which is close to JavaScript's but not identical.
-	exact bool
+	pattern *compiledPattern
+	// Unwrap gives this handle a private backend whose mutations must persist.
+	unwrapped atomic.Pointer[regexp2.Regexp]
+}
+
+type compiledPattern struct {
+	key       patternKey
+	rewritten string
+	options   regexp2.RegexOptions
+	captures  captureLayout
+	backends  sync.Pool
 }
 
 type flagSet struct {
@@ -124,6 +130,15 @@ func parseFlags(flags string) (flagSet, error) {
 // Compile compiles source under the given JavaScript flags, as
 // `new RegExp(source, flags)` would. Pass "" for no flags.
 func Compile(source string, flags string) (*RegExp, error) {
+	pattern, err := patterns.compile(patternKey{source: source, flags: flags})
+	if err != nil {
+		return nil, err
+	}
+	return &RegExp{pattern: pattern}, nil
+}
+
+func compilePattern(key patternKey) (*compiledPattern, error) {
+	source, flags := key.source, key.flags
 	set, err := parseFlags(flags)
 	if err != nil {
 		return nil, err
@@ -176,7 +191,9 @@ func Compile(source string, flags string) (*RegExp, error) {
 		}
 	}
 
-	return &RegExp{source: source, flags: flags, re: re, exact: exact, captures: captures}, nil
+	pattern := &compiledPattern{key: key, rewritten: rewritten, options: options, captures: captures}
+	pattern.backends.Put(re)
+	return pattern, nil
 }
 
 // MustCompile is Compile for a pattern written in this repository rather than
@@ -196,10 +213,7 @@ func MustCompile(source string, flags string) *RegExp {
 // making every caller handle an error that only ever means "this pattern is
 // pathological", and a lint rule has nothing better to do with that than skip.
 func (r *RegExp) Test(s string) bool {
-	if r == nil || r.re == nil {
-		return false
-	}
-	matched, err := r.re.MatchString(s)
+	matched, err := r.TestOrError(s)
 	return err == nil && matched
 }
 
@@ -217,28 +231,67 @@ func (r *RegExp) TestOrTimeout(s string) bool {
 // match ran into MatchTimeout", and that has somewhere other than a match to
 // send the second answer.
 func (r *RegExp) TestOrError(s string) (bool, error) {
-	if r == nil || r.re == nil {
+	re, pooled := r.borrow()
+	if re == nil {
 		return false, nil
 	}
-	return r.re.MatchString(s)
+	matched, err := re.MatchString(s)
+	if pooled {
+		r.pattern.backends.Put(re)
+	}
+	return matched, err
+}
+
+func (r *RegExp) borrow() (*regexp2.Regexp, bool) {
+	if r == nil || r.pattern == nil {
+		return nil, false
+	}
+	if re := r.unwrapped.Load(); re != nil {
+		return re, false
+	}
+	re, _ := r.pattern.backends.Get().(*regexp2.Regexp)
+	if re == nil {
+		// Compile already validated this exact rewritten pattern and options.
+		// Each backend owns its runner cache; concurrent matches never share it.
+		re = regexp2.MustCompile(r.pattern.rewritten, r.pattern.options)
+		re.MatchTimeout = MatchTimeout
+	}
+	return re, true
 }
 
 // Source returns the pattern as it was written, the way `RegExp.prototype
 // .source` does — not the rewritten form handed to regexp2.
-func (r *RegExp) Source() string { return r.source }
+func (r *RegExp) Source() string {
+	if r.pattern == nil {
+		return ""
+	}
+	return r.pattern.key.source
+}
 
 // Flags returns the flags as they were written.
-func (r *RegExp) Flags() string { return r.flags }
+func (r *RegExp) Flags() string {
+	if r.pattern == nil {
+		return ""
+	}
+	return r.pattern.key.flags
+}
 
 // String renders the regexp the way JavaScript writes a regexp literal.
-func (r *RegExp) String() string { return "/" + r.source + "/" + r.flags }
+func (r *RegExp) String() string { return "/" + r.Source() + "/" + r.Flags() }
 
 // Unwrap returns the compiled regexp2 pattern. Both its pattern and capture
 // numbering belong to the backend, not JavaScript. Use ReplaceFirst for string
 // substitution; it preserves JavaScript capture numbers and dollar syntax.
+// The returned backend belongs exclusively to this handle. Changes such as
+// setting MatchTimeout affect subsequent operations on this handle only.
 func (r *RegExp) Unwrap() *regexp2.Regexp {
-	if r == nil {
-		return nil
+	re, pooled := r.borrow()
+	if !pooled {
+		return re
 	}
-	return r.re
+	if r.unwrapped.CompareAndSwap(nil, re) {
+		return re
+	}
+	r.pattern.backends.Put(re)
+	return r.unwrapped.Load()
 }

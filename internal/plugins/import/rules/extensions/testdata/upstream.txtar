@@ -1,0 +1,66 @@
+Fixtures from eslint-plugin-import v2.32.0 tests/files.
+The importer is named input.ts so its virtual contents do not create upstream’s absent ./foo.js.
+
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noResolve":true,"jsx":"preserve","module":"commonjs","resolveJsonModule":true},"include":["**/*.ts","**/*.js","**/*.tsx"]}
+-- package.json --
+{}
+-- index.js --
+export {};
+-- files/bar.js --
+export default 'bar'
+export function foo() { return 'foo' }
+-- files/bar.jsx --
+export default null
+-- files/bar.json --
+{}
+-- files/bar.coffee --
+console.log 'bar'
+-- files/file.with.dot.js --
+export default null
+-- files/index.js --
+// Used in `no-self-import` tests
+-- files/package.json --
+{}
+-- files/typescript-declare.d.ts --
+export declare type MyType = string
+export declare enum MyEnum {
+  Foo,
+  Bar,
+  Baz
+}
+export declare interface Foo {
+  native: string | number
+  typedef: MyType
+  enum: MyEnum
+}
+
+export declare abstract class Bar {
+  abstract foo(): Foo
+
+  method();
+}
+
+export declare function getFoo() : MyType;
+
+export declare module MyModule {
+  export function ModuleFunction();
+}
+
+export declare namespace MyNamespace {
+  export function NamespaceFunction();
+
+  export module NSModule {
+    export function NSModuleFunction();
+  }
+}
+
+interface NotExported {}
+-- files/node_modules/a/index.js --
+exports.foo = 'bar'
+-- files/node_modules/a/package.json --
+{
+  "name": "a"
+}
+-- files/internal-modules/package.json --
+{}

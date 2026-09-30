@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "forbidDefaultForRequired": { "type": "boolean" },
+        "classes": { "enum": ["defaultProps", "ignore"] },
+        "functions": { "enum": ["defaultArguments", "defaultProps", "ignore"] },
+        "ignoreFunctionalComponents": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

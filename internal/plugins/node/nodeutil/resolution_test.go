@@ -77,6 +77,9 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 		want    string
 	}{
 		{"pkg", moduleresolver.Options{}, "/node-runtime/node_modules/pkg/index.js"},
+		// Removed builtins resolve as packages; supported internals remain builtin.
+		{"_stream_readable", moduleresolver.Options{}, "/node-runtime/node_modules/_stream_readable/index.js"},
+		{"_http_agent", moduleresolver.Options{}, ""},
 		{"pkg", moduleresolver.Options{Modules: []string{}}, ""},
 		{"pkg", moduleresolver.Options{Modules: []string{"/node-runtime/vendor"}}, "/node-runtime/vendor/pkg/index.js"},
 		// Module directories may themselves contain a node_modules component.

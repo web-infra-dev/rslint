@@ -3,103 +3,74 @@ package no_unnecessary_assertion
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_unnecessary_assertion"
 )
 
-type checkedMatcher struct {
-	flags checker.TypeFlags
-	thing string
-	kind  rstestUtils.RstestExpectMatcherKind
-}
-
-var checkedMatchers = map[string]checkedMatcher{
-	"toBeNull":      {flags: checker.TypeFlagsNull, thing: "null", kind: rstestUtils.RstestExpectMatcherCall},
-	"toBeUndefined": {flags: checker.TypeFlagsUndefined, thing: "undefined", kind: rstestUtils.RstestExpectMatcherCall},
-	"toBeDefined":   {flags: checker.TypeFlagsUndefined, thing: "undefined", kind: rstestUtils.RstestExpectMatcherCall},
-	"toBeNaN":       {flags: checker.TypeFlagsNumberLike, thing: "a number", kind: rstestUtils.RstestExpectMatcherCall},
-	"null":          {flags: checker.TypeFlagsNull, thing: "null", kind: rstestUtils.RstestExpectMatcherProperty},
-	"undefined":     {flags: checker.TypeFlagsUndefined, thing: "undefined", kind: rstestUtils.RstestExpectMatcherProperty},
-	"NaN":           {flags: checker.TypeFlagsNumberLike, thing: "a number", kind: rstestUtils.RstestExpectMatcherProperty},
-}
-
-func unnecessaryAssertionMessage(thing string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "unnecessaryAssertion",
-		Description: "Unnecessary assertion, subject cannot be " + thing,
+func lookupMatcher(name string, kind rstestUtils.RstestExpectMatcherKind) (shared.Matcher, bool) {
+	switch kind {
+	case rstestUtils.RstestExpectMatcherCall:
+		return shared.CallMatcher(name)
+	case rstestUtils.RstestExpectMatcherProperty:
+		return shared.PropertyMatcher(name)
+	default:
+		return shared.Matcher{}, false
 	}
 }
 
-func noStrictNullCheckMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "noStrictNullCheck",
-		Description: "This rule requires the `strictNullChecks` compiler option to be turned on to function correctly.",
-	}
-}
-
-var NoUnnecessaryAssertionRule = rule.Rule{
-	Name:             "rstest/no-unnecessary-assertion",
-	Schema:           rule.EmptyArraySchema,
-	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		compilerOptions := ctx.Program().Options()
-		if !utils.IsStrictCompilerOptionEnabled(compilerOptions, compilerOptions.StrictNullChecks) {
-			ctx.ReportRange(core.NewTextRange(0, 0), noStrictNullCheckMessage())
-		}
-
+var NoUnnecessaryAssertionRule = shared.NewRule(shared.Config{
+	Name: "rstest/no-unnecessary-assertion",
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
-		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := analysis.ParseExpectCall(node)
-				if parsed == nil ||
-					parsed.Reason != rstestUtils.RstestExpectParseReasonNone ||
-					parsed.Head == nil ||
-					parsed.MatcherEntry == nil ||
-					len(parsed.Matchers) == 0 ||
-					parsed.Entry == rstestUtils.RstestExpectEntryElement ||
-					parsed.Entry == rstestUtils.RstestExpectEntryStatic {
-					return
-				}
+		return shared.Runtime{Check: func(node *ast.Node) *shared.Assertion {
+			parsed := analysis.ParseExpectCall(node)
+			if parsed == nil ||
+				parsed.Reason != rstestUtils.RstestExpectParseReasonNone ||
+				parsed.Head == nil ||
+				parsed.MatcherEntry == nil ||
+				len(parsed.Matchers) == 0 ||
+				parsed.Entry == rstestUtils.RstestExpectEntryElement ||
+				parsed.Entry == rstestUtils.RstestExpectEntryStatic {
+				return nil
+			}
 
-				matcher, ok := checkedMatchers[parsed.Matcher]
-				if !ok || parsed.Matchers[0].Kind != matcher.kind {
-					return
-				}
-				// Rstest's poll proxy only defers function matchers. Chai property
-				// getters execute immediately against the proxy's placeholder null
-				// subject, before the callback is invoked, so its awaited return type
-				// does not describe those assertions.
-				if parsed.Entry == rstestUtils.RstestExpectEntryPoll &&
-					matcher.kind == rstestUtils.RstestExpectMatcherProperty {
-					return
-				}
-				for _, modifier := range parsed.Modifiers {
-					if modifier != "not" {
-						return
-					}
-				}
+			matcherKind := parsed.Matchers[0].Kind
+			matcher, ok := lookupMatcher(parsed.Matcher, matcherKind)
+			if !ok {
+				return nil
+			}
+			// Rstest's poll proxy only defers function matchers. Chai property
+			// getters execute immediately against the proxy's placeholder null
+			// subject, before the callback is invoked, so its awaited return type
+			// does not describe those assertions.
+			if parsed.Entry == rstestUtils.RstestExpectEntryPoll &&
+				matcherKind == rstestUtils.RstestExpectMatcherProperty {
+				return nil
+			}
+			if !shared.OnlyNotModifiers(parsed.Modifiers) {
+				return nil
+			}
 
-				head := parsed.Head.AsCallExpression()
-				if head == nil {
-					return
-				}
-				possibility := runtimeSubjectPossibility(
-					ctx.TypeChecker,
-					head.Arguments.Nodes,
-					parsed.Entry,
-					matcher.flags,
-				)
-				if possibility != typePossibilityImpossible {
-					return
-				}
+			head := parsed.Head.AsCallExpression()
+			if head == nil {
+				return nil
+			}
+			possibility := runtimeSubjectPossibility(
+				ctx.TypeChecker,
+				head.Arguments.Nodes,
+				parsed.Entry,
+				matcher.Flags,
+			)
+			if possibility != typePossibilityImpossible {
+				return nil
+			}
 
-				ctx.ReportNode(parsed.Expression, unnecessaryAssertionMessage(matcher.thing))
-			},
-		}
+			return &shared.Assertion{Node: parsed.Expression, Matcher: matcher}
+		}}
 	},
-}
+})
 
 type typePossibility uint8
 

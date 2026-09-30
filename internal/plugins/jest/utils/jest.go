@@ -65,68 +65,77 @@ var EXPECT_MODIFIER_NAMES = map[string]bool{
 	"resolves": true,
 }
 
+// VALID_JEST_FN_CALL_CHAINS mirrors ValidJestFnCallChains in eslint-plugin-jest
+// v29.16.6 src/rules/utils/parseJestFnCall.ts.
 var VALID_JEST_FN_CALL_CHAINS = map[string]bool{
-	"afterAll":                  true,
-	"afterEach":                 true,
-	"beforeAll":                 true,
-	"beforeEach":                true,
-	"describe":                  true,
-	"describe.each":             true,
-	"describe.only":             true,
-	"describe.only.each":        true,
-	"describe.skip":             true,
-	"describe.skip.each":        true,
-	"fdescribe":                 true,
-	"fdescribe.each":            true,
-	"fit":                       true,
-	"fit.each":                  true,
-	"fit.failing":               true,
-	"fit.fails":                 true,
-	"it":                        true,
-	"it.concurrent":             true,
-	"it.concurrent.each":        true,
-	"it.concurrent.only.each":   true,
-	"it.concurrent.skip.each":   true,
-	"it.each":                   true,
-	"it.failing":                true,
-	"it.failing.each":           true,
-	"it.fails":                  true,
-	"it.only":                   true,
-	"it.only.each":              true,
-	"it.only.failing":           true,
-	"it.only.fails":             true,
-	"it.skip":                   true,
-	"it.skip.each":              true,
-	"it.skip.failing":           true,
-	"it.skip.fails":             true,
-	"it.todo":                   true,
-	"test":                      true,
-	"test.concurrent":           true,
-	"test.concurrent.each":      true,
-	"test.concurrent.only.each": true,
-	"test.concurrent.skip.each": true,
-	"test.each":                 true,
-	"test.failing":              true,
-	"test.fails":                true,
-	"test.only":                 true,
-	"test.only.each":            true,
-	"test.only.failing":         true,
-	"test.only.fails":           true,
-	"test.skip":                 true,
-	"test.skip.each":            true,
-	"test.skip.failing":         true,
-	"test.skip.fails":           true,
-	"test.todo":                 true,
-	"xdescribe":                 true,
-	"xdescribe.each":            true,
-	"xit":                       true,
-	"xit.each":                  true,
-	"xit.failing":               true,
-	"xit.fails":                 true,
-	"xtest":                     true,
-	"xtest.each":                true,
-	"xtest.failing":             true,
-	"xtest.fails":               true,
+	"afterAll":                          true,
+	"afterEach":                         true,
+	"beforeAll":                         true,
+	"beforeEach":                        true,
+	"describe":                          true,
+	"describe.each":                     true,
+	"describe.only":                     true,
+	"describe.only.each":                true,
+	"describe.skip":                     true,
+	"describe.skip.each":                true,
+	"fdescribe":                         true,
+	"fdescribe.each":                    true,
+	"xdescribe":                         true,
+	"xdescribe.each":                    true,
+	"it":                                true,
+	"it.concurrent":                     true,
+	"it.concurrent.failing":             true,
+	"it.concurrent.each":                true,
+	"it.concurrent.failing.each":        true,
+	"it.concurrent.failing.only.each":   true,
+	"it.concurrent.failing.skip.each":   true,
+	"it.concurrent.only.each":           true,
+	"it.concurrent.skip.each":           true,
+	"it.each":                           true,
+	"it.failing":                        true,
+	"it.failing.each":                   true,
+	"it.only":                           true,
+	"it.only.each":                      true,
+	"it.only.failing":                   true,
+	"it.only.failing.each":              true,
+	"it.skip":                           true,
+	"it.skip.each":                      true,
+	"it.skip.failing":                   true,
+	"it.skip.failing.each":              true,
+	"it.todo":                           true,
+	"fit":                               true,
+	"fit.each":                          true,
+	"fit.failing":                       true,
+	"fit.failing.each":                  true,
+	"xit":                               true,
+	"xit.each":                          true,
+	"xit.failing":                       true,
+	"xit.failing.each":                  true,
+	"test":                              true,
+	"test.concurrent":                   true,
+	"test.concurrent.failing":           true,
+	"test.concurrent.each":              true,
+	"test.concurrent.failing.each":      true,
+	"test.concurrent.failing.only.each": true,
+	"test.concurrent.failing.skip.each": true,
+	"test.concurrent.only.each":         true,
+	"test.concurrent.skip.each":         true,
+	"test.each":                         true,
+	"test.failing":                      true,
+	"test.failing.each":                 true,
+	"test.only":                         true,
+	"test.only.each":                    true,
+	"test.only.failing":                 true,
+	"test.only.failing.each":            true,
+	"test.skip":                         true,
+	"test.skip.each":                    true,
+	"test.skip.failing":                 true,
+	"test.skip.failing.each":            true,
+	"test.todo":                         true,
+	"xtest":                             true,
+	"xtest.each":                        true,
+	"xtest.failing":                     true,
+	"xtest.failing.each":                true,
 }
 
 // ParsedJestFnMemberEntry is the Jest-facing name for a shared member-chain
@@ -231,25 +240,10 @@ func JestVersionMajor(v string) int {
 // ApplyGlobalJestAlias maps settings.jest.globalAliases so that e.g. `context` is treated as
 // `describe`, matching eslint-plugin-jest.
 func ApplyGlobalJestAlias(name string, settings map[string]interface{}) string {
-	if name == "" || settings == nil {
+	if name == "" {
 		return name
 	}
-	raw, ok := settings["jest"]
-	if !ok {
-		return name
-	}
-	jm, ok := raw.(map[string]interface{})
-	if !ok {
-		return name
-	}
-	rawGA, ok := jm["globalAliases"]
-	if !ok {
-		return name
-	}
-	ga, ok := rawGA.(map[string]interface{})
-	if !ok {
-		return name
-	}
+	ga := globalJestAliases(settings)
 	for canonStr, aliasesVal := range ga {
 		if !JEST_METHOD_NAMES[canonStr] {
 			continue
@@ -266,6 +260,38 @@ func ApplyGlobalJestAlias(name string, settings map[string]interface{}) string {
 		}
 	}
 	return name
+}
+
+// globalJestAliases returns settings.jest.globalAliases, or nil when it is
+// absent or malformed.
+func globalJestAliases(settings map[string]interface{}) map[string]interface{} {
+	if settings == nil {
+		return nil
+	}
+	jm, ok := settings["jest"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	ga, _ := jm["globalAliases"].(map[string]interface{})
+	return ga
+}
+
+// hookGlobalAliases returns the names settings.jest.globalAliases maps to a
+// lifecycle hook.
+func hookGlobalAliases(settings map[string]interface{}) []string {
+	var aliases []string
+	for canonical, aliasesVal := range globalJestAliases(settings) {
+		if !testFramework.IsHookName(canonical) {
+			continue
+		}
+		list, _ := aliasesVal.([]interface{})
+		for _, a := range list {
+			if alias, ok := a.(string); ok && alias != "" {
+				aliases = append(aliases, alias)
+			}
+		}
+	}
+	return aliases
 }
 
 // jestVersionFromSettings returns the Jest version from rslint settings (ESLint style settings.jest.version).

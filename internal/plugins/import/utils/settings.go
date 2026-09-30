@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 // An explicit extension list restricts export inspection; alternate parser
@@ -190,7 +191,7 @@ func (compiled *ModuleSettings) IsCoreModuleSpecifier(specifier string) bool {
 		return false
 	}
 	base := baseModuleName(specifier)
-	if core.NodeCoreModules()[base] {
+	if modules.IsNodeBuiltin(base) {
 		return true
 	}
 	if compiled == nil {
@@ -198,6 +199,14 @@ func (compiled *ModuleSettings) IsCoreModuleSpecifier(specifier string) bool {
 	}
 	_, configured := compiled.coreModules[base]
 	return configured
+}
+
+// IsBuiltinSpecifier applies importType's builtin classification after
+// resolution. Internal patterns and absolute paths take precedence; a resolved
+// project file also overrides the specifier's lexical core-module classification.
+func (compiled *ModuleSettings) IsBuiltinSpecifier(specifier, resolvedPath string) bool {
+	return resolvedPath == "" && !compiled.IsInternalSpecifier(specifier) &&
+		!nodeutil.IsAbsolutePath(specifier) && compiled.IsCoreModuleSpecifier(specifier)
 }
 
 // IsScopedModuleSpecifier mirrors eslint-plugin-import's lexical scoped-name
@@ -262,6 +271,23 @@ func (compiled *ModuleSettings) IsExternalResolvedImport(ctx rule.RuleContext, s
 		}
 	}
 	return false
+}
+
+// IsExternalModule adds importType's package-name filter and unresolved-module
+// checks to the resolved import policy.
+func (compiled *ModuleSettings) IsExternalModule(ctx rule.RuleContext, specifier, resolvedPath string) bool {
+	if specifier == "" {
+		return false
+	}
+	c := specifier[0]
+	moduleName := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_'
+	if !moduleName && !IsScopedModuleSpecifier(specifier) {
+		return false
+	}
+	if resolvedPath != "" {
+		return compiled.IsExternalResolvedImport(ctx, specifier, resolvedPath)
+	}
+	return !nodeutil.IsAbsolutePath(specifier) && !compiled.IsInternalSpecifier(specifier) && !compiled.IsCoreModuleSpecifier(specifier)
 }
 
 // IsExternalPathFromPackage classifies a resolved target relative to the

@@ -159,6 +159,13 @@ collector's existing glob projection, while `NewMatcher` and
 JavaScript matching engine. Explicit matching keeps array entries intact,
 including embedded newlines; configuration collection retains its existing Git
 character-class and case behavior. No matcher discovers files or imports config.
+RegExp compilation reuses a process-wide, bounded cache keyed by the exact
+source and flags. The regexp package owns rewriting, validation and backend
+reuse; rule definitions and per-file initialization do not participate in the
+cache lifecycle. Each match borrows an independent backend from the pattern's
+pool, avoiding a shared backend's runner lock under concurrent rule execution.
+`Unwrap` permanently assigns a private backend to that handle, so mutations stay
+local and later operations on that handle keep using the exposed backend.
 Shared package metadata queries live in `internal/utils/packagejson`. `Read`
 decodes one package object; `FindNearest` preserves the nearest package boundary,
 while `FindNearestValid` explicitly skips invalid objects for Node's policy.
@@ -478,8 +485,8 @@ copied into every per-rule context.
 
 Configuration is resolved once per file shape into one immutable
 `RuleEnvironment` shared by that file's `ConfiguredRule` entries. During
-planning that environment is frozen beside the file's rules and checker grant;
-execution constructs settings and globals once per file and copies the resulting
+planning that environment belongs to the shared prepared rule set, while each
+file retains its own checker grant. Execution constructs settings and globals once per file and copies the resulting
 base context for each rule. Module references and whole-Program indexes are not
 context fields: generic source references come from `Program().ModuleGraph()`,
 while rule-specific derived indexes use `CachedByProgram`. Both remain keyed by
@@ -663,6 +670,13 @@ LSP positions while retaining its stale-generation and code-action lifecycle.
 Counts, path bases, stderr notices, and protocol empty-array rules stay
 integration-owned; lint/fix observation order and fix-round state belong to the
 core pipeline.
+
+Before an observation is published or its generation released, the pipeline
+replaces diagnostic AST references with immutable text frames. Concurrent
+plugin work must finish, source identity checks must pass, and fix text must be
+frozen first. Frames are shared by source object identity, not by file path, and
+compute ECMAScript line maps lazily. Explicitly requested `LintedFiles` artifacts
+still carry their original ASTs; diagnostic projection does not invalidate them.
 
 ### Severity Levels
 
@@ -1406,7 +1420,7 @@ and mutation sequencing do not.
 5. **Project Loading**: `program/loader.Session` accepts raw project declarations, frozen targets, and sparse service/root/reset policies projected from the shared file resolver. It assembles one project plan and adds service-selected config metadata before construction. Ordinary lint shares target-driven construction while preserving broad/focused validation and binding semantics; program-wide checking retains complete declarations. Explicit and service construction modes remain separate; per-target candidate lists carry scoped root choices and explicit gaps
 6. **Target Binding**: the loader locates the selected project's AST by lexical or frozen canonical identity without changing project policy or target scope. Disabled and unmatched targets, including explicit import-only files and service misses, receive source-only Programs. They cannot borrow a Program selected by another target's parser policy. CLI/API receive one Program sequence and exact parallel target projections; they never construct compiler hosts or implement ownership
 7. **Core Request**: CLI/API/LSP choose a sealed `RunPipeline` request kind and provide semantic adapters. They do not call `PrepareLintPlan`, `RunLinter`, plugin dispatch, or fix application as separate stages.
-8. **Rule Plan Preparation**: for each acquired generation, the core calls `PrepareLintPlan()` with one ordered Program sequence, its exact parallel target projection, and the generation's rule resolver. Planning never discovers, excludes, or scans for fallback targets; a target absent from its bound Program is an invariant error. The immutable result owns that Program sequence, freezes rare syntax diagnostics in a sparse plan-level projection, and keeps each hot per-file execution unit limited to its source, resolved rules, shared rule environment, and checker capability. Syntax-error and zero-rule files remain selected, and the same non-empty file/rule projection feeds third-party plugin dispatch. Worker results are joined in stable Program/file order; cancellation cannot publish a partial plan, and callback panics return through the caller so the enclosing generation lifecycle remains exact-once.
+8. **Rule Plan Preparation**: for each acquired generation, the core calls `PrepareLintPlan()` with one ordered Program sequence, its exact parallel target projection, and the generation's rule resolver. Planning never discovers, excludes, or scans for fallback targets; a target absent from its bound Program is an invariant error. The immutable result owns that Program sequence, freezes rare syntax diagnostics in a sparse plan-level projection, and keeps each hot per-file execution unit limited to its source, a shared prepared rule set, and checker capability. Prepared sets own eligibility, ordered native/plugin projections and rule-derived environments; execution consumes these views without filtering rules again. Syntax-error and zero-rule files remain selected, and the same non-empty file/rule projection feeds third-party plugin dispatch. Worker results are joined in stable Program/file order; cancellation cannot publish a partial plan, and callback panics return through the caller so the enclosing generation lifecycle remains exact-once.
 9. **Rule Execution**: the core invokes `RunLinter()` only with the prepared plan plus scheduling, diagnostic, timing, and optional program-wide type-check concerns. A nil plan explicitly skips lint for `--type-check-only`. Execution never recollects files, re-resolves rules, or accepts a second Program authority alongside a plan. Plans bind exact Program pointers, so every autofix re-observation constructs a fresh Program and plan over the current in-memory snapshot. When `--type-check` is enabled, Phase 2 schedules only Programs that expose complete program diagnostics.
 10. **Fix Rounds and Aggregation**: `RunPipeline` joins native/plugin results, projects stable target paths, computes whole-file changes, applies them to private memory, and reacquires a generation until stable or bounded. A file may move between Program generations when its import graph changes, but the target plan remains stable. Once memory differs from the initial generation, every plugin target is frozen inline from that generation even when the initial CLI host could read disk. CLI independently supplies a terminal committer and therefore touches disk only once after the last successful observation; API and LSP consume the returned memory delta without a committer. Integrations retain only presentation policy for structured plugin notices, path conversion, and output/protocol mapping.
 11. **Report Assembly**: the CLI's concrete, side-effect-free report projection validates final post-fix diagnostics and converts them from rule-domain values to output-owned values. It computes error/warning/type-error counts and one outcome from the same snapshot plus `--max-warnings`; the completed `Report` supplies that outcome to both status rendering and exit policy. Only the default format requests a `Summary` and immutable source snapshots for code frames. Before `RunPipeline`, the loader freezes roots from the actual type-capable Programs selected for the run, combines their identities with already-frozen lint-target identities, and immediately reduces them to the canonical-union file count consumed after execution. Machine formats consume projected positions, do not request root identities, and do not construct fake zero-valued summaries. `--quiet` filters rendering only.
@@ -1597,6 +1611,14 @@ lint and fix execution still await full config activation.
   file's complete rule set once into immutable rslint Program slots. Native
   execution and optional third-party plugin dispatch consume projections of the
   same plan instead of repeating target collection or rule resolution
+- **Shared Prepared Rule Sets**: plan preparation owns rule eligibility and the
+  ordered native/plugin projections together. Files with the same immutable
+  input slice and checker capability share one completely prepared rule set;
+  native execution and plugin input construction consume its views directly.
+  A preparation-local lookup uses the input's exact start, length and capability,
+  and is discarded after workers join. File contexts, checker instances, language
+  defaults and plugin routing remain per-file. Each new plan, including autofix
+  observations, prepares independent sets
 
 ### Performance Optimizations
 
@@ -1661,10 +1683,11 @@ lint and fix execution still await full config activation.
 - **Short-Lived Per-File Structures**: comment stores, disable managers, and rule contexts are allocated per file and dropped after traversal. A comment slice is allocated only if requested
 - **Bounded Listener Retention**: a listener registry lives only for one checker-shard task. After each file it clears every function slot before shortening the slices, so backing capacity can be reused without retaining closures, source files, checker state, or rule contexts. The registry is dropped when that task completes and is never pooled across runs or LSP requests
 - **Source Snapshot Ownership**: snapshot entries hold an immutable source string plus its 128-bit hash without explicitly copying source bytes; on an AST miss, that string is passed directly to the parser. After generation replacement, a retained unchanged AST may still hold the prior equal string while the fresh snapshot owns the new read. Replaced generations are reclaimed after any in-flight lookup releases them. AST retention and source-generation retention remain deliberately separate lifecycles.
+- **Completed Observation Ownership**: CLI/API providers drop their initial generation references when its pipeline lease is released. Retained initial/final autofix observations own diagnostic text and any explicitly requested AST artifacts, so diagnostics alone cannot keep an earlier compiler graph alive. Release never clears shared Program slices, maps, or source objects.
 - **Metadata Snapshot Ownership**: metadata strings and extended-config parse entries live only for one loader session. The cache stores successful reads only, and its scope bounds growth to metadata touched by one CLI invocation or API request; no metadata entry survives into another request or the LSP session.
 - **Fix Application Uses Linear Rebuilds**: `ApplyRuleFixes` sorts fixes, skips overlapping edits, and rebuilds the output with `strings.Builder` rather than mutating source buffers in place
 - **Bounded Queues**: CLI diagnostics use a buffered channel of 4096 items; LSP request/outgoing queues are buffered to 100, and debounce/refresh signals are single-slot channels
-- **No Repo-Local Pooling Layer Today**: there is no explicit `sync.Pool`-based object pooling strategy in the main lint path at the moment
+- **Bounded RegExp Retention**: the regexp cache retains at most 256 compilation results, including errors, in FIFO order. Sources plus flags over 4 KiB or successful rewrites over 64 KiB bypass retention. Cached strings are copied so a small pattern cannot retain a source file's backing storage. Idle matching backends live in per-pattern `sync.Pool` instances and can be discarded by GC; concurrent demand or collection can require recompiling the validated backend pattern. Live handles remain valid after eviction. The cache retains no AST, rule context, options object or linted subject; pool size follows concurrent demand rather than a fixed heap bound. Backends exposed by `Unwrap` belong to their handle and never return to a shared pool.
 - **Fresh ESM Entry Lifetime**: fresh JS/TS config loads use a unique entry-module URL so rewritten bytes and module side effects are evaluated per transaction. Node retains those ESM module namespaces for the process lifetime, so a long-lived native API process can grow this cache slowly across repeated lint requests; static transitive imports continue to use Node's ordinary cache. Bounding this without weakening freshness requires a disposable evaluator realm or worker and remains a future optimization.
 - **Garbage Collection Handles Cycles**: the repository does not implement custom cycle breaking for AST/checker graphs; lifecycle cleanup relies on Go GC and on dropping references after each run
 

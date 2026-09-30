@@ -12,6 +12,7 @@ import {
   reactPlugin,
   importPlugin,
   nodePlugin,
+  jestPlugin,
   rstestPlugin,
   unicornPlugin,
 } from '@rslint/core';
@@ -44,8 +45,15 @@ describe('defineConfig and config presets', () => {
     expect(nodePlugin.configs.recommended).toBeDefined();
     expect(nodePlugin.configs.recommendedModule).toBeDefined();
     expect(nodePlugin.configs.recommendedScript).toBeDefined();
+    expect(jestPlugin).toBeDefined();
+    expect(jestPlugin.configs.all).toBeDefined();
+    expect(jestPlugin.configs.recommended).toBeDefined();
+    expect(jestPlugin.configs.style).toBeDefined();
     expect(rstestPlugin).toBeDefined();
+    expect(rstestPlugin.configs.all).toBeDefined();
+    expect(rstestPlugin.configs.env).toBeDefined();
     expect(rstestPlugin.configs.recommended).toBeDefined();
+    expect(rstestPlugin.configs.style).toBeDefined();
     expect(unicornPlugin).toBeDefined();
     expect(unicornPlugin.configs.recommended).toBeDefined();
   });
@@ -57,6 +65,7 @@ describe('defineConfig and config presets', () => {
       reactPlugin,
       importPlugin,
       nodePlugin,
+      jestPlugin,
       rstestPlugin,
       unicornPlugin,
     ]) {
@@ -150,6 +159,48 @@ describe('defineConfig and config presets', () => {
     const rec = reactPlugin.configs.recommended;
     expect(rec.plugins).toBeDefined();
     expect(rec.plugins).toContain('react');
+  });
+
+  test('jestPlugin presets should match the supported upstream presets', () => {
+    expect(jestPlugin.configs.style.rules).toEqual({
+      'jest/prefer-to-be': 'error',
+      'jest/prefer-to-contain': 'error',
+      'jest/prefer-to-have-length': 'error',
+    });
+
+    expect(Object.keys(jestPlugin.configs.all.rules ?? {})).toHaveLength(70);
+    expect(
+      Object.values(jestPlugin.configs.all.rules ?? {}).every(
+        (severity) => severity === 'error',
+      ),
+    ).toBe(true);
+
+    for (const preset of Object.values(jestPlugin.configs)) {
+      expect(preset.plugins).toContain('jest');
+      expect(preset.languageOptions?.globals).toEqual(globals.jest);
+    }
+  });
+
+  test('jestPlugin presets should expose Jest globals to core rules', async () => {
+    const directory = import.meta.dirname;
+
+    for (const [name, preset] of Object.entries(jestPlugin.configs)) {
+      const result = await lint({
+        config: normalizeConfig([preset, { rules: { 'no-undef': 'error' } }]),
+        configDirectory: directory,
+        workingDirectory: directory,
+        fileContents: {
+          [path.join(directory, `${name}.test.js`)]:
+            "test('works', () => expect(true).toBe(true));",
+        },
+      });
+
+      expect(
+        result.diagnostics.filter(
+          (diagnostic) => diagnostic.ruleName === 'no-undef',
+        ),
+      ).toHaveLength(0);
+    }
   });
 
   test('import.configs.recommended should declare import plugin and report unresolved imports', async () => {
@@ -255,6 +306,46 @@ describe('defineConfig and config presets', () => {
     }
   });
 
+  test('rstestPlugin presets should expose the expected rules and environment', () => {
+    expect(rstestPlugin.configs.style.rules).toEqual({
+      'rstest/prefer-to-be': 'error',
+      'rstest/prefer-to-contain': 'error',
+      'rstest/prefer-to-have-length': 'error',
+    });
+
+    const allRules = rstestPlugin.configs.all.rules ?? {};
+    expect(Object.keys(allRules)).toHaveLength(82);
+    expect(
+      Object.entries(allRules)
+        .filter(([, severity]) => severity === 'off')
+        .map(([name]) => name),
+    ).toEqual([
+      'rstest/no-importing-rstest-globals',
+      'rstest/prefer-called-once',
+      'rstest/prefer-to-be-falsy',
+      'rstest/prefer-to-be-truthy',
+      'rstest/require-test-timeout',
+    ]);
+    expect(
+      Object.values(allRules).every(
+        (severity) => severity === 'off' || severity === 'warn',
+      ),
+    ).toBe(true);
+
+    for (const preset of [
+      rstestPlugin.configs.all,
+      rstestPlugin.configs.recommended,
+      rstestPlugin.configs.style,
+    ]) {
+      expect(preset.plugins).toContain('rstest');
+      expect(preset.languageOptions?.globals).toBeUndefined();
+    }
+
+    expect(rstestPlugin.configs.env.languageOptions?.globals).toEqual(
+      globals.rstest,
+    );
+  });
+
   test('rstestPlugin.configs.recommended should declare rstest plugin and rule', () => {
     const rec = rstestPlugin.configs.recommended;
     expect(rec.plugins).toBeDefined();
@@ -278,6 +369,24 @@ describe('defineConfig and config presets', () => {
       'rstest/valid-expect-in-promise': 'error',
       'rstest/valid-title': 'error',
     });
+  });
+
+  test('rstestPlugin.configs.env should expose Rstest globals to core rules', async () => {
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig([
+        rstestPlugin.configs.env,
+        { rules: { 'no-undef': 'error' } },
+      ]),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'env.test.js')]:
+          'void [test, describe, it, expect, assert, beforeAll, afterAll, beforeEach, afterEach, onTestFinished, onTestFailed, rs, rstest];',
+      },
+    });
+
+    expect(result.diagnostics).toHaveLength(0);
   });
 
   test('unicornPlugin.configs.recommended should declare unicorn plugin and the ported rule', () => {

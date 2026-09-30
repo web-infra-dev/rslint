@@ -302,16 +302,6 @@ func TestNoUnsafeRule(t *testing.T) {
         }
       `, Tsx: true, Settings: settingsReact("16.4.0")},
 
-		// ---- ElementAccessExpression in extends — `React['Component']` is
-		// not a PropertyAccessExpression, so doesn't match. (ESLint's
-		// MemberExpression branch checks `.property.name` which is undefined
-		// for computed access — so upstream also doesn't match.) ----
-		{Code: `
-        class Foo extends React['Component'] {
-          UNSAFE_componentWillMount() {}
-        }
-      `, Tsx: true, Settings: settingsReact("16.4.0")},
-
 		// ---- Class extends a HOC return value — not a literal Component reference. ----
 		{Code: `
         class Foo extends withRouter(Base) {

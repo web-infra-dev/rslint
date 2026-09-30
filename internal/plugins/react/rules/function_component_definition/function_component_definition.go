@@ -232,7 +232,7 @@ func (w *walker) fileVarType() string {
 }
 
 func (w *walker) validate(node *ast.Node, functionType string) {
-	if !w.isDetectedComponentNode(node) {
+	if !reactutil.IsDetectedStatelessComponent(node, w.pragma, w.ctx.TypeChecker, w.wrappers, w.scopes) {
 		return
 	}
 	// Upstream `if (node.parent && node.parent.type === 'Property') return;`.
@@ -513,29 +513,6 @@ func isUnfixableBecauseOfExport(node *ast.Node) bool {
 
 func isFunctionExpressionWithName(node *ast.Node) bool {
 	return node.Kind == ast.KindFunctionExpression && identifierText(node.Name()) != ""
-}
-
-// isDetectedComponentNode answers upstream's `components.get(node)` for the
-// function node the rule is about to validate — that is, whether the
-// `Components.detect` pipeline registered THIS node (rather than nothing, or a
-// wrapper call around it) with a non-zero confidence.
-func (w *walker) isDetectedComponentNode(node *ast.Node) bool {
-	// Confidence 0: `Components.detect`'s FunctionExpression /
-	// FunctionDeclaration listeners permanently ban an async generator.
-	if node.Kind != ast.KindArrowFunction && reactutil.IsAsyncGeneratorFunction(node) {
-		return false
-	}
-	wrapper := reactutil.OutermostComponentWrapperCall(node, w.pragma, w.wrappers, w.ctx.TypeChecker, w.scopes)
-	if wrapper != nil && reactutil.WrapperWrapsKnownSiblingComponent(wrapper, node) {
-		return false
-	}
-	if !reactutil.IsStatelessReactComponentWithWrappers(node, w.pragma, w.ctx.TypeChecker, w.wrappers, w.scopes) {
-		return false
-	}
-	// `getStatelessComponent` redirects a wrapped function to its outer-most
-	// wrapper call, so the function node itself never enters the components
-	// list — `components.get(node)` is null and the rule stays silent.
-	return wrapper == nil
 }
 
 func contains(list []string, value string) bool {

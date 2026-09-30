@@ -99,6 +99,41 @@ func collectRstestTestCallbacks(analysis *RstestCallAnalysis) RstestTestCallback
 	return result
 }
 
+// collectRstestHookCallbacks resolves each hook's first argument the way a test
+// callback argument is resolved, including the guarded name fallback of
+// walkRstestCallbackRegistrations.
+func collectRstestHookCallbacks(analysis *RstestCallAnalysis) map[*ast.Node]bool {
+	callbacks := map[*ast.Node]bool{}
+	if !testFramework.SourceFileMentionsHook(analysis.ctx.SourceFile) {
+		return callbacks
+	}
+	pending := map[string]bool{}
+	for _, node := range analysis.calls {
+		parsed := analysis.ParseFnCall(node)
+		if parsed == nil || parsed.Kind != RstestFnTypeHook {
+			continue
+		}
+		arguments := node.Arguments()
+		if len(arguments) == 0 {
+			continue
+		}
+		info := resolveRstestCallbackArgument(analysis, arguments[0])
+		if info.functionNode != nil {
+			callbacks[info.functionNode] = true
+		} else if info.name != "" {
+			pending[info.name] = true
+		}
+	}
+	for name := range pending {
+		entry := analysis.functions[name]
+		if entry.node == nil || entry.ambiguous || !isModuleTopLevelFunction(entry.node) {
+			continue
+		}
+		callbacks[entry.node] = true
+	}
+	return callbacks
+}
+
 // collectRstestCallbackOwnership indexes both test and describe callbacks by
 // the registrations that run them, which is what an execution mode is
 // inherited through.
@@ -230,40 +265,11 @@ func resolveRstestCallbackBinding(
 	symbol *ast.Symbol,
 	name string,
 ) rstestCallbackInfo {
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	function := testFramework.LocalFunctionImplementation(analysis.ctx.SourceFile, analysis.ctx.Refs, symbol)
+	if function == nil {
 		return rstestCallbackInfo{}
 	}
-	declaration := symbol.Declarations[0]
-	if declaration == nil || ast.GetSourceFileOfNode(declaration) != analysis.ctx.SourceFile ||
-		rstestCallbackBindingIsWritten(analysis, symbol) {
-		return rstestCallbackInfo{}
-	}
-	switch declaration.Kind {
-	case ast.KindFunctionDeclaration:
-		return rstestCallbackInfo{functionNode: declaration, name: name}
-	case ast.KindVariableDeclaration:
-		initializer := declaration.AsVariableDeclaration().Initializer
-		if initializer == nil {
-			return rstestCallbackInfo{}
-		}
-		initializer = internalUtils.SkipAssertionsAndParens(initializer)
-		if ast.IsFunctionExpressionOrArrowFunction(initializer) {
-			return rstestCallbackInfo{functionNode: initializer, name: name}
-		}
-	}
-	return rstestCallbackInfo{}
-}
-
-func rstestCallbackBindingIsWritten(
-	analysis *RstestCallAnalysis,
-	symbol *ast.Symbol,
-) bool {
-	for _, reference := range analysis.ctx.Refs.References(symbol) {
-		if internalUtils.IsWriteReference(reference) {
-			return true
-		}
-	}
-	return false
+	return rstestCallbackInfo{functionNode: function, name: name}
 }
 
 func recordRstestTestCallback(

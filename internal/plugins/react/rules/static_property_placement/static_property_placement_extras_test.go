@@ -13,6 +13,8 @@ import (
 func TestStaticPropertyPlacementExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StaticPropertyPlacementRule,
 		[]rule_tester.ValidTestCase{
+			// Private superclass names do not identify React component bases.
+			{Code: `class React { static #Component = class {}; static make() { return class C extends React.#Component { static propTypes = {}; }; } }`, Options: []interface{}{propertyAssignment}, Tsx: true},
 			// ---- Upstream MemberExpression boundary behavior ----
 			{Code: `class MyComponent extends React.Component {} MyComponent?.propTypes = {};`, Tsx: true},
 			{Code: `class MyComponent extends React.Component {} MyComponent?.[displayName] = {};`, Tsx: true},

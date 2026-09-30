@@ -111,7 +111,7 @@ ruleTester.run('max-expects', {} as never, {
     },
     {
       code: `
-      test.each(['should', 'pass'], () => {
+      test.each(['should', 'pass'])('case', () => {
         expect(true).toBeDefined();
         expect(true).toBeDefined();
         expect(true).toBeDefined();
@@ -640,7 +640,7 @@ ruleTester.run('max-expects', {} as never, {
     },
     {
       code: `
-        test.each(['should', 'not', 'pass'], () => {
+        test.each(['should', 'not', 'pass'])('case', () => {
           expect(true).toBeDefined();
           expect(true).toBeDefined();
           expect(true).toBeDefined();

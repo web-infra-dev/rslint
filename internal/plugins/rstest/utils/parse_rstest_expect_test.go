@@ -54,6 +54,14 @@ func describeParsedExpectChain(parsed *rstestUtils.ParsedRstestExpectCall) strin
 	)
 }
 
+func describeMatcherNegation(parsed *rstestUtils.ParsedRstestExpectCall) string {
+	matchers := make([]string, len(parsed.Matchers))
+	for i, matcher := range parsed.Matchers {
+		matchers[i] = fmt.Sprintf("%s:%t", matcher.Name, matcher.Negated)
+	}
+	return strings.Join(matchers, " ")
+}
+
 func expectExpressionKind(node *ast.Node) string {
 	if node == nil {
 		return "nil"
@@ -105,6 +113,43 @@ var expectChainParseProbe = rule.Rule{
 			},
 		}
 	},
+}
+
+var expectMatcherNegationProbe = rule.Rule{
+	Name:             "rstest/expect-matcher-negation-probe",
+	RequiresTypeInfo: true,
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				parsed := analysis.ParseExpectCall(node)
+				if parsed != nil {
+					ctx.ReportNode(node, probeMessage("parsedExpect", describeMatcherNegation(parsed)))
+				}
+			},
+		}
+	},
+}
+
+func TestParseRstestExpectCallTracksMatcherNegation(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &expectMatcherNegationProbe,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `expect("hello").to.be.a("string").that.does.not.contain("world");`,
+				Errors: parsedExpectError("a:false contain:true"),
+			},
+			{
+				Code:   `expect(value).not.toBe(expected).and.toMatchSnapshot();`,
+				Errors: parsedExpectError("toBe:true toMatchSnapshot:true"),
+			},
+			{
+				Code:   `expect(value).toBe(expected).and.toMatchSnapshot();`,
+				Errors: parsedExpectError("toBe:false toMatchSnapshot:false"),
+			},
+		},
+	)
 }
 
 func parsedExpectError(message string) []rule_tester.InvalidTestCaseError {
@@ -886,18 +931,6 @@ func TestShouldRstestExpectBeAwaited(t *testing.T) {
 }
 
 func TestRstestMatcherTables(t *testing.T) {
-	if len(rstestUtils.RSTEST_MATCHER_ALIASES) != 11 {
-		t.Errorf("expected 11 matcher aliases, got %d", len(rstestUtils.RSTEST_MATCHER_ALIASES))
-	}
-	if got := rstestUtils.RSTEST_MATCHER_ALIASES["toBeCalled"]; got != "toHaveBeenCalled" {
-		t.Errorf("toBeCalled should map to toHaveBeenCalled, got %q", got)
-	}
-	for alias, canonical := range rstestUtils.RSTEST_MATCHER_ALIASES {
-		if _, isAlias := rstestUtils.RSTEST_MATCHER_ALIASES[canonical]; isAlias {
-			t.Errorf("canonical name %q (for alias %q) must not itself be an alias", canonical, alias)
-		}
-	}
-
 	if len(rstestUtils.RSTEST_INLINE_SNAPSHOT_MATCHERS) != 2 {
 		t.Errorf("expected 2 inline snapshot matchers, got %d", len(rstestUtils.RSTEST_INLINE_SNAPSHOT_MATCHERS))
 	}

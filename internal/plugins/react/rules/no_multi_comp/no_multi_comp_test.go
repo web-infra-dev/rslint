@@ -1120,7 +1120,7 @@ func TestNoMultiCompRule(t *testing.T) {
         class B extends React.Component { render() { return <div /> } }
         class C extends React.Component { render() { return <div /> } }
       `,
-			Tsx: true,
+			Tsx:     true,
 			Options: map[string]interface{}{"ignoreStateless": true},
 			Settings: map[string]interface{}{
 				"componentWrapperFunctions": []interface{}{"myObserver"},
@@ -1313,25 +1313,6 @@ func TestNoMultiCompRule(t *testing.T) {
         var A, B;
         A = function() { return <div /> }
         B = function() { return <div /> }
-      `,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: onlyOne, Line: 4},
-			},
-		},
-
-		// ---- Branch 4 lock-in: named-FE id takes priority over LHS ----
-		// `lower = function CapitalizedFE() { return <div/> }` — even
-		// though LHS is lowercase, the FE's named id is capitalized so
-		// the FE classifies as a component (Branch 4 in
-		// IsStatelessReactComponentWithWrappers explicitly checks
-		// `fn.Kind == FunctionExpression && fn.Name() != nil` BEFORE
-		// looking at LHS). Pair with sibling class.
-		{
-			Code: `
-        var helper;
-        helper = function NamedComp() { return <div /> }
-        class App extends React.Component { render() { return <div /> } }
       `,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{

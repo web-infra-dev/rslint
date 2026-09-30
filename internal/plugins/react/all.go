@@ -1,6 +1,7 @@
 package react_plugin
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/async_server_action"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/boolean_prop_naming"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/button_has_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/checked_requires_onchange_or_readonly"
@@ -28,7 +29,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_key"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_max_depth"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_max_props_per_line"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_newline"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_bind"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_constructed_context_values"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_duplicate_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_target_blank"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_undef"
@@ -38,6 +41,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_spread_multi"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_spreading"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_sort_props"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_tag_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
@@ -57,6 +61,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_multi_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_namespace"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_object_type_as_default_prop"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_redundant_should_component_update"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_render_return_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_set_state"
@@ -72,15 +77,18 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_will_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_es6_class"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_exact_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_read_only_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_stateless_function"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/react_in_jsx_scope"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_default_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_optimization"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_prop_types"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/state_in_constructor"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/static_property_placement"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/style_prop_object"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/void_dom_elements_no_children"
@@ -99,6 +107,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		async_server_action.AsyncServerActionRule,
 		boolean_prop_naming.BooleanPropNamingRule,
 		button_has_type.ButtonHasTypeRule,
 		checked_requires_onchange_or_readonly.CheckedRequiresOnchangeOrReadonlyRule,
@@ -126,7 +135,9 @@ func GetAllRules() []rule.Rule {
 		jsx_key.JsxKeyRule,
 		jsx_max_depth.JsxMaxDepthRule,
 		jsx_max_props_per_line.JsxMaxPropsPerLineRule,
+		jsx_newline.JsxNewlineRule,
 		jsx_no_bind.JsxNoBindRule,
+		jsx_no_constructed_context_values.JsxNoConstructedContextValuesRule,
 		jsx_no_duplicate_props.JsxNoDuplicatePropsRule,
 		jsx_no_target_blank.JsxNoTargetBlankRule,
 		jsx_no_undef.JsxNoUndefRule,
@@ -136,6 +147,7 @@ func GetAllRules() []rule.Rule {
 		jsx_props_no_spreading.JsxPropsNoSpreadingRule,
 		jsx_props_no_spread_multi.JsxPropsNoSpreadMultiRule,
 		jsx_sort_props.JsxSortPropsRule,
+		jsx_tag_spacing.JsxTagSpacingRule,
 		jsx_uses_react.JsxUsesReactRule,
 		jsx_uses_vars.JsxUsesVarsRule,
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
@@ -155,6 +167,7 @@ func GetAllRules() []rule.Rule {
 		no_invalid_html_attribute.NoInvalidHtmlAttributeRule,
 		no_multi_comp.NoMultiCompRule,
 		no_namespace.NoNamespaceRule,
+		no_object_type_as_default_prop.NoObjectTypeAsDefaultPropRule,
 		no_unstable_nested_components.NoUnstableNestedComponentsRule,
 		no_unused_class_component_methods.NoUnusedClassComponentMethodsRule,
 		no_unused_prop_types.NoUnusedPropTypesRule,
@@ -170,7 +183,9 @@ func GetAllRules() []rule.Rule {
 		no_unsafe.NoUnsafeRule,
 		no_will_update_set_state.NoWillUpdateSetStateRule,
 		prefer_es6_class.PreferEs6ClassRule,
+		prefer_exact_props.PreferExactPropsRule,
 		prefer_read_only_props.PreferReadOnlyPropsRule,
+		require_default_props.RequireDefaultPropsRule,
 		prefer_stateless_function.PreferStatelessFunctionRule,
 		prop_types.PropTypesRule,
 		react_in_jsx_scope.ReactInJsxScopeRule,
@@ -179,6 +194,7 @@ func GetAllRules() []rule.Rule {
 		self_closing_comp.SelfClosingCompRule,
 		sort_comp.SortCompRule,
 		sort_prop_types.SortPropTypesRule,
+		state_in_constructor.StateInConstructorRule,
 		static_property_placement.StaticPropertyPlacementRule,
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,

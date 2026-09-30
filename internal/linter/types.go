@@ -6,6 +6,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
+// RuleHandler returns immutable configured rules. The returned slice and its
+// entries must remain read-only while a prepared plan can still be consumed;
+// planning may share derived rule views across files with the same input slice.
 type RuleHandler = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule
 type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 

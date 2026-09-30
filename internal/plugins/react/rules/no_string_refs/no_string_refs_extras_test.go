@@ -22,6 +22,17 @@ func TestNoStringRefsRuleExtras(t *testing.T) {
 		// A source annotation overrides settings in both directions.
 		{Code: `/** @jsx Preact.h */ class Hello extends Other.Component { componentDidMount() { var c = this.refs.foo; } }`, Tsx: true, Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0", "pragma": "Other"}}},
 	}, []rule_tester.InvalidTestCase{
+		// A literal superclass key identifies a React component.
+		{
+			Code: `
+class Hello extends React['Component'] {
+  componentDidMount() { var c = this.refs.foo; }
+}
+`,
+			Tsx:      true,
+			Settings: legacy,
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "thisRefsDeprecated", Line: 3, Column: 33}},
+		},
 		{Code: `/** @jsx Preact.h */ class Hello extends Preact.Component { componentDidMount() { var c = this.refs.foo; } }`, Tsx: true, Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0", "pragma": "Other"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thisRefsDeprecated", Line: 1, Column: 91}}},
 		{Code: `/** @jsx Preact.h */ var Hello = Preact.createClass({ componentDidMount() { var c = this.refs.foo; } });`, Tsx: true, Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0", "pragma": "Other", "createClass": "createClass"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thisRefsDeprecated", Line: 1, Column: 85}}},
 		{Code: `class Hello extends React.Component { componentDidMount() { var c = this.refs.foo; } }`, Tsx: true, Settings: map[string]interface{}{"react": map[string]interface{}{"defaultVersion": "18.2.0"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thisRefsDeprecated", Line: 1, Column: 69}}},

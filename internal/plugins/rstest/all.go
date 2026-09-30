@@ -27,8 +27,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_restricted_matchers"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_restricted_rstest_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_standalone_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_test_return_statement"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_unnecessary_assertion"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_unneeded_async_expect_function"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_untyped_mock_factory"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_after_all_blocks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_after_each_blocks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_all"
@@ -56,6 +58,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_mock_promise_shorthand"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_mock_return_shorthand"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_rs_mocked"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_snapshot_hint"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_spy_on"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_boolean_matchers"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_equal"
@@ -111,8 +114,10 @@ func GetAllRules() []rule.Rule {
 		no_restricted_matchers.NoRestrictedMatchersRule,
 		no_restricted_rstest_methods.NoRestrictedRstestMethodsRule,
 		no_standalone_expect.NoStandaloneExpectRule,
+		no_test_return_statement.NoTestReturnStatementRule,
 		no_unnecessary_assertion.NoUnnecessaryAssertionRule,
 		no_unneeded_async_expect_function.NoUnneededAsyncExpectFunctionRule,
+		no_untyped_mock_factory.NoUntypedMockFactoryRule,
 		padding_around_after_all_blocks.PaddingAroundAfterAllBlocksRule,
 		padding_around_after_each_blocks.PaddingAroundAfterEachBlocksRule,
 		padding_around_all.PaddingAroundAllRule,
@@ -140,6 +145,7 @@ func GetAllRules() []rule.Rule {
 		prefer_mock_promise_shorthand.PreferMockPromiseShorthandRule,
 		prefer_mock_return_shorthand.PreferMockReturnShorthandRule,
 		prefer_rs_mocked.PreferRsMockedRule,
+		prefer_snapshot_hint.PreferSnapshotHintRule,
 		prefer_spy_on.PreferSpyOnRule,
 		prefer_strict_boolean_matchers.PreferStrictBooleanMatchersRule,
 		prefer_strict_equal.PreferStrictEqualRule,

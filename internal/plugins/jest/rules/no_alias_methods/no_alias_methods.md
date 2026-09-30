@@ -4,6 +4,8 @@
 
 This rule triggers a warning if the alias name, rather than the canonical name, of a method is used.
 
+The rule checks matchers written with dot access or a static bracket key such as `expect(a)['toBeCalled']()`. A matcher named by a variable, such as `expect(a)[matcherName]()`, is ignored because its name is only known at runtime.
+
 Examples of **incorrect** code for this rule:
 
 ```javascript

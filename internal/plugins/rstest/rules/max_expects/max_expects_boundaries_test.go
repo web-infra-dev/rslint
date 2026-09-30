@@ -47,6 +47,24 @@ test('a', { retry: 2 }, () => {
 });`,
 				Options: max1Option,
 			},
+			// Each branch of a conditional is a separate candidate callback, so
+			// one branch's assertions do not add to the other's.
+			{
+				Code: `
+test('a', flag
+  ? () => { expect(1).toBe(1); }
+  : () => { expect(2).toBe(2); }
+);`,
+				Options: max1Option,
+			},
+			{
+				Code: `
+beforeEach(flag
+  ? () => { expect(1).toBe(1); }
+  : () => { expect(2).toBe(2); }
+);`,
+				Options: max1Option,
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- An unresolved callback counts wherever it sits inside the
@@ -152,6 +170,45 @@ beforeEach(wrap(() => {
 				Options: max1Option,
 				Errors: []rule_tester.InvalidTestCaseError{
 					exceededMaxError(2, 1, 4, 3, 20),
+				},
+			},
+			// A hook callback passed by name is still the hook body.
+			{
+				Code: `
+const setup = () => {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+};
+beforeEach(setup);`,
+				Options: max1Option,
+				Errors: []rule_tester.InvalidTestCaseError{
+					exceededMaxError(2, 1, 4, 3, 20),
+				},
+			},
+			{
+				Code: `
+function setup() {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+}
+beforeEach(setup);`,
+				Options: max1Option,
+				Errors: []rule_tester.InvalidTestCaseError{
+					exceededMaxError(2, 1, 4, 3, 20),
+				},
+			},
+			// A renamed hook import still spells the hook's name in the file.
+			{
+				Code: `
+import { beforeEach as setupEach } from '@rstest/core';
+const setup = () => {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+};
+setupEach(setup);`,
+				Options: max1Option,
+				Errors: []rule_tester.InvalidTestCaseError{
+					exceededMaxError(2, 1, 5, 3, 20),
 				},
 			},
 			// ---- Any function-valued expression between two assertions is a

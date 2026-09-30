@@ -397,39 +397,6 @@ func typeDeclarationScope(n *ast.Node) *ast.Node {
 	return nil
 }
 
-// lastReturnTypeExpression mirrors eslint-plugin-react's ast.loopNodes helper:
-// scan top-level statements backwards, and when a switch is encountered recurse
-// only into its final case. A non-empty trailing switch with no return in that
-// case deliberately prevents falling back to earlier statements.
-func lastReturnTypeExpression(statements []*ast.Node) *ast.Node {
-	for i := len(statements) - 1; i >= 0; i-- {
-		statement := statements[i]
-		if statement == nil {
-			continue
-		}
-		if statement.Kind == ast.KindReturnStatement {
-			return statement.AsReturnStatement().Expression
-		}
-		if statement.Kind != ast.KindSwitchStatement {
-			continue
-		}
-		switchStatement := statement.AsSwitchStatement()
-		if switchStatement == nil || switchStatement.CaseBlock == nil {
-			continue
-		}
-		caseBlock := switchStatement.CaseBlock.AsCaseBlock()
-		if caseBlock == nil || caseBlock.Clauses == nil || len(caseBlock.Clauses.Nodes) == 0 {
-			continue
-		}
-		lastClause := caseBlock.Clauses.Nodes[len(caseBlock.Clauses.Nodes)-1].AsCaseOrDefaultClause()
-		if lastClause == nil || lastClause.Statements == nil {
-			return nil
-		}
-		return lastReturnTypeExpression(lastClause.Statements.Nodes)
-	}
-	return nil
-}
-
 func returnTypeObjectDeclaration(object *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol map[*ast.Symbol]*ast.Node, seen map[*ast.Node]bool, resolve initializerResolver) (propDeclaration, bool) {
 	props, ok := propMap(object, nil, resolve)
 	if !ok {
@@ -502,7 +469,7 @@ func returnTypeDeclaration(query *ast.Node, aliases map[string][]*ast.Node, alia
 		if block == nil || block.Statements == nil {
 			return concreteDeclaration(map[string]propType{}), true
 		}
-		body = unwrap(lastReturnTypeExpression(block.Statements.Nodes))
+		body = unwrap(reactutil.LastReturnedExpression(block.Statements.Nodes))
 	}
 	if body == nil {
 		return concreteDeclaration(map[string]propType{}), true

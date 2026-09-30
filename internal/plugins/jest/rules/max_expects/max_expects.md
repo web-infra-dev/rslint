@@ -4,9 +4,9 @@
 
 Enforce a maximum number of `expect()` calls in a test body. As more assertions are added, a test is more likely to mix multiple objectives. This rule reports when a single test callback exceeds the configured limit.
 
-The rule counts top-level `expect()` calls inside each `test` or `it` callback (including `async` callbacks and forms such as `test.each` and `it.each` that the Jest integration recognizes). The counter resets when entering a new test case. Nested `expect()` calls used as matchers (for example `expect.any(Boolean)` inside `toEqual`) and static `expect` APIs such as `expect.hasAssertions()` are not counted.
+The rule counts `expect()` calls inside each `test` or `it` callback (including `async` callbacks and forms such as `test.each` and `it.each` that the Jest integration recognizes), and inside each lifecycle hook callback such as `beforeEach`. Every callback has its own count. Nested `expect()` calls used as matchers (for example `expect.any(Boolean)` inside `toEqual`) and static `expect` APIs such as `expect.hasAssertions()` are not counted.
 
-`expect` calls inside nested functions within a test (for example a helper arrow function defined in the callback) are counted toward that test's limit. `expect` calls in standalone helper functions defined outside the test callback are not attributed to the test body.
+`expect` calls in a function passed inline to another call inside the test, such as an `Array.prototype.forEach` callback, count toward that test's limit. A function that is not passed directly as an argument, such as a helper arrow function assigned to a variable, has its own count, and the test's count resumes after it. `expect` calls outside every test and hook callback, for example at the top level or directly in a `describe` callback, are not counted.
 
 Examples of **incorrect** code for this rule (with the default `{ "max": 5 }`):
 

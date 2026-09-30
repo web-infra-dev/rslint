@@ -20,11 +20,11 @@ type ExportMeta struct {
 }
 
 // ExportMap records the statically visible exports of an ES module. It does
-// not enumerate synthetic defaults from compiler interop settings; HasDefault
+// not enumerate synthetic defaults from CommonJS interop; HasDefault
 // includes them when checking whether a default import has a value.
 //
-// A map handed to a rule is read-only and shared: one map answers for its file
-// however many files import it, and files are linted concurrently. That is why
+// A map handed to a rule is read-only and can share its underlying data with
+// other importers, which may be linted concurrently. That is why
 // nothing here that writes is exported — only the builder in this package, which
 // owns a map until it publishes it, may fill one in.
 type ExportMap struct {
@@ -201,7 +201,15 @@ func getExportMap(origin *ast.SourceFile, moduleSpecifier *ast.Node, builder *ex
 	if !link.Resolved {
 		return nil, false
 	}
-	return builder.exportMapOf(link.Target), true
+	exports := builder.exportMapOf(link.Target)
+	if link.NodeDefault && !exports.implicitDefault {
+		// The cached map describes the module. This edge's default must not
+		// leak into a CommonJS consumer querying the same module later.
+		view := *exports
+		view.implicitDefault = true
+		return &view, true
+	}
+	return exports, true
 }
 
 // exportMapOf applies a file's export steps in source order. The map is
@@ -304,7 +312,7 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports,
 			// An explicit re-export declares its public name even when its
 			// target is missing. Resolving the target only supplies metadata.
 			meta := dependency.Get(spec.Local)
-			if spec.Local == defaultExportName && dependency.implicitDefault && (meta == nil || meta.unresolved) {
+			if spec.Local == defaultExportName && (dependency.implicitDefault || step.Link.NodeDefault) && (meta == nil || meta.unresolved) {
 				meta = &ExportMeta{}
 			}
 			if meta == nil {

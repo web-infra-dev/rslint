@@ -23,6 +23,9 @@ type PropWrapperEntry struct {
 	FromString bool
 	// Raw is the original string setting when FromString is true.
 	Raw string
+	// Exact records the optional `exact: true` marker used by
+	// react/prefer-exact-props. String-form entries are never exact.
+	Exact bool
 }
 
 // GetPropWrapperFunctions reads `settings.propWrapperFunctions` from the
@@ -55,10 +58,11 @@ func GetPropWrapperFunctions(settings map[string]interface{}) []PropWrapperEntry
 		case map[string]interface{}:
 			obj, _ := t["object"].(string)
 			prop, _ := t["property"].(string)
+			exact, _ := t["exact"].(bool)
 			if prop == "" {
 				continue
 			}
-			out = append(out, PropWrapperEntry{Object: obj, Property: prop})
+			out = append(out, PropWrapperEntry{Object: obj, Property: prop, Exact: exact})
 		}
 	}
 	return out

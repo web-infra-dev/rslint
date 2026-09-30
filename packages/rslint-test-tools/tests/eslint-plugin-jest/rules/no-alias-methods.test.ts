@@ -17,6 +17,11 @@ ruleTester.run('no-alias-methods', {} as never, {
     { code: 'expect(a).toThrow()' },
     { code: 'expect(a).rejects;' },
     { code: 'expect(a);' },
+    // A computed identifier key names the matcher by the variable's value, not
+    // its name.
+    {
+      code: "const toBeCalled = 'toHaveBeenCalled';\nexpect(a)[toBeCalled]();",
+    },
   ],
 
   invalid: [
@@ -268,20 +273,6 @@ ruleTester.run('no-alias-methods', {} as never, {
           data: { alias: 'toBeCalled', canonical: 'toHaveBeenCalled' },
           column: 21,
           line: 1,
-        },
-      ],
-    },
-    {
-      // `toBeCalled` is a variable here, so the alias is reported but not
-      // fixed; rewriting it would point the computed key at an identifier that
-      // does not exist.
-      code: "const toBeCalled = 'toBeCalled';\nexpect(a)[toBeCalled]();",
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: { alias: 'toBeCalled', canonical: 'toHaveBeenCalled' },
-          column: 11,
-          line: 2,
         },
       ],
     },

@@ -4,81 +4,25 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_each"
 )
 
-// Message builder
-
-func buildPreferEachMessage(fn string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "preferEach",
-		Description: "prefer using `" + fn + ".each` rather than a manual loop",
-		Data: map[string]string{
-			"fn": fn,
-		},
-	}
-}
-
-func recommendFn(jestFnCalls []jestUtils.JestFnType) string {
-	if len(jestFnCalls) == 1 && jestFnCalls[0] == jestUtils.JestFnTypeTest {
-		return "it"
-	}
-	return "describe"
-}
-
-var PreferEachRule = rule.Rule{
-	Name:   "jest/prefer-each",
-	Schema: rule.EmptyArraySchema,
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+var PreferEachRule = shared.NewRule(shared.Config{
+	Name: "jest/prefer-each",
+	// Jest exposes `it` and `test` everywhere; a single registered test is
+	// always recommended as `it.each`, whichever spelling the loop used.
+	SingleTestFn: func(string) string { return "it" },
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
 		analysis := jestUtils.GetJestCallAnalysis(ctx)
-		jestFnCalls := make([]jestUtils.JestFnType, 0, 4)
-		inTestCaseCall := false
-
-		enterForLoop := func(node *ast.Node) {
-			if len(jestFnCalls) == 0 || inTestCaseCall {
-				return
-			}
-
-			jestFnCalls = jestFnCalls[:0]
-		}
-
-		exitForLoop := func(node *ast.Node) {
-			if len(jestFnCalls) == 0 || inTestCaseCall {
-				return
-			}
-
-			ctx.ReportNode(node, buildPreferEachMessage(recommendFn(jestFnCalls)))
-			jestFnCalls = jestFnCalls[:0]
-		}
-
-		return rule.RuleListeners{
-			ast.KindForStatement:                        enterForLoop,
-			ast.KindForInStatement:                      enterForLoop,
-			ast.KindForOfStatement:                      enterForLoop,
-			rule.ListenerOnExit(ast.KindForStatement):   exitForLoop,
-			rule.ListenerOnExit(ast.KindForInStatement): exitForLoop,
-			rule.ListenerOnExit(ast.KindForOfStatement): exitForLoop,
-			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := analysis.ParseFnCall(node)
-				if jestFnCall == nil {
-					return
+		return shared.Runtime{
+			Parse: func(node *ast.Node) *testFramework.ParsedCall {
+				parsed := analysis.ParseFnCall(node)
+				if parsed == nil {
+					return nil
 				}
-
-				switch jestFnCall.Kind {
-				case jestUtils.JestFnTypeHook,
-					jestUtils.JestFnTypeDescribe,
-					jestUtils.JestFnTypeTest:
-					jestFnCalls = append(jestFnCalls, jestFnCall.Kind)
-				}
-
-				if jestFnCall.Kind == jestUtils.JestFnTypeTest {
-					inTestCaseCall = true
-				}
-			},
-			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
-				if analysis.ParseTestCall(node) != nil {
-					inTestCaseCall = false
-				}
+				return &parsed.ParsedCall
 			},
 		}
 	},
-}
+})

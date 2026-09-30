@@ -4,9 +4,10 @@
     {
       "type": "object",
       "properties": {
-        "max": {
-          "type": "integer",
-          "minimum": 1
+        "moduleFileExtensions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "additionalItems": false
         }
       },
       "additionalProperties": false

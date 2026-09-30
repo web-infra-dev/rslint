@@ -60,7 +60,7 @@ func TestPreferToHaveBeenCalledRule(t *testing.T) {
 			},
 			{
 				Code:   `expect(method).not.toHaveBeenCalledTimes(0, 1, 2);`,
-				Output: []string{`expect(method).toHaveBeenCalled();`},
+				Output: []string{},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferMatcher", Line: 1, Column: 20},
 				},
@@ -102,7 +102,7 @@ func TestPreferToHaveBeenCalledRule(t *testing.T) {
 			},
 			{
 				Code:   `expect(method)?.["toHaveBeenCalledTimes"](0);`,
-				Output: []string{`expect(method)?.not['toHaveBeenCalled']();`},
+				Output: []string{`expect(method)?.not["toHaveBeenCalled"]();`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferMatcher"},
 				},
