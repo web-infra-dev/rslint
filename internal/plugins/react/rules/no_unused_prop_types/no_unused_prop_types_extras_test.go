@@ -151,6 +151,8 @@ func TestNoUnusedPropTypesExtras(t *testing.T) {
 			{Code: `const obj = { Foo: function(props) { return <div />; } }; obj.Foo.propTypes = { unused: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'unused' PropType is defined but prop is never used"}}},
 			// A named expression's local name does not become part of its external component path.
 			{Code: `const obj = { Foo: function Named(props) { return <div />; } }; obj.Foo.propTypes = { unused: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'unused' PropType is defined but prop is never used"}}},
+			// Components nested in member-assigned object containers retain their complete path.
+			{Code: `const obj = {}; obj.registry = { Foo: function(props) { return <div />; } }; obj.registry.Foo.propTypes = { unused: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'unused' PropType is defined but prop is never used"}}},
 			// Object-literal methods and nested paths are component targets too.
 			{Code: `const root = { nested: { Foo() { return <div />; } } }; root.nested.Foo.propTypes = { unused: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'unused' PropType is defined but prop is never used"}}},
 			// Member assignments also retain the complete component path.

@@ -52,6 +52,7 @@ type component struct {
 	target                            string
 	props                             map[string]prop
 	defaults                          map[string]bool
+	defaultSource                     *ast.Node
 	declared, hasDefaults, unresolved bool
 }
 
@@ -61,10 +62,11 @@ type componentKey struct {
 }
 
 type diagnosticKey struct {
-	component componentKey
-	fallback  *ast.Node
-	id        string
-	name      string
+	contract   *ast.Node
+	fallback   *ast.Node
+	id         string
+	name       string
+	occurrence int
 }
 
 type analyzer struct {
@@ -184,6 +186,7 @@ func (a *analyzer) addDefaults(c *component, n *ast.Node, external bool) {
 		return
 	}
 	c.hasDefaults = true
+	c.defaultSource = n
 	for _, member := range n.AsObjectLiteralExpression().Properties.Nodes {
 		if member.Kind == ast.KindSpreadAssignment {
 			c.unresolved = true
@@ -496,6 +499,7 @@ func (a *analyzer) applyAssignment(n *ast.Node) {
 					c.props[name] = prop{node: n, required: isRequired(bin.Right)}
 				} else {
 					c.hasDefaults = true
+					c.defaultSource = n
 					c.defaults[name] = true
 				}
 			}
@@ -503,17 +507,18 @@ func (a *analyzer) applyAssignment(n *ast.Node) {
 	}
 }
 
-func (a *analyzer) report(c *component, n *ast.Node, id, name string) {
+func (a *analyzer) report(c *component, n, contract *ast.Node, occurrence int, id, name string) {
 	// Component detection may retain multiple component-producing assignments
 	// for one binding and property path. Their external prop/default declarations
-	// form one contract, so report each contract issue once while retaining every
-	// candidate for conditional and later assignments.
+	// share one contract node, so report that contract once while keeping distinct
+	// inline contracts and repeated binding elements independent.
 	key := diagnosticKey{
-		component: componentKey{binding: c.binding, target: c.target},
-		id:        id,
-		name:      name,
+		contract:   contract,
+		id:         id,
+		name:       name,
+		occurrence: occurrence,
 	}
-	if c.binding == nil {
+	if contract == nil {
 		key.fallback = c.node
 	}
 	if _, exists := a.reported[key]; exists {
@@ -546,7 +551,7 @@ func (c *component) check(a *analyzer, opts options) {
 	}
 	if function && opts.functions == "defaultArguments" {
 		if c.hasDefaults {
-			a.report(c, c.node, "noDefaultPropsWithFunction", "")
+			a.report(c, c.node, c.defaultSource, 0, "noDefaultPropsWithFunction", "")
 		}
 		params := c.fn.Parameters()
 		if len(params) == 0 {
@@ -561,13 +566,19 @@ func (c *component) check(a *analyzer, opts options) {
 			return
 		}
 		if name.Kind == ast.KindIdentifier {
-			for _, p := range c.props {
+			optionalNames := make([]string, 0, len(c.props))
+			for propName, p := range c.props {
 				if !p.required {
-					a.report(c, params[0], "destructureInSignature", "")
-					break
+					optionalNames = append(optionalNames, propName)
 				}
 			}
+			if len(optionalNames) > 0 {
+				slices.Sort(optionalNames)
+				contract := c.props[optionalNames[0]].node
+				a.report(c, params[0], contract, 0, "destructureInSignature", "")
+			}
 		} else if name.Kind == ast.KindObjectBindingPattern {
+			occurrences := map[string]int{}
 			for _, element := range name.AsBindingPattern().Elements.Nodes {
 				if element.Kind != ast.KindBindingElement {
 					continue
@@ -590,11 +601,13 @@ func (c *component) check(a *analyzer, opts options) {
 				if !exists {
 					continue
 				}
+				occurrence := occurrences[key.Text()]
+				occurrences[key.Text()] = occurrence + 1
 				if p.required && binding.Initializer != nil {
-					a.report(c, element, "noDefaultWithRequired", key.Text())
+					a.report(c, element, p.node, occurrence, "noDefaultWithRequired", key.Text())
 				}
 				if !p.required && binding.Initializer == nil {
-					a.report(c, element, "shouldAssignObjectDefault", key.Text())
+					a.report(c, element, p.node, occurrence, "shouldAssignObjectDefault", key.Text())
 				}
 			}
 		}
@@ -624,13 +637,13 @@ func (c *component) check(a *analyzer, opts options) {
 		}
 		if p.required {
 			if opts.forbidDefaultForRequired && c.defaults[name] {
-				a.report(c, p.node, "noDefaultWithRequired", name)
+				a.report(c, p.node, p.node, 0, "noDefaultWithRequired", name)
 			}
 			continue
 		}
 		// NOTE: Unlike ESLint, inherited Object.prototype keys are not defaults.
 		if !c.defaults[name] {
-			a.report(c, p.node, "shouldHaveDefault", name)
+			a.report(c, p.node, p.node, 0, "shouldHaveDefault", name)
 		}
 	}
 }

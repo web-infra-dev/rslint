@@ -90,6 +90,8 @@ Disable this rule when optional props may intentionally remain `undefined`.
   upstream can treat that read as an unresolved default declaration.
 - Multiple component values assigned to the same binding produce one diagnostic
   per prop contract. A later component is still checked after a non-component value.
+- Components nested in an object assigned to a member retain their complete
+  external path; upstream can miss declarations such as `ns.registry.C.propTypes`.
 
 ## Original Documentation
 

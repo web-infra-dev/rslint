@@ -291,6 +291,12 @@ func ComponentTarget(node *ast.Node) []string {
 			assignment := parent.AsBinaryExpression()
 			if assignment.OperatorToken != nil && assignment.OperatorToken.Kind == ast.KindEqualsToken && assignment.Right == current {
 				if parts := PropertyAccessParts(assignment.Left); len(parts) > 0 {
+					if memberTarget {
+						// The assignment owns an object container rather than the
+						// component directly. Preserve the component's path inside it:
+						// `ns.registry = { C: () => ... }` is `ns.registry.C`.
+						return append(parts, target...)
+					}
 					return parts
 				}
 			}
