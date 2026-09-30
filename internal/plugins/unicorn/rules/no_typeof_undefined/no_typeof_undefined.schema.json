@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "checkGlobalVariables": {
+          "type": "boolean",
+          "description": "Whether to also check typeof comparisons against global variables."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
