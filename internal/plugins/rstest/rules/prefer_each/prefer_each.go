@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_each"
 )
 
@@ -20,7 +21,7 @@ var PreferEachRule = shared.NewRule(shared.Config{
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return shared.Runtime{
-			Parse: func(node *ast.Node) *shared.ParsedCall {
+			Parse: func(node *ast.Node) *testFramework.ParsedCall {
 				parsed := analysis.ParseFnCall(node)
 				if parsed == nil {
 					return nil

@@ -6,11 +6,8 @@ import (
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
-type ParsedCall = testFramework.ParsedCall
-
 type Runtime struct {
 	Parse func(*ast.Node) *testFramework.ParsedCall
-	Skip  bool
 }
 
 type Config struct {
@@ -91,10 +88,6 @@ func NewRule(config Config) rule.Rule {
 		Schema: rule.EmptyArraySchema,
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			runtime := config.Prepare(ctx)
-			if runtime.Skip {
-				return rule.RuleListeners{}
-			}
-
 			recommend := func(pending []registration) string {
 				if len(pending) == 1 && pending[0].kind == testFramework.FnKindTest {
 					if config.SingleTestFn != nil {
