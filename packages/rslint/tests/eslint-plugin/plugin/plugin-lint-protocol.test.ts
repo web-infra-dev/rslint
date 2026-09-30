@@ -20,6 +20,7 @@ import {
   buildPluginLintTasks,
   buildPluginLintResult,
   type EslintPluginLintRequest,
+  type ResolvedEslintPluginLintRequest,
 } from '../../../src/eslint-plugin/plugin/plugin-lint-protocol.js';
 import type { LintFileResult } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
 import { resolvePluginAttachments } from '../../../src/eslint-plugin/plugin/attachments.js';
@@ -28,7 +29,7 @@ describe('shared plugin host attachment references', () => {
   test('preserves complete text, native capabilities and file metadata', () => {
     const source = '\ufeffconst café = "😀";\r\n// \u0000';
     const capability = { lease: 7, offset: 3, length: 2 };
-    const request = {
+    const request: EslintPluginLintRequest = {
       collectFixes: true,
       rules: { 'local/check': {} },
       files: [
@@ -53,10 +54,28 @@ describe('shared plugin host attachment references', () => {
   test('preserves an explicitly empty snapshot', () => {
     expect(
       resolvePluginAttachments(
-        { files: [{ path: '/missing.ts', textAttachment: 0 }] },
+        {
+          files: [{ path: '/missing.ts', textAttachment: 0 }],
+          collectFixes: false,
+        },
         [''],
       ),
-    ).toEqual({ files: [{ path: '/missing.ts', text: '' }] });
+    ).toEqual({
+      files: [{ path: '/missing.ts', text: '' }],
+      collectFixes: false,
+    });
+  });
+
+  test('an explicitly absent attachment remains an inline snapshot', () => {
+    const resolved = resolvePluginAttachments({
+      files: [
+        { path: '/missing.ts', text: 'snapshot', textAttachment: undefined },
+      ],
+      collectFixes: false,
+    });
+    const [task] = buildPluginLintTasks(resolved, { configDirSet: new Set() });
+    expect(task.text).toBe('snapshot');
+    expect(resolved.files[0]).not.toHaveProperty('textAttachment');
   });
 
   test('decodes owned binary source at the application boundary', () => {
@@ -84,7 +103,7 @@ describe('shared plugin host attachment references', () => {
     ({ bytes }) => {
       expect(() =>
         resolvePluginAttachments(
-          { files: [{ path: 'a.ts', textAttachment: 0 }] },
+          { files: [{ path: 'a.ts', textAttachment: 0 }], collectFixes: false },
           [Uint8Array.from(bytes)],
         ),
       ).toThrow();
@@ -104,7 +123,7 @@ describe('shared plugin host attachment references', () => {
       bytes.byteLength - 2,
     );
     const resolved = resolvePluginAttachments(
-      { files: [{ path: 'a.ts', textAttachment: 0 }] },
+      { files: [{ path: 'a.ts', textAttachment: 0 }], collectFixes: false },
       [view],
     );
     expect(resolved.files[0].text).toBe(text);
@@ -118,28 +137,45 @@ describe('shared plugin host attachment references', () => {
     { files: [{ textAttachment: 0, text: '' }] },
     { files: [{ textAttachment: 0, sharedSource: {} }] },
     { files: [{ textAttachment: 0 }, { textAttachment: 0 }] },
-    { files: [{ sourceRange: { offset: 0, length: 0 } }] },
     { files: [{}] },
     { files: [null] },
   ])('rejects ambiguous or incomplete references: %j', (request) => {
     expect(() =>
+      // @ts-expect-error Exercise the runtime guard with malformed wire input.
       resolvePluginAttachments(request, ['complete source']),
     ).toThrow();
   });
+
+  test.each([
+    { sharedSource: { lease: 1, offset: 0, length: 0 } },
+    { sourceRange: { offset: 0, length: 0 } },
+    { sourceIndex: 0 },
+  ])(
+    'rejects native or legacy wire fields without attachments: %j',
+    (source) => {
+      expect(() =>
+        resolvePluginAttachments({
+          files: [{ path: '/missing.ts', ...source }],
+          collectFixes: false,
+        }),
+      ).toThrow('invalid plugin source file');
+    },
+  );
 
   test('a missing attachment cannot become a filesystem read', () => {
     expect(() =>
       resolvePluginAttachments({
         files: [{ path: '/missing.ts', textAttachment: 0 }],
+        collectFixes: false,
       }),
     ).toThrow('invalid plugin source attachment');
   });
 });
 
 function input(
-  files: EslintPluginLintRequest['files'],
-  opts: Partial<EslintPluginLintRequest> = {},
-): EslintPluginLintRequest {
+  files: ResolvedEslintPluginLintRequest['files'],
+  opts: Partial<ResolvedEslintPluginLintRequest> = {},
+): ResolvedEslintPluginLintRequest {
   return {
     files,
     rules: opts.rules ?? { 'uc/no-null': { options: [] } },
@@ -150,9 +186,13 @@ function input(
 
 describe('buildPluginLintTasks', () => {
   test('rejects an unresolved wire range instead of reading disk', () => {
-    const files = [{ path: '/missing.ts', textAttachment: 0 }];
+    const request: EslintPluginLintRequest = {
+      files: [{ path: '/missing.ts', textAttachment: 0 }],
+      collectFixes: false,
+    };
     expect(() =>
-      buildPluginLintTasks(input(files), { configDirSet: new Set() }),
+      // @ts-expect-error A wire request must pass through the attachment adapter.
+      buildPluginLintTasks(request, { configDirSet: new Set() }),
     ).toThrow('unresolved shared plugin source');
   });
   test('forwards native source capabilities without decoding or reading files', () => {

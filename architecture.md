@@ -1620,6 +1620,9 @@ Published storage remains channel-owned after a caller cancels: a later exact
 acknowledgement may release it, but cannot revive the cancelled request. An
 ordinary result, cancellation or timeout never authorizes reuse by itself.
 The shared plugin host resolves file attachment indices before worker dispatch.
+Its wire request type carries `textAttachment` indices; a separate resolved
+request type carries inline text or private native capabilities. Task construction
+accepts only the resolved type, keeping native capabilities out of the wire model.
 
 Linux uses a sealed anonymous memory file, macOS an immediately unlinked POSIX
 shared-memory object, and Windows an anonymous pagefile mapping whose handle

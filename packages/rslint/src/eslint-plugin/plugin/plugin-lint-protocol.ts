@@ -39,13 +39,12 @@ export interface EslintPluginLintRequest {
   files: ReadonlyArray<{
     path: string;
     /**
-     * Complete source snapshot. The plugin host may replace its wire encoding
-     * with a native sharedSource capability. Hosts that explicitly permit
-     * filesystem reads may omit both; overlays and autofix retain snapshots.
+     * Complete inline snapshot. Hosts that explicitly permit filesystem reads
+     * may omit both text and textAttachment; overlays and autofix retain snapshots.
      */
     text?: string;
-    /** Private native capability installed by the plugin attachment adapter. */
-    sharedSource?: SharedBytes;
+    /** Index into the request's text/byte attachments, mutually exclusive with text. */
+    textAttachment?: number;
     /**
      * Per-file `languageOptions`, computed by Go via `GetConfigForFile`
      * (flat-config files-glob match + deep merge). Opaque here; the
@@ -67,6 +66,21 @@ export interface EslintPluginLintRequest {
   suggestionsMode?: 'off' | 'eager';
   /** Collect per-rule execution times (driven by Go's `--timing`). */
   collectTiming?: boolean;
+}
+
+/** Host input after attachment resolution; native capabilities are local to Node. */
+export interface ResolvedEslintPluginLintRequest extends Omit<
+  EslintPluginLintRequest,
+  'files'
+> {
+  files: ReadonlyArray<
+    Omit<EslintPluginLintRequest['files'][number], 'textAttachment'> & {
+      /** Only the attachment adapter can install this private native capability. */
+      sharedSource?: SharedBytes;
+      /** Wire attachment references must be resolved before task construction. */
+      textAttachment?: never;
+    }
+  >;
 }
 
 export interface BuildPluginLintTasksOptions {
@@ -91,7 +105,7 @@ export interface BuildPluginLintTasksOptions {
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * Build per-file {@link LintTask}s from an EslintPluginLintRequest. Each
+ * Build per-file {@link LintTask}s from a resolved plugin request. Each
  * task carries the file's `configKey` verbatim; the worker uses it to
  * pick the right `LoadedPlugins` from its per-config map.
  *
@@ -100,7 +114,7 @@ export interface BuildPluginLintTasksOptions {
  * report the failure via `parseError` — keeping wire-format consistency.
  */
 export function buildPluginLintTasks(
-  input: EslintPluginLintRequest,
+  input: ResolvedEslintPluginLintRequest,
   options: BuildPluginLintTasksOptions,
 ): LintTask[] {
   const sharedRules = Object.fromEntries(
