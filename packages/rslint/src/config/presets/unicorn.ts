@@ -334,7 +334,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-type-literal-last': 'error', // not implemented
     // 'unicorn/prefer-uint8array-base64': 'off', // not implemented
     // 'unicorn/prefer-unary-minus': 'error', // not implemented
-    // 'unicorn/prefer-unicode-code-point-escapes': 'error', // not implemented
+    'unicorn/prefer-unicode-code-point-escapes': 'error',
     // 'unicorn/prefer-url-can-parse': 'error', // not implemented
     // 'unicorn/prefer-url-href': 'error', // not implemented
     // 'unicorn/prefer-url-search-parameters': 'error', // not implemented

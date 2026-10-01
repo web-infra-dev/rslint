@@ -88,8 +88,11 @@ var PreferUnicodeCodePointEscapesRule = rule.Rule{
 				}
 				if unicodeFlags.UV() {
 					ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
-						fixed := "/" + replaceEscapes(pattern, true, unicodeFlags.UnicodeSets) + "/" + flags
-						return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, fixed)}
+						fixed := replaceEscapes(pattern, true, unicodeFlags.UnicodeSets)
+						if !utils.IsValidRegexPattern(fixed, unicodeFlags) {
+							return nil
+						}
+						return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, "/"+fixed+"/"+flags)}
 					})
 					return
 				}
