@@ -1,4 +1,4 @@
-import { Rslint, ts } from '@rslint/core';
+import { Rslint, ts, unicornPlugin } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
 import { describe, test, expect } from 'rstack/test';
 import { spawn } from 'node:child_process';
@@ -183,6 +183,30 @@ describe('Rslint class', () => {
       expect(diagnostics).toEqual([]);
     } finally {
       await cleanupTempDir(tmp);
+    }
+  });
+
+  test('Unicorn recommended preset enables explicit length checks', async () => {
+    const rslint = new Rslint({
+      cwd: fixturesDir,
+      overrideConfigFile: true,
+      overrideConfig: [unicornPlugin.configs.recommended],
+    });
+    try {
+      const [result] = await rslint.lintText(
+        'const items = []; if (items.length) {}',
+        { filePath: 'length-check.js' },
+      );
+      expect(result.messages).toContainEqual(
+        expect.objectContaining({
+          ruleId: 'unicorn/explicit-length-check',
+          severity: 2,
+          messageId: 'non-zero',
+          fix: { range: [22, 34], text: 'items.length > 0' },
+        }),
+      );
+    } finally {
+      await rslint.close();
     }
   });
 

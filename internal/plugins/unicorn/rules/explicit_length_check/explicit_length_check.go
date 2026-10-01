@@ -82,7 +82,14 @@ var ExplicitLengthCheckRule = rule.Rule{
 					return
 				}
 				fix := func() []rule.RuleFix {
-					fixed := ctx.SourceFile.Text()[utils.TrimNodeTextRange(ctx.SourceFile, length).Pos():length.End()] + " " + code
+					memberRange := utils.TrimNodeTextRange(ctx.SourceFile, length)
+					nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+					comments := ctx.Comments.All()
+					if utils.HasCommentInSpan(comments, nodeRange.Pos(), memberRange.Pos()) ||
+						utils.HasCommentInSpan(comments, memberRange.End(), nodeRange.End()) {
+						return nil
+					}
+					fixed := ctx.SourceFile.Text()[memberRange.Pos():memberRange.End()] + " " + code
 					if comparisonNeedsParentheses(node, operator) {
 						fixed = "(" + fixed + ")"
 					}
@@ -96,9 +103,13 @@ var ExplicitLengthCheckRule = rule.Rule{
 					ctx.ReportNodeWithDeferredFixes(node, message, fix)
 				} else {
 					ctx.ReportNodeWithDeferredSuggestions(node, message, func() []rule.RuleSuggestion {
+						fixes := fix()
+						if len(fixes) == 0 {
+							return nil
+						}
 						return []rule.RuleSuggestion{{
 							Message:  rule.RuleMessage{Id: "suggestion", Description: "Replace `." + property + "` with `." + property + " " + code + "`.", Data: message.Data},
-							FixesArr: fix(),
+							FixesArr: fixes,
 						}}
 					})
 				}
@@ -124,8 +135,8 @@ func shouldSkipLengthCheck(ctx rule.RuleContext, evaluator *utils.StaticStringEv
 			}
 		} else {
 			// A local object can use these names for non-collection properties.
-			// Only trust its initializer while every reference is a property read.
-			// Check each object once; do not reconstruct values after writes or calls.
+			// Check once whether references could change or expose it; do not
+			// reconstruct values after writes or calls.
 			unsafeObjects[initializer] = true
 			for _, reference := range ctx.Refs.References(ctx.Refs.ResolveInFile(object)) {
 				if !utils.IsReadReference(reference) {
@@ -134,6 +145,11 @@ func shouldSkipLengthCheck(ctx rule.RuleContext, evaluator *utils.StaticStringEv
 				access := ast.FindAncestor(reference.Parent, func(parent *ast.Node) bool {
 					return !ast.IsOuterExpression(parent, ast.OEKAll)
 				})
+				if access != nil && (access.Kind == ast.KindTypeOfExpression || access.Kind == ast.KindVoidExpression ||
+					access.Kind == ast.KindExpressionStatement || unicornutil.IsBooleanExpression(ctx, reference) ||
+					unicornutil.IsControlFlowTest(reference)) {
+					continue
+				}
 				if access == nil || !ast.IsAccessExpression(access) || utils.SkipAssertionsAndParens(access.Expression()) != reference {
 					return true
 				}
@@ -146,6 +162,28 @@ func shouldSkipLengthCheck(ctx rule.RuleContext, evaluator *utils.StaticStringEv
 				}
 			}
 			unsafeObjects[initializer] = false
+		}
+		object = utils.SkipAssertionsAndParens(initializer)
+	}
+	if ast.IsObjectLiteralExpression(object) && object.AsObjectLiteralExpression().Properties != nil {
+		// Only the final matching property determines this value. Unknown sibling
+		// values must not hide a known non-collection length or size.
+		properties := object.AsObjectLiteralExpression().Properties.Nodes
+		for i := len(properties) - 1; i >= 0; i-- {
+			property := properties[i]
+			name, known := evaluator.EvalPropertyName(property.Name())
+			if !known {
+				break // A spread or unknown key may override the selected property.
+			}
+			if name != member.Name().Text() {
+				continue
+			}
+			if _, value, ok := unicornutil.ObjectDataProperty(property); ok {
+				if value, known := evaluator.EvalValue(value); known {
+					return !isCardinality(value)
+				}
+			}
+			break
 		}
 	}
 	value, known := evaluator.EvalValue(member)

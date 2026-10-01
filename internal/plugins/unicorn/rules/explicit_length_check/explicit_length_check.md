@@ -72,13 +72,29 @@ if (box.length) {} // Left unchanged by rslint.
 
 Use an explicit comparison such as `box.length > 0` for these custom objects.
 An unmodified object initialized with `{ length: 2 }` is still checked.
+Uses such as `typeof box` and boolean checks on `box` do not by themselves
+cause its length checks to be skipped.
 Array, string, and collection checks are unaffected by this restriction.
+
+Known non-collection values are ignored even when other object properties
+have unknown values. For example, rslint leaves the following check unchanged,
+while upstream v76.0.0 reports it and offers a fix that changes the result:
+
+```javascript
+const box = { length: -1, other: unknown };
+if (box.length) {}
+```
 
 Automatic fixes preserve grouping and add a semicolon when removing a negation
 could join two statements. For example, `1 + !items.length` becomes
 `1 + (items.length === 0)`, and `Boolean(items.length).valueOf()` becomes
 `(items.length > 0).valueOf()`. Upstream v76.0.0 omits these parentheses, which
 can change the result or produce invalid code.
+
+When replacing a wrapper or comparison would delete a comment, rslint reports
+the check without a fix or suggestion. For example,
+`if (items.length /* keep */ !== 0) {}` is reported but left unchanged.
+Comments inside the retained property expression are preserved.
 
 Vue template expressions such as `<div v-if="items.length">` are not checked.
 Use the upstream rule in ESLint with `vue-eslint-parser` to check Vue templates.
