@@ -59,9 +59,12 @@ var NoArrayCallbackReferenceRule = rule.Rule{
 					return
 				}
 				object := utils.ESTreeRuntimeExpression(call.Object)
+				// Parentheses around an optional factory call terminate its chain;
+				// within the same chain ESTree still exposes a CallExpression.
+				isFactoryCall := ast.IsCallExpression(object) && (!ast.IsOptionalChain(object) || call.Object == object)
 				for _, name := range ignored {
 					if unicornutil.NodeMatchesPath(object, name) ||
-						(ast.IsCallExpression(object) && !ast.IsOptionalChain(object) && unicornutil.NodeMatchesPath(object.Expression(), name)) {
+						(isFactoryCall && unicornutil.NodeMatchesPath(object.Expression(), name)) {
 						return
 					}
 				}

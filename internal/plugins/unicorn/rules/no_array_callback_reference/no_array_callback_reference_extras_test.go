@@ -20,6 +20,11 @@ import (
 func TestNoArrayCallbackReferenceExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_array_callback_reference.NoArrayCallbackReferenceRule,
 		[]rule_tester.ValidTestCase{
+			{Code: "myLib?.().map(callback)", FileName: "file.js", Options: []any{map[string]any{"ignore": []any{"myLib"}}}},
+			{Code: "jQuery?.().map(callback)", FileName: "file.js"},
+			{Code: "((myLib))?.().map(callback)", FileName: "file.js", Options: []any{map[string]any{"ignore": []any{"myLib"}}}},
+			{Code: "(myLib()).map(callback)", FileName: "file.js", Options: []any{map[string]any{"ignore": []any{"myLib"}}}},
+			{Code: "myLib.tools?.().map(callback)", FileName: "file.js", Options: []any{map[string]any{"ignore": []any{"myLib.tools"}}}},
 			// Checked against v76 with TypeScript parser services enabled.
 			{Code: "export {}; class Service { map(callback: Function) {} } function Base(): typeof Service { return Service; } class Child extends Base() { run() { super.map(callback); } }", FileName: "file.ts"},
 			{Code: "export {}; class Service { map(callback: Function) {} } const Parent = () => Service; class Child extends Parent() { run() { super.map(callback); } }", FileName: "file.ts"},
@@ -48,6 +53,34 @@ func TestNoArrayCallbackReferenceExtras(t *testing.T) {
 			{Code: "Promise.map(callback)", FileName: "file.js", Options: []any{map[string]any{}}},
 			{Code: "lib.tools().map(callback)", FileName: "file.js", Options: []any{map[string]any{"ignore": []any{" lib.tools "}}}},
 		}, []rule_tester.InvalidTestCase{
+			{Code: "(myLib?.()).map(callback)", FileName: "file.js", Options: []any{map[string]any{"ignore": []any{"myLib"}}}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error-with-name", Message: "Do not pass function `callback` directly to `.map(…)`.", Line: 1, Column: 17, EndLine: 1, EndColumn: 25, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "replace-with-name", Output: "(myLib?.()).map((element) => callback(element))"},
+					{MessageId: "replace-with-name", Output: "(myLib?.()).map((element, index) => callback(element, index))"},
+					{MessageId: "replace-with-name", Output: "(myLib?.()).map((element, index, array) => callback(element, index, array))"},
+				}},
+			}},
+			{Code: "(jQuery?.()).map(callback)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error-with-name", Message: "Do not pass function `callback` directly to `.map(…)`.", Line: 1, Column: 18, EndLine: 1, EndColumn: 26, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "replace-with-name", Output: "(jQuery?.()).map((element) => callback(element))"},
+					{MessageId: "replace-with-name", Output: "(jQuery?.()).map((element, index) => callback(element, index))"},
+					{MessageId: "replace-with-name", Output: "(jQuery?.()).map((element, index, array) => callback(element, index, array))"},
+				}},
+			}},
+			{Code: "(myLib.tools?.()).map(callback)", FileName: "file.js", Options: []any{map[string]any{"ignore": []any{"myLib.tools"}}}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error-with-name", Message: "Do not pass function `callback` directly to `.map(…)`.", Line: 1, Column: 23, EndLine: 1, EndColumn: 31, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "replace-with-name", Output: "(myLib.tools?.()).map((element) => callback(element))"},
+					{MessageId: "replace-with-name", Output: "(myLib.tools?.()).map((element, index) => callback(element, index))"},
+					{MessageId: "replace-with-name", Output: "(myLib.tools?.()).map((element, index, array) => callback(element, index, array))"},
+				}},
+			}},
+			{Code: "myLib?.().map(callback)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error-with-name", Message: "Do not pass function `callback` directly to `.map(…)`.", Line: 1, Column: 15, EndLine: 1, EndColumn: 23, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "replace-with-name", Output: "myLib?.().map((element) => callback(element))"},
+					{MessageId: "replace-with-name", Output: "myLib?.().map((element, index) => callback(element, index))"},
+					{MessageId: "replace-with-name", Output: "myLib?.().map((element, index, array) => callback(element, index, array))"},
+				}},
+			}},
 			// Checked against v76 with TypeScript parser services enabled.
 			{Code: "export {}; class Rows extends Array<number> {} const Parent = () => Rows; class Child extends Parent() { run() { super.map(callback); } }", FileName: "file.ts", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "error-with-name", Message: "Do not pass function `callback` directly to `.map(…)`.", Line: 1, Column: 124, EndLine: 1, EndColumn: 132, Suggestions: []rule_tester.InvalidTestCaseSuggestion{

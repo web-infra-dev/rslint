@@ -393,6 +393,7 @@ describe('defineConfig and config presets', () => {
     const rec = unicornPlugin.configs.recommended;
     expect(rec.plugins).toBeDefined();
     expect(rec.plugins).toContain('unicorn');
+    expect(rec.rules?.['unicorn/no-array-callback-reference']).toBe('error');
     expect(rec.rules?.['unicorn/no-array-fill-with-reference-type']).toBe(
       'error',
     );
@@ -433,6 +434,40 @@ describe('defineConfig and config presets', () => {
       String.raw`const x = '\u{61}';`,
     ]);
     expect(fixed.diagnostics).toEqual([]);
+  });
+
+  test('unicornPlugin.configs.recommended reports array callback references', async () => {
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig(
+        defineConfig([unicornPlugin.configs.recommended]),
+      ),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'array-callback-preset.js')]: `
+          const values = [1, 2, 3];
+          const callback = value => value;
+          values.map(callback);
+          values.map(value => callback(value));
+        `,
+      },
+    });
+
+    expect(result.fileCount).toBe(1);
+    expect(
+      result.diagnostics.filter(
+        (diagnostic) =>
+          diagnostic.ruleName === 'unicorn/no-array-callback-reference',
+      ),
+    ).toMatchObject([
+      {
+        ruleName: 'unicorn/no-array-callback-reference',
+        messageId: 'error-with-name',
+        message: 'Do not pass function `callback` directly to `.map(…)`.',
+        severity: 'error',
+      },
+    ]);
   });
 
   test('unicornPlugin.configs.recommended disables an earlier require-post-message-target-origin setting', async () => {
