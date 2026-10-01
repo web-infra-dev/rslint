@@ -9,13 +9,7 @@
 // This mirrors the real binary's happy-path frame sequence so runEngine can
 // be exercised end-to-end without Go.
 
-// Own fd 1 so end() flushes the frames and closes the actual pipe. Node's
-// special stdout can finish without producing EOF on Windows. Do not access
-// process.stdout first: its lazy getter duplicates the Windows pipe handle.
-const stdout = require('node:fs').createWriteStream(null, {
-  fd: 1,
-  autoClose: true,
-});
+const stdout = process.stdout;
 
 let buf = Buffer.alloc(0);
 let remainingText = '';
@@ -52,24 +46,6 @@ function onMessage(msg) {
     return;
   }
   if (msg.kind === 'init') {
-    if (mode === 'eof-before-init' || mode === 'eof-after-init') {
-      if (mode === 'eof-after-init') {
-        send({ kind: 'response', id: msg.id, data: { ok: true } });
-      }
-      // Remain alive on stdin after EOF. Tests either let the host terminate
-      // this disconnected child or explicitly release a natural exit below.
-      stdout.end();
-      return;
-    }
-    if (mode === 'reject-init' || mode === 'reject-init-eof') {
-      send({
-        kind: 'error',
-        id: msg.id,
-        data: { message: 'injected init failure' },
-      });
-      if (mode === 'reject-init-eof') stdout.end();
-      return;
-    }
     if (mode === 'require-mapping') {
       const assert = require('node:assert/strict');
       assert.equal(configured, true);
@@ -92,15 +68,6 @@ function onMessage(msg) {
       id: 999,
       data: { stream: 'stdout', text: text.slice(0, split) },
     });
-  } else if (
-    (mode === 'eof-before-init' ||
-      mode === 'eof-after-init' ||
-      mode === 'reject-init-eof') &&
-    msg.kind === 'exit-after-eof'
-  ) {
-    // The parent sends this only after observing its readable EOF, making the
-    // EOF-before-exit ordering deterministic without a timing-based sleep.
-    process.exit(msg.data.code);
   } else if (msg.id === 999) {
     if (msg.kind !== 'response') process.exit(2);
     send({

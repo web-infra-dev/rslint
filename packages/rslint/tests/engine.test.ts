@@ -1,11 +1,12 @@
-import { describe, test, expect } from 'rstack/test';
-import { ChildProcess } from 'node:child_process';
+import { afterAll, beforeAll, describe, test, expect } from 'rstack/test';
+import { ChildProcess, execFile } from 'node:child_process';
 import { once } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import { PassThrough, Writable } from 'node:stream';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { runEngine } from '../src/cli/engine.js';
 import { ConfigModuleHost } from '../src/config/config-loader.js';
 import { resolveRslintBinary } from '../src/internal/resolve-binary.js';
@@ -212,7 +213,35 @@ describe('runEngine init payload TTY fact', () => {
 });
 
 describe('runEngine IPC disconnect cleanup', () => {
-  function start(mode: string, stdoutDoesNotHalfClose = false) {
+  let fixtureRoot: string;
+  let fixtureBin: string;
+
+  beforeAll(async () => {
+    fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-disconnect-'));
+    fixtureBin = path.join(
+      fixtureRoot,
+      process.platform === 'win32' ? 'peer.exe' : 'peer',
+    );
+    // Windows libuv fs.close deliberately leaves descriptors 0-2 open.
+    // A Go peer can close the real stdout handle while remaining alive on
+    // stdin, matching the process whose lifetime runEngine actually manages.
+    await promisify(execFile)(
+      'go',
+      [
+        'build',
+        '-o',
+        fixtureBin,
+        path.join(__dirname, 'fixtures/ipc-disconnect/main.go'),
+      ],
+      { timeout: 60_000 },
+    );
+  }, 70_000);
+
+  afterAll(() => {
+    if (fixtureRoot) fs.rmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  function start(mode: string) {
     const stderr = new PassThrough();
     const state = { stderr: '', timedOut: false };
     stderr.on('data', (chunk: Buffer) => {
@@ -229,27 +258,8 @@ describe('runEngine IPC disconnect cleanup', () => {
     let run: Promise<number>;
     try {
       run = runEngine({
-        binPath: process.execPath,
-        goArgs: stdoutDoesNotHalfClose
-          ? [
-              '-e',
-              // Like Node's special stdout on Windows, this stream finishes
-              // its writes without closing the pipe's underlying descriptor.
-              // Install it without touching the original lazy stdout getter.
-              `const fs = require('node:fs');
-              const { Writable } = require('node:stream');
-              Object.defineProperty(process, 'stdout', {
-                value: new Writable({
-                  write(chunk, encoding, callback) {
-                    fs.write(1, chunk, callback);
-                  },
-                }),
-              });
-              require(process.argv[1]);`,
-              FAKE_BIN,
-              mode,
-            ]
-          : [FAKE_BIN, mode],
+        binPath: fixtureBin,
+        goArgs: [mode],
         stdout: new PassThrough(),
         stderr,
         createMemoryTransport: () => undefined,
@@ -333,8 +343,8 @@ describe('runEngine IPC disconnect cleanup', () => {
     20_000,
   );
 
-  test('flushes init before EOF when stdout does not half-close', async () => {
-    const fixture = start('eof-after-init', true);
+  test('flushes the complete init response before closing stdout', async () => {
+    const fixture = start('eof-after-init');
     const chunks: Buffer[] = [];
     fixture.child.stdout!.on('data', (chunk: Buffer) => chunks.push(chunk));
     try {
