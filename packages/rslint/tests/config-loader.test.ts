@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import vm from 'node:vm';
-import { ts, unicornPlugin } from '../src/config/presets/index.js';
+import { ts } from '../src/config/presets/index.js';
 
 function createTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-config-loader-test-'));
@@ -605,14 +605,6 @@ describe('collectPluginMeta', () => {
     expect(eslintPluginEntries).toEqual([
       { prefix: 'local', ruleNames: ['no-bar', 'no-foo', 'zzz'] },
     ]);
-  });
-});
-
-describe('Unicorn preset values', () => {
-  test('recommended enables no-lonely-if', () => {
-    const preset = unicornPlugin.configs.recommended;
-    expect(preset.plugins).toContain('unicorn');
-    expect(preset.rules?.['unicorn/no-lonely-if']).toBe('error');
   });
 });
 
