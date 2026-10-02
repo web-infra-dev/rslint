@@ -93,6 +93,12 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const undefinedNullish = undefined ?? \"then\";\n" +
 		"const stringCall = String(\"then\");\n" +
 		"const stringNumberCall = String(1 + 2);\n" +
+		"const reviewStringAlias = String; const reviewSymbolString = reviewStringAlias(Symbol.iterator);\n" +
+		"const reviewNumberAlias = Number; const reviewParseAlias = reviewNumberAlias.parseInt; const reviewParsed = reviewParseAlias('10px');\n" +
+		"const reviewGlobalParseAlias = parseInt; const reviewGlobalParsed = reviewGlobalParseAlias('0x10');\n" +
+		"const reviewMathAlias = Math; const reviewMaxAlias = reviewMathAlias.max; const reviewInfAlias = Infinity; const reviewMax = String(reviewMaxAlias(reviewInfAlias, 2));\n" +
+		"const reviewTextAlias = ' foo '; const reviewTrimmed = reviewTextAlias.trim();\n" +
+		"const reviewChainAlias = null?.x; const reviewChainBoundary = reviewChainAlias.y;\n" +
 		"const stringNoArgumentCall = String();\n" +
 		"const stringToString = \"GET\".toString();\n" +
 		"const emptyToString = \"\".toString();\n" +
@@ -267,6 +273,12 @@ func TestStaticStringEvaluator(t *testing.T) {
 		ok   bool
 	}{
 		{name: "direct", want: "then", ok: true},
+		{name: "reviewSymbolString", want: "Symbol(Symbol.iterator)", ok: true},
+		{name: "reviewParsed", want: "10", ok: true},
+		{name: "reviewGlobalParsed", want: "16", ok: true},
+		{name: "reviewMax", want: "Infinity", ok: true},
+		{name: "reviewTrimmed", want: "foo", ok: true},
+		{name: "reviewChainBoundary"},
 		{name: "concat", want: "then", ok: true},
 		{name: "template", want: "then", ok: true},
 		{name: "asserted", want: "then", ok: true},
@@ -434,6 +446,8 @@ func TestStaticStringEvaluatorConfiguredGlobals(t *testing.T) {
 	for _, expression := range []string{
 		"String.raw`\\n`", `String("x")`, `Array.of("x")[0]`,
 		`Object.freeze(["x"])[0]`, `undefined`, `Math.PI`, `Number.EPSILON`,
+		`Infinity`, `NaN`, `String(Symbol.iterator)`, `Number.parseInt("10")`,
+		`parseInt("10")`, `Math.max(Infinity, 2)`,
 	} {
 		t.Run(expression, func(t *testing.T) {
 			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/globals.js", Path: "/globals.js"}, "const value = "+expression, core.ScriptKindJS)
@@ -443,6 +457,73 @@ func TestStaticStringEvaluatorConfiguredGlobals(t *testing.T) {
 				evaluator.GlobalAccess = func(string) GlobalAccess { return access }
 				if _, known := evaluator.EvalToString(initializer); known != access.IsDeclared() {
 					t.Fatalf("EvalToString with %s globals: known = %v", access, known)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticStringEvaluatorReviewValues(t *testing.T) {
+	for _, test := range []struct {
+		expression   string
+		want         string
+		known        bool
+		withoutScope bool
+	}{
+		{`String(Symbol.iterator)`, "Symbol(Symbol.iterator)", true, false},
+		{`String(Symbol.for("foo"))`, "Symbol(foo)", true, false},
+		{`String(Symbol.for(""))`, "Symbol()", true, false},
+		{`String(...[Symbol.iterator])`, "Symbol(Symbol.iterator)", true, false},
+		{`String(Symbol.iterator, unknown)`, "", false, false},
+		{"`${Symbol.iterator}`", "", false, false},
+		{`Symbol.iterator + ""`, "", false, false},
+		{`Symbol.for(Symbol.iterator)`, "", false, false},
+		{`Number.parseInt("10px")`, "10", true, false},
+		{`Number["parseInt"]("0x10")`, "16", true, false},
+		{`parseInt("1e2")`, "1", true, false},
+		{`parseInt("10", 4294967298)`, "2", true, false},
+		{`parseInt("10", undefined)`, "10", true, false},
+		{`parseInt()`, "NaN", true, false},
+		{`parseInt(10n)`, "10", true, false},
+		{`parseInt(Symbol.iterator)`, "", false, false},
+		{`parseInt("10", 2n)`, "", false, false},
+		{`parseInt("10", Symbol.iterator)`, "", false, false},
+		{`Math.max(Infinity, 2)`, "Infinity", true, false},
+		{`Math.min(-Infinity, 2)`, "-Infinity", true, false},
+		{`String(Math.max(1, 2))`, "2", true, false},
+		{`Math.max()`, "-Infinity", true, false},
+		{`Math.min()`, "Infinity", true, false},
+		{`Math.max(NaN, 2)`, "NaN", true, false},
+		{`Math.max(NaN, Symbol.iterator)`, "", false, false},
+		{`Math.min(NaN, 2n)`, "", false, false},
+		{`1 / Math.max(-0, 0)`, "Infinity", true, false},
+		{`1 / Math.min(-0, 0)`, "-Infinity", true, false},
+		{`"\uFEFF foo \u2029".trim()`, "foo", true, true},
+		{`"\u0085foo\u0085".trim()`, "\u0085foo\u0085", true, true},
+		{`null?.x`, "undefined", true, true},
+		{`null?.[unknown]`, "undefined", true, true},
+		{`null?.x.y(unknown)`, "undefined", true, true},
+		{`null?.x!.y`, "undefined", true, true},
+		{`(null?.x)?.()`, "undefined", true, true},
+		{`(null?.x).y`, "", false, false},
+		{`({})?.missing.y`, "", false, false},
+		{`({}).toString?.()`, "", false, false},
+		{`({toString: undefined}).toString?.()`, "undefined", true, false},
+		{`({__proto__: null}).toString?.()`, "undefined", true, true},
+		{`null.x`, "", false, false},
+	} {
+		t.Run(test.expression, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/review.ts", Path: "/review.ts"}, "const value = "+test.expression, core.ScriptKindTS)
+			initializer := findVariableInitializer(t, source, "value")
+			for _, scope := range []bool{false, true} {
+				evaluator := NewStaticStringEvaluatorWithoutScope()
+				if scope {
+					evaluator = NewStaticStringEvaluatorWithSourceFile(nil, source)
+				}
+				wantKnown := test.known && (scope || test.withoutScope)
+				got, known := evaluator.EvalToString(initializer)
+				if known != wantKnown || known && got != test.want {
+					t.Fatalf("EvalToString with scope=%v = (%q, %v), want (%q, %v)", scope, got, known, test.want, wantKnown)
 				}
 			}
 		})
