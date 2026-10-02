@@ -59,6 +59,7 @@ export interface MemoryArena {
   configure(config: MemoryConfiguration): void;
   descriptor(): NativeMemoryMapping;
   register(batches: MemoryBatch[]): number;
+  /** Revoke reads; retry while existing readers prevent reuse. True only once. */
   release(lease: number): boolean;
   close(): void;
 }

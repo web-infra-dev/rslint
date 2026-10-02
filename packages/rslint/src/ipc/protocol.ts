@@ -41,6 +41,7 @@ export interface WireAttachment {
 export interface TransportMetadata {
   mapping?: MemoryMapping;
   batches?: MemoryBatch[];
+  /** Exact request batches, on its result or a later transportRelease frame. */
   released?: MemoryBatch[];
 }
 

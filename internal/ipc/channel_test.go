@@ -214,6 +214,131 @@ func TestChannelCancelledAttachmentAcceptsOnlyExactLateAck(t *testing.T) {
 	}
 }
 
+func TestChannelDeferredAttachmentRelease(t *testing.T) {
+	for _, outcome := range []string{"response", "error", "cancel", "release-before-result"} {
+		t.Run(outcome, func(t *testing.T) {
+			client, peer := newChannelPair(t)
+			pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+64)}}
+			for i := 1; i < MemorySlotCount; i++ {
+				pool.slots[i].busy = true
+			}
+			client.memory, client.memoryInitialized = pool, true
+			client.SetInboundHandler(func(context.Context, *Message) (any, error) { return struct{}{}, nil })
+			client.Start()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			done := make(chan error, 1)
+			go func() {
+				_, err := client.SendRequest(ctx, "attached", nil, Text("snapshot"))
+				done <- err
+			}()
+			request, err := ReadFrame(peer.reader)
+			if err != nil {
+				t.Fatal(err)
+			}
+			batches := request.Transport.Batches
+			barrier := func() {
+				t.Helper()
+				if err := peer.writeFrame(&Message{Kind: "barrier", ID: request.ID + 1}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := ReadFrame(peer.reader); err != nil {
+					t.Fatal(err)
+				}
+			}
+			reply := func() {
+				t.Helper()
+				kind := KindResponse
+				if outcome == "error" {
+					kind = KindError
+				}
+				if err := peer.writeFrame(&Message{Kind: kind, ID: request.ID}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if outcome == "cancel" {
+				cancel()
+				if err := <-done; !errors.Is(err, context.Canceled) {
+					t.Fatalf("cancel result: %v", err)
+				}
+				reply()
+			} else if outcome != "release-before-result" {
+				reply()
+				if err := <-done; (err != nil) != (outcome == "error") {
+					t.Fatalf("request result: %v", err)
+				}
+			}
+			barrier()
+			if !pool.slots[0].busy || len(client.published) != 1 {
+				t.Fatal("result/cancel lost ownership before reader completion")
+			}
+			if full, _ := pool.store([]Attachment{Text("must remain inline")}); len(full) != 0 {
+				t.Fatal("live reader's slot was reused")
+			}
+			ack := func(id int, released []MemoryBatch) {
+				t.Helper()
+				if err := peer.writeFrame(&Message{Kind: KindTransportRelease, ID: id, Transport: &TransportMetadata{Released: released}}); err != nil {
+					t.Fatal(err)
+				}
+				barrier()
+			}
+			ack(request.ID+100, batches)
+			for _, invalid := range [][]MemoryBatch{
+				{{Slot: 1, Generation: batches[0].Generation, Length: batches[0].Length}},
+				{{Slot: 0, Generation: batches[0].Generation + 1, Length: batches[0].Length}},
+				{{Slot: 0, Generation: batches[0].Generation, Length: batches[0].Length + 1}},
+				{batches[0], batches[0]},
+			} {
+				ack(request.ID, invalid)
+				if !pool.slots[0].busy || len(client.published) != 1 {
+					t.Fatal("invalid ACK lost or released ownership")
+				}
+			}
+			ack(request.ID, batches)
+			if pool.slots[0].busy || len(client.published) != 0 {
+				t.Fatal("deferred ACK did not reclaim the completed lease")
+			}
+			if outcome == "release-before-result" {
+				select {
+				case err := <-done:
+					t.Fatalf("storage ACK resolved an application request: %v", err)
+				default:
+				}
+				reply()
+				if err := <-done; err != nil {
+					t.Fatal(err)
+				}
+			}
+			reused, _ := pool.store([]Attachment{Text("next")})
+			if len(reused) != 1 || reused[0].Generation <= batches[0].Generation {
+				t.Fatal("deferred completion did not restore capacity")
+			}
+			ack(request.ID, batches)
+			if !pool.slots[0].busy {
+				t.Fatal("duplicate ACK freed a newer generation")
+			}
+		})
+	}
+}
+
+func TestChannelRejectsMalformedDeferredRelease(t *testing.T) {
+	for _, message := range []Message{
+		{Kind: KindTransportRelease, ID: 1},
+		{Kind: KindTransportRelease, ID: 0, Transport: &TransportMetadata{Released: []MemoryBatch{{}}}},
+		{Kind: KindTransportRelease, ID: 1, Data: []byte(`null`), Transport: &TransportMetadata{Released: []MemoryBatch{{}}}},
+		{Kind: KindTransportRelease, ID: 1, Attachments: []AttachmentData{{Text: new("payload")}}, Transport: &TransportMetadata{Released: []MemoryBatch{{}}}},
+		{Kind: KindTransportRelease, ID: 1, Transport: &TransportMetadata{Mapping: &MemoryMapping{}, Released: []MemoryBatch{{}}}},
+	} {
+		client, _ := newChannelPair(t)
+		client.dispatch(&message)
+		select {
+		case <-client.Done():
+		default:
+			t.Fatalf("malformed release did not close channel: %+v", message)
+		}
+	}
+}
+
 func TestChannelOversizedInlineFrameRollsBackAndRemainsUsable(t *testing.T) {
 	for _, shared := range []bool{false, true} {
 		t.Run(strconv.FormatBool(shared), func(t *testing.T) {

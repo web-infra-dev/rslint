@@ -1614,11 +1614,19 @@ for the session. Neither the CLI engine nor the plugin host chooses a
 platform mapping or manages a lease. The client validates attachment ranges,
 registers one native capability for all of the request's batches, dispatches
 the application handler and revokes the capability before returning either a
-result or an error. It acknowledges reuse only when native revocation succeeds.
+result or an error. It acknowledges reuse only after every native reader returns.
 Go matches the entire ordered batch set to that request's published storage.
 Published storage remains channel-owned after a caller cancels: a later exact
 acknowledgement may release it, but cannot revive the cancelled request. An
 ordinary result, cancellation or timeout never authorizes reuse by itself.
+If native readers outlive a handler, the result returns immediately without an
+acknowledgement. `IpcClient` retains only a release function and request ID and
+polls pending leases with one unreferenced 25 ms timer. When a lease becomes
+reusable, a payload-free `transportRelease` frame carries its original request
+ID and exact ordered batch set. Go retains that publication until the ACK or
+channel close; the control frame never resolves an application request. Both
+queues are bounded by occupied slots. Closing the session cancels the timer and
+discards pending reclamation; outstanding native readers still pin their mapping.
 The shared plugin host resolves file attachment indices before worker dispatch.
 Its wire request type carries `textAttachment` indices; a separate resolved
 request type carries inline text or private native capabilities. Task construction
@@ -1647,10 +1655,13 @@ Buffer lifetime does not delay slot reuse.
 The plugin parser is one consumer of this byte access. Its `parseSharedBytes`
 entry handles UTF-8/BOM normalization, parser size limits, ESTree parsing and
 direct construction of the required JavaScript SourceCode string. The memory
-module contains none of those policies; ESTree JSON is unchanged. If any reader
-is still active at revocation, every slot in that lease is permanently retired,
-so cancellation, shutdown and late worker results cannot authorize an
-overlapping write.
+module contains none of those policies; ESTree JSON is unchanged. Revocation
+removes the capability from the reader registry immediately. If any reader is
+still active, the arena retains the revoked lease and keeps all of its slots
+occupied. A release retry can succeed only after the last reader returns, and
+only once; old capabilities remain invalid after slot reuse. Reader completion
+restores capacity without restarting the IPC session. Native lease tracking
+contains no request IDs, timers, wire messages or worker scheduling policy.
 Worker termination may remain pending until synchronous native parsing returns.
 Both parser entries preserve N-API's pending exception or termination state
 during result conversion instead of trying to throw a second exception.

@@ -117,8 +117,8 @@ export type MemoryTransport = ReturnType<typeof createMemoryTransport>;
 
 export interface ReceivedAttachments {
   values: IpcAttachment[] | undefined;
-  /** Revoke the whole request; partial revocation never authorizes reuse. */
-  release(): MemoryBatch[] | undefined;
+  /** Revoke now; false requires a retry after native readers return. */
+  release(): MemoryBatch[] | false | undefined;
 }
 
 /**
@@ -246,8 +246,9 @@ export function receiveAttachments(
     ),
     release() {
       if (!active) return undefined;
+      if (!memory.release(lease)) return false;
       active = false;
-      return memory.release(lease) ? batches : undefined;
+      return batches;
     },
   };
 }

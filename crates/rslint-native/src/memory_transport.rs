@@ -204,7 +204,6 @@ impl Lease {
 struct Slot {
     generation: u32,
     lease: u32,
-    retired: bool,
 }
 
 /// Owned by one IPC session. Failure to create or configure this optional store
@@ -215,6 +214,9 @@ pub struct MemoryArena {
     mapping: Option<Arc<mapping::Mapping>>,
     // Advertised slot count alone must not cause proportional heap allocation.
     slots: HashMap<u32, Slot>,
+    // Revoked capabilities cannot acquire new readers. Keep their ownership
+    // until the last existing reader returns, then allow a release retry.
+    revoked: HashMap<u32, Arc<Lease>>,
 }
 
 #[napi]
@@ -227,6 +229,7 @@ impl MemoryArena {
             backing: Some(backing),
             mapping: None,
             slots: HashMap::new(),
+            revoked: HashMap::new(),
         })
     }
 
@@ -280,9 +283,10 @@ impl MemoryArena {
                 || batch.length as usize > layout.slot_size
                 || batch.generation == 0
                 || !seen.insert(batch.slot)
-                || self.slots.get(&batch.slot).is_some_and(|entry| {
-                    entry.retired || entry.lease != 0 || batch.generation <= entry.generation
-                })
+                || self
+                    .slots
+                    .get(&batch.slot)
+                    .is_some_and(|entry| entry.lease != 0 || batch.generation <= entry.generation)
             {
                 return Err(invalid());
             }
@@ -326,21 +330,30 @@ impl MemoryArena {
         Ok(id)
     }
 
-    /// Revoke new reads first, then decide reuse for the whole lease. Any active
-    /// native reader permanently retires every batch, even if it reads one range.
+    /// Revoke new reads immediately. False means an existing reader still pins
+    /// the whole lease (or the lease is unknown); retry after readers return.
+    /// Only true authorizes reuse, and each lease can succeed exactly once.
     #[napi]
     pub fn release(&mut self, lease: u32) -> bool {
         if lease == 0 || !self.slots.values().any(|slot| slot.lease == lease) {
             return false;
         }
         let mut registry = readers().lock().unwrap_or_else(|error| error.into_inner());
-        let reader = registry.remove(&lease);
-        let released = reader.is_some_and(|reader| Arc::try_unwrap(reader).is_ok());
+        let reader = self
+            .revoked
+            .remove(&lease)
+            .or_else(|| registry.remove(&lease));
+        let Some(reader) = reader else {
+            return false;
+        };
+        if let Err(reader) = Arc::try_unwrap(reader) {
+            self.revoked.insert(lease, reader);
+            return false;
+        }
         for slot in self.slots.values_mut().filter(|slot| slot.lease == lease) {
             slot.lease = 0;
-            slot.retired = !released;
         }
-        released
+        true
     }
 
     #[napi]
@@ -350,6 +363,7 @@ impl MemoryArena {
             registry.remove(&slot.lease);
         }
         self.slots.clear();
+        self.revoked.clear();
         self.mapping = None;
         self.backing = None;
     }
@@ -611,7 +625,7 @@ mod tests {
     }
 
     #[test]
-    fn revocation_during_read_retires_slot_and_pins_mapping() {
+    fn revocation_during_read_pins_mapping_through_close() {
         let mut arena = configured_arena();
         arena.mapping.as_ref().unwrap().publish_for_test(0, 1);
         let id = arena.register(vec![batch(0, 1, 8)]).unwrap();
@@ -791,7 +805,7 @@ mod tests {
     }
 
     #[test]
-    fn a_reader_retires_every_batch_even_when_borrowing_one_range() {
+    fn release_waits_for_every_reader_then_reuses_all_batches() {
         let mut arena = configured_arena();
         let mapping = arena.mapping.as_ref().unwrap();
         mapping.write_for_test(2, 1, b"abc");
@@ -799,6 +813,12 @@ mod tests {
         let id = arena
             .register(vec![batch(2, 1, 3), batch(0, 1, 2)])
             .unwrap();
+        let last_reader = acquire(&SharedBytes {
+            lease: id,
+            offset: 0,
+            length: 5,
+        })
+        .unwrap();
         with_bytes(
             SharedBytes {
                 lease: id,
@@ -807,9 +827,9 @@ mod tests {
             },
             |bytes| {
                 assert!(!arena.release(id));
-                assert!(arena.slots[&0].retired && arena.slots[&2].retired);
-                assert_eq!(arena.slots[&0].lease, 0);
-                assert_eq!(arena.slots[&2].lease, 0);
+                assert!(!arena.release(id));
+                assert_eq!(arena.slots[&0].lease, id);
+                assert_eq!(arena.slots[&2].lease, id);
                 assert!(with_bytes(
                     SharedBytes {
                         lease: id,
@@ -826,12 +846,38 @@ mod tests {
                 assert!(arena.register(vec![batch(2, 2, 3)]).is_err());
                 let unrelated = arena.register(vec![batch(1, 1, 0)]).unwrap();
                 assert!(arena.release(unrelated));
-                arena.close();
                 assert_eq!(bytes, b"b");
                 Ok(())
             },
         )
         .unwrap();
+        assert!(!arena.release(id));
+        assert_eq!(last_reader.bytes(0, 5).unwrap().as_ref(), b"abcde");
+        drop(last_reader);
+        assert!(arena.release(id));
+        assert!(arena.revoked.is_empty());
+        assert!(!arena.release(id));
+        // Reader completion restores capacity without reopening the arena or
+        // reviving the old capability, including after many repeated cycles.
+        for generation in 2..20 {
+            let mapping = arena.mapping.as_ref().unwrap();
+            mapping.publish_for_test(0, generation);
+            mapping.publish_for_test(2, generation);
+            let current = arena
+                .register(vec![batch(2, generation, 3), batch(0, generation, 2)])
+                .unwrap();
+            let reader = acquire(&SharedBytes {
+                lease: current,
+                offset: 0,
+                length: 5,
+            })
+            .unwrap();
+            assert!(!arena.release(id));
+            assert!(!arena.release(current));
+            drop(reader);
+            assert!(arena.release(current));
+            assert!(arena.revoked.is_empty());
+        }
     }
 
     #[test]
@@ -851,8 +897,10 @@ mod tests {
             },
             |bytes| {
                 assert!(!arena.release(id));
-                assert!(arena.slots[&0].retired && arena.slots[&1].retired);
+                assert_eq!(arena.slots[&0].lease, id);
+                assert_eq!(arena.slots[&1].lease, id);
                 arena.close();
+                assert!(arena.revoked.is_empty());
                 assert_eq!(bytes, b"bc");
                 Ok(())
             },
@@ -870,7 +918,8 @@ mod tests {
             .register(vec![batch(0, 1, 2), batch(1, 1, 2)])
             .unwrap();
         assert!(arena.release(old));
-        assert!(!arena.slots[&0].retired && !arena.slots[&1].retired);
+        assert_eq!(arena.slots[&0].lease, 0);
+        assert_eq!(arena.slots[&1].lease, 0);
         let mapping = arena.mapping.as_ref().unwrap();
         mapping.write_for_test(0, 2, b"new");
         mapping.write_for_test(1, 2, b"data");

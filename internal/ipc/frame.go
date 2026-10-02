@@ -40,12 +40,16 @@ const (
 	KindHandshake MessageKind = "handshake"
 	// KindTransportConfig returns storage settings before mapping bootstrap.
 	KindTransportConfig MessageKind = "transportConfig"
+	// KindTransportRelease acknowledges storage after a handler already replied.
+	// Its ID identifies that request; it carries no application result.
+	KindTransportRelease MessageKind = "transportRelease"
 	// KindExit requests termination.
 	KindExit MessageKind = "exit"
 )
 
 // Message is one decoded wire frame. `ID` is 0 for notifications and a
-// positive monotonic integer for requests/responses. `Data` is the
+// positive monotonic integer for requests/responses; transport release frames
+// reuse the owning request's ID without replying again. `Data` is the
 // untyped payload — handlers decode it into a typed shape as needed.
 type Message struct {
 	Kind        MessageKind        `json:"kind"`

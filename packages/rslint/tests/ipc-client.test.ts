@@ -681,6 +681,141 @@ describe('IPC byte attachments', () => {
     }
   });
 
+  test.each(['response', 'handler error', 'serialization error'] as const)(
+    'returns %s before deferred reclamation and acknowledges it exactly once',
+    async (outcome) => {
+      const memory = createMemoryTransport();
+      const release = memory.release;
+      let readerFinished = false;
+      let attempts = 0;
+      // The native worker suite exercises real overlapping reads. Here control
+      // the completion boundary to check result/ACK ordering independently.
+      memory.release = (lease) => {
+        attempts++;
+        return readerFinished && release(lease);
+      };
+      const pair = receiver({ memoryTransport: memory });
+      pair.b.setInboundHandler(() => {
+        if (outcome === 'handler error') throw new Error('task failed');
+        if (outcome === 'serialization error') return 1n;
+        return { ok: true };
+      });
+      const batches = [emptyBatch(), { ...emptyBatch(), slot: 2 }];
+      try {
+        const response = await pair.request({
+          attachments: [{ range: { offset: 0, length: 0 } }],
+          transport: { batches },
+        });
+        expect(response.kind).toBe(
+          outcome === 'response' ? 'response' : 'error',
+        );
+        expect(response.transport).toBeUndefined();
+        expect(attempts).toBe(1);
+        const acknowledgement = once(pair.streams.bToA, 'data');
+        readerFinished = true;
+        const frame = decodeFrame((await acknowledgement)[0])!.msg;
+        expect(frame).toEqual({
+          kind: 'transportRelease',
+          id: response.id,
+          transport: { released: batches },
+        });
+        const completedAttempts = attempts;
+        const extraFrames: Buffer[] = [];
+        pair.streams.bToA.on('data', (frame: Buffer) =>
+          extraFrames.push(frame),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 75));
+        expect(attempts).toBe(completedAttempts);
+        expect(extraFrames).toEqual([]);
+      } finally {
+        pair.cleanup();
+      }
+    },
+  );
+
+  test.each(['close', 'native error', 'write error'] as const)(
+    'stops deferred release work after %s',
+    async (ending) => {
+      const memory = createMemoryTransport();
+      const release = memory.release;
+      let finish = false;
+      let attempts = 0;
+      memory.release = (lease) => {
+        attempts++;
+        if (!finish) return false;
+        if (ending === 'native error') throw new Error('release failed');
+        return release(lease);
+      };
+      const pair = receiver({ memoryTransport: memory });
+      pair.b.setInboundHandler(() => ({ ok: true }));
+      try {
+        await pair.request({
+          attachments: [{ range: { offset: 0, length: 0 } }],
+          transport: { batches: [emptyBatch()] },
+        });
+        if (ending === 'close') pair.b.close();
+        if (ending === 'write error') {
+          pair.streams.bToA.write = () => {
+            throw new Error('release write failed');
+          };
+        }
+        finish = true;
+        const reason = await pair.b.done;
+        expect(reason.message).toContain(
+          ending === 'close' ? 'closed' : 'failed',
+        );
+        const completedAttempts = attempts;
+        await new Promise((resolve) => setTimeout(resolve, 75));
+        expect(attempts).toBe(completedAttempts);
+        expect(memory.configuration()).toBeUndefined();
+      } finally {
+        pair.cleanup();
+      }
+    },
+  );
+
+  test('closes on a duplicate request ID instead of losing a pending release', async () => {
+    const memory = createMemoryTransport();
+    memory.release = () => false;
+    const pair = receiver({ memoryTransport: memory });
+    pair.b.setInboundHandler(() => undefined);
+    const attachments = [{ range: { offset: 0, length: 0 } }];
+    try {
+      const response = await pair.request({
+        attachments,
+        transport: { batches: [emptyBatch()] },
+      });
+      pair.streams.aToB.write(
+        encodeFrame({
+          kind: 'testAttachments',
+          id: response.id,
+          attachments,
+          transport: { batches: [{ ...emptyBatch(), slot: 1 }] },
+        }),
+      );
+      expect((await pair.b.done).message).toContain('duplicate pending');
+      expect(memory.configuration()).toBeUndefined();
+    } finally {
+      pair.cleanup();
+    }
+  });
+
+  test('rejects reverse storage ACKs without invoking application handlers', async () => {
+    const pair = receiver();
+    let calls = 0;
+    pair.b.setInboundHandler(() => calls++);
+    pair.b.registerNotification('transportRelease', () => calls++);
+    try {
+      pair.streams.aToB.write(encodeFrame({ kind: 'transportRelease', id: 1 }));
+      expect((await pair.b.done).message).toContain(
+        'unexpected shared memory release',
+      );
+      expect(calls).toBe(0);
+    } finally {
+      pair.cleanup();
+    }
+  });
+
   test('registers and acknowledges an ordered batch set as one lease', async () => {
     const memory = createMemoryTransport();
     const register = memory.register;
@@ -1129,6 +1264,85 @@ describe('real Go/Node arbitrary byte attachments', () => {
     },
     120_000,
   );
+  test('a real Go peer reuses slots only after Node sends the deferred ACK', async () => {
+    const memory = createMemoryTransport();
+    const register = memory.register;
+    const release = memory.release;
+    const publications: MemoryBatch[][] = [];
+    let blockedLease: number | undefined;
+    let readerFinished = false;
+    let reclaimed!: () => void;
+    const reclamation = new Promise<void>((resolve) => {
+      reclaimed = resolve;
+    });
+    memory.register = (batches) => {
+      publications.push(batches);
+      const lease = register(batches);
+      blockedLease ??= lease;
+      return lease;
+    };
+    memory.release = (lease) => {
+      if (lease === blockedLease && !readerFinished) return false;
+      const result = release(lease);
+      if (result && lease === blockedLease) queueMicrotask(reclaimed);
+      return result;
+    };
+    const { child, client } = spawnIpcProcess({
+      binPath: binary,
+      goArgs: [],
+      createMemoryTransport: () => memory,
+    });
+    const childClosed = new Promise<void>((resolve) =>
+      child.once('close', () => resolve()),
+    );
+    child.on('error', (error) => client.close(error));
+    child.once('exit', () => client.close());
+    client.setInboundHandler((message) => {
+      expect(message.kind).toBe('binaryAttachments');
+      const data = message.data as {
+        round: number;
+        hashes: string[];
+        lengths: number[];
+      };
+      const buffers = message.attachments!.map(readAttachmentBytes);
+      const hashes = buffers.map((bytes) =>
+        createHash('sha256').update(bytes).digest('hex'),
+      );
+      expect(hashes).toEqual(data.hashes);
+      return {
+        round: data.round,
+        hashes,
+        lengths: buffers.map((bytes) => bytes.length),
+      };
+    });
+    client.start();
+    try {
+      // This test gates native completion; the packaged worker test proves
+      // that an actual synchronous native reader creates the same boundary.
+      await client.sendRequest('startBinary', { round: 0 });
+      await client.sendRequest('startBinary', { round: 1 });
+      expect(publications).toHaveLength(2);
+      const occupied = new Set(publications[0].map((batch) => batch.slot));
+      expect(publications[1].every((batch) => !occupied.has(batch.slot))).toBe(
+        true,
+      );
+      readerFinished = true;
+      await reclamation;
+      await client.sendRequest('startBinary', { round: 2 });
+      expect(publications).toHaveLength(3);
+      expect(publications[2].map((batch) => batch.slot)).toEqual([...occupied]);
+      expect(
+        publications[2].every(
+          (batch, index) =>
+            batch.generation > publications[0][index].generation,
+        ),
+      ).toBe(true);
+    } finally {
+      client.close();
+      child.kill();
+      await childClosed;
+    }
+  }, 120_000);
 });
 
 describe('encode/decode round-trip', () => {

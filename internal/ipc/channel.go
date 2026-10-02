@@ -464,6 +464,15 @@ func (c *Channel) dispatch(msg *Message) {
 			return
 		}
 	}
+	if msg.Kind == KindTransportRelease {
+		if msg.ID <= 0 || len(msg.Data) != 0 || len(msg.Attachments) != 0 ||
+			msg.Transport == nil || msg.Transport.Mapping != nil || len(msg.Transport.Released) == 0 {
+			c.closeWith(errors.New("ipc: invalid memory release frame"))
+			return
+		}
+		c.releasePublished(msg)
+		return
+	}
 	// Response/error → route to the waiting SendRequest by id.
 	if msg.Kind == KindResponse || msg.Kind == KindError {
 		c.mu.Lock()
@@ -471,20 +480,14 @@ func (c *Channel) dispatch(msg *Message) {
 		if ok {
 			delete(c.pending, msg.ID)
 		}
-		batches := c.published[msg.ID]
-		delete(c.published, msg.ID)
-		memory := c.memory
 		c.mu.Unlock()
 		// Storage ownership outlives its caller's waiter. Only an exact ACK
 		// for this request proves every native view was revoked; late ACKs
 		// may release storage but can never revive a cancelled request.
-		if memory != nil && len(batches) != 0 && msg.Transport != nil &&
-			slices.Equal(msg.Transport.Released, batches) {
-			memory.release(batches)
-		}
+		hadPublished := c.releasePublished(msg)
 		if ok {
 			ch <- msg
-		} else if len(batches) == 0 {
+		} else if !hadPublished {
 			fmt.Fprintf(os.Stderr, "rslint: orphan response id=%d kind=%s\n", msg.ID, msg.Kind)
 		}
 		return
@@ -534,6 +537,25 @@ func (c *Channel) dispatch(msg *Message) {
 		return
 	}
 	go c.handleInboundRequest(h, msg)
+}
+
+// A result without an exact ACK does not revoke storage ownership. The peer
+// can acknowledge later after its native readers finish, even when the caller
+// has already returned or cancelled. Records remain bounded by occupied slots.
+func (c *Channel) releasePublished(msg *Message) bool {
+	c.mu.Lock()
+	batches := c.published[msg.ID]
+	memory := c.memory
+	released := memory != nil && len(batches) != 0 && msg.Transport != nil &&
+		slices.Equal(msg.Transport.Released, batches)
+	if released {
+		delete(c.published, msg.ID)
+	}
+	c.mu.Unlock()
+	if released {
+		memory.release(batches)
+	}
+	return len(batches) != 0
 }
 
 func (c *Channel) handleInboundRequest(h InboundHandler, msg *Message) {

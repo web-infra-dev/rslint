@@ -58,6 +58,8 @@ const MAX_FRAME_BYTES = 256 * 1024 * 1024;
 const RESPONSE_KIND = 'response';
 const ERROR_KIND = 'error';
 const TRANSPORT_CONFIG_KIND = 'transportConfig';
+const TRANSPORT_RELEASE_KIND = 'transportRelease';
+const RELEASE_POLL_MS = 25;
 
 /** Internal record for a request awaiting its response. */
 interface PendingRequest {
@@ -90,6 +92,13 @@ export class IpcClient {
 
   // ── routing tables ──
   private readonly pending = new Map<number, PendingRequest>();
+  // Only lease release functions are retained, never handler payloads/results.
+  // Each owns at least one slot, bounding this queue by the negotiated arena.
+  private readonly pendingReleases = new Map<
+    number,
+    ReceivedAttachments['release']
+  >();
+  private releaseTimer: NodeJS.Timeout | undefined;
   private readonly notificationHandlers = new Map<
     MessageKind,
     NotificationHandler
@@ -204,6 +213,9 @@ export class IpcClient {
     this.notificationHandlers.clear();
     for (const [, p] of this.pending) p.reject(error);
     this.pending.clear();
+    clearTimeout(this.releaseTimer);
+    this.releaseTimer = undefined;
+    this.pendingReleases.clear();
     this.closeMemory();
     this.finishClose(error);
   }
@@ -376,6 +388,36 @@ export class IpcClient {
       }),
     );
   }
+
+  private scheduleReleases(): void {
+    if (this.closed || this.releaseTimer || this.pendingReleases.size === 0)
+      return;
+    // A native reader may outlive a timed-out handler. Do not delay its result
+    // or keep an otherwise idle process alive while waiting for reclamation.
+    this.releaseTimer = setTimeout(this.pollReleases, RELEASE_POLL_MS).unref();
+  }
+
+  private readonly pollReleases = (): void => {
+    this.releaseTimer = undefined;
+    try {
+      for (const [id, release] of this.pendingReleases) {
+        if (this.closed) return;
+        const batches = release();
+        if (batches === false) continue;
+        this.pendingReleases.delete(id);
+        if (batches)
+          this.writeResponse(TRANSPORT_RELEASE_KIND, id, undefined, batches);
+      }
+    } catch (error) {
+      this.close(
+        new Error(
+          `IpcClient: memory release failed: ${safeErrorMessage(error)}`,
+        ),
+      );
+      return;
+    }
+    this.scheduleReleases();
+  };
 
   // ─────────────────────────────────────────────────────────────────
   // internals
@@ -587,6 +629,12 @@ export class IpcClient {
 
   /** Route a fully decoded frame. */
   private dispatch(msg: WireMessage): void {
+    if (msg.kind === TRANSPORT_RELEASE_KIND) {
+      // This endpoint never publishes shared bytes. Control frames must not
+      // reach application handlers or settle an unrelated outbound request.
+      this.close(new Error('IpcClient: unexpected shared memory release'));
+      return;
+    }
     if (msg.kind === RESPONSE_KIND || msg.kind === ERROR_KIND) {
       this.routeResponse(msg);
       return;
@@ -703,7 +751,17 @@ export class IpcClient {
         };
       } finally {
         try {
-          released = received?.release();
+          const batches = received?.release();
+          if (batches === false && received && !this.closed) {
+            if (this.pendingReleases.has(msg.id)) {
+              this.close(new Error('duplicate pending shared memory request'));
+            } else {
+              this.pendingReleases.set(msg.id, received.release);
+              this.scheduleReleases();
+            }
+          } else if (batches !== false) {
+            released = batches;
+          }
         } catch (error) {
           kind = ERROR_KIND;
           result = {

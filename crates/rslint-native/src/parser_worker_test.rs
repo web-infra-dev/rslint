@@ -70,7 +70,7 @@ pub fn create_worker_termination_fixture(text: String) -> Result<WorkerTerminati
 }
 
 /// Change only the publication word, leaving the pinned payload untouched. A
-/// rejected second registration must prove retirement, not a stale generation.
+/// A rejected registration must prove a live lease, not a stale generation.
 #[napi]
 pub fn republish_worker_fixture(arena: &MemoryArena) -> Result<()> {
     arena.publish_for_test(0, 2, &[])

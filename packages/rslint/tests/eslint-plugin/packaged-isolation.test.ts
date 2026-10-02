@@ -159,6 +159,7 @@ const require = createRequire(entry);
 const nativePath = require.resolve(${JSON.stringify(`@rslint/${PKG_BASE}`)});
 const native = require(nativePath);
 const { WorkerPool } = await import(pathToFileURL(entry).href);
+const closeBeforeResume = process.argv[2] === 'close';
 const cfgDir = path.join(here, 'cfg');
 const text = '\\ufeffconst pinned = null; // café 😀 retained through arena.close()\\r\\n';
 const expected = native.parse('pinned.ts', text.slice(1), 'module', false).program;
@@ -196,13 +197,23 @@ try {
   assert.throws(() => native.parseSharedBytes('pinned.ts', source, 'module', false), /invalid or expired/);
   native.republishWorkerFixture(arena);
   assert.throws(() => arena.register([{ slot: 0, generation: 2, length: source.length }]), /invalid or expired/);
-  arena.close();
-  assert.throws(() => arena.descriptor(), /invalid or expired/);
+  if (closeBeforeResume) {
+    arena.close();
+    assert.throws(() => arena.descriptor(), /invalid or expired/);
+  }
   // Node termination is pending while synchronous native code runs. Releasing
-  // this barrier lets the real Oxc parser read the bytes AFTER arena.close().
+  // this barrier lets Oxc finish, including after the optional arena.close().
   native.resumeWorkerParse();
   await pool.shutdown();
   assert.equal(native.workerParsedProgram(), expected, 'Oxc must finish from the pinned bytes');
+  if (!closeBeforeResume) {
+    assert.equal(arena.release(source.lease), true, 'reader exit must restore capacity in the same arena');
+    assert.equal(arena.release(source.lease), false, 'reclamation must succeed exactly once');
+    const lease = arena.register([{ slot: 0, generation: 2, length: source.length }]);
+    assert.throws(() => native.parseSharedBytes('pinned.ts', source, 'module', false), /invalid or expired/);
+    assert.equal(native.parseSharedBytes('pinned.ts', { ...source, lease }, 'module', false).parsed.program, expected);
+    assert.equal(arena.release(lease), true);
+  }
   assert.equal(logs.some((record) => record.level === 'error'), false);
   console.log('PACKAGED_TERMINATION_OK');
 } finally {
@@ -333,10 +344,14 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
     });
 
-    test.each(['debug', 'release'] as const)(
-      '%s: terminating a real worker preserves its in-flight native source reader',
-      (profile) => {
-        const root = path.join(tmp, `worker-termination-${profile}`);
+    test.each(
+      (['debug', 'release'] as const).flatMap((profile) =>
+        (['close', 'reuse'] as const).map((ending) => ({ profile, ending })),
+      ),
+    )(
+      'terminating a real worker preserves native reads and supports $ending ($profile)',
+      ({ profile, ending }) => {
+        const root = path.join(tmp, `worker-termination-${profile}-${ending}`);
         fs.mkdirSync(root, { recursive: true });
         stage(root, { withNative: false });
         stageNative(
@@ -347,7 +362,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         fs.writeFileSync(path.join(root, 'runner.mjs'), TERMINATION_RUNNER);
         const result = spawnSync(
           process.execPath,
-          [path.join(root, 'runner.mjs')],
+          [path.join(root, 'runner.mjs'), ending],
           {
             cwd: root,
             encoding: 'utf8',
