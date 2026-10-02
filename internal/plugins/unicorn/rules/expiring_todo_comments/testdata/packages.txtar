@@ -1,0 +1,95 @@
+-- package.json --
+{
+  "name": "expiring-todo-fixture",
+  "version": "76.0.0",
+  "dependencies": {
+    "find-up-simple": "^1.0.1",
+    "semver": "^7.8.5"
+  },
+  "devDependencies": {
+    "@lubien/fixture-beta-package": "^1.0.0-beta.1"
+  },
+  "peerDependencies": {
+    "eslint": ">=10.4"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
+-- docs/package.json --
+{
+  "name": "expiring-docs-fixture",
+  "version": "2.0.0",
+  "dependencies": {
+    "already-have-pkg": "1.0.0",
+    "read-pkg": "^5.1.1",
+    "lodash": "^4.0.0",
+    "vue": "^3.0.0",
+    "cerebro": "^1.0.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9"
+  },
+  "engines": {
+    "node": ">=12"
+  }
+}
+-- catalog/package.json --
+{
+  "name": "catalog-package",
+  "dependencies": {
+    "eslint": "catalog:"
+  },
+  "devDependencies": {
+    "prettier": "catalog:"
+  },
+  "peerDependencies": {
+    "eslint": "catalog:peer"
+  }
+}
+-- edge/package.json --
+{
+  "version": "^1.2.3-beta.2",
+  "dependencies": {
+    "aa": "^1.0.0",
+    "bb": "workspace:*",
+    "cc": "1.0.0 - 3.0.0",
+    "dd": "latest",
+    "ee": "01.2.3",
+    "ff": "v2.3.4",
+    "gg": 2,
+    "hh": "1.2.3+build",
+    "ii": "",
+    "jj": "catalog:shared",
+    "kk": "~0.3",
+    "ll": false,
+    "😀": "1.2.3",
+    "a": "1.2.3",
+    "中": "1.2.3",
+    "spaces": "\t1.2.3-beta.2﻿",
+    "array": [
+      "1.2.3"
+    ]
+  },
+  "devDependencies": {
+    "aa": "^2.0.0",
+    "cc": ""
+  },
+  "peerDependencies": {
+    "union": "^8 || ^9",
+    "strict": ">1.2.3",
+    "pre": ">=1.0.0-beta.1",
+    "empty": ">1 <1",
+    "wild": "*",
+    "upper": "<0.0.0",
+    "workspace": "workspace:*",
+    "catalog": "catalog:shared"
+  },
+  "engines": {
+    "node": ">= 22"
+  }
+}
+-- missing/package.json --
+not json
+-- no-fields/package.json --
+{}

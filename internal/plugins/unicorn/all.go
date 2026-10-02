@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_tuple_labels"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/empty_brace_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/error_message"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/expiring_todo_comments"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/explicit_timer_delay"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/max_nested_calls"
@@ -21,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_async_promise_finally"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_expression_member"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_console_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_document_cookie"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_exports_in_scripts"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_instanceof_builtins"
@@ -36,6 +38,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_thenable"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_assignment"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_outside_of_class"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_typeof_undefined"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_flat_depth"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_splice_count"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_slice_end"
@@ -56,6 +59,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_blob_reading_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_date_now"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_dom_node_append"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_flat_math_min_max"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_global_number_constants"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_identifier_import_export_specifiers"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
@@ -86,6 +90,7 @@ func GetAllRules() []rule.Rule {
 		empty_brace_spaces.EmptyBraceSpacesRule,
 		error_message.ErrorMessageRule,
 		explicit_timer_delay.ExplicitTimerDelayRule,
+		expiring_todo_comments.ExpiringTodoCommentsRule,
 		filename_case.FilenameCaseRule,
 		max_nested_calls.MaxNestedCallsRule,
 		new_for_builtins.NewForBuiltinsRule,
@@ -99,6 +104,7 @@ func GetAllRules() []rule.Rule {
 		no_async_promise_finally.NoAsyncPromiseFinallyRule,
 		no_await_expression_member.NoAwaitExpressionMemberRule,
 		no_await_in_promise_methods.NoAwaitInPromiseMethodsRule,
+		no_console_spaces.NoConsoleSpacesRule,
 		no_document_cookie.NoDocumentCookieRule,
 		no_exports_in_scripts.NoExportsInScriptsRule,
 		no_instanceof_builtins.NoInstanceofBuiltinsRule,
@@ -114,6 +120,7 @@ func GetAllRules() []rule.Rule {
 		no_thenable.NoThenableRule,
 		no_this_assignment.NoThisAssignmentRule,
 		no_this_outside_of_class.NoThisOutsideOfClassRule,
+		no_typeof_undefined.NoTypeofUndefinedRule,
 		no_unnecessary_array_flat_depth.NoUnnecessaryArrayFlatDepthRule,
 		no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule,
 		no_unnecessary_slice_end.NoUnnecessarySliceEndRule,
@@ -134,6 +141,7 @@ func GetAllRules() []rule.Rule {
 		prefer_blob_reading_methods.PreferBlobReadingMethodsRule,
 		prefer_date_now.PreferDateNowRule,
 		prefer_dom_node_append.PreferDomNodeAppendRule,
+		prefer_flat_math_min_max.PreferFlatMathMinMaxRule,
 		prefer_global_number_constants.PreferGlobalNumberConstantsRule,
 		prefer_identifier_import_export_specifiers.PreferIdentifierImportExportSpecifiersRule,
 		prefer_node_protocol.PreferNodeProtocolRule,

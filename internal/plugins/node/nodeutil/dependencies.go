@@ -2,7 +2,6 @@ package nodeutil
 
 import (
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -102,34 +101,9 @@ func stringArray(value any) []string {
 	case []any:
 		result := make([]string, len(value))
 		for i, item := range value {
-			result[i] = settingString(item)
+			result[i] = ecmascript.JSONValueToString(item)
 		}
 		return result
 	}
 	return nil
-}
-
-// Shared settings and package JSON are JSON values. Preserve JavaScript's
-// String conversion, including Array#join's treatment of null elements.
-func settingString(value any) string {
-	switch value := value.(type) {
-	case nil:
-		return "null"
-	case string:
-		return value
-	case bool:
-		return strconv.FormatBool(value)
-	case float64:
-		return ecmascript.NumberToString(value)
-	case []any:
-		parts := make([]string, len(value))
-		for i, item := range value {
-			if item != nil {
-				parts[i] = settingString(item)
-			}
-		}
-		return strings.Join(parts, ",")
-	default:
-		return "[object Object]"
-	}
 }

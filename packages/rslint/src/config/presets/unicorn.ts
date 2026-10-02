@@ -43,7 +43,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/empty-brace-spaces': 'error',
     'unicorn/error-message': 'error',
     // 'unicorn/escape-case': 'error', // not implemented
-    // 'unicorn/expiring-todo-comments': 'error', // not implemented
+    'unicorn/expiring-todo-comments': 'error',
     // 'unicorn/explicit-length-check': 'error', // not implemented
     'unicorn/explicit-timer-delay': 'error',
     'unicorn/filename-case': 'error',
@@ -149,7 +149,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-top-level-assignment-in-function': 'error', // not implemented
     // 'unicorn/no-top-level-side-effects': 'error', // not implemented
     // 'unicorn/no-transition-all': 'error', // not implemented
-    // 'unicorn/no-typeof-undefined': 'error', // not implemented
+    'unicorn/no-typeof-undefined': 'error',
     // 'unicorn/no-uncalled-method': 'error', // not implemented
     // 'unicorn/no-undeclared-class-members': 'error', // not implemented
     'unicorn/no-unnecessary-array-flat-depth': 'error',
@@ -244,7 +244,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-event-target': 'error', // not implemented
     // 'unicorn/prefer-explicit-viewport-units': 'off', // not implemented
     // 'unicorn/prefer-export-from': 'error', // not implemented
-    // 'unicorn/prefer-flat-math-min-max': 'error', // not implemented
+    'unicorn/prefer-flat-math-min-max': 'error',
     // 'unicorn/prefer-get-or-insert-computed': 'error', // not implemented
     'unicorn/prefer-global-number-constants': 'error',
     // 'unicorn/prefer-global-this': 'error', // not implemented
