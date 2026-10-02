@@ -283,6 +283,9 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 	if node == nil {
 		return staticEvalResult{}
 	}
+	if staticEvaluator.optionalChainShortCircuits(node) {
+		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+	}
 
 	switch node.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
@@ -308,23 +311,6 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 		}
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 	case ast.KindIdentifier:
-		if !staticEvaluator.resolveIdentifiers {
-			return staticEvalResult{}
-		}
-		switch node.Text() {
-		case "undefined":
-			if staticEvaluator.isBuiltinIdentifier(node, "undefined") {
-				return staticEvalResult{value: staticUndefinedValue{}, ok: true}
-			}
-		case "NaN":
-			if staticEvaluator.isBuiltinIdentifier(node, "NaN") {
-				return staticEvalResult{value: jsnum.NaN(), ok: true}
-			}
-		case "Infinity":
-			if staticEvaluator.isBuiltinIdentifier(node, "Infinity") {
-				return staticEvalResult{value: jsnum.Inf(1), ok: true}
-			}
-		}
 		return staticEvaluator.evalIdentifier(node)
 	case ast.KindTemplateExpression:
 		return staticEvaluator.evalTemplateExpression(node, false)
@@ -380,6 +366,9 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 		if result := staticEvaluator.evalSymbolCall(node); result.ok {
 			return result
 		}
+		if result := staticEvaluator.evalNumericBuiltinCall(node); result.ok {
+			return result
+		}
 		if result := staticEvaluator.evalBuiltinStaticCall(node); result.ok {
 			return result
 		}
@@ -404,6 +393,19 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 func (staticEvaluator *StaticStringEvaluator) evalIdentifier(node *ast.Node) staticEvalResult {
 	if !staticEvaluator.resolveIdentifiers {
 		return staticEvalResult{}
+	}
+	if ast.IsIdentifier(node) {
+		name := node.Text()
+		if (name == "undefined" || name == "Infinity" || name == "NaN") && staticEvaluator.isBuiltinIdentifier(node, name) {
+			switch name {
+			case "undefined":
+				return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+			case "Infinity":
+				return staticEvalResult{value: staticNumberValue(math.Inf(1)), ok: true}
+			case "NaN":
+				return staticEvalResult{value: staticNumberValue(math.NaN()), ok: true}
+			}
+		}
 	}
 	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
 	if !ok || staticEvaluator.resolving[symbol] {
@@ -825,7 +827,7 @@ func (staticEvaluator *StaticStringEvaluator) evalObjectLiteralMember(node *ast.
 	if prototypeSet {
 		return prototypeValue
 	}
-	return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+	return staticDefaultObjectMember(key)
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalArrayLiteral(node *ast.Node) staticEvalResult {
@@ -971,10 +973,13 @@ func staticMemberValue(object any, key string) staticEvalResult {
 		if value, ok := staticObjectOwnProperty(object, key); ok {
 			return staticEvalResult{value: value, ok: true}
 		}
-		if object.prototypeSet && object.prototype != nil {
-			return staticPrototypeMemberValue(object.prototype, key)
+		if object.prototypeSet {
+			if object.prototype != nil {
+				return staticPrototypeMemberValue(object.prototype, key)
+			}
+			return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 		}
-		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+		return staticDefaultObjectMember(key)
 	case *staticArrayValue:
 		if key == "length" {
 			return staticEvalResult{value: staticNumberValue(object.length), ok: true}
@@ -992,6 +997,17 @@ func staticMemberValue(object any, key string) staticEvalResult {
 		return staticEvalResult{value: object.element(index), ok: true}
 	}
 	return staticEvalResult{}
+}
+
+func staticDefaultObjectMember(key string) staticEvalResult {
+	switch key {
+	case "constructor", "toString", "toLocaleString", "valueOf", "hasOwnProperty",
+		"isPrototypeOf", "propertyIsEnumerable", "__proto__", "__defineGetter__",
+		"__defineSetter__", "__lookupGetter__", "__lookupSetter__":
+		return staticEvalResult{}
+	default:
+		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+	}
 }
 
 // staticPrototypeMemberValue reads a property through an authored __proto__
@@ -1263,18 +1279,21 @@ func (staticEvaluator *StaticStringEvaluator) evalStringCall(node *ast.Node) sta
 		return staticEvalResult{}
 	}
 
-	args := node.Arguments()
-	if len(args) == 0 {
+	arguments, ok := staticEvaluator.evalCallArguments(node)
+	if !ok {
+		return staticEvalResult{}
+	}
+	if len(arguments) == 0 {
 		return staticEvalResult{value: "", ok: true}
 	}
-	if ast.IsSpreadElement(args[0]) {
-		return staticEvalResult{}
+	if symbol, ok := arguments[0].(staticSymbolValue); ok {
+		key := symbol.key
+		if symbol.kind == staticSymbolWellKnown {
+			key = "Symbol." + key
+		}
+		return staticEvalResult{value: "Symbol(" + key + ")", ok: true}
 	}
-	arg := staticEvaluator.evalValue(args[0])
-	if !arg.ok {
-		return staticEvalResult{}
-	}
-	value, ok := staticValueToString(arg.value)
+	value, ok := staticValueToString(arguments[0])
 	if !ok {
 		return staticEvalResult{}
 	}
@@ -1331,6 +1350,8 @@ func (staticEvaluator *StaticStringEvaluator) evalBuiltinStaticCall(node *ast.No
 		return staticEvalResult{value: ecmascript.StringToUpperCase(text), ok: true}
 	case "toLowerCase":
 		return staticEvalResult{value: ecmascript.StringToLowerCase(text), ok: true}
+	case "trim":
+		return staticEvalResult{value: ecmascript.StringTrim(text), ok: true}
 	case "slice":
 		return staticStringSlice(text, arguments)
 	case "substring":
