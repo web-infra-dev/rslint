@@ -1,3 +1,5 @@
+// cspell:ignore ttooltipped
+
 package max_nested_calls_test
 
 import (
