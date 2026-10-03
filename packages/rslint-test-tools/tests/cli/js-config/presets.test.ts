@@ -405,9 +405,34 @@ describe('defineConfig and config presets', () => {
     expect(rec.rules?.['unicorn/no-await-expression-member']).toBe('error');
     expect(rec.rules?.['unicorn/number-literal-case']).toBe('error');
     expect(rec.rules?.['unicorn/prefer-date-now']).toBe('error');
+    expect(rec.rules?.['unicorn/prefer-unicode-code-point-escapes']).toBe(
+      'error',
+    );
     expect(rec.rules?.['unicorn/require-post-message-target-origin']).toBe(
       'off',
     );
+  });
+
+  test('unicornPlugin.configs.recommended reports and fixes Unicode escapes', async () => {
+    const directory = import.meta.dirname;
+    const filename = path.join(directory, 'unicode-preset.js');
+    const request = {
+      configDirectory: directory,
+      workingDirectory: directory,
+      config: normalizeConfig([unicornPlugin.configs.recommended]),
+      fileContents: { [filename]: String.raw`const x = '\x61';` },
+    };
+    const result = await lint(request);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]).toMatchObject({
+      ruleName: 'unicorn/prefer-unicode-code-point-escapes',
+      messageId: 'prefer-unicode-code-point-escapes',
+    });
+    const fixed = await lint({ ...request, fix: true });
+    expect(Object.values(fixed.output ?? {})).toEqual([
+      String.raw`const x = '\u{61}';`,
+    ]);
+    expect(fixed.diagnostics).toEqual([]);
   });
 
   test('unicornPlugin.configs.recommended disables an earlier require-post-message-target-origin setting', async () => {
