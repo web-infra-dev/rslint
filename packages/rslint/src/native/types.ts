@@ -58,6 +58,8 @@ export interface MemoryArena {
   fd(): number | null | undefined;
   configure(config: MemoryConfiguration): void;
   descriptor(): NativeMemoryMapping;
+  /** Transfer the configured Unix descriptor to Go's one-shot listener. */
+  sendFd(socketPath: string): void;
   register(batches: MemoryBatch[]): number;
   /** Revoke reads; retry while existing readers prevent reuse. True only once. */
   release(lease: number): boolean;

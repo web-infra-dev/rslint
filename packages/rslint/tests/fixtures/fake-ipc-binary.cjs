@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Minimal Go-binary stand-in for engine tests, speaking the IPC frame
 // protocol ([4-byte u32 LE length][JSON {kind,id,data}]) over stdio:
-//   1. answers optional `transportConfig`, then `init` → `response {ok:true}`,
+//   1. optionally prepares storage after `init`, then replies to `init` → `response {ok:true}`,
 //   2. sends the first output half as an acknowledged `output` request,
 //   3. after its acknowledgement, sends the second half as a notification,
 //   4. sends a `shutdown` request,
@@ -14,6 +14,7 @@ const stdout = process.stdout;
 let buf = Buffer.alloc(0);
 let remainingText = '';
 let configured = false;
+let pendingInit;
 const mode = process.argv[2];
 
 function send(msg) {
@@ -24,40 +25,33 @@ function send(msg) {
 }
 
 function onMessage(msg) {
-  if (msg.kind === 'transportConfig') {
+  if (msg.id === 998) {
     const assert = require('node:assert/strict');
-    assert.equal(configured, false);
-    assert.equal(msg.data, undefined);
-    assert.equal(msg.attachments, undefined);
-    assert.equal(msg.transport, undefined);
+    assert.equal(msg.kind, 'response');
+    assert.equal(msg.data.version, 1);
     configured = true;
-    send({
-      kind: 'response',
-      id: msg.id,
-      // A small non-default peer layout, independent of production defaults.
-      data: {
-        version: 1,
-        slotCount: 3,
-        slotSize: 4096,
-        headerSize: 512,
-        publicationStride: 32,
-      },
-    });
+    send({ kind: 'transportCommit', id: 0 });
+    onMessage(pendingInit);
     return;
   }
   if (msg.kind === 'init') {
-    if (mode === 'require-mapping') {
-      const assert = require('node:assert/strict');
-      assert.equal(configured, true);
-      assert.equal(msg.transport?.mapping?.version, 1);
-      if (process.platform !== 'win32') {
-        assert.equal(msg.transport.mapping.fd, 3);
-        // macOS may round the backing object up to a host page.
-        assert.ok(require('node:fs').fstatSync(3).size >= 512 + 3 * 4096);
-      } else {
-        assert.equal(typeof msg.transport.mapping.handle, 'string');
-        assert.equal(typeof msg.transport.mapping.processId, 'number');
-      }
+    if (mode === 'require-mapping' && !configured) {
+      require('node:assert/strict').equal(msg.transport?.sharedMemory, 1);
+      pendingInit = msg;
+      send({
+        kind: 'transportPrepare',
+        id: 998,
+        data: {
+          configuration: {
+            version: 1,
+            slotCount: 3,
+            slotSize: 4096,
+            headerSize: 512,
+            publicationStride: 32,
+          },
+        },
+      });
+      return;
     }
     send({ kind: 'response', id: msg.id, data: { ok: true } });
     const text = JSON.stringify(msg.data);

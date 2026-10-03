@@ -1,7 +1,7 @@
 //! OS handles are local implementation details. The wire carries a descriptor,
 //! never a process address or an application-file path. All supported npm targets use
 //! the same fixed-slot protocol above this module.
-// cspell:words munmap syscall memfd CLOEXEC CREAT RDWR fcntl SETFD ftruncate READWRITE EFAULT nonoverlapping fstat
+// cspell:words sockaddr socklen SETFL NONBLOCK iovec CMSG cmsghdr msghdr iovlen controllen FIRSTHDR cmsg sendmsg NOSIGNAL munmap syscall memfd CLOEXEC CREAT RDWR fcntl SETFD ftruncate READWRITE EFAULT nonoverlapping fstat
 
 use super::{Layout, MemoryMapping};
 use std::io;
@@ -20,8 +20,8 @@ mod platform {
     use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
     use std::ptr;
 
-    /// Created before spawn so the child inherits the same anonymous object.
-    /// Its dimensions and memory views do not exist until Go supplies a layout.
+    /// Anonymous storage created on first attachment demand, then configured
+    /// with Go's layout and transferred to the already-running child.
     pub struct Backing {
         fd: OwnedFd,
     }
@@ -347,7 +347,7 @@ mod platform {
             }
             // Reserve payload pages until the Go writer needs a slot. Plain
             // PAGE_READWRITE defaults to SEC_COMMIT and would charge the full
-            // arena even for native-only CLI runs. Only the control page must
+            // arena before its first publication. Only the control page must
             // be readable before the first producer publication.
             let control =
                 unsafe { MapViewOfFile(handle, FILE_MAP_WRITE, 0, 0, layout.header_size) };
@@ -469,3 +469,71 @@ pub(super) use platform::{Backing, Mapping};
 // prevents the Go producer from receiving permission to reuse that slot.
 unsafe impl Send for Mapping {}
 unsafe impl Sync for Mapping {}
+
+/// Queue one fd on an already-listening private Unix socket. Both connect and
+/// send do not block: unavailable bootstrap resources select inline transport.
+#[cfg(unix)]
+pub fn send_fd(path: &str, fd: i32) -> io::Result<()> {
+    use std::mem::{offset_of, size_of, zeroed};
+    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+
+    let mut address: libc::sockaddr_un = unsafe { zeroed() };
+    let bytes = path.as_bytes();
+    if bytes.len() >= address.sun_path.len() || bytes.contains(&0) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid memory socket path",
+        ));
+    }
+    address.sun_family = libc::AF_UNIX as _;
+    for (target, byte) in address.sun_path.iter_mut().zip(bytes) {
+        *target = *byte as _;
+    }
+    let length = (offset_of!(libc::sockaddr_un, sun_path) + bytes.len() + 1) as libc::socklen_t;
+    let raw = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_STREAM, 0) };
+    if raw < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let socket = unsafe { OwnedFd::from_raw_fd(raw) };
+    let raw = socket.as_raw_fd();
+    if unsafe { libc::fcntl(raw, libc::F_SETFD, libc::FD_CLOEXEC) } < 0
+        || unsafe { libc::fcntl(raw, libc::F_SETFL, libc::O_NONBLOCK) } < 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    if unsafe { libc::connect(raw, (&address as *const libc::sockaddr_un).cast(), length) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let mut byte = 0u8;
+    let mut vector = libc::iovec {
+        iov_base: (&mut byte as *mut u8).cast(),
+        iov_len: 1,
+    };
+    let space = unsafe { libc::CMSG_SPACE(size_of::<i32>() as _) } as usize;
+    // cmsghdr requires alignment; a byte Vec would not guarantee it.
+    let mut control = vec![0usize; space.div_ceil(size_of::<usize>())];
+    let mut message: libc::msghdr = unsafe { zeroed() };
+    message.msg_iov = &mut vector;
+    message.msg_iovlen = 1;
+    message.msg_control = control.as_mut_ptr().cast();
+    message.msg_controllen = space as _;
+    unsafe {
+        let header = libc::CMSG_FIRSTHDR(&message);
+        (*header).cmsg_level = libc::SOL_SOCKET;
+        (*header).cmsg_type = libc::SCM_RIGHTS;
+        (*header).cmsg_len = libc::CMSG_LEN(size_of::<i32>() as _) as _;
+        libc::CMSG_DATA(header).cast::<i32>().write(fd);
+        if libc::sendmsg(raw, &message, libc::MSG_NOSIGNAL) != 1 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+pub fn send_fd(_path: &str, _fd: i32) -> io::Result<()> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "Unix fd transfer is unavailable",
+    ))
+}

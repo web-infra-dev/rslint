@@ -39,7 +39,7 @@ export function createMemoryTransport() {
   const arena = new MemoryArena();
   let fd: number | undefined;
   try {
-    // Only prepare the inheritable Unix handle; no layout is known yet.
+    // Native storage is only constructed in response to actual attachment demand.
     fd = arena.fd() ?? undefined;
   } catch (error) {
     arena.close();
@@ -92,16 +92,19 @@ export function createMemoryTransport() {
     configuration() {
       return configuration;
     },
-    descriptor(inheritedFd?: number): MemoryMapping {
+    descriptor(): MemoryMapping {
       if (!mapping) throw new Error('shared memory storage is not configured');
-      // Unix spawn chooses the child's fd index. Windows transfers the handle.
-      return {
-        ...mapping,
-        fd:
-          typeof mapping.fd === 'number'
-            ? (inheritedFd ?? mapping.fd)
-            : undefined,
-      };
+      return { ...mapping };
+    },
+    transfer(socketPath?: string): MemoryMapping {
+      if (!mapping) throw new Error('shared memory storage is not configured');
+      if (typeof mapping.fd === 'number') {
+        if (!socketPath) throw new Error('missing shared memory socket');
+        arena.sendFd(socketPath);
+        // Descriptor numbers are process-local. Go receives its own fd via SCM_RIGHTS.
+        return { version: mapping.version };
+      }
+      return mapping;
     },
     register(batches: MemoryBatch[]) {
       return arena.register(batches);

@@ -39,6 +39,8 @@ export interface WireAttachment {
 }
 
 export interface TransportMetadata {
+  /** Late shared-memory setup, advertised without loading native code. */
+  sharedMemory?: 1;
   mapping?: MemoryMapping;
   batches?: MemoryBatch[];
   /** Exact request batches, on its result or a later transportRelease frame. */
