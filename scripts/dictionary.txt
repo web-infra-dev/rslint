@@ -601,6 +601,7 @@ stroustrup
 stub
 stylesheet
 stype
+subarray
 subclassing
 subpackages
 subtag

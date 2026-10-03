@@ -433,7 +433,7 @@ func TestStaticStringEvaluator(t *testing.T) {
 func TestStaticStringEvaluatorConfiguredGlobals(t *testing.T) {
 	for _, expression := range []string{
 		"String.raw`\\n`", `String("x")`, `Array.of("x")[0]`,
-		`Object.freeze(["x"])[0]`, `undefined`, `Math.PI`, `Number.EPSILON`,
+		`Object.freeze(["x"])[0]`, `undefined`, `NaN`, `Infinity`, `Math.PI`, `Number.EPSILON`,
 	} {
 		t.Run(expression, func(t *testing.T) {
 			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/globals.js", Path: "/globals.js"}, "const value = "+expression, core.ScriptKindJS)
@@ -812,6 +812,30 @@ func TestStaticStringEvaluatorBinaryExpressions(t *testing.T) {
 			if !known || got != test.want {
 				t.Fatalf("EvalToString = (%q, %v), want %q", got, known, test.want)
 			}
+		})
+	}
+}
+
+func TestStaticStringEvaluatorGlobalNumbers(t *testing.T) {
+	for _, test := range []struct {
+		code, want string
+		known      bool
+	}{
+		{"const value = NaN;", "NaN", true},
+		{"const value = -Infinity;", "-Infinity", true},
+		{"const value = String(Infinity);", "Infinity", true},
+		{"const value = [NaN, Infinity].join(',');", "NaN,Infinity", true},
+		{"function f(NaN) { const value = NaN; }", "", false},
+		{"function f(Infinity) { const value = Infinity; }", "", false},
+	} {
+		t.Run(test.code, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/globals.js", Path: "/globals.js"}, test.code, core.ScriptKindJS)
+			node := findVariableInitializer(t, source, "value")
+			got, known := NewStaticStringEvaluatorWithSourceFile(nil, source).EvalToString(node)
+			assert.Equal(t, known, test.known)
+			assert.Equal(t, got, test.want)
+			_, known = NewStaticStringEvaluatorWithoutScope().EvalValue(node)
+			assert.Assert(t, !known, "scope-free evaluation resolved a global")
 		})
 	}
 }

@@ -309,9 +309,19 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 		if !staticEvaluator.resolveIdentifiers {
 			return staticEvalResult{}
 		}
-		identifier := node.AsIdentifier()
-		if identifier != nil && staticEvaluator.isBuiltinIdentifier(node, "undefined") {
-			return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+		switch node.Text() {
+		case "undefined":
+			if staticEvaluator.isBuiltinIdentifier(node, "undefined") {
+				return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+			}
+		case "NaN":
+			if staticEvaluator.isBuiltinIdentifier(node, "NaN") {
+				return staticEvalResult{value: jsnum.NaN(), ok: true}
+			}
+		case "Infinity":
+			if staticEvaluator.isBuiltinIdentifier(node, "Infinity") {
+				return staticEvalResult{value: jsnum.Inf(1), ok: true}
+			}
 		}
 		return staticEvaluator.evalIdentifier(node)
 	case ast.KindTemplateExpression:

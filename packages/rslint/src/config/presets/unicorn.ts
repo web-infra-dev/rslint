@@ -44,7 +44,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/error-message': 'error',
     // 'unicorn/escape-case': 'error', // not implemented
     'unicorn/expiring-todo-comments': 'error',
-    // 'unicorn/explicit-length-check': 'error', // not implemented
+    'unicorn/explicit-length-check': 'error',
     'unicorn/explicit-timer-delay': 'error',
     'unicorn/filename-case': 'error',
     // 'unicorn/id-match': 'off', // not implemented
