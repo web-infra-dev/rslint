@@ -1,5 +1,3 @@
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
 import {
   ConfigModuleHost,
   type PluginConfigDescriptor,
@@ -44,14 +42,8 @@ let pluginHostFactoryPromise: Promise<CreatePluginLintHost> | undefined;
 
 export async function loadPluginHostFactory(): Promise<CreatePluginLintHost> {
   pluginHostFactoryPromise ??= (async () => {
-    // The private host bundle coordinates workers without importing their parser
-    // into the API thread. Resolve from the package root in source and built code.
-    const pluginEntry = new URL(
-      './dist/eslint-plugin/host.js',
-      pathToFileURL(
-        createRequire(import.meta.url).resolve('@rslint/core/package.json'),
-      ),
-    ).href;
+    // The standalone host is relative to the built API bundle in dist/.
+    const pluginEntry: string = './eslint-plugin/host.js';
     const module: unknown = await import(/* webpackIgnore: true */ pluginEntry);
     if (!isPluginHostFactoryModule(module)) {
       throw new Error(
