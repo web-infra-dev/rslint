@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -427,6 +428,85 @@ func TestStaticStringEvaluator(t *testing.T) {
 	}
 	if isArray, known := staticEvaluator.EvalControlFlowArrayValue(findVariableInitializer(t, sourceFile, "controlArrayUse")); !known || !isArray {
 		t.Fatalf("EvalControlFlowArrayValue(controlArrayUse) = (%v, %v), want (true, true)", isArray, known)
+	}
+}
+
+type staticEvaluatorTestResolver struct{ resolver binder.NameResolver }
+
+func (r *staticEvaluatorTestResolver) Resolve(node *ast.Node) *ast.Symbol {
+	return r.resolver.Resolve(node, node.Text(), ast.SymbolFlagsValue|ast.SymbolFlagsAlias, nil, true, false)
+}
+
+func TestStaticStringEvaluatorMutationAnalysisOrder(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		declarations string
+		method       string
+	}{
+		{"array", `const method = ["reverse"];`, `method[0]`},
+		{"object", `const method = {name: "reverse"};`, `method.name`},
+		{"alias", `const names = ["reverse"]; const method = names[0];`, `method`},
+		{"nested", `const names = ["reverse"]; const method = {name: names[0]};`, `method.name`},
+		{"arrayCoercion", `const method = ["reverse"];`, `method`},
+		{"callInitializer", `const method = Array.of("reverse");`, `method[0]`},
+		{"letBinding", `let method = ["reverse"];`, `method[0]`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := fixtures.GetRootDir()
+			filePath := tspath.ResolvePath(root.Dir, "file.ts")
+			code := test.declarations + `
+const values = ["", "ok"];
+const untouched = ["stable"];
+const cycleA = [cycleB[0]];
+const cycleB = [cycleA[0]];
+const uncertain = ["ignored"];
+uncertain[cycleA[0]]();
+const selfMutating = ["reverse", "pop"];
+selfMutating[selfMutating[0]]();
+const prime = ` + test.method + `;
+values[` + test.method + `]();
+const result = values[0];
+const stable = untouched[0];
+const cyclic = cycleA[0];
+const selfRead = selfMutating[0];`
+			fs := NewOverlayVFS(root.FS, map[string]string{filePath: code})
+			program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
+			assert.NilError(t, err)
+			sourceFile := program.GetSourceFile(filePath)
+			assert.Assert(t, sourceFile != nil)
+			typeChecker, done := program.GetTypeChecker(t.Context())
+			defer done()
+			for _, resolution := range []string{"checker", "references"} {
+				for _, first := range []string{"prime", "result", "stable", "cyclic", "selfRead"} {
+					t.Run(resolution+"/"+first, func(t *testing.T) {
+						staticEvaluator := NewStaticStringEvaluatorWithSourceFile(typeChecker, sourceFile)
+						if resolution == "references" {
+							resolver := &staticEvaluatorTestResolver{resolver: binder.NameResolver{Globals: sourceFile.Locals}}
+							staticEvaluator = NewStaticStringEvaluatorWithReferenceResolver(nil, sourceFile, resolver)
+						}
+						staticEvaluator.EvalValue(findVariableInitializer(t, sourceFile, first))
+						// Reuse the instance after both successful and failed evaluations.
+						for range 2 {
+							if value, known := staticEvaluator.Eval(findVariableInitializer(t, sourceFile, "result")); known {
+								t.Fatalf("mutated array folded to %q after evaluating %s first", value, first)
+							}
+							if value, known := staticEvaluator.EvalToString(findVariableInitializer(t, sourceFile, "prime")); !known || value != "reverse" {
+								t.Fatalf("method = (%q, %v), want (reverse, true)", value, known)
+							}
+							if value, known := staticEvaluator.Eval(findVariableInitializer(t, sourceFile, "stable")); !known || value != "stable" {
+								t.Fatalf("unmodified array = (%q, %v), want (stable, true)", value, known)
+							}
+							if value, known := staticEvaluator.EvalValue(findVariableInitializer(t, sourceFile, "cyclic")); known {
+								t.Fatalf("cyclic initializer folded to %v", value)
+							}
+							if value, known := staticEvaluator.Eval(findVariableInitializer(t, sourceFile, "selfRead")); known {
+								t.Fatalf("self-modifying array folded to %q", value)
+							}
+						}
+					})
+				}
+			}
+		})
 	}
 }
 

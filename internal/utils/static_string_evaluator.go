@@ -1738,7 +1738,17 @@ func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Sy
 
 func (staticEvaluator *StaticStringEvaluator) referenceFlagsFor(symbol *ast.Symbol) staticReferenceFlags {
 	if !staticEvaluator.referenceFlagsComputed {
-		staticEvaluator.computeReferenceFlags()
+		// A computed mutator name may depend on a symbol the caller is already
+		// resolving. Analyze it with an independent recursion stack, then publish
+		// the completed facts without disturbing the caller's evaluation.
+		analysis := NewStaticStringEvaluatorWithReferenceResolver(
+			staticEvaluator.typeChecker, staticEvaluator.sourceFile, staticEvaluator.referenceResolver,
+		)
+		analysis.GlobalAccess = staticEvaluator.GlobalAccess
+		analysis.resolveIdentifiers = staticEvaluator.resolveIdentifiers
+		analysis.computeReferenceFlags()
+		staticEvaluator.referenceFlags = analysis.referenceFlags
+		staticEvaluator.referenceFlagsComputed = true
 	}
 	return staticEvaluator.referenceFlags[symbol]
 }
