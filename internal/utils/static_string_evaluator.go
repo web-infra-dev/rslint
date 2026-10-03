@@ -31,6 +31,7 @@ type StaticStringEvaluator struct {
 	evaluator              evaluator.Evaluator
 	resolveIdentifiers     bool
 	resolving              map[*ast.Symbol]bool
+	evaluation             *staticEvaluationState
 	referenceFlagsComputed bool
 	referenceFlags         map[*ast.Symbol]staticReferenceFlags
 }
@@ -260,6 +261,9 @@ func (staticEvaluator *StaticStringEvaluator) EvalStringValue(node *ast.Node) (s
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return node.AsNoSubstitutionTemplateLiteral().Text, StaticEvalString
 	case ast.KindCallExpression:
+		if ast.IsOptionalChain(node) {
+			break
+		}
 		if value, matched, ok := staticEvaluator.evalArrayJoin(node); matched {
 			if ok {
 				return value, StaticEvalString
@@ -278,12 +282,8 @@ func (staticEvaluator *StaticStringEvaluator) EvalStringValue(node *ast.Node) (s
 	return "", StaticEvalNonString
 }
 
-func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEvalResult {
-	node = SkipAssertionsAndParens(node)
-	if node == nil {
-		return staticEvalResult{}
-	}
-	if staticEvaluator.optionalChainShortCircuits(node) {
+func (staticEvaluator *StaticStringEvaluator) evalUncachedValue(node *ast.Node) staticEvalResult {
+	if staticEvaluator.evaluation.optionalChainShortCircuits(node, staticEvaluator) {
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 	}
 
@@ -1578,14 +1578,7 @@ func clampSubstringIndex(index, length int) int {
 }
 
 func toUint32(number float64) uint32 {
-	if math.IsNaN(number) || math.IsInf(number, 0) || number == 0 {
-		return 0
-	}
-	remainder := math.Mod(math.Trunc(number), 1<<32)
-	if remainder < 0 {
-		remainder += 1 << 32
-	}
-	return uint32(remainder)
+	return ecmascript.NumberToUint32(number)
 }
 
 func toInt32(number float64) int32 {
@@ -1783,6 +1776,10 @@ type staticMutationCandidate struct {
 }
 
 func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
+	parentEvaluation := staticEvaluator.evaluation
+	staticEvaluator.evaluation = nil
+	defer func() { staticEvaluator.evaluation = parentEvaluation }()
+
 	staticEvaluator.referenceFlagsComputed = true
 	staticEvaluator.referenceFlags = nil
 	var mutationCandidates []staticMutationCandidate

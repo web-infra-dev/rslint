@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"math"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
@@ -18,31 +16,34 @@ func (staticEvaluator *StaticStringEvaluator) evalNumericBuiltinCall(node *ast.N
 		return staticParseInt(arguments)
 	}
 	method, ok := staticEvaluator.builtinMethodName(callee, "Math", map[*ast.Symbol]bool{})
-	if !ok || method != "max" && method != "min" {
+	if !ok {
+		return staticEvalResult{}
+	}
+	builtin, ok := ecmascript.LookupMathBuiltin(method)
+	if !ok {
 		return staticEvalResult{}
 	}
 	arguments, ok := staticEvaluator.evalCallArguments(node)
 	if !ok {
 		return staticEvalResult{}
 	}
-	value := math.Inf(-1)
-	if method == "min" {
-		value = math.Inf(1)
+	count := builtin.Arity
+	if count < 0 {
+		count = len(arguments)
 	}
-	for _, argument := range arguments {
+	numbers := make([]float64, count)
+	for index := range count {
+		argument := any(staticUndefinedValue{})
+		if index < len(arguments) {
+			argument = arguments[index]
+		}
 		number, ok := staticValueToNumber(argument)
 		if !ok {
 			return staticEvalResult{}
 		}
-		if math.IsNaN(value) || math.IsNaN(number) {
-			value = math.NaN()
-		} else if method == "max" {
-			value = math.Max(value, number)
-		} else {
-			value = math.Min(value, number)
-		}
+		numbers[index] = number
 	}
-	return staticEvalResult{value: staticNumberValue(value), ok: true}
+	return staticEvalResult{value: staticNumberValue(builtin.Evaluate(numbers)), ok: true}
 }
 
 func staticParseInt(arguments []any) staticEvalResult {

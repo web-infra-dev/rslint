@@ -94,9 +94,11 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const stringCall = String(\"then\");\n" +
 		"const stringNumberCall = String(1 + 2);\n" +
 		"const reviewStringAlias = String; const reviewSymbolString = reviewStringAlias(Symbol.iterator);\n" +
-		"const reviewNumberAlias = Number; const reviewParseAlias = reviewNumberAlias.parseInt; const reviewParsed = reviewParseAlias('10px');\n" +
-		"const reviewGlobalParseAlias = parseInt; const reviewGlobalParsed = reviewGlobalParseAlias('0x10');\n" +
+		"const reviewNumberAlias = Number; const reviewParseAlias = reviewNumberAlias.parseInt; const reviewParsed = String(reviewParseAlias('10px'));\n" +
+		"const reviewGlobalParseAlias = parseInt; const reviewGlobalParsed = String(reviewGlobalParseAlias('0x10'));\n" +
 		"const reviewMathAlias = Math; const reviewMaxAlias = reviewMathAlias.max; const reviewInfAlias = Infinity; const reviewMax = String(reviewMaxAlias(reviewInfAlias, 2));\n" +
+		"const reviewAbsAlias = reviewMathAlias.abs; const reviewAbs = String(reviewAbsAlias(-1));\n" +
+		"const reviewMathKey = Math.abs(-1); const reviewMathKeyUse = String(reviewMathKey + 1);\n" +
 		"const reviewTextAlias = ' foo '; const reviewTrimmed = reviewTextAlias.trim();\n" +
 		"const reviewChainAlias = null?.x; const reviewChainBoundary = reviewChainAlias.y;\n" +
 		"const stringNoArgumentCall = String();\n" +
@@ -276,6 +278,8 @@ func TestStaticStringEvaluator(t *testing.T) {
 		{name: "reviewSymbolString", want: "Symbol(Symbol.iterator)", ok: true},
 		{name: "reviewParsed", want: "10", ok: true},
 		{name: "reviewGlobalParsed", want: "16", ok: true},
+		{name: "reviewAbs", want: "1", ok: true},
+		{name: "reviewMathKeyUse", want: "2", ok: true},
 		{name: "reviewMax", want: "Infinity", ok: true},
 		{name: "reviewTrimmed", want: "foo", ok: true},
 		{name: "reviewChainBoundary"},
@@ -498,6 +502,31 @@ func TestStaticStringEvaluatorReviewValues(t *testing.T) {
 		{`Math.min(NaN, 2n)`, "", false, false},
 		{`1 / Math.max(-0, 0)`, "Infinity", true, false},
 		{`1 / Math.min(-0, 0)`, "-Infinity", true, false},
+		{`Math.abs(-1) + 1`, "2", true, false},
+		{`String(Math.abs(-1))`, "1", true, false},
+		{`Math.abs()`, "NaN", true, false},
+		{`Math.abs(-1, Symbol.iterator)`, "1", true, false},
+		{`Math.abs(-1, 2n)`, "1", true, false},
+		{`Math.abs(-1, unknown())`, "", false, false},
+		{`Math.abs(Symbol.iterator)`, "", false, false},
+		{`Math.abs(2n)`, "", false, false},
+		{`Math.clz32()`, "32", true, false},
+		{`Math.imul(2)`, "0", true, false},
+		{`Math.pow(1, NaN)`, "NaN", true, false},
+		{`Math.pow(-1, Infinity)`, "NaN", true, false},
+		{`Math.pow(NaN, 0)`, "1", true, false},
+		{`Math.round(-1.5)`, "-1", true, false},
+		{`Math.round(0.49999999999999994)`, "0", true, false},
+		{`1 / Math.round(-0.5)`, "-Infinity", true, false},
+		{`1 / Math.sign(-0)`, "-Infinity", true, false},
+		{`1 / Math.abs(-0)`, "Infinity", true, false},
+		{`Math.hypot(Infinity, NaN)`, "Infinity", true, false},
+		{`Math.hypot(NaN, Infinity)`, "Infinity", true, false},
+		{`Math.hypot(Number.MAX_VALUE, Number.MAX_VALUE, NaN)`, "NaN", true, false},
+		{`Math.hypot(Number.MAX_VALUE, Number.MAX_VALUE, NaN, Infinity)`, "Infinity", true, false},
+		{`Math.hypot(Infinity, Symbol.iterator)`, "", false, false},
+		{`Math.hypot()`, "0", true, false},
+		{`Math.random()`, "", false, false},
 		{`"\uFEFF foo \u2029".trim()`, "foo", true, true},
 		{`"\u0085foo\u0085".trim()`, "\u0085foo\u0085", true, true},
 		{`null?.x`, "undefined", true, true},
@@ -506,6 +535,9 @@ func TestStaticStringEvaluatorReviewValues(t *testing.T) {
 		{`null?.x!.y`, "undefined", true, true},
 		{`(null?.x)?.()`, "undefined", true, true},
 		{`(null?.x).y`, "", false, false},
+		{`"x"?.trim?.()`, "x", true, true},
+		{`String?.("x")`, "x", true, false},
+		{`Symbol?.for("x")`, "", false, false},
 		{`({})?.missing.y`, "", false, false},
 		{`({}).toString?.()`, "", false, false},
 		{`({toString: undefined}).toString?.()`, "undefined", true, false},

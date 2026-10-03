@@ -8,6 +8,18 @@ import (
 	"strings"
 )
 
+// NumberToUint32 applies ECMAScript's modulo-2^32 integer conversion.
+func NumberToUint32(number float64) uint32 {
+	if math.IsNaN(number) || math.IsInf(number, 0) || number == 0 {
+		return 0
+	}
+	remainder := math.Mod(math.Trunc(number), 1<<32)
+	if remainder < 0 {
+		remainder += 1 << 32
+	}
+	return uint32(remainder)
+}
+
 // NumberToString writes a number the way JavaScript writes one, which is what
 // `String(n)` and string concatenation produce: the shortest run of digits that
 // reads back as the same value, no sign on a zero, and exponential notation
