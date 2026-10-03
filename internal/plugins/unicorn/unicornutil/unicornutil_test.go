@@ -142,27 +142,37 @@ array.flatMap((asserted: unknown) => asserted!);
 }
 
 func TestNodeMatchesPathNestedBoundaries(t *testing.T) {
-	sourceFile := parseTestSource(`
-utils.deep.flat(value);
-(utils.deep).flat(value);
-utils?.deep.flat(value);
-utils.deep?.flat(value);
-utils["deep"].flat(value);
-`)
 	tests := []struct {
-		text string
-		want bool
+		text, path string
+		want       bool
 	}{
-		{text: "utils.deep.flat", want: true},
-		{text: "(utils.deep).flat", want: true},
-		{text: "utils?.deep.flat"},
-		{text: "utils.deep?.flat"},
-		{text: `utils["deep"].flat`},
+		{text: "utils.deep.flat", path: "utils.deep.flat", want: true},
+		{text: "(utils.deep).flat", path: "utils.deep.flat", want: true},
+		{text: "utils?.deep.flat", path: "utils.deep.flat"},
+		{text: "utils.deep?.flat", path: "utils.deep.flat"},
+		{text: `utils["deep"].flat`, path: "utils.deep.flat"},
+		{text: "(utils)", path: "\uFEFF utils\u00A0", want: true},
+		{text: "utils", path: "utils.deep"},
+		{text: "utils", path: ""},
+		{text: "utils.deep", path: "utils"},
+		{text: "utils()", path: "utils"},
+		{text: "utils()", path: "utils.deep"},
+		{text: "utils as unknown", path: "utils"},
+		{text: "this", path: "this", want: true},
+		{text: "this", path: "this.deep"},
+		{text: "super", path: "super", want: true},
+		{text: "super", path: "super.deep"},
+		{text: "import.meta", path: "import.meta", want: true},
+		{text: "import.meta", path: "import"},
 	}
 	for _, test := range tests {
+		sourceFile := parseTestSource(test.text + ";")
+		if test.text == "super" {
+			sourceFile = parseTestSource("class A extends B { method() { super.call(); } }")
+		}
 		node := findTestNode(t, sourceFile, test.text)
-		if got := NodeMatchesPath(node, "utils.deep.flat"); got != test.want {
-			t.Fatalf("NodeMatchesPath(%q) = %v, want %v", test.text, got, test.want)
+		if got := NodeMatchesPath(node, test.path); got != test.want {
+			t.Fatalf("NodeMatchesPath(%q, %q) = %v, want %v", test.text, test.path, got, test.want)
 		}
 	}
 }

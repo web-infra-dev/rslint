@@ -28,6 +28,7 @@ type TypeClassifierOptions struct {
 	HeritageSymbolFlags          ast.SymbolFlags
 	NonTargetSymbolLessTypeFlags checker.TypeFlags
 	AllowNullishInMixedUnion     bool
+	TreatMixedUnionAsNonTarget   bool
 }
 
 // ClassifyType mirrors eslint-plugin-unicorn's getTypeScriptType plus the
@@ -111,6 +112,9 @@ func classifyUnion(ctx rule.RuleContext, parts []*checker.Type, options TypeClas
 	allTarget := true
 	allNonTarget := true
 	for _, class := range classes {
+		if options.TreatMixedUnionAsNonTarget && class == TypeNonTarget {
+			return TypeNonTarget
+		}
 		allTarget = allTarget && class == TypeTarget
 		allNonTarget = allNonTarget && class == TypeNonTarget
 	}
@@ -144,11 +148,16 @@ func classifyHeritage(ctx rule.RuleContext, t *checker.Type, options TypeClassif
 	if symbol == nil || symbol.Flags&options.HeritageSymbolFlags == 0 {
 		return TypeUnknown
 	}
+	// Constructors have the class symbol too, but do not inherit its instance
+	// methods. Only resolve declared heritage for instances and type references.
+	if checker.Type_objectFlags(t)&(checker.ObjectFlagsClassOrInterface|checker.ObjectFlagsReference) == 0 {
+		return TypeUnknown
+	}
 	declared := checker.Checker_getDeclaredTypeOfSymbol(ctx.TypeChecker, symbol)
 	if declared == nil {
 		return TypeUnknown
 	}
-	for _, base := range checker.Checker_getBaseTypes(ctx.TypeChecker, declared) {
+	for _, base := range ctx.TypeChecker.GetBaseTypes(declared) {
 		if ClassifyType(ctx, base, options) == TypeTarget {
 			return TypeTarget
 		}

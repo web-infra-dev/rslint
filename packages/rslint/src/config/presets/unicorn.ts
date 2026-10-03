@@ -59,7 +59,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-accessor-recursion': 'error', // not implemented
     // 'unicorn/no-accidental-bitwise-operator': 'error', // not implemented
     // 'unicorn/no-anonymous-default-export': 'error', // not implemented
-    // 'unicorn/no-array-callback-reference': 'error', // not implemented
+    'unicorn/no-array-callback-reference': 'error',
     'unicorn/no-array-concat-in-loop': 'error',
     'unicorn/no-array-fill-with-reference-type': 'error',
     'unicorn/no-array-from-fill': 'error',
