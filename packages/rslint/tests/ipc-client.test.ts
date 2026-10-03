@@ -78,12 +78,33 @@ function pairClients(options: IpcClientOptions = {}): {
 }
 
 describe('IPC byte attachments', () => {
-  function receiver(options: IpcClientOptions = {}) {
-    // Inbound attachment cases start after the Go configuration exchange.
-    options.memoryTransport?.configure(MEMORY_CONFIG);
-    const pair = pairClients(options);
+  function receiver(
+    options: {
+      memoryTransport?: ReturnType<typeof createMemoryTransport>;
+    } = {},
+  ) {
+    const memory = options.memoryTransport;
+    const pair = pairClients({
+      createMemoryTransport: memory ? () => memory : undefined,
+    });
     let id = 0;
     pair.b.start();
+    if (memory) {
+      // Storage/lease tests start after a successful private setup. Real fd
+      // transfer is covered below by the Go binary peer.
+      memory.transfer = () => ({ version: MEMORY_CONFIG.version });
+      const discard = () => undefined;
+      pair.streams.bToA.on('data', discard);
+      pair.streams.aToB.write(
+        encodeFrame({
+          kind: 'transportPrepare',
+          id: 1000,
+          data: { configuration: MEMORY_CONFIG },
+        }),
+      );
+      pair.streams.aToB.write(encodeFrame({ kind: 'transportCommit', id: 0 }));
+      pair.streams.bToA.off('data', discard);
+    }
     return {
       ...pair,
       async request(message: Partial<IpcMessage>) {
@@ -187,209 +208,210 @@ describe('IPC byte attachments', () => {
     }
   });
 
-  test('adds the mapping to the first request envelope only', async () => {
-    const memory = createMemoryTransport();
-    const pair = pairClients({ memoryTransport: memory });
-    const frames: IpcMessage[] = [];
-    pair.streams.bToA.on('data', (chunk: Buffer) => {
-      const message = decodeFrame(chunk)!.msg;
-      frames.push(message);
-      pair.streams.aToB.write(
-        encodeFrame({
-          kind: 'response',
-          id: message.id,
-          data:
-            message.kind === 'transportConfig' ? MEMORY_CONFIG : { ok: true },
-        }),
-      );
-    });
-    pair.b.start();
-    try {
-      await pair.b.sendRequest('init', { runtime: {} });
-      await pair.b.sendRequest('other', {});
-      expect(frames.map(({ kind }) => kind)).toEqual([
-        'transportConfig',
-        'init',
-        'other',
-      ]);
-      expect(frames[0]).toEqual({ kind: 'transportConfig', id: 1 });
-      expect(frames[1].transport).toEqual({ mapping: memory.descriptor() });
-      expect(frames[1].data).toEqual({ runtime: {} });
-      expect(frames[2].transport).toBeUndefined();
-      expect(memory.configuration()).toEqual(MEMORY_CONFIG);
-    } finally {
-      pair.cleanup();
-    }
-  });
-
-  test('shares one runtime configuration exchange across concurrent first requests', async () => {
-    const memory = createMemoryTransport();
-    expect(() => memory.descriptor()).toThrow('not configured');
+  test('advertises once without loading native storage or delaying first requests', async () => {
+    let created = 0;
     const pair = pairClients({
-      memoryTransport: memory,
-      inheritedMemoryFd: 7,
+      createMemoryTransport: () => {
+        created++;
+        throw new Error('must stay lazy');
+      },
     });
     const frames: IpcMessage[] = [];
     pair.streams.bToA.on('data', (chunk: Buffer) => {
       const message = decodeFrame(chunk)!.msg;
       frames.push(message);
-      if (message.kind !== 'transportConfig') {
-        pair.streams.aToB.write(
-          encodeFrame({ kind: 'response', id: message.id }),
-        );
-      }
+      pair.streams.aToB.write(
+        encodeFrame({ kind: 'response', id: message.id, data: { ok: true } }),
+      );
     });
     pair.b.start();
     try {
-      const configurationRequest = once(pair.streams.bToA, 'data');
-      const first = pair.b.sendRequest('first', {});
-      const second = pair.b.sendRequest('second', {});
-      const config = decodeFrame((await configurationRequest)[0])!.msg;
-      expect(frames).toEqual([{ kind: 'transportConfig', id: config.id }]);
-      pair.streams.aToB.write(
-        encodeFrame({ kind: 'response', id: config.id, data: MEMORY_CONFIG }),
-      );
-      await Promise.all([first, second]);
-      expect(frames.map(({ kind }) => kind)).toEqual([
-        'transportConfig',
-        'first',
-        'second',
+      await Promise.all([
+        pair.b.sendRequest('init', {}),
+        pair.b.sendRequest('other', {}),
       ]);
-      expect(frames[1].transport).toEqual({ mapping: memory.descriptor(7) });
-      expect(frames[2].transport).toBeUndefined();
+      expect(frames.map(({ kind }) => kind)).toEqual(['init', 'other']);
+      expect(frames[0].transport).toEqual({ sharedMemory: 1 });
+      expect(frames[1].transport).toBeUndefined();
+      expect(created).toBe(0);
     } finally {
       pair.cleanup();
     }
   });
 
-  test.each([
-    { when: 'before request', closeThrows: false },
-    { when: 'before response', closeThrows: false },
-    { when: 'after response', closeThrows: false },
-    { when: 'after error response', closeThrows: false },
-    { when: 'before request', closeThrows: true },
-    { when: 'before response', closeThrows: true },
-    { when: 'after response', closeThrows: true },
-    { when: 'after error response', closeThrows: true },
-  ])(
-    'close during bootstrap rejects every waiter without configuring or sending init: %j',
-    async ({ when, closeThrows }) => {
+  test.each(['commit', 'abort'] as const)(
+    'prepares storage once and observes %s before admitting readers',
+    async (outcome) => {
+      let created = 0;
       const memory = createMemoryTransport();
-      let configured = 0;
-      const configure = memory.configure;
-      memory.configure = (value) => {
-        configured++;
-        configure(value);
-      };
-      let closeCalls = 0;
-      const closeMemory = memory.close;
-      memory.close = () => {
-        closeCalls++;
-        closeMemory();
-        if (closeThrows) throw new Error('native cleanup failed');
-      };
-      const pair = pairClients({ memoryTransport: memory });
-      const frames: IpcMessage[] = [];
-      pair.streams.bToA.on('data', (chunk: Buffer) => {
-        frames.push(decodeFrame(chunk)!.msg);
+      memory.transfer = () => ({ version: 1 });
+      const pair = pairClients({
+        createMemoryTransport: () => {
+          created++;
+          return memory;
+        },
       });
+      pair.b.setInboundHandler(() => true);
       pair.b.start();
+      async function request(message: IpcMessage) {
+        const response = once(pair.streams.bToA, 'data');
+        pair.streams.aToB.write(encodeFrame(message));
+        return decodeFrame((await response)[0])!.msg;
+      }
       try {
-        const configurationRequest =
-          when === 'before request'
-            ? undefined
-            : once(pair.streams.bToA, 'data');
-        const pending = Promise.allSettled([
-          pair.b.sendRequest('init', {}),
-          pair.b.sendRequest('other', {}),
-        ]);
-        const config = configurationRequest
-          ? decodeFrame((await configurationRequest)[0])!.msg
-          : undefined;
-        if (when === 'after response' || when === 'after error response') {
-          pair.streams.aToB.write(
-            encodeFrame({
-              kind: when === 'after response' ? 'response' : 'error',
-              id: config!.id,
-              data:
-                when === 'after response'
-                  ? MEMORY_CONFIG
-                  : { message: 'unsupported transportConfig' },
-            }),
-          );
-        }
-        const reason = new Error('test session closed');
-        pair.b.close(reason);
-        expect(await pair.b.done).toBe(reason);
-        for (const result of await pending) {
-          expect(result.status).toBe('rejected');
-          if (result.status === 'rejected') expect(result.reason).toBe(reason);
-        }
-        expect(configured).toBe(0);
-        expect(closeCalls).toBe(1);
-        expect(frames.map(({ kind }) => kind)).toEqual(
-          when === 'before request' ? [] : ['transportConfig'],
+        expect(
+          (
+            await request({
+              kind: 'transportPrepare',
+              id: 1,
+              data: { configuration: MEMORY_CONFIG },
+            })
+          ).data,
+        ).toEqual({ version: 1 });
+        const attached = {
+          kind: 'bytes',
+          id: 2,
+          attachments: [{ range: { offset: 0, length: 0 } }],
+          transport: { batches: [emptyBatch()] },
+        };
+        expect((await request(attached)).kind).toBe('error');
+        pair.streams.aToB.write(
+          encodeFrame({
+            kind: outcome === 'commit' ? 'transportCommit' : 'transportAbort',
+            id: 0,
+          }),
         );
-        expect(memory.fd()).toBeUndefined();
+        expect((await request({ ...attached, id: 3 })).kind).toBe(
+          outcome === 'commit' ? 'response' : 'error',
+        );
+        expect(
+          (
+            await request({
+              kind: 'transportPrepare',
+              id: 4,
+              data: { configuration: MEMORY_CONFIG },
+            })
+          ).kind,
+        ).toBe('error');
+        expect(created).toBe(1);
+        if (outcome === 'abort') expect(memory.configuration()).toBeUndefined();
       } finally {
         pair.cleanup();
       }
     },
   );
 
-  test.each(['peer error', 'invalid configuration', 'native failure'] as const)(
-    'closes the arena and keeps complete inline text after bootstrap %s',
+  test.each(['load', 'configuration', 'transfer'] as const)(
+    'retains inline attachments after native %s failure, without retry',
     async (failure) => {
+      let created = 0;
+      let closed = 0;
       const memory = createMemoryTransport();
-      const configure = memory.configure;
-      if (failure === 'native failure') {
-        memory.configure = () => {
-          throw new Error('allocation failed');
-        };
-      }
-      const pair = pairClients({ memoryTransport: memory });
-      const frames: IpcMessage[] = [];
+      const close = memory.close;
+      memory.close = () => {
+        closed++;
+        close();
+      };
+      memory.transfer = () => {
+        throw new Error('transfer unavailable');
+      };
+      const pair = pairClients({
+        createMemoryTransport: () => {
+          created++;
+          if (failure === 'load') {
+            memory.close();
+            throw new Error('addon unavailable');
+          }
+          return memory;
+        },
+      });
       const text = '\ufeffconst complete = "😀";\u0000\r\n';
+      pair.b.setInboundHandler((msg) => {
+        expect(msg.attachments).toEqual([text]);
+        return true;
+      });
+      pair.b.start();
+      async function request(message: IpcMessage) {
+        const response = once(pair.streams.bToA, 'data');
+        pair.streams.aToB.write(encodeFrame(message));
+        return decodeFrame((await response)[0])!.msg;
+      }
+      try {
+        for (const id of [1, 2]) {
+          expect(
+            (
+              await request({
+                kind: 'transportPrepare',
+                id,
+                data: {
+                  configuration:
+                    failure === 'configuration' ? {} : MEMORY_CONFIG,
+                },
+              })
+            ).kind,
+          ).toBe('error');
+        }
+        expect(
+          (await request({ kind: 'inline', id: 3, attachments: [{ text }] }))
+            .kind,
+        ).toBe('response');
+        expect(created).toBe(1);
+        expect(closed).toBe(1);
+      } finally {
+        pair.cleanup();
+      }
+    },
+  );
+
+  test.each(['before prepare', 'create', 'configure', 'transfer'] as const)(
+    'close during %s cannot resurrect storage',
+    async (when) => {
+      let created = 0;
+      let closed = 0;
+      const memory = createMemoryTransport();
+      const close = memory.close;
+      memory.close = () => {
+        closed++;
+        close();
+      };
+      const reason = new Error('session closed');
+      const pair = pairClients({
+        createMemoryTransport: () => {
+          created++;
+          if (when === 'create') pair.b.close(reason);
+          return memory;
+        },
+      });
+      const configure = memory.configure;
+      memory.configure = (value) => {
+        configure(value);
+        if (when === 'configure') pair.b.close(reason);
+      };
+      memory.transfer = () => {
+        pair.b.close(reason);
+        return { version: 1 };
+      };
+      const frames: IpcMessage[] = [];
       pair.streams.bToA.on('data', (chunk: Buffer) => {
-        const message = decodeFrame(chunk)!.msg;
-        frames.push(message);
-        const configuring = message.kind === 'transportConfig';
-        pair.streams.aToB.write(
-          encodeFrame({
-            kind:
-              configuring && failure === 'peer error' ? 'error' : 'response',
-            id: message.id,
-            data: configuring
-              ? failure === 'peer error'
-                ? { message: 'unsupported request' }
-                : failure === 'invalid configuration'
-                  ? { ...MEMORY_CONFIG, slotSize: '4096' }
-                  : MEMORY_CONFIG
-              : { ok: true },
-          }),
-        );
+        frames.push(decodeFrame(chunk)!.msg);
       });
       pair.b.start();
       try {
-        await Promise.all([
-          pair.b.sendRequest('init', {}, [text]),
-          pair.b.sendRequest('other', {}, [text]),
-        ]);
-        await pair.b.sendRequest('later', {}, [text]);
-        expect(frames.map(({ kind }) => kind)).toEqual([
-          'transportConfig',
-          'init',
-          'other',
-          'later',
-        ]);
-        for (const frame of frames.slice(1)) {
-          expect(frame.transport).toBeUndefined();
-          expect(frame.attachments).toEqual([{ text }]);
-        }
-        expect(memory.configuration()).toBeUndefined();
-        expect(() => configure(MEMORY_CONFIG)).toThrow('closed');
+        if (when === 'before prepare') pair.b.close(reason);
+        pair.streams.aToB.write(
+          encodeFrame({
+            kind: 'transportPrepare',
+            id: 1,
+            data: { configuration: MEMORY_CONFIG },
+          }),
+        );
+        expect(await pair.b.done).toBe(reason);
+        expect(created).toBe(when === 'before prepare' ? 0 : 1);
+        expect(closed).toBe(when === 'before prepare' ? 0 : 1);
+        expect(frames).toEqual([]);
       } finally {
         pair.cleanup();
+        if (!created) memory.close();
       }
     },
   );
@@ -414,10 +436,13 @@ describe('IPC byte attachments', () => {
   });
 
   test.each([false, true])(
-    'keeps bootstrap first under serialization reentry (outer fails: %s)',
+    'keeps capability on the first written frame under serialization reentry (outer fails: %s)',
     async (failOuter) => {
-      const memory = createMemoryTransport();
-      const pair = pairClients({ memoryTransport: memory });
+      const pair = pairClients({
+        createMemoryTransport: () => {
+          throw new Error('must stay lazy');
+        },
+      });
       const frames: IpcMessage[] = [];
       pair.streams.bToA.on('data', (chunk: Buffer) => {
         const message = decodeFrame(chunk)!.msg;
@@ -426,7 +451,7 @@ describe('IPC byte attachments', () => {
           encodeFrame({
             kind: 'response',
             id: message.id,
-            data: message.kind === 'transportConfig' ? MEMORY_CONFIG : {},
+            data: {},
           }),
         );
       });
@@ -445,13 +470,10 @@ describe('IPC byte attachments', () => {
         else await outer;
         await nested;
         expect(frames.map((message) => message.kind)).toEqual(
-          failOuter
-            ? ['transportConfig', 'nested']
-            : ['transportConfig', 'outer', 'nested'],
+          failOuter ? ['nested'] : ['outer', 'nested'],
         );
-        expect(frames[0].transport).toBeUndefined();
-        expect(frames[1].transport).toEqual({ mapping: memory.descriptor() });
-        if (!failOuter) expect(frames[2].transport).toBeUndefined();
+        expect(frames[0].transport).toEqual({ sharedMemory: 1 });
+        if (!failOuter) expect(frames[1].transport).toBeUndefined();
       } finally {
         pair.cleanup();
       }
@@ -476,6 +498,9 @@ describe('IPC byte attachments', () => {
           if (failure === 'descriptor')
             throw new Error('descriptor unavailable');
           return { version: MEMORY_CONFIG.version + 1 };
+        }
+        sendFd() {
+          throw new Error('not transferred in this test');
         }
         register(): number {
           throw new Error('must not register');
@@ -521,6 +546,9 @@ describe('IPC byte attachments', () => {
             processId: platform === 'windows' ? 123 : null,
           };
         }
+        sendFd() {
+          throw new Error('not transferred in this test');
+        }
         register(): number {
           throw new Error('must not register');
         }
@@ -536,10 +564,10 @@ describe('IPC byte attachments', () => {
         memory = createMemoryTransport();
         expect(memory.fd()).toBe(platform === 'windows' ? undefined : 5);
         memory.configure(MEMORY_CONFIG);
-        expect(JSON.parse(JSON.stringify(memory.descriptor(7)))).toEqual(
+        expect(JSON.parse(JSON.stringify(memory.descriptor()))).toEqual(
           platform === 'windows'
             ? { version: MEMORY_CONFIG.version, handle: '42', processId: 123 }
-            : { version: MEMORY_CONFIG.version, fd: 7 },
+            : { version: MEMORY_CONFIG.version, fd: 5 },
         );
       } finally {
         memory?.close();
@@ -2225,7 +2253,10 @@ describe('IpcClient terminal cleanup', () => {
       const input = new PassThrough();
       const output = new PassThrough();
       const memory = createMemoryTransport();
-      const client = new IpcClient(input, output, { memoryTransport: memory });
+      memory.transfer = () => ({ version: 1 });
+      const client = new IpcClient(input, output, {
+        createMemoryTransport: () => memory,
+      });
       let completed = 0;
       const completedSession = client.done.then((reason) => {
         completed++;
@@ -2253,21 +2284,21 @@ describe('IpcClient terminal cleanup', () => {
       });
       output.on('data', (chunk: Buffer) => {
         const frame = decodeFrame(chunk)!.msg;
-        if (frame.kind === 'transportConfig') {
-          input.write(
-            encodeFrame({
-              kind: 'response',
-              id: frame.id,
-              data: MEMORY_CONFIG,
-            }),
-          );
-        } else if (++requests === 2) {
+        if (frame.kind !== 'response' && ++requests === 2) {
           sent();
         }
       });
       client.setInboundHandler(() => undefined);
       client.registerNotification('log', () => undefined);
       client.start();
+      input.write(
+        encodeFrame({
+          kind: 'transportPrepare',
+          id: 1000,
+          data: { configuration: MEMORY_CONFIG },
+        }),
+      );
+      input.write(encodeFrame({ kind: 'transportCommit', id: 0 }));
       try {
         const pending = Promise.allSettled([
           client.sendRequest('first', {}),

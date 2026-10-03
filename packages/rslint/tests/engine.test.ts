@@ -140,11 +140,12 @@ describe('CLI shared source integration', () => {
     },
   );
 
-  test('configures the inherited empty arena from a non-default peer layout', async () => {
+  test('configures storage on demand from a non-default peer layout', async () => {
     const transport = createMemoryTransport();
     const fd = transport.fd();
     if (fd !== undefined) expect(fs.fstatSync(fd).size).toBe(0);
     expect(transport.configuration()).toBeUndefined();
+    transport.transfer = () => transport.descriptor();
     const configurations: unknown[] = [];
     const configure = transport.configure;
     transport.configure = (config) => {

@@ -1537,13 +1537,13 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    bounded, demand-driven scheduling and thread lifetime within each host;
    adapters own configuration activation and generation lifetimes. Plugin
    loading uses the config entry versions selected by `ConfigModuleHost`.
-   The CLI loads the dedicated `dist/eslint-plugin/host.js` bundle for worker
+   The CLI and native API load the dedicated `dist/eslint-plugin/host.js` bundle for worker
    coordination and protocol conversion. This entry excludes the per-file lint
    runtime and native parser, which load inside `lint-worker.js`. The existing
-   `eslint-plugin/index.js` entry retains the full exported runtime for native
-   API and LSP consumers. Both entries bundle the same host implementation and
+   `eslint-plugin/index.js` entry retains the full exported runtime for LSP
+   and direct consumers. Both entries bundle the same host implementation and
    resolve the sibling `lint-worker.js` relative to their module URL. The host
-   is a private CLI asset, not a new package export; `build:js` emits it in a
+   is a private core asset, not a new package export; `build:js` emits it in a
    separate library block to keep the worker independent of shared chunks.
 
 `internal/ipc.Channel` is the common Go/Node data transport. Its request API
@@ -1601,17 +1601,35 @@ The CLI allows a disconnected child the existing process-exit grace period,
 preserving its natural exit code. A child that outlives that grace is terminated
 and reported as a host failure.
 
-For shared attachments, `spawnIpcProcess` prepares an empty anonymous Unix
-descriptor before spawning Go; Windows needs no mapping at this point. Before
-sending the first application request, `IpcClient` requests the storage configuration through the
-same channel's `transportConfig` request. Go supplies the layout, and Rust
-uses it to size and map the arena. The configuration request is handled inside
-IPC and does not consume the application request's mapping bootstrap. Concurrent
-initial requests share this one configuration exchange. `IpcClient` then sends
-the initialized mapping in the first application request envelope and owns its
-lifetime. A failed setup closes native resources and keeps complete attachments inline
-for the session. Neither the CLI engine nor the plugin host chooses a
-platform mapping or manages a lease. The client validates attachment ranges,
+`spawnIpcProcess` starts Go with ordinary stdio and a lazy native factory.
+The first successfully serialized application request advertises late shared
+storage support in its transport envelope; it loads no addon and allocates no
+arena. Go starts one session-owned setup only when `SendRequest` has a nonempty
+attachment that fits the arena budget. Requests without eligible attachments
+remain inline without consuming that opportunity. Setup never inspects plugin
+configuration or application message kinds.
+
+Go sends `transportPrepare` with its runtime layout. On Unix it first opens a
+one-shot socket in a private temporary directory. Node creates and configures
+its native arena, then queues its fd using `SCM_RIGHTS` without blocking; on Windows
+it replies with the existing anonymous mapping descriptor. Go receives and maps
+the backing, writes `transportCommit` on the ordinary IPC stream, and only then
+allows requests to publish shared ranges. Node admits readers only after that
+commit. Concurrent consumers wait on the same setup without blocking the read
+loop or unrelated requests. A five-second session setup deadline is independent
+of application caller cancellation; channel close cancels setup. Failed setup
+aborts and closes prepared resources, preserving complete inline attachments
+without retries. Stream faults remain terminal errors.
+
+The arena and lease registry belong to the IPC session in Node's main thread,
+not to a plugin worker or per-lint plugin host. A resident API can activate and
+retire multiple plugin hosts while retaining one arena until the session closes.
+No-plugin CLI/API startup therefore needs no native addon; plugin activation
+without attachment traffic still needs no main-thread arena, although warming
+plugin workers loads their parser. Legacy peers without the late capability
+stay inline, while Go still accepts the previous inherited-fd bootstrap.
+Neither the CLI engine nor the plugin host chooses a platform mapping or manages
+a lease. The client validates attachment ranges,
 registers one native capability for all of the request's batches, dispatches
 the application handler and revokes the capability before returning either a
 result or an error. It acknowledges reuse only after every native reader returns.
@@ -1634,8 +1652,11 @@ accepts only the resolved type, keeping native capabilities out of the wire mode
 
 Linux uses a sealed anonymous memory file, macOS an immediately unlinked POSIX
 shared-memory object, and Windows an anonymous pagefile mapping whose handle
-Go duplicates. These are private backend details: attachment transfer never uses
-filesystem paths or process addresses. Windows reserves the arena and commits
+Go duplicates. Attachment bytes never use filesystem backing or process
+addresses. Unix bootstrap uses a temporary socket path only to transfer an
+anonymous fd, then removes it on success, failure or ordinary shutdown. If both
+processes are forcibly killed during setup, a socket path may remain; the OS
+still releases their memory mappings and descriptors. Windows reserves the arena and commits
 its control page initially; each data slot is committed on its first write.
 Allocation or commitment failures, exhausted capacity and attachments larger
 than the available budget retain their complete inline representation.

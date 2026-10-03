@@ -59,8 +59,9 @@ func (a Attachment) inline() AttachmentData {
 	return AttachmentData{Text: &a.text}
 }
 
-// initializeMemory runs before the first application request is dispatched.
-// That request fixes the backend, including absent or unavailable storage.
+// The first application request fixes peer capabilities before its handler can
+// send attachments. Legacy peers can still provide their inherited mapping;
+// capable peers allocate nothing until an outbound attachment needs storage.
 func (c *Channel) initializeMemory(transport *TransportMetadata) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -74,6 +75,7 @@ func (c *Channel) initializeMemory(transport *TransportMetadata) error {
 		return nil
 	}
 	c.memoryInitialized = true
+	c.memoryCapable = transport != nil && transport.SharedMemory == 1 && transport.Mapping == nil
 	if transport != nil && transport.Mapping != nil {
 		// Shared storage is optional. Unsupported layouts, platforms and
 		// allocation failures retain the complete inline transport.

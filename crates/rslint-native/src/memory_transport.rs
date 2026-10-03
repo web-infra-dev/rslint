@@ -233,8 +233,7 @@ impl MemoryArena {
         })
     }
 
-    /// Unix inherits this empty backing when Go starts; Windows needs no handle
-    /// until the peer supplies the runtime dimensions.
+    /// Process-local Unix descriptor. Windows uses a mapping handle instead.
     #[napi]
     pub fn fd(&self) -> Option<i32> {
         self.backing
@@ -259,6 +258,18 @@ impl MemoryArena {
     #[napi]
     pub fn descriptor(&self) -> Result<MemoryMapping> {
         Ok(self.mapping.as_ref().ok_or_else(invalid)?.descriptor())
+    }
+
+    /// Transfer the configured anonymous Unix backing without blocking the JS
+    /// thread on a peer response. The listener already exists before this call.
+    #[napi]
+    pub fn send_fd(&self, socket_path: String) -> Result<()> {
+        let fd = self
+            .mapping
+            .as_ref()
+            .and_then(|mapping| mapping.fd())
+            .ok_or_else(invalid)?;
+        mapping::send_fd(&socket_path, fd).map_err(|error| Error::from_reason(error.to_string()))
     }
 
     /// Register all batches atomically as one ordered logical byte space. No
