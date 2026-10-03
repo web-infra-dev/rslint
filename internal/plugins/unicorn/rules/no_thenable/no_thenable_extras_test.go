@@ -34,6 +34,12 @@ func TestNoThenableExtras(t *testing.T) {
 		t,
 		&no_thenable.NoThenableRule,
 		[]rule_tester.ValidTestCase{
+			// Evaluating the computed method first must not hide the array mutation.
+			{Code: `const method = ["reverse"];
+const names = ["then", "safe"];
+const first = {[method[0]]: 1};
+names[method[0]]();
+const second = {[names[0]]: 1};`},
 			// ---- Dimension 4: unresolved computed identifiers are dynamic keys ----
 			tsValid(`const foo = {[(then)]: 1}`),
 			tsValid(`class Foo {[(then)]() {}}`),

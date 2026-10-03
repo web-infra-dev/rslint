@@ -18,6 +18,12 @@ func TestNoInvalidFetchOptionsExtras(t *testing.T) {
 		t,
 		&no_invalid_fetch_options.NoInvalidFetchOptionsRule,
 		[]rule_tester.ValidTestCase{
+			// Evaluating the computed method first must not hide the array mutation.
+			{Code: `const method = ["reverse"];
+const methods = ["GET", "POST"];
+fetch("/", {method: method[0] && "POST", body: "payload"});
+methods[method[0]]();
+fetch("/", {method: methods[0], body: "payload"});`},
 			// ---- Dimension 4: Optional calls do not match direct fetch calls ----
 			jsValid(`fetch?.(url, {body})`),
 			jsValid(`(fetch)?.(url, {body})`),

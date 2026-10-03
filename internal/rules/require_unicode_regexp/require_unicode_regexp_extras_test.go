@@ -34,6 +34,12 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 		t,
 		&RequireUnicodeRegexpRule,
 		[]rule_tester.ValidTestCase{
+			// Evaluating the computed method first must not hide the array mutation.
+			{Code: `const method = ["reverse"];
+const flags = ["", "u"];
+RegExp("a", method[0] && "u");
+flags[method[0]]();
+RegExp("a", flags[0]);`},
 			// ReferenceTracker treats authored program-scope type declarations
 			// as modifications of a script global, but not of a module global.
 			{Code: "interface RegExp {}\nRegExp('x')", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},

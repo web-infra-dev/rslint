@@ -18,6 +18,12 @@ func TestErrorMessageExtras(t *testing.T) {
 		t,
 		&error_message.ErrorMessageRule,
 		[]rule_tester.ValidTestCase{
+			// Evaluating the computed method first must not hide the array mutation.
+			{Code: `const method = ["reverse"];
+const messages = ["", "ok"];
+new Error(method[0]);
+messages[method[0]]();
+new Error(messages[0]);`},
 			// ---- Dimension 4: Optional chain calls are skipped ----
 			jsValid("Error?.('msg')"),
 			jsValid("AggregateError?.(errors, 'msg')"),
