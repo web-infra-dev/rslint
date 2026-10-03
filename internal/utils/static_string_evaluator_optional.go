@@ -2,10 +2,19 @@ package utils
 
 import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
-func (staticEvaluator *StaticStringEvaluator) optionalChainShortCircuits(node *ast.Node) bool {
+func (state *staticEvaluationState) optionalChainShortCircuits(node *ast.Node, staticEvaluator *StaticStringEvaluator) bool {
 	if node == nil || !ast.IsOptionalChain(node) {
 		return false
 	}
+	if result, found := state.optionalShortCircuits[node]; found {
+		return result
+	}
+	result := state.computeOptionalChainShortCircuit(node, staticEvaluator)
+	state.optionalShortCircuits[node] = result
+	return result
+}
+
+func (state *staticEvaluationState) computeOptionalChainShortCircuit(node *ast.Node, staticEvaluator *StaticStringEvaluator) bool {
 	var input *ast.Node
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
@@ -17,7 +26,7 @@ func (staticEvaluator *StaticStringEvaluator) optionalChainShortCircuits(node *a
 	default:
 		return false
 	}
-	if staticEvaluator.optionalChainShortCircuits(input) {
+	if state.optionalChainShortCircuits(input, staticEvaluator) {
 		return true
 	}
 	if !ast.IsOptionalChainRoot(node) {
