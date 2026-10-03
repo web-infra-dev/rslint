@@ -52,7 +52,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/isolated-functions': 'error', // not implemented
     // 'unicorn/iteration-fallback-style': 'off', // not implemented
     // 'unicorn/logical-assignment-operators': 'error', // not implemented
-    // 'unicorn/max-nested-calls': 'error', // not implemented
+    'unicorn/max-nested-calls': 'error',
     // 'unicorn/name-replacements': 'error', // not implemented
     'unicorn/new-for-builtins': 'error',
     // 'unicorn/no-abusive-eslint-disable': 'error', // not implemented

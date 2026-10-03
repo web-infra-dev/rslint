@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/expiring_todo_comments"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/explicit_timer_delay"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/max_nested_calls"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_anonymous_default_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_concat_in_loop"
@@ -91,6 +92,7 @@ func GetAllRules() []rule.Rule {
 		explicit_timer_delay.ExplicitTimerDelayRule,
 		expiring_todo_comments.ExpiringTodoCommentsRule,
 		filename_case.FilenameCaseRule,
+		max_nested_calls.MaxNestedCallsRule,
 		new_for_builtins.NewForBuiltinsRule,
 		no_anonymous_default_export.NoAnonymousDefaultExportRule,
 		no_array_concat_in_loop.NoArrayConcatInLoopRule,
