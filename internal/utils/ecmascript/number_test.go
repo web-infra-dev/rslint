@@ -97,6 +97,30 @@ func TestStringToNumber(t *testing.T) {
 	}
 }
 
+func TestNumberParseInt(t *testing.T) {
+	for _, test := range []struct {
+		text  string
+		radix int32
+		want  float64
+	}{
+		{"10px", 0, 10}, {"1e2", 0, 1}, {"0x10", 0, 16}, {"0X10", 16, 16},
+		{"0x10", 10, 0}, {"0b10", 0, 0}, {"010", 0, 10}, {"11", 2, 3},
+		{"z!", 36, 35}, {"+FF", 16, 255}, {"\uFEFF -0x10", 0, -16},
+		{"-0", 10, math.Copysign(0, -1)}, {"9007199254740993", 10, 9007199254740992},
+		{"", 0, math.NaN()}, {"0x", 0, math.NaN()}, {"+", 10, math.NaN()},
+		{"\u008510", 0, math.NaN()}, {"10", 1, math.NaN()}, {"10", 37, math.NaN()},
+	} {
+		got := NumberParseInt(test.text, test.radix)
+		if math.IsNaN(test.want) {
+			if !math.IsNaN(got) {
+				t.Errorf("NumberParseInt(%q, %d) = %v, want NaN", test.text, test.radix, got)
+			}
+		} else if math.Float64bits(got) != math.Float64bits(test.want) {
+			t.Errorf("NumberParseInt(%q, %d) = %v, want %v", test.text, test.radix, got, test.want)
+		}
+	}
+}
+
 func TestStringToBigInt(t *testing.T) {
 	tests := []struct {
 		name  string

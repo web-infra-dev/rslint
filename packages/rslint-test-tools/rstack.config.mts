@@ -851,6 +851,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/no-console-spaces.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-document-cookie.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-exports-in-scripts.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-global-object-property-assignment.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-instanceof-builtins.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-invalid-fetch-options.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-invalid-remove-event-listener.test.ts',

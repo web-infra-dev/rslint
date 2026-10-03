@@ -15,8 +15,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
-// StaticStringEvaluator folds expressions to string constants. It wraps tsgo's
-// evaluator and adds stable local variable resolution through the TypeChecker.
+// StaticStringEvaluator folds expressions to static JavaScript values and exposes
+// string/property-name conversions to callers. It wraps tsgo's evaluator and adds
+// stable local variable resolution through the TypeChecker. Internal values such
+// as Symbols stay typed until a conversion boundary instead of being stringified.
 // Create one evaluator per linted file; it keeps write-reference and recursion
 // state for that file.
 type StaticStringEvaluator struct {
@@ -29,6 +31,7 @@ type StaticStringEvaluator struct {
 	evaluator              evaluator.Evaluator
 	resolveIdentifiers     bool
 	resolving              map[*ast.Symbol]bool
+	evaluation             *staticEvaluationState
 	referenceFlagsComputed bool
 	referenceFlags         map[*ast.Symbol]staticReferenceFlags
 }
@@ -258,6 +261,9 @@ func (staticEvaluator *StaticStringEvaluator) EvalStringValue(node *ast.Node) (s
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return node.AsNoSubstitutionTemplateLiteral().Text, StaticEvalString
 	case ast.KindCallExpression:
+		if ast.IsOptionalChain(node) {
+			break
+		}
 		if value, matched, ok := staticEvaluator.evalArrayJoin(node); matched {
 			if ok {
 				return value, StaticEvalString
@@ -276,10 +282,9 @@ func (staticEvaluator *StaticStringEvaluator) EvalStringValue(node *ast.Node) (s
 	return "", StaticEvalNonString
 }
 
-func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEvalResult {
-	node = SkipAssertionsAndParens(node)
-	if node == nil {
-		return staticEvalResult{}
+func (staticEvaluator *StaticStringEvaluator) evalUncachedValue(node *ast.Node) staticEvalResult {
+	if staticEvaluator.evaluation.optionalChainShortCircuits(node, staticEvaluator) {
+		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 	}
 
 	switch node.Kind {
@@ -306,13 +311,6 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 		}
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 	case ast.KindIdentifier:
-		if !staticEvaluator.resolveIdentifiers {
-			return staticEvalResult{}
-		}
-		identifier := node.AsIdentifier()
-		if identifier != nil && staticEvaluator.isBuiltinIdentifier(node, "undefined") {
-			return staticEvalResult{value: staticUndefinedValue{}, ok: true}
-		}
 		return staticEvaluator.evalIdentifier(node)
 	case ast.KindTemplateExpression:
 		return staticEvaluator.evalTemplateExpression(node, false)
@@ -333,10 +331,19 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 			return result
 		}
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		if result := staticEvaluator.evalWellKnownSymbolMember(node); result.ok {
+			return result
+		}
 		if result := staticEvaluator.evalMemberAccess(node); result.ok {
 			return result
 		}
 	case ast.KindCallExpression:
+		if result := staticEvaluator.evalSymbolCall(node); result.ok {
+			return result
+		}
+		if result := staticEvaluator.evalNumericBuiltinCall(node); result.ok {
+			return result
+		}
 		if result := staticEvaluator.evalBuiltinStaticCall(node); result.ok {
 			return result
 		}
@@ -361,6 +368,19 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 func (staticEvaluator *StaticStringEvaluator) evalIdentifier(node *ast.Node) staticEvalResult {
 	if !staticEvaluator.resolveIdentifiers {
 		return staticEvalResult{}
+	}
+	if ast.IsIdentifier(node) {
+		name := node.Text()
+		if (name == "undefined" || name == "Infinity" || name == "NaN") && staticEvaluator.isBuiltinIdentifier(node, name) {
+			switch name {
+			case "undefined":
+				return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+			case "Infinity":
+				return staticEvalResult{value: staticNumberValue(math.Inf(1)), ok: true}
+			case "NaN":
+				return staticEvalResult{value: staticNumberValue(math.NaN()), ok: true}
+			}
+		}
 	}
 	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
 	if !ok || staticEvaluator.resolving[symbol] {
@@ -782,7 +802,7 @@ func (staticEvaluator *StaticStringEvaluator) evalObjectLiteralMember(node *ast.
 	if prototypeSet {
 		return prototypeValue
 	}
-	return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+	return staticDefaultObjectMember(key)
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalArrayLiteral(node *ast.Node) staticEvalResult {
@@ -928,10 +948,13 @@ func staticMemberValue(object any, key string) staticEvalResult {
 		if value, ok := staticObjectOwnProperty(object, key); ok {
 			return staticEvalResult{value: value, ok: true}
 		}
-		if object.prototypeSet && object.prototype != nil {
-			return staticPrototypeMemberValue(object.prototype, key)
+		if object.prototypeSet {
+			if object.prototype != nil {
+				return staticPrototypeMemberValue(object.prototype, key)
+			}
+			return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 		}
-		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+		return staticDefaultObjectMember(key)
 	case *staticArrayValue:
 		if key == "length" {
 			return staticEvalResult{value: staticNumberValue(object.length), ok: true}
@@ -949,6 +972,17 @@ func staticMemberValue(object any, key string) staticEvalResult {
 		return staticEvalResult{value: object.element(index), ok: true}
 	}
 	return staticEvalResult{}
+}
+
+func staticDefaultObjectMember(key string) staticEvalResult {
+	switch key {
+	case "constructor", "toString", "toLocaleString", "valueOf", "hasOwnProperty",
+		"isPrototypeOf", "propertyIsEnumerable", "__proto__", "__defineGetter__",
+		"__defineSetter__", "__lookupGetter__", "__lookupSetter__":
+		return staticEvalResult{}
+	default:
+		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+	}
 }
 
 // staticPrototypeMemberValue reads a property through an authored __proto__
@@ -1220,18 +1254,21 @@ func (staticEvaluator *StaticStringEvaluator) evalStringCall(node *ast.Node) sta
 		return staticEvalResult{}
 	}
 
-	args := node.Arguments()
-	if len(args) == 0 {
+	arguments, ok := staticEvaluator.evalCallArguments(node)
+	if !ok {
+		return staticEvalResult{}
+	}
+	if len(arguments) == 0 {
 		return staticEvalResult{value: "", ok: true}
 	}
-	if ast.IsSpreadElement(args[0]) {
-		return staticEvalResult{}
+	if symbol, ok := arguments[0].(staticSymbolValue); ok {
+		key := symbol.key
+		if symbol.kind == staticSymbolWellKnown {
+			key = "Symbol." + key
+		}
+		return staticEvalResult{value: "Symbol(" + key + ")", ok: true}
 	}
-	arg := staticEvaluator.evalValue(args[0])
-	if !arg.ok {
-		return staticEvalResult{}
-	}
-	value, ok := staticValueToString(arg.value)
+	value, ok := staticValueToString(arguments[0])
 	if !ok {
 		return staticEvalResult{}
 	}
@@ -1288,6 +1325,8 @@ func (staticEvaluator *StaticStringEvaluator) evalBuiltinStaticCall(node *ast.No
 		return staticEvalResult{value: ecmascript.StringToUpperCase(text), ok: true}
 	case "toLowerCase":
 		return staticEvalResult{value: ecmascript.StringToLowerCase(text), ok: true}
+	case "trim":
+		return staticEvalResult{value: ecmascript.StringTrim(text), ok: true}
 	case "slice":
 		return staticStringSlice(text, arguments)
 	case "substring":
@@ -1539,14 +1578,7 @@ func clampSubstringIndex(index, length int) int {
 }
 
 func toUint32(number float64) uint32 {
-	if math.IsNaN(number) || math.IsInf(number, 0) || number == 0 {
-		return 0
-	}
-	remainder := math.Mod(math.Trunc(number), 1<<32)
-	if remainder < 0 {
-		remainder += 1 << 32
-	}
-	return uint32(remainder)
+	return ecmascript.NumberToUint32(number)
 }
 
 func toInt32(number float64) int32 {
@@ -1640,7 +1672,11 @@ func (staticEvaluator *StaticStringEvaluator) isStringRawTag(tag *ast.Node) bool
 	return staticEvaluator.isBuiltinStringValue(AccessExpressionObject(tag), map[*ast.Symbol]bool{})
 }
 
-func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Node, resolvingAliases map[*ast.Symbol]bool) bool {
+func (staticEvaluator *StaticStringEvaluator) isBuiltinValue(
+	node *ast.Node,
+	name string,
+	resolvingAliases map[*ast.Symbol]bool,
+) bool {
 	if !staticEvaluator.resolveIdentifiers {
 		return false
 	}
@@ -1648,7 +1684,7 @@ func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Nod
 	if node == nil {
 		return false
 	}
-	if staticEvaluator.isBuiltinIdentifier(node, "String") {
+	if staticEvaluator.isBuiltinIdentifier(node, name) {
 		return true
 	}
 	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
@@ -1657,24 +1693,15 @@ func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Nod
 	}
 	resolvingAliases[symbol] = true
 	defer delete(resolvingAliases, symbol)
-	return staticEvaluator.isBuiltinStringValue(initializer, resolvingAliases)
+	return staticEvaluator.isBuiltinValue(initializer, name, resolvingAliases)
+}
+
+func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Node, resolvingAliases map[*ast.Symbol]bool) bool {
+	return staticEvaluator.isBuiltinValue(node, "String", resolvingAliases)
 }
 
 func (staticEvaluator *StaticStringEvaluator) isBuiltinArrayValue(node *ast.Node, resolvingAliases map[*ast.Symbol]bool) bool {
-	node = SkipAssertionsAndParens(node)
-	if node == nil {
-		return false
-	}
-	if staticEvaluator.isBuiltinIdentifier(node, "Array") {
-		return true
-	}
-	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
-	if !ok || resolvingAliases[symbol] {
-		return false
-	}
-	resolvingAliases[symbol] = true
-	defer delete(resolvingAliases, symbol)
-	return staticEvaluator.isBuiltinArrayValue(initializer, resolvingAliases)
+	return staticEvaluator.isBuiltinValue(node, "Array", resolvingAliases)
 }
 
 func (staticEvaluator *StaticStringEvaluator) isBuiltinIdentifier(node *ast.Node, name string) bool {
@@ -1749,6 +1776,10 @@ type staticMutationCandidate struct {
 }
 
 func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
+	parentEvaluation := staticEvaluator.evaluation
+	staticEvaluator.evaluation = nil
+	defer func() { staticEvaluator.evaluation = parentEvaluation }()
+
 	staticEvaluator.referenceFlagsComputed = true
 	staticEvaluator.referenceFlags = nil
 	var mutationCandidates []staticMutationCandidate
@@ -1846,7 +1877,7 @@ func isMutatingArrayMethod(name string) bool {
 
 func staticValueIsTsgoSafe(value any) bool {
 	switch value.(type) {
-	case bool, staticNullValue, staticUndefinedValue, staticNumberValue, *big.Int, *staticStringNode, *staticRegExpNode, *staticObjectValue, *staticArrayValue:
+	case bool, staticNullValue, staticUndefinedValue, staticNumberValue, staticSymbolValue, *big.Int, *staticStringNode, *staticRegExpNode, *staticObjectValue, *staticArrayValue:
 		return false
 	default:
 		return value != nil
@@ -1898,6 +1929,7 @@ const (
 	staticKindNumber
 	staticKindBigInt
 	staticKindBoolean
+	staticKindSymbol
 	staticKindNull
 	staticKindUndefined
 )
@@ -1908,6 +1940,8 @@ func staticValueKindOf(value any) staticValueKind {
 		return staticKindBigInt
 	case bool:
 		return staticKindBoolean
+	case staticSymbolValue:
+		return staticKindSymbol
 	case staticNullValue:
 		return staticKindNull
 	case staticUndefinedValue:
@@ -1964,6 +1998,11 @@ func staticValuesStrictEqual(left any, right any) (equal bool, ok bool) {
 			return false, false
 		}
 		return leftFlag == rightFlag, true
+	case staticKindSymbol:
+		leftSymbol, leftOK := left.(staticSymbolValue)
+		rightSymbol, rightOK := right.(staticSymbolValue)
+		known := leftOK && rightOK
+		return known && leftSymbol == rightSymbol, known
 	}
 	return true, true
 }
@@ -1990,6 +2029,8 @@ func staticValueTruthy(value any) (truthy bool, ok bool) {
 		return stringValue != "", true
 	case bool:
 		return value, true
+	case staticSymbolValue:
+		return true, true
 	case staticNullValue, staticUndefinedValue:
 		return false, true
 	case *staticRegExpNode, *staticObjectValue, *staticArrayValue:
@@ -2020,6 +2061,10 @@ func staticValueToString(value any) (string, bool) {
 		return "null", true
 	case staticUndefinedValue:
 		return "undefined", true
+	case staticSymbolValue:
+		// JavaScript's implicit ToString(Symbol) throws. Symbol keys remain
+		// first-class values and are never coerced into invented string names.
+		return "", false
 	case *staticArrayValue:
 		return staticArrayToString(value)
 	case *staticObjectValue:
