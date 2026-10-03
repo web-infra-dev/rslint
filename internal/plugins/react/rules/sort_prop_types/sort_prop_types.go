@@ -205,7 +205,7 @@ var SortPropTypesRule = rule.Rule{
 						continue
 					}
 					assignment := prop.AsPropertyAssignment()
-					if isAuthoredPropertyName(assignment.Name(), "propTypes") {
+					if reactutil.IsAuthoredPropertyName(assignment.Name(), "propTypes") {
 						// Upstream only examines an inline object in this path; identifier
 						// resolution belongs to assignment and class-property declarations.
 						value := utils.ESTreeRuntimeExpression(assignment.Initializer)
@@ -220,11 +220,11 @@ var SortPropTypesRule = rule.Rule{
 				if hasModifier(property.Modifiers(), ast.KindAccessorKeyword) {
 					return
 				}
-				if property.Type != nil && isAuthoredPropertyName(property.Name(), "props") {
+				if property.Type != nil && reactutil.IsAuthoredPropertyName(property.Name(), "props") {
 					checkValue(property.Initializer)
 					return
 				}
-				if isAuthoredPropertyName(property.Name(), "propTypes") {
+				if reactutil.IsAuthoredPropertyName(property.Name(), "propTypes") {
 					checkValue(property.Initializer)
 				}
 			},
@@ -477,20 +477,6 @@ func isShapeCall(callee *ast.Node) bool {
 	default:
 		return false
 	}
-}
-
-func isAuthoredPropertyName(name *ast.Node, expected string) bool {
-	if name == nil {
-		return false
-	}
-	if identifierOrPrivateName(name) == expected {
-		return true
-	}
-	if name.Kind == ast.KindComputedPropertyName {
-		expression := utils.ESTreeRuntimeExpression(name.AsComputedPropertyName().Expression)
-		return identifierOrPrivateName(expression) == expected
-	}
-	return false
 }
 
 func identifierOrPrivateName(node *ast.Node) string {

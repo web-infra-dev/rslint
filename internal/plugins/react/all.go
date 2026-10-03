@@ -87,6 +87,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_comp"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_default_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/state_in_constructor"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/static_property_placement"
@@ -193,6 +194,7 @@ func GetAllRules() []rule.Rule {
 		require_render_return.RequireRenderReturnRule,
 		self_closing_comp.SelfClosingCompRule,
 		sort_comp.SortCompRule,
+		sort_default_props.SortDefaultPropsRule,
 		sort_prop_types.SortPropTypesRule,
 		state_in_constructor.StateInConstructorRule,
 		static_property_placement.StaticPropertyPlacementRule,
