@@ -149,6 +149,73 @@ assert.equal(fs.readFileSync(file, 'utf8'), changed);
 console.log('PACKAGED_SHARED_OK');
 `;
 
+// Intercept only this main thread's native loads, before importing core. Worker
+// isolates load their own parser; the coordinator must remain native-free until
+// Go actually sends attachments, even when plugin metadata warms workers.
+const LAZY_RUNNER = `import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
+const cfgDir = path.join(here, 'cfg');
+const config = path.join(cfgDir, 'rslint.config.mjs');
+const counts = { loads: 0, arenas: 0, configure: 0, register: 0, close: 0 };
+const dlopen = process.dlopen;
+process.dlopen = function(module, filename, ...args) {
+  const result = dlopen.call(this, module, filename, ...args);
+  if (String(filename).endsWith('.node')) {
+    counts.loads++;
+    const native = module.exports;
+    const Arena = native.MemoryArena;
+    native.MemoryArena = new Proxy(Arena, { construct(target, args) {
+      counts.arenas++;
+      return Reflect.construct(target, args);
+    } });
+    for (const method of ['configure', 'register', 'close']) {
+      const original = Arena.prototype[method];
+      Arena.prototype[method] = function(...args) {
+        counts[method]++;
+        return original.apply(this, args);
+      };
+    }
+  }
+  return result;
+};
+const plain = 'export default [{ files: ["**/*.ts"], plugins: ["@typescript-eslint"], rules: { "@typescript-eslint/no-explicit-any": "error" } }];';
+const plugin = (enabled) => 'import lp from "./local-plugin.mjs"; export default [{ files: ["**/*.ts"], plugins: { pkg: lp }, rules: ' + JSON.stringify(enabled ? { 'pkg/no-null': 'error' } : {}) + ' }];';
+const zero = { ...counts };
+fs.writeFileSync(config, plain);
+if (process.argv[2] === 'cli') {
+  const { run } = await import(pathToFileURL(path.join(here, 'dist', 'cli.js')).href);
+  const require = createRequire(import.meta.url);
+  assert.equal(await run(require.resolve(${JSON.stringify(`@rslint/${PKG_BASE}/bin`)}), ['--no-color', path.join(cfgDir, 'input.ts')], Date.now()), 0);
+  assert.deepEqual(counts, zero);
+} else {
+  const { Rslint } = await import(pathToFileURL(path.join(here, 'dist', 'index.js')).href);
+  const lint = new Rslint({ cwd: cfgDir });
+  const check = () => lint.lintText('const sample = null;', { filePath: 'input.ts' });
+  try {
+    await check();
+    assert.deepEqual(counts, zero, 'plain API must not load addon');
+    fs.writeFileSync(config, plugin(false));
+    await check();
+    assert.deepEqual(counts, zero, 'plugin activation without tasks must not load addon in main');
+    fs.writeFileSync(config, plugin(true));
+    for (let round = 1; round <= 2; round++) {
+      const [result] = await check();
+      assert.equal(result.messages.filter(message => message.ruleId === 'pkg/no-null').length, 1);
+      assert.deepEqual(counts, { loads: 1, arenas: 1, configure: 1, register: round, close: 0 });
+    }
+    fs.writeFileSync(config, plain);
+    await check();
+    assert.deepEqual(counts, { loads: 1, arenas: 1, configure: 1, register: 2, close: 0 });
+  } finally { await lint.close(); }
+  assert.equal(counts.close, 1);
+}
+console.log('PACKAGED_LAZY_OK ' + JSON.stringify(counts));
+`;
+
 const TERMINATION_RUNNER = `import assert from 'node:assert/strict';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -381,19 +448,19 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
     );
 
-    test(
-      'complete CLI and worker share the staged native source registry',
-      () => {
-        const root = path.join(tmp, 'shared-cli');
+    test.each(['shared', 'cli', 'api'] as const)(
+      'complete packaged runtime preserves shared storage and lazy loading: %s',
+      (mode) => {
+        const root = path.join(tmp, `complete-${mode}`);
         fs.mkdirSync(root, { recursive: true });
         fs.cpSync(
           path.resolve(__dirname, '../../dist'),
           path.join(root, 'dist'),
           { recursive: true },
         );
-        fs.writeFileSync(
+        fs.copyFileSync(
+          path.resolve(__dirname, '../../package.json'),
           path.join(root, 'package.json'),
-          JSON.stringify({ type: 'module' }),
         );
         stageNative(root, true);
         fs.cpSync(
@@ -413,10 +480,13 @@ export default [{ files: ['**/*.ts'], plugins: { pkg: lp }, rules: { 'pkg/no-nul
           path.join(cfgDir, 'input.ts'),
           '\ufeffconst sample = null; // café 😀\r\n',
         );
-        fs.writeFileSync(path.join(root, 'runner.mjs'), SHARED_RUNNER);
+        fs.writeFileSync(
+          path.join(root, 'runner.mjs'),
+          mode === 'shared' ? SHARED_RUNNER : LAZY_RUNNER,
+        );
         const result = spawnSync(
           process.execPath,
-          [path.join(root, 'runner.mjs')],
+          [path.join(root, 'runner.mjs'), mode],
           {
             cwd: cfgDir,
             encoding: 'utf8',
@@ -429,8 +499,10 @@ export default [{ files: ['**/*.ts'], plugins: { pkg: lp }, rules: { 'pkg/no-nul
         expect(result.error).toBeUndefined();
         expect(result.signal).toBeNull();
         expect(result.status, result.stderr).toBe(0);
-        expect(result.stdout).toContain('no null');
-        expect(result.stdout).toContain('PACKAGED_SHARED_OK');
+        expect(result.stdout).toContain(
+          mode === 'shared' ? 'PACKAGED_SHARED_OK' : 'PACKAGED_LAZY_OK',
+        );
+        if (mode === 'shared') expect(result.stdout).toContain('no null');
         expect(result.stderr.trim()).toBe('');
       },
       PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,

@@ -40,6 +40,10 @@ const (
 	KindHandshake MessageKind = "handshake"
 	// KindTransportConfig returns storage settings before mapping bootstrap.
 	KindTransportConfig MessageKind = "transportConfig"
+	// Late storage setup is private to IPC, independent of application requests.
+	KindTransportPrepare MessageKind = "transportPrepare"
+	KindTransportCommit  MessageKind = "transportCommit"
+	KindTransportAbort   MessageKind = "transportAbort"
 	// KindTransportRelease acknowledges storage after a handler already replied.
 	// Its ID identifies that request; it carries no application result.
 	KindTransportRelease MessageKind = "transportRelease"

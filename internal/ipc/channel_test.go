@@ -615,6 +615,123 @@ func TestChannelAbsentInitialMappingCannotBeInstalledLater(t *testing.T) {
 	}
 }
 
+// Setup belongs to the session: cancellation of its first consumer must not
+// cancel another consumer, and unrelated requests must keep flowing.
+func TestChannelLazyMemorySingleflightAndCancellation(t *testing.T) {
+	client, peer := newChannelPair(t)
+	if err := client.initializeMemory(&TransportMetadata{SharedMemory: 1}); err != nil {
+		t.Fatal(err)
+	}
+	client.Start()
+	if err := client.ensureMemory(context.Background(), []Attachment{Text(""), Bytes(nil)}); err != nil {
+		t.Fatal(err)
+	}
+	if client.memorySetupDone != nil || client.memory != nil {
+		t.Fatal("empty attachments initialized storage")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	first := make(chan error, 1)
+	go func() { first <- client.ensureMemory(ctx, []Attachment{Text("first")}) }()
+	prepare, err := ReadFrame(peer.reader)
+	if err != nil || prepare.Kind != KindTransportPrepare {
+		t.Fatalf("missing prepare: %+v %v", prepare, err)
+	}
+	var config memoryPrepare
+	if err := prepare.Decode(&config); err != nil || config.Configuration != memoryConfiguration() {
+		t.Fatalf("wrong layout: %+v %v", config, err)
+	}
+	cancel()
+	if err := <-first; !errors.Is(err, context.Canceled) {
+		t.Fatalf("first waiter did not cancel: %v", err)
+	}
+	second := make(chan error, 1)
+	go func() { second <- client.ensureMemory(context.Background(), []Attachment{Bytes([]byte{0, 255})}) }()
+	plain := make(chan error, 1)
+	go func() { _, err := client.SendRequest(context.Background(), "unrelated", nil); plain <- err }()
+	request, err := ReadFrame(peer.reader)
+	if err != nil || request.Kind != "unrelated" {
+		t.Fatalf("setup blocked unrelated request or retried: %+v %v", request, err)
+	}
+	if err := peer.writeFrame(&Message{Kind: KindResponse, ID: request.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-plain; err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-second:
+		t.Fatal("cancelling first waiter completed the session setup")
+	default:
+	}
+	// Peer/native failure falls back once, including for a still-waiting caller.
+	if err := peer.writeFrame(&Message{Kind: KindError, ID: prepare.ID, Data: []byte(`{"message":"native unavailable"}`)}); err != nil {
+		t.Fatal(err)
+	}
+	abort, err := ReadFrame(peer.reader)
+	if err != nil || abort.Kind != KindTransportAbort {
+		t.Fatalf("missing abort: %+v %v", abort, err)
+	}
+	if err := <-second; err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ensureMemory(context.Background(), []Attachment{Text("later")}); err != nil {
+		t.Fatal(err)
+	}
+	if client.memory != nil || client.closed {
+		t.Fatal("optional setup failure broke inline transport")
+	}
+	if config.SocketPath != "" {
+		if _, err := os.Stat(config.SocketPath); !os.IsNotExist(err) {
+			t.Fatalf("bootstrap socket remains: %v", err)
+		}
+	}
+}
+
+func TestChannelLazyMemoryTimeoutAndClose(t *testing.T) {
+	for _, end := range []string{"timeout", "close"} {
+		t.Run(end, func(t *testing.T) {
+			client, peer := newChannelPair(t)
+			if err := client.initializeMemory(&TransportMetadata{SharedMemory: 1}); err != nil {
+				t.Fatal(err)
+			}
+			client.Start()
+			result := make(chan error, 1)
+			go func() { result <- client.ensureMemory(context.Background(), []Attachment{Text("bytes")}) }()
+			prepare, err := ReadFrame(peer.reader)
+			if err != nil || prepare.Kind != KindTransportPrepare {
+				t.Fatalf("missing prepare: %+v %v", prepare, err)
+			}
+			if end == "close" {
+				_ = client.Close()
+				if err := <-result; err == nil {
+					t.Fatal("closed setup reported success")
+				}
+			} else {
+				abort, err := ReadFrame(peer.reader)
+				if err != nil || abort.Kind != KindTransportAbort {
+					t.Fatalf("timeout did not abort: %+v %v", abort, err)
+				}
+				if err := <-result; err != nil {
+					t.Fatal(err)
+				}
+			}
+			<-client.memorySetupDone
+			if end == "timeout" {
+				// A late prepared response cannot install memory or retry setup.
+				if err := peer.writeFrame(&Message{Kind: KindResponse, ID: prepare.ID, Data: []byte(`{"version":1}`)}); err != nil {
+					t.Fatal(err)
+				}
+				if err := client.ensureMemory(context.Background(), []Attachment{Text("later")}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if client.memory != nil {
+				t.Fatal("unfinished setup installed storage")
+			}
+		})
+	}
+}
+
 func TestChannelCloseJoinsMemoryWriter(t *testing.T) {
 	entered, finish := make(chan struct{}), make(chan struct{})
 	var unmapped atomic.Bool

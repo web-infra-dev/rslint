@@ -48,7 +48,7 @@ import type {
   NotificationHandler,
   ErrorResponseData,
   MemoryBatch,
-  MemoryMapping,
+  TransportMetadata,
   WireMessage,
 } from './protocol.js';
 
@@ -58,6 +58,9 @@ const MAX_FRAME_BYTES = 256 * 1024 * 1024;
 const RESPONSE_KIND = 'response';
 const ERROR_KIND = 'error';
 const TRANSPORT_CONFIG_KIND = 'transportConfig';
+const TRANSPORT_PREPARE_KIND = 'transportPrepare';
+const TRANSPORT_COMMIT_KIND = 'transportCommit';
+const TRANSPORT_ABORT_KIND = 'transportAbort';
 const TRANSPORT_RELEASE_KIND = 'transportRelease';
 const RELEASE_POLL_MS = 25;
 
@@ -70,10 +73,8 @@ interface PendingRequest {
 type WireFrame<T = unknown> = Omit<WireMessage, 'data'> & { data?: T };
 
 export interface IpcClientOptions {
-  /** Native reader storage, owned and closed by this IPC session. */
-  readonly memoryTransport?: MemoryTransport;
-  /** Child stdio index chosen by spawnIpcProcess for the prepared Unix fd. */
-  readonly inheritedMemoryFd?: number;
+  /** Called at most once, only when Go requests storage for attachments. */
+  readonly createMemoryTransport?: () => MemoryTransport | undefined;
   /**
    * Initial buffer size for the read accumulator. Frames larger than this
    * will simply grow the buffer; this is just a starting hint for typical
@@ -117,9 +118,10 @@ export class IpcClient {
   private closed = false;
   private started = false;
   private memory: MemoryTransport | undefined;
-  private readonly inheritedMemoryFd: number | undefined;
-  private bootstrapPromise: Promise<void> | undefined;
-  private mappingSent = false;
+  private readonly createMemoryTransport: IpcClientOptions['createMemoryTransport'];
+  private memoryState: 'dormant' | 'prepared' | 'ready' | 'disabled' =
+    'dormant';
+  private capabilitySent = false;
   private preparingFirstRequest: Promise<void> | undefined;
   private finishClose!: (error: Error) => void;
 
@@ -131,8 +133,7 @@ export class IpcClient {
   constructor(input: Readable, output: Writable, opts: IpcClientOptions = {}) {
     this.input = input;
     this.output = output;
-    this.memory = opts.memoryTransport;
-    this.inheritedMemoryFd = opts.inheritedMemoryFd;
+    this.createMemoryTransport = opts.createMemoryTransport;
   }
 
   get isClosed(): boolean {
@@ -252,29 +253,36 @@ export class IpcClient {
     data: TIn,
     attachments?: readonly (string | Uint8Array)[],
   ): Promise<IpcMessage<TOut>> {
-    if (kind === TRANSPORT_CONFIG_KIND) {
-      throw new Error('IpcClient: transportConfig is an internal request');
+    if (
+      [
+        TRANSPORT_CONFIG_KIND,
+        TRANSPORT_PREPARE_KIND,
+        TRANSPORT_COMMIT_KIND,
+        TRANSPORT_ABORT_KIND,
+      ].includes(kind)
+    ) {
+      throw new Error(`IpcClient: ${kind} is an internal request`);
     }
     if (this.closed) {
       throw new Error('IpcClient: cannot sendRequest on closed client');
     }
-    if (this.memory && !this.mappingSent) await this.configureMemory();
     // A payload's toJSON may synchronously call sendRequest again. Keep only
-    // bootstrap serialization ordered so the mapping stays on the first frame.
+    // capability advertisement on the first successfully serialized frame.
     if (this.preparingFirstRequest) await this.preparingFirstRequest;
     if (this.closed) throw await this.done;
     let finishPreparing: (() => void) | undefined;
-    if (this.memory && !this.mappingSent) {
+    if (this.createMemoryTransport && !this.capabilitySent) {
       this.preparingFirstRequest = new Promise<void>((resolve) => {
         finishPreparing = resolve;
       });
     }
     let response: Promise<IpcMessage<TOut>>;
     try {
-      const mapping = this.mappingSent
-        ? undefined
-        : this.memory?.descriptor(this.inheritedMemoryFd);
-      response = this.writeRequest(kind, data, attachments, mapping);
+      const transport: TransportMetadata | undefined =
+        this.createMemoryTransport && !this.capabilitySent
+          ? { sharedMemory: 1 }
+          : undefined;
+      response = this.writeRequest(kind, data, attachments, transport);
     } finally {
       if (finishPreparing) {
         this.preparingFirstRequest = undefined;
@@ -284,34 +292,45 @@ export class IpcClient {
     return response;
   }
 
-  private async configureMemory(): Promise<void> {
-    // Publish the promise before writing: even an in-process peer can reenter.
-    // This RPC uses pending/write directly and never waits for its own bootstrap.
-    this.bootstrapPromise ??= Promise.resolve().then(async () => {
-      const memory = this.memory;
-      if (!memory || this.closed) return;
-      try {
-        const response = await this.writeRequest(
-          TRANSPORT_CONFIG_KIND,
-          undefined,
-        );
-        if (this.closed) throw await this.done;
-        memory.configure(response.data);
-      } catch {
-        this.closeMemory();
-        if (this.closed) throw await this.done;
-        // Unsupported peers, invalid layouts and allocation failures all keep
-        // the session usable with complete inline attachments, without retries.
+  private prepareMemory(msg: WireMessage): void {
+    if (
+      msg.id <= 0 ||
+      this.memoryState !== 'dormant' ||
+      !this.createMemoryTransport
+    ) {
+      this.sendErrorResponse(msg.id, 'shared memory setup is unavailable');
+      return;
+    }
+    // One attempt per session. Native loading and allocation are synchronous;
+    // the descriptor transfer never waits for the Go read loop or handler.
+    this.memoryState = 'disabled';
+    try {
+      const memory = this.createMemoryTransport();
+      if (!memory) throw new Error('shared memory is unavailable');
+      if (this.closed) {
+        memory.close();
+        return;
       }
-    });
-    return this.bootstrapPromise;
+      this.memory = memory;
+      const data = msg.data as
+        { configuration?: unknown; socketPath?: string } | undefined;
+      memory.configure(data?.configuration);
+      if (this.closed) return;
+      const mapping = memory.transfer(data?.socketPath);
+      if (this.closed) return;
+      this.memoryState = 'prepared';
+      this.sendResponse(msg.id, mapping);
+    } catch (error) {
+      this.closeMemory();
+      this.sendErrorResponse(msg.id, safeErrorMessage(error));
+    }
   }
 
   private async writeRequest<TIn = unknown, TOut = unknown>(
     kind: string,
     data: TIn,
     attachments?: readonly (string | Uint8Array)[],
-    mapping?: MemoryMapping,
+    transport?: TransportMetadata,
   ): Promise<IpcMessage<TOut>> {
     const id = this.nextId++; // id > 0 always; notifications use 0
     const frame = encodeFrame({
@@ -329,11 +348,11 @@ export class IpcClient {
               ).toString('base64'),
             },
       ),
-      transport: mapping ? { mapping } : undefined,
+      transport,
     });
     if (this.closed) throw await this.done;
-    // Only a successfully serialized application envelope publishes the mapping.
-    if (mapping) this.mappingSent = true;
+    // Failed serialization leaves the capability for the next application frame.
+    if (transport) this.capabilitySent = true;
     const response = new Promise<IpcMessage<TOut>>((resolve, reject) => {
       this.pending.set(id, {
         resolve: resolve as (msg: IpcMessage) => void,
@@ -629,6 +648,29 @@ export class IpcClient {
 
   /** Route a fully decoded frame. */
   private dispatch(msg: WireMessage): void {
+    if (msg.kind === TRANSPORT_PREPARE_KIND) {
+      this.prepareMemory(msg);
+      return;
+    }
+    if (
+      msg.kind === TRANSPORT_COMMIT_KIND ||
+      msg.kind === TRANSPORT_ABORT_KIND
+    ) {
+      if (
+        msg.id !== 0 ||
+        (this.memoryState !== 'prepared' && msg.kind === TRANSPORT_COMMIT_KIND)
+      ) {
+        this.close(new Error('IpcClient: invalid shared memory setup control'));
+        return;
+      }
+      if (msg.kind === TRANSPORT_COMMIT_KIND) {
+        this.memoryState = 'ready';
+      } else if (this.memoryState !== 'ready') {
+        this.memoryState = 'disabled';
+        this.closeMemory();
+      }
+      return;
+    }
     if (msg.kind === TRANSPORT_RELEASE_KIND) {
       // This endpoint never publishes shared bytes. Control frames must not
       // reach application handlers or settle an unrelated outbound request.
@@ -737,7 +779,7 @@ export class IpcClient {
         received = receiveAttachments(
           msg.attachments,
           msg.transport?.batches,
-          this.memory,
+          this.memoryState === 'ready' ? this.memory : undefined,
         );
         const handler = this.inboundHandler;
         if (!handler) {

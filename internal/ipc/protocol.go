@@ -128,9 +128,10 @@ func (a *AttachmentData) UnmarshalJSON(data []byte) error {
 // Mapping is bootstrap-only. Released must match the request's complete ordered
 // batch list; partial, reordered or unsolicited acknowledgements grant no reuse.
 type TransportMetadata struct {
-	Mapping  *MemoryMapping `json:"mapping,omitempty"`
-	Batches  []MemoryBatch  `json:"batches,omitempty"`
-	Released []MemoryBatch  `json:"released,omitempty"`
+	SharedMemory uint32         `json:"sharedMemory,omitempty"`
+	Mapping      *MemoryMapping `json:"mapping,omitempty"`
+	Batches      []MemoryBatch  `json:"batches,omitempty"`
+	Released     []MemoryBatch  `json:"released,omitempty"`
 }
 
 func (m *TransportMetadata) UnmarshalJSON(data []byte) error {

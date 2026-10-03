@@ -114,6 +114,9 @@ type Channel struct {
 	// serialized with closure; application handlers never own a mapping.
 	memory            *memoryPool
 	memoryInitialized bool
+	memoryCapable     bool
+	memorySetupDone   chan struct{}
+	memorySetupID     int // a timed-out prepare may still receive its one reply
 	closeDone         chan struct{}
 	// writeSealed rejects frames that have not yet passed write admission.
 	// It is published while writeMu is held on a terminal response or write
@@ -218,6 +221,9 @@ func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any
 			defer cancel()
 		}
 	}
+	if err := c.ensureMemory(ctx, attachments); err != nil {
+		return nil, err
+	}
 
 	c.mu.Lock()
 	if c.closed {
@@ -227,6 +233,9 @@ func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any
 	id := c.nextID
 	c.nextID++
 	msg.ID = id
+	if kind == KindTransportPrepare {
+		c.memorySetupID = id
+	}
 	memory := c.memory
 	c.mu.Unlock()
 	batches := attach(msg, memory, attachments)
@@ -477,6 +486,7 @@ func (c *Channel) dispatch(msg *Message) {
 	if msg.Kind == KindResponse || msg.Kind == KindError {
 		c.mu.Lock()
 		ch, ok := c.pending[msg.ID]
+		setupResponse := c.memorySetupID != 0 && msg.ID == c.memorySetupID
 		if ok {
 			delete(c.pending, msg.ID)
 		}
@@ -487,7 +497,7 @@ func (c *Channel) dispatch(msg *Message) {
 		hadPublished := c.releasePublished(msg)
 		if ok {
 			ch <- msg
-		} else if !hadPublished {
+		} else if !hadPublished && !setupResponse {
 			fmt.Fprintf(os.Stderr, "rslint: orphan response id=%d kind=%s\n", msg.ID, msg.Kind)
 		}
 		return

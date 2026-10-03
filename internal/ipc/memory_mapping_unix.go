@@ -15,8 +15,13 @@ func mapMemory(descriptor MemoryMapping) (memoryMapping, error) {
 		return memoryMapping{}, errors.New("invalid shared memory descriptor")
 	}
 	defer unix.Close(MemoryInheritedFD)
+	return mapMemoryFD(MemoryInheritedFD)
+}
+
+// The caller owns fd, received either through inheritance or SCM_RIGHTS.
+func mapMemoryFD(fd int) (memoryMapping, error) {
 	var stat unix.Stat_t
-	if err := unix.Fstat(MemoryInheritedFD, &stat); err != nil {
+	if err := unix.Fstat(fd, &stat); err != nil {
 		return memoryMapping{}, err
 	}
 	// Darwin rounds POSIX shared objects up to the host page size. Only map
@@ -24,7 +29,7 @@ func mapMemory(descriptor MemoryMapping) (memoryMapping, error) {
 	if stat.Size < MemoryCapacity {
 		return memoryMapping{}, errors.New("invalid shared memory mapping size")
 	}
-	data, err := unix.Mmap(MemoryInheritedFD, 0, MemoryCapacity, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
+	data, err := unix.Mmap(fd, 0, MemoryCapacity, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		return memoryMapping{}, err
 	}
