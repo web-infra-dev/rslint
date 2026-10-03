@@ -113,7 +113,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-keyword-prefix': 'off', // not implemented
     // 'unicorn/no-late-current-target-access': 'error', // not implemented
     // 'unicorn/no-late-event-control': 'error', // not implemented
-    // 'unicorn/no-lonely-if': 'error', // not implemented
+    'unicorn/no-lonely-if': 'error',
     // 'unicorn/no-loop-iterable-mutation': 'error', // not implemented
     'unicorn/no-magic-array-flat-depth': 'error',
     // 'unicorn/no-manually-wrapped-comments': 'off', // not implemented

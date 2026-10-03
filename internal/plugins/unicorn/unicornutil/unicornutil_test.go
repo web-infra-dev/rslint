@@ -381,6 +381,8 @@ func TestNeedsSemicolonBeforeExpressionBoundary(t *testing.T) {
 		{"const value = () => {}", true},
 		{"const value = class {}", true},
 		{"value = {}", true},
+		{"value++", true},
+		{"value--", true},
 		{"function value() {}", false},
 		{"class Value {}", false},
 		{"{}", false},
@@ -400,6 +402,51 @@ func TestNeedsSemicolonBeforeExpressionBoundary(t *testing.T) {
 		source := parseTestJavaScript(code)
 		if NeedsSemicolonBefore(source, findTestNode(t, source, "1.0"), "(1)") {
 			t.Errorf("unexpected statement separator in %q", code)
+		}
+	}
+}
+
+func TestNeedsSemicolonAfterStatement(t *testing.T) {
+	for _, test := range []struct {
+		code               string
+		want, sameLineWant bool
+	}{
+		{"value++", true, true},
+		{"var value = {}", true, true},
+		{"export default value", true, true},
+		{"function f() { return", true, true},
+		{"function f() { throw value", true, true},
+		{"do {} while (ready)", true, true},
+		{"while (ready) { break", false, true},
+		{"while (ready) { continue", false, true},
+		{"outer: while (ready) { break outer", true, true},
+		{"debugger", false, true},
+		{"while (ready) {}", false, false},
+		{"function f() {}", false, false},
+		{"value++;", false, false},
+	} {
+		source := parseTestJavaScript(test.code)
+		last, ok := utils.TokenBeforePosition(source, len(test.code))
+		if !ok {
+			t.Fatalf("missing last token in %q", test.code)
+		}
+		for _, following := range []string{"[0]", "(value)", "/regexp/", "`template`", "+1", "-1", "<T>value"} {
+			if got := NeedsSemicolonAfter(source, last, following, false); got != test.want {
+				t.Errorf("NeedsSemicolonAfter(%q, %q) = %t, want %t", test.code, following, got, test.want)
+			}
+		}
+		if got := NeedsSemicolonAfter(source, last, "value", true); got != test.sameLineWant {
+			t.Errorf("same-line separator after %q = %t, want %t", test.code, got, test.sameLineWant)
+		}
+		if NeedsSemicolonAfter(source, last, "value", false) {
+			t.Errorf("unexpected separator before a new line after %q", test.code)
+		}
+		for _, following := range []string{"", ";", "}"} {
+			for _, sameLine := range []bool{false, true} {
+				if NeedsSemicolonAfter(source, last, following, sameLine) {
+					t.Errorf("unexpected separator before %q after %q", following, test.code)
+				}
+			}
 		}
 	}
 }
