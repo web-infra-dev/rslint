@@ -1,7 +1,6 @@
 package no_commented_out_tests
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -10,40 +9,32 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
-var rstestRootCandidate = regexp.MustCompile(`(?m)^[\t ]*[;(]*[\t ]*(test|it|describe)\b`)
-
-type rstestAPIKind uint8
+type apiPhase uint8
 
 const (
-	rstestAPIInvalid rstestAPIKind = iota
-	rstestAPITest
-	rstestAPIDescribe
+	phaseInvalid apiPhase = iota
+	phaseAPI
+	phaseConditionalFactory
+	phaseParameterizedFactory
+	phaseExtendFactory
+	phaseRegistrar
+	phaseRegistered
 )
 
-type rstestAPIPhase uint8
-
-const (
-	rstestPhaseInvalid rstestAPIPhase = iota
-	rstestPhaseAPI
-	rstestPhaseConditionalFactory
-	rstestPhaseParameterizedFactory
-	rstestPhaseExtendFactory
-	rstestPhaseRegistrar
-	rstestPhaseRegistered
-)
-
-type rstestExpression struct {
-	kind       rstestAPIKind
-	phase      rstestAPIPhase
+type expression struct {
+	kind       RootKind
+	phase      apiPhase
 	rootOffset int
 	extendable bool
+	// hasMember records whether any member access has been applied, which is
+	// the only position where a profile may accept an unlisted member.
+	hasMember bool
+	// lenient marks a chain through an unlisted member. Its shape is unknown,
+	// so the first call registers and later members or calls keep the registration.
+	lenient bool
 }
 
-func invalidRstestExpression() rstestExpression {
-	return rstestExpression{}
-}
-
-func unwrapRstestExpression(node *ast.Node) *ast.Node {
+func unwrapExpression(node *ast.Node) *ast.Node {
 	for node != nil {
 		switch node.Kind {
 		case ast.KindParenthesizedExpression:
@@ -63,7 +54,7 @@ func unwrapRstestExpression(node *ast.Node) *ast.Node {
 	return nil
 }
 
-func staticRstestMemberName(node *ast.Node) (string, *ast.Node, bool) {
+func staticMemberName(node *ast.Node) (string, *ast.Node, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		access := node.AsPropertyAccessExpression()
@@ -74,7 +65,7 @@ func staticRstestMemberName(node *ast.Node) (string, *ast.Node, bool) {
 		return name.Text(), access.Expression, true
 	case ast.KindElementAccessExpression:
 		access := node.AsElementAccessExpression()
-		argument := unwrapRstestExpression(access.ArgumentExpression)
+		argument := unwrapExpression(access.ArgumentExpression)
 		if argument == nil {
 			return "", nil, false
 		}
@@ -91,113 +82,115 @@ func staticRstestMemberName(node *ast.Node) (string, *ast.Node, bool) {
 	}
 }
 
-func applyRstestMember(receiver rstestExpression, member string) rstestExpression {
-	if receiver.phase != rstestPhaseAPI {
-		return invalidRstestExpression()
-	}
-
-	switch member {
-	case "only", "skip", "todo", "concurrent", "sequential":
-		receiver.extendable = false
+func (p *Profile) applyMember(receiver expression, name string) expression {
+	if receiver.lenient && receiver.phase == phaseRegistered {
 		return receiver
-	case "fails":
-		if receiver.kind != rstestAPITest {
-			return invalidRstestExpression()
+	}
+	if receiver.phase != phaseAPI {
+		return expression{}
+	}
+	member, known := p.Members[name]
+	if !known {
+		if !p.AcceptUnknownRootMember || receiver.hasMember {
+			return expression{}
 		}
 		receiver.extendable = false
+		receiver.hasMember = true
+		receiver.lenient = true
 		return receiver
-	case "runIf", "skipIf":
-		receiver.phase = rstestPhaseConditionalFactory
-		receiver.extendable = false
-		return receiver
-	case "each", "for":
-		receiver.phase = rstestPhaseParameterizedFactory
-		receiver.extendable = false
-		return receiver
-	case "extend":
-		if receiver.kind != rstestAPITest || !receiver.extendable {
-			return invalidRstestExpression()
-		}
-		receiver.phase = rstestPhaseExtendFactory
-		return receiver
-	default:
-		return invalidRstestExpression()
 	}
+	if member.TestOnly && receiver.kind != RootTest {
+		return expression{}
+	}
+	receiver.hasMember = true
+	switch member.Kind {
+	case MemberModifier:
+		receiver.extendable = false
+	case MemberConditionalFactory:
+		receiver.phase = phaseConditionalFactory
+		receiver.extendable = false
+	case MemberParameterizedFactory:
+		receiver.phase = phaseParameterizedFactory
+		receiver.extendable = false
+	case MemberExtendFactory:
+		if !receiver.extendable {
+			return expression{}
+		}
+		receiver.phase = phaseExtendFactory
+	}
+	return receiver
 }
 
-func evaluateRstestExpression(node *ast.Node) rstestExpression {
-	node = unwrapRstestExpression(node)
+func (p *Profile) evaluate(node *ast.Node) expression {
+	node = unwrapExpression(node)
 	if node == nil {
-		return invalidRstestExpression()
+		return expression{}
 	}
 
 	switch node.Kind {
 	case ast.KindIdentifier:
-		name := node.AsIdentifier().Text
-		switch name {
-		case "test", "it":
-			return rstestExpression{
-				kind:       rstestAPITest,
-				phase:      rstestPhaseAPI,
-				rootOffset: node.Loc.Pos(),
-				extendable: true,
-			}
-		case "describe":
-			return rstestExpression{
-				kind:       rstestAPIDescribe,
-				phase:      rstestPhaseAPI,
-				rootOffset: node.Loc.Pos(),
-			}
-		default:
-			return invalidRstestExpression()
+		root, ok := p.Roots[node.AsIdentifier().Text]
+		if !ok {
+			return expression{}
+		}
+		return expression{
+			kind:       root.Kind,
+			phase:      phaseAPI,
+			rootOffset: node.Loc.Pos(),
+			extendable: root.Extendable,
 		}
 
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		member, receiverNode, ok := staticRstestMemberName(node)
+		member, receiverNode, ok := staticMemberName(node)
 		if !ok {
-			return invalidRstestExpression()
+			return expression{}
 		}
-		return applyRstestMember(evaluateRstestExpression(receiverNode), member)
+		return p.applyMember(p.evaluate(receiverNode), member)
 
 	case ast.KindCallExpression:
 		call := node.AsCallExpression()
-		expression := evaluateRstestExpression(call.Expression)
-		switch expression.phase {
-		case rstestPhaseAPI, rstestPhaseRegistrar:
+		result := p.evaluate(call.Expression)
+		switch result.phase {
+		case phaseAPI, phaseRegistrar:
 			if call.TypeArguments != nil {
-				return invalidRstestExpression()
+				return expression{}
 			}
-			expression.phase = rstestPhaseRegistered
-			expression.extendable = false
-			return expression
-		case rstestPhaseConditionalFactory:
+			result.phase = phaseRegistered
+			result.extendable = false
+			return result
+		case phaseRegistered:
+			if !result.lenient {
+				return expression{}
+			}
+			return result
+		case phaseConditionalFactory:
 			if call.TypeArguments != nil {
-				return invalidRstestExpression()
+				return expression{}
 			}
-			expression.phase = rstestPhaseAPI
-			expression.extendable = false
-			return expression
-		case rstestPhaseParameterizedFactory:
-			expression.phase = rstestPhaseRegistrar
-			return expression
-		case rstestPhaseExtendFactory:
-			expression.phase = rstestPhaseAPI
-			expression.extendable = true
-			return expression
+			result.phase = phaseAPI
+			result.extendable = false
+			return result
+		case phaseParameterizedFactory:
+			result.phase = phaseRegistrar
+			return result
+		case phaseExtendFactory:
+			result.phase = phaseAPI
+			result.extendable = true
+			return result
 		default:
-			return invalidRstestExpression()
+			return expression{}
 		}
 
 	case ast.KindTaggedTemplateExpression:
 		tagged := node.AsTaggedTemplateExpression()
-		expression := evaluateRstestExpression(tagged.Tag)
-		if expression.phase != rstestPhaseParameterizedFactory {
-			return invalidRstestExpression()
+		result := p.evaluate(tagged.Tag)
+		if result.phase != phaseParameterizedFactory {
+			return expression{}
 		}
-		expression.phase = rstestPhaseRegistrar
-		return expression
+		result.phase = phaseRegistrar
+		return result
 	default:
-		return invalidRstestExpression()
+		return expression{}
 	}
 }
 
@@ -350,12 +343,12 @@ func lineWindowEnd(text string, count int) int {
 // doubling the line count keeps a single-line registration at one parse and a
 // multiline one at a logarithmic number, which bounds the total work for a
 // block by its length rather than by its length times the candidate count.
-func findRegistrationInCandidate(text string, expectedRootOffset int, scriptKind core.ScriptKind) (int, bool) {
+func (p *Profile) findRegistrationInCandidate(text string, expectedRootOffset int, scriptKind core.ScriptKind) (int, bool) {
 	for lines := 1; ; lines *= 2 {
 		end := lineWindowEnd(text, lines)
 		complete := end >= len(text)
 		if end >= expectedRootOffset {
-			if offset, found := findRegistrationInWindow(text[:end], expectedRootOffset, scriptKind, complete); found {
+			if offset, found := p.findRegistrationInWindow(text[:end], expectedRootOffset, scriptKind, complete); found {
 				return offset, true
 			}
 		}
@@ -365,10 +358,10 @@ func findRegistrationInCandidate(text string, expectedRootOffset int, scriptKind
 	}
 }
 
-func findRegistrationInWindow(text string, expectedRootOffset int, scriptKind core.ScriptKind, complete bool) (int, bool) {
+func (p *Profile) findRegistrationInWindow(text string, expectedRootOffset int, scriptKind core.ScriptKind, complete bool) (int, bool) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: "/commented-rstest",
-		Path:     "/commented-rstest",
+		FileName: "/commented-test",
+		Path:     "/commented-test",
 	}, text, scriptKind)
 
 	// A window that stops short of the candidate can cut a registration in
@@ -384,13 +377,13 @@ func findRegistrationInWindow(text string, expectedRootOffset int, scriptKind co
 	var visit func(*ast.Node) bool
 	visit = func(node *ast.Node) bool {
 		if node.Kind == ast.KindCallExpression {
-			expression := evaluateRstestExpression(node)
+			result := p.evaluate(node)
 			statement := registrationExpressionStatement(node)
-			if expression.phase == rstestPhaseRegistered &&
-				expression.rootOffset >= 0 &&
-				expression.rootOffset <= expectedRootOffset &&
-				!strings.Contains(text[expression.rootOffset:expectedRootOffset], "\n") &&
-				expression.rootOffset < bestOffset &&
+			if result.phase == phaseRegistered &&
+				result.rootOffset >= 0 &&
+				result.rootOffset <= expectedRootOffset &&
+				!strings.Contains(text[result.rootOffset:expectedRootOffset], "\n") &&
+				result.rootOffset < bestOffset &&
 				statement != nil &&
 				!hasDiagnosticInRange(sourceFile.Diagnostics(), node.Pos(), node.End()) &&
 				registrationHasCleanLineEnd(text, node.End()) {
@@ -407,8 +400,8 @@ func findRegistrationInWindow(text string, expectedRootOffset int, scriptKind co
 	return bestOffset, true
 }
 
-func findCommentedRstestRegistrations(text string, scriptKind core.ScriptKind) []int {
-	matches := rstestRootCandidate.FindAllStringSubmatchIndex(text, -1)
+func (p *Profile) findCommentedRegistrations(text string, scriptKind core.ScriptKind) []int {
+	matches := p.rootCandidate.FindAllStringSubmatchIndex(text, -1)
 	offsets := make([]int, 0, len(matches))
 	seen := make(map[int]struct{}, len(matches))
 	var fence markdownFenceTracker
@@ -422,7 +415,7 @@ func findCommentedRstestRegistrations(text string, scriptKind core.ScriptKind) [
 			continue
 		}
 		relativeRoot := rootOffset - candidateStart
-		foundOffset, found := findRegistrationInCandidate(text[candidateStart:], relativeRoot, scriptKind)
+		foundOffset, found := p.findRegistrationInCandidate(text[candidateStart:], relativeRoot, scriptKind)
 		if !found {
 			continue
 		}
