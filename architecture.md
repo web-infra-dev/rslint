@@ -107,6 +107,7 @@ The directory map below folds the high-level module relationships into the packa
 | `cmd/rslint/`                  | Main Go binary entry point with CLI, API, and LSP modes                                                                        | Owns mode selection and process stdio/exit-code composition. The default CLI prepares config, targets, Program-generation and final disk-projection adapters for `internal/linter.RunPipeline`; `--api` delegates concrete requests to `internal/api/server`; `--lsp` delegates to `internal/lsp`                                                                                                                                           |
 | `internal/output/`             | Report model, lifecycle/status text, colors, and stdout formatters                                                             | Consumes a completed presentation-only `Report` assembled by the CLI and renders `default`, `jsonline`, `github`, or `gitlab`. Its diagnostics contain only message, location, severity, and optional immutable source-text projections; origin has already been reduced into report counts. The package imports no linter, rule, config, Program, AST, VFS, or compiler-core contracts                                                     |
 | `cmd/tsgo/`                    | ts-go semantic inspection/export tool                                                                                          | Talks directly to `typescript-go` and bypasses the lint framework; consumed by `packages/tsgo` and `crates/tsgo-client`                                                                                                                                                                                                                                                                                                                     |
+| `internal/ipc/`                | Generic framed requests and bounded text/binary attachment transport                                                           | Owns request matching, shared-memory publication, acknowledgements and private platform backends. Application message structures and decoding belong to their consumers; IPC imports no linter or plugin implementation. Node uses `packages/rslint/src/ipc`, and Rust provides byte access through `memory_transport`                                                                                                                      |
 | `internal/api/`                | stdio IPC protocol, wire types, and generic bidirectional service for JS/WASM integration                                      | Defines the stable request/response boundary used by `packages/rslint`, `packages/rslint-wasm`, and `internal/api/server`; it does not import concrete lint, config, Program-loader, or command implementations                                                                                                                                                                                                                             |
 | `internal/api/server/`         | Concrete rslint API request handlers                                                                                           | Implements lint and AST-inspection requests over `internal/api`, owns API-specific paths, request-overlay generation adapters, reverse config/plugin adapters, and structured response projection; it delegates lint planning, execution, and in-memory fix application to `internal/linter`                                                                                                                                                |
 | `internal/config/`             | Configuration models, authored path-space snapshots, matching/merging, project-path resolution, and configured-rule evaluation | Owns the shared extension/default-exclude policy, the `GlobalIgnoreMatcher` consumed by config-candidate discovery, and the `TargetMatcher` consumed by lint-target planning; both matchers share the private config-target resolver. File resolvers receive an immutable `internal/rule.Catalog` explicitly and convert merged rule settings into execution descriptors without owning target walking, module loading, or config ownership |
@@ -1544,6 +1545,146 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    resolve the sibling `lint-worker.js` relative to their module URL. The host
    is a private CLI asset, not a new package export; `build:js` emits it in a
    separate library block to keep the worker independent of shared chunks.
+
+`internal/ipc.Channel` is the common Go/Node data transport. Its request API
+accepts an application payload plus optional `Text` or `Bytes` attachments.
+Text has JSON-compatible Unicode semantics; bytes preserve arbitrary binary
+data, including invalid UTF-8 and NUL. Storage, publication and lifetime do not
+depend on file paths, source code, plugin rules or an application message kind.
+Inline binary attachments use base64; negotiated shared memory avoids that
+encoding and carries only attachment ranges in the control frame.
+Shared-memory acceleration currently covers Go-to-Node request attachments;
+Node-to-Go attachments use the same text/binary contract inline.
+
+One logical request can use multiple memory slots. The channel packs complete
+attachments into the available storage, including attachments that span slots,
+without splitting the application request or merging application results.
+The linter retains its existing rule/config grouping and scheduling. Its
+`WithTextAttachments` wire projection only associates file text with attachment
+indices. CLI and capable native API hosts consume that projection; legacy API
+hosts and LSP retain inline file text. There is no separate plugin transport
+package or second plugin scheduler.
+
+Mapping descriptors, published batches and release acknowledgements belong to
+the transport envelope, never to plugin requests or results. The private pool
+and platform mapping files live in the existing IPC package. Allocation failure
+or unavailable capacity preserves complete inline attachments. The existing
+256 MiB encoded frame limit still applies, including base64 overhead on binary
+fallback. A request exceeding it fails before writing a frame; no data is
+silently truncated. The transport does not implement an unbounded streaming
+protocol. Closing the channel rejects new work, wakes pending calls and waits
+for a current memory writer before releasing the mapping; mapped slices never
+escape the storage implementation.
+
+On Node, CLI and the resident API share `spawnIpcProcess` and `IpcClient` for
+process startup, framing, request matching and reverse-request dispatch. The
+API adapter owns only process lifetime, activity-based `ref`/`unref` and the
+projection from response envelopes to API payloads, retaining generic attachment
+context for inbound handlers. Native API sessions can negotiate the same memory
+transport as CLI sessions. The optional `pluginLintAttachments` application
+capability controls whether Go projects plugin file text into attachments;
+storage negotiation alone does not imply that an older plugin handler can
+interpret attachment indices. API request serialization and configuration
+generations remain in their application owners.
+
+`IpcClient` has one terminal cleanup path for explicit close, input EOF/close,
+read errors and output errors/close/finish. It detaches its listeners, rejects
+pending requests, clears retained buffers and handlers, closes native storage
+once, and publishes the first terminal error through `done` even if native
+cleanup fails. Request rejection and transport termination remain distinguishable
+when their events arrive together. A stream fault does
+not wait for the child process to exit. The API adapter terminates its child
+when the channel closes, so a pending reverse handler cannot keep a broken
+session alive. The process factory owns pipe error guards until child `close`,
+covering queued write errors after the client has detached its own listeners.
+The CLI allows a disconnected child the existing process-exit grace period,
+preserving its natural exit code. A child that outlives that grace is terminated
+and reported as a host failure.
+
+For shared attachments, `spawnIpcProcess` prepares an empty anonymous Unix
+descriptor before spawning Go; Windows needs no mapping at this point. Before
+sending the first application request, `IpcClient` requests the storage configuration through the
+same channel's `transportConfig` request. Go supplies the layout, and Rust
+uses it to size and map the arena. The configuration request is handled inside
+IPC and does not consume the application request's mapping bootstrap. Concurrent
+initial requests share this one configuration exchange. `IpcClient` then sends
+the initialized mapping in the first application request envelope and owns its
+lifetime. A failed setup closes native resources and keeps complete attachments inline
+for the session. Neither the CLI engine nor the plugin host chooses a
+platform mapping or manages a lease. The client validates attachment ranges,
+registers one native capability for all of the request's batches, dispatches
+the application handler and revokes the capability before returning either a
+result or an error. It acknowledges reuse only after every native reader returns.
+Go matches the entire ordered batch set to that request's published storage.
+Published storage remains channel-owned after a caller cancels: a later exact
+acknowledgement may release it, but cannot revive the cancelled request. An
+ordinary result, cancellation or timeout never authorizes reuse by itself.
+If native readers outlive a handler, the result returns immediately without an
+acknowledgement. `IpcClient` retains only a release function and request ID and
+polls pending leases with one unreferenced 25 ms timer. When a lease becomes
+reusable, a payload-free `transportRelease` frame carries its original request
+ID and exact ordered batch set. Go retains that publication until the ACK or
+channel close; the control frame never resolves an application request. Both
+queues are bounded by occupied slots. Closing the session cancels the timer and
+discards pending reclamation; outstanding native readers still pin their mapping.
+The shared plugin host resolves file attachment indices before worker dispatch.
+Its wire request type carries `textAttachment` indices; a separate resolved
+request type carries inline text or private native capabilities. Task construction
+accepts only the resolved type, keeping native capabilities out of the wire model.
+
+Linux uses a sealed anonymous memory file, macOS an immediately unlinked POSIX
+shared-memory object, and Windows an anonymous pagefile mapping whose handle
+Go duplicates. These are private backend details: attachment transfer never uses
+filesystem paths or process addresses. Windows reserves the arena and commits
+its control page initially; each data slot is committed on its first write.
+Allocation or commitment failures, exhausted capacity and attachments larger
+than the available budget retain their complete inline representation.
+The arena is bounded to sixteen 16 MiB slots plus a 4 KiB control region.
+
+An aligned 32-bit publication word per slot supplies the release/acquire memory
+fence between Go and Rust. The native reader holds a writable control view for
+atomic references and a separate read-only data view. `MemoryArena` registers
+all batches atomically. A `SharedBytes` capability addresses their logical byte
+space using a lease, offset and length; offsets count actual published bytes,
+not slot capacity. A reader pins both views for every batch. A range within one
+slot is borrowed directly; a range spanning slots is assembled in Rust before
+the consumer decodes it. The generic `readBytes` entry returns an independent,
+Node-owned Buffer: JavaScript writes cannot mutate a published snapshot, and
+Buffer lifetime does not delay slot reuse.
+
+The plugin parser is one consumer of this byte access. Its `parseSharedBytes`
+entry handles UTF-8/BOM normalization, parser size limits, ESTree parsing and
+direct construction of the required JavaScript SourceCode string. The memory
+module contains none of those policies; ESTree JSON is unchanged. Revocation
+removes the capability from the reader registry immediately. If any reader is
+still active, the arena retains the revoked lease and keeps all of its slots
+occupied. A release retry can succeed only after the last reader returns, and
+only once; old capabilities remain invalid after slot reuse. Reader completion
+restores capacity without restarting the IPC session. Native lease tracking
+contains no request IDs, timers, wire messages or worker scheduling policy.
+Worker termination may remain pending until synchronous native parsing returns.
+Both parser entries preserve N-API's pending exception or termination state
+during result conversion instead of trying to throw a second exception.
+
+`internal/ipc/protocol.go` owns the storage settings: slot count, slot size,
+control-region size and publication stride. They travel to Node and Rust at
+runtime; native mapping, address calculations and range checks use that received
+configuration. Capacity is derived from the layout instead of transmitted as
+another independent setting. Rust validates the supported publication version,
+integer bounds, alignment and arithmetic before mapping, and permits only one
+configuration attempt per arena. The four-byte little-endian frame prefix, JSON
+envelope and 32-bit publication words remain fixed wire conventions. There is no
+protocol code generator or generated binding build step. Each language validates
+inputs at its own boundary. Platform handles, native reader leases and
+application scheduling remain implementation details of their owners.
+
+The native layer owns its N-API input and capability types without importing
+IPC. These value types live in `native/types.ts`, which has no Node dependencies;
+browser and WASM protocol consumers do not import the Node binding loader.
+The loader and its Buffer-returning API stay in `native/binding.ts`.
+IPC owns the wire envelope and converts nullable native mapping
+fields at that boundary. Worker parser types therefore do not depend on the
+IPC protocol or its build inputs.
 
 Other invariants:
 

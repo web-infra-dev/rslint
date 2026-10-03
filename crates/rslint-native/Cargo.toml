@@ -8,6 +8,10 @@ publish = false
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+# Built only into the isolated native addon used by the worker termination test.
+test-worker-termination = []
+
 [dependencies]
 napi = "3.12.1"
 napi-derive = "3.5.6"
@@ -21,6 +25,12 @@ oxc_parser = "0.133.0"
 oxc_span = "0.133.0"
 # token_map builds the AST cover from the ESTree JSON value.
 serde_json = "1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Memory"] }
 
 [build-dependencies]
 napi-build = "2.3.2"

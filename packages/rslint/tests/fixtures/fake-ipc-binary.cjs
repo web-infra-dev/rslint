@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Minimal Go-binary stand-in for engine tests, speaking the IPC frame
 // protocol ([4-byte u32 LE length][JSON {kind,id,data}]) over stdio:
-//   1. expects an `init` request → replies `response {ok:true}`,
+//   1. answers optional `transportConfig`, then `init` → `response {ok:true}`,
 //   2. sends the first output half as an acknowledged `output` request,
 //   3. after its acknowledgement, sends the second half as a notification,
 //   4. sends a `shutdown` request,
@@ -9,18 +9,56 @@
 // This mirrors the real binary's happy-path frame sequence so runEngine can
 // be exercised end-to-end without Go.
 
+const stdout = process.stdout;
+
 let buf = Buffer.alloc(0);
 let remainingText = '';
+let configured = false;
+const mode = process.argv[2];
 
 function send(msg) {
   const body = Buffer.from(JSON.stringify(msg), 'utf8');
   const head = Buffer.alloc(4);
   head.writeUInt32LE(body.length, 0);
-  process.stdout.write(Buffer.concat([head, body]));
+  stdout.write(Buffer.concat([head, body]));
 }
 
 function onMessage(msg) {
+  if (msg.kind === 'transportConfig') {
+    const assert = require('node:assert/strict');
+    assert.equal(configured, false);
+    assert.equal(msg.data, undefined);
+    assert.equal(msg.attachments, undefined);
+    assert.equal(msg.transport, undefined);
+    configured = true;
+    send({
+      kind: 'response',
+      id: msg.id,
+      // A small non-default peer layout, independent of production defaults.
+      data: {
+        version: 1,
+        slotCount: 3,
+        slotSize: 4096,
+        headerSize: 512,
+        publicationStride: 32,
+      },
+    });
+    return;
+  }
   if (msg.kind === 'init') {
+    if (mode === 'require-mapping') {
+      const assert = require('node:assert/strict');
+      assert.equal(configured, true);
+      assert.equal(msg.transport?.mapping?.version, 1);
+      if (process.platform !== 'win32') {
+        assert.equal(msg.transport.mapping.fd, 3);
+        // macOS may round the backing object up to a host page.
+        assert.ok(require('node:fs').fstatSync(3).size >= 512 + 3 * 4096);
+      } else {
+        assert.equal(typeof msg.transport.mapping.handle, 'string');
+        assert.equal(typeof msg.transport.mapping.processId, 'number');
+      }
+    }
     send({ kind: 'response', id: msg.id, data: { ok: true } });
     const text = JSON.stringify(msg.data);
     const split = Math.ceil(text.length / 2);

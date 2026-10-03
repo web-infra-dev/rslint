@@ -33,6 +33,7 @@ type EslintPluginRuleConfig struct {
 type EslintPluginLintFile struct {
 	Path            string         `json:"path"`
 	Text            *string        `json:"text,omitempty"`
+	TextAttachment  *uint32        `json:"textAttachment,omitempty"`
 	ConfigKey       string         `json:"configKey"`
 	LanguageOptions map[string]any `json:"languageOptions,omitempty"`
 	Settings        map[string]any `json:"settings,omitempty"`
@@ -45,6 +46,27 @@ type EslintPluginLintRequest struct {
 	CollectFixes    bool                              `json:"collectFixes"`
 	SuggestionsMode string                            `json:"suggestionsMode"`
 	CollectTiming   bool                              `json:"collectTiming,omitempty"`
+}
+
+// WithTextAttachments projects complete snapshots into attachment indices for
+// hosts that support them. It preserves the logical request, file order and
+// metadata; storage and request scheduling remain outside this wire projection.
+// The original request and its immutable text strings are not modified.
+func (req EslintPluginLintRequest) WithTextAttachments() (EslintPluginLintRequest, []string) {
+	files := make([]EslintPluginLintFile, len(req.Files))
+	texts := make([]string, 0, len(req.Files))
+	for i, file := range req.Files {
+		files[i] = file
+		if file.Text == nil {
+			continue
+		}
+		index := uint32(len(texts))
+		texts = append(texts, *file.Text)
+		files[i].Text = nil
+		files[i].TextAttachment = &index
+	}
+	req.Files = files
+	return req, texts
 }
 
 // SuggestionsMode values for EslintPluginLintRequest.SuggestionsMode — the wire
@@ -107,9 +129,9 @@ type EslintPluginDispatcher func(ctx context.Context, req EslintPluginLintReques
 // plugin-lint input before wire batching.
 type EslintPluginFileInput struct {
 	Path string
-	// Text is the generation source SENT TO THE WORKER on the wire. Overlay
-	// hosts and later autofix generations set it; the initial CLI generation
-	// leaves it nil so the worker can read disk without a whole-repository clone.
+	// Text is the complete generation source sent to the worker. Production
+	// IPC CLI and overlay hosts supply snapshots; only callers that explicitly
+	// enable HostReadsInitialText may omit it for the initial generation.
 	Text *string
 	// SourceFile is the frame Go REBUILDS diagnostics against (Go-local; never
 	// sent on the wire). The CLI sets it to the ts-go *ast.SourceFile the native

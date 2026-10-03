@@ -20,13 +20,162 @@ import {
   buildPluginLintTasks,
   buildPluginLintResult,
   type EslintPluginLintRequest,
+  type ResolvedEslintPluginLintRequest,
 } from '../../../src/eslint-plugin/plugin/plugin-lint-protocol.js';
 import type { LintFileResult } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
+import { resolvePluginAttachments } from '../../../src/eslint-plugin/plugin/attachments.js';
+
+describe('shared plugin host attachment references', () => {
+  test('preserves complete text, native capabilities and file metadata', () => {
+    const source = '\ufeffconst café = "😀";\r\n// \u0000';
+    const capability = { lease: 7, offset: 3, length: 2 };
+    const request: EslintPluginLintRequest = {
+      collectFixes: true,
+      rules: { 'local/check': {} },
+      files: [
+        { path: 'a.ts', textAttachment: 0, configKey: 'config-a' },
+        { path: 'b.ts', text: 'existing inline' },
+        { path: 'c.ts', textAttachment: 1 },
+        { path: 'd.ts' },
+      ],
+    };
+    expect(resolvePluginAttachments(request, [source, capability])).toEqual({
+      ...request,
+      files: [
+        { path: 'a.ts', text: source, configKey: 'config-a' },
+        { path: 'b.ts', text: 'existing inline' },
+        { path: 'c.ts', sharedSource: capability },
+        { path: 'd.ts' },
+      ],
+    });
+    expect(request.files[0]).toHaveProperty('textAttachment', 0);
+  });
+
+  test('preserves an explicitly empty snapshot', () => {
+    expect(
+      resolvePluginAttachments(
+        {
+          files: [{ path: '/missing.ts', textAttachment: 0 }],
+          collectFixes: false,
+        },
+        [''],
+      ),
+    ).toEqual({
+      files: [{ path: '/missing.ts', text: '' }],
+      collectFixes: false,
+    });
+  });
+
+  test('an explicitly absent attachment remains an inline snapshot', () => {
+    const resolved = resolvePluginAttachments({
+      files: [
+        { path: '/missing.ts', text: 'snapshot', textAttachment: undefined },
+      ],
+      collectFixes: false,
+    });
+    const [task] = buildPluginLintTasks(resolved, { configDirSet: new Set() });
+    expect(task.text).toBe('snapshot');
+    expect(resolved.files[0]).not.toHaveProperty('textAttachment');
+  });
+
+  test('decodes owned binary source at the application boundary', () => {
+    const text = '\ufeffconst café = "😀";\r\n// \u0000';
+    const resolved = resolvePluginAttachments(
+      { files: [{ path: 'a.ts', textAttachment: 0 }], collectFixes: false },
+      [Buffer.from(text, 'utf8')],
+    );
+    expect(resolved.files).toEqual([{ path: 'a.ts', text }]);
+    const tasks = buildPluginLintTasks(resolved, { configDirSet: new Set() });
+    expect(tasks[0].text).toBe(text);
+    expect(tasks[0].sharedSource).toBeUndefined();
+  });
+
+  test.each(
+    [
+      [0xff],
+      [0xc0, 0xaf],
+      [0xed, 0xa0, 0x80],
+      [0xe2, 0x82],
+      [0x61, 0x80, 0x62],
+    ].map((bytes) => ({ bytes })),
+  )(
+    'rejects malformed UTF-8 byte snapshots instead of replacing source text: %j',
+    ({ bytes }) => {
+      expect(() =>
+        resolvePluginAttachments(
+          { files: [{ path: 'a.ts', textAttachment: 0 }], collectFixes: false },
+          [Uint8Array.from(bytes)],
+        ),
+      ).toThrow();
+    },
+  );
+
+  test('preserves a BOM and decodes only the supplied byte view', () => {
+    const text = '\ufeffconst café = "😀";\r\n';
+    const bytes = Buffer.concat([
+      Buffer.from([0xff]),
+      Buffer.from(text),
+      Buffer.from([0xff]),
+    ]);
+    const view = new Uint8Array(
+      bytes.buffer,
+      bytes.byteOffset + 1,
+      bytes.byteLength - 2,
+    );
+    const resolved = resolvePluginAttachments(
+      { files: [{ path: 'a.ts', textAttachment: 0 }], collectFixes: false },
+      [view],
+    );
+    expect(resolved.files[0].text).toBe(text);
+  });
+
+  test.each([
+    { files: [{ textAttachment: -1 }] },
+    { files: [{ textAttachment: 0.5 }] },
+    { files: [{ textAttachment: '0' }] },
+    { files: [{ textAttachment: 1 }] },
+    { files: [{ textAttachment: 0, text: '' }] },
+    { files: [{ textAttachment: 0, sharedSource: {} }] },
+    { files: [{ textAttachment: 0 }, { textAttachment: 0 }] },
+    { files: [{}] },
+    { files: [null] },
+  ])('rejects ambiguous or incomplete references: %j', (request) => {
+    expect(() =>
+      // @ts-expect-error Exercise the runtime guard with malformed wire input.
+      resolvePluginAttachments(request, ['complete source']),
+    ).toThrow();
+  });
+
+  test.each([
+    { sharedSource: { lease: 1, offset: 0, length: 0 } },
+    { sourceRange: { offset: 0, length: 0 } },
+    { sourceIndex: 0 },
+  ])(
+    'rejects native or legacy wire fields without attachments: %j',
+    (source) => {
+      expect(() =>
+        resolvePluginAttachments({
+          files: [{ path: '/missing.ts', ...source }],
+          collectFixes: false,
+        }),
+      ).toThrow('invalid plugin source file');
+    },
+  );
+
+  test('a missing attachment cannot become a filesystem read', () => {
+    expect(() =>
+      resolvePluginAttachments({
+        files: [{ path: '/missing.ts', textAttachment: 0 }],
+        collectFixes: false,
+      }),
+    ).toThrow('invalid plugin source attachment');
+  });
+});
 
 function input(
-  files: EslintPluginLintRequest['files'],
-  opts: Partial<EslintPluginLintRequest> = {},
-): EslintPluginLintRequest {
+  files: ResolvedEslintPluginLintRequest['files'],
+  opts: Partial<ResolvedEslintPluginLintRequest> = {},
+): ResolvedEslintPluginLintRequest {
   return {
     files,
     rules: opts.rules ?? { 'uc/no-null': { options: [] } },
@@ -36,6 +185,25 @@ function input(
 }
 
 describe('buildPluginLintTasks', () => {
+  test('rejects an unresolved wire range instead of reading disk', () => {
+    const request: EslintPluginLintRequest = {
+      files: [{ path: '/missing.ts', textAttachment: 0 }],
+      collectFixes: false,
+    };
+    expect(() =>
+      // @ts-expect-error A wire request must pass through the attachment adapter.
+      buildPluginLintTasks(request, { configDirSet: new Set() }),
+    ).toThrow('unresolved shared plugin source');
+  });
+  test('forwards native source capabilities without decoding or reading files', () => {
+    const sharedSource = { lease: 1, offset: 0, length: 12 };
+    const tasks = buildPluginLintTasks(
+      input([{ path: '/missing.ts', sharedSource }]),
+      { configDirSet: new Set() },
+    );
+    expect(tasks[0].sharedSource).toBe(sharedSource);
+    expect(tasks[0].text).toBeUndefined();
+  });
   test('configKey absent on file → empty string on task', () => {
     const tasks = buildPluginLintTasks(
       input([{ path: '/a.ts', text: 'const x = 1;' }]),

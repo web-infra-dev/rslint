@@ -57,13 +57,13 @@ import (
 )
 
 // Application-level IPC message kinds for the CLI ⇆ Node engine protocol.
-// The transport (ipc.Channel) owns only response/error/handshake/exit; the
-// kinds below are declared here and travel through the same opaque envelope.
+// The transport (ipc.Channel) owns response/error, storage configuration and
+// lifecycle kinds; application kinds travel through the same opaque envelope.
 const (
 	kindInit            ipc.MessageKind = "init"            // Node → Go: handshake payload
 	kindShutdown        ipc.MessageKind = "shutdown"        // Go → Node: lint done
 	kindOutput          ipc.MessageKind = "output"          // Go → Node: forwarded stdout text (request = acknowledged)
-	kindPluginLint      ipc.MessageKind = "pluginLint"      // Go → Node: run ESLint-plugin rules in a worker
+	kindPluginLint      ipc.MessageKind = "pluginLint"      // Go → Node: execute one logical plugin request
 	kindLoadConfigs     ipc.MessageKind = "loadConfigs"     // Go → Node: evaluate one config frontier
 	kindActivateConfigs ipc.MessageKind = "activateConfigs" // Go → Node: prepare the effective config/plugin set
 	kindPrepareConfigs  ipc.MessageKind = "prepareConfigs"  // Go → Node: start activation, return planning metadata
@@ -410,16 +410,21 @@ func runCLI(args []string) int {
 	// Reverse dispatcher: send each plugin-lint batch back to the Node host
 	// over the IPC channel and decode its result. Runs concurrently with the
 	// native lint pass (handleLintCommand awaits it before output / --fix).
-	dispatch := func(reqCtx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-		msg, sendErr := ch.SendRequest(reqCtx, kindPluginLint, req)
-		if sendErr != nil {
-			return nil, sendErr
+	dispatch := func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		wire, texts := req.WithTextAttachments()
+		attachments := make([]ipc.Attachment, len(texts))
+		for i, text := range texts {
+			attachments[i] = ipc.Text(text)
 		}
-		var res linter.EslintPluginLintResult
-		if err := msg.Decode(&res); err != nil {
+		msg, err := ch.SendRequest(ctx, kindPluginLint, wire, attachments...)
+		if err != nil {
+			return nil, err
+		}
+		var result linter.EslintPluginLintResult
+		if err := msg.Decode(&result); err != nil {
 			return nil, fmt.Errorf("decode pluginLint result: %w", err)
 		}
-		return &res, nil
+		return &result, nil
 	}
 
 	// Hold the --timing table until Node confirms that its real stdout sink has

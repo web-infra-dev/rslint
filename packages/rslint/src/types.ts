@@ -5,6 +5,7 @@ import type {
   ActivateConfigsRequest,
   LoadConfigsRequest,
 } from './config/config-discovery-protocol.js';
+import type { IpcAttachment } from './ipc/protocol.js';
 
 export interface Position {
   line: number;
@@ -130,6 +131,8 @@ export interface IpcMessage {
   id: number;
   kind: string;
   data: any;
+  /** Borrowed shared attachments remain valid until the inbound handler settles. */
+  attachments?: readonly IpcAttachment[];
 }
 
 /** Handler for a positive-id request frame sent by the Go peer. */
@@ -137,7 +140,12 @@ export type InboundRequestHandler = (message: IpcMessage) => unknown;
 
 /** Reverse-request handlers that are scoped to one outer lint request. */
 export interface LintInboundHandlers {
-  pluginLint?: (request: unknown) => unknown;
+  pluginLint?: (
+    request: unknown,
+    attachments?: readonly IpcAttachment[],
+  ) => unknown;
+  /** Opt into file textAttachment indices; omitted for legacy inline-text hosts. */
+  pluginLintAttachments?: boolean;
   loadConfigs?: (request: LoadConfigsRequest) => unknown;
   activateConfigs?: (request: ActivateConfigsRequest) => unknown;
 }

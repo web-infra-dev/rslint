@@ -89,8 +89,8 @@ async function run() {
       const settled = [false, false, false];
       const waiters = [
         request('activateConfigs', selection),
-        request('pluginLint', { request: 'first' }),
-        request('pluginLint', { request: 'second' }),
+        request('pluginLint', { request: 'first', files: [] }),
+        request('pluginLint', { request: 'second', files: [] }),
       ].map((promise, index) =>
         promise.then((result) => {
           settled[index] = true;
@@ -106,7 +106,7 @@ async function run() {
       const plugin =
         mode === 'failure-without-tasks'
           ? undefined
-          : await request('pluginLint', {});
+          : await request('pluginLint', { files: [] });
       await report('completed', { activation, plugin });
     }
   }
@@ -115,6 +115,21 @@ async function run() {
 }
 
 function onMessage(message) {
+  if (message.kind === 'transportConfig') {
+    send({
+      kind: 'response',
+      id: message.id,
+      // A small non-default peer layout, independent of production defaults.
+      data: {
+        version: 1,
+        slotCount: 3,
+        slotSize: 4096,
+        headerSize: 512,
+        publicationStride: 32,
+      },
+    });
+    return;
+  }
   if (message.kind === 'init') {
     send({ kind: 'response', id: message.id, data: { ok: true } });
     void run().catch((error) => {

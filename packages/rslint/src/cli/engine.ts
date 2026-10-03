@@ -8,9 +8,9 @@
  *
  * Exit codes propagate from the Go child (or 2 on a host-level failure).
  */
-import { spawn, type ChildProcess } from 'node:child_process';
-import { IpcClient } from '../ipc/index.js';
-import type { IpcMessage } from '../ipc/index.js';
+import type { ChildProcess } from 'node:child_process';
+import { spawnIpcProcess, type IpcProcessOptions } from '../ipc/index.js';
+import type { IpcAttachment, IpcMessage } from '../ipc/index.js';
 import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
@@ -21,7 +21,11 @@ import {
 } from '../config/config-loader.js';
 
 interface PluginLintHost {
-  lint(req: unknown): Promise<unknown>;
+  lint(
+    req: unknown,
+    signal?: AbortSignal,
+    attachments?: readonly IpcAttachment[],
+  ): Promise<unknown>;
   shutdown(): Promise<void>;
 }
 
@@ -249,6 +253,8 @@ export interface EngineRunOptions {
   createPluginLintHost?: CreatePluginLintHost;
   /** @internal Dependency seam for post-prepare lifecycle tests. */
   configModuleHost?: ConfigModuleHost;
+  /** @internal Dependency seam for source ownership and fallback tests. */
+  createMemoryTransport?: IpcProcessOptions['createMemoryTransport'];
 }
 
 export async function runEngine(opts: EngineRunOptions): Promise<number> {
@@ -261,9 +267,11 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const stdoutIsTTY = (stdout as Partial<NodeJS.WriteStream>).isTTY === true;
 
-  const child = spawn(opts.binPath, opts.goArgs, {
-    stdio: ['pipe', 'pipe', 'inherit'],
-    cwd: opts.cwd ?? process.cwd(),
+  const { child, client: ipc } = spawnIpcProcess({
+    binPath: opts.binPath,
+    goArgs: opts.goArgs,
+    cwd: opts.cwd,
+    createMemoryTransport: opts.createMemoryTransport,
   });
 
   // childExit always RESOLVES (never rejects); awaits race against it so a
@@ -294,6 +302,38 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     });
   });
 
+  const waitForExit = async (): Promise<ChildExit> => {
+    const exited = await Promise.race([
+      childExit,
+      ipc.done.then(() => undefined),
+    ]);
+    if (exited) return exited;
+
+    // EOF may arrive before the child's exit event, including successful fast
+    // paths. Preserve that exit code, but bound a disconnected child's lifetime.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const naturalExit = await Promise.race([
+        childExit,
+        new Promise<undefined>((resolve) => {
+          timer = setTimeout(() => {
+            resolve(undefined);
+          }, KILL_GRACE_MS);
+          timer.unref();
+        }),
+      ]);
+      if (naturalExit) return naturalExit;
+      stderr.write(
+        'rslint: Go IPC closed without process exit; terminating Go process\n',
+      );
+      safeKillGo(child);
+      await childExit;
+      return { code: 2 };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+
   type RaceResult<T> =
     { kind: 'task'; value: T } | { kind: 'exit'; state: ChildExit };
   const raceWithExit = async <T>(task: Promise<T>): Promise<RaceResult<T>> =>
@@ -302,21 +342,13 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       childExit.then((state) => ({ kind: 'exit' as const, state })),
     ]);
 
-  // Validate stdio BEFORE installing process-level signal listeners, so a throw
-  // here can't leak listeners on `process` for a long-lived host.
-  if (!child.stdin || !child.stdout) {
-    safeKillGo(child);
-    throw new Error('engine: Go child process missing stdin/stdout');
-  }
-  const ipc = new IpcClient(child.stdout, child.stdin);
-
   // Host the ESLint-plugin worker pool that answers Go's reverse
   // `pluginLint` requests. Loaded via a runtime dynamic import: the
   // `: string` path type stops the library dts build (which excludes
   // src/eslint-plugin/**) from type-checking the worker module, and
   // `webpackIgnore` keeps rslib from bundling it into the engine chunk — it
   // must stay a sibling so the worker's `import.meta.url` resolution finds
-  // lint-worker.js. Resolves at runtime to dist/eslint-plugin/index.js.
+  // lint-worker.js. Resolves at runtime to dist/eslint-plugin/host.js.
   let pluginHost: PluginLintHost | null = null;
   const configModuleHost = opts.configModuleHost ?? new ConfigModuleHost();
   const configTransactions = new Set<string>();
@@ -551,7 +583,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
               'engine: pluginLint requested without an activated plugin host',
             );
           }
-          return pluginHost.lint(msg.data);
+          return pluginHost.lint(msg.data, undefined, msg.attachments);
         default:
           throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);
       }
@@ -578,16 +610,20 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
             },
           }),
         );
-      } catch {
-        // The init request can reject when the Go child exits cleanly before we
-        // read its init ack: a fast path (--help / --init) closes the pipe the
-        // moment its work is done, and the stdout-EOF seal that rejects the
-        // pending request can beat the child 'exit' event into the race above
-        // (observed on Linux, where stdout 'end' tends to precede 'exit'). The
-        // child's exit code is the source of truth — a clean (0) exit means Go
-        // finished its job, so honor it; only a non-zero exit is a real failure.
-        safeKillGo(child);
-        const state = await childExit;
+      } catch (error) {
+        const closedByTransport = ipc.isClosed && error === (await ipc.done);
+        if (!closedByTransport) {
+          // A rejected init is an application failure, not the normal EOF/exit
+          // race, even if EOF arrived before this catch continuation ran.
+          // Stop promptly instead of granting the disconnect grace.
+          stderr.write(`rslint: init failed: ${asError(error).message}\n`);
+          safeKillGo(child);
+          await childExit;
+          return 2;
+        }
+        // Fast paths can close stdout without an init acknowledgement. Their
+        // natural exit remains authoritative within the disconnect grace.
+        const state = await waitForExit();
         if (state.code === 0) return 0;
         stderr.write(`rslint: init failed (Go exited ${state.code})\n`);
         return state.code;
@@ -611,10 +647,9 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       }
     }
 
-    // Output forwarding + shutdown ack happen in the handlers above; just wait
-    // for the Go child to finish (it exits with its own lint exit code).
-    const finalExit = await childExit;
-    ipc.close();
+    // Output forwarding + shutdown ack happen in the handlers above. A closed
+    // IPC session must not leave us waiting forever for a disconnected child.
+    const finalExit = await waitForExit();
     return finalExit.code;
   } finally {
     // Single cleanup site for every return above: drop the process-level
@@ -630,6 +665,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       shutdownPluginHost(pluginHost),
       ...[...stagedPluginHosts].map(shutdownPluginHost),
     ]);
+    ipc.close();
     for (const transactionId of configTransactions) {
       configModuleHost.deleteSession(transactionId);
     }

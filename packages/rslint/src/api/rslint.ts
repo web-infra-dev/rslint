@@ -580,6 +580,7 @@ export class Rslint {
 
     return {
       handlers: {
+        pluginLintAttachments: true,
         loadConfigs: async (request) => {
           const response = await configHost.loadConfigs(request);
           transactions.add(request.transactionId);
@@ -606,13 +607,13 @@ export class Rslint {
           }
           return activation;
         },
-        pluginLint: async (request) => {
+        pluginLint: async (request, attachments) => {
           if (!pluginSession) {
             throw new Error(
               'rslint API: pluginLint requested without an activated plugin host',
             );
           }
-          return pluginSession.host.lint(request);
+          return pluginSession.host.lint(request, undefined, attachments);
         },
       },
       shutdown,

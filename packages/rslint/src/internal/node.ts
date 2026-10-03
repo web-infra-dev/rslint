@@ -1,12 +1,14 @@
-import { spawn, ChildProcess } from 'child_process';
+import type { ChildProcess } from 'node:child_process';
 import { Socket } from 'node:net';
 import { RSLintService } from '../service/service.js';
+import { spawnIpcProcess, type IpcClient } from '../ipc/index.js';
+
+export { readAttachmentBytes } from '../ipc/memory-transport.js';
+export type { ByteInput } from '../native/types.js';
 import { resolveRslintBinary } from './resolve-binary.js';
 import type {
   RslintServiceInterface,
   RSlintOptions,
-  PendingMessage,
-  IpcMessage,
   InboundRequestHandler,
   LintOptions,
   LintResponse,
@@ -16,100 +18,61 @@ import type {
  * Node.js implementation of RslintService using child processes
  */
 export class NodeRslintService implements RslintServiceInterface {
-  private nextMessageId: number;
-  private readonly pendingMessages: Map<number, PendingMessage>;
-  private readonly rslintPath: string;
   private readonly process: ChildProcess;
-  private chunks: Buffer[];
-  private chunkSize: number;
-  private expectedSize: number | null;
-  // Set once the process can no longer answer (crashed or terminated). Guards
-  // sendMessage so requests made after death reject immediately instead of
-  // registering a pending that nothing will ever resolve.
-  private dead: boolean;
-  // True once close() has sent the graceful 'exit' signal: the peer's exit is
-  // then EXPECTED (not a crash), so the exit handler resolves in-flight
-  // requests instead of rejecting them — otherwise close()'s pending 'exit'
-  // request could reject and surface as an unhandledRejection.
-  private closing: boolean;
-  private inboundHandler: InboundRequestHandler | null;
-  private activeInboundRequests: number;
+  private readonly client: IpcClient;
+  private dead = false;
+  private activeRequests = 0;
+  private activeInboundRequests = 0;
+  private inboundHandler: InboundRequestHandler | null = null;
 
   constructor(options: RSlintOptions = {}) {
-    this.nextMessageId = 1;
-    this.pendingMessages = new Map();
-    this.rslintPath = options.rslintPath || resolveRslintBinary();
-    this.dead = false;
-    this.closing = false;
-    this.inboundHandler = null;
-    this.activeInboundRequests = 0;
-
-    this.process = spawn(this.rslintPath, ['--api'], {
-      stdio: ['pipe', 'pipe', 'inherit'],
-      cwd: options.workingDirectory || process.cwd(),
-      env: {
-        ...process.env,
-      },
+    const { child, client } = spawnIpcProcess({
+      binPath: options.rslintPath || resolveRslintBinary(),
+      goArgs: ['--api'],
+      cwd: options.workingDirectory || undefined,
     });
-
-    // Start idle: the resident child + its stdio pipes are unref'd so a caller
-    // that never calls close() (e.g. a one-off script) still lets the Node
-    // process exit; setLoopActive(true) re-refs them around an in-flight request
-    // (see sendMessage). The Go peer then sees stdin EOF on parent exit and
-    // exits too (Service.Start returns on io.EOF). close()/[Symbol.asyncDispose]
-    // remain for prompt teardown in long-lived hosts.
-    this.setLoopActive(false);
-
-    // Set up binary message reading
-    this.process.stdout!.on('data', (data) => {
-      this.handleChunk(data);
+    this.process = child;
+    this.client = client;
+    child.once('error', this.onProcessError);
+    child.once('exit', this.onProcessExit);
+    child.once('close', () => {
+      child.off('error', this.onProcessError);
+      child.off('exit', this.onProcessExit);
     });
-
-    // If the process dies, reject every in-flight request — otherwise their
-    // promises hang forever, since the Go peer can no longer answer. Mirrors the
-    // wasm browser backend's worker.onerror reject-all-pending.
-    this.process.on('error', (err) => {
-      this.dead = true;
-      this.rejectAllPending(new Error(`rslint process error: ${err.message}`));
-    });
-    this.process.on('exit', (code, signal) => {
-      this.dead = true;
-      if (this.closing) {
-        // Expected shutdown: close() asked the peer to exit. Settle in-flight
-        // requests (the 'exit' request itself) by resolving — the peer may exit
-        // before we read its ack frame, and rejecting here would turn close()'s
-        // pending into an unhandledRejection.
-        this.resolveAllPending();
-      } else {
-        this.rejectAllPending(
-          new Error(
-            `rslint process exited unexpectedly (code=${code}, signal=${signal})`,
-          ),
-        );
+    client.setInboundHandler(async (message) => {
+      this.activeInboundRequests++;
+      this.updateLoopActivity();
+      try {
+        if (!this.inboundHandler) {
+          throw new Error(
+            `no inbound handler registered (kind=${message.kind})`,
+          );
+        }
+        return await this.inboundHandler({
+          id: message.id,
+          kind: message.kind,
+          data: message.data,
+          ...(message.attachments === undefined
+            ? {}
+            : { attachments: message.attachments }),
+        });
+      } finally {
+        this.activeInboundRequests--;
+        this.updateLoopActivity();
       }
     });
-    // Once the peer closes, further stdin writes raise EPIPE; swallow it so it
-    // doesn't surface as an unhandled 'error' (pending requests are already
-    // rejected by the exit/error handlers above).
-    this.process.stdin!.on('error', () => {
-      /* EPIPE after the peer closed — already handled by the exit/error handlers */
+    client.start();
+    // EOF can precede process exit, including while a reverse handler is
+    // still awaiting user code. A closed channel cannot serve more requests;
+    // release this backend's child without waiting for those handlers.
+    void client.done.then(() => {
+      this.terminate();
     });
-
-    this.chunks = [];
-    this.chunkSize = 0;
-    this.expectedSize = null;
+    // A resident service must not keep a one-shot Node script alive merely
+    // because the caller omitted close(). Active requests re-reference it.
+    this.updateLoopActivity();
   }
 
-  /**
-   * Keep the Node event loop alive only while a request is in flight. The
-   * resident child and its stdio pipes are unref'd while idle so a caller that
-   * never calls close() still lets the process exit; they are ref'd around an
-   * in-flight request because a pending promise alone does NOT keep the loop
-   * alive — without the ref the loop could drain before the response arrives,
-   * leaving the await unsettled (Node would exit with code 13). The piped stdio
-   * streams are net.Socket at runtime (with ref/unref); child_process widens
-   * them to Readable/Writable, so narrow via `instanceof Socket` to reach those.
-   */
   private setLoopActive(active: boolean): void {
     if (active) this.process.ref();
     else this.process.unref();
@@ -124,209 +87,75 @@ export class NodeRslintService implements RslintServiceInterface {
   private updateLoopActivity(): void {
     this.setLoopActive(
       !this.dead &&
-        (this.pendingMessages.size > 0 || this.activeInboundRequests > 0),
+        !this.client.isClosed &&
+        (this.activeRequests > 0 || this.activeInboundRequests > 0),
     );
   }
 
-  /** Install the handler for positive-id requests sent by the Go peer. */
+  /** Install the API's request-scoped reverse handler. IPC owns dispatch. */
   setInboundHandler(handler: InboundRequestHandler | null): void {
     this.inboundHandler = handler;
   }
 
-  /**
-   * Send a message to the rslint process
-   */
   async sendMessage(kind: string, data: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      // Process already gone — fail fast instead of registering a pending that
-      // no exit/error/terminate handler will ever reject (they only sweep
-      // pendings that exist at the moment they fire).
-      if (this.dead) {
-        reject(new Error('rslint service is no longer running'));
-        return;
-      }
-      // 'exit' is the graceful-shutdown signal — from here the peer is expected
-      // to exit, so its 'exit' event must not be treated as a crash.
-      if (kind === 'exit') {
-        this.closing = true;
-      }
-      const id = this.nextMessageId++;
-      const message: IpcMessage = { id, kind, data };
-
-      // Register promise callbacks
-      this.pendingMessages.set(id, { resolve, reject });
-      // Keep the child + pipes referenced until the response arrives (a
-      // pending promise alone does not keep Node's event loop alive).
-      this.updateLoopActivity();
-      try {
-        this.writeMessage(message);
-      } catch (error) {
-        this.pendingMessages.delete(id);
-        this.updateLoopActivity();
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
-    });
-  }
-
-  private writeMessage(message: IpcMessage): void {
-    if (this.dead) return;
-    const jsonBuffer = Buffer.from(JSON.stringify(message), 'utf8');
-    const length = Buffer.alloc(4);
-    length.writeUInt32LE(jsonBuffer.length, 0);
-    this.process.stdin!.write(Buffer.concat([length, jsonBuffer]));
-  }
-
-  /**
-   * Handle incoming binary data chunks
-   */
-  private handleChunk(chunk: Buffer): void {
-    this.chunks.push(chunk);
-    this.chunkSize += chunk.length;
-
-    // Process complete messages
-    while (true) {
-      // Read message length if we don't have it yet
-      if (this.expectedSize === null) {
-        if (this.chunkSize < 4) return;
-
-        // Combine chunks to read the message length
-        const combined = Buffer.concat(this.chunks);
-        this.expectedSize = combined.readUInt32LE(0);
-
-        // Remove length bytes from buffer
-        this.chunks = [combined.subarray(4)];
-        this.chunkSize -= 4;
-      }
-
-      // Check if we have the full message
-      if (this.chunkSize < this.expectedSize) return;
-
-      // Read the message content
-      const combined = Buffer.concat(this.chunks);
-      const message = combined.subarray(0, this.expectedSize).toString('utf8');
-
-      // Handle the message
-      try {
-        const parsed: IpcMessage = JSON.parse(message);
-        this.handleMessage(parsed);
-      } catch (err) {
-        console.error('Error parsing message:', err);
-      }
-
-      // Reset for next message
-      this.chunks = [combined.subarray(this.expectedSize)];
-      this.chunkSize = this.chunks[0].length;
-      this.expectedSize = null;
+    if (this.dead) {
+      throw new Error('rslint service is no longer running');
     }
-  }
-
-  /**
-   * Handle a complete message from rslint
-   */
-  private handleMessage(message: IpcMessage): void {
-    const { id, kind, data } = message;
-    // IDs are allocated independently in each direction and can collide. Only
-    // response/error frames settle an outbound request; every other positive-id
-    // frame is a request from Go that must be answered independently.
-    if (kind === 'response' || kind === 'error') {
-      const pending = this.pendingMessages.get(id);
-      if (!pending) return;
-
-      this.pendingMessages.delete(id);
-      if (kind === 'error') {
-        pending.reject(new Error(data?.message ?? 'rslint request failed'));
-      } else {
-        pending.resolve(data);
-      }
-      this.updateLoopActivity();
-      return;
-    }
-
-    if (id <= 0) return;
-
-    this.activeInboundRequests++;
+    this.activeRequests++;
     this.updateLoopActivity();
-    void Promise.resolve()
-      .then(async () => {
-        if (!this.inboundHandler) {
-          throw new Error(
-            `no inbound handler registered (kind=${message.kind})`,
-          );
-        }
-        return this.inboundHandler(message);
-      })
-      .then(
-        (result) => {
-          try {
-            this.writeMessage({ id, kind: 'response', data: result });
-          } catch (error) {
-            const detail =
-              error instanceof Error ? error.message : String(error);
-            this.writeMessage({
-              id,
-              kind: 'error',
-              data: { message: `failed to encode inbound response: ${detail}` },
-            });
-          }
-        },
-        (error: unknown) => {
-          const detail = error instanceof Error ? error.message : String(error);
-          this.writeMessage({
-            id,
-            kind: 'error',
-            data: { message: detail },
-          });
-        },
+    try {
+      const response = await this.client.sendRequest(kind, data);
+      return response.data;
+    } catch (error) {
+      // A peer can close stdout before its exit acknowledgement is delivered.
+      // This best-effort shutdown request alone tolerates transport closure;
+      // all ordinary in-flight requests still reject through IpcClient.
+      if (
+        kind === 'exit' &&
+        this.client.isClosed &&
+        error === (await this.client.done)
       )
-      .finally(() => {
-        this.activeInboundRequests--;
-        this.updateLoopActivity();
-      })
-      .catch(() => {
-        // A terminal stdin write failure is reported by the stream/process
-        // handlers, which also settle the outer request. Avoid a detached
-        // reverse-response chain becoming an unhandled rejection meanwhile.
-      });
-  }
-
-  /**
-   * Reject every in-flight request and clear the queue. Called when the process
-   * dies (exit/error) or is terminated, so callers never hang on a process that
-   * can no longer reply. No-op when nothing is pending (the normal close path).
-   */
-  private rejectAllPending(err: Error): void {
-    if (this.pendingMessages.size === 0) return;
-    for (const [, pending] of this.pendingMessages) {
-      pending.reject(err);
+        return null;
+      throw error;
+    } finally {
+      this.activeRequests--;
+      this.updateLoopActivity();
     }
-    this.pendingMessages.clear();
-    this.updateLoopActivity();
   }
 
-  /**
-   * Resolve every in-flight request (no payload) and clear the queue. Used on
-   * the expected close() shutdown path so the 'exit' request settles cleanly
-   * instead of rejecting. No-op when nothing is pending.
-   */
-  private resolveAllPending(): void {
-    if (this.pendingMessages.size === 0) return;
-    for (const [, pending] of this.pendingMessages) {
-      pending.resolve(null);
-    }
-    this.pendingMessages.clear();
-    this.updateLoopActivity();
-  }
-
-  /**
-   * Terminate the rslint process
-   */
-  terminate(): void {
+  private finish(error: Error): void {
+    if (this.dead) return;
     this.dead = true;
-    if (this.process && !this.process.killed) {
-      this.process.stdin!.end();
+    this.inboundHandler = null;
+    this.client.close(error);
+    this.updateLoopActivity();
+  }
+
+  private readonly onProcessError = (error: Error): void => {
+    this.finish(new Error(`rslint process error: ${error.message}`));
+  };
+
+  private readonly onProcessExit = (
+    code: number | null,
+    signal: NodeJS.Signals | null,
+  ): void => {
+    this.finish(
+      new Error(
+        `rslint process exited unexpectedly (code=${code}, signal=${signal})`,
+      ),
+    );
+  };
+
+  terminate(): void {
+    this.finish(new Error('rslint service terminated'));
+    if (
+      !this.process.killed &&
+      this.process.exitCode === null &&
+      this.process.signalCode === null
+    ) {
+      this.process.stdin?.end();
       this.process.kill();
     }
-    this.rejectAllPending(new Error('rslint service terminated'));
   }
 }
 

@@ -20,6 +20,21 @@ function send(msg) {
 }
 
 function onMessage(msg) {
+  if (msg.kind === 'transportConfig') {
+    send({
+      kind: 'response',
+      id: msg.id,
+      // A small non-default peer layout, independent of production defaults.
+      data: {
+        version: 1,
+        slotCount: 3,
+        slotSize: 4096,
+        headerSize: 512,
+        publicationStride: 32,
+      },
+    });
+    return;
+  }
   if (msg.kind === 'init') {
     send({ kind: 'response', id: msg.id, data: { ok: true } });
     send({

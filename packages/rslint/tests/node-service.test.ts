@@ -1,7 +1,13 @@
 import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { NodeRslintService } from '../src/internal/node.js';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { once } from 'node:events';
+import { spawn, type ChildProcess } from 'node:child_process';
+import {
+  NodeRslintService,
+  readAttachmentBytes,
+} from '../src/internal/node.js';
+import type { IpcClient } from '../src/ipc/client.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FAKE = path.resolve(__dirname, './fixtures/fake-api-binary.cjs');
@@ -14,12 +20,31 @@ const suite = process.platform === 'win32' ? describe.skip : describe;
 
 // Reach the private child handle to simulate an external SIGKILL (TS-private,
 // present at runtime).
-function childOf(svc: NodeRslintService): { kill: (sig?: string) => void } {
-  return (svc as unknown as { process: { kill: (sig?: string) => void } })
-    .process;
+function childOf(svc: NodeRslintService): ChildProcess {
+  return (svc as unknown as { process: ChildProcess }).process;
 }
 
 suite('NodeRslintService reject-all-pending on crash/terminate', () => {
+  test('forwards generic binary attachments without interpreting application kinds', async () => {
+    const svc = new NodeRslintService({ rslintPath: FAKE });
+    svc.setInboundHandler((message) => {
+      expect(message.kind).toBe('arbitraryBinary');
+      expect(message.attachments).toEqual([Buffer.from([0, 255, 128]), '']);
+      expect('transport' in message).toBe(false);
+      return {
+        bytes: Array.from(readAttachmentBytes(message.attachments![0])),
+      };
+    });
+    try {
+      await expect(svc.sendMessage('reverse-bytes', {})).resolves.toEqual({
+        reverseKind: 'response',
+        reverseData: { bytes: [0, 255, 128] },
+      });
+    } finally {
+      svc.terminate();
+    }
+  });
+
   test('answers an inbound request without confusing a colliding outbound id', async () => {
     const svc = new NodeRslintService({ rslintPath: FAKE });
     svc.setInboundHandler(async (message) => ({
@@ -61,15 +86,20 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
     svc.sendMessage('crash', {}).catch(() => {
       /* the fake exits before acking — the rejection is expected, ignore it */
     }); // make the fake exit(42)
-    // Asserts the exit handler (not some watchdog) rejected it.
-    await expect(inflight).rejects.toThrow(/exited unexpectedly/);
+    // Either EOF or child exit may arrive first; both must reject immediately.
+    await expect(inflight).rejects.toThrow(
+      /exited unexpectedly|peer closed input stream/,
+    );
   });
 
   test('rejects in-flight requests on an external SIGKILL', async () => {
     const svc = new NodeRslintService({ rslintPath: FAKE });
     const inflight = svc.sendMessage('lint', {});
     childOf(svc).kill('SIGKILL');
-    await expect(inflight).rejects.toThrow(/exited unexpectedly/);
+    // Killing before bootstrap writes may surface EPIPE before EOF or exit.
+    await expect(inflight).rejects.toThrow(
+      /exited unexpectedly|peer closed input stream|output write failed: .*EPIPE/,
+    );
   });
 
   test('rejects in-flight requests on terminate()', async () => {
@@ -77,6 +107,40 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
     const inflight = svc.sendMessage('lint', {});
     svc.terminate();
     await expect(inflight).rejects.toThrow(/terminated/);
+  });
+
+  test('rejects on stdout EOF even while the Go process stays alive', async () => {
+    const svc = new NodeRslintService({ rslintPath: FAKE });
+    try {
+      await expect(svc.sendMessage('close-output', {})).rejects.toThrow(
+        /peer closed input stream/,
+      );
+      expect(childOf(svc).exitCode).toBeNull();
+      await expect(svc.sendMessage('lint', {})).rejects.toThrow(
+        /closed|no longer running/,
+      );
+    } finally {
+      svc.terminate();
+    }
+  });
+
+  test('owns late pipe errors until the terminated child has closed', async () => {
+    const svc = new NodeRslintService({ rslintPath: FAKE });
+    await svc.sendMessage('handshake', { version: '3.1.0' });
+    const child = childOf(svc);
+    const closed = once(child, 'close');
+    svc.terminate();
+    // IpcClient has detached its listeners, but the child still owns its
+    // pipes. A queued asynchronous write may emit EPIPE in this interval.
+    expect(() =>
+      child.stdin!.emit('error', new Error('late EPIPE')),
+    ).not.toThrow();
+    expect(() =>
+      child.stdout!.emit('error', new Error('late read error')),
+    ).not.toThrow();
+    await closed;
+    expect(child.stdin!.listenerCount('error')).toBe(0);
+    expect(child.stdout!.listenerCount('error')).toBe(0);
   });
 
   test('does not harm a normal request/response round-trip', async () => {
@@ -99,20 +163,55 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
     );
   });
 
-  test('graceful exit resolves the request even when the peer exits before acking', async () => {
-    // Silent-exit fake: the peer exits(0) WITHOUT acking 'exit', so the process
-    // 'exit' event fires before any response is read. The 'exit' kind flags
-    // closing, so the exit handler RESOLVES the pending instead of rejecting it
-    // — this is what keeps RSLintService.close()'s awaited 'exit' request from
-    // rejecting into an unhandledRejection. (Pre-fix, the exit handler rejected
-    // unconditionally and this would reject with /exited unexpectedly/.)
+  test('receives the normal exit acknowledgement before output closes', async () => {
+    const svc = new NodeRslintService({ rslintPath: FAKE });
+    try {
+      // A lost final frame would instead resolve to the best-effort null
+      // result used for an unacknowledged exit.
+      await expect(svc.sendMessage('exit', {})).resolves.toEqual({});
+    } finally {
+      svc.terminate();
+    }
+  });
+
+  test('silent exit resolves only the exit request and rejects other pending work', async () => {
+    // The peer exits without acknowledging shutdown. The API adapter retains
+    // the best-effort exit result, while IPC still rejects unfinished linting.
     process.env.RSLINT_FAKE_EXIT_SILENT = '1';
     try {
       const svc = new NodeRslintService({ rslintPath: FAKE });
       await svc.sendMessage('handshake', { version: '3.1.0' });
-      await expect(svc.sendMessage('exit', {})).resolves.toBeNull();
+      const [lint, exit] = await Promise.allSettled([
+        svc.sendMessage('lint', {}),
+        svc.sendMessage('exit', {}),
+      ]);
+      expect(lint.status).toBe('rejected');
+      expect(exit).toEqual({ status: 'fulfilled', value: null });
     } finally {
       delete process.env.RSLINT_FAKE_EXIT_SILENT;
+    }
+  });
+
+  test('preserves an exit rejection when EOF arrives before its catch continuation', async () => {
+    const svc = new NodeRslintService({ rslintPath: FAKE });
+    const client = (svc as unknown as { client: IpcClient }).client;
+    const originalSend = client.sendRequest;
+    // Delay delivery of the real peer rejection until EOF. A concurrent
+    // transport close must not turn an application error into success.
+    client.sendRequest = function (kind, data, attachments) {
+      return originalSend
+        .call(this, kind, data, attachments)
+        .catch(async (error: unknown) => {
+          await this.done;
+          throw error;
+        });
+    } as typeof client.sendRequest;
+    try {
+      await expect(svc.sendMessage('exit', { reject: true })).rejects.toThrow(
+        'exit rejected',
+      );
+    } finally {
+      svc.terminate();
     }
   });
 
@@ -128,4 +227,61 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
     const inflight = svc.sendMessage('lint', {});
     await expect(inflight).rejects.toThrow(/rslint process error/);
   });
+
+  test('EOF releases a resident process with an unanswered inbound request', async () => {
+    // Use a separate Node process: the test runner's own handles would hide a
+    // leaked child/pipe reference. Finish the handshake before asking the fake
+    // for an unsolicited request, so no outbound finally can drive cleanup.
+    const entry = pathToFileURL(
+      path.resolve(__dirname, '../dist/internal.js'),
+    ).href;
+    const script = `
+      import { NodeRslintService } from ${JSON.stringify(entry)};
+      const keepAlive = setInterval(() => {}, 1000);
+      const service = new NodeRslintService({ rslintPath: ${JSON.stringify(FAKE)} });
+      await service.sendMessage('handshake', { version: '3.1.0' });
+      service.setInboundHandler(() => {
+        clearInterval(keepAlive);
+        process.stdout.write('INBOUND_PENDING\\n');
+        return new Promise(() => {});
+      });
+      // Reach the transport only to trigger a request without creating an
+      // outbound API pending. The service still owns all lifecycle decisions.
+      service.client.done.then(() => process.stdout.write('IPC_CLOSED\\n'));
+      service.client.sendNotification('reverse-close-output', {});
+    `;
+    const child = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
+    let timedOut = false;
+    const watchdog = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, 5_000);
+    try {
+      const [code, signal] = await once(child, 'close');
+      expect({ code, signal, timedOut, stderr }).toEqual({
+        code: 0,
+        signal: null,
+        timedOut: false,
+        stderr: '',
+      });
+      expect(stdout).toBe('INBOUND_PENDING\nIPC_CLOSED\n');
+    } finally {
+      clearTimeout(watchdog);
+      child.kill('SIGKILL');
+    }
+  }, 10_000);
 });

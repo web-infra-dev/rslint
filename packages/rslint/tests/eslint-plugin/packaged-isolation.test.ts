@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
-import { platformTuple } from '../../src/eslint-plugin/native/platform-tuple.js';
+import { platformTuple } from '../../src/native/platform-tuple.js';
 
 /**
  * Packaged-layout isolation guard.
@@ -25,9 +25,15 @@ import { platformTuple } from '../../src/eslint-plugin/native/platform-tuple.js'
  * still reject. The full public entry rejects during import instead. Neither
  * entry may fall back to a workspace platform package.
  *
- * Requires `dist/eslint-plugin/` (built by `pnpm build`, the same prerequisite
- * the worker-pool e2e suites already document) and the host platform package's
- * `.node` (built by `pnpm --filter @rslint/native build`).
+ * The complete CLI case additionally proves that its arena and worker parser
+ * share the staged native registry, preserving Go's snapshot after a disk edit.
+ * The termination case builds a separate feature-only addon to stop a real
+ * worker inside parseSharedBytes while its native reader holds the mapping.
+ *
+ * Requires `dist/`, the host Go binary (built by `pnpm build`) and the host
+ * platform package's `.node` (built by `pnpm --filter @rslint/native build`).
+ * The termination cases also require Cargo; their debug/release feature addons
+ * use a separate target directory and never replace the platform package.
  */
 
 const require = createRequire(import.meta.url);
@@ -89,6 +95,207 @@ if (d.length === 1 && d[0].ruleName === 'pkg/no-null') {
 }
 `;
 
+const SHARED_RUNNER = `import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
+const parentRequire = createRequire(path.join(here, 'dist', 'cli.js'));
+const workerRequire = createRequire(path.join(here, 'dist', 'eslint-plugin', 'lint-worker.js'));
+const nativePackage = ${JSON.stringify(`@rslint/${PKG_BASE}`)};
+const resolved = parentRequire.resolve(nativePackage);
+assert.equal(resolved, workerRequire.resolve(nativePackage));
+assert.ok(resolved.startsWith(here + path.sep));
+const native = parentRequire(nativePackage);
+const file = path.join(here, 'cfg', 'input.ts');
+const original = fs.readFileSync(file, 'utf8');
+const changed = 'const changedOnDisk = false;';
+let registered = 0;
+let configured = 0;
+const configure = native.MemoryArena.prototype.configure;
+native.MemoryArena.prototype.configure = function(config) {
+  assert.equal(configured, 0);
+  assert.equal(registered, 0);
+  const fd = this.fd();
+  if (fd !== undefined && fd !== null) assert.equal(fs.fstatSync(fd).size, 0);
+  for (const field of ['version', 'slotCount', 'slotSize', 'headerSize', 'publicationStride']) {
+    assert.equal(Number.isInteger(config[field]) && config[field] > 0, true);
+  }
+  configure.call(this, config);
+  configured++;
+  assert.equal(this.descriptor().version, config.version);
+};
+const register = native.MemoryArena.prototype.register;
+native.MemoryArena.prototype.register = function(batches) {
+  assert.equal(configured, 1);
+  const lease = register.call(this, batches);
+  const length = batches.reduce((total, batch) => total + batch.length, 0);
+  const source = native.parseSharedBytes(file, { lease, offset: 0, length }, 'module', false);
+  assert.equal(source.sourceText, original.slice(1));
+  assert.equal(source.hadBom, true);
+  registered++;
+  // Observe the real CLI registration after Go published its snapshot, before
+  // the adapter sends the capability to the real worker. No transport is mocked.
+  fs.writeFileSync(file, changed);
+  return lease;
+};
+const { run } = await import(pathToFileURL(path.join(here, 'dist', 'cli.js')).href);
+const code = await run(parentRequire.resolve(nativePackage + '/bin'), ['--no-color', file], Date.now());
+assert.equal(code, 1);
+assert.equal(configured, 1, 'CLI must configure storage through its Go peer');
+assert.equal(registered, 1, 'CLI must register shared source, not use inline fallback');
+assert.equal(fs.readFileSync(file, 'utf8'), changed);
+console.log('PACKAGED_SHARED_OK');
+`;
+
+const TERMINATION_RUNNER = `import assert from 'node:assert/strict';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
+const entry = path.join(here, 'eslint-plugin', 'index.js');
+const require = createRequire(entry);
+const nativePath = require.resolve(${JSON.stringify(`@rslint/${PKG_BASE}`)});
+const native = require(nativePath);
+const { WorkerPool } = await import(pathToFileURL(entry).href);
+const closeBeforeResume = process.argv[2] === 'close';
+const cfgDir = path.join(here, 'cfg');
+const text = '\\ufeffconst pinned = null; // café 😀 retained through arena.close()\\r\\n';
+const expected = native.parse('pinned.ts', text.slice(1), 'module', false).program;
+const { arena, source } = native.createWorkerTerminationFixture(text);
+const logs = [];
+const pool = new WorkerPool({
+  configs: [{ configPath: path.join(cfgDir, 'rslint.config.mjs'), configDirectory: cfgDir }],
+  workerCount: 1,
+  warmupWorkerCount: 1,
+  taskTimeoutMs: 1,
+  retryCap: 0,
+  onLog: (record) => logs.push(record),
+});
+try {
+  await pool.init();
+  const response = pool.lintBatch([{
+    filePath: 'pinned.ts',
+    sharedSource: source,
+    configKey: cfgDir,
+    rules: { 'pkg/no-null': { options: [] } },
+    collectFixes: false,
+    suggestionsMode: 'off',
+  }]);
+  // This event is emitted only after with_bytes has pinned the lease and the
+  // real native parser entry has decoded UTF-8/BOM. Blocking this JS thread
+  // keeps the task timer from firing until the worker has entered the barrier.
+  native.waitForWorkerParse();
+  // The pool timeout callback requests Worker.terminate() before this promise
+  // continuation runs. The worker is still blocked inside the native call.
+  const result = await response;
+  assert.equal(result.length, 1);
+  assert.equal(result[0].parseError, 'task_timeout');
+  assert.deepEqual(result[0].diagnostics, []);
+  assert.equal(arena.release(source.lease), false, 'an active native reader must prevent reuse');
+  assert.throws(() => native.parseSharedBytes('pinned.ts', source, 'module', false), /invalid or expired/);
+  native.republishWorkerFixture(arena);
+  assert.throws(() => arena.register([{ slot: 0, generation: 2, length: source.length }]), /invalid or expired/);
+  if (closeBeforeResume) {
+    arena.close();
+    assert.throws(() => arena.descriptor(), /invalid or expired/);
+  }
+  // Node termination is pending while synchronous native code runs. Releasing
+  // this barrier lets Oxc finish, including after the optional arena.close().
+  native.resumeWorkerParse();
+  await pool.shutdown();
+  assert.equal(native.workerParsedProgram(), expected, 'Oxc must finish from the pinned bytes');
+  if (!closeBeforeResume) {
+    assert.equal(arena.release(source.lease), true, 'reader exit must restore capacity in the same arena');
+    assert.equal(arena.release(source.lease), false, 'reclamation must succeed exactly once');
+    const lease = arena.register([{ slot: 0, generation: 2, length: source.length }]);
+    assert.throws(() => native.parseSharedBytes('pinned.ts', source, 'module', false), /invalid or expired/);
+    assert.equal(native.parseSharedBytes('pinned.ts', { ...source, lease }, 'module', false).parsed.program, expected);
+    assert.equal(arena.release(lease), true);
+  }
+  assert.equal(logs.some((record) => record.level === 'error'), false);
+  console.log('PACKAGED_TERMINATION_OK');
+} finally {
+  arena.close();
+  native.resumeWorkerParse();
+  await pool.shutdown();
+}
+`;
+
+function stageNative(
+  root: string,
+  withBinary = false,
+  testAddon?: string,
+): void {
+  const nativeDir = path.join(root, 'node_modules', '@rslint', PKG_BASE);
+  fs.mkdirSync(nativeDir, { recursive: true });
+  const srcPkgDir = path.dirname(
+    require.resolve(`@rslint/${PKG_BASE}/package.json`),
+  );
+  const srcNode = testAddon ?? path.join(srcPkgDir, NODE_FILE);
+  if (!fs.existsSync(srcNode)) {
+    throw new Error(
+      `no built ${NODE_FILE} in ${srcPkgDir} — run ` +
+        '`pnpm --filter @rslint/native build` before this test',
+    );
+  }
+  fs.copyFileSync(srcNode, path.join(nativeDir, NODE_FILE));
+  const exports: Record<string, string> = { '.': `./${NODE_FILE}` };
+  if (withBinary) {
+    const binary = require.resolve(`@rslint/${PKG_BASE}/bin`);
+    const name = path.basename(binary);
+    fs.copyFileSync(binary, path.join(nativeDir, name));
+    exports['./bin'] = `./${name}`;
+  }
+  fs.writeFileSync(
+    path.join(nativeDir, 'package.json'),
+    JSON.stringify({ name: `@rslint/${PKG_BASE}`, exports }),
+  );
+}
+
+/** A feature addon never enters the platform package used by production builds. */
+function buildTerminationAddon(profile: 'debug' | 'release'): string {
+  const repoRoot = path.resolve(__dirname, '../../../..');
+  const target = path.join(repoRoot, 'target', 'worker-termination-test');
+  const build = spawnSync(
+    'cargo',
+    [
+      'build',
+      '--locked',
+      ...(profile === 'release' ? ['--release'] : []),
+      '-p',
+      'rslint-native',
+      '--features',
+      'test-worker-termination',
+      '--target-dir',
+      target,
+    ],
+    {
+      cwd: repoRoot,
+      // A release job may export a cross-compilation target. This addon must
+      // use Cargo's host build and its ordinary debug/release output directory.
+      env: { ...process.env, CARGO_BUILD_TARGET: undefined },
+      encoding: 'utf8',
+      timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+      killSignal: 'SIGKILL',
+      maxBuffer: 16 * 1024 * 1024,
+    },
+  );
+  if (build.error || build.signal || build.status !== 0) {
+    throw new Error(
+      `worker termination addon build failed: ${build.error ?? build.signal ?? build.status}\n${build.stderr}`,
+    );
+  }
+  const library =
+    process.platform === 'win32'
+      ? 'rslint_native.dll'
+      : process.platform === 'darwin'
+        ? 'librslint_native.dylib'
+        : 'librslint_native.so';
+  return path.join(target, profile, library);
+}
+
 /** Stage a packaged layout under `root`; omit the nested native for the negative control. */
 function stage(root: string, opts: { withNative: boolean }): void {
   const coreEpDir = path.resolve(__dirname, '../../dist/eslint-plugin');
@@ -113,26 +320,7 @@ function stage(root: string, opts: { withNative: boolean }): void {
     // Stage the host platform package `@rslint/native-<tuple>` (minimal
     // package.json + the `.node` under its real name) — what the worker's
     // loader resolves at runtime.
-    const nativeDir = path.join(epDest, 'node_modules', '@rslint', PKG_BASE);
-    fs.mkdirSync(nativeDir, { recursive: true });
-    const srcPkgDir = path.dirname(
-      require.resolve(`@rslint/${PKG_BASE}/package.json`),
-    );
-    const srcNode = path.join(srcPkgDir, NODE_FILE);
-    if (!fs.existsSync(srcNode)) {
-      throw new Error(
-        `no built ${NODE_FILE} in ${srcPkgDir} — run ` +
-          '`pnpm --filter @rslint/native build` before this test',
-      );
-    }
-    fs.copyFileSync(srcNode, path.join(nativeDir, NODE_FILE));
-    fs.writeFileSync(
-      path.join(nativeDir, 'package.json'),
-      JSON.stringify({
-        name: `@rslint/${PKG_BASE}`,
-        exports: { '.': `./${NODE_FILE}` },
-      }),
-    );
+    stageNative(epDest);
   }
 
   const cfgDir = path.join(root, 'cfg');
@@ -155,6 +343,98 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     afterAll(() => {
       if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
     });
+
+    test.each(
+      (['debug', 'release'] as const).flatMap((profile) =>
+        (['close', 'reuse'] as const).map((ending) => ({ profile, ending })),
+      ),
+    )(
+      'terminating a real worker preserves native reads and supports $ending ($profile)',
+      ({ profile, ending }) => {
+        const root = path.join(tmp, `worker-termination-${profile}-${ending}`);
+        fs.mkdirSync(root, { recursive: true });
+        stage(root, { withNative: false });
+        stageNative(
+          path.join(root, 'eslint-plugin'),
+          false,
+          buildTerminationAddon(profile),
+        );
+        fs.writeFileSync(path.join(root, 'runner.mjs'), TERMINATION_RUNNER);
+        const result = spawnSync(
+          process.execPath,
+          [path.join(root, 'runner.mjs'), ending],
+          {
+            cwd: root,
+            encoding: 'utf8',
+            timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+            killSignal: 'SIGKILL',
+            maxBuffer: 16 * 1024 * 1024,
+            env: { ...process.env, NODE_PATH: '' },
+          },
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.signal, result.stderr).toBeNull();
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout.trim()).toBe('PACKAGED_TERMINATION_OK');
+        expect(result.stderr.trim()).toBe('');
+      },
+      PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
+    );
+
+    test(
+      'complete CLI and worker share the staged native source registry',
+      () => {
+        const root = path.join(tmp, 'shared-cli');
+        fs.mkdirSync(root, { recursive: true });
+        fs.cpSync(
+          path.resolve(__dirname, '../../dist'),
+          path.join(root, 'dist'),
+          { recursive: true },
+        );
+        fs.writeFileSync(
+          path.join(root, 'package.json'),
+          JSON.stringify({ type: 'module' }),
+        );
+        stageNative(root, true);
+        fs.cpSync(
+          path.dirname(require.resolve('picomatch/package.json')),
+          path.join(root, 'node_modules', 'picomatch'),
+          { recursive: true },
+        );
+        const cfgDir = path.join(root, 'cfg');
+        fs.mkdirSync(cfgDir);
+        fs.writeFileSync(path.join(cfgDir, 'local-plugin.mjs'), LOCAL_PLUGIN);
+        fs.writeFileSync(
+          path.join(cfgDir, 'rslint.config.mjs'),
+          `import lp from './local-plugin.mjs';
+export default [{ files: ['**/*.ts'], plugins: { pkg: lp }, rules: { 'pkg/no-null': 'error' } }];`,
+        );
+        fs.writeFileSync(
+          path.join(cfgDir, 'input.ts'),
+          '\ufeffconst sample = null; // café 😀\r\n',
+        );
+        fs.writeFileSync(path.join(root, 'runner.mjs'), SHARED_RUNNER);
+        const result = spawnSync(
+          process.execPath,
+          [path.join(root, 'runner.mjs')],
+          {
+            cwd: cfgDir,
+            encoding: 'utf8',
+            timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+            killSignal: 'SIGKILL',
+            maxBuffer: 16 * 1024 * 1024,
+            env: { ...process.env, NODE_PATH: '' },
+          },
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.signal).toBeNull();
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout).toContain('no null');
+        expect(result.stdout).toContain('PACKAGED_SHARED_OK');
+        expect(result.stderr.trim()).toBe('');
+      },
+      PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
+    );
 
     test.each(HOST_ENTRIES)(
       '%s worker loads the nested platform package and a plugin rule fires',

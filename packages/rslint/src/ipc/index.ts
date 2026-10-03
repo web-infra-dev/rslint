@@ -5,10 +5,14 @@
  * child; callers layer their task (currently lint) on top of this transport.
  */
 export { IpcClient, encodeFrame, decodeFrame } from './client.js';
+export { spawnIpcProcess, type IpcProcessOptions } from './process.js';
 export type {
   MessageKind,
   IpcMessage,
+  IpcAttachment,
   ErrorResponseData,
   InboundRequestHandler,
   NotificationHandler,
 } from './protocol.js';
+
+export { readAttachmentBytes } from './memory-transport.js';

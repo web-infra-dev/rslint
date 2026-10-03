@@ -773,3 +773,5 @@ popura
 cerebro
 jquery
 warningcomments
+Condvar
+librslint

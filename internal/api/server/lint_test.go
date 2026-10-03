@@ -1623,8 +1623,23 @@ func TestHandleLint_FixRangeIsUTF16(t *testing.T) {
 
 type apiRequesterFunc func(context.Context, ipc.MessageKind, any) (*ipc.Message, error)
 
-func (f apiRequesterFunc) SendRequest(ctx context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+func (f apiRequesterFunc) SendRequest(ctx context.Context, kind ipc.MessageKind, payload any, _ ...ipc.Attachment) (*ipc.Message, error) {
 	return f(ctx, kind, payload)
+}
+
+type apiAttachmentRequesterFunc func(context.Context, ipc.MessageKind, any, ...ipc.Attachment) (*ipc.Message, error)
+
+func (f apiAttachmentRequesterFunc) SendRequest(ctx context.Context, kind ipc.MessageKind, payload any, attachments ...ipc.Attachment) (*ipc.Message, error) {
+	return f(ctx, kind, payload, attachments...)
+}
+
+type apiAttachmentCapabilityRequester struct {
+	apiAttachmentRequesterFunc
+	attachments bool
+}
+
+func (requester apiAttachmentCapabilityRequester) PeerSupportsCapability(capability string) bool {
+	return capability == api.CapabilityReversePluginLint || (capability == api.CapabilityPluginLintAttachments && requester.attachments)
 }
 
 type apiPeerCapabilityRequester struct {
@@ -2469,90 +2484,103 @@ func TestHandleLint_ConfigDiscoveryAllCandidatesFail(t *testing.T) {
 }
 
 func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
-	dir := t.TempDir()
-	pluginConfigDirectory := filepath.Join(dir, "authored-config")
-	target := filepath.Join(dir, "input.js")
-	const source = "const bad = 1;\n"
-	config := json.RawMessage(`[{
-		"plugins": ["community"],
-		"rules": { "community/rename": ["error", { "replacement": "good" }] }
-	}]`)
+	for _, mode := range []string{"legacy requester", "legacy capability", "attachments"} {
+		t.Run(mode, func(t *testing.T) {
+			dir := t.TempDir()
+			pluginConfigDirectory := filepath.Join(dir, "authored-config")
+			target := filepath.Join(dir, "input.js")
+			const source = "const bad = 1;\n"
+			config := json.RawMessage(`[{
+				"plugins": ["community"],
+				"rules": { "community/rename": ["error", { "replacement": "good" }] }
+			}]`)
 
-	var calls atomic.Int32
-	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
-		call := calls.Add(1)
-		if kind != api.KindPluginLint {
-			t.Fatalf("expected pluginLint reverse request, got %q", kind)
-		}
-		req, ok := payload.(linter.EslintPluginLintRequest)
-		if !ok {
-			t.Fatalf("unexpected pluginLint payload type %T", payload)
-		}
-		if !req.CollectFixes || req.SuggestionsMode != linter.SuggestionsModeEager {
-			t.Fatalf("unexpected edit settings: collectFixes=%v suggestions=%q", req.CollectFixes, req.SuggestionsMode)
-		}
-		if len(req.Files) != 1 || req.Files[0].Text == nil {
-			t.Fatalf("plugin request must carry the exact overlay text, got %+v", req.Files)
-		}
-		wantText := source
-		if call == 2 {
-			wantText = "const good = 1;\n"
-		}
-		if *req.Files[0].Text != wantText {
-			t.Fatalf("plugin request %d text = %q, want %q", call, *req.Files[0].Text, wantText)
-		}
-		if req.Files[0].ConfigKey != pluginConfigDirectory {
-			t.Fatalf("expected configKey %q, got %q", pluginConfigDirectory, req.Files[0].ConfigKey)
-		}
-		ruleConfig, ok := req.Rules["community/rename"]
-		if !ok || len(ruleConfig.Options) != 1 {
-			t.Fatalf("missing normalized plugin rule options: %+v", req.Rules)
-		}
+			var calls atomic.Int32
+			send := apiAttachmentRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any, attachments ...ipc.Attachment) (*ipc.Message, error) {
+				call := calls.Add(1)
+				if kind != api.KindPluginLint {
+					t.Fatalf("expected pluginLint reverse request, got %q", kind)
+				}
+				req, ok := payload.(linter.EslintPluginLintRequest)
+				if !ok {
+					t.Fatalf("unexpected pluginLint payload type %T", payload)
+				}
+				if !req.CollectFixes || req.SuggestionsMode != linter.SuggestionsModeEager {
+					t.Fatalf("unexpected edit settings: collectFixes=%v suggestions=%q", req.CollectFixes, req.SuggestionsMode)
+				}
+				if len(req.Files) != 1 {
+					t.Fatalf("plugin request must carry the exact overlay text, got %+v", req.Files)
+				}
+				wantText := source
+				if call == 2 {
+					wantText = "const good = 1;\n"
+				}
+				if mode == "attachments" {
+					if req.Files[0].Text != nil || req.Files[0].TextAttachment == nil || *req.Files[0].TextAttachment != 0 || !reflect.DeepEqual(attachments, []ipc.Attachment{ipc.Text(wantText)}) {
+						t.Fatalf("plugin request %d lost attachment snapshot or index: %+v", call, req.Files[0])
+					}
+				} else if len(attachments) != 0 || req.Files[0].TextAttachment != nil || req.Files[0].Text == nil || *req.Files[0].Text != wantText {
+					t.Fatalf("legacy plugin request %d lost inline snapshot: %+v", call, req.Files[0])
+				}
+				if req.Files[0].ConfigKey != pluginConfigDirectory {
+					t.Fatalf("expected configKey %q, got %q", pluginConfigDirectory, req.Files[0].ConfigKey)
+				}
+				ruleConfig, ok := req.Rules["community/rename"]
+				if !ok || len(ruleConfig.Options) != 1 {
+					t.Fatalf("missing normalized plugin rule options: %+v", req.Rules)
+				}
 
-		result := linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{FilePath: req.Files[0].Path}}}
-		if call == 1 {
-			result.Results[0].Diagnostics = []linter.EslintPluginDiagnostic{{
-				RuleName:  "community/rename",
-				MessageId: "rename",
-				Message:   "rename bad",
-				StartPos:  6,
-				EndPos:    9,
-				Fixes: []linter.EslintPluginFix{{
-					Range: [2]int{6, 9},
-					Text:  "good",
+				result := linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{FilePath: req.Files[0].Path}}}
+				if call == 1 {
+					result.Results[0].Diagnostics = []linter.EslintPluginDiagnostic{{
+						RuleName:  "community/rename",
+						MessageId: "rename",
+						Message:   "rename bad",
+						StartPos:  6,
+						EndPos:    9,
+						Fixes: []linter.EslintPluginFix{{
+							Range: [2]int{6, 9},
+							Text:  "good",
+						}},
+					}}
+				}
+				return ipc.NewMessage(ipc.KindResponse, 1, result)
+			})
+
+			var requester api.Requester = send
+			if mode != "legacy requester" {
+				requester = apiAttachmentCapabilityRequester{send, mode == "attachments"}
+			}
+
+			response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+				Config:                config,
+				ConfigDirectory:       dir,
+				PluginConfigDirectory: pluginConfigDirectory,
+				WorkingDirectory:      dir,
+				Files:                 []string{target},
+				FileContents:          map[string]string{target: source},
+				EslintPlugins: []api.EslintPluginEntry{{
+					Prefix:    "community",
+					RuleNames: []string{"rename"},
 				}},
-			}}
-		}
-		return ipc.NewMessage(ipc.KindResponse, 1, result)
-	})
-
-	response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
-		Config:                config,
-		ConfigDirectory:       dir,
-		PluginConfigDirectory: pluginConfigDirectory,
-		WorkingDirectory:      dir,
-		Files:                 []string{target},
-		FileContents:          map[string]string{target: source},
-		EslintPlugins: []api.EslintPluginEntry{{
-			Prefix:    "community",
-			RuleNames: []string{"rename"},
-		}},
-		Fix: true,
-	}, requester)
-	if err != nil {
-		t.Fatalf("HandleLintWithContext returned error: %v", err)
-	}
-	if calls.Load() != 2 {
-		t.Fatalf("pluginLint requests = %d, want fixing and final observations", calls.Load())
-	}
-	if len(response.Diagnostics) != 0 {
-		t.Fatalf("final plugin diagnostics = %+v, want none", response.Diagnostics)
-	}
-	if response.ErrorCount != 0 || response.FixableErrorCount != 0 || response.RuleCount != 1 {
-		t.Fatalf("unexpected plugin counts: errors=%d fixable=%d rules=%d", response.ErrorCount, response.FixableErrorCount, response.RuleCount)
-	}
-	if got := response.Output["input.js"]; got != "const good = 1;\n" {
-		t.Fatalf("expected plugin fix in Output, got %q", got)
+				Fix: true,
+			}, requester)
+			if err != nil {
+				t.Fatalf("HandleLintWithContext returned error: %v", err)
+			}
+			if calls.Load() != 2 {
+				t.Fatalf("pluginLint requests = %d, want fixing and final observations", calls.Load())
+			}
+			if len(response.Diagnostics) != 0 {
+				t.Fatalf("final plugin diagnostics = %+v, want none", response.Diagnostics)
+			}
+			if response.ErrorCount != 0 || response.FixableErrorCount != 0 || response.RuleCount != 1 {
+				t.Fatalf("unexpected plugin counts: errors=%d fixable=%d rules=%d", response.ErrorCount, response.FixableErrorCount, response.RuleCount)
+			}
+			if got := response.Output["input.js"]; got != "const good = 1;\n" {
+				t.Fatalf("expected plugin fix in Output, got %q", got)
+			}
+		})
 	}
 }
 

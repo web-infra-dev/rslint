@@ -1,57 +1,72 @@
+import type { ByteInput } from '../native/types.js';
+
 /**
- * Wire-format protocol types for the Go↔Node IPC transport, shared between
- * the Go side (`internal/ipc.Channel`, and `internal/api` for `--api` mode)
- * and the Node {@link IpcClient}.
- *
- * The frame layout is `[4 bytes u32 LE length][JSON payload]`. The payload is
- * the {@link IpcMessage} `{kind, id, data}` triple, mirroring Go's
- * `ipc.Message` byte-for-byte. The two definitions must stay in lockstep; the
- * cross-language contract tests pin it.
+ * Wire and handler-facing types for Go↔Node IPC. Go provides shared storage
+ * configuration at runtime. IpcClient resolves byte attachments and hides
+ * storage metadata before delivering a message to an application handler.
  *
  * This is pure transport protocol — it carries no knowledge of any specific
  * task (lint, …); those live in their own layers.
  */
 
 /**
- * Frame kinds used in {@link IpcMessage.kind}. A string union so consumers can
- * switch exhaustively. These map directly to Go's `MessageKind` constants.
+ * Application kinds remain opaque to IPC.
  */
-export type MessageKind =
-  // ── shared infrastructure (also consumed by `--api` mode for wasm/rslint-api) ──
-  | 'lint'
-  | 'getAstInfo'
-  | 'response'
-  | 'error'
-  | 'handshake'
-  | 'exit'
-  // ── CLI host-process IPC kinds ──
-  // (Go child ↔ Node parent over stdio. The LSP path is NOT wired
-  //  through these frames — it uses LSP custom requests instead.)
-  | 'init'
-  | 'cancel'
-  | 'output'
-  | 'log'
-  | 'shutdown'
-  // Go -> Node reverse request: evaluate one staged config frontier. The same
-  // logical payload is used by the API and LSP adapters.
-  | 'loadConfigs'
-  | 'activateConfigs'
-  // CLI-only: start the same activation, returning provisional metadata for
-  // planning. activateConfigs must complete before lint/fix execution.
-  | 'prepareConfigs'
-  // Go → Node reverse request: run JS ESLint-plugin rules for a batch of
-  // files in the worker pool and return the diagnostics.
-  | 'pluginLint';
+export type MessageKind = WireMessage['kind'];
+
+export interface MemoryMapping {
+  version: number;
+  fd?: number;
+  handle?: string;
+  processId?: number;
+}
+
+export interface MemoryBatch {
+  slot: number;
+  generation: number;
+  length: number;
+}
+
+export interface MemoryRange {
+  offset: number;
+  length: number;
+}
+
+export interface WireAttachment {
+  text?: string;
+  bytes?: string;
+  range?: MemoryRange;
+}
+
+export interface TransportMetadata {
+  mapping?: MemoryMapping;
+  batches?: MemoryBatch[];
+  /** Exact request batches, on its result or a later transportRelease frame. */
+  released?: MemoryBatch[];
+}
+
+export interface WireMessage {
+  kind: string;
+  id: number;
+  data?: unknown;
+  attachments?: WireAttachment[];
+  transport?: TransportMetadata;
+}
+
+/** Owned inline text/bytes or a request-scoped, pointer-free native capability. */
+export type IpcAttachment = ByteInput;
 
 /**
  * Single IPC frame (JSON-decoded). `id` is 0 for notifications and a positive
  * monotonic integer for requests/responses. `data` is the untyped payload —
  * handlers re-decode into a typed shape as needed.
  */
-export interface IpcMessage<T = unknown> {
-  kind: MessageKind;
-  id: number;
+export interface IpcMessage<T = unknown> extends Omit<
+  WireMessage,
+  'data' | 'attachments' | 'transport'
+> {
   data?: T;
+  attachments?: readonly IpcAttachment[];
 }
 
 /**

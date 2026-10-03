@@ -20,6 +20,7 @@
 
 import type { LintTask } from '../worker-pool.js';
 import type { LintFileResult } from '../linter/ecma-language-plugin.js';
+import type { SharedBytes } from '../../native/types.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Inputs
@@ -38,12 +39,12 @@ export interface EslintPluginLintRequest {
   files: ReadonlyArray<{
     path: string;
     /**
-     * Optional file content override. The initial CLI generation leaves it
-     * absent so the worker can read disk without a whole-repository clone.
-     * Overlay-backed hosts and later in-memory autofix generations send it so
-     * the worker observes the same immutable source generation as native lint.
+     * Complete inline snapshot. Hosts that explicitly permit filesystem reads
+     * may omit both text and textAttachment; overlays and autofix retain snapshots.
      */
     text?: string;
+    /** Index into the request's text/byte attachments, mutually exclusive with text. */
+    textAttachment?: number;
     /**
      * Per-file `languageOptions`, computed by Go via `GetConfigForFile`
      * (flat-config files-glob match + deep merge). Opaque here; the
@@ -65,6 +66,21 @@ export interface EslintPluginLintRequest {
   suggestionsMode?: 'off' | 'eager';
   /** Collect per-rule execution times (driven by Go's `--timing`). */
   collectTiming?: boolean;
+}
+
+/** Host input after attachment resolution; native capabilities are local to Node. */
+export interface ResolvedEslintPluginLintRequest extends Omit<
+  EslintPluginLintRequest,
+  'files'
+> {
+  files: ReadonlyArray<
+    Omit<EslintPluginLintRequest['files'][number], 'textAttachment'> & {
+      /** Only the attachment adapter can install this private native capability. */
+      sharedSource?: SharedBytes;
+      /** Wire attachment references must be resolved before task construction. */
+      textAttachment?: never;
+    }
+  >;
 }
 
 export interface BuildPluginLintTasksOptions {
@@ -89,7 +105,7 @@ export interface BuildPluginLintTasksOptions {
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * Build per-file {@link LintTask}s from an EslintPluginLintRequest. Each
+ * Build per-file {@link LintTask}s from a resolved plugin request. Each
  * task carries the file's `configKey` verbatim; the worker uses it to
  * pick the right `LoadedPlugins` from its per-config map.
  *
@@ -98,7 +114,7 @@ export interface BuildPluginLintTasksOptions {
  * report the failure via `parseError` — keeping wire-format consistency.
  */
 export function buildPluginLintTasks(
-  input: EslintPluginLintRequest,
+  input: ResolvedEslintPluginLintRequest,
   options: BuildPluginLintTasksOptions,
 ): LintTask[] {
   const sharedRules = Object.fromEntries(
@@ -112,6 +128,11 @@ export function buildPluginLintTasks(
   const collectTiming = input.collectTiming ?? false;
 
   return input.files.map((f) => {
+    // Only the plugin application adapter can resolve attachment references. A
+    // missing/older adapter must not turn a shared snapshot into a disk read.
+    if ('textAttachment' in f || 'sourceRange' in f) {
+      throw new Error('unresolved shared plugin source');
+    }
     const configKey = f.configKey ?? '';
     if (configKey !== '' && !options.configDirSet.has(configKey)) {
       options.onUnknownConfigKey?.(f.path, configKey);
@@ -119,6 +140,7 @@ export function buildPluginLintTasks(
     return {
       filePath: f.path,
       text: f.text,
+      sharedSource: f.sharedSource,
       languageOptions: f.languageOptions as never,
       settings: f.settings,
       rules: sharedRules,
