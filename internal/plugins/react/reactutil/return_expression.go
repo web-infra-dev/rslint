@@ -34,3 +34,29 @@ func LastReturnedExpression(statements []*ast.Node) *ast.Node {
 	}
 	return nil
 }
+
+// LastReturnedExpressionInBody applies LastReturnedExpression to a function
+// body and safely handles bodyless declarations.
+func LastReturnedExpressionInBody(body *ast.Node) *ast.Node {
+	if body == nil || body.Kind != ast.KindBlock || body.AsBlock().Statements == nil {
+		return nil
+	}
+	return LastReturnedExpression(body.AsBlock().Statements.Nodes)
+}
+
+// LastDirectReturnedExpression scans top-level statements backwards without
+// descending into switch clauses. ESLint uses this narrower behavior for
+// propTypes getters.
+func LastDirectReturnedExpression(body *ast.Node) (*ast.Node, bool) {
+	if body == nil || body.Kind != ast.KindBlock || body.AsBlock().Statements == nil {
+		return nil, false
+	}
+	statements := body.AsBlock().Statements.Nodes
+	for index := len(statements) - 1; index >= 0; index-- {
+		statement := statements[index]
+		if statement != nil && statement.Kind == ast.KindReturnStatement {
+			return statement.AsReturnStatement().Expression, true
+		}
+	}
+	return nil, false
+}
