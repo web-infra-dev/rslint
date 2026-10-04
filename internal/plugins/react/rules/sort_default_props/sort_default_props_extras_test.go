@@ -29,8 +29,6 @@ func TestSortDefaultPropsExtras(t *testing.T) {
 		{Code: `C.defaultProps=({z:0,a:0} as any); C.defaultProps=({z:0,a:0} satisfies T); C.defaultProps=defaults!;`, Tsx: true},
 		// ---- Dimension 4: optional chain expression boundary ----
 		{Code: `C?.defaultProps || {z:0,a:0}; C?.x.defaultProps ?? {z:0,a:0};`, Tsx: true},
-		// ---- Dimension 4: literal and dynamic targets ignored ----
-		{Code: "C[\"defaultProps\"]={z:0,a:0}; C[`defaultProps`]={z:0,a:0}; C[0]={z:0,a:0}; C[Symbol.iterator]={z:0,a:0}; class D { \"defaultProps\"={z:0,a:0}; [\"defaultProps\"]={z:0,a:0}; }", Tsx: true},
 		// ---- Dimension 4: methods and function bodies are not declarations ----
 		{Code: `const C=createReactClass({getDefaultProps(){return {z:0,a:0};}}); class D {get defaultProps(){return {z:0,a:0};} getDefaultProps(){return {z:0,a:0};}}`, Tsx: true},
 		// ---- Dimension 4: rest binding ----
@@ -55,6 +53,14 @@ func TestSortDefaultPropsExtras(t *testing.T) {
 		// ---- Review: destructured variables do not refer to their container ----
 		// Upstream incorrectly checks the entire destructuring initializer.
 		{Code: `const {d}={z:0,a:0}; C.defaultProps=d;`, Tsx: true},
+		// ---- Dimension 4: dynamic keys are not literal defaults property names ----
+		{Code: `const defaultProps="other"; C[defaultProps]={z:0,a:0}; class D {[defaultProps]={z:0,a:0};} C[0]={z:0,a:0}; C[Symbol.iterator]={z:0,a:0};`, Tsx: true},
+		// ---- Dimension 4: computed identifier spellings do not establish their values ----
+		{Code: `C[(defaultProps)]={z:0,a:0}; class C { static [(getDefaultProps)]={z:0,a:0}; }`, Tsx: true},
+		// ---- Dimension 4: private fields are distinct from public defaults properties ----
+		{Code: `class C { #defaultProps={z:0,a:0}; f(){this.#defaultProps={z:0,a:0};} }`, Tsx: true},
+		// ---- Review: reads, comparisons, arithmetic and iteration do not declare defaults ----
+		{Code: `C.defaultProps === {z:0,a:0}; const style=C.defaultProps && {z:0,a:0}; C.defaultProps || {z:0,a:0}; C.defaultProps += {z:0,a:0}; for(C.defaultProps in {z:0,a:0}){} for(C.defaultProps of {z:0,a:0}){}`, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Locks in checkSorted: retain maximum after inversions ----
 		{Code: `C.defaultProps={z:0,a:0,b:0,y:0};`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
@@ -94,16 +100,6 @@ func TestSortDefaultPropsExtras(t *testing.T) {
 		{Code: `(C as any).defaultProps={z:0,a:0}; C!.defaultProps={z:0,a:0};`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "propsNotSorted", Message: "Default prop types declarations should be sorted alphabetically", Line: 1, Column: 30, EndLine: 1, EndColumn: 33},
 			{MessageId: "propsNotSorted", Message: "Default prop types declarations should be sorted alphabetically", Line: 1, Column: 57, EndLine: 1, EndColumn: 60},
-		}},
-		// ---- Dimension 4: computed identifier target ----
-		{Code: `C[(defaultProps)]={z:0,a:0}; class C { static [(getDefaultProps)]={z:0,a:0}; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "propsNotSorted", Message: "Default prop types declarations should be sorted alphabetically", Line: 1, Column: 24, EndLine: 1, EndColumn: 27},
-			{MessageId: "propsNotSorted", Message: "Default prop types declarations should be sorted alphabetically", Line: 1, Column: 72, EndLine: 1, EndColumn: 75},
-		}},
-		// ---- Dimension 4: private field name ----
-		{Code: `class C { #defaultProps={z:0,a:0}; f(){this.#defaultProps={z:0,a:0};} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "propsNotSorted", Message: "Default prop types declarations should be sorted alphabetically", Line: 1, Column: 30, EndLine: 1, EndColumn: 33},
-			{MessageId: "propsNotSorted", Message: "Default prop types declarations should be sorted alphabetically", Line: 1, Column: 64, EndLine: 1, EndColumn: 67},
 		}},
 		// ---- Dimension 4: raw string/numeric/computed keys ----
 		{Code: `C.defaultProps={2:0,10:0,0x0:0,"z":0,"a":0,[z]:0,[(a)]:0};`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
@@ -175,11 +171,6 @@ func TestSortDefaultPropsExtras(t *testing.T) {
 		// ---- Locks in MemberExpression: getDefaultProps assignment ----
 		{Code: `C.getDefaultProps={z:0,a:0};`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "propsNotSorted", Message: "Default prop types declarations should be sorted alphabetically", Line: 1, Column: 24, EndLine: 1, EndColumn: 27},
-		}},
-		// ---- Locks in MemberExpression: comparison and logical parents ----
-		{Code: `C.defaultProps === {z:0,a:0}; C.defaultProps || {z:0,a:0};`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "propsNotSorted", Message: "Default prop types declarations should be sorted alphabetically", Line: 1, Column: 25, EndLine: 1, EndColumn: 28},
-			{MessageId: "propsNotSorted", Message: "Default prop types declarations should be sorted alphabetically", Line: 1, Column: 54, EndLine: 1, EndColumn: 57},
 		}},
 	})
 }
