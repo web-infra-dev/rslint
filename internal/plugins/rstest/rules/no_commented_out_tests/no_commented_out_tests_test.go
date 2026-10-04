@@ -24,6 +24,11 @@ func TestNoCommentedOutTests(t *testing.T) {
 		t,
 		&no_commented_out_tests.NoCommentedOutTestsRule,
 		[]rule_tester.ValidTestCase{
+			// Real code interrupts reconstruction; incomplete calls and examples stay ignored.
+			{Code: "// test(\"works\", () => {\nconst value = 1;\n// });"},
+			{Code: "// test(\"works\", () => {\n\n// prose that is not code !!!"},
+			{Code: "// ```js\n\n// test(\"example\", () => {});\n\n// ```"},
+
 			// Active Rstest calls are not comments.
 			{Code: `test("foo", () => {})`},
 			{Code: `it.skip("foo", () => {})`},
@@ -99,6 +104,18 @@ func TestNoCommentedOutTests(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Blank lines without comment markers do not split a disabled test.
+			invalid("// test(\"works\", () => {\n//   const value = 1;\n\n//   expect(value).toBe(1);\n// });"),
+			invalid("// test(\"works\", () => {\n//   const value = 1;\n \t\n\n//   expect(value).toBe(1);\n// });"),
+			invalid("// test(\"works\", () => {\r\n//   const value = 1;\r\n\r\n//   expect(value).toBe(1);\r\n// });"),
+			{
+				Code: "// test(\"first\", () => {});\n\n// test(\"second\", () => {});",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 1},
+					{MessageId: "commentedTests", Line: 3, Column: 1},
+				},
+			},
+
 			// Direct test and suite calls.
 			invalid(`// test("foo", () => {})`),
 			invalid(`// it("foo", () => {})`),

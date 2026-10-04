@@ -4,7 +4,7 @@
 
 Disallow commenting out Jest tests. Reviewers often skim past comments, so disabled cases can sit in the tree indefinitely. Prefer removing dead tests, extracting helpers, or using `.skip` / `test.todo` when you need an explicit, auditable signal. This is the comment-side complement to `jest/no-disabled-tests`, which reports `skip` / `only` / `todo` on real call sites instead of commented-out text.
 
-rslint rebuilds each comment, joining adjacent `//` lines, and parses it as code using the file's language (TypeScript or TSX). It reports the **whole** comment when a statement in it is a complete `test`, `it` or `describe` registration, with the message “Do not comment out tests”. Recognized forms are the plain call, the legacy `xit` / `xtest` / `fit` / `xdescribe` / `fdescribe` aliases, member chains such as `.skip`, `.only`, `.concurrent`, `.failing` and `['skip']`, and `.each` tables (array or tagged template, with optional type arguments) once they are called with a title.
+rslint rebuilds each comment, joining `//` lines separated only by whitespace, including blank lines, and parses it as code using the file's language (TypeScript or TSX). It reports the **whole** comment when a statement in it is a complete `test`, `it` or `describe` registration, with the message “Do not comment out tests”. Recognized forms are the plain call, the legacy `xit` / `xtest` / `fit` / `xdescribe` / `fdescribe` aliases, member chains such as `.skip`, `.only`, `.concurrent`, `.failing` and `['skip']`, and `.each` tables (array or tagged template, with optional type arguments) once they are called with a title.
 
 Examples of **incorrect** code for this rule:
 

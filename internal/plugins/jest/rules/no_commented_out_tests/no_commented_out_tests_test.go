@@ -26,6 +26,11 @@ func TestNoCommentedOutTestsRule(t *testing.T) {
 		t,
 		&no_commented_out_tests.NoCommentedOutTestsRule,
 		[]rule_tester.ValidTestCase{
+			// Real code interrupts reconstruction; incomplete calls and examples stay ignored.
+			{Code: "// test(\"works\", () => {\nconst value = 1;\n// });"},
+			{Code: "// test(\"works\", () => {\n\n// prose that is not code !!!"},
+			{Code: "// ```js\n\n// test(\"example\", () => {});\n\n// ```"},
+
 			{Code: `// foo("bar", function () {})`},
 			{Code: `describe("foo", function () {})`},
 			{Code: `it("foo", function () {})`},
@@ -91,6 +96,18 @@ func TestNoCommentedOutTestsRule(t *testing.T) {
 			{Code: `// test("invalid JSX here", () => <div />)`, FileName: "file.ts"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Blank lines without comment markers do not split a disabled test.
+			invalid("// test(\"works\", () => {\n//   const value = 1;\n\n//   expect(value).toBe(1);\n// });"),
+			invalid("// test(\"works\", () => {\n//   const value = 1;\n \t\n\n//   expect(value).toBe(1);\n// });"),
+			invalid("// test(\"works\", () => {\r\n//   const value = 1;\r\n\r\n//   expect(value).toBe(1);\r\n// });"),
+			{
+				Code: "// test(\"first\", () => {});\n\n// test(\"second\", () => {});",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 1},
+					{MessageId: "commentedTests", Line: 3, Column: 1},
+				},
+			},
+
 			{
 				Code: `// describe("foo", function () {})`,
 				Errors: []rule_tester.InvalidTestCaseError{

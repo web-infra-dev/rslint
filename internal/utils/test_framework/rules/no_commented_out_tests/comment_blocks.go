@@ -258,37 +258,35 @@ func commentBody(sourceText string, comment *ast.CommentRange) (string, bool) {
 	}
 }
 
-func containsExactlyOneLineTerminator(text string) bool {
+// whitespaceLineBreaks returns zero when the gap contains anything but whitespace.
+func whitespaceLineBreaks(text string) int {
 	count := 0
 	for offset := 0; offset < len(text); {
 		if size := lineTerminatorLength(text, offset); size != 0 {
 			count++
-			if count > 1 {
-				return false
-			}
 			offset += size
 			continue
 		}
 
 		r, size := utf8.DecodeRuneInString(text[offset:])
 		if r == utf8.RuneError && size == 1 || !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
-			return false
+			return 0
 		}
 		offset += size
 	}
-	return count == 1
+	return count
 }
 
-func lineCommentsAreAdjacent(sourceText string, current, next *ast.CommentRange) bool {
+func lineCommentGap(sourceText string, current, next *ast.CommentRange) int {
 	if current == nil || next == nil ||
 		current.Kind != ast.KindSingleLineCommentTrivia ||
 		next.Kind != ast.KindSingleLineCommentTrivia ||
 		current.End() > next.Pos() {
-		return false
+		return 0
 	}
 
 	between := sourceText[current.End():next.Pos()]
-	return containsExactlyOneLineTerminator(between)
+	return whitespaceLineBreaks(between)
 }
 
 func buildCommentBlocks(sourceText string, comments []*ast.CommentRange) []commentBlock {
@@ -315,13 +313,19 @@ func buildCommentBlocks(sourceText string, comments []*ast.CommentRange) []comme
 
 		if comment.Kind == ast.KindSingleLineCommentTrivia {
 			previous := comment
-			for i < len(comments) && lineCommentsAreAdjacent(sourceText, previous, comments[i]) {
+			for i < len(comments) {
 				next := comments[i]
+				lineBreaks := lineCommentGap(sourceText, previous, next)
+				if lineBreaks == 0 {
+					break
+				}
 				nextBody, nextOK := commentBody(sourceText, next)
 				if !nextOK {
 					break
 				}
-				text.WriteByte('\n')
+				// Blank lines remain part of the commented code. Normalize their
+				// terminators to LF, as for block comments, without collapsing them.
+				text.WriteString(strings.Repeat("\n", lineBreaks))
 				block.segments = append(block.segments, commentBlockSegment{
 					start:   text.Len(),
 					comment: next,
