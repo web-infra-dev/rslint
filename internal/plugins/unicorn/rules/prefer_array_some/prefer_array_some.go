@@ -75,7 +75,7 @@ func checkFindCall(ctx rule.RuleContext, node *ast.Node) {
 	}
 
 	comparison := comparisonParent(node)
-	isBooleanUse := comparison != nil || isBooleanExpression(ctx, node) || isControlFlowTest(node)
+	isBooleanUse := comparison != nil || unicornutil.IsBooleanExpression(ctx, node) || unicornutil.IsControlFlowTest(node)
 	if !isBooleanUse && !isVariableDeclarationInitializer(node) {
 		return
 	}
@@ -253,7 +253,7 @@ func isFindResultVariableUsedOnlyAsBoolean(ctx rule.RuleContext, callExpression 
 	}
 
 	for _, reference := range references {
-		if !isBooleanExpression(ctx, reference) && !isControlFlowTest(reference) {
+		if !unicornutil.IsBooleanExpression(ctx, reference) && !unicornutil.IsControlFlowTest(reference) {
 			return false
 		}
 	}
@@ -440,106 +440,6 @@ func isRawZeroLiteral(sourceFile *ast.SourceFile, node *ast.Node) bool {
 		return false
 	}
 	return scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, node, false) == "0"
-}
-
-// ---- boolean / control-flow position (upstream utils/boolean.js) ----
-
-func isLogicalExpression(node *ast.Node) bool {
-	if node == nil || !ast.IsBinaryExpression(node) {
-		return false
-	}
-	operator := node.AsBinaryExpression().OperatorToken.Kind
-	return operator == ast.KindAmpersandAmpersandToken || operator == ast.KindBarBarToken
-}
-
-func isLogicNot(node *ast.Node) bool {
-	return node != nil && node.Kind == ast.KindPrefixUnaryExpression &&
-		node.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken
-}
-
-func isLogicNotArgument(node *ast.Node) bool {
-	parent := effectiveParent(node)
-	return isLogicNot(parent) &&
-		ast.SkipParentheses(parent.AsPrefixUnaryExpression().Operand) == node
-}
-
-// isGlobalBooleanCall reports whether node is a `Boolean(...)` call to the
-// global Boolean (single non-spread argument, not optional, not shadowed).
-func isGlobalBooleanCall(ctx rule.RuleContext, node *ast.Node) bool {
-	if node == nil || !ast.IsCallExpression(node) {
-		return false
-	}
-	call := node.AsCallExpression()
-	if call.QuestionDotToken != nil {
-		return false
-	}
-	callee := ast.SkipParentheses(call.Expression)
-	if callee == nil || !ast.IsIdentifier(callee) || callee.AsIdentifier().Text != "Boolean" {
-		return false
-	}
-	args := node.Arguments()
-	if len(args) != 1 || args[0].Kind == ast.KindSpreadElement {
-		return false
-	}
-	return !utils.IsShadowed(callee, "Boolean")
-}
-
-func isBooleanCallArgument(ctx rule.RuleContext, node *ast.Node) bool {
-	parent := effectiveParent(node)
-	if !isGlobalBooleanCall(ctx, parent) {
-		return false
-	}
-	args := parent.Arguments()
-	return len(args) == 1 && ast.SkipParentheses(args[0]) == node
-}
-
-func isDirectBooleanExpression(ctx rule.RuleContext, node *ast.Node) bool {
-	return isLogicNot(node) ||
-		isLogicNotArgument(node) ||
-		isGlobalBooleanCall(ctx, node) ||
-		isBooleanCallArgument(ctx, node)
-}
-
-func isBooleanExpression(ctx rule.RuleContext, node *ast.Node) bool {
-	if isDirectBooleanExpression(ctx, node) {
-		return true
-	}
-	parent := effectiveParent(node)
-	if isLogicalExpression(parent) {
-		return isBooleanExpression(ctx, parent)
-	}
-	return false
-}
-
-func isDirectControlFlowTest(node *ast.Node) bool {
-	parent := effectiveParent(node)
-	if parent == nil {
-		return false
-	}
-	switch parent.Kind {
-	case ast.KindIfStatement:
-		return ast.SkipParentheses(parent.AsIfStatement().Expression) == node
-	case ast.KindConditionalExpression:
-		return ast.SkipParentheses(parent.AsConditionalExpression().Condition) == node
-	case ast.KindWhileStatement:
-		return ast.SkipParentheses(parent.AsWhileStatement().Expression) == node
-	case ast.KindDoStatement:
-		return ast.SkipParentheses(parent.AsDoStatement().Expression) == node
-	case ast.KindForStatement:
-		return ast.SkipParentheses(parent.AsForStatement().Condition) == node
-	}
-	return false
-}
-
-func isControlFlowTest(node *ast.Node) bool {
-	if isDirectControlFlowTest(node) {
-		return true
-	}
-	parent := effectiveParent(node)
-	if isLogicalExpression(parent) {
-		return isControlFlowTest(parent)
-	}
-	return false
 }
 
 // ---- misc AST helpers ----

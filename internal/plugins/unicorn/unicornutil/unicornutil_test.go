@@ -489,3 +489,34 @@ func TestNeedsSemicolonBeforeTypeScriptBoundary(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSameReference(t *testing.T) {
+	for _, test := range []struct {
+		left, right string
+		want        bool
+	}{
+		{`a["b" + "c"]`, `a.bc`, true},
+		{`a[1 + 1]`, `a[2]`, true},
+		{`a[key]`, `a[key]`, true},
+		{`a[key]`, `a.other`, false},
+		{`a.b`, `a["b" as string]`, false},
+		{`a?.b`, `(a as Box).b`, true},
+		{`a.#b`, `a.#b`, true},
+		{`a.#b`, `a.b`, false},
+		{`a()`, `a()`, false},
+		{`this.a`, `this.a`, true},
+		{`a[unknown + "b"]`, `a[unknown + "b"]`, false},
+	} {
+		t.Run(test.left+"/"+test.right, func(t *testing.T) {
+			source := parseTestSource("const left = " + test.left + "; const right = " + test.right + ";")
+			left := source.Statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].AsVariableDeclaration().Initializer
+			right := source.Statements.Nodes[1].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].AsVariableDeclaration().Initializer
+			if got := IsSameReference(left, right); got != test.want {
+				t.Fatalf("IsSameReference = %v, want %v", got, test.want)
+			}
+		})
+	}
+	if IsSameReference(nil, nil) {
+		t.Fatal("nil references must not match")
+	}
+}

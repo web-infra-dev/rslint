@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "non-zero": {
+          "enum": ["greater-than", "not-equal"],
+          "default": "greater-than"
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
