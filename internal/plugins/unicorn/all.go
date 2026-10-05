@@ -50,6 +50,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_continue"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_error_capture_stack_trace"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_spread"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_switch_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_xor_as_exponentiation"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_zero_fractions"
@@ -136,6 +137,7 @@ func GetAllRules() []rule.Rule {
 		no_unsafe_string_replacement.NoUnsafeStringReplacementRule,
 		no_useless_continue.NoUselessContinueRule,
 		no_useless_error_capture_stack_trace.NoUselessErrorCaptureStackTraceRule,
+		no_useless_spread.NoUselessSpreadRule,
 		no_useless_switch_case.NoUselessSwitchCaseRule,
 		no_xor_as_exponentiation.NoXorAsExponentiationRule,
 		no_zero_fractions.NoZeroFractionsRule,
