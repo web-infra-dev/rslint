@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from 'rstack/test';
+import { rspack, type Rspack } from 'rstack/lib';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -10,7 +11,7 @@ import { platformTuple } from '../../src/native/platform-tuple.js';
 /**
  * Packaged-layout isolation guard.
  *
- * Exercise the CLI's private host entry and the public entry used by API/LSP
+ * Exercise the CLI/API private host entry and the public entry used by LSP
  * consumers outside the repository's dependency resolution paths. The VS Code
  * extension resolves a project-local `@rslint/core`; it does not bundle a copy
  * of this runtime. Ordinary worker-pool tests can resolve workspace packages,
@@ -147,6 +148,29 @@ assert.equal(configured, 1, 'CLI must configure storage through its Go peer');
 assert.equal(registered, 1, 'CLI must register shared source, not use inline fallback');
 assert.equal(fs.readFileSync(file, 'utf8'), changed);
 console.log('PACKAGED_SHARED_OK');
+`;
+
+const API_RUNNER = `import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { Rslint } from '@rslint/core';
+const cfgDir = process.cwd();
+const lint = new Rslint({ cwd: cfgDir });
+try {
+  for (let call = 0; call < 2; call++) {
+    const results = await lint.lintText(
+      fs.readFileSync(path.join(cfgDir, 'input.ts'), 'utf8'),
+      { filePath: 'input.ts' },
+    );
+    assert.equal(results.length, 1);
+    assert.equal(results[0].messages.length, 1);
+    assert.equal(results[0].messages[0].ruleId, 'pkg/no-null');
+    assert.equal(results[0].messages[0].message, 'no null');
+  }
+} finally {
+  await lint.close();
+}
+console.log('PACKAGED_API_OK');
 `;
 
 const TERMINATION_RUNNER = `import assert from 'node:assert/strict';
@@ -381,20 +405,32 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
     );
 
-    test(
-      'complete CLI and worker share the staged native source registry',
-      () => {
-        const root = path.join(tmp, 'shared-cli');
-        fs.mkdirSync(root, { recursive: true });
+    test.each(['CLI', 'API', 'bundled API'] as const)(
+      'complete %s uses its staged host and worker',
+      async (mode) => {
+        const root = path.join(tmp, `complete-${mode}`);
+        const packageRoot =
+          mode === 'bundled API'
+            ? path.join(root, 'node_modules', '@rslint', 'core')
+            : root;
+        fs.mkdirSync(packageRoot, { recursive: true });
         fs.cpSync(
           path.resolve(__dirname, '../../dist'),
-          path.join(root, 'dist'),
+          path.join(packageRoot, 'dist'),
           { recursive: true },
         );
-        fs.writeFileSync(
-          path.join(root, 'package.json'),
-          JSON.stringify({ type: 'module' }),
+        fs.copyFileSync(
+          path.resolve(__dirname, '../../package.json'),
+          path.join(packageRoot, 'package.json'),
         );
+        if (mode !== 'CLI') {
+          // Preserve the real exports map so a package self-reference still
+          // resolves, but fail if the API evaluates the full public runtime.
+          fs.writeFileSync(
+            path.join(packageRoot, 'dist', 'eslint-plugin', 'index.js'),
+            "throw new Error('API loaded the full public plugin runtime');\n",
+          );
+        }
         stageNative(root, true);
         fs.cpSync(
           path.dirname(require.resolve('picomatch/package.json')),
@@ -413,24 +449,71 @@ export default [{ files: ['**/*.ts'], plugins: { pkg: lp }, rules: { 'pkg/no-nul
           path.join(cfgDir, 'input.ts'),
           '\ufeffconst sample = null; // café 😀\r\n',
         );
-        fs.writeFileSync(path.join(root, 'runner.mjs'), SHARED_RUNNER);
-        const result = spawnSync(
-          process.execPath,
-          [path.join(root, 'runner.mjs')],
-          {
-            cwd: cfgDir,
-            encoding: 'utf8',
-            timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
-            killSignal: 'SIGKILL',
-            maxBuffer: 16 * 1024 * 1024,
-            env: { ...process.env, NODE_PATH: '' },
-          },
-        );
+        let runner = path.join(root, 'runner.mjs');
+        fs.writeFileSync(runner, mode === 'CLI' ? SHARED_RUNNER : API_RUNNER);
+        if (mode === 'bundled API') {
+          // Inline the installed API into a consumer outside the core package.
+          // Its private host/worker assets remain in node_modules/@rslint/core.
+          const bundleDir = path.join(root, 'bundle');
+          const compiler = rspack({
+            context: root,
+            mode: 'none',
+            target: 'node',
+            entry: runner,
+            output: {
+              path: bundleDir,
+              filename: 'runner.mjs',
+              module: true,
+            },
+            experiments: { outputModule: true },
+            // User config and plugin imports are resolved by Node at runtime.
+            module: {
+              parser: { javascript: { importDynamic: false } },
+            },
+            devtool: false,
+          });
+          const stats = await new Promise<Rspack.Stats>((resolve, reject) => {
+            compiler.run((error, stats) => {
+              compiler.close((closeError) => {
+                if (error || closeError) reject(error || closeError);
+                else if (!stats)
+                  reject(new Error('Missing consumer build stats'));
+                else resolve(stats);
+              });
+            });
+          });
+          expect(stats.hasErrors(), stats.toString({ colors: false })).toBe(
+            false,
+          );
+          expect(
+            [...stats.compilation.modules].map((module) =>
+              module.nameForCondition?.(),
+            ),
+          ).toContain(
+            fs.realpathSync(path.join(packageRoot, 'dist', 'index.js')),
+          );
+          expect(fs.existsSync(path.join(bundleDir, 'eslint-plugin'))).toBe(
+            false,
+          );
+          runner = path.join(bundleDir, 'runner.mjs');
+        }
+        const result = spawnSync(process.execPath, [runner], {
+          cwd: cfgDir,
+          encoding: 'utf8',
+          timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+          killSignal: 'SIGKILL',
+          maxBuffer: 16 * 1024 * 1024,
+          env: { ...process.env, NODE_PATH: '' },
+        });
         expect(result.error).toBeUndefined();
         expect(result.signal).toBeNull();
         expect(result.status, result.stderr).toBe(0);
-        expect(result.stdout).toContain('no null');
-        expect(result.stdout).toContain('PACKAGED_SHARED_OK');
+        if (mode === 'CLI') {
+          expect(result.stdout).toContain('no null');
+        }
+        expect(result.stdout).toContain(
+          mode === 'CLI' ? 'PACKAGED_SHARED_OK' : 'PACKAGED_API_OK',
+        );
         expect(result.stderr.trim()).toBe('');
       },
       PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,

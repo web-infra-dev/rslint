@@ -3,9 +3,9 @@
  * runtime — Worker pool, per-file lint pipeline, scope manager, fixer.
  * (Merged from the former `@rslint/eslint-plugin-runner` package.)
  *
- * Retains the full public runtime for API and VS Code consumers. The CLI
- * loads a separate lightweight `host.js` bundle of the same host implementation
- * so it does not evaluate this entry's per-file lint runtime in its parent.
+ * Retains the full public runtime for direct callers and VS Code. CLI and API
+ * load a separate lightweight `host.js` bundle of the same host implementation
+ * to keep this entry's per-file lint runtime out of their parent threads.
  * Both entries start the sibling `lint-worker.js` for plugin execution.
  */
 
@@ -15,8 +15,8 @@ export type { ConfigDescriptor } from './types.js';
 export { WorkerPool } from './worker-pool.js';
 export type { WorkerPoolOptions, LintTask } from './worker-pool.js';
 
-// CLI / LSP plugin-lint host — owns a WorkerPool and answers reverse
-// `pluginLint` requests. Shared by the CLI engine and the VS Code
+// CLI / API / LSP plugin-lint host — owns a WorkerPool and answers reverse
+// `pluginLint` requests. Shared by the CLI engine, API and the VS Code
 // extension's PluginLintPool so the request→tasks→result boundary is
 // single-sourced.
 export { createPluginLintHost } from './host.js';
