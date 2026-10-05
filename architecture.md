@@ -1538,8 +1538,11 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    adapters own configuration activation and generation lifetimes. Plugin
    loading uses the config entry versions selected by `ConfigModuleHost`.
    The CLI and native API load the dedicated `dist/eslint-plugin/host.js` bundle
-   for worker coordination and protocol conversion, using a path relative to
-   their built modules in `dist/`. This entry excludes the per-file lint runtime
+   for worker coordination and protocol conversion. The CLI uses a path relative
+   to its built module in `dist/`. The API resolves the existing public
+   `@rslint/core/eslint-plugin` entry without evaluating it, then loads the private
+   sibling `host.js`. Anchoring this path to the installed package preserves
+   consumers that bundle the API into a different directory. This entry excludes the per-file lint runtime
    and native parser, which load inside `lint-worker.js`. The existing
    `eslint-plugin/index.js` entry retains the full exported runtime for direct
    callers and LSP consumers. Both entries bundle the same host implementation

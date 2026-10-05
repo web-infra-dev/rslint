@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from 'rstack/test';
+import { rspack, type Rspack } from 'rstack/lib';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -152,10 +153,8 @@ console.log('PACKAGED_SHARED_OK');
 const API_RUNNER = `import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-const here = path.dirname(fileURLToPath(import.meta.url));
-const cfgDir = path.join(here, 'cfg');
-const { Rslint } = await import('./dist/index.js');
+import { Rslint } from '@rslint/core';
+const cfgDir = process.cwd();
 const lint = new Rslint({ cwd: cfgDir });
 try {
   for (let call = 0; call < 2; call++) {
@@ -406,25 +405,29 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
     );
 
-    test.each(['CLI', 'API'] as const)(
+    test.each(['CLI', 'API', 'bundled API'] as const)(
       'complete %s uses its staged host and worker',
-      (mode) => {
+      async (mode) => {
         const root = path.join(tmp, `complete-${mode}`);
-        fs.mkdirSync(root, { recursive: true });
+        const packageRoot =
+          mode === 'bundled API'
+            ? path.join(root, 'node_modules', '@rslint', 'core')
+            : root;
+        fs.mkdirSync(packageRoot, { recursive: true });
         fs.cpSync(
           path.resolve(__dirname, '../../dist'),
-          path.join(root, 'dist'),
+          path.join(packageRoot, 'dist'),
           { recursive: true },
         );
         fs.copyFileSync(
           path.resolve(__dirname, '../../package.json'),
-          path.join(root, 'package.json'),
+          path.join(packageRoot, 'package.json'),
         );
-        if (mode === 'API') {
+        if (mode !== 'CLI') {
           // Preserve the real exports map so a package self-reference still
           // resolves, but fail if the API evaluates the full public runtime.
           fs.writeFileSync(
-            path.join(root, 'dist', 'eslint-plugin', 'index.js'),
+            path.join(packageRoot, 'dist', 'eslint-plugin', 'index.js'),
             "throw new Error('API loaded the full public plugin runtime');\n",
           );
         }
@@ -446,22 +449,62 @@ export default [{ files: ['**/*.ts'], plugins: { pkg: lp }, rules: { 'pkg/no-nul
           path.join(cfgDir, 'input.ts'),
           '\ufeffconst sample = null; // café 😀\r\n',
         );
-        fs.writeFileSync(
-          path.join(root, 'runner.mjs'),
-          mode === 'API' ? API_RUNNER : SHARED_RUNNER,
-        );
-        const result = spawnSync(
-          process.execPath,
-          [path.join(root, 'runner.mjs')],
-          {
-            cwd: cfgDir,
-            encoding: 'utf8',
-            timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
-            killSignal: 'SIGKILL',
-            maxBuffer: 16 * 1024 * 1024,
-            env: { ...process.env, NODE_PATH: '' },
-          },
-        );
+        let runner = path.join(root, 'runner.mjs');
+        fs.writeFileSync(runner, mode === 'CLI' ? SHARED_RUNNER : API_RUNNER);
+        if (mode === 'bundled API') {
+          // Inline the installed API into a consumer outside the core package.
+          // Its private host/worker assets remain in node_modules/@rslint/core.
+          const bundleDir = path.join(root, 'bundle');
+          const compiler = rspack({
+            context: root,
+            mode: 'none',
+            target: 'node',
+            entry: runner,
+            output: {
+              path: bundleDir,
+              filename: 'runner.mjs',
+              module: true,
+            },
+            experiments: { outputModule: true },
+            // User config and plugin imports are resolved by Node at runtime.
+            module: {
+              parser: { javascript: { importDynamic: false } },
+            },
+            devtool: false,
+          });
+          const stats = await new Promise<Rspack.Stats>((resolve, reject) => {
+            compiler.run((error, stats) => {
+              compiler.close((closeError) => {
+                if (error || closeError) reject(error || closeError);
+                else if (!stats)
+                  reject(new Error('Missing consumer build stats'));
+                else resolve(stats);
+              });
+            });
+          });
+          expect(stats.hasErrors(), stats.toString({ colors: false })).toBe(
+            false,
+          );
+          expect(
+            [...stats.compilation.modules].map((module) =>
+              module.nameForCondition?.(),
+            ),
+          ).toContain(
+            fs.realpathSync(path.join(packageRoot, 'dist', 'index.js')),
+          );
+          expect(fs.existsSync(path.join(bundleDir, 'eslint-plugin'))).toBe(
+            false,
+          );
+          runner = path.join(bundleDir, 'runner.mjs');
+        }
+        const result = spawnSync(process.execPath, [runner], {
+          cwd: cfgDir,
+          encoding: 'utf8',
+          timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+          killSignal: 'SIGKILL',
+          maxBuffer: 16 * 1024 * 1024,
+          env: { ...process.env, NODE_PATH: '' },
+        });
         expect(result.error).toBeUndefined();
         expect(result.signal).toBeNull();
         expect(result.status, result.stderr).toBe(0);
@@ -469,7 +512,7 @@ export default [{ files: ['**/*.ts'], plugins: { pkg: lp }, rules: { 'pkg/no-nul
           expect(result.stdout).toContain('no null');
         }
         expect(result.stdout).toContain(
-          mode === 'API' ? 'PACKAGED_API_OK' : 'PACKAGED_SHARED_OK',
+          mode === 'CLI' ? 'PACKAGED_SHARED_OK' : 'PACKAGED_API_OK',
         );
         expect(result.stderr.trim()).toBe('');
       },
