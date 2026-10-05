@@ -6,6 +6,8 @@ Native Node defaults depend on the importing module's format.
 {"extends":"./tsconfig.json","compilerOptions":{"esModuleInterop":true}}
 -- tsconfig.no-interop.json --
 {"extends":"./tsconfig.json","compilerOptions":{"esModuleInterop":false}}
+-- tsconfig.no-synthetic.json --
+{"extends":"./tsconfig.interop.json","compilerOptions":{"allowSyntheticDefaultImports":false}}
 -- consumer.mts --
 import first from './named.cjs';
 import second from './named.mjs';

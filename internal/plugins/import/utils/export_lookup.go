@@ -231,7 +231,8 @@ func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder 
 			if builder.defaultImport {
 				interop = explicitESModuleInterop(builder.program())
 			}
-			if exportName == defaultExportName && exportAssignmentHasDefaultWithInterop(sourceFile, stmt.AsExportAssignment(), interop) {
+			syntheticDefault := compilerOptionsAllowSyntheticDefaultImports(builder.program(), interop)
+			if exportName == defaultExportName && exportAssignmentHasDefaultWithSyntheticDefault(sourceFile, stmt.AsExportAssignment(), syntheticDefault) {
 				return true, true
 			}
 		case ast.KindExportDeclaration:
@@ -271,10 +272,11 @@ func exportedDeclarationHasName(stmt *ast.Node, exportName string) bool {
 }
 
 func exportAssignmentHasDefault(sourceProgram *program.Program, sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment) bool {
-	return exportAssignmentHasDefaultWithInterop(sourceFile, exportAssignment, compilerOptionsESModuleInterop(sourceProgram))
+	syntheticDefault := compilerOptionsAllowSyntheticDefaultImports(sourceProgram, compilerOptionsESModuleInterop(sourceProgram))
+	return exportAssignmentHasDefaultWithSyntheticDefault(sourceFile, exportAssignment, syntheticDefault)
 }
 
-func exportAssignmentHasDefaultWithInterop(sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment, interop bool) bool {
+func exportAssignmentHasDefaultWithSyntheticDefault(sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment, syntheticDefault bool) bool {
 	if exportAssignment == nil {
 		return false
 	}
@@ -282,9 +284,9 @@ func exportAssignmentHasDefaultWithInterop(sourceFile *ast.SourceFile, exportAss
 		return true
 	}
 
-	// Match eslint-plugin-import's TypeScript export-assignment visitor:
-	// `export = namespace` gets a synthetic default only under esModuleInterop,
-	// while non-namespace local declarations and re-export-like expressions do.
+	// Follow TypeScript's synthetic-default option for `export = namespace`.
+	// Other declarations and re-export-like expressions retain the upstream
+	// export-assignment visitor's default visibility.
 	name, ok := exportAssignmentReferencedIdentifier(exportAssignment.Expression)
 	if !ok {
 		return true
@@ -296,7 +298,7 @@ func exportAssignmentHasDefaultWithInterop(sourceFile *ast.SourceFile, exportAss
 	if kind != exportAssignmentLocalDeclarationModule {
 		return true
 	}
-	return interop
+	return syntheticDefault
 }
 
 // exportAssignmentReferencedIdentifier returns the identifier an expression
@@ -316,6 +318,28 @@ func exportAssignmentReferencedIdentifier(expr *ast.Node) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// The tsgo shim exposes the legacy option fields but no longer computes their
+// defaults. In particular, its resolver now defaults to bundler for older
+// module modes too, which must not implicitly enable legacy synthetic defaults.
+// The caller selects explicit interop for import/default, or inferred interop
+// for the export index, preserving their distinct compatibility behavior.
+//
+//nolint:staticcheck // Honor explicit legacy options for import/export compatibility.
+func compilerOptionsAllowSyntheticDefaultImports(sourceProgram *program.Program, interop bool) bool {
+	if !sourceProgram.IsValid() || sourceProgram.Options() == nil {
+		return false
+	}
+	options := sourceProgram.Options()
+	if options.AllowSyntheticDefaultImports != core.TSUnknown {
+		return options.AllowSyntheticDefaultImports == core.TSTrue
+	}
+	resolution := options.ModuleResolution
+	if resolution == core.ModuleResolutionKindUnknown && options.Module == core.ModuleKindPreserve {
+		resolution = core.ModuleResolutionKindBundler
+	}
+	return interop || options.Module == core.ModuleKindSystem || resolution == core.ModuleResolutionKindBundler
 }
 
 // The tsgo shim exposes CompilerOptions fields but not GetESModuleInterop.

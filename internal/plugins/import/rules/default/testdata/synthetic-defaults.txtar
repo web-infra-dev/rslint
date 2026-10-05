@@ -1,0 +1,50 @@
+Synthetic default imports for React-style CommonJS declarations.
+
+-- tsconfig.json --
+{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","noEmit":true},"include":["**/*"]}
+-- tsconfig.no-interop.json --
+{"extends":"./tsconfig.json","compilerOptions":{"esModuleInterop":false}}
+-- tsconfig.synthetic.json --
+{"extends":"./tsconfig.json","compilerOptions":{"module":"commonjs","moduleResolution":"node10","esModuleInterop":false,"allowSyntheticDefaultImports":true}}
+-- tsconfig.preserve.json --
+{"compilerOptions":{"module":"preserve","esModuleInterop":false,"noEmit":true},"include":["**/*"]}
+-- tsconfig.no-synthetic.json --
+{"extends":"./tsconfig.json","compilerOptions":{"allowSyntheticDefaultImports":false}}
+-- tsconfig.interop-no-synthetic.json --
+{"extends":"./tsconfig.json","compilerOptions":{"esModuleInterop":true,"allowSyntheticDefaultImports":false}}
+-- node_modules/react/package.json --
+{"name":"react","types":"index.d.ts"}
+-- node_modules/react/index.d.ts --
+export = React;
+export as namespace React;
+declare namespace React {
+  type ReactNode = string | number;
+  function createElement(): ReactNode;
+}
+-- barrel.ts --
+export { default } from "react";
+-- named.ts --
+export const value = 1;
+-- named.d.mts --
+export declare const value: number;
+-- node_modules/esm-only/package.json --
+{"name":"esm-only","type":"module","types":"index.d.ts"}
+-- node_modules/esm-only/index.d.ts --
+export declare const value: number;
+-- declared.d.ts --
+export declare const value: number;
+-- marked.d.ts --
+export declare const value: number;
+export declare const __esModule: boolean;
+-- missing-default.ts --
+export { missing as default } from "./named";
+-- declared-missing-default.d.ts --
+export { missing as default } from "./named";
+-- actual-default.ts --
+export default 1;
+-- empty-namespace.ts --
+namespace Empty {}
+export = Empty;
+-- namespace.ts --
+namespace Values { export const value = 1; }
+export = Values;

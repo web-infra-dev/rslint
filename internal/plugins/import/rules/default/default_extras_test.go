@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
@@ -174,6 +175,66 @@ func TestDefaultExtras(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestDefaultSyntheticImports(t *testing.T) {
+	root := rule_tester.Root{
+		Dir: tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/synthetic-defaults.txtar").Materialize(t, "")),
+		FS:  bundled.WrapFS(osvfs.FS()),
+	}
+	for _, config := range []string{
+		"tsconfig.json",
+		"tsconfig.no-interop.json",
+		"tsconfig.synthetic.json",
+		"tsconfig.preserve.json",
+	} {
+		t.Run(config, func(t *testing.T) {
+			rule_tester.RunRuleTester(root, config, t, &default_rule.DefaultRule,
+				[]rule_tester.ValidTestCase{
+					// #2369: React-style export assignments support type and value imports.
+					{Code: `import type React from "react";`},
+					{Code: `import React from "react";`},
+					{Code: `import React, { createElement } from "react";`},
+					{Code: `import React from "./barrel";`},
+					{Code: `import value from "./declared";`},
+					{Code: `import value from "./empty-namespace";`},
+					{Code: `import value from "./namespace";`},
+				},
+				[]rule_tester.InvalidTestCase{
+					// Synthetic defaults do not hide missing defaults in ES modules.
+					{Code: `import value from "./named";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault"}}},
+					{Code: `import type Value from "./named";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault"}}},
+					{Code: `import value from "./named.mjs";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault"}}},
+					{Code: `import value from "esm-only";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault"}}},
+					{Code: `import value from "./marked";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault"}}},
+					{Code: `import value from "./missing-default";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault"}}},
+					{Code: `import value from "./declared-missing-default";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault"}}},
+				})
+		})
+	}
+	for _, config := range []string{"tsconfig.no-synthetic.json", "tsconfig.interop-no-synthetic.json"} {
+		t.Run(config, func(t *testing.T) {
+			valid := []rule_tester.ValidTestCase{{Code: `import value from "./actual-default";`}}
+			if config == "tsconfig.interop-no-synthetic.json" {
+				// Keep upstream's explicit interop behavior for ordinary ES modules.
+				valid = append(valid,
+					rule_tester.ValidTestCase{Code: `import value from "./named";`},
+					rule_tester.ValidTestCase{Code: `import value from "./named.mjs";`},
+					rule_tester.ValidTestCase{Code: `import value from "esm-only";`},
+				)
+			}
+			rule_tester.RunRuleTester(root, config, t, &default_rule.DefaultRule,
+				valid,
+				[]rule_tester.InvalidTestCase{
+					{Code: `import type React from "react";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault", Line: 1, Column: 13, EndLine: 1, EndColumn: 18}}},
+					{Code: `import React from "react";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault", Line: 1, Column: 8, EndLine: 1, EndColumn: 13}}},
+					{Code: `import React from "./barrel";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault"}}},
+					{Code: `import value from "./declared";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault"}}},
+					{Code: `import value from "./empty-namespace";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault"}}},
+					{Code: `import value from "./namespace";`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noDefault"}}},
+				})
+		})
+	}
 }
 
 func TestDefaultSkippedBabelReExportSyntaxIsNotParsedByTsgo(t *testing.T) {
