@@ -1,4 +1,3 @@
-import { Rslint, ts } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
 import { describe, test, expect } from 'rstack/test';
 import { spawn } from 'node:child_process';
@@ -15,6 +14,13 @@ import {
   cp,
   symlink,
 } from 'node:fs/promises';
+
+// Exercise the public API bundle, including its relative host/worker imports.
+const { Rslint, ts } = await import(
+  /* webpackIgnore: true */ pathToFileURL(
+    path.resolve(import.meta.dirname, '../dist/index.js'),
+  ).href
+);
 
 async function cleanupTempDir(tempDir) {
   // Windows can retain a child process's working directory during teardown.

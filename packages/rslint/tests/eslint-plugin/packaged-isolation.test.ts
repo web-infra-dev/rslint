@@ -10,7 +10,7 @@ import { platformTuple } from '../../src/native/platform-tuple.js';
 /**
  * Packaged-layout isolation guard.
  *
- * Exercise the CLI's private host entry and the public entry used by API/LSP
+ * Exercise the CLI/API private host entry and the public entry used by LSP
  * consumers outside the repository's dependency resolution paths. The VS Code
  * extension resolves a project-local `@rslint/core`; it does not bundle a copy
  * of this runtime. Ordinary worker-pool tests can resolve workspace packages,
@@ -147,6 +147,31 @@ assert.equal(configured, 1, 'CLI must configure storage through its Go peer');
 assert.equal(registered, 1, 'CLI must register shared source, not use inline fallback');
 assert.equal(fs.readFileSync(file, 'utf8'), changed);
 console.log('PACKAGED_SHARED_OK');
+`;
+
+const API_RUNNER = `import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
+const cfgDir = path.join(here, 'cfg');
+const { Rslint } = await import('./dist/index.js');
+const lint = new Rslint({ cwd: cfgDir });
+try {
+  for (let call = 0; call < 2; call++) {
+    const results = await lint.lintText(
+      fs.readFileSync(path.join(cfgDir, 'input.ts'), 'utf8'),
+      { filePath: 'input.ts' },
+    );
+    assert.equal(results.length, 1);
+    assert.equal(results[0].messages.length, 1);
+    assert.equal(results[0].messages[0].ruleId, 'pkg/no-null');
+    assert.equal(results[0].messages[0].message, 'no null');
+  }
+} finally {
+  await lint.close();
+}
+console.log('PACKAGED_API_OK');
 `;
 
 const TERMINATION_RUNNER = `import assert from 'node:assert/strict';
@@ -381,20 +406,28 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
     );
 
-    test(
-      'complete CLI and worker share the staged native source registry',
-      () => {
-        const root = path.join(tmp, 'shared-cli');
+    test.each(['CLI', 'API'] as const)(
+      'complete %s uses its staged host and worker',
+      (mode) => {
+        const root = path.join(tmp, `complete-${mode}`);
         fs.mkdirSync(root, { recursive: true });
         fs.cpSync(
           path.resolve(__dirname, '../../dist'),
           path.join(root, 'dist'),
           { recursive: true },
         );
-        fs.writeFileSync(
+        fs.copyFileSync(
+          path.resolve(__dirname, '../../package.json'),
           path.join(root, 'package.json'),
-          JSON.stringify({ type: 'module' }),
         );
+        if (mode === 'API') {
+          // Preserve the real exports map so a package self-reference still
+          // resolves, but fail if the API evaluates the full public runtime.
+          fs.writeFileSync(
+            path.join(root, 'dist', 'eslint-plugin', 'index.js'),
+            "throw new Error('API loaded the full public plugin runtime');\n",
+          );
+        }
         stageNative(root, true);
         fs.cpSync(
           path.dirname(require.resolve('picomatch/package.json')),
@@ -413,7 +446,10 @@ export default [{ files: ['**/*.ts'], plugins: { pkg: lp }, rules: { 'pkg/no-nul
           path.join(cfgDir, 'input.ts'),
           '\ufeffconst sample = null; // café 😀\r\n',
         );
-        fs.writeFileSync(path.join(root, 'runner.mjs'), SHARED_RUNNER);
+        fs.writeFileSync(
+          path.join(root, 'runner.mjs'),
+          mode === 'API' ? API_RUNNER : SHARED_RUNNER,
+        );
         const result = spawnSync(
           process.execPath,
           [path.join(root, 'runner.mjs')],
@@ -429,8 +465,12 @@ export default [{ files: ['**/*.ts'], plugins: { pkg: lp }, rules: { 'pkg/no-nul
         expect(result.error).toBeUndefined();
         expect(result.signal).toBeNull();
         expect(result.status, result.stderr).toBe(0);
-        expect(result.stdout).toContain('no null');
-        expect(result.stdout).toContain('PACKAGED_SHARED_OK');
+        if (mode === 'CLI') {
+          expect(result.stdout).toContain('no null');
+        }
+        expect(result.stdout).toContain(
+          mode === 'API' ? 'PACKAGED_API_OK' : 'PACKAGED_SHARED_OK',
+        );
         expect(result.stderr.trim()).toBe('');
       },
       PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,

@@ -1,9 +1,15 @@
-import { Rslint } from '@rslint/core';
 import { describe, test, expect } from 'rstack/test';
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+// Exercise the public API bundle, including its relative host/worker imports.
+const { Rslint } = await import(
+  /* webpackIgnore: true */ pathToFileURL(
+    path.resolve(import.meta.dirname, '../dist/index.js'),
+  ).href
+);
 
 describe('Rslint autofix', () => {
   test('remaining multi-edit metadata targets the final output', async () => {

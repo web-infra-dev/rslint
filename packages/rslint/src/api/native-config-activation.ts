@@ -42,10 +42,8 @@ let pluginHostFactoryPromise: Promise<CreatePluginLintHost> | undefined;
 
 export async function loadPluginHostFactory(): Promise<CreatePluginLintHost> {
   pluginHostFactoryPromise ??= (async () => {
-    // A package self-reference resolves to src under the test condition and to
-    // dist/eslint-plugin in published builds. Keep it runtime-only: the library
-    // declaration build deliberately excludes the worker implementation.
-    const pluginEntry: string = '@rslint/core/eslint-plugin';
+    // The standalone host is relative to the built API bundle in dist/.
+    const pluginEntry: string = './eslint-plugin/host.js';
     const module: unknown = await import(/* webpackIgnore: true */ pluginEntry);
     if (!isPluginHostFactoryModule(module)) {
       throw new Error(
