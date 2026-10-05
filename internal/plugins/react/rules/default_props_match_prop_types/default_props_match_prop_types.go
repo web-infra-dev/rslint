@@ -203,7 +203,9 @@ func (a *analysis) typeProps(node *ast.Node, out map[string]bool, seen map[*ast.
 		ref := node.AsTypeReferenceNode()
 		if props := reactutil.ReactGenericArgumentWithAmbient(ref.TypeName, ref.TypeArguments, a.ctx.Refs.Resolve); props != nil {
 			opaque = a.typeProps(props, out, seen)
-			out["children"] = false
+			if _, declared := out["children"]; !declared {
+				out["children"] = false
+			}
 			return opaque
 		}
 		if ref.TypeName == nil || ref.TypeName.Kind != ast.KindIdentifier {

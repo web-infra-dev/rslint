@@ -66,6 +66,12 @@ func TestDefaultPropsMatchPropTypesExtras(t *testing.T) {
 			{Code: "namespace React{export interface FC<P>{(props:P):unknown}}type Props={a:string};const C:React.FC<Props>=(props)=><div/>;C.defaultProps={a:1};", Tsx: true},
 			// ---- Regression: a local configured-pragma receiver is not React.forwardRef ----
 			{Code: "const R={forwardRef:<T,P>(fn:(props:P)=>unknown)=>fn};type Props={a:string};const C=R.forwardRef<HTMLDivElement,Props>((props)=><div/>);C.defaultProps={a:1};", Tsx: true, Settings: map[string]any{"react": map[string]any{"pragma": "R"}}},
+			// ---- Regression: React.FC without type arguments is safe ----
+			{Code: "import React from \"react\";const C:React.FC=(props)=><div/>;", Tsx: true},
+			// ---- Regression control: implicit children remains optional ----
+			{Code: "import React from \"react\";const C:React.FC<{name:string}>=(props)=><div/>;C.defaultProps={children:\"x\"};", Tsx: true},
+			// ---- Regression control: explicit optional children remains optional ----
+			{Code: "import React from \"react\";const C:React.FC<{children?:string}>=(props)=><div/>;C.defaultProps={children:\"x\"};", Tsx: true},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized receivers ----
@@ -167,6 +173,10 @@ func TestDefaultPropsMatchPropTypesExtras(t *testing.T) {
 			{Code: "type Props={a:string};class C extends React.Component{props:Props;static defaultProps={a:1};render(){return <div/>;}}", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requiredHasDefault", Message: "defaultProp \"a\" defined for isRequired propType.", Line: 1, Column: 88, EndLine: 1, EndColumn: 91}}},
 			// ---- Regression control: static propTypes is the runtime props contract ----
 			{Code: "class C extends React.Component{static propTypes={a:P.string.isRequired};static defaultProps={a:1};render(){return <div/>;}}", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requiredHasDefault", Message: "defaultProp \"a\" defined for isRequired propType.", Line: 1, Column: 95, EndLine: 1, EndColumn: 98}}},
+			// ---- Regression: explicit required children is not overwritten by React.FC ----
+			{Code: "import React from \"react\";const C:React.FC<{children:string}>=(props)=><div/>;C.defaultProps={children:\"x\"};", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requiredHasDefault", Message: "defaultProp \"children\" defined for isRequired propType.", Line: 1, Column: 95, EndLine: 1, EndColumn: 107}}},
+			// ---- Regression: PropsWithChildren does not overwrite explicit required children ----
+			{Code: "import React from \"react\";const C:React.FC<React.PropsWithChildren<{children:string}>>=(props)=><div/>;C.defaultProps={children:\"x\"};", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requiredHasDefault", Message: "defaultProp \"children\" defined for isRequired propType.", Line: 1, Column: 120, EndLine: 1, EndColumn: 132}}},
 		},
 	)
 }

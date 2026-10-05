@@ -74,6 +74,8 @@ func TestPropTypesRuleExtras(t *testing.T) {
 			{Code: `type A = { name: string }; type B = { other: string }; function Hello(props: A | B) { return <div>{props.name}</div>; }`, Tsx: true},
 			{Code: `interface Props { first: string } interface Props { last: string } function Hello(props: Props) { return <div>{props.first}{props.last}</div>; }`, Tsx: true},
 			{Code: `type A = B; type B = C; type C = D; type D = E; type E = F; type F = { name: string }; function Hello(props: A) { return <div>{props.name}</div>; }`, Tsx: true},
+			// ---- Regression: React.FC without type arguments is safe ----
+			{Code: "import React from 'react'; const Hello: React.FC = props => <div />;", Tsx: true},
 		}, []rule_tester.InvalidTestCase{
 			{Code: `function Hello(props) { return <div>{props[0]}</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'0' is missing in props validation`}}},
 			{Code: `function Hello({ user }) { return <div>{user.name}</div>; } Hello.propTypes = { user: PropTypes.shape({}) };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType"}}},

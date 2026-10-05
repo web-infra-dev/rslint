@@ -142,6 +142,9 @@ func reactImportedName(name *ast.Node, resolve func(*ast.Node) *ast.Symbol, allo
 }
 
 func reactGenericArgumentAtIndex(imported string, arguments *ast.NodeList) *ast.Node {
+	if arguments == nil {
+		return nil
+	}
 	index := 0
 	switch imported {
 	case "forwardRef", "ForwardRefRenderFunction":
@@ -389,7 +392,7 @@ func ComponentTarget(node *ast.Node) []string {
 				// property: `{ C: function Named() {} }` is `C`, not `C.Named`.
 				target = []string{member}
 				memberTarget = true
-			} else if len(target) == 0 || target[0] != member {
+			} else {
 				target = append([]string{member}, target...)
 			}
 			current = parent.Parent
@@ -402,9 +405,6 @@ func ComponentTarget(node *ast.Node) []string {
 				if objectName := parent.AsVariableDeclaration().Name(); objectName != nil && objectName.Kind == ast.KindIdentifier {
 					if !memberTarget {
 						return []string{objectName.Text()}
-					}
-					if len(target) == 1 && target[0] == objectName.AsIdentifier().Text {
-						return target
 					}
 					return append([]string{objectName.AsIdentifier().Text}, target...)
 				}
