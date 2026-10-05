@@ -259,6 +259,9 @@ func (safety *staticControlFlowSafety) hasMutableBinding(node *ast.Node) bool {
 		if !ast.IsVarConst(declaration.Parent) {
 			return true
 		}
+		if declaration.End() > node.Pos() {
+			return true
+		}
 		if safety.visiting[symbol] {
 			return false
 		}
