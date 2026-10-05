@@ -1,3 +1,5 @@
+// cspell:ignore ftest
+
 package no_commented_out_tests_test
 
 import (
@@ -9,12 +11,26 @@ import (
 )
 
 func TestNoCommentedOutTestsRule(t *testing.T) {
+	invalid := func(code string) rule_tester.InvalidTestCase {
+		return rule_tester.InvalidTestCase{
+			Code: code,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "commentedTests", Line: 1, Column: 1},
+			},
+		}
+	}
+
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
 		t,
 		&no_commented_out_tests.NoCommentedOutTestsRule,
 		[]rule_tester.ValidTestCase{
+			// Real code interrupts reconstruction; incomplete calls and examples stay ignored.
+			{Code: "// test(\"works\", () => {\nconst value = 1;\n// });"},
+			{Code: "// test(\"works\", () => {\n\n// prose that is not code !!!"},
+			{Code: "// ```js\n\n// test(\"example\", () => {});\n\n// ```"},
+
 			{Code: `// foo("bar", function () {})`},
 			{Code: `describe("foo", function () {})`},
 			{Code: `it("foo", function () {})`},
@@ -62,8 +78,36 @@ func TestNoCommentedOutTestsRule(t *testing.T) {
         return {}
       }
     		`},
+
+			// Beyond the upstream suite: commented code is now parsed, so text
+			// that only resembles a registration is ignored.
+			{Code: `// ftest("foo", function () {})`},
+			{Code: `// it (see docs)`},
+			{Code: `// test (foo bar)`},
+			{Code: `// test("foo") should be preferred in examples`},
+			{Code: `// test.each(rows)`},
+			{Code: "// test.each`a | b`"},
+			{Code: `// test.foo.bar("foo", () => {})`},
+			{Code: `// test[modifier]("foo", () => {})`},
+			{Code: `// rstest.test("foo", () => {})`},
+			{Code: `/** test("documented example", () => {}) */`},
+			{Code: "// ```ts\n// test(\"documented example\", () => {})\n// ```"},
+			{Code: "// test(\"foo\", () => {\n//   prose that is not code !!!"},
+			{Code: `// test("invalid JSX here", () => <div />)`, FileName: "file.ts"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Blank lines without comment markers do not split a disabled test.
+			invalid("// test(\"works\", () => {\n//   const value = 1;\n\n//   expect(value).toBe(1);\n// });"),
+			invalid("// test(\"works\", () => {\n//   const value = 1;\n \t\n\n//   expect(value).toBe(1);\n// });"),
+			invalid("// test(\"works\", () => {\r\n//   const value = 1;\r\n\r\n//   expect(value).toBe(1);\r\n// });"),
+			{
+				Code: "// test(\"first\", () => {});\n\n// test(\"second\", () => {});",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 1},
+					{MessageId: "commentedTests", Line: 3, Column: 1},
+				},
+			},
+
 			{
 				Code: `// describe("foo", function () {})`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -246,6 +290,44 @@ func TestNoCommentedOutTestsRule(t *testing.T) {
 				Code: `const e = "🚀"; /* describe() */`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "commentedTests", Line: 1, Column: 17},
+				},
+			},
+
+			invalid(`// it.failing("foo", function () {})`),
+			invalid(`// it.skip.failing("foo", function () {})`),
+			invalid(`// test.only.each(rows)("foo", function () {})`),
+			invalid(`// test.concurrent.only.each(rows)("foo", function () {})`),
+			invalid(`// describe.skip.each(rows)("foo", function () {})`),
+			invalid(`// test.each<Row>(rows)("foo", function () {})`),
+			invalid("// test.each`a | b`(\"foo\", function () {})"),
+			invalid(`// test["only"]["each"](rows)("foo", function () {})`),
+			invalid(`// xit.each(rows)("foo", function () {})`),
+			invalid(`// fit.only("foo", function () {})`),
+			invalid(`// fdescribe("foo", function () {})`),
+			invalid(`// test?.("foo", function () {})`),
+			invalid(`// ;test("foo", function () {})`),
+			invalid(`// ((test))("foo", function () {})`),
+			// Unlisted members are accepted as a whole chain, like upstream's
+			// `test.<anything>(`, so calls after them keep the registration.
+			invalid(`// test.runIf(condition)("foo", function () {})`),
+			invalid(`// test.extend(fixtures).only("foo", function () {})`),
+			invalid(`// describe.concurrent("foo", function () {})`),
+			invalid(`// test.todo("foo")`),
+			// Multi-line candidates, including a `*` leader in block comments.
+			invalid("// test\n//   .only\n//   .concurrent(\"foo\", () => {})"),
+			invalid("/*\n * test(\"foo\", function () {})\n */"),
+			invalid("/*\n  describe(\"foo\", () => {\n    it(\"bar\", () => {})\n  })\n*/"),
+			{
+				Code:     `/* test("renders", () => <div />) */`,
+				FileName: "file.tsx",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: "// setup only\n// test(\"foo\", () => {})",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 2, Column: 1},
 				},
 			},
 		},

@@ -4,7 +4,7 @@
 
 Disallow commenting out Jest tests. Reviewers often skim past comments, so disabled cases can sit in the tree indefinitely. Prefer removing dead tests, extracting helpers, or using `.skip` / `test.todo` when you need an explicit, auditable signal. This is the comment-side complement to `jest/no-disabled-tests`, which reports `skip` / `only` / `todo` on real call sites instead of commented-out text.
 
-rslint walks each comment body line by line: the slice after `//`, or the text inside `/* … */`. If **any** line matches the eslint-plugin-jest-style heuristic—optional `x` or `f` prefix (`xit`, `fit`, …), then `test`, `it`, or `describe`, optional dot- or bracket-member chains (e.g. `.skip`, `.only`, `.concurrent`, `['skip']`), then optional whitespace and `(`—it reports the **entire** comment range with the message “Do not comment out tests”.
+rslint rebuilds each comment, joining `//` lines separated only by whitespace, including blank lines, and parses it as code using the file's language (TypeScript or TSX). It reports the **whole** comment when a statement in it is a complete `test`, `it` or `describe` registration, with the message “Do not comment out tests”. Recognized forms are the plain call, the legacy `xit` / `xtest` / `fit` / `xdescribe` / `fdescribe` aliases, member chains such as `.skip`, `.only`, `.concurrent`, `.failing` and `['skip']`, and `.each` tables (array or tagged template, with optional type arguments) once they are called with a title.
 
 Examples of **incorrect** code for this rule:
 
@@ -52,7 +52,7 @@ test.only('bar', () => {});
 
 ## Limitations
 
-Matching is based on the **literal** shape of test API names inside comment text, not on full parsing of the commented code. It will not flag indirect or renamed patterns, for example:
+Only calls whose callee is written with the Jest names are recognized. Indirect or renamed patterns are not flagged, for example:
 
 ```javascript
 // const testSkip = test.skip;
@@ -62,7 +62,16 @@ Matching is based on the **literal** shape of test API names inside comment text
 // myTest('does not have function body');
 ```
 
-Because the heuristic treats any `test` / `it` / `describe`-like call opening inside a comment as suspicious, a comment that merely **mentions** that shape (for example documenting an API) can be reported; prefer rephrasing such comments or using examples that do not mirror a call form.
+## Differences from upstream
+
+eslint-plugin-jest matches each comment line against a regular expression. rslint parses the commented code instead, which changes these edge cases:
+
+- Text that only looks like a call is no longer reported, such as `// it (see docs)`, `// test("foo") should be preferred`, or a call cut short by prose such as `// test(` or a lone `// it('foo', () => {` opener that is never closed in the comment.
+- `// test.each(rows)` without the call that registers a test is not reported, since nothing is registered yet.
+- `/** ... */` documentation comments and commented-out Markdown code fences are not reported.
+- More real registrations are reported: chains such as `test.only.each(rows)(...)`, `.each` tagged templates, `*`-led lines inside a block comment, and a leading `;` or `?.` call.
+- Only real Jest globals are roots. A name the regular expression matched by accident, such as an `f`-prefixed `test`, is no longer treated as one.
+- A member that is not a known Jest modifier is still accepted directly after the root, as upstream does, e.g. `// test.someNewMethod()`.
 
 ## Original Documentation
 
