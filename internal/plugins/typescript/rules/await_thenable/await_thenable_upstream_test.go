@@ -744,3 +744,475 @@ class C<R extends number> {
 		},
 	})
 }
+
+// Promise aggregator cases from typescript-eslint v8.71.0.
+func TestAwaitThenablePromiseAggregatorsUpstream(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &AwaitThenableRule, []rule_tester.ValidTestCase{
+		{Code: `
+// @ts-expect-error
+Promise.all();
+      `},
+		{Code: `
+Promise.all([,]);
+      `},
+		{Code: `
+declare const x: unknown;
+
+// @ts-expect-error
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: any;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Array<Promise<unknown>>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Array<Promise<number>> | Array<Promise<string>>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Array<Promise<number> | Promise<string>>;
+Promise.all(x);
+      `},
+		{Code: `
+function f<T>(x: Array<Promise<T>>) {
+  Promise.all(x);
+}
+      `},
+		{Code: `
+function f<T extends Promise<unknown>>(x: Array<T>) {
+  Promise.all(x);
+}
+      `},
+		{Code: `
+declare const x: Array<unknown>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Array<any>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: number | Array<Promise<number>>;
+
+// @ts-expect-error
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: [Promise<unknown>, Promise<void>];
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: [Promise<number>] | [Promise<string>];
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: [Promise<number> | Promise<string>];
+Promise.all(x);
+      `},
+		{Code: `
+function f<T>(x: [Promise<T>]) {
+  Promise.all(x);
+}
+      `},
+		{Code: `
+function f<T extends Promise<unknown>>(x: [T]) {
+  Promise.all(x);
+}
+      `},
+		{Code: `
+declare const x: [unknown, any];
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: number | [Promise<number>];
+
+// @ts-expect-error
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Iterable<Promise<unknown>>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Iterable<Promise<number>> | Iterable<Promise<string>>;
+
+// @ts-expect-error
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Iterable<Promise<number | string>>;
+Promise.all(x);
+      `},
+		{Code: `
+function f<T>(x: Iterable<Promise<T>>) {
+  Promise.all(x);
+}
+      `},
+		{Code: `
+function f<T extends Promise<unknown>>(x: Iterable<T>) {
+  Promise.all(x);
+}
+      `},
+		{Code: `
+declare const x: Iterable<unknown>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Iterable<any>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: number | Iterable<Promise<number>>;
+
+// @ts-expect-error
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Iterable<Promise<unknown>, number>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Iterable<Promise<string>> | Array<Promise<string>>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x:
+  Iterable<Promise<string>> | [Promise<string>, Promise<unknown>];
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Array<Promise<string>> | [Promise<string>, Promise<unknown>];
+Promise.all(x);
+      `},
+		{Code: `
+// @ts-expect-error
+Promise.all(1);
+      `},
+		{Code: `
+declare const x: Promise<number>;
+
+// @ts-expect-error
+Promise.all(x);
+      `},
+		{Code: `
+interface MyArray<Unused, T> extends Array<T> {}
+declare const x: MyArray<null, Promise<void>>;
+
+Promise.all(x);
+      `},
+		{Code: `
+function* x() {
+  yield Promise.resolve(1);
+  yield Promise.resolve(2);
+  yield Promise.resolve(3);
+}
+
+Promise.all(x());
+      `},
+		{Code: `
+function* x() {
+  yield 1 as unknown;
+}
+
+Promise.all(x());
+      `},
+		{Code: `
+function* x() {
+  yield 1 as any;
+}
+
+Promise.all(x());
+      `},
+		{Code: `
+declare const x: Generator<Promise<number>>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Generator<unknown>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: Generator<any>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: ReadonlyArray<Promise<number>>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: ReadonlyArray<unknown>;
+Promise.all(x);
+      `},
+		{Code: `
+declare const x: ReadonlyArray<any>;
+Promise.all(x);
+      `},
+		{Code: `
+Promise.all([Promise.resolve(1), Promise.resolve(2), Promise.resolve(3)]);
+      `},
+		{Code: `
+declare const _unknown_: unknown;
+
+Promise.all([
+  _unknown_,
+  Promise.resolve(1),
+  Promise.resolve(2),
+  Promise.resolve(3),
+]);
+      `},
+		{Code: `
+declare const _any_: any;
+
+Promise.all([
+  _any_,
+  Promise.resolve(1),
+  Promise.resolve(2),
+  Promise.resolve(3),
+]);
+      `},
+		{Code: `
+declare const _promise_: Promise<number | string>;
+
+Promise.all([
+  _promise_,
+  Promise.resolve(1),
+  Promise.resolve(2),
+  Promise.resolve(3),
+]);
+      `},
+		{Code: `
+Promise.all([
+  Promise.resolve(1),
+  Promise.resolve(2),
+  Promise.resolve(3),
+  ...[Promise.resolve(4), Promise.resolve(5), Promise.resolve(6)],
+]);
+      `},
+		{Code: `
+declare const maybePromise: Promise<number> | number;
+
+Promise.all([
+  maybePromise,
+  Promise.resolve(1),
+  Promise.resolve(2),
+  Promise.resolve(3),
+]);
+      `},
+	}, []rule_tester.InvalidTestCase{
+		{Code: `
+declare const x: Array<number>;
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: Array<number> | Array<Promise<number>>;
+Promise.race(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 14, EndLine: 3, EndColumn: 15},
+			},
+		},
+		{Code: `
+declare const x: Array<number> | Array<string>;
+Promise.allSettled(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 20, EndLine: 3, EndColumn: 21},
+			},
+		},
+		{Code: `
+declare const x: Array<number | Promise<number>>;
+Promise.any(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: [number];
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: [number] | [Promise<number>];
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: [number | Promise<number>];
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: [Promise<number>, number];
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: Iterable<number>;
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: Iterable<number> | Iterable<Promise<number>>;
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: Iterable<number | Promise<number>>;
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: Iterable<string> | Array<Promise<unknown>>;
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: Iterable<Promise<string>> | [string, Promise<unknown>];
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: Array<string> | [Promise<string>, Promise<unknown>];
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: Array<Array<Promise<number>>>;
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+interface MyArray<Unused, T> extends Array<T> {}
+declare const x: MyArray<Promise<void>, null>;
+
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 5, Column: 13, EndLine: 5, EndColumn: 14},
+			},
+		},
+		{Code: `
+function* x() {
+  yield 1;
+  yield 2;
+  yield 3;
+}
+
+Promise.all(x());
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 8, Column: 13, EndLine: 8, EndColumn: 16},
+			},
+		},
+		{Code: `
+function* x() {
+  yield 1 as number;
+}
+
+Promise.all(x());
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 6, Column: 13, EndLine: 6, EndColumn: 16},
+			},
+		},
+		{Code: `
+function* x() {
+  yield 1 as number | Promise<number>;
+}
+
+Promise.all(x());
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 6, Column: 13, EndLine: 6, EndColumn: 16},
+			},
+		},
+		{Code: `
+declare const x: Generator<number>;
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: ReadonlyArray<number>;
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+declare const x: ReadonlyArray<number | Promise<string>>;
+Promise.all(x);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 3, Column: 13, EndLine: 3, EndColumn: 14},
+			},
+		},
+		{Code: `
+Promise.all([Promise.resolve(1), 2, Promise.resolve(3)]);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 2, Column: 34, EndLine: 2, EndColumn: 35},
+			},
+		},
+		{Code: `
+Promise.all([1, 2, Promise.resolve(3)]);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 2, Column: 14, EndLine: 2, EndColumn: 15},
+				{MessageId: "invalidPromiseAggregatorInput", Line: 2, Column: 17, EndLine: 2, EndColumn: 18},
+			},
+		},
+		{Code: `
+Promise.all([...[1, 2, 3]]);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidPromiseAggregatorInput", Line: 2, Column: 14, EndLine: 2, EndColumn: 26},
+			},
+		},
+	})
+}
