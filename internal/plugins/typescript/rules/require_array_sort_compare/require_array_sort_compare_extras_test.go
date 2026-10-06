@@ -56,6 +56,13 @@ function sort<T extends Key>(values: T[]) { values.%s(); }`,
 
 			// Do not broaden the exemption to non-string elements or array unions.
 			for _, code := range []string{
+				`declare const values: 42[]; values.%s();`,
+				`enum Key { A = 1, B = 2 }
+declare const values: Key.A[];
+values.%s();`,
+				`enum Key { A = Math.random() }
+declare const values: Key.A[];
+values.%s();`,
 				`enum Key { A, B }
 declare const values: Key[];
 values.%s();`,
