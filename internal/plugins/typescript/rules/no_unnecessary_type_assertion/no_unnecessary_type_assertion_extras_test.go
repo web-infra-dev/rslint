@@ -21,6 +21,18 @@ func TestNoUnnecessaryTypeAssertionContextual(t *testing.T) {
 				Code:    `declare const x: number; x as /* comment */ number;`,
 				Options: []any{map[string]any{"typesToIgnore": []any{"number"}}},
 			},
+			{
+				Code:    `declare const x: number; < /* comment */ number > x;`,
+				Options: []any{map[string]any{"typesToIgnore": []any{"number"}}},
+			},
+			{
+				Code:    `declare const x: number; x as (/* comment */ (number));`,
+				Options: []any{map[string]any{"typesToIgnore": []any{"number"}}},
+			},
+			{
+				Code:    `declare const x: number; <(number)>x;`,
+				Options: []any{map[string]any{"typesToIgnore": []any{"number"}}},
+			},
 			{Code: `declare const value: unknown; const result: number = value as number;`},
 			{Code: `declare function fn(x: string | undefined): void; fn(undefined as string | undefined);`},
 			{Code: `declare function fn(x: number[]): void; fn([...(1 as any)]);`},
@@ -72,6 +84,24 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 `},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:    `declare const x: number; x as /* comment */ number;`,
+				Output:  []string{`declare const x: number; x;`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+				Options: []any{map[string]any{"typesToIgnore": []any{}}},
+			},
+			{
+				Code:    `declare const x: number; x as /* comment */ number;`,
+				Output:  []string{`declare const x: number; x;`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+				Options: []any{map[string]any{"typesToIgnore": []any{"string"}}},
+			},
+			{
+				Code:    `declare const x: number; x as (number);`,
+				Output:  []string{`declare const x: number; x;`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+				Options: []any{map[string]any{"typesToIgnore": []any{"(number)"}}},
+			},
 			{
 				Code:   `declare const x: string | undefined; (x as string | undefined)?.trim();`,
 				Output: []string{`declare const x: string | undefined; (x)?.trim();`},
