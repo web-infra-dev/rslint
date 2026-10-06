@@ -54,19 +54,19 @@ var NoMeaninglessVoidOperatorRule = rule.CreateRule(rule.Rule{
 				arg := node.AsVoidExpression().Expression
 				argType := ctx.TypeChecker.GetTypeAtLocation(arg)
 
-				mask := checker.TypeFlagsVoidLike | checker.TypeFlagsNever
-
-				for _, t := range utils.UnionTypeParts(argType) {
-					mask &= checker.Type_flags(t)
-				}
+				unionParts := utils.UnionTypeParts(argType)
 
 				fixRemoveVoidKeyword := func() rule.RuleFix {
-					return rule.RuleFixRemoveRange(utils.TrimNodeTextRange(ctx.SourceFile, node).WithEnd(arg.Pos()))
+					return rule.RuleFixRemoveRange(utils.TrimNodeTextRange(ctx.SourceFile, node).WithEnd(utils.TrimNodeTextRange(ctx.SourceFile, arg).Pos()))
 				}
 
-				if mask&checker.TypeFlagsVoidLike != 0 {
+				if utils.Every(unionParts, func(t *checker.Type) bool {
+					return utils.IsTypeFlagSet(t, checker.TypeFlagsVoidLike)
+				}) {
 					ctx.ReportNodeWithFixes(node, buildMeaninglessVoidOperatorMessage(ctx.TypeChecker.TypeToString(argType)), fixRemoveVoidKeyword())
-				} else if opts.CheckNever && mask&checker.TypeFlagsNever != 0 {
+				} else if opts.CheckNever && utils.Every(unionParts, func(t *checker.Type) bool {
+					return utils.IsTypeFlagSet(t, checker.TypeFlagsVoidLike|checker.TypeFlagsNever)
+				}) {
 					ctx.ReportNodeWithSuggestions(node, buildMeaninglessVoidOperatorMessage(ctx.TypeChecker.TypeToString(argType)), rule.RuleSuggestion{
 						Message:  buildRemoveVoidMessage(),
 						FixesArr: []rule.RuleFix{fixRemoveVoidKeyword()},
