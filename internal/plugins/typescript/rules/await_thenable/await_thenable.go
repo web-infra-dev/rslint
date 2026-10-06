@@ -2,6 +2,7 @@ package await_thenable
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -42,12 +43,65 @@ func buildAwaitUsingOfNonAsyncDisposableMessage() rule.RuleMessage {
 	}
 }
 
+func buildInvalidPromiseAggregatorInputMessage() rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "invalidPromiseAggregatorInput",
+		Description: "Unexpected iterable of non-Promise (non-\"Thenable\") values passed to promise aggregator.",
+	}
+}
+
 var AwaitThenableRule = rule.CreateRule(rule.Rule{
 	Name:             "await-thenable",
 	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		var evaluator *utils.StaticStringEvaluator
 		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				call := node.AsCallExpression()
+				callee := ast.SkipParentheses(call.Expression)
+				if !ast.IsAccessExpression(callee) || len(call.Arguments.Nodes) == 0 {
+					return
+				}
+				method, known := utils.AccessExpressionStaticName(callee)
+				if !known {
+					if evaluator == nil {
+						evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
+						evaluator.GlobalAccess = ctx.Globals.Access
+					}
+					method, _ = evaluator.EvalAccessExpressionName(callee)
+				}
+				switch method {
+				case "all", "allSettled", "any", "race":
+				default:
+					return
+				}
+				calleeType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, callee.Expression())
+				// Upstream recognizes PromiseConstructor and its derived interfaces,
+				// not the broader Promise class constructors accepted by our helper.
+				if !utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, calleeType, "PromiseConstructor") {
+					return
+				}
+
+				argument := ast.SkipParentheses(call.Arguments.Nodes[0])
+				if ast.IsArrayLiteralExpression(argument) {
+					for _, element := range argument.AsArrayLiteralExpression().Elements.Nodes {
+						if element.Kind == ast.KindOmittedExpression {
+							continue
+						}
+						element = ast.SkipParentheses(element)
+						t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, element)
+						if isAlwaysNonAwaitableType(ctx.TypeChecker, element, t) {
+							ctx.ReportNode(element, buildInvalidPromiseAggregatorInputMessage())
+						}
+					}
+					return
+				}
+				t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
+				if isInvalidPromiseAggregatorInput(ctx.TypeChecker, argument, t) {
+					ctx.ReportNode(argument, buildInvalidPromiseAggregatorInputMessage())
+				}
+			},
 			ast.KindAwaitExpression: func(node *ast.Node) {
 				awaitArgument := node.AsAwaitExpression().Expression
 				awaitArgumentType := ctx.TypeChecker.GetTypeAtLocation(awaitArgument)
@@ -134,3 +188,51 @@ var AwaitThenableRule = rule.CreateRule(rule.Rule{
 		}
 	},
 })
+
+func isAlwaysNonAwaitableType(typeChecker *checker.Checker, node *ast.Node, t *checker.Type) bool {
+	for _, part := range utils.UnionTypeParts(t) {
+		if utils.NeedsToBeAwaited(typeChecker, node, part) != utils.TypeAwaitableNever {
+			return false
+		}
+	}
+	return true
+}
+
+func isInvalidPromiseAggregatorInput(typeChecker *checker.Checker, node *ast.Node, t *checker.Type) bool {
+	parts := utils.UnionTypeParts(t)
+	// Non-iterable inputs already produce a TypeScript error. Match upstream by
+	// requiring every union constituent to be iterable before checking values.
+	for _, part := range parts {
+		if utils.GetWellKnownSymbolPropertyOfType(part, "iterator", typeChecker) == nil {
+			return false
+		}
+	}
+	for _, part := range parts {
+		for _, valueType := range getValueTypesOfArrayLike(typeChecker, part) {
+			// A literal element is reported only when it cannot be awaited, but
+			// an iterable variable is reported if it can contain a non-Thenable.
+			for _, valuePart := range utils.UnionTypeParts(valueType) {
+				if utils.NeedsToBeAwaited(typeChecker, node, valuePart) == utils.TypeAwaitableNever {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func getValueTypesOfArrayLike(typeChecker *checker.Checker, t *checker.Type) []*checker.Type {
+	if checker.IsTupleType(t) {
+		return checker.Checker_getTypeArguments(typeChecker, t)
+	}
+	if typeChecker.IsArrayLikeType(t) {
+		return []*checker.Type{typeChecker.GetNumberIndexType(t)}
+	}
+	// For other iterable references, upstream checks only the first type
+	// argument (the yielded value, not a generator's return or next type).
+	if utils.IsTypeReference(t) {
+		arguments := checker.Checker_getTypeArguments(typeChecker, t)
+		return arguments[:min(1, len(arguments))]
+	}
+	return nil
+}
