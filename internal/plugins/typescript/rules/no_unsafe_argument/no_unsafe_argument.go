@@ -216,6 +216,8 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 				case ast.KindSpreadElement:
 					spreadArgType := ctx.TypeChecker.GetTypeAtLocation(argument.Expression())
 
+					// Match upstream: check any, any[] and concrete tuples only. Other
+					// iterable spreads are ignored without advancing the parameter cursor.
 					if utils.IsTypeAnyType(spreadArgType) {
 						// foo(...any)
 						ctx.ReportNode(argument, buildUnsafeSpreadMessage(describeType(spreadArgType)))
@@ -248,49 +250,6 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 							// the last element was a rest - so all remaining defined arguments can be considered "consumed"
 							// all remaining arguments should be compared against the rest type (if one exists)
 							signature.consumeRemainingArguments()
-						}
-
-					} else {
-						// A non-tuple spread contributes an unknown number of values.
-						// Prefer the iterable yield type, which follows generic iterable
-						// constraints. When the active libs do not define Iterable (for
-						// example, lib.es5), arrays are still valid spread sources, so
-						// fall back to their numeric index type.
-						spreadElementType := checker.Checker_getIterationTypeOfIterable(
-							ctx.TypeChecker,
-							checker.IterationUseSpread,
-							checker.IterationTypeKindYield,
-							spreadArgType,
-							nil,
-						)
-						if spreadElementType == nil {
-							constrainedType := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, spreadArgType)
-							if constrainedType == nil {
-								constrainedType = spreadArgType
-							}
-							// GetNumberIndexType returns nil for non-indexable types. Do not
-							// require a single array or tuple here: an array union also has
-							// a numeric index type.
-							spreadElementType = utils.GetNumberIndexType(ctx.TypeChecker, constrainedType)
-						}
-						// Match upstream's argument alignment for an indeterminate-length
-						// spread: inspect the current parameter without advancing the real
-						// signature cursor used by later arguments.
-						spreadSignature := signature
-						parameterType := spreadSignature.getNextParameterType()
-						if spreadElementType != nil && parameterType != nil {
-							_, _, unsafe := utils.IsUnsafeAssignment(
-								spreadElementType,
-								parameterType,
-								ctx.TypeChecker,
-								nil,
-							)
-							if unsafe {
-								ctx.ReportNode(argument, buildUnsafeArgumentMessage(
-									describeType(spreadElementType),
-									describeType(parameterType),
-								))
-							}
 						}
 					}
 

@@ -34,7 +34,7 @@ baz(...strArray);
 
 ## Differences from typescript-eslint
 
-rslint also checks the element type of non-tuple iterable spreads, including ordinary arrays and type parameters constrained to `Iterable` or an array type. typescript-eslint currently ignores these spread arguments.
+Spread handling matches typescript-eslint: this rule checks `any`, `any[]`, and concrete tuple spreads. Other iterable spreads, including `Set<any>`, arrays with generic element types such as `Set<any>[]`, and generic `Parameters<T>` spreads, are ignored without advancing the parameter position used to check later arguments.
 
 ## Original Documentation
 
