@@ -34,6 +34,9 @@ Modules that cannot be resolved, are ignored, or are not ES modules are not repo
   upstream v2.32.0 allows it. Import `{ value }` or add a default export.
   With NodeNext, native ES imports of CommonJS modules still receive
   `module.exports` as their default, regardless of the interop setting.
+- A file containing only `import './setup.mjs';` has no default export, so
+  rslint reports a default import from it. Upstream v2.32.0 may skip that
+  file because its initial text check does not recognize side-effect imports.
 
 ## Original Documentation
 

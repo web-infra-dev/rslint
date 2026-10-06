@@ -2,14 +2,63 @@ package default_rule_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	default_rule "github.com/web-infra-dev/rslint/internal/plugins/import/rules/default"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestDefaultModuleBoundaries(t *testing.T) {
+	root := rule_tester.Root{
+		Dir: tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/module-boundaries.txtar").Materialize(t, "")),
+		FS:  osvfs.FS(),
+	}
+	for _, config := range []string{
+		"tsconfig.json", "tsconfig.legacy.json", "tsconfig.force.json",
+		"tsconfig.interop.json", "tsconfig.legacy-interop.json", "tsconfig.force-interop.json",
+	} {
+		t.Run(config, func(t *testing.T) {
+			var valid []rule_tester.ValidTestCase
+			for _, source := range []string{
+				"common.cjs", "object.cjs", "properties.cjs", "common.js", "empty.cjs", "decoys.cjs",
+				"meta.mjs", "default.mjs", "common-barrel.mjs", "named-common-barrel.mjs", "type-query.ts", "jsdoc.cjs",
+			} {
+				valid = append(valid, rule_tester.ValidTestCase{
+					Code: fmt.Sprintf("import value from './%s';", source), FileName: "consumer.ts",
+				})
+			}
+			valid = append(valid,
+				rule_tester.ValidTestCase{Code: `import type Value from './common.cjs';`, FileName: "consumer.ts"},
+				rule_tester.ValidTestCase{Code: `import value, { named } from './object.cjs';`, FileName: "consumer.ts"},
+				// RunRuleTester registers the rule under the name "test".
+				rule_tester.ValidTestCase{Code: "// eslint-disable-next-line test\nimport value from './named.mjs';", FileName: "consumer.ts"},
+				rule_tester.ValidTestCase{Code: "/* eslint-disable test */\nimport value from './named.mjs';", FileName: "consumer.ts"},
+			)
+			var invalid []rule_tester.InvalidTestCase
+			// Keep the documented interop behavior: named ESM exports do not
+			// synthesize a default even when esModuleInterop is enabled.
+			for _, source := range []string{
+				"named.mjs", "mixed.cjs", "import-binding.cjs", "meta-named.mjs", "import-only.cjs",
+				"common-star.mjs", "missing-barrel.mjs", "dynamic.cjs", "nested-dynamic.cjs", "computed-dynamic.cjs",
+			} {
+				invalid = append(invalid, rule_tester.InvalidTestCase{
+					Code: fmt.Sprintf("import value from './%s';", source), FileName: "consumer.ts",
+					Errors: []rule_tester.InvalidTestCaseError{{
+						MessageId: "noDefault", Message: fmt.Sprintf("No default export found in imported module %q.", "./"+source),
+						Line: 1, Column: 8, EndLine: 1, EndColumn: 13,
+					}},
+				})
+			}
+			rule_tester.RunRuleTester(root, config, t, &default_rule.DefaultRule, valid, invalid)
+		})
+	}
+}
 
 // TestDefaultExtras locks in branches and edge shapes that the upstream test
 // suite doesn't exercise. Each case carries an inline comment pointing at the

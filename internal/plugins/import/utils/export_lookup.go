@@ -167,8 +167,20 @@ func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.Sour
 }
 
 func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder *exportBuilder) (bool, bool) {
-	if sourceFile == nil || !ast.IsExternalModule(sourceFile) {
+	if sourceFile == nil {
 		return false, false
+	}
+	// Upstream builds export maps for authored module declarations or runtime
+	// dynamic imports. A compiler-forced module marker or import.meta alone
+	// does not make CommonJS exports statically visible.
+	indicator := sourceFile.ExternalModuleIndicator
+	if indicator == nil || !ast.IsExternalModuleIndicator(indicator) {
+		// The parser flag also covers import types and can survive incremental
+		// edits, so confirm that a runtime import remains in the syntax tree.
+		if sourceFile.AsNode().Flags&ast.NodeFlagsPossiblyContainsDynamicImport == 0 ||
+			sourceFile.SubtreeFacts()&ast.SubtreeContainsDynamicImport == 0 {
+			return false, false
+		}
 	}
 	if exportName == defaultExportName && sourceFile.IsDeclarationFile && builder.index.localExportsOf(builder.program(), sourceFile).ImplicitDefault {
 		return true, true
