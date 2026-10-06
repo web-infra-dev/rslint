@@ -3,11 +3,160 @@
 package no_unnecessary_type_assertion
 
 import (
+	"context"
+	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+func TestNoUnnecessaryTypeAssertionReportingDemand(t *testing.T) {
+	const code = "declare const value: number;\r\n" +
+		"/* leading */\u00a0value /* keep */ as /* type */ number;\r\n" +
+		"(<number>value);\r\nvalue!;\r\n" +
+		"// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion\r\nvalue as number;"
+	p, sourceFile, err := rule_tester.NewProgramHelper(fixtures.GetRootDir()).CreateTestProgram(code, "file.ts", "tsconfig.json")
+	if err != nil || sourceFile == nil {
+		t.Fatalf("create program: %v", err)
+	}
+	typeChecker, release := p.GetTypeCheckerForFile(context.Background(), sourceFile)
+	defer release()
+	program := lintprogram.NewFromCompiler(p)
+	for _, test := range []struct {
+		name   string
+		demand rule.EditDemand
+	}{
+		{"diagnostics", rule.EditDemandNone},
+		{"autofix", rule.EditDemandAutofix},
+		{"suggestions", rule.EditDemandSuggestion},
+		{"all", rule.EditDemandAll},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var diagnostics []rule.RuleDiagnostic
+			ctx := rule.RuleContext{
+				SourceFile:     sourceFile,
+				TypeChecker:    typeChecker,
+				DisableManager: rule.NewDisableManager(sourceFile, rule.NewCommentStore(sourceFile)),
+			}.WithProgram(program).WithDiagnosticConsumer(NoUnnecessaryTypeAssertionRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+				Demand: test.demand,
+				Report: func(diagnostic rule.RuleDiagnostic) { diagnostics = append(diagnostics, diagnostic) },
+			})
+			listeners := NoUnnecessaryTypeAssertionRule.Run(ctx, nil)
+			var visit func(*ast.Node) bool
+			visit = func(node *ast.Node) bool {
+				if listener := listeners[node.Kind]; listener != nil {
+					listener(node)
+				}
+				node.ForEachChild(visit)
+				return false
+			}
+			for range 2 {
+				diagnostics = nil
+				visit(sourceFile.AsNode())
+				if len(diagnostics) != 3 {
+					t.Fatalf("got %d diagnostics, want 3", len(diagnostics))
+				}
+				for index, want := range []struct{ diagnostic, fix string }{
+					{"value /* keep */ as /* type */ number", " as /* type */ number"},
+					{"<number>value", "<number>"},
+					{"value!", "!"},
+				} {
+					diagnostic := diagnostics[index]
+					if got := code[diagnostic.Range.Pos():diagnostic.Range.End()]; got != want.diagnostic || diagnostic.Message.Id != "unnecessaryAssertion" {
+						t.Fatalf("diagnostic %d: range %q, message %q", index, got, diagnostic.Message.Id)
+					}
+					if diagnostic.Suggestions != nil {
+						t.Fatalf("diagnostic %d unexpectedly has suggestions", index)
+					}
+					if test.demand&rule.EditDemandAutofix == 0 {
+						if diagnostic.FixesPtr != nil {
+							t.Fatalf("diagnostic %d unexpectedly has fixes", index)
+						}
+						continue
+					}
+					if diagnostic.FixesPtr == nil || len(*diagnostic.FixesPtr) != 1 {
+						t.Fatalf("diagnostic %d should have one fix", index)
+					}
+					fix := (*diagnostic.FixesPtr)[0]
+					if got := code[fix.Range.Pos():fix.Range.End()]; got != want.fix || fix.Text != "" {
+						t.Fatalf("diagnostic %d: fix replaces %q with %q", index, got, fix.Text)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestNoUnnecessaryTypeAssertionMethodBoundaries(t *testing.T) {
+	const declarations = `
+declare const value: string | Error;
+declare const receiver: any;
+declare function wrap<T>(value: T): T;
+`
+	var valid []rule_tester.ValidTestCase
+	for _, code := range []string{
+		`wrap({ [receiver(value as Error)]() {} });`,
+		`wrap({ get [receiver(value as Error)]() { return 0; } });`,
+		`wrap({ set [receiver(value as Error)](param: string) {} });`,
+		`wrap(class { [receiver(value as Error)]() {} });`,
+		`wrap(class { @receiver(value as Error) method() {} });`,
+		`wrap(class { field = receiver(value as Error); });`,
+		`wrap(class { static { receiver(value as Error); } });`,
+		`wrap({ method() { wrap(value as Error); } });`,
+		`wrap(() => receiver(value as Error));`,
+		`wrap({ method() { const narrowed: Error = value as Error; } });`,
+	} {
+		valid = append(valid, rule_tester.ValidTestCase{Code: declarations + code})
+	}
+	valid = append(valid, rule_tester.ValidTestCase{
+		Code:    declarations + `wrap({ method() { receiver(value as Error); } });`,
+		Options: []any{map[string]any{"typesToIgnore": []any{"Error"}}},
+	})
+
+	var invalid []rule_tester.InvalidTestCase
+	for _, code := range []string{
+		`wrap({ method() { receiver(value as Error); } });`,
+		`wrap({ async method() { receiver(value as Error); } });`,
+		`wrap({ *method() { yield receiver(value as Error); } });`,
+		`wrap({ get error() { return receiver(value as Error); } });`,
+		`wrap({ get error(): unknown { return value as Error; } });`,
+		`wrap({ set error(param: string) { receiver(value as Error); } });`,
+		`wrap(class { method() { receiver(value as Error); } });`,
+		`wrap(class { static method() { receiver(value as Error); } });`,
+		`wrap(class { get error() { return receiver(value as Error); } });`,
+		`wrap(class { set error(param: string) { receiver(value as Error); } });`,
+		`wrap(class { constructor() { receiver(value as Error); } });`,
+		`wrap({ method(param: unknown = value as Error) {} });`,
+		`wrap(class { constructor(param: unknown = value as Error) {} });`,
+		`wrap({ method({ [receiver(value as Error)]: param }: any) {} });`,
+		`wrap({ method() { receiver((value as Error)); } });`,
+		`wrap(() => ({ method() { receiver(value as Error); } }));`,
+		`wrap({ method() { wrap({ method() { receiver(value as Error); } }); } });`,
+		`wrap({ method: function() { receiver(value as Error); } });`,
+		`wrap({ method: () => { receiver(value as Error); } });`,
+		`declare function run<T>(input: T, options: { onError(param: { error: string | Error }): void }): void;
+run({}, { onError(param) { receiver(param.error as Error); } });`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:   declarations + code,
+			Output: []string{declarations + strings.ReplaceAll(code, " as Error", "")},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+		})
+	}
+	invalid = append(invalid, rule_tester.InvalidTestCase{
+		Code:   declarations + `wrap({ method() { receiver(<Error>value); } });`,
+		Output: []string{declarations + `wrap({ method() { receiver(value); } });`},
+		Errors: []rule_tester.InvalidTestCaseError{{
+			MessageId: "contextuallyUnnecessary",
+			Line:      5, Column: 28, EndLine: 5, EndColumn: 40,
+		}},
+	})
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule, valid, invalid)
+}
 
 func TestNoUnnecessaryTypeAssertionContextual(t *testing.T) {
 	rule_tester.RunRuleTester(
