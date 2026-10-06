@@ -812,7 +812,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			}
 
 			if (utils.IsTypeFlagSetWithUnion(uncast, checker.TypeFlagsNonPrimitive) && !utils.IsTypeFlagSetWithUnion(cast, checker.TypeFlagsNonPrimitive)) ||
-				(assertionHasIndexSignature(ctx.TypeChecker, uncast) && !assertionHasIndexSignature(ctx.TypeChecker, cast)) ||
+				assertionHasIndexSignature(ctx.TypeChecker, uncast) != assertionHasIndexSignature(ctx.TypeChecker, cast) ||
 				assertionTypeContainsAny(ctx.TypeChecker, uncast) ||
 				assertionTypeContainsAny(ctx.TypeChecker, cast) ||
 				(assertionTypeContainsTypeVariable(ctx.TypeChecker, cast) && !assertionTypeContainsTypeVariable(ctx.TypeChecker, uncast)) {
@@ -884,8 +884,15 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 
 		checkTypeAssertion := func(node *ast.Node) {
 			typeNode := node.Type()
-			if slices.Contains(opts.TypesToIgnore, utils.TrimmedNodeText(ctx.SourceFile, typeNode)) {
-				return
+			if len(opts.TypesToIgnore) > 0 {
+				ignoredType := typeNode
+				// ESTree omits parentheses around the type annotation's text.
+				if ignoredType.Kind == ast.KindParenthesizedType {
+					ignoredType = ast.SkipTypeParentheses(ignoredType)
+				}
+				if slices.Contains(opts.TypesToIgnore, utils.TrimmedNodeText(ctx.SourceFile, ignoredType)) {
+					return
+				}
 			}
 
 			castType := ctx.TypeChecker.GetTypeAtLocation(node)
