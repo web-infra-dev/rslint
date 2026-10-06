@@ -16,7 +16,7 @@ import (
 
 func TestNoUselessSpreadEditDemand(t *testing.T) {
 	t.Parallel()
-	const source = `const x = [...[foo]]; const y = [...foo.concat(bar)]; Object.assign(target, {...source}); new Set(...items);`
+	const source = `const x = [...[foo]]; const y = [...foo.concat(bar)]; Object.assign(target, {...source}); new Set(...items); for (const value of [...items]) {} function* f() { yield* [...items]; }`
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.js", Path: "/edit-demand.js",
 	}, source, core.ScriptKindJS)
@@ -37,8 +37,8 @@ func TestNoUselessSpreadEditDemand(t *testing.T) {
 			return node.ForEachChild(visit)
 		}
 		file.AsNode().ForEachChild(visit)
-		if len(diagnostics) != 4 {
-			t.Fatalf("demand %d: got %d diagnostics, want 4", demand, len(diagnostics))
+		if len(diagnostics) != 6 {
+			t.Fatalf("demand %d: got %d diagnostics, want 6", demand, len(diagnostics))
 		}
 		return diagnostics
 	}
@@ -57,11 +57,11 @@ func TestNoUselessSpreadEditDemand(t *testing.T) {
 			}
 		}
 	}
-	want := `const x = [foo]; const y = foo.concat(bar); Object.assign(target, {...source}); new Set(...items);`
+	want := `const x = [foo]; const y = foo.concat(bar); Object.assign(target, {...source}); new Set(...items); for (const value of [...items]) {} function* f() { yield* [...items]; }`
 	if output, _, fixed := linter.ApplyRuleFixes(source, all); !fixed || output != want {
 		t.Fatalf("autofix = %q, want %q", output, want)
 	}
-	want = `const x = [...[foo]]; const y = [...foo.concat(bar)]; Object.assign(target, source); new Set(...items);`
+	want = `const x = [...[foo]]; const y = [...foo.concat(bar)]; Object.assign(target, source); new Set(...items); for (const value of [...items]) {} function* f() { yield* [...items]; }`
 	if all[2].Suggestions == nil || len(*all[2].Suggestions) != 1 {
 		t.Fatal("expected one Object.assign suggestion")
 	}
@@ -70,7 +70,7 @@ func TestNoUselessSpreadEditDemand(t *testing.T) {
 	}
 }
 
-// Additional runtime shapes and edit boundaries checked against Unicorn v77.0.0.
+// Additional runtime shapes and edit boundaries, including documented safety differences.
 func TestNoUselessSpreadExtrasRuntimeShapes(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_useless_spread.NoUselessSpreadRule,
 		[]rule_tester.ValidTestCase{
@@ -86,7 +86,7 @@ func TestNoUselessSpreadExtrasRuntimeShapes(t *testing.T) {
 			{Code: "class C { #flat() {} f() { return [...this.#flat()]; } }", FileName: "file.js"},
 		},
 		[]rule_tester.InvalidTestCase{
-			{Code: "async function f(){for await (const value of [...items]);}", FileName: "file.js", Output: []string{"async function f(){for await (const value of items);}"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 46, EndLine: 1, EndColumn: 56}}},
+			{Code: "async function f(){for await (const value of [...items]);}", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 46, EndLine: 1, EndColumn: 56, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "async function f(){for await (const value of items);}"}}}}},
 			{Code: "const b = [...((a?.b).flat)()];", FileName: "file.js", Output: []string{"const b = ((a?.b).flat)();"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "clone-array", Message: "Unnecessarily cloning an array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 31}}},
 			{Code: "const a = [1,2]; const b = [...a.slice(1)];", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "clone-array", Message: "Unnecessarily cloning an array.", Line: 1, Column: 28, EndLine: 1, EndColumn: 43}}},
 			{Code: "[...(foo.flat)()]", FileName: "file.js", Output: []string{"(foo.flat)()"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "clone-array", Message: "Unnecessarily cloning an array.", Line: 1, Column: 1, EndLine: 1, EndColumn: 18}}},
@@ -96,7 +96,7 @@ func TestNoUselessSpreadExtrasRuntimeShapes(t *testing.T) {
 			{Code: "new (Set)([...items])", FileName: "file.js", Output: []string{"new (Set)(items)"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array", Message: "`new Set(…)` accepts an iterable as an argument, it's unnecessary to convert to an array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21}}},
 			{Code: "class C extends foo(...[bar]) {}", FileName: "file.js", Output: []string{"class C extends foo(bar) {}"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-list", Message: "Spread an array literal in arguments is unnecessary.", Line: 1, Column: 21, EndLine: 1, EndColumn: 24}}},
 			{Code: "function f(Set) { return new Set([...items]); }", FileName: "file.js", Output: []string{"function f(Set) { return new Set(items); }"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array", Message: "`new Set(…)` accepts an iterable as an argument, it's unnecessary to convert to an array.", Line: 1, Column: 34, EndLine: 1, EndColumn: 44}}},
-			{Code: "Object.assign(target, ({...a, ...b}))", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-object-assign", Message: "`Object.assign(…)` source object with only spread properties is unnecessary.", Line: 1, Column: 25, EndLine: 1, EndColumn: 28, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-object-assign-spread", Output: "Object.assign(target, (a, b))"}}}}},
+			{Code: "Object.assign(target, ({...a, ...b}))", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-object-assign", Message: "`Object.assign(…)` source object with only spread properties is unnecessary.", Line: 1, Column: 25, EndLine: 1, EndColumn: 28, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-object-assign-spread", Output: "Object.assign(target, a, b)"}}}}},
 			{Code: "Object.assign(target, {...a}, ...rest)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-object-assign", Message: "`Object.assign(…)` source object with only spread properties is unnecessary.", Line: 1, Column: 24, EndLine: 1, EndColumn: 27, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-object-assign-spread", Output: "Object.assign(target, a, ...rest)"}}}}},
 			{Code: "foo?.(...[a,,b])", FileName: "file.js", Output: []string{"foo?.(a,undefined,b)"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-list", Message: "Spread an array literal in arguments is unnecessary.", Line: 1, Column: 7, EndLine: 1, EndColumn: 10}}},
 			{Code: "superFn(...[,,a,])", FileName: "file.js", Output: []string{"superFn(undefined,undefined,a)"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-list", Message: "Spread an array literal in arguments is unnecessary.", Line: 1, Column: 9, EndLine: 1, EndColumn: 12}}},
@@ -140,13 +140,13 @@ func TestNoUselessSpreadExtrasTypeScriptAndJSX(t *testing.T) {
 			{Code: "function f(a: Int16Array) { return [...a.map(x => x)]; }", FileName: "file.ts"},
 		},
 		[]rule_tester.InvalidTestCase{
-			{Code: "for (const value of [...fn<string>]);", FileName: "file.ts", Output: []string{"for (const value of (fn<string>));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 21, EndLine: 1, EndColumn: 36}}},
-			{Code: "for (const value of [...<Iterable<string>>items]);", FileName: "file.ts", Output: []string{"for (const value of <Iterable<string>>items);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 21, EndLine: 1, EndColumn: 49}}},
+			{Code: "for (const value of [...fn<string>]);", FileName: "file.ts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 21, EndLine: 1, EndColumn: 36, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for (const value of (fn<string>));"}}}}},
+			{Code: "for (const value of [...<Iterable<string>>items]);", FileName: "file.ts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 21, EndLine: 1, EndColumn: 49, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for (const value of <Iterable<string>>items);"}}}}},
 			{Code: "function f(a: number[]) { return [...a.slice(1)]; }", FileName: "file.ts", Output: []string{"function f(a: number[]) { return a.slice(1); }"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "clone-array", Message: "Unnecessarily cloning an array.", Line: 1, Column: 34, EndLine: 1, EndColumn: 49}}},
 			{Code: "const el = <C values={[...[a]]} />;", FileName: "file.tsx", Output: []string{"const el = <C values={[a]} />;"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-list", Message: "Spread an array literal in array literal is unnecessary.", Line: 1, Column: 24, EndLine: 1, EndColumn: 27}}},
-			{Code: "for(const value of [...items!]);", FileName: "file.ts", Output: []string{"for(const value of items!);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 20, EndLine: 1, EndColumn: 31}}},
-			{Code: "for(const value of [...items as string[]]);", FileName: "file.ts", Output: []string{"for(const value of items as string[]);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 20, EndLine: 1, EndColumn: 42}}},
-			{Code: "for(const value of [...items satisfies Iterable<string>]);", FileName: "file.ts", Output: []string{"for(const value of items satisfies Iterable<string>);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 20, EndLine: 1, EndColumn: 57}}},
+			{Code: "for(const value of [...items!]);", FileName: "file.ts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 20, EndLine: 1, EndColumn: 31, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for(const value of items!);"}}}}},
+			{Code: "for(const value of [...items as string[]]);", FileName: "file.ts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 20, EndLine: 1, EndColumn: 42, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for(const value of items as string[]);"}}}}},
+			{Code: "for(const value of [...items satisfies Iterable<string>]);", FileName: "file.ts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 20, EndLine: 1, EndColumn: 57, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for(const value of items satisfies Iterable<string>);"}}}}},
 		})
 }
 
@@ -157,15 +157,15 @@ func TestNoUselessSpreadExtrasPrecedenceAndConsumers(t *testing.T) {
 			{Code: "[...await Promise.all(...args)]", FileName: "file.js"},
 		},
 		[]rule_tester.InvalidTestCase{
-			{Code: "for(const value of [...a || b]);", FileName: "file.js", Output: []string{"for(const value of (a || b));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 20, EndLine: 1, EndColumn: 31}}},
-			{Code: "for(const value of [...(a || b)]);", FileName: "file.js", Output: []string{"for(const value of (a || b));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 20, EndLine: 1, EndColumn: 33}}},
-			{Code: "for(const value of [...(a, b)]);", FileName: "file.js", Output: []string{"for(const value of (a, b));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 20, EndLine: 1, EndColumn: 31}}},
-			{Code: "async function f(){for(const value of [...await values]);}", FileName: "file.js", Output: []string{"async function f(){for(const value of (await values));}"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 39, EndLine: 1, EndColumn: 56}}},
-			{Code: "function* f(){yield*[...a ? b : c];}", FileName: "file.js", Output: []string{"function* f(){yield*(a ? b : c);}"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-yield-star", Message: "`yield*` can delegate to an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 21, EndLine: 1, EndColumn: 35}}},
-			{Code: "for(const value of [...this]);", FileName: "file.js", Output: []string{"for(const value of this);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 20, EndLine: 1, EndColumn: 29}}},
-			{Code: "for(const value of [...null]);", FileName: "file.js", Output: []string{"for(const value of null);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 20, EndLine: 1, EndColumn: 29}}},
-			{Code: "for(const value of [...`a${b}`]);", FileName: "file.js", Output: []string{"for(const value of `a${b}`);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 20, EndLine: 1, EndColumn: 32}}},
-			{Code: "for(const value of [...{}]);", FileName: "file.js", Output: []string{"for(const value of ({}));"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.", Line: 1, Column: 20, EndLine: 1, EndColumn: 27}}},
+			{Code: "for(const value of [...a || b]);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 20, EndLine: 1, EndColumn: 31, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for(const value of (a || b));"}}}}},
+			{Code: "for(const value of [...(a || b)]);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 20, EndLine: 1, EndColumn: 33, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for(const value of (a || b));"}}}}},
+			{Code: "for(const value of [...(a, b)]);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 20, EndLine: 1, EndColumn: 31, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for(const value of (a, b));"}}}}},
+			{Code: "async function f(){for(const value of [...await values]);}", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 39, EndLine: 1, EndColumn: 56, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "async function f(){for(const value of (await values));}"}}}}},
+			{Code: "function* f(){yield*[...a ? b : c];}", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-yield-star", Message: "`yield*` can delegate directly when materializing the iterable is unnecessary.", Line: 1, Column: 21, EndLine: 1, EndColumn: 35, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "function* f(){yield*(a ? b : c);}"}}}}},
+			{Code: "for(const value of [...this]);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 20, EndLine: 1, EndColumn: 29, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for(const value of this);"}}}}},
+			{Code: "for(const value of [...null]);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 20, EndLine: 1, EndColumn: 29, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for(const value of null);"}}}}},
+			{Code: "for(const value of [...`a${b}`]);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 20, EndLine: 1, EndColumn: 32, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for(const value of `a${b}`);"}}}}},
+			{Code: "for(const value of [...{}]);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 20, EndLine: 1, EndColumn: 27, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "for(const value of ({}));"}}}}},
 			{Code: "Int8Array.from([...items]);", FileName: "file.js", Output: []string{"Int8Array.from(items);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array", Message: "`Int8Array.from(…)` accepts an iterable as an argument, it's unnecessary to convert to an array.", Line: 1, Column: 16, EndLine: 1, EndColumn: 26}}},
 			{Code: "Uint8Array.from([...items]);", FileName: "file.js", Output: []string{"Uint8Array.from(items);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array", Message: "`Uint8Array.from(…)` accepts an iterable as an argument, it's unnecessary to convert to an array.", Line: 1, Column: 17, EndLine: 1, EndColumn: 27}}},
 			{Code: "Uint8ClampedArray.from([...items]);", FileName: "file.js", Output: []string{"Uint8ClampedArray.from(items);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array", Message: "`Uint8ClampedArray.from(…)` accepts an iterable as an argument, it's unnecessary to convert to an array.", Line: 1, Column: 24, EndLine: 1, EndColumn: 34}}},
@@ -178,5 +178,40 @@ func TestNoUselessSpreadExtrasPrecedenceAndConsumers(t *testing.T) {
 			{Code: "Float64Array.from([...items]);", FileName: "file.js", Output: []string{"Float64Array.from(items);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array", Message: "`Float64Array.from(…)` accepts an iterable as an argument, it's unnecessary to convert to an array.", Line: 1, Column: 19, EndLine: 1, EndColumn: 29}}},
 			{Code: "BigInt64Array.from([...items]);", FileName: "file.js", Output: []string{"BigInt64Array.from(items);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array", Message: "`BigInt64Array.from(…)` accepts an iterable as an argument, it's unnecessary to convert to an array.", Line: 1, Column: 20, EndLine: 1, EndColumn: 30}}},
 			{Code: "BigUint64Array.from([...items]);", FileName: "file.js", Output: []string{"BigUint64Array.from(items);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array", Message: "`BigUint64Array.from(…)` accepts an iterable as an argument, it's unnecessary to convert to an array.", Line: 1, Column: 21, EndLine: 1, EndColumn: 31}}},
+		})
+}
+
+// Review regressions preserve runtime behavior where Unicorn 77.0.0 fixes do not.
+func TestNoUselessSpreadExtrasFixSafety(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_useless_spread.NoUselessSpreadRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "const a = null; [...a?.b.flat()];", FileName: "file.js"},
+			{Code: "[...a?.b.flat().concat(other)];", FileName: "file.js"},
+			{Code: "[...(a?.b.flat())];", FileName: "file.js"},
+			{Code: "[...a?.b.flat];", FileName: "file.js"},
+			{Code: "const a=[1,2]; const b=[...a.copyWithin(0,1)]; b[0]=9;", FileName: "file.js"},
+			{Code: "[...[1,2].copyWithin(0,1)];", FileName: "file.js"},
+			{Code: "let count=0; const x={...{get value(){return ++count}}}; [count,x.value,x.value,count];", FileName: "file.js"},
+			{Code: "const x={...{set value(v){consume(v)}}};", FileName: "file.js"},
+			{Code: "const x={...{__proto__:null}};", FileName: "file.js"},
+			{Code: "const x={__proto__:null,...{__proto__:null}};", FileName: "file.js"},
+			{Code: "const x={...{\"__proto__\":null}};", FileName: "file.js"},
+			{Code: "const x={...{\"__pro\\u0074o__\":null}};", FileName: "file.js"},
+			{Code: "const x={__proto__:{value:2},...{value:1,read(){return super.value}}}; x.read();", FileName: "file.js"},
+			{Code: "const x={...{read(){return () => super.value}}};", FileName: "file.js"},
+			{Code: "const x={...{read(value = super.value){return value}}};", FileName: "file.js"},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: "[...(a?.b).flat()];", FileName: "file.js", Output: []string{"(a?.b).flat();"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "clone-array", Message: "Unnecessarily cloning an array.", Line: 1, Column: 1, EndLine: 1, EndColumn: 19}}},
+			{Code: "const x={...{[\"__proto__\"]:null}};", FileName: "file.js", Output: []string{"const x={[\"__proto__\"]:null};"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-list", Message: "Spread an object literal in object literal is unnecessary.", Line: 1, Column: 10, EndLine: 1, EndColumn: 13}}},
+			{Code: "const x={...{__proto__}};", FileName: "file.js", Output: []string{"const x={__proto__};"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-list", Message: "Spread an object literal in object literal is unnecessary.", Line: 1, Column: 10, EndLine: 1, EndColumn: 13}}},
+			{Code: "const x={...{read(){return {read(){return super.value}}}}};", FileName: "file.js", Output: []string{"const x={read(){return {read(){return super.value}}}};"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-list", Message: "Spread an object literal in object literal is unnecessary.", Line: 1, Column: 10, EndLine: 1, EndColumn: 13}}},
+			{Code: "const x={...{read(){return this.value}}};", FileName: "file.js", Output: []string{"const x={read(){return this.value}};"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-list", Message: "Spread an object literal in object literal is unnecessary.", Line: 1, Column: 10, EndLine: 1, EndColumn: 13}}},
+			{Code: "Object.assign(target, (({...a,...b})));", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-object-assign", Message: "`Object.assign(…)` source object with only spread properties is unnecessary.", Line: 1, Column: 26, EndLine: 1, EndColumn: 29, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-object-assign-spread", Output: "Object.assign(target, a, b);"}}}}},
+			{Code: "Object.assign(target, (/* keep */ {...a,...b}));", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-object-assign", Message: "`Object.assign(…)` source object with only spread properties is unnecessary.", Line: 1, Column: 36, EndLine: 1, EndColumn: 39}}},
+			{Code: "Object.assign(target, ({...a,...b} /* keep */));", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-object-assign", Message: "`Object.assign(…)` source object with only spread properties is unnecessary.", Line: 1, Column: 25, EndLine: 1, EndColumn: 28}}},
+			{Code: "Object.assign(target, /** @type {object} */ ({...a,...b}));", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "spread-in-object-assign", Message: "`Object.assign(…)` source object with only spread properties is unnecessary.", Line: 1, Column: 47, EndLine: 1, EndColumn: 50, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-object-assign-spread", Output: "Object.assign(target, /** @type {object} */ a, b);"}}}}},
+			{Code: "const a=[1,2,3]; const seen=[]; for(const x of [...a]) {seen.push(x); a.pop()} seen;", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-for-of", Message: "`for…of` can iterate directly when an array snapshot is not needed.", Line: 1, Column: 48, EndLine: 1, EndColumn: 54, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "const a=[1,2,3]; const seen=[]; for(const x of a) {seen.push(x); a.pop()} seen;"}}}}},
+			{Code: "function* inner(){yield 1;return 42} function* outer(){return yield* [...inner()]}", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "iterable-to-array-in-yield-star", Message: "`yield*` can delegate directly when materializing the iterable is unnecessary.", Line: 1, Column: 70, EndLine: 1, EndColumn: 82, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion/remove-iterable-to-array", Output: "function* inner(){yield 1;return 42} function* outer(){return yield* inner()}"}}}}},
 		})
 }

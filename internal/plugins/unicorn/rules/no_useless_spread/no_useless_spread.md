@@ -50,14 +50,43 @@ Spreading the only argument to a collection constructor, such as
 directly. Cloning `new Array(...)` or calling `.slice()` on a receiver whose
 array type cannot be established also produces a report without a fix.
 
-TypedArray constructors are excluded: `new Uint8Array([...'ab'])` and
+Array conversions passed to TypedArray constructors are allowed: `new Uint8Array([...'ab'])` and
 `new Uint8Array('ab')` have different lengths. This rule assumes dense arrays;
 disable it where sparse arrays are intentional, since spread converts holes
 to `undefined` while some array operations preserve them.
 
 ## Options
 
-This rule has no options.
+This rule has no options. It is enabled at `error` severity in
+`unicornPlugin.configs.recommended`.
+
+## Differences from upstream
+
+Compared with Unicorn v77.0.0, rslint preserves these JavaScript behaviors:
+
+- Spreading `array.copyWithin(...)` is allowed because `copyWithin` returns
+  the original array. The spread creates a separate copy.
+- Object literals containing getters, setters, a non-computed `__proto__`
+  property, or methods using `super` retain their spread. Removing it can
+  change property values, the prototype, or the behavior of those methods.
+- An `Object.assign` suggestion removes surrounding parentheses when expanding
+  multiple sources, so `Object.assign(target, ({ ...a, ...b }))` becomes
+  `Object.assign(target, a, b)`. Comments within the replaced span prevent the
+  suggestion.
+- `for…of` and `yield*` conversions offer manual suggestions instead of
+  automatic fixes. Direct iteration can observe mutations to the original
+  collection; direct delegation can change the generator's return value,
+  side-effect timing, and iterator protocol calls.
+
+For example, keep the snapshot when the loop changes the original array:
+
+```javascript
+const values = [1, 2, 3];
+for (const value of [...values]) {
+  consume(value);
+  values.pop();
+}
+```
 
 ## Original Documentation
 

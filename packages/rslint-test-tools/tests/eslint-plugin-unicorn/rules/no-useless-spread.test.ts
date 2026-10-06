@@ -1,5 +1,6 @@
 // Upstream: https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v77.0.0/test/no-useless-spread.js
-// Includes every upstream case and documentation example. Go tests also assert exact ranges and edits.
+// Includes every upstream case and documentation example, with documented safety differences.
+// Go tests also assert exact ranges and edits.
 import { RuleTester } from '../rule-tester';
 
 const tester = new RuleTester();
@@ -53,6 +54,10 @@ tester.run('no-useless-spread', {} as never, {
     },
     {
       code: 'function a(foo, ...rest) {}',
+      filename: 'src/virtual.js',
+    },
+    {
+      code: '({\n\tget a() {},\n\tset a(v) {},\n\t...{\n\t\tget a() {}\n\t}\n})',
       filename: 'src/virtual.js',
     },
   ],
@@ -898,22 +903,6 @@ tester.run('no-useless-spread', {} as never, {
         },
       ],
       output: '({a:1, a: 2})',
-    },
-    {
-      code: '({\n\tget a() {},\n\tset a(v) {},\n\t...{\n\t\tget a() {}\n\t}\n})',
-      filename: 'src/virtual.js',
-      errors: [
-        {
-          messageId: 'spread-in-list',
-          message: 'Spread an object literal in object literal is unnecessary.',
-          line: 4,
-          column: 2,
-          endLine: 4,
-          endColumn: 5,
-          suggestions: [],
-        },
-      ],
-      output: '({\n\tget a() {},\n\tset a(v) {},\n\t\n\t\tget a() {}\n\t\n})',
     },
     {
       code: '({[a]:1, ...{[a]: 2}})',
@@ -1876,15 +1865,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-for-of',
           message:
-            "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.",
+            '`for…of` can iterate directly when an array snapshot is not needed.',
           line: 1,
           column: 19,
           endLine: 1,
           endColumn: 32,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'for (const foo of iterable);',
+            },
+          ],
         },
       ],
-      output: 'for (const foo of iterable);',
+      output: null,
     },
     {
       code: 'async () => {for await (const foo of [...iterable]);}',
@@ -1893,15 +1887,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-for-of',
           message:
-            "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.",
+            '`for…of` can iterate directly when an array snapshot is not needed.',
           line: 1,
           column: 38,
           endLine: 1,
           endColumn: 51,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'async () => {for await (const foo of iterable);}',
+            },
+          ],
         },
       ],
-      output: 'async () => {for await (const foo of iterable);}',
+      output: null,
     },
     {
       code: 'const map = new Map([...iterable,])',
@@ -1927,15 +1926,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-for-of',
           message:
-            "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.",
+            '`for…of` can iterate directly when an array snapshot is not needed.',
           line: 1,
           column: 19,
           endLine: 1,
           endColumn: 33,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'for (const foo of iterable);',
+            },
+          ],
         },
       ],
-      output: 'for (const foo of iterable);',
+      output: null,
     },
     {
       code: 'const map = new Map([...iterable,],)',
@@ -1978,15 +1982,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-for-of',
           message:
-            "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.",
+            '`for…of` can iterate directly when an array snapshot is not needed.',
           line: 1,
           column: 19,
           endLine: 1,
           endColumn: 38,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'for (const foo of (( iterable )));',
+            },
+          ],
         },
       ],
-      output: 'for (const foo of (( iterable )));',
+      output: null,
     },
     {
       code: 'const map = new Map((( [...(( iterable ))] )))',
@@ -2012,15 +2021,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-for-of',
           message:
-            "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.",
+            '`for…of` can iterate directly when an array snapshot is not needed.',
           line: 1,
           column: 22,
           endLine: 1,
           endColumn: 41,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'for (const foo of (( (( iterable )) )));',
+            },
+          ],
         },
       ],
-      output: 'for (const foo of (( (( iterable )) )));',
+      output: null,
     },
     {
       code: 'for (const foo of[...iterable]);',
@@ -2029,15 +2043,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-for-of',
           message:
-            "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.",
+            '`for…of` can iterate directly when an array snapshot is not needed.',
           line: 1,
           column: 18,
           endLine: 1,
           endColumn: 31,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'for (const foo of iterable);',
+            },
+          ],
         },
       ],
-      output: 'for (const foo of iterable);',
+      output: null,
     },
     {
       code: 'function * fn() {\n\tyield * [...iterable];\n}',
@@ -2046,15 +2065,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-yield-star',
           message:
-            "`yield*` can delegate to an iterable, it's unnecessary to convert to an array.",
+            '`yield*` can delegate directly when materializing the iterable is unnecessary.',
           line: 2,
           column: 10,
           endLine: 2,
           endColumn: 23,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'function * fn() {\n\tyield * iterable;\n}',
+            },
+          ],
         },
       ],
-      output: 'function * fn() {\n\tyield * iterable;\n}',
+      output: null,
     },
     {
       code: 'function * fn() {\n\tyield * [...iterable,];\n}',
@@ -2063,15 +2087,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-yield-star',
           message:
-            "`yield*` can delegate to an iterable, it's unnecessary to convert to an array.",
+            '`yield*` can delegate directly when materializing the iterable is unnecessary.',
           line: 2,
           column: 10,
           endLine: 2,
           endColumn: 24,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'function * fn() {\n\tyield * iterable;\n}',
+            },
+          ],
         },
       ],
-      output: 'function * fn() {\n\tyield * iterable;\n}',
+      output: null,
     },
     {
       code: 'function * fn() {\n\tyield * (( [...iterable] ));\n}',
@@ -2080,15 +2109,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-yield-star',
           message:
-            "`yield*` can delegate to an iterable, it's unnecessary to convert to an array.",
+            '`yield*` can delegate directly when materializing the iterable is unnecessary.',
           line: 2,
           column: 13,
           endLine: 2,
           endColumn: 26,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'function * fn() {\n\tyield * (( iterable ));\n}',
+            },
+          ],
         },
       ],
-      output: 'function * fn() {\n\tyield * (( iterable ));\n}',
+      output: null,
     },
     {
       code: 'function * fn() {\n\tyield * (( [...(( iterable ))] ));\n}',
@@ -2097,15 +2131,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-yield-star',
           message:
-            "`yield*` can delegate to an iterable, it's unnecessary to convert to an array.",
+            '`yield*` can delegate directly when materializing the iterable is unnecessary.',
           line: 2,
           column: 13,
           endLine: 2,
           endColumn: 32,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'function * fn() {\n\tyield * (( (( iterable )) ));\n}',
+            },
+          ],
         },
       ],
-      output: 'function * fn() {\n\tyield * (( (( iterable )) ));\n}',
+      output: null,
     },
   ],
 });
@@ -2225,6 +2264,10 @@ tester.run('no-useless-spread', {} as never, {
       code: '[...Iterator.concat(bar)]',
       filename: 'src/virtual.js',
     },
+    {
+      code: '[...foo.copyWithin(-2)]',
+      filename: 'src/virtual.js',
+    },
   ],
   invalid: [
     {
@@ -2242,22 +2285,6 @@ tester.run('no-useless-spread', {} as never, {
         },
       ],
       output: 'foo.concat(bar)',
-    },
-    {
-      code: '[...foo.copyWithin(-2)]',
-      filename: 'src/virtual.js',
-      errors: [
-        {
-          messageId: 'clone-array',
-          message: 'Unnecessarily cloning an array.',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 24,
-          suggestions: [],
-        },
-      ],
-      output: 'foo.copyWithin(-2)',
     },
     {
       code: '[...foo.flat()]',
@@ -2628,15 +2655,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-for-of',
           message:
-            "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.",
+            '`for…of` can iterate directly when an array snapshot is not needed.',
           line: 1,
           column: 18,
           endLine: 1,
           endColumn: 32,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'for (const foo of iterable2);',
+            },
+          ],
         },
       ],
-      output: 'for (const foo of iterable2);',
+      output: null,
     },
   ],
 });
@@ -2922,15 +2954,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-for-of',
           message:
-            "`for…of` can iterate over an iterable, it's unnecessary to convert to an array.",
+            '`for…of` can iterate directly when an array snapshot is not needed.',
           line: 1,
           column: 19,
           endLine: 1,
           endColumn: 27,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'for (const foo of set);',
+            },
+          ],
         },
       ],
-      output: 'for (const foo of set);',
+      output: null,
     },
     {
       code: 'function * foo() {\n\tyield * [...anotherGenerator()];\n}',
@@ -2939,15 +2976,20 @@ tester.run('no-useless-spread', {} as never, {
         {
           messageId: 'iterable-to-array-in-yield-star',
           message:
-            "`yield*` can delegate to an iterable, it's unnecessary to convert to an array.",
+            '`yield*` can delegate directly when materializing the iterable is unnecessary.',
           line: 2,
           column: 10,
           endLine: 2,
           endColumn: 33,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'suggestion/remove-iterable-to-array',
+              output: 'function * foo() {\n\tyield * anotherGenerator();\n}',
+            },
+          ],
         },
       ],
-      output: 'function * foo() {\n\tyield * anotherGenerator();\n}',
+      output: null,
     },
   ],
 });

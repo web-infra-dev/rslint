@@ -12,7 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-var cloneMethods = []string{"copyWithin", "flat", "slice", "splice", "toReversed", "toSorted", "toSpliced", "with"}
+var cloneMethods = []string{"flat", "slice", "splice", "toReversed", "toSorted", "toSpliced", "with"}
 
 var NoUselessSpreadRule = rule.Rule{
 	Name:   "unicorn/no-useless-spread",
@@ -94,7 +94,7 @@ func checkLiteralSpread(ctx rule.RuleContext, node *ast.Node) {
 	case ast.KindArrayLiteralExpression:
 		parentDescription = "array literal"
 	case ast.KindObjectLiteralExpression:
-		if node.Kind != ast.KindObjectLiteralExpression {
+		if node.Kind != ast.KindObjectLiteralExpression || !canFlattenObject(node) {
 			return
 		}
 		argumentType, parentDescription = "object", "object literal"
@@ -121,6 +121,28 @@ func checkLiteralSpread(ctx rule.RuleContext, node *ast.Node) {
 	})
 }
 
+func canFlattenObject(node *ast.Node) bool {
+	for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
+		switch property.Kind {
+		case ast.KindGetAccessor, ast.KindSetAccessor:
+			// Spread reads accessors and creates data properties on the target.
+			return false
+		case ast.KindPropertyAssignment:
+			name := property.Name()
+			if name.Kind != ast.KindComputedPropertyName && ast.GetPropertyNameForPropertyNameNode(name) == "__proto__" {
+				return false
+			}
+		case ast.KindMethodDeclaration:
+			// Moving a method changes its home object, including super captured
+			// by arrows or used in parameter initializers.
+			if property.SubtreeFacts()&ast.SubtreeContainsLexicalSuper != 0 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func checkObjectAssign(ctx rule.RuleContext, node *ast.Node) {
 	properties := node.AsObjectLiteralExpression().Properties.Nodes
 	if len(properties) == 0 {
@@ -138,8 +160,14 @@ func checkObjectAssign(ctx rule.RuleContext, node *ast.Node) {
 		return
 	}
 	hasTarget := false
+	replacement := node
 	for _, argument := range parent.Arguments() {
 		if utils.ESTreeRuntimeExpression(argument) == node {
+			// Multiple sources must become separate arguments, not a grouped
+			// comma expression. Single sources can retain their parentheses.
+			if len(properties) > 1 {
+				replacement = argument
+			}
 			break
 		}
 		hasTarget = hasTarget || argument.Kind != ast.KindSpreadElement
@@ -152,7 +180,7 @@ func checkObjectAssign(ctx rule.RuleContext, node *ast.Node) {
 		Id:          "spread-in-object-assign",
 		Description: "`Object.assign(…)` source object with only spread properties is unnecessary.",
 	}, func() []rule.RuleSuggestion {
-		objectRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+		objectRange := utils.TrimNodeTextRange(ctx.SourceFile, replacement)
 		if utils.HasCommentInSpan(ctx.Comments.All(), objectRange.Pos(), objectRange.End()) {
 			return nil
 		}
@@ -162,7 +190,7 @@ func checkObjectAssign(ctx rule.RuleContext, node *ast.Node) {
 		}
 		return []rule.RuleSuggestion{{
 			Message:  rule.RuleMessage{Id: "suggestion/remove-object-assign-spread", Description: "Remove the object literal wrapper."},
-			FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, strings.Join(arguments, ", "))},
+			FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, replacement, strings.Join(arguments, ", "))},
 		}}
 	})
 }
@@ -181,10 +209,10 @@ func checkIterableConversion(ctx rule.RuleContext, node *ast.Node) {
 	switch {
 	case parent.Kind == ast.KindForOfStatement && utils.ESTreeRuntimeExpression(parent.AsForInOrOfStatement().Expression) == node:
 		message.Id = "iterable-to-array-in-for-of"
-		message.Description = "`for…of` can iterate over an iterable, it's unnecessary to convert to an array."
+		message.Description = "`for…of` can iterate directly when an array snapshot is not needed."
 	case parent.Kind == ast.KindYieldExpression && parent.AsYieldExpression().AsteriskToken != nil:
 		message.Id = "iterable-to-array-in-yield-star"
-		message.Description = "`yield*` can delegate to an iterable, it's unnecessary to convert to an array."
+		message.Description = "`yield*` can delegate directly when materializing the iterable is unnecessary."
 	default:
 		description := iterableConsumer(parent)
 		if description == "" || utils.ESTreeRuntimeExpression(parent.Arguments()[0]) != node {
@@ -193,6 +221,19 @@ func checkIterableConversion(ctx rule.RuleContext, node *ast.Node) {
 		message.Id = "iterable-to-array"
 		message.Description = "`" + description + "` accepts an iterable as an argument, it's unnecessary to convert to an array."
 		message.Data = map[string]string{"parentDescription": description}
+	}
+	if parent.Kind == ast.KindForOfStatement || parent.Kind == ast.KindYieldExpression {
+		// Iterating directly can change snapshots, side-effect timing and the
+		// generator protocol. Leave that choice to an explicit suggestion.
+		ctx.ReportNodeWithDeferredSuggestions(node, message, func() []rule.RuleSuggestion {
+			return []rule.RuleSuggestion{{
+				Message: rule.RuleMessage{
+					Id: "suggestion/remove-iterable-to-array", Description: "Use the iterable directly.",
+				},
+				FixesArr: unwrapArray(ctx, node),
+			}}
+		})
+		return
 	}
 	ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
 		return unwrapArray(ctx, node)
@@ -223,6 +264,11 @@ func iterableConsumer(node *ast.Node) string {
 }
 
 func checkArrayClone(ctx rule.RuleContext, array, argument *ast.Node) {
+	// ESTree exposes a complete optional chain as a ChainExpression. tsgo
+	// marks every continuation; parentheses ending the chain clear that flag.
+	if ast.IsOptionalChain(argument) {
+		return
+	}
 	call, isMethod := unicornutil.MatchDotMethodCall(argument, unicornutil.DotMethodCallOptions{})
 	method := ""
 	if isMethod {
