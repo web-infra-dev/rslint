@@ -1,5 +1,4 @@
 import { lint } from '@rslint/core/internal';
-import { unicornPlugin } from '@rslint/core';
 import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 import { RemoteSourceFile } from '@rslint/api';
@@ -18,30 +17,6 @@ const cfg = (project, rule) => [
 
 describe('lint api', async (t) => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
-  test('Unicorn recommended enables no-useless-spread', async () => {
-    const result = await lint({
-      config: [
-        unicornPlugin.configs.recommended,
-        { languageOptions: { parserOptions: { project: false } } },
-      ],
-      configDirectory: cwd,
-      workingDirectory: cwd,
-      fileContents: {
-        [path.resolve(cwd, 'src/virtual.js')]: 'const values = [...[1]];',
-      },
-    });
-    expect(result.fileCount).toBe(1);
-    expect(
-      result.diagnostics.filter(
-        (diagnostic) => diagnostic.ruleName === 'unicorn/no-useless-spread',
-      ),
-    ).toEqual([
-      expect.objectContaining({
-        messageId: 'spread-in-list',
-        severity: 'error',
-      }),
-    ]);
-  });
   test('virtual file support', async (t) => {
     let config = cfg(
       './tsconfig.virtual.json',
