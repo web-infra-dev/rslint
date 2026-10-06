@@ -26,9 +26,13 @@ Numeric and unknown arguments are reported without edits. `new Array(3)` creates
 
 ## Options
 
-This rule has no options. It provides automatic fixes and editor suggestions.
+This rule has no options. It provides automatic fixes and editor suggestions and is enabled at `error` severity in `unicornPlugin.configs.recommended`.
 
 ## Differences from upstream
+
+When `Array` refers to a local declaration, parameter, or import, or is disabled through `languageOptions.globals`, rslint reports the diagnostic without a fix or suggestion. This preserves custom constructor behavior, such as setting `result.value` in `new Array('x')`.
+
+Constructors with explicit TypeScript type arguments also receive no fix or suggestion. For example, changing `new Array<string | null>('x')` to `['x']` would infer `string[]` and reject a later `push(null)`. To use a literal while retaining the element type, write `const values: (string | null)[] = ['x'];`.
 
 For built-in objects, functions, and symbols, such as `new Array(Math)`, `new Array(Array)`, or `new Array(Symbol.iterator)`, rslint reports the same diagnostic but does not offer upstream's automatic fix. This also applies to their `typeof` expressions, such as `new Array(typeof Array)`.
 

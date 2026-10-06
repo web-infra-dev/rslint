@@ -398,6 +398,7 @@ describe('defineConfig and config presets', () => {
       'error',
     );
     expect(rec.rules?.['unicorn/no-array-reverse']).toBe('error');
+    expect(rec.rules?.['unicorn/no-new-array']).toBe('error');
     expect(rec.rules?.['unicorn/no-useless-error-capture-stack-trace']).toBe(
       'error',
     );
@@ -412,6 +413,27 @@ describe('defineConfig and config presets', () => {
     expect(rec.rules?.['unicorn/require-post-message-target-origin']).toBe(
       'off',
     );
+  });
+
+  test('unicornPlugin.configs.recommended reports single-argument array constructors', async () => {
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig([unicornPlugin.configs.recommended]),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'array-constructor-preset.js')]: 'new Array(1);',
+      },
+    });
+
+    expect(result.fileCount).toBe(1);
+    expect(result.diagnostics).toMatchObject([
+      {
+        ruleName: 'unicorn/no-new-array',
+        messageId: 'error',
+        severity: 'error',
+      },
+    ]);
   });
 
   test('unicornPlugin.configs.recommended reports and fixes Unicode escapes', async () => {

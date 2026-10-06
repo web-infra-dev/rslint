@@ -28,6 +28,10 @@ var NoNewArrayRule = rule.Rule{
 				}
 				nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
 				buildFix := func() []rule.RuleFix {
+					// Unlike upstream, preserve the explicitly declared element type.
+					if construction.TypeArguments != nil && len(construction.TypeArguments.Nodes) > 0 {
+						return nil
+					}
 					// Replacing the whole constructor must not discard comments.
 					if utils.HasCommentInSpan(ctx.Comments.All(), nodeRange.Pos(), nodeRange.End()) {
 						return nil
@@ -47,6 +51,10 @@ var NoNewArrayRule = rule.Rule{
 						}
 					}
 
+					// A same-named custom constructor can have unrelated behavior.
+					if !ctx.Globals.Access("Array").IsDeclared() || !unicornutil.IsGlobalReference(ctx, callee) {
+						return nil
+					}
 					text := utils.TrimmedNodeText(ctx.SourceFile, argument)
 					if ast.IsParenthesizedExpression(node.Arguments()[0]) {
 						text = "(" + text + ")"
