@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	"github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed no_unused_vars.schema.json
@@ -60,6 +61,7 @@ type analysisContext struct {
 	fallbackInfos      map[*ast.Symbol]referenceInfo
 	fallbackCandidates map[string][]*ast.Node
 	heritageReferences map[*ast.Symbol][]*ast.Node
+	signatureUsedTypes map[*ast.Node]bool
 	jsxScanned         bool
 	globalSourceFile   bool
 	declarationFile    bool
@@ -844,7 +846,8 @@ func isParameterInWithoutBodyDeclaration(node *ast.Node) bool {
 // by typescript-eslint's UnusedVarsVisitor. Identifiers anywhere in a function
 // type signature parameter are marked as used; identifiers in the return type
 // are not. The bodyless function cases correspond to TSDeclareFunction and
-// TSEmptyBodyFunctionExpression in typescript-estree.
+// TSEmptyBodyFunctionExpression in typescript-estree. Setters use the same
+// parameter visitor, even when they have a body.
 func isUsedInFunctionTypeSignatureParameter(node *ast.Node) bool {
 	for current := node; current != nil; current = current.Parent {
 		if current.Kind != ast.KindParameter {
@@ -861,13 +864,60 @@ func isUsedInFunctionTypeSignatureParameter(node *ast.Node) bool {
 			ast.KindConstructSignature,
 			ast.KindMethodSignature:
 			return true
-		case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
-			return owner.Body() == nil
-		default:
-			return false
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
+			ast.KindMethodDeclaration, ast.KindConstructor:
+			if owner.Body() == nil {
+				return true
+			}
+		case ast.KindSetAccessor:
+			return true
 		}
 	}
 	return false
+}
+
+// markSignatureTypeParameters mirrors UnusedVarsVisitor's name-based marking.
+// Its pattern visitor traverses every identifier in a signature parameter,
+// including infer declarations, property names, and named tuple labels.
+func markSignatureTypeParameters(ctx rule.RuleContext, parameters, typeParameters []*ast.Node) map[*ast.Node]bool {
+	if len(parameters) == 0 || len(typeParameters) == 0 {
+		return nil
+	}
+	names := make(map[string]bool, len(typeParameters))
+	for _, parameter := range typeParameters {
+		names[parameter.Name().Text()] = true
+	}
+	var manager *scope.Manager
+	var used map[*ast.Node]bool
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if ast.IsIdentifier(node) && names[node.Text()] {
+			if manager == nil {
+				manager = scopeanalysis.Declarations(ctx)
+				used = make(map[*ast.Node]bool)
+			}
+			// The first lexical binding can shadow an infer binding in an
+			// enclosing conditional, even when node declares that inference.
+			for current := manager.Acquire(node); current != nil; current = current.Parent {
+				declarations := current.Declarations(node.Text())
+				if len(declarations) == 0 {
+					continue
+				}
+				for _, declaration := range declarations {
+					if declaration.Kind == scope.DefTypeParameter {
+						used[declaration.DefNode] = true
+					}
+				}
+				break
+			}
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	for _, parameter := range parameters {
+		visit(parameter)
+	}
+	return used
 }
 
 // isInsideAmbientModuleBlock checks if the node is inside an ambient (declare)
@@ -2174,7 +2224,18 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		allDecls = sym.Declarations
 	}
 
-	if implicitJSXReference(ctx, name, definition, ac) != nil {
+	implicitlyUsed := false
+	if definition != nil && definition.Kind == ast.KindTypeParameter {
+		// Mapped-type keys are also marked as used by UnusedVarsVisitor.
+		implicitlyUsed = definition.Parent != nil && definition.Parent.Kind == ast.KindMappedType
+		for _, declaration := range allDecls {
+			if ac.signatureUsedTypes[declaration] {
+				implicitlyUsed = true
+				break
+			}
+		}
+	}
+	if implicitlyUsed || implicitJSXReference(ctx, name, definition, ac) != nil {
 		varInfo.Used = true
 	} else {
 		hasUsage := false
@@ -2321,6 +2382,8 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 		exportsCollected := false
 
 		var seenWithoutBodyFuncSymbols map[*ast.Symbol]bool
+		var typeParameters []*ast.Node
+		var signatureParameters []*ast.Node
 
 		ensureCollected := func(node *ast.Node) {
 			if !exportsCollected {
@@ -2375,6 +2438,16 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 		}
 
 		return rule.RuleListeners{
+			rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
+				// Signature parameters can mark an earlier type parameter as used,
+				// including a repeated infer binding or a shadowing generic.
+				ac.signatureUsedTypes = markSignatureTypeParameters(ctx, signatureParameters, typeParameters)
+				for _, node := range typeParameters {
+					ensureCollected(node)
+					nameNode := node.Name()
+					processVariable(ctx, nameNode, nameNode.Text(), node, &opts, ac)
+				}
+			},
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				varDecl := node.AsVariableDeclaration()
 				if varDecl == nil {
@@ -2570,6 +2643,11 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				if paramDecl == nil {
 					return
 				}
+				// An outer signature parameter already includes nested signatures;
+				// collect each subtree once, regardless of nesting depth.
+				if isUsedInFunctionTypeSignatureParameter(node) && !isUsedInFunctionTypeSignatureParameter(node.Parent) {
+					signatureParameters = append(signatureParameters, node)
+				}
 
 				if isParameterInWithoutBodyDeclaration(node) {
 					return
@@ -2670,15 +2748,18 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 
 			ast.KindTypeParameter: func(node *ast.Node) {
 				// Generic type parameter declarations: `<T>`, `<T = unknown>`, `<T extends U>`.
-				// Skip nodes that syntactically share KindTypeParameter in tsgo but the
-				// TypeScript rule intentionally treats as used: mapped-type `[P in K]`
-				// bindings and JSDoc @template metadata. `infer T` remains an ordinary
-				// scope variable and is checked.
+				// JSDoc templates do not introduce upstream scope variables. Mapped
+				// keys are always used, but still participate in reportUsedIgnorePattern.
+				// `infer T` remains an ordinary scope variable and is checked.
 				parent := node.Parent
 				if parent != nil {
 					switch parent.Kind {
-					case ast.KindMappedType, ast.KindJSDocTemplateTag:
+					case ast.KindJSDocTemplateTag:
 						return
+					case ast.KindMappedType:
+						if !opts.ReportUsedIgnorePattern {
+							return
+						}
 					}
 				}
 				if isInsideAmbientModuleBlock(node, ac) || isInDtsWithoutExplicitExports(node, ac) {
@@ -2692,12 +2773,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				if nameNode == nil || !ast.IsIdentifier(nameNode) {
 					return
 				}
-				identifier := nameNode.AsIdentifier()
-				if identifier == nil {
-					return
-				}
-				ensureCollected(node)
-				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
+				typeParameters = append(typeParameters, node)
 			},
 		}
 	},

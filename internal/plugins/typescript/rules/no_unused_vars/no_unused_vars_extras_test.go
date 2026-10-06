@@ -285,6 +285,186 @@ export interface MethodSignature { method(): typeof methodSignatureReturn; }`,
 	)
 }
 
+func TestNoUnusedVarsSignatureTypeParameters(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnusedVarsRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `export type Result<T> = T extends (...args: infer _Args) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends (...args: infer Args) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends (value: infer Args) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends (value?: infer Args) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends (...args: [infer Args]) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends (value: Array<infer Args>) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends (...args: infer Args extends unknown[]) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends new (...args: infer Args) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends abstract new (...args: infer Args) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends { (...args: infer Args): infer R } ? R : never;`},
+			{Code: `export type Result<T> = T extends { new (...args: infer Args): infer R } ? R : never;`},
+			{Code: `export type Result<T> = T extends { method(...args: infer Args): infer R } ? R : never;`},
+			// The whole parameter is visited, including nested signatures and their returns.
+			{Code: `export type Result<T> = T extends (callback: () => infer Args) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends (callback: (value: infer Args) => void) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends (value: { property: infer Args }) => infer R ? R : never;`},
+			{Code: `export type Result<T> = T extends (value: (unknown extends infer Args ? unknown : never)) => infer R ? R : never;`},
+			// Repeated inferences share a binding, even when its first declaration is a return.
+			{Code: `export type Result<T> = T extends { (): infer Args; (...args: infer Args): infer R } ? R : never;`},
+			{Code: `export type Result<T> = T extends (one: infer Args, two: infer Args) => infer R ? R : never;`},
+			{Code: `export type Result = (callback: <Unused>() => void) => void;`},
+			{Code: `export declare function run<T>(value: T extends infer U ? unknown : never): void;`},
+			{Code: `export abstract class A<T> { abstract run(value: T extends infer U ? unknown : never): void; }`},
+			{Code: `export class A<T> { run(value: T extends infer U ? unknown : never): void; run(value: unknown): void { console.log(value); } }`},
+			{Code: `export class A<T> { constructor(value: T extends infer U ? unknown : never); constructor(value: unknown) { console.log(value); } }`},
+			{Code: `export class A<T> { set value(value: T extends infer U ? unknown : never) {} }`},
+			{Code: `export type Result<T> = (value: { [key: string]: T extends infer U ? unknown : never }) => void;`},
+			{Code: `export type Result<T> = ({ value }: { value: T extends infer U ? unknown : never }) => void;`},
+			{Code: `export type Result<T> = (value: T extends infer U ? unknown : never) => value is never;`},
+			// Upstream also visits names that are not TypeScript references.
+			{Code: `export type Result<T> = T extends (arg: { U: unknown }) => infer U ? true : false;`},
+			{Code: `export type Result<T> = T extends (...arg: [U: unknown]) => infer U ? true : false;`},
+			{Code: `export type Result<U> = (arg: { U: unknown }) => void;`},
+			{Code: `export type Result<U> = (...arg: [U: unknown]) => void;`},
+			{Code: `export type Result<T> = T extends (arg: { [K in string]: infer U }) => void ? true : false;`},
+			{Code: `export type Result<T> = T extends (arg: (unknown extends string ? never : infer U)) => void ? true : false;`},
+			{Code: `export type Result<T> = T extends (arg: (unknown extends infer U ? U : never)) => void ? true : false;`},
+			{Code: `export type Result<T> = T extends (arg: { [U: string]: infer U }) => void ? true : false;`},
+			{Code: `export type Result<T> = T extends { (): infer U; <U>(arg: infer U): void; (arg: infer U): void } ? true : false;`},
+			{Code: `export type Result<T> = (arg: <U extends T>() => void) => void;`},
+			{Code: `export type Result<T> = (arg: () => (T extends infer U ? unknown : never)) => void;`},
+			{Code: `export function run<T>(): (arg: T extends infer U ? unknown : never) => void { return () => {}; }`},
+			{Code: `const value = 1; export abstract class A { abstract run(arg: typeof value): void; }`},
+			{Code: `const value = 1; export class A { constructor(arg: typeof value); constructor(arg: number) { console.log(arg); } }`},
+			{Code: `const value = 1; export class A { set value(arg: typeof value) {} }`},
+			{Code: `const value = 1; export type Result = (arg: { [key: string]: typeof value }) => void;`},
+			{
+				Code:    `export type Result<T> = T extends (...args: infer _Args) => infer R ? R : never;`,
+				Options: map[string]interface{}{"argsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `export type Result<T> = T extends (...args: infer Args) => infer R ? Args : never;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 66}},
+			},
+			{
+				Code:   `export type Result<T> = T extends Array<infer U> ? true : false;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 47}},
+			},
+			{
+				Code:   `export type Result<T> = T extends [infer U] ? true : false;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 42}},
+			},
+			{
+				Code:   `export type Result<T> = T extends { value: infer U } ? true : false;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 50}},
+			},
+			{
+				Code:   `export type Result<T> = T extends { [key: string]: infer U } ? true : false;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 58}},
+			},
+			{
+				Code:   `const _Unused = 1; export {};`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 7}},
+			},
+			{
+				Code:   `export type Result = <Unused>() => void;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 23}},
+			},
+			// A declaration in one scope must not mark a same-named binding in another.
+			{
+				Code:   `export type Result<Unused> = (callback: <Unused>() => void) => void;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 20}},
+			},
+			{
+				Code:   `export type Result<T, Args> = T extends (...args: infer Args) => infer R ? R : never;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 23}},
+			},
+			{
+				Code:   `export type Result<T> = [T extends (...args: infer U) => infer R ? R : never, T extends Array<infer U> ? true : false];`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 101}},
+			},
+			{
+				Code:   `export type Result<T> = T extends (arg: <U>(x: U) => infer U) => infer R ? R : never;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 60}},
+			},
+			{
+				Code:   `export declare function run<T>(value: T): T extends infer U ? unknown : never;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 59}},
+			},
+			{
+				Code:   `export function run<T>(value: T extends infer U ? unknown : never): void { console.log(value); }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 47}},
+			},
+			{
+				Code:   `export type Result<T> = T extends <U>(arg: infer U) => void ? true : false;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 50}},
+			},
+			{
+				Code:   `export type Result<T> = T extends (U: infer U) => void ? true : false;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 45}},
+			},
+			{
+				Code:   `export type Result<T> = T extends (...Args: infer Args) => void ? true : false;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 51}},
+			},
+			{
+				Code:   `export type Result<T> = T extends (U: unknown) => infer U ? true : false;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 57}},
+			},
+			{
+				Code:   `export type Result<U> = () => { U: unknown };`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 20}},
+			},
+			{
+				Code:   `export type Result<U> = () => [U: unknown];`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 20}},
+			},
+			{
+				Code:   `export type Result<T> = T extends { (): infer U; <U>(arg: infer U): void } ? true : false;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 47}},
+			},
+			{
+				Code:   `export type Result<T> = T extends (arg: { [U in string]: infer U }) => void ? true : false;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 64}},
+			},
+			{
+				Code:   `export type Result<T> = T extends (arg: { [U in string]: <U>() => infer U }) => void ? true : false;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 73}},
+			},
+			{
+				Code:    `export type Result<U> = (arg: { U: unknown }) => void;`,
+				Options: map[string]interface{}{"varsIgnorePattern": "^U$", "reportUsedIgnorePattern": true},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar", Line: 1, Column: 20}},
+			},
+			{
+				Code:    `export type Result<T> = T extends (arg: { [U in string]: infer U }) => void ? true : false;`,
+				Options: map[string]interface{}{"varsIgnorePattern": "^U$", "reportUsedIgnorePattern": true},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar", Line: 1, Column: 44}},
+			},
+			{
+				Code:    `export type Result<T> = T extends (arg: { [U in string]: <U>() => infer U }) => void ? true : false;`,
+				Options: map[string]interface{}{"varsIgnorePattern": "^U$", "reportUsedIgnorePattern": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "usedIgnoredVar", Line: 1, Column: 44},
+					{MessageId: "usedIgnoredVar", Line: 1, Column: 59},
+				},
+			},
+			{
+				Code:    `export type Result<T> = T extends (...args: infer _Args) => infer R ? R : never;`,
+				Options: map[string]interface{}{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "usedIgnoredVar",
+					Message:   "'_Args' is marked as ignored but is used. Used vars must not match /^_/u.",
+					Line:      1,
+					Column:    51,
+				}},
+			},
+		},
+	)
+}
+
 func TestNoUnusedVarsReportsWriteFromDeclarationScope(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
