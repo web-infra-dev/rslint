@@ -61,7 +61,7 @@ type analysisContext struct {
 	fallbackInfos      map[*ast.Symbol]referenceInfo
 	fallbackCandidates map[string][]*ast.Node
 	heritageReferences map[*ast.Symbol][]*ast.Node
-	signatureUsedTypes map[*ast.Node]bool
+	signatureUsage     *signatureTypeUsage
 	jsxScanned         bool
 	globalSourceFile   bool
 	declarationFile    bool
@@ -918,6 +918,28 @@ func markSignatureTypeParameters(ctx rule.RuleContext, parameters, typeParameter
 		visit(parameter)
 	}
 	return used
+}
+
+type signatureTypeUsage struct {
+	parameters     []*ast.Node
+	typeParameters []*ast.Node
+	used           map[*ast.Node]bool
+}
+
+func (usage *signatureTypeUsage) isUsed(ctx rule.RuleContext, declarations []*ast.Node) bool {
+	if usage.parameters != nil {
+		usage.used = markSignatureTypeParameters(ctx, usage.parameters, usage.typeParameters)
+		// Clear the inputs even when no binding was marked, so the analysis
+		// runs only once and releases the slices after its first consumer.
+		usage.parameters = nil
+		usage.typeParameters = nil
+	}
+	for _, declaration := range declarations {
+		if usage.used[declaration] {
+			return true
+		}
+	}
+	return false
 }
 
 // isInsideAmbientModuleBlock checks if the node is inside an ambient (declare)
@@ -2228,12 +2250,6 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	if definition != nil && definition.Kind == ast.KindTypeParameter {
 		// Mapped-type keys are also marked as used by UnusedVarsVisitor.
 		implicitlyUsed = definition.Parent != nil && definition.Parent.Kind == ast.KindMappedType
-		for _, declaration := range allDecls {
-			if ac.signatureUsedTypes[declaration] {
-				implicitlyUsed = true
-				break
-			}
-		}
 	}
 	if implicitlyUsed || implicitJSXReference(ctx, name, definition, ac) != nil {
 		varInfo.Used = true
@@ -2286,6 +2302,13 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	if isTypeOrImportDeclaration && varInfo.OnlyUsedAsType {
 		varInfo.Used = true
 		varInfo.OnlyUsedAsType = false
+	}
+	// A real reference already proves that a type parameter is used, including
+	// for reportUsedIgnorePattern. Build the signature scope graph only when
+	// implicit marking can still change that conclusion.
+	if !varInfo.Used && definition != nil && definition.Kind == ast.KindTypeParameter &&
+		ac.signatureUsage != nil && ac.signatureUsage.isUsed(ctx, allDecls) {
+		varInfo.Used = true
 	}
 
 	// A used variable cannot produce a diagnostic unless the caller asks to
@@ -2441,7 +2464,12 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 			rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
 				// Signature parameters can mark an earlier type parameter as used,
 				// including a repeated infer binding or a shadowing generic.
-				ac.signatureUsedTypes = markSignatureTypeParameters(ctx, signatureParameters, typeParameters)
+				if len(signatureParameters) != 0 && len(typeParameters) != 0 {
+					ac.signatureUsage = &signatureTypeUsage{
+						parameters:     signatureParameters,
+						typeParameters: typeParameters,
+					}
+				}
 				for _, node := range typeParameters {
 					ensureCollected(node)
 					nameNode := node.Name()

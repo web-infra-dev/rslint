@@ -339,6 +339,11 @@ func TestNoUnusedVarsSignatureTypeParameters(t *testing.T) {
 			{Code: `const value = 1; export class A { set value(arg: typeof value) {} }`},
 			{Code: `const value = 1; export type Result = (arg: { [key: string]: typeof value }) => void;`},
 			{
+				Code: `export interface Used<T> { consume(value: T): T; }
+export type Result<T> = T extends (...args: infer Args) => infer R ? R : never;
+export type PropertyName<U> = (value: { U: unknown }) => void;`,
+			},
+			{
 				Code:    `export type Result<T> = T extends (...args: infer _Args) => infer R ? R : never;`,
 				Options: map[string]interface{}{"argsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
 			},
@@ -437,6 +442,24 @@ func TestNoUnusedVarsSignatureTypeParameters(t *testing.T) {
 				Code:    `export type Result<U> = (arg: { U: unknown }) => void;`,
 				Options: map[string]interface{}{"varsIgnorePattern": "^U$", "reportUsedIgnorePattern": true},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar", Line: 1, Column: 20}},
+			},
+			{
+				Code: `export interface Used<_T> { consume(value: _T): _T; }
+export type Result<T> = T extends (...args: infer _Args) => infer R ? R : never;`,
+				Options: map[string]interface{}{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "usedIgnoredVar", Line: 1, Column: 23},
+					{MessageId: "usedIgnoredVar", Line: 2, Column: 51},
+				},
+			},
+			{
+				Code: `export type Unused<T> = number;
+export type Result<T> = T extends (...args: infer Args) => infer R ? R : never;
+export type UnusedAgain<T> = number;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Line: 1, Column: 20},
+					{MessageId: "unusedVar", Line: 3, Column: 25},
+				},
 			},
 			{
 				Code:    `export type Result<T> = T extends (arg: { [U in string]: infer U }) => void ? true : false;`,
