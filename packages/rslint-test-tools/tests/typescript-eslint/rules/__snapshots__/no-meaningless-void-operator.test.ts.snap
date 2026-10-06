@@ -1,0 +1,92 @@
+// Rstest Snapshot v1
+
+exports[`no-meaningless-void-operator > invalid 1`] = `
+{
+  "code": "void (() => {})();",
+  "diagnostics": [
+    {
+      "message": "void operator shouldn't be used on void; it should convey that a return value is being ignored",
+      "messageId": "meaninglessVoidOperator",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-meaningless-void-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "(() => {})();",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-meaningless-void-operator > invalid 2`] = `
+{
+  "code": "
+function foo() {}
+void foo();
+      ",
+  "diagnostics": [
+    {
+      "message": "void operator shouldn't be used on void; it should convey that a return value is being ignored",
+      "messageId": "meaninglessVoidOperator",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-meaningless-void-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo() {}
+foo();
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-meaningless-void-operator > invalid 3`] = `
+{
+  "code": "
+function bar(x: never) {
+  void x;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "void operator shouldn't be used on never; it should convey that a return value is being ignored",
+      "messageId": "meaninglessVoidOperator",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-meaningless-void-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;

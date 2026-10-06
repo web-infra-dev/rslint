@@ -465,7 +465,7 @@ define.test({
     './tests/typescript-eslint/rules/no-loop-func.test.ts',
     // './tests/typescript-eslint/rules/no-loss-of-precision.test.ts',
     './tests/typescript-eslint/rules/no-magic-numbers.test.ts',
-    // './tests/typescript-eslint/rules/no-meaningless-void-operator.test.ts',
+    './tests/typescript-eslint/rules/no-meaningless-void-operator.test.ts',
     './tests/typescript-eslint/rules/no-misused-new.test.ts',
     './tests/typescript-eslint/rules/no-misused-promises.test.ts',
     // './tests/typescript-eslint/rules/no-misused-spread.test.ts',

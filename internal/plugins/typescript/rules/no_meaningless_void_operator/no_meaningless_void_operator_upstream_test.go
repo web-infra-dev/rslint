@@ -29,7 +29,7 @@ function bar(x: never) {
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code:   "void (() => {})();",
-			Output: []string{" (() => {})();"},
+			Output: []string{"(() => {})();"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "meaninglessVoidOperator",
@@ -45,7 +45,7 @@ void foo();
       `,
 			Output: []string{`
 function foo() {}
- foo();
+foo();
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -73,7 +73,7 @@ function bar(x: never) {
 							MessageId: "removeVoid",
 							Output: `
 function bar(x: never) {
-   x;
+  x;
 }
       `,
 						},

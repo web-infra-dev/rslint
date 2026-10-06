@@ -54,22 +54,29 @@ var NoMeaninglessVoidOperatorRule = rule.CreateRule(rule.Rule{
 				arg := node.AsVoidExpression().Expression
 				argType := ctx.TypeChecker.GetTypeAtLocation(arg)
 
-				mask := checker.TypeFlagsVoidLike | checker.TypeFlagsNever
-
-				for _, t := range utils.UnionTypeParts(argType) {
-					mask &= checker.Type_flags(t)
+				unionParts := utils.UnionTypeParts(argType)
+				isVoidLike := utils.Every(unionParts, func(t *checker.Type) bool {
+					return utils.IsTypeFlagSet(t, checker.TypeFlagsVoidLike)
+				})
+				if !isVoidLike && (!opts.CheckNever || !utils.Every(unionParts, func(t *checker.Type) bool {
+					return utils.IsTypeFlagSet(t, checker.TypeFlagsVoidLike|checker.TypeFlagsNever)
+				})) {
+					return
 				}
 
-				fixRemoveVoidKeyword := func() rule.RuleFix {
-					return rule.RuleFixRemoveRange(utils.TrimNodeTextRange(ctx.SourceFile, node).WithEnd(arg.Pos()))
+				reportRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+				message := buildMeaninglessVoidOperatorMessage(ctx.TypeChecker.TypeToString(argType))
+				buildFixes := func() []rule.RuleFix {
+					return []rule.RuleFix{rule.RuleFixRemoveRange(reportRange.WithEnd(utils.TrimNodeTextRange(ctx.SourceFile, arg).Pos()))}
 				}
-
-				if mask&checker.TypeFlagsVoidLike != 0 {
-					ctx.ReportNodeWithFixes(node, buildMeaninglessVoidOperatorMessage(ctx.TypeChecker.TypeToString(argType)), fixRemoveVoidKeyword())
-				} else if opts.CheckNever && mask&checker.TypeFlagsNever != 0 {
-					ctx.ReportNodeWithSuggestions(node, buildMeaninglessVoidOperatorMessage(ctx.TypeChecker.TypeToString(argType)), rule.RuleSuggestion{
-						Message:  buildRemoveVoidMessage(),
-						FixesArr: []rule.RuleFix{fixRemoveVoidKeyword()},
+				if isVoidLike {
+					ctx.ReportRangeWithDeferredFixes(reportRange, message, buildFixes)
+				} else {
+					ctx.ReportRangeWithDeferredSuggestions(reportRange, message, func() []rule.RuleSuggestion {
+						return []rule.RuleSuggestion{{
+							Message:  buildRemoveVoidMessage(),
+							FixesArr: buildFixes(),
+						}}
 					})
 				}
 			},
