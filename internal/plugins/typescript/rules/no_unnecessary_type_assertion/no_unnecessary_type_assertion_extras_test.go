@@ -266,6 +266,96 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 	)
 }
 
+func TestNoUnnecessaryTypeAssertionIndexSignatures(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnnecessaryTypeAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+declare const config: { field?: boolean } | undefined;
+export const value = (config as Record<string, unknown> | undefined)?.field;
+`},
+			{Code: `declare const value: { field?: boolean } | undefined; const result = (value as Record<string, unknown> | undefined)?.extra;`},
+			{Code: `
+declare const config: { field?: boolean } | null;
+export const value = (<Record<string, unknown> | null>config)?.field;
+`},
+			{Code: `
+declare const config: { field?: boolean } | null | undefined;
+export const value = (config as Record<string, unknown> | null | undefined)?.field;
+`},
+			{Code: `declare const value: { field?: boolean }; const result = value as { field?: boolean; [key: string]: unknown };`},
+			{Code: `declare const value: {}; const result = (value as { [key: number]: unknown })[0];`},
+			{Code: `declare const key: unique symbol; declare const value: {}; const result = (value as { [key: symbol]: unknown })[key];`},
+			{Code: "declare const value: {}; const result = (value as { [key: `data-${string}`]: unknown })['data-x'];"},
+			{Code: `declare const value: {}; const result = value as { readonly [key: string]: unknown };`},
+			{Code: `declare const value: Record<string, unknown> | undefined; const result = value as {} | undefined;`},
+			{Code: `
+declare const config: { field?: boolean } | undefined;
+declare function identity<T>(value: T): T;
+const result = identity(config as Record<string, unknown> | undefined);
+`},
+			{Code: `declare const value: { field?: boolean } | undefined; const result = value as unknown as Record<string, unknown> | undefined;`},
+			{
+				Code:     `declare const value: { field?: boolean } | undefined; const result = value as Record<string, unknown> | undefined;`,
+				TSConfig: "tsconfig.exactOptionalPropertyTypes.json",
+			},
+			{
+				Code:     `declare const value: { field?: boolean } | undefined; const result = value as Record<string, unknown> | undefined;`,
+				TSConfig: "tsconfig.noUncheckedIndexedAccess.json",
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+interface Config { field?: boolean; [key: string]: unknown }
+declare const config: Config | undefined;
+export const value = (config as Record<string, unknown> | undefined)?.field;
+`,
+				Output: []string{`
+interface Config { field?: boolean; [key: string]: unknown }
+declare const config: Config | undefined;
+export const value = (config)?.field;
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const value: Record<string, unknown> | null; const result = <Record<string, unknown> | null>value;`,
+				Output: []string{`declare const value: Record<string, unknown> | null; const result = value;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const value: { field?: boolean } | undefined; const result = value as { field?: boolean } | undefined;`,
+				Output: []string{`declare const value: { field?: boolean } | undefined; const result = value;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const value: { [key: string]: unknown }; const result = value as { [key: string]: unknown };`,
+				Output: []string{`declare const value: { [key: string]: unknown }; const result = value;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:     `declare const value: Record<string, unknown> | undefined; const result = value as Record<string, unknown> | undefined;`,
+				Output:   []string{`declare const value: Record<string, unknown> | undefined; const result = value;`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+				TSConfig: "tsconfig.exactOptionalPropertyTypes.json",
+			},
+			{
+				Code:   `declare const value: { field?: boolean }; const result: Record<string, unknown> = value as Record<string, unknown>;`,
+				Output: []string{`declare const value: { field?: boolean }; const result: Record<string, unknown> = value;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			},
+			{
+				Code:   `declare const value: { field?: boolean }; declare function consume(value: Record<string, unknown>): void; consume(value as Record<string, unknown>);`,
+				Output: []string{`declare const value: { field?: boolean }; declare function consume(value: Record<string, unknown>): void; consume(value);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			},
+		},
+	)
+}
+
 func TestNoUnnecessaryTypeAssertionInferenceGuards(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),

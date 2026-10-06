@@ -812,7 +812,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			}
 
 			if (utils.IsTypeFlagSetWithUnion(uncast, checker.TypeFlagsNonPrimitive) && !utils.IsTypeFlagSetWithUnion(cast, checker.TypeFlagsNonPrimitive)) ||
-				(assertionHasIndexSignature(ctx.TypeChecker, uncast) && !assertionHasIndexSignature(ctx.TypeChecker, cast)) ||
+				assertionHasIndexSignature(ctx.TypeChecker, uncast) != assertionHasIndexSignature(ctx.TypeChecker, cast) ||
 				assertionTypeContainsAny(ctx.TypeChecker, uncast) ||
 				assertionTypeContainsAny(ctx.TypeChecker, cast) ||
 				(assertionTypeContainsTypeVariable(ctx.TypeChecker, cast) && !assertionTypeContainsTypeVariable(ctx.TypeChecker, uncast)) {
