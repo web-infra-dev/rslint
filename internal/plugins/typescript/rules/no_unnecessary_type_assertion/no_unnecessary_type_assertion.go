@@ -331,10 +331,17 @@ func assertionHasGenericCallSignature(typeChecker *checker.Checker, t *checker.T
 
 func assertionIsInGenericContext(ctx rule.RuleContext, node *ast.Node) bool {
 	seenFunction := false
-	for current := assertionWalkUpParentheses(node).Parent; current != nil; current = current.Parent {
+	for child := assertionWalkUpParentheses(node); child.Parent != nil; child = child.Parent {
+		current := child.Parent
 		switch current.Kind {
 		case ast.KindFunctionDeclaration:
 			return false
+		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+			// ESTree wraps method parameters and bodies in a function expression.
+			// Computed names and decorators remain in the enclosing context.
+			if child == current.Body() || ast.IsParameterDeclaration(child) {
+				return false
+			}
 		case ast.KindFunctionExpression, ast.KindArrowFunction:
 			if ast.IsBlock(current.Body()) || seenFunction {
 				return false
@@ -622,18 +629,20 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 		opts := parseOptions(options)
 
 		sourceText := ctx.SourceFile.Text()
-		var fixScanner *scanner.Scanner
+		// Match TrimNodeTextRange's scanner setup while sharing the scanner
+		// across diagnostic ranges and synchronously materialized fixes.
+		var tokenScanner *scanner.Scanner
 		getTokenRange := func(pos int) core.TextRange {
-			if fixScanner == nil {
-				fixScanner = scanner.NewScanner()
+			if tokenScanner == nil {
+				tokenScanner = scanner.NewScanner()
 			} else {
-				fixScanner.Reset()
+				tokenScanner.Reset()
 			}
-			fixScanner.SetText(sourceText)
-			fixScanner.SetLanguageVariant(ctx.SourceFile.LanguageVariant)
-			fixScanner.ResetPos(pos)
-			fixScanner.Scan()
-			return fixScanner.TokenRange()
+			tokenScanner.SetText(sourceText)
+			tokenScanner.SetLanguageVariant(ctx.SourceFile.LanguageVariant)
+			tokenScanner.ResetPos(pos)
+			tokenScanner.Scan()
+			return tokenScanner.TokenRange()
 		}
 
 		compilerOptions := ctx.Program().Options()
@@ -905,7 +914,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			expression := node.Expression()
 			uncastType := getUncastType(node)
 			reportAssertion := func(msg rule.RuleMessage) {
-				ctx.ReportNodeWithDeferredFixes(node, msg, func() []rule.RuleFix {
+				ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), msg, func() []rule.RuleFix {
 					if node.Kind == ast.KindAsExpression {
 						asKeywordRange := getTokenRange(expression.End())
 						startPos := ecmascript.SkipTrailingWhitespace(sourceText, expression.End(), asKeywordRange.Pos())
@@ -951,7 +960,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				if msg.Id == "" {
 					return
 				}
-				ctx.ReportNodeWithDeferredFixes(node, msg, func() []rule.RuleFix {
+				ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), msg, func() []rule.RuleFix {
 					originalRange := utils.TrimNodeTextRange(ctx.SourceFile, originalExpression)
 					replacement := sourceText[originalRange.Pos():originalRange.End()]
 					semanticNode := assertionWalkUpParentheses(node)
@@ -1024,7 +1033,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 
 				if ast.IsAssignmentExpression(node.Parent, true) {
 					if node.Parent.AsBinaryExpression().Left == node {
-						ctx.ReportNodeWithDeferredFixes(node, buildContextuallyUnnecessaryMessage(), buildRemoveExclamationFix)
+						ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), buildContextuallyUnnecessaryMessage(), buildRemoveExclamationFix)
 					}
 					// for all other = assignments we ignore non-null checks
 					// this is because non-null assertions can change the type-flow of the code
@@ -1050,7 +1059,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 						if isPossiblyUsedBeforeAssigned(expression, expressionIdentifierInfo.declaration, nil) {
 							return
 						}
-						ctx.ReportNodeWithDeferredFixes(node, buildUnnecessaryAssertionMessage(), buildRemoveExclamationFix)
+						ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), buildUnnecessaryAssertionMessage(), buildRemoveExclamationFix)
 						return
 					}
 				}
@@ -1070,7 +1079,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 							return
 						}
 					}
-					ctx.ReportNodeWithDeferredFixes(node, buildUnnecessaryAssertionMessage(), buildRemoveExclamationFix)
+					ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), buildUnnecessaryAssertionMessage(), buildRemoveExclamationFix)
 				} else {
 					// we know it's a nullable type
 					// so figure out if the variable is used in a place that accepts nullable types
@@ -1103,7 +1112,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 						isValidVoid := !typeIncludesVoid || contextualTypeIncludesVoid
 
 						if isValidUndefined && isValidNull && isValidVoid {
-							ctx.ReportNodeWithDeferredFixes(node, buildContextuallyUnnecessaryMessage(), buildRemoveExclamationFix)
+							ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), buildContextuallyUnnecessaryMessage(), buildRemoveExclamationFix)
 						}
 					}
 				}
