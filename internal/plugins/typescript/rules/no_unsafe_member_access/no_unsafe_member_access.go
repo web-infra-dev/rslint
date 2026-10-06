@@ -106,6 +106,11 @@ var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
 			if opts.allowOptionalChaining && ast.IsOptionalChainRoot(node) {
 				object := ast.SkipParentheses(node.Expression())
 				if ast.IsAccessExpression(object) {
+					// Reuse checked chains before recursing, without adding a cache
+					// lookup for optional accesses with no member receiver.
+					if cachedState, ok := stateCache[node]; ok {
+						return cachedState
+					}
 					// ESLint sorts diagnostics by source position. Checking the optional
 					// link's receiver first preserves that order in rslint's
 					// streaming reporter without changing the cached state.
@@ -184,6 +189,15 @@ var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
 				}
 			},
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
+				if ast.IsJsxTagName(node) {
+					// tsgo represents JSXMemberExpression names as property accesses.
+					// Cache the whole tag before traversal reaches its inner links;
+					// runtime expressions in attributes and children remain separate.
+					for member := node; ast.IsPropertyAccessExpression(member); member = member.Expression() {
+						stateCache[member] = stateSafe
+					}
+					return
+				}
 				checkMemberExpression(node)
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
