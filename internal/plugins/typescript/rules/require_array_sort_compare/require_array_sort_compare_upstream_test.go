@@ -7,7 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestRequireArraySortCompareRule(t *testing.T) {
+func TestRequireArraySortCompareUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &RequireArraySortCompareRule, []rule_tester.ValidTestCase{
 		{Code: `
       function f(a: any[]) {

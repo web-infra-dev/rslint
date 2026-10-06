@@ -64,14 +64,14 @@ var RequireArraySortCompareRule = rule.CreateRule(rule.Rule{
 
 				if opts.IgnoreStringArrays && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, calleeObjType) {
 					if utils.Every(checker.Checker_getTypeArguments(ctx.TypeChecker, calleeObjType), func(t *checker.Type) bool {
-						return utils.IsTypeFlagSet(t, checker.TypeFlagsString)
+						return utils.GetTypeName(ctx.TypeChecker, t) == "string"
 					}) {
 						return
 					}
 				}
 
 				if utils.Every(utils.UnionTypeParts(calleeObjType), func(t *checker.Type) bool {
-					return checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t)
+					return checker.Checker_isArrayType(ctx.TypeChecker, t)
 				}) {
 					ctx.ReportNode(node, buildRequireCompareMessage())
 				}
