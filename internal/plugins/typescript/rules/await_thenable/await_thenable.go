@@ -108,11 +108,13 @@ var AwaitThenableRule = rule.CreateRule(rule.Rule{
 				certainty := utils.NeedsToBeAwaited(ctx.TypeChecker, awaitArgument, awaitArgumentType)
 
 				if certainty == utils.TypeAwaitableNever {
-					ctx.ReportNodeWithSuggestions(node, buildAwaitMessage(), rule.RuleSuggestion{
-						Message: buildRemoveAwaitMessage(),
-						FixesArr: []rule.RuleFix{
-							rule.RuleFixRemoveRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())),
-						},
+					ctx.ReportNodeWithDeferredSuggestions(node, buildAwaitMessage(), func() []rule.RuleSuggestion {
+						return []rule.RuleSuggestion{{
+							Message: buildRemoveAwaitMessage(),
+							FixesArr: []rule.RuleFix{
+								rule.RuleFixRemoveRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())),
+							},
+						}}
 					})
 				}
 			},
@@ -133,16 +135,18 @@ var AwaitThenableRule = rule.CreateRule(rule.Rule{
 					}
 				}
 
-				ctx.ReportRangeWithSuggestions(
+				ctx.ReportRangeWithDeferredSuggestions(
 					utils.GetForStatementHeadLoc(ctx.SourceFile, node),
 					buildForAwaitOfNonAsyncIterableMessage(),
 					// Note that this suggestion causes broken code for sync iterables
 					// of promises, since the loop variable is not awaited.
-					rule.RuleSuggestion{
-						Message: buildConvertToOrdinaryForMessage(),
-						FixesArr: []rule.RuleFix{
-							rule.RuleFixRemove(ctx.SourceFile, stmt.AwaitModifier),
-						},
+					func() []rule.RuleSuggestion {
+						return []rule.RuleSuggestion{{
+							Message: buildConvertToOrdinaryForMessage(),
+							FixesArr: []rule.RuleFix{
+								rule.RuleFixRemove(ctx.SourceFile, stmt.AwaitModifier),
+							},
+						}}
 					},
 				)
 			},
@@ -169,20 +173,21 @@ var AwaitThenableRule = rule.CreateRule(rule.Rule{
 						}
 					}
 
-					var suggestions []rule.RuleSuggestion
 					// let the user figure out what to do if there's
 					// await using a = b, c = d, e = f;
 					// it's rare and not worth the complexity to handle.
-					if len(declaration.Declarations.Nodes) == 1 {
-						suggestions = append(suggestions, rule.RuleSuggestion{
+					if len(declaration.Declarations.Nodes) != 1 {
+						ctx.ReportNode(init, buildAwaitUsingOfNonAsyncDisposableMessage())
+						continue
+					}
+					ctx.ReportNodeWithDeferredSuggestions(init, buildAwaitUsingOfNonAsyncDisposableMessage(), func() []rule.RuleSuggestion {
+						return []rule.RuleSuggestion{{
 							Message: buildRemoveAwaitMessage(),
 							FixesArr: []rule.RuleFix{
 								rule.RuleFixRemoveRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())),
 							},
-						})
-					}
-
-					ctx.ReportNodeWithSuggestions(init, buildAwaitUsingOfNonAsyncDisposableMessage(), suggestions...)
+						}}
+					})
 				}
 			},
 		}
