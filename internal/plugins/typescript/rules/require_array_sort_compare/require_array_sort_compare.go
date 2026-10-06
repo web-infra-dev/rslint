@@ -62,19 +62,26 @@ var RequireArraySortCompareRule = rule.CreateRule(rule.Rule{
 
 				calleeObjType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, callee.Expression())
 
-				if opts.IgnoreStringArrays && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, calleeObjType) {
+				isArray := checker.Checker_isArrayType(ctx.TypeChecker, calleeObjType)
+				if !isArray && !utils.Every(utils.UnionTypeParts(calleeObjType), func(t *checker.Type) bool {
+					return checker.Checker_isArrayType(ctx.TypeChecker, t)
+				}) {
+					return
+				}
+
+				if opts.IgnoreStringArrays && isArray {
 					if utils.Every(checker.Checker_getTypeArguments(ctx.TypeChecker, calleeObjType), func(t *checker.Type) bool {
-						return utils.IsTypeFlagSet(t, checker.TypeFlagsString)
+						// Numeric types cannot be strings; avoid printing their type names.
+						if utils.IsTypeFlagSet(t, checker.TypeFlagsNumberLike) {
+							return false
+						}
+						return utils.GetTypeName(ctx.TypeChecker, t) == "string"
 					}) {
 						return
 					}
 				}
 
-				if utils.Every(utils.UnionTypeParts(calleeObjType), func(t *checker.Type) bool {
-					return checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t)
-				}) {
-					ctx.ReportNode(node, buildRequireCompareMessage())
-				}
+				ctx.ReportNode(node, buildRequireCompareMessage())
 			},
 		}
 	},
