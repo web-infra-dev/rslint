@@ -1,9 +1,14 @@
 package no_meaningless_void_operator
 
 import (
+	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -76,6 +81,97 @@ func TestNoMeaninglessVoidOperatorUnionTypes(t *testing.T) {
 			}
 			rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoMeaninglessVoidOperatorRule, valid, invalid)
 		})
+	}
+}
+
+func TestNoMeaninglessVoidOperatorEditDemand(t *testing.T) {
+	const ruleName = "@typescript-eslint/no-meaningless-void-operator"
+	for _, test := range []struct {
+		name        string
+		declaration string
+		expression  string
+		operand     string
+		typeName    string
+		suggestion  bool
+	}{
+		{"union", "declare const call: (() => void) | undefined;", "void /* remove */ (/* keep */ call?.())", "(/* keep */ call?.())", "void | undefined", false},
+		{"never", "declare function fail(): never;", "void // remove\n\t(fail())", "(fail())", "never", true},
+	} {
+		for _, suppression := range []struct {
+			name   string
+			prefix string
+		}{
+			{"enabled", ""},
+			{"line", "// eslint-disable-next-line " + ruleName + "\n"},
+			{"block", "/* eslint-disable " + ruleName + " */\n"},
+		} {
+			t.Run(test.name+"/"+suppression.name, func(t *testing.T) {
+				code := test.declaration + "\n" + suppression.prefix + test.expression + ";"
+				helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+				program, file, err := helper.CreateTestProgram(code, "void-edit-demand.ts", "tsconfig.json")
+				if err != nil {
+					t.Fatal(err)
+				}
+				typeChecker, release := program.GetTypeChecker(t.Context())
+				defer release()
+				options := rule_tester.ResolveTestCaseOptions(t, &NoMeaninglessVoidOperatorRule, map[string]any{"checkNever": true})
+				for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
+					var diagnostics []rule.RuleDiagnostic
+					comments := rule.NewCommentStore(file)
+					ctx := (rule.RuleContext{
+						SourceFile:     file,
+						TypeChecker:    typeChecker,
+						Comments:       comments,
+						DisableManager: rule.NewDisableManager(file, comments),
+					}).WithDiagnosticConsumer(ruleName, rule.SeverityWarning, rule.DiagnosticConsumer{
+						Demand: demand,
+						Report: func(diagnostic rule.RuleDiagnostic) { diagnostics = append(diagnostics, diagnostic) },
+					})
+					listener := NoMeaninglessVoidOperatorRule.Run(ctx, options)[ast.KindVoidExpression]
+					var visit func(*ast.Node) bool
+					visit = func(node *ast.Node) bool {
+						if node.Kind == ast.KindVoidExpression {
+							listener(node)
+						}
+						return node.ForEachChild(visit)
+					}
+					file.AsNode().ForEachChild(visit)
+					if suppression.prefix != "" {
+						if len(diagnostics) != 0 {
+							t.Fatalf("demand %d: suppressed diagnostic was reported", demand)
+						}
+						continue
+					}
+					if len(diagnostics) != 1 {
+						t.Fatalf("demand %d: got %d diagnostics, want 1", demand, len(diagnostics))
+					}
+					diagnostic := diagnostics[0]
+					start := strings.Index(code, test.expression)
+					if diagnostic.Range != core.NewTextRange(start, start+len(test.expression)) ||
+						diagnostic.Message.Id != "meaninglessVoidOperator" ||
+						diagnostic.Message.Description != "void operator shouldn't be used on "+test.typeName+"; it should convey that a return value is being ignored" ||
+						diagnostic.RuleName != ruleName || diagnostic.Severity != rule.SeverityWarning {
+						t.Fatalf("demand %d: unexpected diagnostic: %#v", demand, diagnostic)
+					}
+					wantFixes := []rule.RuleFix{{Range: core.NewTextRange(start, start+strings.Index(test.expression, test.operand))}}
+					if !test.suggestion && demand&rule.EditDemandAutofix != 0 {
+						if diagnostic.FixesPtr == nil || !reflect.DeepEqual(*diagnostic.FixesPtr, wantFixes) {
+							t.Fatalf("demand %d: unexpected fixes: %#v", demand, diagnostic.FixesPtr)
+						}
+					} else if diagnostic.FixesPtr != nil {
+						t.Fatalf("demand %d: unexpected autofix", demand)
+					}
+					if test.suggestion && demand&rule.EditDemandSuggestion != 0 {
+						want := []rule.RuleSuggestion{{Message: rule.RuleMessage{Id: "removeVoid", Description: "Remove 'void'"}, FixesArr: wantFixes}}
+						if diagnostic.Suggestions == nil || !reflect.DeepEqual(*diagnostic.Suggestions, want) {
+							t.Fatalf("demand %d: unexpected suggestions: %#v", demand, diagnostic.Suggestions)
+						}
+					} else if diagnostic.Suggestions != nil {
+						t.Fatalf("demand %d: unexpected suggestions", demand)
+					}
+				}
+			})
+		}
 	}
 }
 

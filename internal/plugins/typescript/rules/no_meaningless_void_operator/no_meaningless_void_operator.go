@@ -55,21 +55,28 @@ var NoMeaninglessVoidOperatorRule = rule.CreateRule(rule.Rule{
 				argType := ctx.TypeChecker.GetTypeAtLocation(arg)
 
 				unionParts := utils.UnionTypeParts(argType)
-
-				fixRemoveVoidKeyword := func() rule.RuleFix {
-					return rule.RuleFixRemoveRange(utils.TrimNodeTextRange(ctx.SourceFile, node).WithEnd(utils.TrimNodeTextRange(ctx.SourceFile, arg).Pos()))
+				isVoidLike := utils.Every(unionParts, func(t *checker.Type) bool {
+					return utils.IsTypeFlagSet(t, checker.TypeFlagsVoidLike)
+				})
+				if !isVoidLike && (!opts.CheckNever || !utils.Every(unionParts, func(t *checker.Type) bool {
+					return utils.IsTypeFlagSet(t, checker.TypeFlagsVoidLike|checker.TypeFlagsNever)
+				})) {
+					return
 				}
 
-				if utils.Every(unionParts, func(t *checker.Type) bool {
-					return utils.IsTypeFlagSet(t, checker.TypeFlagsVoidLike)
-				}) {
-					ctx.ReportNodeWithFixes(node, buildMeaninglessVoidOperatorMessage(ctx.TypeChecker.TypeToString(argType)), fixRemoveVoidKeyword())
-				} else if opts.CheckNever && utils.Every(unionParts, func(t *checker.Type) bool {
-					return utils.IsTypeFlagSet(t, checker.TypeFlagsVoidLike|checker.TypeFlagsNever)
-				}) {
-					ctx.ReportNodeWithSuggestions(node, buildMeaninglessVoidOperatorMessage(ctx.TypeChecker.TypeToString(argType)), rule.RuleSuggestion{
-						Message:  buildRemoveVoidMessage(),
-						FixesArr: []rule.RuleFix{fixRemoveVoidKeyword()},
+				reportRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+				message := buildMeaninglessVoidOperatorMessage(ctx.TypeChecker.TypeToString(argType))
+				buildFixes := func() []rule.RuleFix {
+					return []rule.RuleFix{rule.RuleFixRemoveRange(reportRange.WithEnd(utils.TrimNodeTextRange(ctx.SourceFile, arg).Pos()))}
+				}
+				if isVoidLike {
+					ctx.ReportRangeWithDeferredFixes(reportRange, message, buildFixes)
+				} else {
+					ctx.ReportRangeWithDeferredSuggestions(reportRange, message, func() []rule.RuleSuggestion {
+						return []rule.RuleSuggestion{{
+							Message:  buildRemoveVoidMessage(),
+							FixesArr: buildFixes(),
+						}}
 					})
 				}
 			},
