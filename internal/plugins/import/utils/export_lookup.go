@@ -119,11 +119,17 @@ func (builder *exportBuilder) findExport(link exportLink, name string, settings 
 }
 
 // HasDefaultExport resolves moduleSpecifier from ctx.SourceFile and reports
-// whether the resolved module has a statically visible default export. The
+// whether eslint-plugin-import exposes a default for this import, including
+// the fallback from an explicitly enabled esModuleInterop option. The
 // second result is false when no export map is available, matching
 // eslint-plugin-import's "imports == null" branch.
 func HasDefaultExport(ctx rule.RuleContext, moduleSpecifier *ast.Node) (bool, bool) {
-	return HasExport(ctx, moduleSpecifier, defaultExportName)
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+		return false, false
+	}
+	builder := newExportBuilder(IndexFor(ctx), ctx.Program())
+	builder.defaultImport = true
+	return hasExport(ctx.SourceFile, moduleSpecifier, defaultExportName, builder)
 }
 
 // HasExport resolves moduleSpecifier from ctx.SourceFile and reports whether
@@ -149,7 +155,7 @@ func hasExport(origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName str
 	if link.Target == nil {
 		return false, false
 	}
-	if exportName == defaultExportName && link.NodeDefault {
+	if exportName == defaultExportName && link.NodeDefault && !builder.defaultImport {
 		return true, true
 	}
 	return sourceFileHasExport(link.Target, exportName, builder)
@@ -167,10 +173,31 @@ func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.Sour
 }
 
 func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder *exportBuilder) (bool, bool) {
-	if sourceFile == nil || !ast.IsExternalModule(sourceFile) {
+	if sourceFile == nil {
 		return false, false
 	}
-	if exportName == defaultExportName && sourceFile.IsDeclarationFile && builder.index.localExportsOf(builder.program(), sourceFile).ImplicitDefault {
+	if builder.defaultImport {
+		info := builder.index.defaultImportInfoOf(builder.program(), sourceFile)
+		if !info.available {
+			return false, false
+		}
+		if exportName == defaultExportName && info.syntheticDefault {
+			return true, true
+		}
+	}
+	// Upstream builds export maps for authored module declarations or runtime
+	// dynamic imports. A compiler-forced module marker or import.meta alone
+	// does not make CommonJS exports statically visible.
+	indicator := sourceFile.ExternalModuleIndicator
+	if indicator == nil || !ast.IsExternalModuleIndicator(indicator) {
+		// The parser flag also covers import types and can survive incremental
+		// edits, so confirm that a runtime import remains in the syntax tree.
+		if sourceFile.AsNode().Flags&ast.NodeFlagsPossiblyContainsDynamicImport == 0 ||
+			sourceFile.SubtreeFacts()&ast.SubtreeContainsDynamicImport == 0 {
+			return false, false
+		}
+	}
+	if !builder.defaultImport && exportName == defaultExportName && sourceFile.IsDeclarationFile && builder.index.localExportsOf(builder.program(), sourceFile).ImplicitDefault {
 		return true, true
 	}
 
@@ -200,7 +227,11 @@ func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder 
 
 		switch stmt.Kind {
 		case ast.KindExportAssignment:
-			if exportName == defaultExportName && exportAssignmentHasDefault(builder.program(), sourceFile, stmt.AsExportAssignment()) {
+			interop := compilerOptionsESModuleInterop(builder.program())
+			if builder.defaultImport {
+				interop = explicitESModuleInterop(builder.program())
+			}
+			if exportName == defaultExportName && exportAssignmentHasDefaultWithInterop(sourceFile, stmt.AsExportAssignment(), interop) {
 				return true, true
 			}
 		case ast.KindExportDeclaration:
@@ -240,6 +271,10 @@ func exportedDeclarationHasName(stmt *ast.Node, exportName string) bool {
 }
 
 func exportAssignmentHasDefault(sourceProgram *program.Program, sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment) bool {
+	return exportAssignmentHasDefaultWithInterop(sourceFile, exportAssignment, compilerOptionsESModuleInterop(sourceProgram))
+}
+
+func exportAssignmentHasDefaultWithInterop(sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment, interop bool) bool {
 	if exportAssignment == nil {
 		return false
 	}
@@ -261,7 +296,7 @@ func exportAssignmentHasDefault(sourceProgram *program.Program, sourceFile *ast.
 	if kind != exportAssignmentLocalDeclarationModule {
 		return true
 	}
-	return compilerOptionsESModuleInterop(sourceProgram)
+	return interop
 }
 
 // exportAssignmentReferencedIdentifier returns the identifier an expression

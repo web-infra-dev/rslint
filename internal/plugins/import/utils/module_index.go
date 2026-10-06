@@ -25,7 +25,8 @@ import (
 type ModuleIndex struct {
 	settings *ModuleSettings
 
-	exports rslint_utils.LazyMap[*ast.SourceFile, *localExports]
+	exports        rslint_utils.LazyMap[*ast.SourceFile, *localExports]
+	defaultImports rslint_utils.LazyMap[*ast.SourceFile, defaultImportInfo]
 
 	mu sync.Mutex
 	// exportMaps holds the fully merged export maps that turned out not to

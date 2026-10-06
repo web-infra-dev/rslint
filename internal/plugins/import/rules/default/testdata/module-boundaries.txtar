@@ -1,0 +1,120 @@
+Default-import lookups require authored module syntax or a runtime dynamic import.
+Compiler-forced module markers and import.meta alone do not establish an export map.
+
+-- tsconfig.json --
+{"compilerOptions":{"target":"es2022","module":"esnext","moduleResolution":"bundler","strict":true,"allowJs":true,"checkJs":false,"noEmit":true,"skipLibCheck":true,"types":[],"esModuleInterop":false,"allowSyntheticDefaultImports":false,"moduleDetection":"auto"},"include":["**/*"]}
+-- tsconfig.legacy.json --
+{"extends":"./tsconfig.json","compilerOptions":{"moduleDetection":"legacy"}}
+-- tsconfig.force.json --
+{"extends":"./tsconfig.json","compilerOptions":{"moduleDetection":"force"}}
+-- tsconfig.interop.json --
+{"extends":"./tsconfig.json","compilerOptions":{"esModuleInterop":true,"allowSyntheticDefaultImports":true}}
+-- tsconfig.legacy-interop.json --
+{"extends":"./tsconfig.interop.json","compilerOptions":{"moduleDetection":"legacy"}}
+-- tsconfig.force-interop.json --
+{"extends":"./tsconfig.interop.json","compilerOptions":{"moduleDetection":"force"}}
+-- tsconfig.node.json --
+{"extends":"./tsconfig.json","compilerOptions":{"module":"nodenext","moduleResolution":"nodenext"}}
+-- tsconfig.node-interop.json --
+{"extends":"./tsconfig.node.json","compilerOptions":{"esModuleInterop":true,"allowSyntheticDefaultImports":true}}
+-- consumer.ts --
+export {};
+-- common.cjs --
+module.exports = function value() { return 1; };
+-- object.cjs --
+module.exports = { named: 1 };
+-- properties.cjs --
+exports.named = 1;
+exports.__esModule = true;
+-- common.js --
+module.exports = 1;
+-- empty.cjs --
+// No imports or exports.
+-- decoys.cjs --
+// export default 1; import('./named.mjs');
+module.exports = "export const named = 1; import('./named.mjs');";
+-- meta.mjs --
+console.log(import.meta.url);
+-- default.mjs --
+export default 1;
+-- named.mjs --
+export const named = 1;
+-- mixed.cjs --
+export const named = 1;
+module.exports = 1;
+-- import-binding.cjs --
+import value from './default.mjs';
+module.exports = value;
+-- spaced-import.cjs --
+module.exports = import ('./named.mjs');
+-- comment-import.cjs --
+module.exports = import/* comment */('./named.mjs');
+-- comment-export.cjs --
+// export const fake = 1
+import './default.mjs';
+-- comment-trigger.cjs --
+// ; export const fake = 1
+import './default.mjs';
+-- non-js-space.cjs --
+//export fake
+import './default.mjs';
+-- import-alias.cts --
+import name = require('./named.mjs');
+-- import-alias-export.cts --
+import name = require('./named.mjs');
+export const named = 1;
+-- reexport-import-only.mjs --
+export { missing as default } from './import-only.cjs';
+-- empty.mjs --
+export {};
+-- local-list.mjs --
+const named = 1;
+export { named };
+-- remote-list.mjs --
+export { named } from './named.mjs';
+-- namespace.mjs --
+export * as names from './named.mjs';
+-- broken-default-local.mjs --
+export { missing as default } from './named.mjs';
+export const named = 2;
+-- unicode-space.mjs --
+export const named = 1;
+-- unicode-line.mjs --
+/* lead */ export const named = 1;
+-- type-export.ts --
+export interface Named {}
+-- empty-namespace.cts --
+declare namespace Empty {}
+export = Empty;
+-- named.cts --
+export const named = 1;
+-- declared.d.cts --
+export declare const named: number;
+-- remote-default.mjs --
+export { default } from './named.mjs';
+-- import-only.cjs --
+import './default.mjs';
+-- meta-named.mjs --
+console.log(import.meta.url);
+export const named = 1;
+-- common-barrel.mjs --
+export { default } from './common.cjs';
+-- named-common-barrel.mjs --
+export { named as default } from './object.cjs';
+-- common-star.mjs --
+export * from './common.cjs';
+-- missing-barrel.mjs --
+export { missing as default } from './named.mjs';
+-- dynamic.cjs --
+module.exports = 1;
+import('./named.mjs');
+-- nested-dynamic.cjs --
+module.exports = () => import('./missing.mjs');
+-- computed-dynamic.cjs --
+module.exports = name => import(name);
+-- type-query.ts --
+type Query = typeof import('./named.mjs');
+-- jsdoc.cjs --
+/** @type {import('./named.mjs')} */
+const value = {};
+module.exports = value;
