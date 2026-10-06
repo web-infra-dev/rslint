@@ -14,6 +14,34 @@ import (
 // no_unsafe_member_access_upstream_test.go.
 func TestNoUnsafeMemberAccessExtras(t *testing.T) {
 	valid := []rule_tester.ValidTestCase{
+		// JSX tag names are JSXMemberExpression nodes in ESTree, not runtime member accesses.
+		{
+			Code: `declare const Context: any;
+const view = <Context.Provider></Context.Provider>;`,
+			Tsx: true,
+		},
+		// Self-closing JSX tags have the same exclusion.
+		{
+			Code: `declare const Context: any;
+const view = <Context.Provider />;`,
+			Tsx: true,
+		},
+		// Every link in nested JSX tag names is excluded.
+		{
+			Code: `declare const Context: any;
+const view = <Context.A.B.C><Context.D.E /></Context.A.B.C>;`,
+			Tsx: true,
+		},
+		// An any-typed intermediate tag component is also excluded.
+		{
+			Code: `declare const Typed: { Provider: any }; const view = <Typed.Provider.Nested></Typed.Provider.Nested>;`,
+			Tsx:  true,
+		},
+		// Typed JSX components remain valid.
+		{
+			Code: `declare const Typed: { Provider: (props: {}) => null }; const view = <Typed.Provider />;`,
+			Tsx:  true,
+		},
 		// ---- Real-user: typescript-eslint#3292 ----
 		// Nested namespace heritage accesses are excluded at every depth.
 		{Code: `
@@ -72,6 +100,145 @@ function empty() {}
 	}
 
 	invalid := []rule_tester.InvalidTestCase{
+		// Runtime members before, inside, and after JSX retain their exact diagnostics.
+		{
+			Code: `declare const Context: any;
+Context.before; const view = <Context.Provider prop={Context.inside}>{Context.child}</Context.Provider>; Context.after;`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .before on an `any` value.",
+					Line:      2, Column: 9, EndLine: 2, EndColumn: 15,
+				},
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .inside on an `any` value.",
+					Line:      2, Column: 62, EndLine: 2, EndColumn: 68,
+				},
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .child on an `any` value.",
+					Line:      2, Column: 79, EndLine: 2, EndColumn: 84,
+				},
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .after on an `any` value.",
+					Line:      2, Column: 114, EndLine: 2, EndColumn: 119,
+				},
+			},
+		},
+		// Computed keys and spread attributes still contain ordinary member expressions.
+		{
+			Code: `declare const Context: any;
+declare const key: any;
+declare const safe: { [key: string]: unknown };
+const view = <Context.Provider prop={Context.field} keyValue={safe[key]} {...Context.props} />;`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .field on an `any` value.",
+					Line:      4, Column: 46, EndLine: 4, EndColumn: 51,
+				},
+				{
+					MessageId: "unsafeComputedMemberAccess",
+					Message:   "Computed name [key] resolves to an `any` value.",
+					Line:      4, Column: 68, EndLine: 4, EndColumn: 71,
+				},
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .props on an `any` value.",
+					Line:      4, Column: 86, EndLine: 4, EndColumn: 91,
+				},
+			},
+		},
+		// Nested JSX in an attribute must not suppress surrounding runtime expressions.
+		{
+			Code: `declare const Context: any;
+const view = <Context.Provider prop={<Context.Inner prop={Context.field} />}>{Context.child}</Context.Provider>;`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .field on an `any` value.",
+					Line:      2, Column: 67, EndLine: 2, EndColumn: 72,
+				},
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .child on an `any` value.",
+					Line:      2, Column: 87, EndLine: 2, EndColumn: 92,
+				},
+			},
+		},
+		// JSX this tags are excluded without suppressing this expressions in attributes or children.
+		{
+			Code:     `function render(this: any) { return <this.Provider.Inner prop={this.field}>{this.child}</this.Provider.Inner>; }`,
+			Tsx:      true,
+			TSConfig: "tsconfig.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .field on an `any` value.",
+					Line:      1, Column: 69, EndLine: 1, EndColumn: 74,
+				},
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .child on an `any` value.",
+					Line:      1, Column: 82, EndLine: 1, EndColumn: 87,
+				},
+			},
+		},
+		// Allowed optional links still end suppression at ordinary members and parenthesized boundaries.
+		{
+			Code: `declare const Context: any;
+const view = <Context.Provider prop={Context?.field.inner}>{(Context?.other).field}</Context.Provider>;`,
+			Tsx:     true,
+			Options: map[string]any{"allowOptionalChaining": true},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .inner on an `any` value.",
+					Line:      2, Column: 53, EndLine: 2, EndColumn: 58,
+				},
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .field on an `any` value.",
+					Line:      2, Column: 78, EndLine: 2, EndColumn: 83,
+				},
+			},
+		},
+		// A line directive suppresses its runtime access, not the following expression.
+		{
+			Code: `declare const Context: any;
+// eslint-disable-next-line test
+const view = <Context.Provider prop={Context.field} />;
+Context.after;`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .after on an `any` value.",
+					Line:      4, Column: 9, EndLine: 4, EndColumn: 14,
+				},
+			},
+		},
+		// Block directives around JSX retain their ordinary member-access scope.
+		{
+			Code: `declare const Context: any;
+/* eslint-disable test */
+const view = <Context.Provider prop={Context.field} />;
+/* eslint-enable test */
+Context.after;`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeMemberExpression",
+					Message:   "Unsafe member access .after on an `any` value.",
+					Line:      5, Column: 9, EndLine: 5, EndColumn: 14,
+				},
+			},
+		},
 		// Locks in exact text and selection for all six upstream message IDs.
 		{
 			Code: `declare const value: any;
