@@ -141,8 +141,7 @@ func TestNoUnsafeArgumentES5ArrayConstraintSpread(t *testing.T) {
 		"tsconfig.es5.json",
 		t,
 		&NoUnsafeArgumentRule,
-		nil,
-		[]rule_tester.InvalidTestCase{
+		[]rule_tester.ValidTestCase{
 			{
 				Code: `
 declare function acceptStrings(...values: string[]): void;
@@ -151,36 +150,18 @@ function forward<T extends readonly any[]>(values: T): void {
   acceptStrings(...values);
 }
 `,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "unsafeArgument",
-					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
-					Line:      5,
-					Column:    17,
-					EndLine:   5,
-					EndColumn: 26,
-				}},
 			},
 			{
-				// The ES5 fallback must retrieve an index type from each array
-				// union rather than requiring the whole type to be an array.
+				// Upstream skips array unions even when only ES5 libs are loaded.
 				Code: `
 declare function acceptStrings(...values: string[]): void;
 declare const values: string[] | any[];
 
 acceptStrings(...values);
 `,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "unsafeArgument",
-					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
-					Line:      5,
-					Column:    15,
-					EndLine:   5,
-					EndColumn: 24,
-				}},
 			},
 			{
-				// Generic array-union constraints take the same fallback after the
-				// checker resolves their base constraint.
+				// A generic array-union constraint does not make the spread an any[].
 				Code: `
 declare function acceptStrings(...values: string[]): void;
 
@@ -188,16 +169,9 @@ function forward<T extends string[] | any[]>(values: T): void {
   acceptStrings(...values);
 }
 `,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "unsafeArgument",
-					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
-					Line:      5,
-					Column:    17,
-					EndLine:   5,
-					EndColumn: 26,
-				}},
 			},
 		},
+		nil,
 	)
 }
 
@@ -352,6 +326,86 @@ func TestNoUnsafeArgumentExtras(t *testing.T) {
 		&NoUnsafeArgumentRule,
 		[]rule_tester.ValidTestCase{
 			{
+				// Upstream skips non-tuple iterables, including Set<any>.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+declare const values: Set<any>;
+acceptStrings(...values);
+`,
+			},
+			{
+				// An Iterable<any> constraint is not itself an any-typed spread.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+function forward<T extends Iterable<any>>(values: T): void {
+  acceptStrings(...values);
+}
+`,
+			},
+			{
+				// An array constraint is not itself an any[] spread.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+function forward<T extends readonly any[]>(values: T): void {
+  acceptStrings(...values);
+}
+`,
+			},
+			{
+				// Upstream does not compare generic element types of non-tuple array spreads.
+				Code: `
+declare function acceptSets(...values: Set<string>[]): void;
+declare const values: Set<any>[];
+acceptSets(...values);
+`,
+			},
+			{
+				// Parameters<T> is a conditional type, not a concrete tuple or any[].
+				// Checking its iterable yield type creates an extra diagnostic.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+function forward<T extends (...values: any[]) => void>(...values: Parameters<T>) {
+  acceptStrings(...values);
+}
+`,
+			},
+			{
+				// Mirrors the generic method wrapper from sidebar-operate-model.ts.
+				Code: `
+class Model {
+  add(value: string): void {}
+  remove(value: number): void {}
+  withLoading<T extends this['add'] | this['remove']>(operateFn: T) {
+    return async (...args: Parameters<T>) => {
+      await operateFn.call(this, ...args);
+    };
+  }
+}
+`,
+			},
+			{
+				// Tuple unions and type parameters are not concrete tuple spreads.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+declare const values: [any] | [string, any];
+acceptStrings(...values);
+function forward<T extends [any]>(values: T): void {
+  acceptStrings(...values);
+}
+`,
+			},
+			{
+				// NewExpression shares the same iterable-spread boundary as calls.
+				Code: `
+declare class Box { constructor(...values: string[]); }
+declare const values: Set<any>;
+new Box(...values);
+function forward<T extends readonly any[]>(values: T): void {
+  new Box(...values);
+}
+`,
+			},
+			{
 				// ---- Real-user: typescript-eslint#10415 generic-constraint false negative ----
 				// This is a known upstream false negative; parity means not reporting it.
 				Code: `
@@ -378,7 +432,7 @@ identity(values);
 `,
 			},
 			{
-				// A safe iterable element type flows to the rest element type.
+				// A safe non-tuple iterable is ignored, like any other iterable.
 				Code: `
 declare function acceptStrings(...values: string[]): void;
 declare const values: Set<string>;
@@ -386,7 +440,7 @@ acceptStrings(...values);
 `,
 			},
 			{
-				// The generic constraint supplies the iterable element type.
+				// Generic iterable spreads are ignored without resolving their constraints.
 				Code: `
 declare function acceptStrings(...values: string[]): void;
 function forward<T extends Iterable<string>>(values: T): void {
@@ -396,7 +450,7 @@ forward(new Set<string>());
 `,
 			},
 			{
-				// Any is safe when the iterable feeds a rest parameter that accepts any.
+				// Ignoring an iterable does not depend on the receiver type.
 				Code: `
 declare function acceptAnything(...values: any[]): void;
 declare const values: Set<any>;
@@ -404,7 +458,7 @@ acceptAnything(...values);
 `,
 			},
 			{
-				// Strings use the same iterable yield path without introducing any.
+				// String spreads are ignored along with other non-tuple iterables.
 				Code: `
 declare function acceptStrings(...values: string[]): void;
 acceptStrings(...'safe');
@@ -435,6 +489,54 @@ optional();
 		},
 		[]rule_tester.InvalidTestCase{
 			{
+				// Skipping an iterable must not consume the parameter for a later argument.
+				Code: `
+declare function acceptValues(first: string, second: number): void;
+declare const values: Set<any>;
+acceptValues(...values, 1 as any);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      4,
+					Column:    25,
+					EndLine:   4,
+					EndColumn: 33,
+				}},
+			},
+			{
+				// Only concrete tuples advance the cursor when an iterable is between them.
+				Code: `
+declare function acceptValues(first: number, second: string, third: boolean): void;
+declare const values: Set<any>;
+acceptValues(...[1] as [number], ...values, ...[1 as any] as [any]);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeTupleSpread",
+					Message:   "Unsafe spread of a tuple type. The argument is of type `any` and is assigned to a parameter of type `string`.",
+					Line:      4,
+					Column:    45,
+					EndLine:   4,
+					EndColumn: 67,
+				}},
+			},
+			{
+				// A concrete readonly any[] must still take the unsafe-array branch.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+declare const values: readonly any[];
+acceptStrings(...values);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArraySpread",
+					Message:   "Unsafe spread of an `readonly any[]` array type.",
+					Line:      4,
+					Column:    15,
+					EndLine:   4,
+					EndColumn: 24,
+				}},
+			},
+			{
 				// Locks in upstream FunctionSignature.create(): classify a generic rest parameter through its array constraint.
 				Code: `
 declare function acceptStrings<T extends string[]>(...values: T): void;
@@ -449,54 +551,6 @@ function forward<T extends string[]>(value: any): void {
 					Column:    20,
 					EndLine:   4,
 					EndColumn: 25,
-				}},
-			},
-			{
-				// A non-array iterable still spreads its element type into the rest parameter.
-				Code: `
-declare function acceptStrings(...values: string[]): void;
-declare const values: Set<any>;
-acceptStrings(...values);
-`,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "unsafeArgument",
-					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
-					Line:      4,
-					Column:    15,
-					EndLine:   4,
-					EndColumn: 24,
-				}},
-			},
-			{
-				// A type parameter gets its iteration type through the generic constraint.
-				Code: `
-declare function acceptStrings(...values: string[]): void;
-function forward<T extends Iterable<any>>(values: T): void {
-  acceptStrings(...values);
-}
-`,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "unsafeArgument",
-					Line:      4,
-					Column:    17,
-					EndLine:   4,
-					EndColumn: 26,
-				}},
-			},
-			{
-				// Array-like generic constraints reach the same iterable path because T is not itself an array.
-				Code: `
-declare function acceptStrings(...values: string[]): void;
-function forward<T extends readonly any[]>(values: T): void {
-  acceptStrings(...values);
-}
-`,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "unsafeArgument",
-					Line:      4,
-					Column:    17,
-					EndLine:   4,
-					EndColumn: 26,
 				}},
 			},
 			{
@@ -529,22 +583,6 @@ acceptValues(...values, 1 as any);
 					Column:    25,
 					EndLine:   4,
 					EndColumn: 33,
-				}},
-			},
-			{
-				// Ordinary array spreads participate in rslint's iterable element-type check.
-				Code: `
-declare function acceptSets(...values: Set<string>[]): void;
-declare const values: Set<any>[];
-acceptSets(...values);
-`,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "unsafeArgument",
-					Message:   "Unsafe argument of type `Set<any>` assigned to a parameter of type `Set<string>`.",
-					Line:      4,
-					Column:    12,
-					EndLine:   4,
-					EndColumn: 21,
 				}},
 			},
 			{
