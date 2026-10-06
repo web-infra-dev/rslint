@@ -42,6 +42,10 @@ const [foo = ''] = [undefined];
 function f(a?: number) {}
 
 function g(p?: number | undefined) {}
+
+function first([value = 1]: [number?]) {
+  return value;
+}
 ```
 
 ## Options
@@ -49,6 +53,8 @@ function g(p?: number | undefined) {}
 ### `allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing`
 
 Defaults to `false`. While `false`, the rule emits a top-of-file diagnostic on every file whose `tsconfig.json` does **not** enable `strictNullChecks` (or `strict`). Without `strictNullChecks`, TypeScript erases `undefined` and `null` from types — which makes this rule unable to tell whether a value can be `undefined`, so any per-site report would be unreliable. Set this option to `true` to opt out of that file-level diagnostic and let the rule continue to run anyway.
+
+Rslint follows TypeScript 7 defaults: omitting both `strict` and `strictNullChecks` enables strict null checking. An explicit `strictNullChecks` value takes precedence over `strict`, including `strict: false`.
 
 Examples of code for this rule with `{ "allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing": true }`:
 

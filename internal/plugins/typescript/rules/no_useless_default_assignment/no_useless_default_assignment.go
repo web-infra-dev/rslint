@@ -243,9 +243,27 @@ func checkBindingElement(ctx rule.RuleContext, beNode *ast.Node, initializer *as
 		if elementIndex < 0 || elementIndex >= len(tupleArgs) {
 			return
 		}
-		elementType := tupleArgs[elementIndex]
-		if canBeUndefined(elementType) {
+		target := sourceType.TargetTupleType()
+		// Optional and rest elements do not guarantee a value at this index,
+		// even when strictNullChecks erases undefined from their types.
+		minLength := 0
+		for _, element := range target.ElementInfos() {
+			if element.TupleElementFlags()&(checker.ElementFlagsRequired|checker.ElementFlagsVariadic) != 0 {
+				minLength++
+			}
+		}
+		if elementIndex >= minLength {
 			return
+		}
+		elementTypes := tupleArgs[elementIndex : elementIndex+1]
+		if elementIndex >= target.FixedLength() {
+			// A rest element can shift any following element into this slot.
+			elementTypes = tupleArgs[target.FixedLength():]
+		}
+		for _, elementType := range elementTypes {
+			if canBeUndefined(elementType) {
+				return
+			}
 		}
 		reportUselessDefaultAssignment(ctx, beNode, initializer, "property")
 	}
@@ -570,13 +588,27 @@ func indexOfBindingElement(pattern *ast.Node, child *ast.Node) int {
 // reportUselessDefaultAssignment emits the `uselessDefaultAssignment`
 // diagnostic with the autofix that removes the ` = <initializer>` text.
 func reportUselessDefaultAssignment(ctx rule.RuleContext, node *ast.Node, initializer *ast.Node, kind string) {
-	fix := removeDefaultFix(node, initializer)
-	ctx.ReportNodeWithFixes(initializer, buildUselessDefaultAssignmentMessage(kind), fix)
+	ctx.ReportNodeWithDeferredFixes(initializer, buildUselessDefaultAssignmentMessage(kind), func() []rule.RuleFix {
+		return []rule.RuleFix{removeDefaultFix(node, initializer)}
+	})
 }
 
 func reportUselessUndefined(ctx rule.RuleContext, node *ast.Node, initializer *ast.Node, kind string) {
-	fix := removeDefaultFix(node, initializer)
-	ctx.ReportNodeWithFixes(initializer, buildUselessUndefinedMessage(kind), fix)
+	ctx.ReportRangeWithDeferredFixes(undefinedRange(ctx.SourceFile, initializer), buildUselessUndefinedMessage(kind), func() []rule.RuleFix {
+		return []rule.RuleFix{removeDefaultFix(node, initializer)}
+	})
+}
+
+func undefinedRange(sourceFile *ast.SourceFile, initializer *ast.Node) core.TextRange {
+	// Plain identifiers have a fixed spelling. Escaped identifiers and
+	// parenthesized expressions still need the scanner's original range.
+	const text = "undefined"
+	end := initializer.End()
+	start := end - len(text)
+	if initializer.Kind == ast.KindIdentifier && start >= initializer.Pos() && start >= 0 && end <= len(sourceFile.Text()) && sourceFile.Text()[start:end] == text {
+		return core.NewTextRange(start, end)
+	}
+	return utils.TrimNodeTextRange(sourceFile, initializer)
 }
 
 // reportPreferOptionalSyntax combines removeDefaultFix with the `?` insertion
@@ -584,17 +616,15 @@ func reportUselessUndefined(ctx rule.RuleContext, node *ast.Node, initializer *a
 // binding is an Identifier — array/object patterns can't carry the `?`
 // syntactically, so we mirror the gate.
 func reportPreferOptionalSyntax(ctx rule.RuleContext, node *ast.Node, initializer *ast.Node) {
-	fixes := []rule.RuleFix{removeDefaultFix(node, initializer)}
-	param := node.AsParameterDeclaration()
-	name := param.Name()
-	if name != nil && name.Kind == ast.KindIdentifier {
-		insertPos := name.End()
-		fixes = append(fixes, rule.RuleFix{
-			Text:  "?",
-			Range: core.NewTextRange(insertPos, insertPos),
-		})
-	}
-	ctx.ReportNodeWithFixes(initializer, buildPreferOptionalSyntaxMessage(), fixes...)
+	ctx.ReportRangeWithDeferredFixes(undefinedRange(ctx.SourceFile, initializer), buildPreferOptionalSyntaxMessage(), func() []rule.RuleFix {
+		fix := removeDefaultFix(node, initializer)
+		name := node.AsParameterDeclaration().Name()
+		if name != nil && name.Kind == ast.KindIdentifier {
+			insertPos := name.End()
+			return []rule.RuleFix{fix, {Text: "?", Range: core.NewTextRange(insertPos, insertPos)}}
+		}
+		return []rule.RuleFix{fix}
+	})
 }
 
 // removeDefaultFix produces the `[leftEnd, initializer.End()]` removal range

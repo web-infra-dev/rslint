@@ -51,11 +51,11 @@ func TestNoUnnecessaryAssertionCompilerOptions(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: "expect(value).toBe(other)", TSConfig: "tsconfig.json"},
 			{Code: "expect(value).toBe(other)", TSConfig: "tsconfig.strict-null.json"},
+			{Code: "expect(value).toBe(other)", TSConfig: "tsconfig.default.json"},
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: "expect(value).toBe(other)", TSConfig: "tsconfig.unstrict.json", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStrictNullCheck"}}},
 			{Code: "expect(value).toBe(other)", TSConfig: "tsconfig.override.json", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStrictNullCheck"}}},
-			{Code: "expect(value).toBe(other)", TSConfig: "tsconfig.default.json", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStrictNullCheck"}}},
 		},
 	)
 }

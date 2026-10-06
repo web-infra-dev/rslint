@@ -291,42 +291,14 @@ func getChildrenWithScanner(node *ast.Node, sourceFile *ast.SourceFile, tokens *
 	return children
 }
 
-// Checks if a given compiler option is enabled, accounting for whether all flags
-// (except `strictPropertyInitialization`) have been enabled by `strict: true`.
-//
-// @category Compiler Options
-//
-// @example
-//
-//	const optionsLenient = {
-//		noImplicitAny: true,
-//	};
-//
-// isStrictCompilerOptionEnabled(optionsLenient, "noImplicitAny"); // true
-// isStrictCompilerOptionEnabled(optionsLenient, "noImplicitThis"); // false
-//
-// @example
-//
-//	const optionsStrict = {
-//		noImplicitThis: false,
-//		strict: true,
-//	};
-//
-// isStrictCompilerOptionEnabled(optionsStrict, "noImplicitAny"); // true
-// isStrictCompilerOptionEnabled(optionsStrict, "noImplicitThis"); // false
+// IsStrictCompilerOptionEnabled resolves a strict-family option using the
+// compiler's defaults and explicit overrides. TypeScript 7 enables strict
+// when it is omitted.
 func IsStrictCompilerOptionEnabled(
 	options *core.CompilerOptions,
 	option core.Tristate,
 ) bool {
-	if options.Strict.IsTrue() {
-		return option.IsTrueOrUnknown()
-	}
-	return option.IsTrue()
-	// return (
-	// 	(options.strict ? options[option] !== false : options[option] === true) &&
-	// 	(option !== "strictPropertyInitialization" ||
-	// 		isStrictCompilerOptionEnabled(options, "strictNullChecks"))
-	// );
+	return options.GetStrictOptionValue(option)
 }
 
 // Port https://github.com/JoshuaKGoldberg/ts-api-utils/blob/491c0374725a5dd64632405efea101f20ed5451f/src/tokens.ts#L34

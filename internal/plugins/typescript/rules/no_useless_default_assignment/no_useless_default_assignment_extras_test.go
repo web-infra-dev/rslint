@@ -6,11 +6,208 @@
 package no_useless_default_assignment
 
 import (
+	"context"
+	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestNoUselessDefaultAssignmentEditDemand(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, code, message, target, fixed string
+	}{
+		{"required property", "function f({ value = /* default */ 1 }: { value: number }) {}", "uselessDefaultAssignment", "1", "function f({ value }: { value: number }) {}"},
+		{"undefined property", "const { value = /* default */ undefined } = {};", "uselessUndefined", "undefined", "const { value } = {};"},
+		{"optional parameter", "function f(value: number | undefined = /* 🌟 */ undefined) {}", "preferOptionalSyntax", "undefined", "function f(value?: number | undefined) {}"},
+		{"escaped identifier", `function f(value: number | undefined = \u0075ndefined) {}`, "preferOptionalSyntax", `\u0075ndefined`, "function f(value?: number | undefined) {}"},
+		{"parenthesized identifier", "function f(value: number | undefined = (undefined)) {}", "preferOptionalSyntax", "(undefined)", "function f(value?: number | undefined) {}"},
+		{"binding parameter", "function f({ value }: { value: number } | undefined = undefined) {}", "preferOptionalSyntax", "undefined", "function f({ value }: { value: number } | undefined) {}"},
+		{"line disable", "function f(value = undefined) {} // eslint-disable-line @typescript-eslint/no-useless-default-assignment", "", "", ""},
+		{"next-line disable", "// eslint-disable-next-line @typescript-eslint/no-useless-default-assignment\nfunction f(value = undefined) {}", "", "", ""},
+		{"block disable", "/* eslint-disable @typescript-eslint/no-useless-default-assignment */\nfunction f(value = undefined) {}", "", "", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			p, sf, err := rule_tester.NewProgramHelper(fixtures.GetRootDir()).CreateTestProgram(c.code, "reporting.ts", "tsconfig.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if sf == nil {
+				t.Fatal("missing source file")
+			}
+			tc, release := p.GetTypeCheckerForFile(context.Background(), sf)
+			defer release()
+			options := rule_tester.ResolveTestCaseOptions(t, &NoUselessDefaultAssignmentRule, nil)
+			for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
+				var diagnostics []rule.RuleDiagnostic
+				ctx := (rule.RuleContext{
+					SourceFile: sf, TypeChecker: tc,
+					DisableManager: rule.NewDisableManager(sf, rule.NewCommentStore(sf)),
+				}).WithProgram(lintprogram.NewFromCompiler(p)).WithDiagnosticConsumer(
+					NoUselessDefaultAssignmentRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+						Demand: demand, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) },
+					})
+				listeners := NoUselessDefaultAssignmentRule.Run(ctx, options)
+				var visit func(*ast.Node) bool
+				visit = func(n *ast.Node) bool {
+					if listener := listeners[n.Kind]; listener != nil {
+						listener(n)
+					}
+					n.ForEachChild(visit)
+					return false
+				}
+				visit(sf.AsNode())
+				if c.message == "" {
+					if len(diagnostics) != 0 {
+						t.Fatalf("demand %d: suppressed diagnostics = %v", demand, diagnostics)
+					}
+					continue
+				}
+				if len(diagnostics) != 1 || diagnostics[0].Message.Id != c.message {
+					t.Fatalf("demand %d: unexpected diagnostics = %v", demand, diagnostics)
+				}
+				diagnostic := diagnostics[0]
+				start := strings.LastIndex(c.code, c.target)
+				if start < 0 || diagnostic.Range != core.NewTextRange(start, start+len(c.target)) {
+					t.Fatalf("demand %d: unexpected range = %v", demand, diagnostic.Range)
+				}
+				if diagnostic.Suggestions != nil {
+					t.Fatalf("demand %d: unexpected suggestions", demand)
+				}
+				if demand&rule.EditDemandAutofix == 0 {
+					if diagnostic.FixesPtr != nil {
+						t.Fatalf("demand %d: unexpected fixes", demand)
+					}
+					continue
+				}
+				fixed, _, _ := linter.ApplyRuleFixes(c.code, diagnostics)
+				if fixed != c.fixed {
+					t.Fatalf("demand %d: fixed = %q, want %q", demand, fixed, c.fixed)
+				}
+			}
+		})
+	}
+}
+
+func TestNoUselessDefaultAssignmentUndefinedRange(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name, source string
+		kind         ast.Kind
+		start, end   int
+	}{
+		{"plain", "undefined", ast.KindIdentifier, 0, 9},
+		{"trivia", "/* 🌟 */undefined", ast.KindIdentifier, 0, len("/* 🌟 */undefined")},
+		{"escaped", `\u0075ndefined`, ast.KindIdentifier, 0, len(`\u0075ndefined`)},
+		{"parenthesized", "(undefined)", ast.KindParenthesizedExpression, 0, 11},
+		{"empty", "", ast.KindIdentifier, 0, 0},
+		{"short range", "undefined", ast.KindIdentifier, 0, 4},
+		{"shifted range", "undefined", ast.KindIdentifier, 1, 9},
+		{"long range", "undefined", ast.KindIdentifier, 0, 12},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/range.ts", Path: "/range.ts"}, c.source, core.ScriptKindTS)
+			node := &ast.Node{Kind: c.kind, Loc: core.NewTextRange(c.start, c.end)}
+			want := utils.TrimNodeTextRange(sf, node)
+			if got := undefinedRange(sf, node); got != want {
+				t.Fatalf("range = %v, want scanner range %v", got, want)
+			}
+		})
+	}
+}
+
+func TestNoUselessDefaultAssignmentCompilerOptions(t *testing.T) {
+	const code = "export const value = 1;"
+	const optionalTuple = "function f([value = 1]: [number?]) { return value; }"
+	const requiredDefault = "function f({ value = 1 }: { value: number }) { return value; }"
+	const withoutDefault = "function f({ value }: { value: number }) { return value; }"
+	var valid []rule_tester.ValidTestCase
+	var invalid []rule_tester.InvalidTestCase
+
+	for _, config := range []string{
+		"tsconfig.default-strictness.json",
+		"tsconfig.json",
+		"tsconfig.strict-null-checks-only.json",
+	} {
+		valid = append(valid,
+			rule_tester.ValidTestCase{Code: code, TSConfig: config},
+			rule_tester.ValidTestCase{Code: optionalTuple, TSConfig: config},
+			rule_tester.ValidTestCase{
+				Code:     "function f({ value = 1 }: { value?: number }) { return value; }",
+				TSConfig: config,
+			},
+			rule_tester.ValidTestCase{
+				Code:     "function f({ value = 1 }: { value: number | undefined }) { return value; }",
+				TSConfig: config,
+			},
+		)
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:     requiredDefault,
+			TSConfig: config,
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "uselessDefaultAssignment"}},
+			Output:   []string{withoutDefault},
+		})
+	}
+	for _, config := range []string{
+		"tsconfig.unstrict.json",
+		"tsconfig.strict-with-null-checks-off.json",
+	} {
+		for _, source := range []string{code, optionalTuple} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code:     source,
+				TSConfig: config,
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStrictNullCheck"}},
+			})
+			valid = append(valid, rule_tester.ValidTestCase{
+				Code:     source,
+				TSConfig: config,
+				Options: map[string]interface{}{
+					"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing": true,
+				},
+			})
+		}
+	}
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+		&NoUselessDefaultAssignmentRule, valid, invalid)
+}
+
+func TestNoUselessDefaultAssignmentTupleDefaults(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+		&NoUselessDefaultAssignmentRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "function f([head, value = 1]: [number, ...number[]]) { return value; }"},
+			{Code: "function f([, value = 1]: [...number[], number]) { return value; }"},
+			{Code: "function f([value = 1]: [...number[], number | undefined]) { return value; }"},
+			{Code: "function f([value = 1]: [...(number | undefined)[], number]) { return value; }"},
+			{Code: "function f([head, value = 1]: [number, ...number[], number | undefined]) { return value; }"},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   "function f([value = 1]: [number, ...number[]]) { return value; }",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "uselessDefaultAssignment"}},
+				Output: []string{"function f([value]: [number, ...number[]]) { return value; }"},
+			},
+			{
+				Code:   "function f([value = 1]: [...number[], number]) { return value; }",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "uselessDefaultAssignment"}},
+				Output: []string{"function f([value]: [...number[], number]) { return value; }"},
+			},
+		},
+	)
+}
 
 func TestNoUselessDefaultAssignmentExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
