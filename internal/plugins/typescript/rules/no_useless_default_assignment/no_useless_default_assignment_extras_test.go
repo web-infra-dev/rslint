@@ -12,6 +12,87 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+func TestNoUselessDefaultAssignmentCompilerOptions(t *testing.T) {
+	const code = "export const value = 1;"
+	const optionalTuple = "function f([value = 1]: [number?]) { return value; }"
+	const requiredDefault = "function f({ value = 1 }: { value: number }) { return value; }"
+	const withoutDefault = "function f({ value }: { value: number }) { return value; }"
+	var valid []rule_tester.ValidTestCase
+	var invalid []rule_tester.InvalidTestCase
+
+	for _, config := range []string{
+		"tsconfig.default-strictness.json",
+		"tsconfig.json",
+		"tsconfig.strict-null-checks-only.json",
+	} {
+		valid = append(valid,
+			rule_tester.ValidTestCase{Code: code, TSConfig: config},
+			rule_tester.ValidTestCase{Code: optionalTuple, TSConfig: config},
+			rule_tester.ValidTestCase{
+				Code:     "function f({ value = 1 }: { value?: number }) { return value; }",
+				TSConfig: config,
+			},
+			rule_tester.ValidTestCase{
+				Code:     "function f({ value = 1 }: { value: number | undefined }) { return value; }",
+				TSConfig: config,
+			},
+		)
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:     requiredDefault,
+			TSConfig: config,
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "uselessDefaultAssignment"}},
+			Output:   []string{withoutDefault},
+		})
+	}
+	for _, config := range []string{
+		"tsconfig.unstrict.json",
+		"tsconfig.strict-with-null-checks-off.json",
+	} {
+		for _, source := range []string{code, optionalTuple} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code:     source,
+				TSConfig: config,
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStrictNullCheck"}},
+			})
+			valid = append(valid, rule_tester.ValidTestCase{
+				Code:     source,
+				TSConfig: config,
+				Options: map[string]interface{}{
+					"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing": true,
+				},
+			})
+		}
+	}
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+		&NoUselessDefaultAssignmentRule, valid, invalid)
+}
+
+func TestNoUselessDefaultAssignmentTupleDefaults(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+		&NoUselessDefaultAssignmentRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "function f([head, value = 1]: [number, ...number[]]) { return value; }"},
+			{Code: "function f([, value = 1]: [...number[], number]) { return value; }"},
+			{Code: "function f([value = 1]: [...number[], number | undefined]) { return value; }"},
+			{Code: "function f([value = 1]: [...(number | undefined)[], number]) { return value; }"},
+			{Code: "function f([head, value = 1]: [number, ...number[], number | undefined]) { return value; }"},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   "function f([value = 1]: [number, ...number[]]) { return value; }",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "uselessDefaultAssignment"}},
+				Output: []string{"function f([value]: [number, ...number[]]) { return value; }"},
+			},
+			{
+				Code:   "function f([value = 1]: [...number[], number]) { return value; }",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "uselessDefaultAssignment"}},
+				Output: []string{"function f([value]: [...number[], number]) { return value; }"},
+			},
+		},
+	)
+}
+
 func TestNoUselessDefaultAssignmentExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),

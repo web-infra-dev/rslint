@@ -243,9 +243,27 @@ func checkBindingElement(ctx rule.RuleContext, beNode *ast.Node, initializer *as
 		if elementIndex < 0 || elementIndex >= len(tupleArgs) {
 			return
 		}
-		elementType := tupleArgs[elementIndex]
-		if canBeUndefined(elementType) {
+		target := sourceType.TargetTupleType()
+		// Optional and rest elements do not guarantee a value at this index,
+		// even when strictNullChecks erases undefined from their types.
+		minLength := 0
+		for _, element := range target.ElementInfos() {
+			if element.TupleElementFlags()&(checker.ElementFlagsRequired|checker.ElementFlagsVariadic) != 0 {
+				minLength++
+			}
+		}
+		if elementIndex >= minLength {
 			return
+		}
+		elementTypes := tupleArgs[elementIndex : elementIndex+1]
+		if elementIndex >= target.FixedLength() {
+			// A rest element can shift any following element into this slot.
+			elementTypes = tupleArgs[target.FixedLength():]
+		}
+		for _, elementType := range elementTypes {
+			if canBeUndefined(elementType) {
+				return
+			}
 		}
 		reportUselessDefaultAssignment(ctx, beNode, initializer, "property")
 	}

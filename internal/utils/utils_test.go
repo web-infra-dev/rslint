@@ -9,6 +9,36 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 )
 
+func TestIsStrictCompilerOptionEnabled(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		strict core.Tristate
+		option core.Tristate
+		want   bool
+	}{
+		{"both omitted", core.TSUnknown, core.TSUnknown, true},
+		{"strict omitted, option enabled", core.TSUnknown, core.TSTrue, true},
+		{"strict omitted, option disabled", core.TSUnknown, core.TSFalse, false},
+		{"strict enabled, option omitted", core.TSTrue, core.TSUnknown, true},
+		{"both enabled", core.TSTrue, core.TSTrue, true},
+		{"strict enabled, option disabled", core.TSTrue, core.TSFalse, false},
+		{"strict disabled, option omitted", core.TSFalse, core.TSUnknown, false},
+		{"strict disabled, option enabled", core.TSFalse, core.TSTrue, true},
+		{"both disabled", core.TSFalse, core.TSFalse, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			options := &core.CompilerOptions{Strict: tt.strict}
+			if got := IsStrictCompilerOptionEnabled(options, tt.option); got != tt.want {
+				t.Errorf("IsStrictCompilerOptionEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestExtractRegexPatternAndFlags(t *testing.T) {
 	tests := []struct {
 		input   string
