@@ -44,6 +44,12 @@ var NoSinglePromiseInPromiseMethodsRule = rule.Rule{
 					Description: "Wrapping single-element array with `Promise." + method + "()` is unnecessary.",
 					Data:        map[string]string{"method": method},
 				}
+				// Unwrapping Promise.any changes rejection from AggregateError to
+				// the input's rejection reason, even with only one input.
+				if method == "any" {
+					ctx.ReportNode(array, message)
+					return
+				}
 				parent := utils.ESTreeParent(node)
 				if parent.Kind == ast.KindAwaitExpression &&
 					(method != "all" || utils.ESTreeParent(parent).Kind == ast.KindExpressionStatement) {
@@ -68,6 +74,10 @@ var NoSinglePromiseInPromiseMethodsRule = rule.Rule{
 						expression := utils.ESTreeRuntimeExpression(element)
 						canSkipParens := ast.IsIdentifier(expression) ||
 							(ast.IsAccessExpression(expression) && !ast.IsOptionalChain(expression))
+						switch ast.GetLeftmostExpression(expression, false).Kind {
+						case ast.KindObjectLiteralExpression, ast.KindFunctionExpression, ast.KindClassExpression:
+							canSkipParens = false
+						}
 						if element == expression && !canSkipParens {
 							text = "(" + text + ")"
 						}
@@ -134,7 +144,8 @@ func fixPromiseAllFirstElement(ctx rule.RuleContext, call, element *ast.Node) []
 	var pattern *ast.Node
 	if parent.Kind == ast.KindVariableDeclaration {
 		declaration := parent.AsVariableDeclaration()
-		if utils.ESTreeType(parent) == nil && utils.ESTreeRuntimeExpression(declaration.Initializer) == await {
+		// Both TypeScript and JSDoc annotations describe the original tuple.
+		if declaration.Type == nil && utils.ESTreeRuntimeExpression(declaration.Initializer) == await {
 			pattern = declaration.Name()
 		}
 	} else if ast.IsAssignmentExpression(parent, true) &&

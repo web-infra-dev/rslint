@@ -1,6 +1,7 @@
 // Ported from eslint-plugin-unicorn v77.0.0; see LICENSE.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v77.0.0/test/no-single-promise-in-promise-methods.js
 // Documentation examples are kept in their own group below.
+// Promise.any cases intentionally have no edits to preserve AggregateError.
 package no_single_promise_in_promise_methods_test
 
 import (
@@ -255,20 +256,20 @@ func TestNoSinglePromiseInPromiseMethodsUpstreamAwaited(t *testing.T) {
 					},
 				},
 			},
+			// Promise.any retains its AggregateError rejection semantics; no edits are offered
 			{
 				Code:     "await Promise.any([promise])",
 				FileName: "case.mjs",
-				Output:   []string{"await promise"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
 						Line: 1, Column: 19, EndLine: 1, EndColumn: 28,
 					},
 				},
 			},
+			// Promise.any retains its AggregateError rejection semantics; no edits are offered
 			{
 				Code:     "await Promise.any([promise,],)",
 				FileName: "case.mjs",
-				Output:   []string{"await promise"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
 						Line: 1, Column: 19, EndLine: 1, EndColumn: 29,
@@ -538,29 +539,23 @@ func TestNoSinglePromiseInPromiseMethodsUpstreamNotAwaited(t *testing.T) {
 					},
 				},
 			},
+			// Promise.any retains its AggregateError rejection semantics; no edits are offered
 			{
 				Code:     "Promise.any([promise])",
 				FileName: "case.mjs",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
 						Line: 1, Column: 13, EndLine: 1, EndColumn: 22,
-						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "promise"},
-							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "Promise.resolve(promise)"},
-						},
 					},
 				},
 			},
+			// Promise.any retains its AggregateError rejection semantics; no edits are offered
 			{
 				Code:     "foo(Promise.any([promise]))",
 				FileName: "case.mjs",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
 						Line: 1, Column: 17, EndLine: 1, EndColumn: 26,
-						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "foo(promise)"},
-							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "foo(Promise.resolve(promise))"},
-						},
 					},
 				},
 			},
@@ -711,10 +706,10 @@ func TestNoSinglePromiseInPromiseMethodsUpstreamPromiseAll(t *testing.T) {
 					},
 				},
 			},
+			// Promise.any retains its AggregateError rejection semantics; no edits are offered
 			{
 				Code:     "const results = await Promise.any([promise])",
 				FileName: "case.mjs",
-				Output:   []string{"const results = await promise"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
 						Line: 1, Column: 35, EndLine: 1, EndColumn: 44,
@@ -908,6 +903,7 @@ func TestNoSinglePromiseInPromiseMethodsUpstreamPromiseAll(t *testing.T) {
 					},
 				},
 			},
+			// Promise.any retains its AggregateError rejection semantics; no edits are offered
 			{
 				Code:     "await Promise.any([/* comment */ promise])",
 				FileName: "case.mjs",
@@ -951,10 +947,10 @@ func TestNoSinglePromiseInPromiseMethodsUpstreamDocumentation(t *testing.T) {
 					},
 				},
 			},
+			// Promise.any retains its AggregateError rejection semantics; no edits are offered
 			{
 				Code:     "const foo = await Promise.any([promise]);",
 				FileName: "case.mjs",
-				Output:   []string{"const foo = await promise;"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
 						Line: 1, Column: 31, EndLine: 1, EndColumn: 40,

@@ -1,3 +1,4 @@
+// Promise.any cases intentionally have no edits to preserve AggregateError.
 // Ported from eslint-plugin-unicorn v77.0.0; see LICENSE.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v77.0.0/test/no-single-promise-in-promise-methods.js
 import path from 'node:path';
@@ -420,6 +421,7 @@ const groups = [
       {
         code: 'await Promise.any([promise])',
         filename: 'src/virtual.js',
+        name: 'Promise.any retains its AggregateError rejection semantics; no edits are offered',
         errors: [
           {
             messageId: 'no-single-promise-in-promise-methods/error',
@@ -432,11 +434,12 @@ const groups = [
             suggestions: [],
           },
         ],
-        output: 'await promise',
+        output: null,
       },
       {
         code: 'await Promise.any([promise,],)',
         filename: 'src/virtual.js',
+        name: 'Promise.any retains its AggregateError rejection semantics; no edits are offered',
         errors: [
           {
             messageId: 'no-single-promise-in-promise-methods/error',
@@ -449,7 +452,7 @@ const groups = [
             suggestions: [],
           },
         ],
-        output: 'await promise',
+        output: null,
       },
       {
         code: 'await Promise.race([promise])',
@@ -1078,6 +1081,7 @@ const groups = [
       {
         code: 'Promise.any([promise])',
         filename: 'src/virtual.js',
+        name: 'Promise.any retains its AggregateError rejection semantics; no edits are offered',
         errors: [
           {
             messageId: 'no-single-promise-in-promise-methods/error',
@@ -1087,19 +1091,7 @@ const groups = [
             column: 13,
             endLine: 1,
             endColumn: 22,
-            suggestions: [
-              {
-                messageId: 'no-single-promise-in-promise-methods/unwrap',
-                desc: 'Use the value directly.',
-                output: 'promise',
-              },
-              {
-                messageId:
-                  'no-single-promise-in-promise-methods/use-promise-resolve',
-                desc: 'Switch to `Promise.resolve(…)`.',
-                output: 'Promise.resolve(promise)',
-              },
-            ],
+            suggestions: [],
           },
         ],
         output: null,
@@ -1107,6 +1099,7 @@ const groups = [
       {
         code: 'foo(Promise.any([promise]))',
         filename: 'src/virtual.js',
+        name: 'Promise.any retains its AggregateError rejection semantics; no edits are offered',
         errors: [
           {
             messageId: 'no-single-promise-in-promise-methods/error',
@@ -1116,19 +1109,7 @@ const groups = [
             column: 17,
             endLine: 1,
             endColumn: 26,
-            suggestions: [
-              {
-                messageId: 'no-single-promise-in-promise-methods/unwrap',
-                desc: 'Use the value directly.',
-                output: 'foo(promise)',
-              },
-              {
-                messageId:
-                  'no-single-promise-in-promise-methods/use-promise-resolve',
-                desc: 'Switch to `Promise.resolve(…)`.',
-                output: 'foo(Promise.resolve(promise))',
-              },
-            ],
+            suggestions: [],
           },
         ],
         output: null,
@@ -1423,6 +1404,7 @@ const groups = [
       {
         code: 'const results = await Promise.any([promise])',
         filename: 'src/virtual.js',
+        name: 'Promise.any retains its AggregateError rejection semantics; no edits are offered',
         errors: [
           {
             messageId: 'no-single-promise-in-promise-methods/error',
@@ -1435,7 +1417,7 @@ const groups = [
             suggestions: [],
           },
         ],
-        output: 'const results = await promise',
+        output: null,
       },
       {
         code: 'const results = await Promise.race([promise])',
@@ -1780,6 +1762,7 @@ const groups = [
       {
         code: 'await Promise.any([/* comment */ promise])',
         filename: 'src/virtual.js',
+        name: 'Promise.any retains its AggregateError rejection semantics; no edits are offered',
         errors: [
           {
             messageId: 'no-single-promise-in-promise-methods/error',
@@ -1876,6 +1859,7 @@ const groups = [
       {
         code: 'const foo = await Promise.any([promise]);',
         filename: 'src/virtual.js',
+        name: 'Promise.any retains its AggregateError rejection semantics; no edits are offered',
         errors: [
           {
             messageId: 'no-single-promise-in-promise-methods/error',
@@ -1888,7 +1872,7 @@ const groups = [
             suggestions: [],
           },
         ],
-        output: 'const foo = await promise;',
+        output: null,
       },
       {
         code: 'const foo = await Promise.race([promise]);',

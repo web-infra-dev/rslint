@@ -27,7 +27,7 @@ const [{ value, reason }] = await Promise.allSettled([promise]);
 
 ## Fixes and Suggestions
 
-Awaited `Promise.any()` and `Promise.race()` calls can be replaced with the single value. Calls without `await` offer suggestions to use the value directly or switch to `Promise.resolve()`.
+Awaited `Promise.race()` calls can be replaced with the single value. Calls without `await` offer suggestions to use the value directly or switch to `Promise.resolve()`. `Promise.any()` is reported without fixes or suggestions because replacing it changes how rejections are handled.
 
 `Promise.all()` produces an array, so it is only automatically unwrapped when the awaited result is discarded, destructured into one identifier, or accessed at index `0` in a variable initializer or assignment:
 
@@ -44,6 +44,12 @@ The rule checks direct, non-optional calls on the identifier `Promise`. Computed
 ## Options
 
 This rule has no options.
+
+## Differences from upstream
+
+- `Promise.any([promise])` keeps its diagnostic but has no fixes or suggestions. Unlike eslint-plugin-unicorn v77.0.0, rslint preserves the `AggregateError` and its `.errors` array when the input rejects. For example, `await Promise.any([Promise.reject('failure')])` must not become `await Promise.reject('failure')`.
+- Destructuring with a JSDoc tuple annotation is not automatically unwrapped. For example, `/** @type {[number]} */ const [value] = await Promise.all([promise])` keeps its tuple annotation on the destructuring pattern, avoiding a new type error under `checkJs`.
+- Direct-value suggestions keep parentheses around members whose receiver starts with an object, function, or class expression. For example, `Promise.race([{ value: promise }.value])` becomes `({ value: promise }.value)`, which remains valid as a statement or an arrow function body.
 
 ## Original Documentation
 

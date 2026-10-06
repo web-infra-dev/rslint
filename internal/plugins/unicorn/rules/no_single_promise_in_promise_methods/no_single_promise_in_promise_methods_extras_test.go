@@ -14,7 +14,7 @@ import (
 )
 
 func TestNoSinglePromiseInPromiseMethodsEditDemand(t *testing.T) {
-	const code = "await Promise.race([promise]); Promise.any([other]); Promise.all([last]);"
+	const code = "await Promise.race([promise]); Promise.race([other]); Promise.all([last]); Promise.any([last]);"
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
 	program, sourceFile, err := helper.CreateTestProgram(code, "edit-demand.mts", "tsconfig.json")
 	if err != nil {
@@ -36,14 +36,14 @@ func TestNoSinglePromiseInPromiseMethodsEditDemand(t *testing.T) {
 				diagnostics[demand] = append(diagnostics[demand], d)
 			}},
 		})
-		if len(diagnostics[demand]) != 3 {
-			t.Fatalf("demand %d: expected three diagnostics, got %d", demand, len(diagnostics[demand]))
+		if len(diagnostics[demand]) != 4 {
+			t.Fatalf("demand %d: expected four diagnostics, got %d", demand, len(diagnostics[demand]))
 		}
 	}
 	all := diagnostics[rule.EditDemandAll]
 	if len(all[0].Fixes()) != 1 || all[1].Suggestions == nil || len(*all[1].Suggestions) != 2 ||
-		all[2].FixesPtr != nil || all[2].Suggestions != nil {
-		t.Fatal("expected an autofix, two suggestions, and a report without edits")
+		all[2].FixesPtr != nil || all[2].Suggestions != nil || all[3].FixesPtr != nil || all[3].Suggestions != nil {
+		t.Fatal("expected an autofix, two suggestions, and two reports without edits")
 	}
 	for demand, got := range diagnostics {
 		for i, diagnostic := range got {
@@ -76,25 +76,17 @@ func TestNoSinglePromiseInPromiseMethodsExtras(t *testing.T) {
 			{Code: "class Container { static #race() {} static run() { Promise.#race([promise]); } }", FileName: "case.mjs"},
 		},
 		[]rule_tester.InvalidTestCase{
-			// An outer autofix exposes the nested call to await on the next pass.
+			// The outer fix keeps Promise.any and its AggregateError rejection semantics.
 			{
 				Code:     "await Promise.race([Promise.any([promise])])",
 				FileName: "case.mjs",
-				Output:   []string{"await Promise.any([promise])", "await promise"},
+				Output:   []string{"await Promise.any([promise])"},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "no-single-promise-in-promise-methods/error",
-						Message:   "Wrapping single-element array with `Promise.race()` is unnecessary.",
-						Line:      1, Column: 20, EndLine: 1, EndColumn: 44,
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 20, EndLine: 1, EndColumn: 44,
 					},
-					{
-						MessageId: "no-single-promise-in-promise-methods/error",
-						Message:   "Wrapping single-element array with `Promise.any()` is unnecessary.",
-						Line:      1, Column: 33, EndLine: 1, EndColumn: 42,
-						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "await Promise.race([promise])"},
-							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "await Promise.race([Promise.resolve(promise)])"},
-						},
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
+						Line: 1, Column: 33, EndLine: 1, EndColumn: 42,
 					},
 				},
 			},
@@ -103,11 +95,11 @@ func TestNoSinglePromiseInPromiseMethodsExtras(t *testing.T) {
 				Code:     "[(foo)] = await Promise.all([promise])",
 				FileName: "case.mjs",
 				Output:   []string{"foo = await promise"},
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "no-single-promise-in-promise-methods/error",
-					Message:   "Wrapping single-element array with `Promise.all()` is unnecessary.",
-					Line:      1, Column: 29, EndLine: 1, EndColumn: 38,
-				}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 29, EndLine: 1, EndColumn: 38,
+					},
+				},
 			},
 			// Parentheses around receiver, callee, array, call, and value
 			{
@@ -122,11 +114,11 @@ func TestNoSinglePromiseInPromiseMethodsExtras(t *testing.T) {
 			},
 			// Local binding still matches the syntactic name
 			{
-				Code:     "const Promise = custom; Promise.any([promise])",
+				Code:     "const Promise = custom; Promise.race([promise])",
 				FileName: "case.mjs",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
-						Line: 1, Column: 37, EndLine: 1, EndColumn: 46,
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 38, EndLine: 1, EndColumn: 47,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "const Promise = custom; promise"},
 							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "const Promise = custom; Promise.resolve(promise)"},
@@ -198,36 +190,36 @@ func TestNoSinglePromiseInPromiseMethodsExtras(t *testing.T) {
 			},
 			// TS satisfies precedence
 			{
-				Code:     "await Promise.any([promise satisfies Value])",
+				Code:     "await Promise.race([promise satisfies Value])",
 				FileName: "case.ts",
 				Output:   []string{"await (promise satisfies Value)"},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
-						Line: 1, Column: 19, EndLine: 1, EndColumn: 44,
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 20, EndLine: 1, EndColumn: 45,
 					},
 				},
 			},
 			// Awaited assertions and non-null values
 			{
-				Code:     "await Promise.race([<Value>promise]); await Promise.any([promise!]);",
+				Code:     "await Promise.race([<Value>promise]); await Promise.race([promise!]);",
 				FileName: "case.ts",
 				Output:   []string{"await <Value>promise; await promise!;"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
 						Line: 1, Column: 20, EndLine: 1, EndColumn: 36,
 					},
-					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
-						Line: 1, Column: 57, EndLine: 1, EndColumn: 67,
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 58, EndLine: 1, EndColumn: 68,
 					},
 				},
 			},
 			// Optional-chain value needs parentheses when unwrapped without await
 			{
-				Code:     "foo()\nPromise.any([object?.promise])",
+				Code:     "foo()\nPromise.race([object?.promise])",
 				FileName: "case.mjs",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
-						Line: 2, Column: 13, EndLine: 2, EndColumn: 30,
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 2, Column: 14, EndLine: 2, EndColumn: 31,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "foo()\n;(object?.promise)"},
 							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "foo()\nPromise.resolve(object?.promise)"},
@@ -412,11 +404,11 @@ func TestNoSinglePromiseInPromiseMethodsExtras(t *testing.T) {
 			},
 			// Keep all comments and trailing commas in resolve suggestions
 			{
-				Code:     "Promise.any(/* argument */ ([/* element */ (promise), /* trailing */]),)",
+				Code:     "Promise.race(/* argument */ ([/* element */ (promise), /* trailing */]),)",
 				FileName: "case.mjs",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
-						Line: 1, Column: 29, EndLine: 1, EndColumn: 70,
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 30, EndLine: 1, EndColumn: 71,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "Promise.resolve(/* argument */ (/* element */ (promise) /* trailing */),)"},
 						},
@@ -463,23 +455,23 @@ func TestNoSinglePromiseInPromiseMethodsExtras(t *testing.T) {
 			},
 			// UTF-16 and multiline diagnostic range
 			{
-				Code:     "const text = \"😀\"; await Promise.any([\n  promise\n])",
+				Code:     "const text = \"😀\"; await Promise.race([\n  promise\n])",
 				FileName: "case.mjs",
 				Output:   []string{"const text = \"😀\"; await promise"},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
-						Line: 1, Column: 38, EndLine: 3, EndColumn: 2,
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 39, EndLine: 3, EndColumn: 2,
 					},
 				},
 			},
 
 			// A TypeScript instantiation retains its type arguments when suggested
 			{
-				Code:     "const result = Promise.any([make<Value>,]);",
+				Code:     "const result = Promise.race([make<Value>,]);",
 				FileName: "case.ts",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
-						Line: 1, Column: 28, EndLine: 1, EndColumn: 42,
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 29, EndLine: 1, EndColumn: 43,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "const result = (make<Value>);"},
 							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "const result = Promise.resolve(make<Value>);"},
@@ -502,11 +494,11 @@ func TestNoSinglePromiseInPromiseMethodsExtras(t *testing.T) {
 
 			// JSX text commas are not array separators
 			{
-				Code:     "const result = Promise.any([<div>,</div>,]);",
+				Code:     "const result = Promise.race([<div>,</div>,]);",
 				FileName: "case.tsx",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
-						Line: 1, Column: 28, EndLine: 1, EndColumn: 43,
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 29, EndLine: 1, EndColumn: 44,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "const result = (<div>,</div>);"},
 							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "const result = Promise.resolve(<div>,</div>);"},
@@ -569,11 +561,10 @@ func TestNoSinglePromiseInPromiseMethodsExtras(t *testing.T) {
 				},
 			},
 
-			// A JavaScript JSDoc type does not block destructuring fixes
+			// A JavaScript JSDoc tuple type prevents an unsafe destructuring fix
 			{
 				Code:     "/** @type {[unknown]} */ const [result] = await Promise.all([promise]);",
 				FileName: "case.mjs",
-				Output:   []string{"/** @type {[unknown]} */ const result = await promise;"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
 						Line: 1, Column: 61, EndLine: 1, EndColumn: 70,
@@ -588,6 +579,189 @@ func TestNoSinglePromiseInPromiseMethodsExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
 						Line: 1, Column: 39, EndLine: 1, EndColumn: 48,
+					},
+				},
+			},
+
+			// Awaited Promise.any retains AggregateError rejection semantics
+			{
+				Code:     "await Promise.any([Promise.reject(\"failure\")]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
+						Line: 1, Column: 19, EndLine: 1, EndColumn: 46,
+					},
+				},
+			},
+
+			// Promise.any without await offers no suggestions that change rejection semantics
+			{
+				Code:     "Promise.any([Promise.reject(\"failure\")]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.any()` is unnecessary.",
+						Line: 1, Column: 13, EndLine: 1, EndColumn: 40,
+					},
+				},
+			},
+
+			// A tuple annotation remains valid under checkJs
+			{
+				Code:     "/** @type {[number]} */ const [value] = await Promise.all([Promise.resolve(1)]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 59, EndLine: 1, EndColumn: 79,
+					},
+				},
+			},
+
+			// Object receivers remain expressions in a statement
+			{
+				Code:     "Promise.race([{p: Promise.resolve(1)}.p]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 14, EndLine: 1, EndColumn: 41,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "({p: Promise.resolve(1)}.p);"},
+							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "Promise.resolve({p: Promise.resolve(1)}.p);"},
+						},
+					},
+				},
+			},
+
+			// Object receivers remain expressions in an arrow body
+			{
+				Code:     "const load = () => Promise.race([{p: Promise.resolve(1)}.p]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 33, EndLine: 1, EndColumn: 60,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "const load = () => ({p: Promise.resolve(1)}.p);"},
+							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "const load = () => Promise.resolve({p: Promise.resolve(1)}.p);"},
+						},
+					},
+				},
+			},
+
+			// Anonymous function receivers need parentheses
+			{
+				Code:     "Promise.race([function() {}.p]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 14, EndLine: 1, EndColumn: 31,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "(function() {}.p);"},
+							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "Promise.resolve(function() {}.p);"},
+						},
+					},
+				},
+			},
+
+			// Anonymous class receivers need parentheses
+			{
+				Code:     "Promise.race([class {}.p]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 14, EndLine: 1, EndColumn: 26,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "(class {}.p);"},
+							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "Promise.resolve(class {}.p);"},
+						},
+					},
+				},
+			},
+
+			// Call receivers can start with a function expression
+			{
+				Code:     "Promise.race([function() {}().p]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 14, EndLine: 1, EndColumn: 33,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "(function() {}().p);"},
+							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "Promise.resolve(function() {}().p);"},
+						},
+					},
+				},
+			},
+
+			// Named function receivers in nested member access
+			{
+				Code:     "Promise.race([function load() {}.p.value]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 14, EndLine: 1, EndColumn: 42,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "(function load() {}.p.value);"},
+							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "Promise.resolve(function load() {}.p.value);"},
+						},
+					},
+				},
+			},
+
+			// Named class receivers in nested member access
+			{
+				Code:     "Promise.race([class Value {}.p.value]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 14, EndLine: 1, EndColumn: 38,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "(class Value {}.p.value);"},
+							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "Promise.resolve(class Value {}.p.value);"},
+						},
+					},
+				},
+			},
+
+			// Computed members with object receivers need parentheses
+			{
+				Code:     "Promise.race([{p: promise}[\"p\"]]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 14, EndLine: 1, EndColumn: 33,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "({p: promise}[\"p\"]);"},
+							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "Promise.resolve({p: promise}[\"p\"]);"},
+						},
+					},
+				},
+			},
+
+			// Parenthesized replacement preserves the statement boundary
+			{
+				Code:     "previous()\nPromise.race([{p: promise}.p]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 2, Column: 14, EndLine: 2, EndColumn: 30,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "previous()\n;({p: promise}.p);"},
+							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "previous()\nPromise.resolve({p: promise}.p);"},
+						},
+					},
+				},
+			},
+
+			// Existing receiver parentheses remain sufficient
+			{
+				Code:     "Promise.race([({p: promise}).p]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.race()` is unnecessary.",
+						Line: 1, Column: 14, EndLine: 1, EndColumn: 32,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "no-single-promise-in-promise-methods/unwrap", Output: "({p: promise}).p;"},
+							{MessageId: "no-single-promise-in-promise-methods/use-promise-resolve", Output: "Promise.resolve(({p: promise}).p);"},
+						},
 					},
 				},
 			},

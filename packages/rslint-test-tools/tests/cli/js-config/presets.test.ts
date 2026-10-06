@@ -398,6 +398,9 @@ describe('defineConfig and config presets', () => {
       'error',
     );
     expect(rec.rules?.['unicorn/no-array-reverse']).toBe('error');
+    expect(rec.rules?.['unicorn/no-single-promise-in-promise-methods']).toBe(
+      'error',
+    );
     expect(rec.rules?.['unicorn/no-useless-error-capture-stack-trace']).toBe(
       'error',
     );
@@ -434,6 +437,35 @@ describe('defineConfig and config presets', () => {
       String.raw`const x = '\u{61}';`,
     ]);
     expect(fixed.diagnostics).toEqual([]);
+  });
+
+  test('unicornPlugin.configs.recommended reports single-input Promise methods', async () => {
+    const directory = import.meta.dirname;
+    const result = await lint({
+      config: normalizeConfig([unicornPlugin.configs.recommended]),
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'single-promise-preset.js')]:
+          'Promise.all([promise]); Promise.any([promise]); Promise.race([promise]);',
+      },
+    });
+
+    expect(result.fileCount).toBe(1);
+    expect(
+      result.diagnostics.filter(
+        (diagnostic) =>
+          diagnostic.ruleName ===
+          'unicorn/no-single-promise-in-promise-methods',
+      ),
+    ).toMatchObject(
+      ['all', 'any', 'race'].map((method) => ({
+        ruleName: 'unicorn/no-single-promise-in-promise-methods',
+        messageId: 'no-single-promise-in-promise-methods/error',
+        message: `Wrapping single-element array with \`Promise.${method}()\` is unnecessary.`,
+        severity: 'error',
+      })),
+    );
   });
 
   test('unicornPlugin.configs.recommended reports array callback references', async () => {
