@@ -24,19 +24,17 @@ export default 1;
 import bar from "./bar";
 ```
 
-Modules that cannot be resolved, are ignored, or are not ES modules are not reported by this rule.
+Modules that cannot be resolved or are ignored are not reported. Like upstream,
+this rule also skips files that fail its module text check or contain neither
+an import/export declaration nor a runtime dynamic import. Plain CommonJS
+exports and compiler-forced module markers alone do not establish an export map.
 
-## Differences from upstream
+With `esModuleInterop: true` explicitly enabled, local named exports also provide
+a default for this rule. Named re-exports and `export *` alone do not. For example,
+a default import from `export const value = 1` is accepted with this option.
 
-- `esModuleInterop` does not supply a missing ES module default. Given
-  `export const value = 1` in `values.mjs`, rslint reports
-  `import value from './values.mjs'` even with `esModuleInterop: true`;
-  upstream v2.32.0 allows it. Import `{ value }` or add a default export.
-  With NodeNext, native ES imports of CommonJS modules still receive
-  `module.exports` as their default, regardless of the interop setting.
-- A file containing only `import './setup.mjs';` has no default export, so
-  rslint reports a default import from it. Upstream v2.32.0 may skip that
-  file because its initial text check does not recognize side-effect imports.
+The upstream text check can skip a file containing only `import './setup.mjs';`
+or a spaced dynamic `import ('./setup.mjs')`. This rule preserves that behavior.
 
 ## Original Documentation
 

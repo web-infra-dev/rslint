@@ -166,6 +166,9 @@ type exportBuilder struct {
 	sourceProgram *program.Program
 	building      map[*ast.SourceFile]*ExportMap
 	seen          map[exportKey]bool
+	// defaultImport selects eslint-plugin-import/default's text filtering and
+	// explicit interop behavior without changing the authored export index.
+	defaultImport bool
 	// onStack holds the files whose maps are still being filled, so that
 	// reaching one again is recognized as a cycle rather than as reuse.
 	onStack map[*ast.SourceFile]bool

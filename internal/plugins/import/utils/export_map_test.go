@@ -123,8 +123,14 @@ func TestDefaultExportsAcrossNodeModuleFormats(t *testing.T) {
 					ctx := (rule.RuleContext{SourceFile: source}).WithProgram(sourceProgram)
 					for i, stmt := range source.Statements.Nodes {
 						specifier := stmt.AsImportDeclaration().ModuleSpecifier
-						if found, ok := import_utils.HasDefaultExport(ctx, specifier); !ok || found != tc.want[i] {
-							t.Errorf("%s: HasDefaultExport(%s) = (%v, %v), want (%v, true)", tc.file, specifier.Text(), found, ok, tc.want[i])
+						if found, ok := import_utils.HasExport(ctx, specifier, "default"); !ok || found != tc.want[i] {
+							t.Errorf("%s: HasExport(%s, default) = (%v, %v), want (%v, true)", tc.file, specifier.Text(), found, ok, tc.want[i])
+						}
+						// import/default follows upstream's explicit interop option,
+						// independently of the native Node default on an import edge.
+						wantImportDefault := config == "tsconfig.interop.json" && i != 10
+						if found, ok := import_utils.HasDefaultExport(ctx, specifier); !ok || found != wantImportDefault {
+							t.Errorf("%s: HasDefaultExport(%s) = (%v, %v), want (%v, true)", tc.file, specifier.Text(), found, ok, wantImportDefault)
 						}
 						if exports, ok := import_utils.GetExportMap(ctx, specifier); !ok || exports.HasDefault() != tc.want[i] {
 							t.Errorf("%s: GetExportMap(%s).HasDefault = %v, want %v", tc.file, specifier.Text(), exports.HasDefault(), tc.want[i])
@@ -687,12 +693,14 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 		esModuleInterop   core.Tristate
 		module            core.ModuleKind
 		wantDefaultExport bool
+		wantDefaultImport bool
 	}{
 		{
-			name:              "named TypeScript exports do not synthesize default when enabled",
+			name:              "named TypeScript exports supply an interop default import",
 			source:            "./typescript",
 			esModuleInterop:   core.TSTrue,
 			wantDefaultExport: false,
+			wantDefaultImport: true,
 		},
 		{
 			name:              "named TypeScript exports do not synthesize default with inferred interop",
@@ -711,6 +719,7 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 			source:            "./typescript-export-assign-default-namespace",
 			esModuleInterop:   core.TSTrue,
 			wantDefaultExport: true,
+			wantDefaultImport: true,
 		},
 		{
 			name:              "export equals namespace does not synthesize default when disabled",
@@ -729,12 +738,14 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 			source:            "./typescript-export-assign-local",
 			esModuleInterop:   core.TSFalse,
 			wantDefaultExport: true,
+			wantDefaultImport: true,
 		},
 		{
-			name:              "namespace re-export does not synthesize default when enabled",
+			name:              "namespace re-export supplies an interop default import",
 			source:            "./export-namespace-alias-chain/namespace-alias",
 			esModuleInterop:   core.TSTrue,
 			wantDefaultExport: false,
+			wantDefaultImport: true,
 		},
 		{
 			name:              "namespace re-export does not synthesize default when disabled",
@@ -747,6 +758,7 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 			source:            "./typescript-export-as-default-namespace",
 			esModuleInterop:   core.TSTrue,
 			wantDefaultExport: true,
+			wantDefaultImport: true,
 		},
 	}
 
@@ -759,8 +771,8 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 				Module:          tc.module,
 			})
 			gotDefaultExport, gotOK := import_utils.HasDefaultExport(ctx, specifier)
-			if gotDefaultExport != tc.wantDefaultExport || !gotOK {
-				t.Fatalf("HasDefaultExport with esModuleInterop=%v = (%v, %v), want (%v, true)", tc.esModuleInterop, gotDefaultExport, gotOK, tc.wantDefaultExport)
+			if gotDefaultExport != tc.wantDefaultImport || !gotOK {
+				t.Fatalf("HasDefaultExport with esModuleInterop=%v = (%v, %v), want (%v, true)", tc.esModuleInterop, gotDefaultExport, gotOK, tc.wantDefaultImport)
 			}
 			exports, ok := import_utils.GetExportMap(ctx, specifier)
 			if !ok || exports.HasDefault() != tc.wantDefaultExport {

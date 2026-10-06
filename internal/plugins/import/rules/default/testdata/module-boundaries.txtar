@@ -13,6 +13,10 @@ Compiler-forced module markers and import.meta alone do not establish an export 
 {"extends":"./tsconfig.interop.json","compilerOptions":{"moduleDetection":"legacy"}}
 -- tsconfig.force-interop.json --
 {"extends":"./tsconfig.interop.json","compilerOptions":{"moduleDetection":"force"}}
+-- tsconfig.node.json --
+{"extends":"./tsconfig.json","compilerOptions":{"module":"nodenext","moduleResolution":"nodenext"}}
+-- tsconfig.node-interop.json --
+{"extends":"./tsconfig.node.json","compilerOptions":{"esModuleInterop":true,"allowSyntheticDefaultImports":true}}
 -- consumer.ts --
 export {};
 -- common.cjs --
@@ -41,6 +45,53 @@ module.exports = 1;
 -- import-binding.cjs --
 import value from './default.mjs';
 module.exports = value;
+-- spaced-import.cjs --
+module.exports = import ('./named.mjs');
+-- comment-import.cjs --
+module.exports = import/* comment */('./named.mjs');
+-- comment-export.cjs --
+// export const fake = 1
+import './default.mjs';
+-- comment-trigger.cjs --
+// ; export const fake = 1
+import './default.mjs';
+-- non-js-space.cjs --
+//export fake
+import './default.mjs';
+-- import-alias.cts --
+import name = require('./named.mjs');
+-- import-alias-export.cts --
+import name = require('./named.mjs');
+export const named = 1;
+-- reexport-import-only.mjs --
+export { missing as default } from './import-only.cjs';
+-- empty.mjs --
+export {};
+-- local-list.mjs --
+const named = 1;
+export { named };
+-- remote-list.mjs --
+export { named } from './named.mjs';
+-- namespace.mjs --
+export * as names from './named.mjs';
+-- broken-default-local.mjs --
+export { missing as default } from './named.mjs';
+export const named = 2;
+-- unicode-space.mjs --
+export const named = 1;
+-- unicode-line.mjs --
+/* lead */ export const named = 1;
+-- type-export.ts --
+export interface Named {}
+-- empty-namespace.cts --
+declare namespace Empty {}
+export = Empty;
+-- named.cts --
+export const named = 1;
+-- declared.d.cts --
+export declare const named: number;
+-- remote-default.mjs --
+export { default } from './named.mjs';
 -- import-only.cjs --
 import './default.mjs';
 -- meta-named.mjs --

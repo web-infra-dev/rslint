@@ -3,6 +3,8 @@ package default_rule_test
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -22,33 +24,50 @@ func TestDefaultModuleBoundaries(t *testing.T) {
 	for _, config := range []string{
 		"tsconfig.json", "tsconfig.legacy.json", "tsconfig.force.json",
 		"tsconfig.interop.json", "tsconfig.legacy-interop.json", "tsconfig.force-interop.json",
+		"tsconfig.node.json", "tsconfig.node-interop.json",
 	} {
 		t.Run(config, func(t *testing.T) {
+			fileName := "consumer.ts"
+			if strings.Contains(config, "node") {
+				fileName = "consumer.mts"
+			}
 			var valid []rule_tester.ValidTestCase
 			for _, source := range []string{
 				"common.cjs", "object.cjs", "properties.cjs", "common.js", "empty.cjs", "decoys.cjs",
 				"meta.mjs", "default.mjs", "common-barrel.mjs", "named-common-barrel.mjs", "type-query.ts", "jsdoc.cjs",
+				"import-only.cjs", "spaced-import.cjs", "comment-import.cjs", "comment-export.cjs",
+				"non-js-space.cjs", "import-alias.cts", "reexport-import-only.mjs",
 			} {
 				valid = append(valid, rule_tester.ValidTestCase{
-					Code: fmt.Sprintf("import value from './%s';", source), FileName: "consumer.ts",
+					Code: fmt.Sprintf("import value from './%s';", source), FileName: fileName,
 				})
 			}
 			valid = append(valid,
-				rule_tester.ValidTestCase{Code: `import type Value from './common.cjs';`, FileName: "consumer.ts"},
-				rule_tester.ValidTestCase{Code: `import value, { named } from './object.cjs';`, FileName: "consumer.ts"},
+				rule_tester.ValidTestCase{Code: `import type Value from './common.cjs';`, FileName: fileName},
+				rule_tester.ValidTestCase{Code: `import value, { named } from './object.cjs';`, FileName: fileName},
 				// RunRuleTester registers the rule under the name "test".
-				rule_tester.ValidTestCase{Code: "// eslint-disable-next-line test\nimport value from './named.mjs';", FileName: "consumer.ts"},
-				rule_tester.ValidTestCase{Code: "/* eslint-disable test */\nimport value from './named.mjs';", FileName: "consumer.ts"},
+				rule_tester.ValidTestCase{Code: "// eslint-disable-next-line test\nimport value from './common-star.mjs';", FileName: fileName},
+				rule_tester.ValidTestCase{Code: "/* eslint-disable test */\nimport value from './common-star.mjs';", FileName: fileName},
 			)
 			var invalid []rule_tester.InvalidTestCase
-			// Keep the documented interop behavior: named ESM exports do not
-			// synthesize a default even when esModuleInterop is enabled.
+			// Only local namespace entries synthesize an interop default.
+			interopDefaults := []string{"named.mjs", "mixed.cjs", "meta-named.mjs", "local-list.mjs", "namespace.mjs",
+				"broken-default-local.mjs", "unicode-space.mjs", "unicode-line.mjs", "type-export.ts",
+				"import-alias-export.cts", "empty-namespace.cts", "named.cts", "declared.d.cts", "remote-default.mjs"}
 			for _, source := range []string{
-				"named.mjs", "mixed.cjs", "import-binding.cjs", "meta-named.mjs", "import-only.cjs",
+				"named.mjs", "mixed.cjs", "import-binding.cjs", "meta-named.mjs",
 				"common-star.mjs", "missing-barrel.mjs", "dynamic.cjs", "nested-dynamic.cjs", "computed-dynamic.cjs",
+				"empty.mjs", "local-list.mjs", "remote-list.mjs", "namespace.mjs", "broken-default-local.mjs",
+				"unicode-space.mjs", "unicode-line.mjs", "type-export.ts", "import-alias-export.cts",
+				"empty-namespace.cts", "named.cts", "declared.d.cts", "remote-default.mjs", "comment-trigger.cjs",
 			} {
+				code := fmt.Sprintf("import value from './%s';", source)
+				if strings.Contains(config, "interop") && slices.Contains(interopDefaults, source) {
+					valid = append(valid, rule_tester.ValidTestCase{Code: code, FileName: fileName})
+					continue
+				}
 				invalid = append(invalid, rule_tester.InvalidTestCase{
-					Code: fmt.Sprintf("import value from './%s';", source), FileName: "consumer.ts",
+					Code: code, FileName: fileName,
 					Errors: []rule_tester.InvalidTestCaseError{{
 						MessageId: "noDefault", Message: fmt.Sprintf("No default export found in imported module %q.", "./"+source),
 						Line: 1, Column: 8, EndLine: 1, EndColumn: 13,
@@ -71,6 +90,8 @@ func TestDefaultExtras(t *testing.T) {
 		t,
 		&default_rule.DefaultRule,
 		[]rule_tester.ValidTestCase{
+			// Upstream synthesizes a default from local named exports with interop.
+			{Code: `import value from "./named-exports";`},
 			// ---- Dimension 4: declaration forms, side-effect import has no default specifier ----
 			{Code: `import "./named-exports";`},
 			// ---- Dimension 4: declaration forms, namespace import has no default specifier ----
@@ -98,14 +119,6 @@ func TestDefaultExtras(t *testing.T) {
 			{Code: `import foo from "./cycle-with-local-default-a";`},
 		},
 		[]rule_tester.InvalidTestCase{
-			// esModuleInterop does not create a default for ES named exports.
-			// The fixture config explicitly enables interop.
-			{
-				Code: `import missing from "./named-exports";`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noDefault", Message: noDefaultFromNamedExports, Line: 1, Column: 8, EndLine: 1, EndColumn: 15},
-				},
-			},
 			// ---- Dimension 4: declaration forms, default import plus named imports still checks the default specifier ----
 			{
 				Code:     `import missing, { foo } from "./named-exports";`,
