@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -18,6 +19,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -790,6 +793,15 @@ consume(view);`,
 			wantNames: []string{"div", "title"},
 		},
 		{
+			name:      "JavaScript JSX component references",
+			extension: ".jsx",
+			code: `const React = {};
+const Component = () => null;
+const value = 1;
+export const view = <Component prop={value} />;`,
+			wantNames: []string{"React"},
+		},
+		{
 			name:      "import attribute key",
 			extension: ".ts",
 			code: `const type = 1;
@@ -999,5 +1011,337 @@ assigned = 2;
 	}
 	if suggestionOnly[1].Suggestions != nil || allEdits[1].Suggestions != nil {
 		t.Fatalf("write-only diagnostic unexpectedly has remove suggestions")
+	}
+}
+
+// These cases were checked against ESLint 10.12.0 (Espree) and
+// eslint-plugin-react 7.37.5 with all four marking-rule combinations.
+func TestNoUnusedVarsJSXMarking(t *testing.T) {
+	tests := []struct {
+		name, code string
+		settings   map[string]any
+		options    any
+		want       [4]string
+	}{
+		{
+			name: "basic",
+			code: `const React = {}; const Button = () => null; export const view = <Button />;`,
+			want: [4]string{"unusedVar:React@6", "unusedVar:React@6", "", ""},
+		},
+		{
+			name: "paired",
+			code: `const React = {}; const Button = () => null; export const view = <Button></Button>;`,
+			want: [4]string{"unusedVar:React@6", "unusedVar:React@6", "", ""},
+		},
+		{
+			name: "member",
+			code: `const React = {}; const UI = {}; const Button = 1; export const view = <UI.Button />;`,
+			want: [4]string{"unusedVar:React@6,unusedVar:Button@39", "unusedVar:React@6,unusedVar:Button@39", "unusedVar:Button@39", "unusedVar:Button@39"},
+		},
+		{
+			name: "deep-member",
+			code: `const UI = {}; export const view = <UI.Nested.Button />;`,
+			want: [4]string{"", "", "", ""},
+		},
+		{
+			name: "lower-member",
+			code: `const ui = {}; export const view = <ui.Button />;`,
+			want: [4]string{"", "", "", ""},
+		},
+		{
+			name: "intrinsic",
+			code: `const div = 1; export const view = <div />;`,
+			want: [4]string{"unusedVar:div@6", "unusedVar:div@6", "unusedVar:div@6", "unusedVar:div@6"},
+		},
+		{
+			name: "custom-element",
+			code: `const My = 1; export const view = <My-element />;`,
+			want: [4]string{"unusedVar:My@6", "unusedVar:My@6", "unusedVar:My@6", "unusedVar:My@6"},
+		},
+		{
+			name: "unicode-capital",
+			code: `const É = () => null; export const view = <É />;`,
+			want: [4]string{"", "", "", ""},
+		},
+		{
+			name: "unicode-expansion",
+			code: `const ß = () => null; export const view = <ß />;`,
+			want: [4]string{"unusedVar:ß@6", "", "unusedVar:ß@6", ""},
+		},
+		{
+			name: "unicode-member",
+			code: `const é = {}; export const view = <é.Component />;`,
+			want: [4]string{"", "", "", ""},
+		},
+		{
+			name: "dollar",
+			code: `const $Component = () => null; export const view = <$Component />;`,
+			want: [4]string{"", "", "", ""},
+		},
+		{
+			name: "unicode",
+			code: `const é = () => null; export const view = <é />;`,
+			want: [4]string{"unusedVar:\u00e9@6", "", "unusedVar:\u00e9@6", ""},
+		},
+		{
+			name: "namespace",
+			code: `const Svg = 1; const Path = 1; export const view = <Svg:Path />;`,
+			want: [4]string{"unusedVar:Svg@6,unusedVar:Path@21", "unusedVar:Svg@6,unusedVar:Path@21", "unusedVar:Svg@6,unusedVar:Path@21", "unusedVar:Svg@6,unusedVar:Path@21"},
+		},
+		{
+			name: "expressions",
+			code: `const Component = () => null; const prop = 1; const child = 2; const rest = {}; export const view = <Component prop={prop} {...rest}>{child}</Component>;`,
+			want: [4]string{"", "", "", ""},
+		},
+		{
+			name: "shadow",
+			code: `const React = {}; const Button = () => null; export function render(React, Button) { return <Button />; }`,
+			want: [4]string{"unusedVar:React@6,unusedVar:Button@24", "unusedVar:React@6,unusedVar:Button@24", "unusedVar:React@6,unusedVar:Button@24", "unusedVar:React@6,unusedVar:Button@24"},
+		},
+		{
+			name: "after-used",
+			code: `export function render(unused, Component, trailing) { return <Component />; }`,
+			want: [4]string{"unusedVar:trailing@42", "unusedVar:trailing@42", "unusedVar:trailing@42", "unusedVar:trailing@42"},
+		},
+		{
+			name: "destructured-arg",
+			code: `export function render(unused, {Component}) { return <Component />; }`,
+			want: [4]string{"", "", "", ""},
+		},
+		{
+			name: "recursive",
+			code: `function Component() { return <Component />; }`,
+			want: [4]string{"unusedVar:Component@9", "", "unusedVar:Component@9", ""},
+		},
+		{
+			name: "class-self",
+			code: `class Component { render() { return <Component />; } }`,
+			want: [4]string{"unusedVar:Component@6", "unusedVar:Component@6", "unusedVar:Component@6", "unusedVar:Component@6"},
+		},
+		{
+			name: "named-function",
+			code: `const Inner = 0; export const render = function Inner() { return <Inner />; };`,
+			want: [4]string{"unusedVar:Inner@6", "unusedVar:Inner@6", "unusedVar:Inner@6", "unusedVar:Inner@6"},
+		},
+		{
+			name: "named-class",
+			code: `const Inner = 0; export const View = class Inner { render() { return <Inner />; } };`,
+			want: [4]string{"unusedVar:Inner@6", "unusedVar:Inner@6", "unusedVar:Inner@6", "unusedVar:Inner@6"},
+		},
+		{
+			name: "imports",
+			code: `import React, {Button as Component} from "react"; import * as UI from "ui"; export const view = <Component><UI.Button /></Component>;`,
+			want: [4]string{"unusedVar:React@7", "unusedVar:React@7", "", ""},
+		},
+		{
+			name: "fragment",
+			code: `const React = {}; const Fragment = {}; export const view = <></>;`,
+			want: [4]string{"unusedVar:React@6,unusedVar:Fragment@24", "unusedVar:React@6,unusedVar:Fragment@24", "", ""},
+		},
+		{
+			name:     "settings",
+			code:     `const h = {}; const Frag = {}; const React = {}; const Fragment = {}; export const view = <></>;`,
+			settings: map[string]any{"react": map[string]any{"pragma": "h", "fragment": "Frag"}},
+			want:     [4]string{"unusedVar:h@6,unusedVar:Frag@20,unusedVar:React@37,unusedVar:Fragment@55", "unusedVar:h@6,unusedVar:Frag@20,unusedVar:React@37,unusedVar:Fragment@55", "unusedVar:React@37,unusedVar:Fragment@55", "unusedVar:React@37,unusedVar:Fragment@55"},
+		},
+		{
+			name: "annotation",
+			code: `/** @jsx h.createElement */ const h = {}; const React = {}; export const view = <div />;`,
+			want: [4]string{"unusedVar:h@34,unusedVar:React@48", "unusedVar:h@34,unusedVar:React@48", "unusedVar:React@48", "unusedVar:React@48"},
+		},
+		{
+			name:     "annotation-precedence",
+			code:     `/** @jsx h */ const h = {}; const R = {}; export const view = <div />;`,
+			settings: map[string]any{"react": map[string]any{"pragma": "R"}},
+			want:     [4]string{"unusedVar:h@20,unusedVar:R@34", "unusedVar:h@20,unusedVar:R@34", "unusedVar:R@34", "unusedVar:R@34"},
+		},
+		{
+			name: "global",
+			code: `/* global React, Component, Fragment */ export const view = <><Component /></>;`,
+			want: [4]string{"unusedVar:React@10,unusedVar:Fragment@28", "unusedVar:React@10,unusedVar:Fragment@28", "", ""},
+		},
+		{
+			name: "global-shadow",
+			code: `/* global React */ export function render(React) { return <div />; }`,
+			want: [4]string{"unusedVar:React@10,unusedVar:React@42", "unusedVar:React@10,unusedVar:React@42", "unusedVar:React@10", "unusedVar:React@10"},
+		},
+		{
+			name: "default-scope",
+			code: `const React = {}; export function render(view = <div />) { var React = {}; return view; }`,
+			want: [4]string{"unusedVar:React@6,unusedVar:React@63", "unusedVar:React@6,unusedVar:React@63", "unusedVar:React@6", "unusedVar:React@6"},
+		},
+		{
+			name: "default-component",
+			code: `const Component = () => null; export function render(view = <Component />) { var Component = () => null; return view; }`,
+			want: [4]string{"unusedVar:Component@81", "", "unusedVar:Component@81", ""},
+		},
+		{
+			name: "before-declaration",
+			code: `export const view = <Button />; const Button = () => null;`,
+			want: [4]string{"", "", "", ""},
+		},
+		{
+			name:    "unused-pattern",
+			code:    `const _Component = () => null; export const view = <_Component />;`,
+			options: map[string]any{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
+			want:    [4]string{"usedIgnoredVar:_Component@6", "usedIgnoredVar:_Component@6", "usedIgnoredVar:_Component@6", "usedIgnoredVar:_Component@6"},
+		},
+		{
+			name:    "ignore-react",
+			code:    `const React = {}; export const view = <div />;`,
+			options: map[string]any{"varsIgnorePattern": "^React$", "reportUsedIgnorePattern": true},
+			want:    [4]string{"", "", "usedIgnoredVar:React@6", "usedIgnoredVar:React@6"},
+		},
+		{
+			name:    "args-pattern",
+			code:    `export function render(_Component) { return <_Component />; }`,
+			options: map[string]any{"argsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
+			want:    [4]string{"usedIgnoredVar:_Component@23", "usedIgnoredVar:_Component@23", "usedIgnoredVar:_Component@23", "usedIgnoredVar:_Component@23"},
+		},
+		{
+			name: "catch",
+			code: `try {} catch (Component) { consume(<Component />); }`,
+			want: [4]string{"", "", "", ""},
+		},
+		{
+			name: "write",
+			code: `let Component; Component = () => null; consume(<Component />);`,
+			want: [4]string{"", "", "", ""},
+		},
+		{
+			name: "no-jsx",
+			code: `const React = {}; const Button = () => null;`,
+			want: [4]string{"unusedVar:React@6,unusedVar:Button@24", "unusedVar:React@6,unusedVar:Button@24", "unusedVar:React@6,unusedVar:Button@24", "unusedVar:React@6,unusedVar:Button@24"},
+		},
+		{
+			name: "disabled-markers",
+			code: `const React = {}; const Button = () => null; /* eslint-disable react/jsx-uses-react, react/jsx-uses-vars */ export const view = <Button />;`,
+			want: [4]string{"unusedVar:React@6", "unusedVar:React@6", "", ""},
+		},
+		{
+			name: "disabled-core",
+			code: `const React = {};
+// eslint-disable-next-line no-unused-vars
+const Button = () => null;
+export const view = <Button />;`,
+			want: [4]string{"unusedVar:React@6", "unusedVar:React@6", "", ""},
+		},
+		{
+			name: "shadow-block",
+			code: `const Component = () => null; { const Component = () => null; consume(<Component />); }`,
+			want: [4]string{"unusedVar:Component@6", "unusedVar:Component@6", "unusedVar:Component@6", "unusedVar:Component@6"},
+		},
+		{
+			name: "for-binding",
+			code: `const Component = () => null; for (const Component of components) { consume(<Component />); }`,
+			want: [4]string{"unusedVar:Component@6", "unusedVar:Component@6", "unusedVar:Component@6", "unusedVar:Component@6"},
+		},
+		{
+			name: "member-this",
+			code: `const Button = 1; export function render() { return <this.Button />; }`,
+			want: [4]string{"unusedVar:Button@6", "unusedVar:Button@6", "unusedVar:Button@6", "unusedVar:Button@6"},
+		},
+		{
+			name:    "exported-component",
+			code:    `export const _Component = () => null; consume(<_Component />);`,
+			options: map[string]any{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
+			want:    [4]string{"usedIgnoredVar:_Component@13", "usedIgnoredVar:_Component@13", "usedIgnoredVar:_Component@13", "usedIgnoredVar:_Component@13"},
+		},
+		{
+			name:     "exported-pragma",
+			code:     `export const _React = {}; export const view = <div />;`,
+			settings: map[string]any{"react": map[string]any{"pragma": "_React"}},
+			options:  map[string]any{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
+			want:     [4]string{"", "", "usedIgnoredVar:_React@13", "usedIgnoredVar:_React@13"},
+		},
+		{
+			name: "class-heritage",
+			code: `class Component extends (consume(<Component />), Base) {}`,
+			want: [4]string{"unusedVar:Component@6", "unusedVar:Component@6", "unusedVar:Component@6", "unusedVar:Component@6"},
+		},
+		{
+			name: "class-computed",
+			code: `class Component { [consume(<Component />)]() {} }`,
+			want: [4]string{"unusedVar:Component@6", "unusedVar:Component@6", "unusedVar:Component@6", "unusedVar:Component@6"},
+		},
+		{
+			name: "class-external",
+			code: `class Component { render() { return <Component />; } } consume(<Component />);`,
+			want: [4]string{"", "", "", ""},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := fixtures.GetRootDir()
+			fileName := tspath.ResolvePath(root.Dir, "jsx-marking.jsx")
+			fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: test.code})
+			program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+				RootFileNames:  []string{fileName},
+				Host:           utils.CreateCompilerHost(root.Dir, fs),
+				SingleThreaded: true,
+				CompilerOptions: &core.CompilerOptions{
+					AllowJs: core.TSTrue,
+					NoLib:   core.TSTrue,
+					Jsx:     core.JsxEmitPreserve,
+					Target:  core.ScriptTargetESNext,
+					Module:  core.ModuleKindESNext,
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			resolvedOptions := rule_tester.ResolveTestCaseOptions(t, &NoUnusedVarsRule, test.options)
+			// Reuse the same bound source across configurations and rule orders. The
+			// final unmarked pass must not inherit marks from a previous lint pass.
+			for _, reverse := range []bool{false, true} {
+				for _, mask := range []int{0, 1, 2, 3, 0} {
+					t.Run(fmt.Sprintf("markers-%d/reverse-%t", mask, reverse), func(t *testing.T) {
+						environment := &rule.RuleEnvironment{Settings: test.settings}
+						rules := []rule.ConfiguredRule{{
+							Name:        NoUnusedVarsRule.Name,
+							Severity:    rule.SeverityError,
+							Environment: environment,
+							Run: func(ctx rule.RuleContext) rule.RuleListeners {
+								return NoUnusedVarsRule.Run(ctx, resolvedOptions)
+							},
+						}}
+						for i, marker := range []*rule.Rule{&jsx_uses_vars.JsxUsesVarsRule, &jsx_uses_react.JsxUsesReactRule} {
+							if mask&(1<<i) == 0 {
+								continue
+							}
+							rules = append(rules, rule.ConfiguredRule{
+								Name:        marker.Name,
+								Severity:    rule.SeverityError,
+								Environment: environment,
+								Run: func(ctx rule.RuleContext) rule.RuleListeners {
+									return marker.Run(ctx, nil)
+								},
+							})
+						}
+						if reverse {
+							slices.Reverse(rules)
+						}
+						var got []string
+						testutil.LintProgram(t, testutil.LintProgramOptions{
+							Program: program,
+							Files:   []string{fileName},
+							GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+								return rules
+							},
+							OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
+								name := diagnostic.Message.Data["varName"]
+								got = append(got, fmt.Sprintf("%s:%s@%d", diagnostic.Message.Id, name, diagnostic.Range.Pos()))
+								if actual := test.code[diagnostic.Range.Pos():diagnostic.Range.End()]; actual != name {
+									t.Errorf("diagnostic range selects %q, want %q", actual, name)
+								}
+							},
+						})
+						if strings.Join(got, ",") != test.want[mask] {
+							t.Fatalf("diagnostics = %v, want %s", got, test.want[mask])
+						}
+					})
+				}
+			}
+		})
 	}
 }

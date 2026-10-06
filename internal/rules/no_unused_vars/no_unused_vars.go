@@ -4,12 +4,14 @@ import (
 	_ "embed"
 	"fmt"
 	"sort"
+	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -245,11 +247,10 @@ func reportVariableDiagnostic(
 }
 
 type VariableInfo struct {
-	Variable       *ast.Node
-	Used           bool
-	OnlyUsedAsType bool
-	References     []*ast.Node
-	Definition     *ast.Node
+	Variable   *ast.Node
+	Used       bool
+	References []*ast.Node
+	Definition *ast.Node
 }
 
 func parseOptions(options []any) Config {
@@ -726,7 +727,7 @@ func isStorableFunction(function *ast.Node, rhs *ast.Node) bool {
 
 // isParamUsed checks if a parameter name (Identifier or binding pattern) has any usage.
 // Recursively checks destructured binding elements.
-func isParamUsed(nameNode *ast.Node, allUsages map[*ast.Symbol][]*ast.Node) bool {
+func isParamUsed(ctx rule.RuleContext, nameNode *ast.Node, allUsages map[*ast.Symbol][]*ast.Node) bool {
 	if nameNode == nil {
 		return false
 	}
@@ -734,6 +735,9 @@ func isParamUsed(nameNode *ast.Node, allUsages map[*ast.Symbol][]*ast.Node) bool
 		sym := binderDeclarationSymbol(nameNode, nameNode.Parent)
 		if sym == nil {
 			return false
+		}
+		if ctx.IsVariableMarkedAsUsed(sym) {
+			return true
 		}
 		if usageNodes, exists := allUsages[sym]; exists {
 			for _, usage := range usageNodes {
@@ -750,7 +754,7 @@ func isParamUsed(nameNode *ast.Node, allUsages map[*ast.Symbol][]*ast.Node) bool
 		nameNode.ForEachChild(func(child *ast.Node) bool {
 			if child.Kind == ast.KindBindingElement {
 				elem := child.AsBindingElement()
-				if elem != nil && isParamUsed(elem.Name(), allUsages) {
+				if elem != nil && isParamUsed(ctx, elem.Name(), allUsages) {
 					found = true
 					return true
 				}
@@ -1046,7 +1050,7 @@ func definitionVariableType(definition *ast.Node, opts *Config) variableType {
 // parameter that is used (or has a default value). Used for the "after-used"
 // args option: unused parameters before the last used one are allowed because
 // they serve as positional placeholders.
-func isBeforeLastUsedParam(paramNode *ast.Node, allUsages map[*ast.Symbol][]*ast.Node) bool {
+func isBeforeLastUsedParam(ctx rule.RuleContext, paramNode *ast.Node, allUsages map[*ast.Symbol][]*ast.Node) bool {
 	if paramNode == nil || paramNode.Parent == nil {
 		return false
 	}
@@ -1078,7 +1082,7 @@ func isBeforeLastUsedParam(paramNode *ast.Node, allUsages map[*ast.Symbol][]*ast
 			return true
 		}
 
-		if isParamUsed(sibling.Name(), allUsages) {
+		if isParamUsed(ctx, sibling.Name(), allUsages) {
 			return true
 		}
 	}
@@ -1637,28 +1641,29 @@ func isNonReferenceIdentifier(node *ast.Node) bool {
 			return true
 		}
 	}
-	if ast.IsJsxTagName(node) && scanner.IsIntrinsicJsxName(node.Text()) {
-		return true
+	if ast.IsJsxTagName(node) {
+		name := node.Text()
+		if ast.IsInJSFile(node) {
+			// ESLint 10 compares the first UTF-16 code unit with its uppercase
+			// form. Astral names start with an unchanged surrogate code unit.
+			if len(name) > 0 && name[0] < utf8.RuneSelf {
+				if name[0] >= 'a' && name[0] <= 'z' {
+					return true
+				}
+			} else {
+				first, size := utf8.DecodeRuneInString(name)
+				if first <= 0xffff && ecmascript.StringToUpperCase(name[:size]) != name[:size] {
+					return true
+				}
+			}
+		} else if scanner.IsIntrinsicJsxName(name) {
+			return true
+		}
 	}
 	if parent.Kind == ast.KindJsxAttribute || parent.Kind == ast.KindJsxNamespacedName {
 		return true
 	}
 	return parent.Kind == ast.KindImportAttribute && parent.Name() == node
-}
-
-func isIdentifierInTypeReference(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
-	}
-	if ast.IsPartOfTypeNode(node) || ast.IsPartOfTypeQuery(node) || node.Parent.Kind == ast.KindQualifiedName {
-		return true
-	}
-	current := node.Parent
-	for current != nil && current.Kind == ast.KindPropertyAccessExpression {
-		current = current.Parent
-	}
-	return current != nil && ast.IsExpressionWithTypeArguments(current) &&
-		!ast.IsExpressionWithTypeArgumentsInClassExtendsClause(current)
 }
 
 // binderDeclarationSymbol returns the binder-owned symbol for a declaration.
@@ -2006,18 +2011,17 @@ func coreTypeDeclarationSelfReferenceCounts(definition *ast.Node) bool {
 // is unused and, if so, reports it. The decision pipeline:
 //  1. Resolve the symbol and look up usages (original sym → SkipAlias → shared reference index)
 //  2. Filter out self-references (same position, self-modifying, inside own declaration body)
-//  3. Classify remaining usages as value or type-only
-//  4. Apply global/directive and value-vs-type semantics
+//  3. Accept surviving value/type references and explicit usage marks
+//  4. Apply global/directive semantics
 //  5. Apply ignore patterns (varsIgnorePattern, argsIgnorePattern, etc.)
 //  6. Skip exports, "after-used" parameters, and option-specific suppressions
 //  7. Report at the last write-reference position (or declaration name as fallback)
 func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, definition *ast.Node, opts *Config, ac *analysisContext) {
 	varInfo := &VariableInfo{
-		Variable:       nameNode,
-		Used:           false,
-		OnlyUsedAsType: false,
-		References:     []*ast.Node{},
-		Definition:     definition,
+		Variable:   nameNode,
+		Used:       false,
+		References: []*ast.Node{},
+		Definition: definition,
 	}
 
 	sym := binderDeclarationSymbol(nameNode, definition)
@@ -2075,36 +2079,23 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 			varInfo.References = usageNodes
 
 			declarationScope := utils.FindEnclosingScope(nameNode)
-			filteredUsages := []*ast.Node{}
 			for _, usage := range usageNodes {
 				if (coreModuleBoundary == nil || ast.IsNodeDescendantOf(usage, coreModuleBoundary)) &&
 					(coreTypeOnlyBoundary == nil || ast.IsNodeDescendantOf(usage, coreTypeOnlyBoundary)) &&
 					usage.Pos() != varInfo.Variable.Pos() &&
 					!isSelfModifyingReference(usage, sym, name, declarationScope, ctx.SourceFile) &&
 					(coreTypeSelfReference || !isInsideAnyOwnDeclaration(usage, allDecls)) {
-					filteredUsages = append(filteredUsages, usage)
+					// Core also counts type references supplied by the TypeScript
+					// scope manager. One surviving reference is sufficient.
+					varInfo.Used = true
+					break
 				}
-			}
-
-			if len(filteredUsages) > 0 {
-				onlyUsedAsType := true
-				for _, usage := range filteredUsages {
-					if !isIdentifierInTypeReference(usage) {
-						onlyUsedAsType = false
-						break
-					}
-				}
-				varInfo.Used = !onlyUsedAsType
-				varInfo.OnlyUsedAsType = onlyUsedAsType
 			}
 		}
 	}
 
-	if varInfo.OnlyUsedAsType {
-		// TypeScript's scope manager presents type references to ESLint's core
-		// rule as uses. Preserve that base-rule behavior.
+	if ctx.IsVariableMarkedAsUsed(sym) {
 		varInfo.Used = true
-		varInfo.OnlyUsedAsType = false
 	}
 	// An `/* exported */` global is consumed by a separately loaded file, so
 	// upstream counts the directive itself as a use. reportUsedIgnorePattern
@@ -2162,7 +2153,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	if !varInfo.Used && !coreTypeOnlyParameter && !coreParameterProperty &&
 		definition != nil && definition.Kind == ast.KindParameter && opts.Args == "after-used" {
 		param := definition.AsParameterDeclaration()
-		if param != nil && param.Initializer == nil && isBeforeLastUsedParam(definition, ac.allUsages) {
+		if param != nil && param.Initializer == nil && isBeforeLastUsedParam(ctx, definition, ac.allUsages) {
 			return
 		}
 	}
@@ -2256,16 +2247,14 @@ func newRule() rule.Rule {
 				seenMergedSymbols: make(map[*ast.Symbol]bool),
 				reporter:          reporter,
 			}
-			collected := false
-
 			seenWithoutBodyFuncSymbols := make(map[*ast.Symbol]bool)
 
-			ensureCollected := func(node *ast.Node) {
-				if !collected {
-					sourceFile := ast.GetSourceFileOfNode(node)
-					collectSymbolUsages(ctx.Refs, sourceFile.AsNode(), ac.allUsages, ac.writeRefs, ac.localExportTargets, ac.globalRefsByName)
-					collected = true
-				}
+			// JSX marking rules run during traversal. Analyze bindings at EOF so
+			// rule order, later JSX, and after-used parameters see every mark.
+			type binding struct{ name, definition *ast.Node }
+			bindings := make([]binding, 0, len(ast.GetLocals(ctx.SourceFile.AsNode())))
+			enqueueVariable := func(name, definition *ast.Node) {
+				bindings = append(bindings, binding{name, definition})
 			}
 
 			// processBindingName handles both simple identifiers and destructuring patterns.
@@ -2279,8 +2268,7 @@ func newRule() rule.Rule {
 					if identifier == nil {
 						return
 					}
-					ensureCollected(definition)
-					processVariable(ctx, nameNode, identifier.Text, definition, opts, ac)
+					enqueueVariable(nameNode, definition)
 				} else if nameNode.Kind == ast.KindObjectBindingPattern || nameNode.Kind == ast.KindArrayBindingPattern {
 					nameNode.ForEachChild(func(child *ast.Node) bool {
 						if child.Kind == ast.KindBindingElement {
@@ -2327,8 +2315,6 @@ func newRule() rule.Rule {
 						return
 					}
 
-					ensureCollected(node)
-
 					if node.Body() == nil {
 						sym := binderDeclarationSymbol(nameNode, node)
 						if sym != nil {
@@ -2339,7 +2325,7 @@ func newRule() rule.Rule {
 						}
 					}
 
-					processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 
 				ast.KindModuleDeclaration: func(node *ast.Node) {
@@ -2377,8 +2363,7 @@ func newRule() rule.Rule {
 						return
 					}
 
-					ensureCollected(node)
-					processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 
 				ast.KindClassDeclaration: func(node *ast.Node) {
@@ -2394,8 +2379,7 @@ func newRule() rule.Rule {
 					if identifier == nil {
 						return
 					}
-					ensureCollected(node)
-					processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 
 				ast.KindInterfaceDeclaration: func(node *ast.Node) {
@@ -2408,8 +2392,7 @@ func newRule() rule.Rule {
 					if identifier == nil {
 						return
 					}
-					ensureCollected(node)
-					processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 
 				ast.KindTypeAliasDeclaration: func(node *ast.Node) {
@@ -2422,8 +2405,7 @@ func newRule() rule.Rule {
 					if identifier == nil {
 						return
 					}
-					ensureCollected(node)
-					processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 
 				ast.KindEnumDeclaration: func(node *ast.Node) {
@@ -2436,8 +2418,7 @@ func newRule() rule.Rule {
 					if identifier == nil {
 						return
 					}
-					ensureCollected(node)
-					processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 
 				ast.KindParameter: func(node *ast.Node) {
@@ -2464,8 +2445,7 @@ func newRule() rule.Rule {
 
 					if nameNode := paramDecl.Name(); nameNode != nil {
 						if nameNode.Kind == ast.KindThisKeyword {
-							ensureCollected(node)
-							processVariable(ctx, nameNode, "this", node, opts, ac)
+							enqueueVariable(nameNode, node)
 							return
 						}
 						processBindingName(nameNode, node)
@@ -2488,8 +2468,7 @@ func newRule() rule.Rule {
 					if identifier == nil {
 						return
 					}
-					ensureCollected(node)
-					processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 
 				ast.KindImportClause: func(node *ast.Node) {
@@ -2506,8 +2485,7 @@ func newRule() rule.Rule {
 					if identifier == nil {
 						return
 					}
-					ensureCollected(node)
-					processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 
 				ast.KindNamespaceImport: func(node *ast.Node) {
@@ -2524,8 +2502,7 @@ func newRule() rule.Rule {
 					if identifier == nil {
 						return
 					}
-					ensureCollected(node)
-					processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 
 				ast.KindImportEqualsDeclaration: func(node *ast.Node) {
@@ -2542,8 +2519,7 @@ func newRule() rule.Rule {
 					if identifier == nil {
 						return
 					}
-					ensureCollected(node)
-					processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 
 				ast.KindTypeParameter: func(node *ast.Node) {
@@ -2565,8 +2541,7 @@ func newRule() rule.Rule {
 					if identifier == nil {
 						return
 					}
-					ensureCollected(node)
-					processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 
 				ast.KindEnumMember: func(node *ast.Node) {
@@ -2575,37 +2550,31 @@ func newRule() rule.Rule {
 						return
 					}
 					nameNode := member.Name()
-					ensureCollected(node)
-					processVariable(ctx, nameNode, nameNode.Text(), node, opts, ac)
+					enqueueVariable(nameNode, node)
 				},
 			}
 
-			ensureCollected(ctx.SourceFile.AsNode())
-			if opts.Vars != "local" {
-				for _, inlineGlobal := range inlineGlobals {
-					if !inlineGlobal.Access.IsDeclared() || len(inlineGlobal.NameRanges) == 0 {
-						continue
-					}
-					if hasInlineGlobalUse(ctx.SourceFile, ctx.Refs, inlineGlobal.Name, ac.globalRefsByName[inlineGlobal.Name]) {
-						continue
-					}
-					reporter.reportRange(
-						inlineGlobal.NameRanges[0],
-						buildUnusedVarMessage(inlineGlobal.Name, false, ""),
-					)
+			listeners[rule.ListenerOnExit(ast.KindEndOfFile)] = func(*ast.Node) {
+				collectSymbolUsages(ctx.Refs, ctx.SourceFile.AsNode(), ac.allUsages, ac.writeRefs, ac.localExportTargets, ac.globalRefsByName)
+				for _, binding := range bindings {
+					processVariable(ctx, binding.name, binding.name.Text(), binding.definition, opts, ac)
 				}
-			}
-
-			statements := ctx.SourceFile.Statements
-			if statements == nil || len(statements.Nodes) == 0 {
+				if opts.Vars != "local" {
+					for _, inlineGlobal := range inlineGlobals {
+						if !inlineGlobal.Access.IsDeclared() || len(inlineGlobal.NameRanges) == 0 {
+							continue
+						}
+						if ctx.IsGlobalMarkedAsUsed(inlineGlobal.Name) ||
+							hasInlineGlobalUse(ctx.SourceFile, ctx.Refs, inlineGlobal.Name, ac.globalRefsByName[inlineGlobal.Name]) {
+							continue
+						}
+						reporter.reportRange(
+							inlineGlobal.NameRanges[0],
+							buildUnusedVarMessage(inlineGlobal.Name, false, ""),
+						)
+					}
+				}
 				reporter.flush(ac)
-			} else {
-				lastTopLevelNode := statements.Nodes[len(statements.Nodes)-1]
-				listeners[rule.ListenerOnExit(lastTopLevelNode.Kind)] = func(node *ast.Node) {
-					if node == lastTopLevelNode {
-						reporter.flush(ac)
-					}
-				}
 			}
 
 			return listeners

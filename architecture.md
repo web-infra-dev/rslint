@@ -484,6 +484,15 @@ alone never admits a `RequiresTypeInfo` rule. Process cwd is stored once in the
 file-shared cache and exposed through `ProcessCurrentDirectory()` rather than
 copied into every per-rule context.
 
+Native rules can call `RuleContext.MarkVariableAsUsed(name, location)` to record
+an implicit use in ESLint's enclosing scope, such as a JSX pragma or component
+tag. These marks belong to the file's lint-pass cache, separate from the immutable Program and
+reference index. The core `no-unused-vars` rule checks bindings at end of file,
+after marking listeners have run, so registration order does not affect the
+result. Marks never carry over to another file or lint pass, and a local mark
+does not mark a shadowed global. Like ESLint, disable comments suppress
+diagnostics without disabling a marking rule's listeners.
+
 Configuration is resolved once per file shape into one immutable
 `RuleEnvironment` shared by that file's `ConfiguredRule` entries. During
 planning that environment belongs to the shared prepared rule set, while each

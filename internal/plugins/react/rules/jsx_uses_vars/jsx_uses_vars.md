@@ -2,7 +2,15 @@
 
 ## Rule Details
 
-Prevent variables used in JSX from being incorrectly marked as unused. This rule is implemented as a no-op in rslint because the TypeChecker already handles JSX variable usage tracking.
+Mark JSX component bindings as used by core `no-unused-vars`. For example,
+`<Button />` marks `Button`, and `<UI.Button />` marks `UI` in the JSX element's
+lexical scope. Lowercase standalone tags such as `<div />` and namespaced tags
+such as `<svg:path />` do not mark variables.
+
+Core `no-unused-vars` already tracks JSX component references, following
+ESLint 10. This rule additionally marks bindings explicitly, which can matter
+for otherwise-discarded self-references. Expressions inside JSX, such as
+`<div>{value}</div>`, also count as references without this rule.
 
 ## Original Documentation
 

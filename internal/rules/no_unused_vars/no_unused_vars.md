@@ -116,6 +116,17 @@ defaults to the CommonJS wrapper. TypeScript-flavoured files configured as
 `commonjs` retain a global program scope, so their top-level bindings can be
 marked by the comment.
 
+## JSX usage marks
+
+Following ESLint 10, JSX component names such as `Button` in `<Button />` count
+as variable references. Enable `react/jsx-uses-react` to mark the JSX pragma
+(by default, `React`) as used, and `react/jsx-uses-vars` to mark component
+bindings explicitly. Expressions inside JSX attributes and children also
+count as ordinary references regardless of these rules.
+
+The marking rules use ESLint's scopes and affect `args: "after-used"` and
+`reportUsedIgnorePattern`.
+
 ## Original Documentation
 
 - [ESLint: no-unused-vars](https://eslint.org/docs/latest/rules/no-unused-vars)

@@ -6,10 +6,12 @@ package rule
 type FileCache struct {
 	values                  map[any]any
 	processCurrentDirectory string
+	variableUsage           *variableUsage
 }
 
 // NewFileCache creates the cache that the linter shares with every rule on one
-// file. Rules should consume it through CachedByFile rather than retaining it.
+// file. Rules should use RuleContext accessors or CachedByFile rather than
+// retaining it.
 func NewFileCache() *FileCache {
 	return &FileCache{}
 }

@@ -2,7 +2,14 @@
 
 ## Rule Details
 
-Prevent React from being incorrectly marked as unused when JSX is used. This rule is implemented as a no-op in rslint because the TypeChecker already handles JSX variable usage tracking.
+Mark the JSX pragma binding as used by core `no-unused-vars` whenever JSX
+appears. The default pragma is `React`; an `@jsx` comment takes precedence over
+`settings.react.pragma`. For shorthand fragments (`<></>`), this rule also marks
+`settings.react.fragment`, which defaults to `Fragment`.
+
+Marks apply to the binding visible at each JSX expression. They work with both
+classic and automatic JSX runtimes and do not depend on TypeScript's `jsx`
+compiler option. Enable `react/jsx-uses-vars` as well to mark component tags.
 
 ## Original Documentation
 
