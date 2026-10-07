@@ -863,6 +863,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/no-magic-array-flat-depth.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-new-array.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-new-buffer.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-negated-condition.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-negation-in-equality-check.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-nested-ternary.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-null.test.ts',

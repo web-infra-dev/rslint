@@ -34,6 +34,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_remove_event_listener"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_lonely_if"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_magic_array_flat_depth"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_negated_condition"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_negation_in_equality_check"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_new_array"
@@ -125,6 +126,7 @@ func GetAllRules() []rule.Rule {
 		no_invalid_remove_event_listener.NoInvalidRemoveEventListenerRule,
 		no_lonely_if.NoLonelyIfRule,
 		no_magic_array_flat_depth.NoMagicArrayFlatDepthRule,
+		no_negated_condition.NoNegatedConditionRule,
 		no_negation_in_equality_check.NoNegationInEqualityCheckRule,
 		no_new_array.NoNewArrayRule,
 		no_new_buffer.NoNewBufferRule,
