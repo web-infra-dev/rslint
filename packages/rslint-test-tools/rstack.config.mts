@@ -840,6 +840,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/max-nested-calls.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-accidental-bitwise-operator.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-anonymous-default-export.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-callback-reference.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-concat-in-loop.test.ts',

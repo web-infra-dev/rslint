@@ -57,7 +57,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/new-for-builtins': 'error',
     // 'unicorn/no-abusive-eslint-disable': 'error', // not implemented
     // 'unicorn/no-accessor-recursion': 'error', // not implemented
-    // 'unicorn/no-accidental-bitwise-operator': 'error', // not implemented
+    'unicorn/no-accidental-bitwise-operator': 'error',
     // 'unicorn/no-anonymous-default-export': 'error', // not implemented
     'unicorn/no-array-callback-reference': 'error',
     'unicorn/no-array-concat-in-loop': 'error',
