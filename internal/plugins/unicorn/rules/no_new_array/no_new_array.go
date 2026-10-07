@@ -44,8 +44,8 @@ var NoNewArrayRule = rule.Rule{
 						value, known := evaluator.EvalControlFlowValue(argument)
 						_, number := value.(jsnum.Number)
 						// A number creates holes; an unknown value may be a number.
-						// Built-in objects, functions, and symbols unsupported by the
-						// shared evaluator remain report-only, including their typeof.
+						// Built-in values and typeof results that the shared evaluator
+						// cannot resolve remain report-only.
 						if !known || number {
 							return nil
 						}

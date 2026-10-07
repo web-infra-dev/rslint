@@ -34,9 +34,9 @@ When `Array` refers to a local declaration, parameter, or import, or is disabled
 
 Constructors with explicit TypeScript type arguments also receive no fix or suggestion. For example, changing `new Array<string | null>('x')` to `['x']` would infer `string[]` and reject a later `push(null)`. To use a literal while retaining the element type, write `const values: (string | null)[] = ['x'];`.
 
-For built-in objects, functions, and symbols, such as `new Array(Math)`, `new Array(Array)`, or `new Array(Symbol.iterator)`, rslint reports the same diagnostic but does not offer upstream's automatic fix. This also applies to their `typeof` expressions, such as `new Array(typeof Array)`.
+For built-in objects and functions, such as `new Array(Math)` or `new Array(Array)`, rslint reports the same diagnostic but does not offer upstream's automatic fix. This also applies to their `typeof` expressions and to `new Array(typeof Symbol.iterator)`.
 
-Replace these constructors with array literals manually, for example `[Symbol.iterator]` or `[typeof Array]`, to make the intended single element explicit.
+Replace these constructors with array literals manually, for example `[Math]` or `[typeof Array]`, to make the intended single element explicit. Well-known symbols are supported directly: `new Array(Symbol.iterator)` is automatically fixed to `[Symbol.iterator]`.
 
 ## Original Documentation
 

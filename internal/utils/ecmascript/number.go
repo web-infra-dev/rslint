@@ -8,6 +8,18 @@ import (
 	"strings"
 )
 
+// NumberToUint32 applies ECMAScript's modulo-2^32 integer conversion.
+func NumberToUint32(number float64) uint32 {
+	if math.IsNaN(number) || math.IsInf(number, 0) || number == 0 {
+		return 0
+	}
+	remainder := math.Mod(math.Trunc(number), 1<<32)
+	if remainder < 0 {
+		remainder += 1 << 32
+	}
+	return uint32(remainder)
+}
+
 // NumberToString writes a number the way JavaScript writes one, which is what
 // `String(n)` and string concatenation produce: the shortest run of digits that
 // reads back as the same value, no sign on a zero, and exponential notation
@@ -133,6 +145,58 @@ func StringToNumber(value string) (float64, bool) {
 		return 0, false
 	}
 	return number, true
+}
+
+// NumberParseInt parses the longest integer prefix using JavaScript's parseInt
+// radix, whitespace, and sign rules. The radix has already undergone ToInt32.
+func NumberParseInt(text string, radix int32) float64 {
+	if radix != 0 && (radix < 2 || radix > 36) {
+		return math.NaN()
+	}
+	text = strings.TrimLeftFunc(text, IsWhiteSpaceOrLineTerminator)
+	sign := 1.0
+	if len(text) > 0 && (text[0] == '+' || text[0] == '-') {
+		if text[0] == '-' {
+			sign = -1
+		}
+		text = text[1:]
+	}
+	if radix == 0 || radix == 16 {
+		if len(text) >= 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X') {
+			text = text[2:]
+			radix = 16
+		}
+	}
+	if radix == 0 {
+		radix = 10
+	}
+	end := 0
+	for end < len(text) {
+		var digit int32
+		switch ch := text[end]; {
+		case ch >= '0' && ch <= '9':
+			digit = int32(ch - '0')
+		case ch >= 'a' && ch <= 'z':
+			digit = int32(ch-'a') + 10
+		case ch >= 'A' && ch <= 'Z':
+			digit = int32(ch-'A') + 10
+		default:
+			digit = 36
+		}
+		if digit >= radix {
+			break
+		}
+		end++
+	}
+	if end == 0 {
+		return math.NaN()
+	}
+	integer, ok := new(big.Int).SetString(text[:end], int(radix))
+	if !ok {
+		return math.NaN()
+	}
+	number, _ := new(big.Float).SetInt(integer).Float64()
+	return math.Copysign(number, sign)
 }
 
 // StringToBigInt applies JavaScript's StringToBigInt operation. Decimal
