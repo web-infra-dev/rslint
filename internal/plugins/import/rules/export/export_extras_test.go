@@ -52,6 +52,12 @@ export default 1; export default 2;`},
 			{Code: `export * from "./namespace";`},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: `export * from "./named" with { type: "text" };`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "noNamed", Message: "No named exports found in module './named'.",
+				}},
+			},
 			// Dotted namespace contents still have their own export scope.
 			{Code: `export namespace A.B.C { export const value = 1; export {value}; }
 export const C = 1;`,

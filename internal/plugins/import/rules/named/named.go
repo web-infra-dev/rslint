@@ -10,6 +10,7 @@ import (
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 //go:embed named.schema.json
@@ -27,7 +28,7 @@ var NamedRule = rule.Rule{
 			}
 		}
 		check := func(source, name *ast.Node) {
-			found, path := import_utils.FindExport(ctx, source, name.Text())
+			found, path := import_utils.FindExportForSource(ctx, modules.SourceFromSpecifier(source), name.Text())
 			if found || len(path) == 0 {
 				return
 			}

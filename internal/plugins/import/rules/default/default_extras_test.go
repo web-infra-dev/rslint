@@ -91,6 +91,8 @@ func TestDefaultExtras(t *testing.T) {
 		t,
 		&default_rule.DefaultRule,
 		[]rule_tester.ValidTestCase{
+			// A text loader exposes the file contents as a synthetic default.
+			{Code: `import source from "./named-exports" with { type: "text" };`, TSConfig: "tsconfig.no-interop.json"},
 			// Upstream synthesizes a default from local named exports with interop.
 			{Code: `import value from "./named-exports";`},
 			// ---- Dimension 4: declaration forms, side-effect import has no default specifier ----
@@ -120,6 +122,21 @@ func TestDefaultExtras(t *testing.T) {
 			{Code: `import foo from "./cycle-with-local-default-a";`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Request-specific views must not leak through the authored export cache.
+			{
+				Code:     "import source from './named-exports' with { type: 'text' };\nimport missing from './named-exports';",
+				TSConfig: "tsconfig.no-interop.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noDefault", Message: noDefaultFromNamedExports, Line: 2, Column: 8, EndLine: 2, EndColumn: 15},
+				},
+			},
+			{
+				Code:     "import missing from './named-exports';\nimport source from './named-exports' with { type: 'text' };",
+				TSConfig: "tsconfig.no-interop.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noDefault", Message: noDefaultFromNamedExports, Line: 1, Column: 8, EndLine: 1, EndColumn: 15},
+				},
+			},
 			// ---- Dimension 4: declaration forms, default import plus named imports still checks the default specifier ----
 			{
 				Code:     `import missing, { foo } from "./named-exports";`,

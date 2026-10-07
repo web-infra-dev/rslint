@@ -91,6 +91,13 @@ func TestMaxDependenciesExtras(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:    `import data from "./data.json" with { type: "json" }; import source from "./data.json" with { type: "text" };`,
+				Options: []any{map[string]any{"max": 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					Message: "Maximum number of dependencies (1) exceeded.", Line: 1, Column: 74, EndLine: 1, EndColumn: 87,
+				}},
+			},
 			// Defaults, option boundaries, and module identity.
 			{
 				Code:   "import \"dep0\";\nimport \"dep1\";\nimport \"dep2\";\nimport \"dep3\";\nimport \"dep4\";\nimport \"dep5\";\nimport \"dep6\";\nimport \"dep7\";\nimport \"dep8\";\nimport \"dep9\";\nimport \"dep10\";",

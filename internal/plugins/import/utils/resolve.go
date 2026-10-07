@@ -4,7 +4,6 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
@@ -76,13 +75,13 @@ func NewImportResolver(ctx rule.RuleContext) *ImportResolver {
 // Resolve returns a path, success (including builtins), and a configuration
 // error. A missing module is not a configuration error. JavaScript resolver
 // plugins cannot execute in the native rule runtime.
-func (r *ImportResolver) Resolve(source *ast.Node) (string, bool, string) {
-	return r.ResolveName(source.Text(), source)
+func (r *ImportResolver) Resolve(source modules.Source) (string, bool, string) {
+	return r.ResolveName(source.Specifier.Text(), source)
 }
 
 // ResolveName resolves a candidate spelling in the original reference's context.
 // Rules comparing paths need this without constructing or mutating AST nodes.
-func (r *ImportResolver) ResolveName(name string, source *ast.Node) (string, bool, string) {
+func (r *ImportResolver) ResolveName(name string, source modules.Source) (string, bool, string) {
 	if slices.Contains(r.core, name) {
 		return "", true, ""
 	}
@@ -110,7 +109,7 @@ func (r *ImportResolver) ResolveName(name string, source *ast.Node) (string, boo
 			if modules.IsNodeBuiltin(name) {
 				return "", true, ""
 			}
-			if path, _, ok := r.ctx.Program().ResolveModuleNameAt(r.ctx.SourceFile, name, source); ok {
+			if path, _, ok := r.ctx.Program().ResolveModuleNameAt(r.ctx.SourceFile, name, source.Specifier); ok {
 				return path, true, ""
 			}
 		default:

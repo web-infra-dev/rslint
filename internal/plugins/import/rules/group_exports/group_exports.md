@@ -11,6 +11,8 @@ reports every declaration in a group that contains multiple exports:
 - CommonJS assignments to `module.exports`, `module.exports.name`, and
   `exports.name` form one group for the file.
 
+Named re-exports with different import attributes belong to different groups. Equivalent attribute sets stay in the same group regardless of property order.
+
 Named export groups are separate for each namespace or declared module body.
 CommonJS checks also recognize literal access such as `module["exports"]` and
 computed export names such as `exports[name]` or `module.exports[name]`.

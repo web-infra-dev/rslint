@@ -25,6 +25,8 @@ func TestNoSelfImportRule(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: `import { bar } from "./bar.ts"`, FileName: "foo.ts"},
 			{Code: `import { bar } from "./bar.json" with { type: "json" }`, FileName: "foo.ts"},
+			{Code: `import source from "./foo.ts" with { type: "text" }`, FileName: "foo.ts"},
+			{Code: `import("./foo.ts", { with: { type: "text" } })`, FileName: "foo.ts"},
 			{Code: `require("./bar.ts")`, FileName: "foo.ts"},
 			{Code: `require()`, FileName: "foo.ts"},
 			{Code: `require(123)`, FileName: "foo.ts"},

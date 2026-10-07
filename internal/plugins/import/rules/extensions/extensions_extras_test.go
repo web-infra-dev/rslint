@@ -75,6 +75,7 @@ func TestExtensionsExtras(t *testing.T) {
 	}
 	for _, code := range []string{
 		`import('./missing.js');`,
+		`import source from './missing.js' with { type: 'text' };`,
 		`import(('./missing.js'), { with: { type: 'json' } });`,
 		`((require))(('./missing.js'));`,
 		`require?.('./missing.js');`,

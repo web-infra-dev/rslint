@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 //go:embed extensions.schema.json
@@ -87,7 +88,7 @@ var ExtensionsRule = rule.Rule{
 		settings := import_utils.SettingsFor(ctx)
 		var resolver *import_utils.ImportResolver
 		reportedResolverError := false
-		resolve := func(source *ast.Node, name string) (string, bool) {
+		resolve := func(source modules.Source, name string) (string, bool) {
 			if resolver == nil {
 				resolver = import_utils.NewImportResolver(ctx)
 			}
@@ -98,8 +99,8 @@ var ExtensionsRule = rule.Rule{
 			}
 			return path, found
 		}
-		return import_utils.VisitModules(func(source *ast.Node, declaration *ast.Node) {
-			written := source.Text()
+		return import_utils.VisitModules(func(source modules.Source) {
+			written := source.Specifier.Text()
 			if written == "" {
 				return
 			}
@@ -130,7 +131,7 @@ var ExtensionsRule = rule.Rule{
 				mode = opts.defaultMode
 			}
 			if extension == "" || !strings.HasSuffix(name, "."+extension) {
-				if mode != "always" || !opts.checkTypeImports && ast.IsExclusivelyTypeOnlyImportOrExport(declaration) {
+				if mode != "always" || !opts.checkTypeImports && ast.IsExclusivelyTypeOnlyImportOrExport(source.Declaration) {
 					return
 				}
 				if action == "" && opts.ignorePackages {
@@ -142,14 +143,14 @@ var ExtensionsRule = rule.Rule{
 				if extension != "" {
 					message += "\"" + extension + "\" "
 				}
-				ctx.ReportNode(source, rule.RuleMessage{Description: message + "for \"" + written + "\""})
+				ctx.ReportNode(source.Specifier, rule.RuleMessage{Description: message + "for \"" + written + "\""})
 			} else if mode == "never" {
 				withoutExtension := name[:len(name)-len(extension)-1]
 				otherPath, otherFound := resolve(source, withoutExtension)
 				// Both unresolved is also equality upstream (undefined === undefined).
 				// Builtins are a distinct successful result with no filesystem path.
 				if resolved == otherPath && found == otherFound {
-					ctx.ReportNode(source, rule.RuleMessage{Description: "Unexpected use of file extension \"" + extension + "\" for \"" + written + "\""})
+					ctx.ReportNode(source.Specifier, rule.RuleMessage{Description: "Unexpected use of file extension \"" + extension + "\" for \"" + written + "\""})
 				}
 			}
 		}, import_utils.VisitModulesOptions{ESModule: true, Commonjs: true})

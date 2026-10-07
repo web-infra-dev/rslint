@@ -58,7 +58,7 @@ var NoUnresolvedRule = rule.Rule{
 			if resolver == nil {
 				resolver = import_utils.NewImportResolver(ctx)
 			}
-			path, found, resolveError := resolver.Resolve(source)
+			path, found, resolveError := resolver.Resolve(ref.WithSpecifier(source))
 			if resolveError != "" && !reportedResolverError {
 				ctx.ReportRange(core.NewTextRange(0, 0), rule.RuleMessage{Description: "Resolve error: " + resolveError})
 				reportedResolverError = true

@@ -8,6 +8,7 @@ import (
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 // https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-named-as-default-member.js
@@ -30,7 +31,7 @@ var NoNamedAsDefaultMemberRule = rule.Rule{
 			if declaration.ImportClause == nil || declaration.ImportClause.Name() == nil {
 				continue
 			}
-			names := import_utils.GetLocalExportNames(ctx, declaration.ModuleSpecifier)
+			names := import_utils.GetLocalExportNamesForSource(ctx, modules.SourceFromSpecifier(declaration.ModuleSpecifier))
 			// The default property is always allowed, so a default-only module
 			// cannot produce a diagnostic and needs no expression listeners.
 			if len(names) == 0 || (len(names) == 1 && names[0] == "default") {

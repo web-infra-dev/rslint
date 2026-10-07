@@ -62,3 +62,36 @@ func TestCollectParenthesizedRequire(t *testing.T) {
 		t.Fatalf("require sources = %q, want %q", names, want)
 	}
 }
+
+func TestCollectImportAttributes(t *testing.T) {
+	file := parseModuleSpecifierCacheFile(`
+		import first from "./data.json" with { type: "json", mode: "strict" };
+		import second from "./data.json" with { "mode": "strict", "type": "json" };
+		export { value } from "./data.json" with { type: "text" };
+		import("./data.json", { with: { type: "json" } });
+		import("./data.json", options);
+		import duplicate from "./data.json" with { type: "json", type: "text" };
+	`)
+	sources := Collect(file, ESModuleReferences)
+	if len(sources) != 6 {
+		t.Fatalf("collected %d sources, want 6", len(sources))
+	}
+	if sources[0].Attributes.Key() == "" || sources[0].Attributes.Key() != sources[1].Attributes.Key() {
+		t.Fatalf("reordered attributes have keys %q and %q", sources[0].Attributes.Key(), sources[1].Attributes.Key())
+	}
+	if value, ok := sources[2].Attributes.Value("type"); !ok || value != "text" {
+		t.Fatalf("export type attribute = (%q, %v), want (text, true)", value, ok)
+	}
+	if value, ok := sources[3].Attributes.Value("type"); !ok || value != "json" {
+		t.Fatalf("dynamic import type attribute = (%q, %v), want (json, true)", value, ok)
+	}
+	if sources[4].Attributes.State != AttributesDynamic {
+		t.Fatalf("dynamic options state = %v, want AttributesDynamic", sources[4].Attributes.State)
+	}
+	if sources[0].Attributes.Key() == sources[2].Attributes.Key() {
+		t.Fatal("different attribute values produced the same key")
+	}
+	if sources[5].Attributes.State != AttributesInvalid {
+		t.Fatalf("duplicate attributes state = %v, want AttributesInvalid", sources[5].Attributes.State)
+	}
+}

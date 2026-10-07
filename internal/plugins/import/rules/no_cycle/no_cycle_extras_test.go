@@ -101,6 +101,9 @@ func TestNoCycleExtras(t *testing.T) {
 			// Locks in upstream checkSourceValue() arm 2: direct self imports are delegated to import/no-self-import.
 			{Code: `import { rootValue as self } from "./file"; ` + rootExports},
 
+			// Attribute-selected data views do not execute the target module graph.
+			{Code: `import source from "./no-cycle/depth-one" with { type: "text" }; ` + rootExports},
+
 			// Locks in upstream checkSourceValue() arm 3: import type declarations are ignored.
 			{Code: `import type { RootType as LocalType } from "./no-cycle/type-only"; ` + rootExports},
 

@@ -182,6 +182,15 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			{
+				Code:     `import source from "../server/b" with { type: "text" }`,
+				FileName: "restricted-paths/client/a.ts",
+				Options: zones(map[string]interface{}{
+					"target": "./restricted-paths/client",
+					"from":   "./restricted-paths/server",
+				}),
+				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/b", 1, 20)},
+			},
+			{
 				Code:     `import b from "../server/b"`,
 				FileName: "restricted-paths/client/😀.ts",
 				Options: zones(map[string]interface{}{

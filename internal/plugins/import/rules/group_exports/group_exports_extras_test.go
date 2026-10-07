@@ -91,6 +91,9 @@ const Box = class module { static { module.exports = {}; module.exports.a = 1; }
 exports.b = 2;`, FileName: "test.cjs"},
 			// An export type and an inline type specifier belong to different groups.
 			{Code: "type A = string; type B = number; export type {A}; export {type B};"},
+			// Different import attributes select distinct module requests.
+			{Code: `export {a} from "m" with {type: "json"};
+export {b} from "m" with {type: "text"};`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// __proto__ is an ordinary source name for both value and type re-exports.
@@ -264,7 +267,7 @@ export {e} from "__proto__";`,
 					{MessageId: "", Message: namedMessage, Line: 3, Column: 1, EndLine: 3, EndColumn: 31},
 					{MessageId: "", Message: namedMessage, Line: 4, Column: 1, EndLine: 4, EndColumn: 31},
 				}},
-			// Import attributes do not separate declarations from the same source.
+			// Equivalent import attributes stay in the same source group.
 			{Code: `export {a} from "m" with {type: "json"};
 export {b} from "m" with {type: "json"};`,
 				Errors: []rule_tester.InvalidTestCaseError{

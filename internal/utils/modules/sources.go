@@ -44,6 +44,15 @@ type Source struct {
 	Declaration *ast.Node
 	Kind        ReferenceKind
 	TypeOnly    bool
+	Attributes  ImportAttributes
+}
+
+// WithSpecifier returns the same authored module request with an equivalent
+// source expression. Resolver-facing filters use it after removing transparent
+// ESTree wrappers without dropping declaration attributes.
+func (source Source) WithSpecifier(specifier *ast.Node) Source {
+	source.Specifier = specifier
+	return source
 }
 
 func collectSpecifiers(file *ast.SourceFile, kinds ReferenceKinds) []Source {
@@ -84,12 +93,7 @@ func collectStaticImports(file *ast.SourceFile, kinds ReferenceKinds) []Source {
 		}
 
 		if kinds.includes(kind) {
-			specifiers = append(specifiers, Source{
-				Specifier:   specifier,
-				Declaration: declaration,
-				Kind:        kind,
-				TypeOnly:    typeOnly,
-			})
+			specifiers = append(specifiers, NewSource(specifier, declaration, kind, typeOnly))
 		}
 	}
 	return specifiers
@@ -210,12 +214,52 @@ func appendSpecifier(specifiers *[]Source, specifier *ast.Node, declaration *ast
 	if specifier == nil {
 		return
 	}
-	*specifiers = append(*specifiers, Source{
+	*specifiers = append(*specifiers, NewSource(specifier, declaration, kind, typeOnly))
+}
+
+// NewSource builds the shared syntax description for one module reference.
+// Collection and listener-based rules use the same constructor so attributes
+// cannot disappear merely because a rule observes a different AST event.
+func NewSource(specifier *ast.Node, declaration *ast.Node, kind ReferenceKind, typeOnly bool) Source {
+	source := Source{
 		Specifier:   specifier,
 		Declaration: declaration,
 		Kind:        kind,
 		TypeOnly:    typeOnly,
-	})
+	}
+	if declaration == nil {
+		return source
+	}
+	switch kind {
+	case ModuleReferenceImport:
+		source.Attributes = staticImportAttributes(declaration.AsImportDeclaration().Attributes)
+	case ModuleReferenceExport:
+		source.Attributes = staticImportAttributes(declaration.AsExportDeclaration().Attributes)
+	case ModuleReferenceDynamicImport:
+		source.Attributes = dynamicImportAttributes(declaration.AsCallExpression())
+	}
+	return source
+}
+
+// SourceFromSpecifier recovers the shared static module reference that owns a
+// parser-recorded module specifier. Detached specifiers retain an attribute-free
+// import-shaped request for compatibility with focused utility tests.
+func SourceFromSpecifier(specifier *ast.Node) Source {
+	if specifier == nil {
+		return Source{}
+	}
+	declaration := ast.TryGetImportFromModuleSpecifier(specifier)
+	if declaration == nil {
+		return NewSource(specifier, nil, ModuleReferenceImport, false)
+	}
+	switch declaration.Kind {
+	case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
+		return NewSource(specifier, declaration, ModuleReferenceImport, importDeclarationOnlyImportsTypes(declaration.AsImportDeclaration()))
+	case ast.KindExportDeclaration:
+		return NewSource(specifier, declaration, ModuleReferenceExport, ast.IsTypeOnlyImportOrExportDeclaration(declaration))
+	default:
+		return Source{Specifier: specifier, Declaration: declaration, Kind: ModuleReferenceRequire}
+	}
 }
 
 func importDeclarationOnlyImportsTypes(importDecl *ast.ImportDeclaration) bool {

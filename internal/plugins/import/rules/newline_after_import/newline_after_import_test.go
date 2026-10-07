@@ -209,6 +209,13 @@ func TestNewlineAfterImportRule(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `import source from "./data.json" with { type: "text" };` + "\nconst value = source;",
+				Output: []string{`import source from "./data.json" with { type: "text" };` + "\n\nconst value = source;"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "newlineAfterImport", Line: 1, Column: 1,
+				}},
+			},
 			// ===== Basic import errors =====
 
 			// Single import → code (no blank line)

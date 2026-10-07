@@ -26,6 +26,9 @@ func TestNoDuplicatesRule(t *testing.T) {
 			// --- Different modules ---
 			{Code: `import { x } from './foo'; import { y } from './bar'`},
 			{Code: `import foo from "module-a"; import { bar } from "module-b"`},
+			// Different import attributes describe distinct module requests.
+			{Code: `import { x } from './foo' with { type: 'json' }; import { y } from './foo' with { type: 'text' }`},
+			{Code: `import { x } from './foo'; import { y } from './foo' with { type: 'text' }`},
 
 			// --- Namespace + named from same module (cannot be merged into one line) ---
 			{Code: `import * as ns from './foo'; import {y} from './foo'`},
@@ -64,6 +67,15 @@ func TestNoDuplicatesRule(t *testing.T) {
 			{Code: "declare module 'a' {\n  import { x } from 'bar';\n}\ndeclare module 'b' {\n  import { x } from 'bar';\n}"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Attribute order is not part of module-request identity.
+			{
+				Code:   `import {x} from './foo' with { type: 'json', mode: 'strict' }; import {y} from './foo' with { mode: 'strict', type: 'json' }`,
+				Output: []string{`import {x,y} from './foo' with { type: 'json', mode: 'strict' }; `},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noDuplicates", Line: 1, Column: 17},
+					{MessageId: "noDuplicates", Line: 1, Column: 80},
+				},
+			},
 			// ============================================================
 			// Basic merge scenarios
 			// ============================================================

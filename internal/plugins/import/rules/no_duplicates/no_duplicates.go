@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 //go:embed no_duplicates.schema.json
@@ -118,9 +119,11 @@ func processScope(resolver *importResolver, statements []*ast.Node) {
 			importMap.entries = make(map[string]importEntry)
 		}
 
-		entry, exists := importMap.entries[resolvedPath]
+		attributes := modules.NewSource(importDecl.ModuleSpecifier, stmt, modules.ModuleReferenceImport, importDecl.ImportClause != nil && importDecl.ImportClause.IsTypeOnly()).Attributes
+		identity := resolvedPath + "\x00" + attributes.Key()
+		entry, exists := importMap.entries[identity]
 		if !exists {
-			importMap.entries[resolvedPath] = importEntry{first: stmt}
+			importMap.entries[identity] = importEntry{first: stmt}
 			continue
 		}
 		if entry.groupIndex == 0 {
@@ -130,7 +133,7 @@ func processScope(resolver *importResolver, statements []*ast.Node) {
 				rest:   []*ast.Node{stmt},
 			})
 			entry.groupIndex = len(importMap.groups)
-			importMap.entries[resolvedPath] = entry
+			importMap.entries[identity] = entry
 			continue
 		}
 		group := &importMap.groups[entry.groupIndex-1]

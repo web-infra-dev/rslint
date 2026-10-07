@@ -46,6 +46,8 @@ disables this synthetic default even when `esModuleInterop` is enabled.
 CommonJS declarations also respect this option; enabling it alone does not
 supply a missing default for an ES module.
 
+Import attributes select the effective module view. `type: "text"` exposes the loaded source as a default string export, and `type: "json"` exposes a default JSON value, independently of the target file's authored JavaScript exports. Unknown or dynamic attribute sets are skipped because their export shape is host-defined.
+
 ## Differences from upstream
 
 - For `export = namespace`, rslint respects `allowSyntheticDefaultImports` and

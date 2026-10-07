@@ -4,10 +4,10 @@ import (
 	_ "embed"
 	"slices"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 //go:embed no_nodejs_modules.schema.json
@@ -27,8 +27,8 @@ var NoNodejsModulesRule = rule.Rule{
 		var settings *import_utils.ModuleSettings
 		var resolver *import_utils.ImportResolver
 		reportedResolverError := false
-		return import_utils.VisitModules(func(source *ast.StringLiteralLike, node *ast.Node) {
-			name := source.Text()
+		return import_utils.VisitModules(func(source modules.Source) {
+			name := source.Specifier.Text()
 			if slices.Contains(allowed, any(name)) {
 				return
 			}
@@ -43,7 +43,7 @@ var NoNodejsModulesRule = rule.Rule{
 			}
 			if settings.IsBuiltinSpecifier(name, path) {
 				// Upstream reports the entire declaration/call, with no message ID or edits.
-				ctx.ReportNode(node, rule.RuleMessage{Description: `Do not import Node.js builtin module "` + name + `"`})
+				ctx.ReportNode(source.Declaration, rule.RuleMessage{Description: `Do not import Node.js builtin module "` + name + `"`})
 			}
 		}, import_utils.VisitModulesOptions{ESModule: true, Commonjs: true})
 	},

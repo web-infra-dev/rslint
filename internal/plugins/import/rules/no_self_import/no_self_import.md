@@ -4,6 +4,8 @@
 
 Disallows a module from importing itself. A module that imports itself creates a circular dependency on itself, which is always a mistake and can cause confusing runtime behavior or errors. This applies to both ES module `import` statements and CommonJS `require()` calls.
 
+Loading the current file through a known text or JSON attribute view is not a self module import because that request does not execute the file as JavaScript.
+
 Examples of **incorrect** code for this rule:
 
 ```javascript

@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 // https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-named-as-default.js
@@ -25,7 +26,7 @@ var NoNamedAsDefaultRule = rule.Rule{
 
 			// The shared map supplies module resolution and export metadata.
 			// Parser errors in dependencies are not reproduced as rule reports.
-			exports, ok := import_utils.GetExportMap(ctx, declaration.ModuleSpecifier)
+			exports, ok := import_utils.GetExportMapForSource(ctx, modules.SourceFromSpecifier(declaration.ModuleSpecifier))
 			if !ok || !exports.HasDefault() || exports.Get(name.Text()) == nil {
 				return
 			}

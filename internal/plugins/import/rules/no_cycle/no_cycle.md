@@ -32,6 +32,8 @@ Type-only imports are ignored because they have no runtime effect. Named
 type-only re-exports still participate in the dependency graph, matching
 `eslint-plugin-import`.
 
+Attribute-selected text and JSON views do not execute the target as a JavaScript module, so their authored dependency graph does not participate in cycle detection. Unknown host-defined loaders are also excluded because their runtime dependency behavior is not statically known.
+
 ## Options
 
 ### `maxDepth`

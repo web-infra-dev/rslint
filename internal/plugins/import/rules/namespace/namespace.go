@@ -9,6 +9,7 @@ import (
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 //go:embed namespace.schema.json
@@ -79,7 +80,7 @@ func processImportDeclaration(ctx rule.RuleContext, namespaces map[string]*impor
 		return
 	}
 
-	imports, ok := import_utils.GetExportMap(ctx, importDecl.ModuleSpecifier)
+	imports, ok := import_utils.GetExportMapForSource(ctx, modules.SourceFromSpecifier(importDecl.ModuleSpecifier))
 	if !ok {
 		return
 	}
@@ -153,7 +154,7 @@ func checkNamespaceExport(ctx rule.RuleContext, namespaceExport *ast.Node) {
 		return
 	}
 
-	imports, ok := import_utils.GetExportMap(ctx, exportDecl.ModuleSpecifier)
+	imports, ok := import_utils.GetExportMapForSource(ctx, modules.SourceFromSpecifier(exportDecl.ModuleSpecifier))
 	if !ok || imports.Size() > 0 {
 		return
 	}

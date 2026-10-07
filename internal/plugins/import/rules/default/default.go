@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 // DefaultRule ensures a default export is present when a module is imported
@@ -27,7 +28,8 @@ var DefaultRule = rule.Rule{
 				return
 			}
 
-			hasDefault, ok := import_utils.HasDefaultExport(ctx, importDecl.ModuleSpecifier)
+			source := modules.NewSource(importDecl.ModuleSpecifier, node, modules.ModuleReferenceImport, importDecl.ImportClause.IsTypeOnly())
+			hasDefault, ok := import_utils.HasDefaultExportForSource(ctx, source)
 			if !ok || hasDefault {
 				return
 			}
