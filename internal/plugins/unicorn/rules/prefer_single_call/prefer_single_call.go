@@ -72,7 +72,7 @@ var PreferSingleCallRule = rule.Rule{
 				if blocked {
 					return
 				}
-				if second.isArrayMethod() && evaluator == nil {
+				if evaluator == nil {
 					evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
 					evaluator.GlobalAccess = ctx.Globals.Access
 				}
@@ -194,7 +194,7 @@ func needsSuggestion(ctx rule.RuleContext, evaluator *utils.StaticStringEvaluato
 		return false
 	}
 	for _, argument := range second.node.Arguments() {
-		if utils.HasSideEffect(argument, false) {
+		if evaluator.HasSideEffect(argument, false) {
 			return true
 		}
 	}

@@ -1,7 +1,8 @@
 // Ported from eslint-plugin-unicorn v77.0.0; see LICENSE.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v77.0.0/test/prefer-single-call.js
 // Additional statement, AST, option and fix-safety cases. Expected edits
-// and complete diagnostic ranges were checked with ESLint 10.9.0 and Unicorn 77.0.0.
+// and complete diagnostic ranges were checked with ESLint 10.9.0 and Unicorn 77.0.0,
+// except for the explicitly noted safety regressions where rslint avoids unsafe fixes.
 package prefer_single_call_test
 
 import (
@@ -209,8 +210,229 @@ func TestPreferSingleCallExtras(t *testing.T) {
 			}},
 		})
 	})
+	t.Run("Static object spreads", func(t *testing.T) {
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_single_call.PreferSingleCallRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
+			{Code: "const a=[]; a.push(1); a.push({...{x:1}});", FileName: "case.js", Output: []string{"const a=[]; a.push(1, {...{x:1}});"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.unshift(1); a.unshift({...{x:1}});", FileName: "case.js", Output: []string{"const a=[]; a.unshift({...{x:1}}, 1);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#unshift()` multiple times.", Line: 1, Column: 29, EndLine: 1, EndColumn: 36, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push({...null,...undefined,...1,...true,...1n});", FileName: "case.js", Output: []string{"const a=[]; a.push(1, {...null,...undefined,...1,...true,...1n});"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push({...\"😀a\"});", FileName: "case.js", Output: []string{"const a=[]; a.push(1, {...\"😀a\"});"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push({...\"\\uD800\"});", FileName: "case.js", Output: []string{"const a=[]; a.push(1, {...\"\\uD800\"});"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push({...[,undefined,2]});", FileName: "case.js", Output: []string{"const a=[]; a.push(1, {...[,undefined,2]});"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push([{...{x:1}, x:2, ...{x:3}}]);", FileName: "case.js", Output: []string{"const a=[]; a.push(1, [{...{x:1}, x:2, ...{x:3}}]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push(Object.freeze({...{x:1}}));", FileName: "case.js", Output: []string{"const a=[]; a.push(1, Object.freeze({...{x:1}}));"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push({...{[\"__proto__\"]:1}});", FileName: "case.js", Output: []string{"const a=[]; a.push(1, {...{[\"__proto__\"]:1}});"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push({...{__proto__:{x:1}}});", FileName: "case.js", Output: []string{"const a=[]; a.push(1, {...{__proto__:{x:1}}});"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push({...unknown});", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push(1, {...unknown});"}}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push({...{get x(){return sideEffect();}}});", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push(1, {...{get x(){return sideEffect();}}});"}}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push({...getValues()});", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push(1, {...getValues()});"}}},
+			}},
+			{Code: "const a=[]; const x={value:1}; x.value=2; a.push(1); a.push({...x});", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 56, EndLine: 1, EndColumn: 60, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const x={value:1}; x.value=2; a.push(1, {...x});"}}},
+			}},
+		})
+	})
+	t.Run("TypeScript runtime wrappers", func(t *testing.T) {
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_single_call.PreferSingleCallRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
+			{Code: "element.classList.add(a); element.classList.add(class extends sideEffect() {});", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "element.classList.add(a, class extends sideEffect() {});"}}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(class extends sideEffect()<T> {});", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "element.classList.add(a, class extends sideEffect()<T> {});"}}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(class extends (sideEffect(), Base) {});", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "element.classList.add(a, class extends (sideEffect(), Base) {});"}}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(class extends (Base = Other) {});", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "element.classList.add(a, class extends (Base = Other) {});"}}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add((sideEffect())<T>);", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "element.classList.add(a, (sideEffect())<T>);"}}},
+			}},
+			{Code: "importScripts(a); importScripts((sideEffect(), fn)<T>);", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `importScripts()` multiple times.", Line: 1, Column: 19, EndLine: 1, EndColumn: 32, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "importScripts(a, (sideEffect(), fn)<T>);"}}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add((fn = replacement)<T>);", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "element.classList.add(a, (fn = replacement)<T>);"}}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push(void ((sideEffect())<T>));", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push(1, void ((sideEffect())<T>));"}}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push(void (class extends sideEffect() {}));", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push(1, void (class extends sideEffect() {}));"}}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(class extends Base<ReturnType<typeof sideEffect>> {});", FileName: "case.ts", Output: []string{"element.classList.add(a, class extends Base<ReturnType<typeof sideEffect>> {});"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(class implements NS.Interface {});", FileName: "case.ts", Output: []string{"element.classList.add(a, class implements NS.Interface {});"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(class { static { interface I extends NS.Type {} } });", FileName: "case.ts", Output: []string{"element.classList.add(a, class { static { interface I extends NS.Type {} } });"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(fn<ReturnType<typeof sideEffect>>);", FileName: "case.ts", Output: []string{"element.classList.add(a, fn<ReturnType<typeof sideEffect>>);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+		})
+	})
+	t.Run("Aliased iterator mutation", func(t *testing.T) {
+		// Unlike upstream, never autofix a spread whose iterator is visibly replaced,
+		// including writes through aliases and Object.defineProperty. Iteration can
+		// mutate the receiver, so merging must remain an explicit suggestion.
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_single_call.PreferSingleCallRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
+			{Code: "const a=[]; const values=[1]; const alias=values; alias[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 120, EndLine: 1, EndColumn: 124, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; const alias=values; alias[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...values]);"}}},
+			}},
+			{Code: "const a=[]; const values=[1]; const alias=values; const alias2=alias; alias2[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 141, EndLine: 1, EndColumn: 145, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; const alias=values; const alias2=alias; alias2[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...values]);"}}},
+			}},
+			{Code: "const a=[]; const values=[1]; Object.defineProperty(values,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}); a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 131, EndLine: 1, EndColumn: 135, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; Object.defineProperty(values,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}); a.push(1, [...values]);"}}},
+			}},
+			{Code: "const a=[]; const values=[1]; Reflect.set({},Symbol.iterator,function*(){a.push(0);yield 1;},values); a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 116, EndLine: 1, EndColumn: 120, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; Reflect.set({},Symbol.iterator,function*(){a.push(0);yield 1;},values); a.push(1, [...values]);"}}},
+			}},
+		})
+	})
+	t.Run("Decorator evaluation", func(t *testing.T) {
+		// Applying a decorator invokes it even when its expression is only an
+		// identifier. Keep these merges as suggestions instead of upstream's
+		// unsafe autofixes; decorated parameters run during class definition too.
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_single_call.PreferSingleCallRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
+			{Code: "element.classList.add(a); element.classList.add(class { @decorate method() {} });", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "element.classList.add(a, class { @decorate method() {} });"}}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(class { @decorate value; });", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "element.classList.add(a, class { @decorate value; });"}}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(class { static { @decorate class C {} } });", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "element.classList.add(a, class { static { @decorate class C {} } });"}}},
+			}},
+			{Code: "const a=[]; function decorate(){a.push(0);} a.push(1); a.push(void class { @decorate method() {} });", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 58, EndLine: 1, EndColumn: 62, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; function decorate(){a.push(0);} a.push(1, void class { @decorate method() {} });"}}},
+			}},
+			{Code: "const a=[]; function decorate(){a.push(0);} a.push(1); a.push(void class { static { class C { method(@decorate arg) {} } } });", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 58, EndLine: 1, EndColumn: 62, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; function decorate(){a.push(0);} a.push(1, void class { static { class C { method(@decorate arg) {} } } });"}}},
+			}},
+			{Code: "const a=[]; function decorate(){a.push(0);} a.push(1); a.push(void class { static { class C { constructor(@decorate arg) {} } } });", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 58, EndLine: 1, EndColumn: 62, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; function decorate(){a.push(0);} a.push(1, void class { static { class C { constructor(@decorate arg) {} } } });"}}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(class { constructor(value=sideEffect()) { sideEffect(); } method(value=sideEffect()) { sideEffect(); } });", FileName: "case.ts", Output: []string{"element.classList.add(a, class { constructor(value=sideEffect()) { sideEffect(); } method(value=sideEffect()) { sideEffect(); } });"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+		})
+	})
+	t.Run("Tagged template evaluation", func(t *testing.T) {
+		// A user tag is a function call, including inside a computed class key
+		// or void expression. Upstream misses these effects. Preserve existing
+		// fixes for the built-in String.raw while checking its substitutions.
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_single_call.PreferSingleCallRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
+			{Code: "const a=[]; function tag(){a.push(0);} a.push(1); a.push(void tag``);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 53, EndLine: 1, EndColumn: 57, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; function tag(){a.push(0);} a.push(1, void tag``);"}}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(class { [tag``]() {} });", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "element.classList.add(a, class { [tag``]() {} });"}}},
+			}},
+			{Code: "importScripts(a); importScripts(tag``);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `importScripts()` multiple times.", Line: 1, Column: 19, EndLine: 1, EndColumn: 32, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "importScripts(a, tag``);"}}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push(String.raw`x`);", FileName: "case.js", Output: []string{"const a=[]; a.push(1, String.raw`x`);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push([String.raw`x`]);", FileName: "case.js", Output: []string{"const a=[]; a.push(1, [String.raw`x`]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(String.raw`x`);", FileName: "case.js", Output: []string{"element.classList.add(a, String.raw`x`);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "importScripts(a); importScripts(String.raw`x`);", FileName: "case.js", Output: []string{"importScripts(a, String.raw`x`);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `importScripts()` multiple times.", Line: 1, Column: 19, EndLine: 1, EndColumn: 32, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push(1); a.push(String.raw`x${sideEffect()}`);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push(1, String.raw`x${sideEffect()}`);"}}},
+			}},
+			{Code: "element.classList.add(a); element.classList.add(String.raw`x${sideEffect()}`);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 45, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "element.classList.add(a, String.raw`x${sideEffect()}`);"}}},
+			}},
+			{Code: "function f(String) { element.classList.add(a); element.classList.add(String.raw`x`); }", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 66, EndLine: 1, EndColumn: 69, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "function f(String) { element.classList.add(a, String.raw`x`); }"}}},
+			}},
+			{Code: "function f(String) { const a=[]; a.push(1); a.push(String.raw`x`); }", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 47, EndLine: 1, EndColumn: 51, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "function f(String) { const a=[]; a.push(1, String.raw`x`); }"}}},
+			}},
+			{Code: "const StringAlias=String; element.classList.add(a); element.classList.add(StringAlias.raw`x`);", FileName: "case.js", Output: []string{"const StringAlias=String; element.classList.add(a, StringAlias.raw`x`);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 71, EndLine: 1, EndColumn: 74, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+		})
+	})
 	t.Run("Argument safety", func(t *testing.T) {
 		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_single_call.PreferSingleCallRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
+			{Code: "const a=[]; a.push([...[1]]); a.push(2);", FileName: "case.js", Output: []string{"const a=[]; a.push([...[1]], 2);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 33, EndLine: 1, EndColumn: 37, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.unshift([0,...[1,...[2,3]],4]); a.unshift(5);", FileName: "case.js", Output: []string{"const a=[]; a.unshift(5, [0,...[1,...[2,3]],4]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#unshift()` multiple times.", Line: 1, Column: 49, EndLine: 1, EndColumn: 56, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push([...[,,1]]); a.push(2);", FileName: "case.js", Output: []string{"const a=[]; a.push([...[,,1]], 2);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 35, EndLine: 1, EndColumn: 39, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push([...[],...[],]); a.push(2);", FileName: "case.js", Output: []string{"const a=[]; a.push([...[],...[],], 2);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 39, EndLine: 1, EndColumn: 43, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; const values=[1,2]; a.push([...values]); a.push(2);", FileName: "case.js", Output: []string{"const a=[]; const values=[1,2]; a.push([...values], 2);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 56, EndLine: 1, EndColumn: 60, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push([...\"😀a\"]); a.push(2);", FileName: "case.js", Output: []string{"const a=[]; a.push([...\"😀a\"], 2);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 35, EndLine: 1, EndColumn: 39, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push([...\"\\uD800\"]); a.push(2);", FileName: "case.js", Output: []string{"const a=[]; a.push([...\"\\uD800\"], 2);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 38, EndLine: 1, EndColumn: 42, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; a.push([...getValues()]); a.push(2);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 41, EndLine: 1, EndColumn: 45, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push([...getValues()], 2);"}}},
+			}},
+			{Code: "const a=[]; a.push([...unknown]); a.push(2);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 37, EndLine: 1, EndColumn: 41, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push([...unknown], 2);"}}},
+			}},
+			{Code: "const a=[]; a.push([...1]); a.push(2);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 31, EndLine: 1, EndColumn: 35, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push([...1], 2);"}}},
+			}},
+			{Code: "const a=[]; const values=[1]; values[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push([...values]); a.push(2);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 111, EndLine: 1, EndColumn: 115, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; values[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push([...values], 2);"}}},
+			}},
+			{Code: "const a=[]; a.push([...{[Symbol.iterator](){throw 1;}}]); a.push(2);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 61, EndLine: 1, EndColumn: 65, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push([...{[Symbol.iterator](){throw 1;}}], 2);"}}},
+			}},
+			{Code: "const a=[]; a.push([...[1]].length); a.push(2);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 40, EndLine: 1, EndColumn: 44, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push([...[1]].length, 2);"}}},
+			}},
+			{Code: "const a=[]; a.push([...[1]][0]); a.push(2);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 36, EndLine: 1, EndColumn: 40, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push([...[1]][0], 2);"}}},
+			}},
 			{Code: "importScripts(a); importScripts(import(\"module.js\"));", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "error/array-push", Message: "Do not call `importScripts()` multiple times.", Line: 1, Column: 19, EndLine: 1, EndColumn: 32, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "importScripts(a, import(\"module.js\"));"}}},
 			}},
@@ -238,11 +460,7 @@ func TestPreferSingleCallExtras(t *testing.T) {
 			{Code: "const a=[]; a.push(...[1]); a.push(2);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 31, EndLine: 1, EndColumn: 35, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push(...[1], 2);"}}},
 			}},
-			// The shared evaluator does not fold array spreads. Keep the merge as
-			// a suggestion; see the documented narrow difference from upstream.
-			{Code: "const a=[]; a.push([...[1]]); a.push(2);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 33, EndLine: 1, EndColumn: 37, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; a.push([...[1]], 2);"}}},
-			}},
+
 			{Code: "const a=[]; const values={*[Symbol.iterator](){a.push(0);yield 1;}}; a.push([...values]); a.push(2);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 93, EndLine: 1, EndColumn: 97, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values={*[Symbol.iterator](){a.push(0);yield 1;}}; a.push([...values], 2);"}}},
 			}},

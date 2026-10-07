@@ -73,7 +73,7 @@ func (safety *staticControlFlowSafety) safeValue(node *ast.Node, considerGetters
 	if argument, ok := safety.passThroughArgument(node); ok {
 		return safety.safeValue(argument, false) && safety.evaluator.evalValue(argument).ok
 	}
-	return !HasSideEffect(node, considerGetters) && safety.safeReferencesAndMembers(node)
+	return !safety.evaluator.HasSideEffect(node, considerGetters) && safety.safeReferencesAndMembers(node)
 }
 
 func (safety *staticControlFlowSafety) passThroughArgument(node *ast.Node) (*ast.Node, bool) {
@@ -221,18 +221,32 @@ func safeControlFlowGlobalMember(node, object *ast.Node, key string) bool {
 	return false
 }
 
-// HasSideEffect matches eslint-utils' explicit effects, optionally treating
-// member reads as getters. Function bodies and TypeScript types are not evaluated.
-// Implicit coercions and property getters are otherwise ignored, as upstream does.
-func HasSideEffect(node *ast.Node, considerGetters bool) bool {
+// HasSideEffect checks explicit effects, including decorator and tag calls,
+// optionally treating member reads as getters. Known String.raw tags remain
+// safe unless their children have effects. Implicit coercions and property
+// getters are otherwise ignored, as upstream does.
+func (staticEvaluator *StaticStringEvaluator) HasSideEffect(node *ast.Node, considerGetters bool) bool {
 	node = SkipAssertionsAndParens(node)
-	if node == nil || ast.IsTypeNode(node) {
+	if node == nil {
+		return false
+	}
+	// Class extends clauses and TS instantiation expressions share a type-node
+	// kind, but evaluate their expression. Implements/interface heritage does not.
+	if node.Kind == ast.KindExpressionWithTypeArguments {
+		return !ast.IsPartOfTypeNode(node) && staticEvaluator.HasSideEffect(node.Expression(), considerGetters)
+	}
+	if ast.IsTypeNode(node) {
 		return false
 	}
 	switch node.Kind {
 	case ast.KindCallExpression, ast.KindNewExpression, ast.KindAwaitExpression,
-		ast.KindYieldExpression, ast.KindDeleteExpression, ast.KindPostfixUnaryExpression:
+		ast.KindYieldExpression, ast.KindDeleteExpression, ast.KindPostfixUnaryExpression,
+		ast.KindDecorator:
 		return true
+	case ast.KindTaggedTemplateExpression:
+		if staticEvaluator == nil || !staticEvaluator.isStringRawTag(node.AsTaggedTemplateExpression().Tag) {
+			return true
+		}
 	case ast.KindBinaryExpression:
 		if ast.IsAssignmentOperator(node.AsBinaryExpression().OperatorToken.Kind) {
 			return true
@@ -250,13 +264,20 @@ func HasSideEffect(node *ast.Node, considerGetters bool) bool {
 		return false
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
 		for _, decorator := range node.Decorators() {
-			if HasSideEffect(decorator, considerGetters) {
+			if staticEvaluator.HasSideEffect(decorator, considerGetters) {
 				return true
 			}
 		}
-		return HasSideEffect(node.Name(), considerGetters)
+		// Legacy parameter decorators run during class definition. Parameter
+		// initializers and the function body still wait until invocation.
+		for _, parameter := range node.Parameters() {
+			if len(parameter.Decorators()) > 0 {
+				return true
+			}
+		}
+		return staticEvaluator.HasSideEffect(node.Name(), considerGetters)
 	}
-	return node.ForEachChild(func(child *ast.Node) bool { return HasSideEffect(child, considerGetters) })
+	return node.ForEachChild(func(child *ast.Node) bool { return staticEvaluator.HasSideEffect(child, considerGetters) })
 }
 
 func (safety *staticControlFlowSafety) hasMutableBinding(node *ast.Node) bool {
