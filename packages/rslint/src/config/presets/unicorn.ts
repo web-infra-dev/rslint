@@ -309,7 +309,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-simple-sort-comparator': 'error', // not implemented
     // 'unicorn/prefer-simplified-conditions': 'error', // not implemented
     // 'unicorn/prefer-single-array-predicate': 'error', // not implemented
-    // 'unicorn/prefer-single-call': 'error', // not implemented
+    'unicorn/prefer-single-call': 'error',
     // 'unicorn/prefer-single-object-destructuring': 'error', // not implemented
     // 'unicorn/prefer-single-replace': 'error', // not implemented
     // 'unicorn/prefer-smaller-scope': 'error', // not implemented

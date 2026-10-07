@@ -3,6 +3,8 @@
 Combine adjacent calls to `Array#push()`, `Array#unshift()`,
 `Element#classList.add()`, `Element#classList.remove()`, or `importScripts()`.
 
+This rule is enabled at `error` severity in `unicornPlugin.configs.recommended`.
+
 ## Rule Details
 
 These methods accept multiple arguments. Calls must be adjacent expression
