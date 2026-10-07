@@ -15,6 +15,10 @@ func TestNoGlobalObjectPropertyAssignmentExtras(t *testing.T) {
 		t,
 		&no_global_object_property_assignment.NoGlobalObjectPropertyAssignmentRule,
 		[]rule_tester.ValidTestCase{
+			{Code: "function f(globalThis) { globalThis['foo'] = 1; }"},
+			{Code: "(globalThis.foo as any);", FileName: "case.ts"},
+			{Code: "// rslint-disable-next-line\nglobalThis['foo'] = 1;"},
+			{Code: "/* rslint-disable */\nglobalThis.foo = 1; globalThis[Symbol.iterator] = 1;"},
 			{Code: "[foo([globalThis.foo]).bar] = values;"},
 			{Code: "[foo({value: globalThis.foo}).bar] = values;"},
 			{Code: "({[globalThis.foo]: value} = source);"},
@@ -57,6 +61,9 @@ func TestNoGlobalObjectPropertyAssignmentExtras(t *testing.T) {
 			{Code: "getGlobal().foo = 1;"},
 		},
 		[]rule_tester.InvalidTestCase{
+			{Code: "/* leading */ globalThis[0] = 1;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Line: 1, Column: 15, EndLine: 1, EndColumn: 28}}},
+			{Code: "globalThis[`foo`] = 1;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Line: 1, Column: 1, EndLine: 1, EndColumn: 18}}},
+			{Code: "globalThis[(\"foo\" as const)] = 1;", FileName: "case.ts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment"}}},
 			{Code: "((globalThis.foo!) as any)++;", FileName: "case.ts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Message: "Do not assign properties on the global object."}}},
 			{Code: "((globalThis.foo as any) satisfies any) = value;", FileName: "case.ts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Message: "Do not assign properties on the global object."}}},
 			{Code: "globalThis[Symbol.for('foo')] = 1;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-global-object-property-assignment", Message: "Do not assign properties on the global object."}}},
