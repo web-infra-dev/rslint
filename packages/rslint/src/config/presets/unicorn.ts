@@ -12,7 +12,7 @@ const recommended: RslintConfigEntry = {
     // Keep them enabled (i.e. don't override) until the unicorn replacements are implemented,
     // otherwise users would lose all coverage for these patterns.
     // 'logical-assignment-operators': 'off',
-    // 'no-negated-condition': 'off',
+    'no-negated-condition': 'off',
     // 'no-nested-ternary': 'off',
     // 'no-process-exit': 'off',
 
@@ -124,7 +124,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-named-default': 'error', // not implemented
     // 'unicorn/no-negated-array-predicate': 'error', // not implemented
     // 'unicorn/no-negated-comparison': 'error', // not implemented
-    // 'unicorn/no-negated-condition': 'error', // not implemented
+    'unicorn/no-negated-condition': 'error',
     'unicorn/no-negation-in-equality-check': 'error',
     // 'unicorn/no-nested-ternary': 'error', // not implemented
     'unicorn/no-new-array': 'error',
