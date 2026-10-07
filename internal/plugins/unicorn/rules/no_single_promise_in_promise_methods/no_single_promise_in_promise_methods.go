@@ -50,20 +50,18 @@ var NoSinglePromiseInPromiseMethodsRule = rule.Rule{
 					ctx.ReportNode(array, message)
 					return
 				}
-				parent := utils.ESTreeParent(node)
-				if parent.Kind == ast.KindAwaitExpression &&
-					(method != "all" || utils.ESTreeParent(parent).Kind == ast.KindExpressionStatement) {
+				if method == "all" {
+					ctx.ReportNodeWithDeferredFixes(array, message, func() []rule.RuleFix {
+						return fixPromiseAll(ctx, node, element)
+					})
+					return
+				}
+				if utils.ESTreeParent(node).Kind == ast.KindAwaitExpression {
 					ctx.ReportNodeWithDeferredFixes(array, message, func() []rule.RuleFix {
 						if hasCommentsInside(ctx, node) {
 							return nil
 						}
 						return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, awaitedPromiseText(ctx.SourceFile, element))}
-					})
-					return
-				}
-				if method == "all" {
-					ctx.ReportNodeWithDeferredFixes(array, message, func() []rule.RuleFix {
-						return fixPromiseAllFirstElement(ctx, node, element)
 					})
 					return
 				}
@@ -110,6 +108,19 @@ func hasCommentsInside(ctx rule.RuleContext, node *ast.Node) bool {
 	return utils.HasCommentInSpan(ctx.Comments.All(), r.Pos(), r.End())
 }
 
+// Check only the wrappers of this expression, not constraints on outer results.
+func hasJSDocTypeCast(node *ast.Node) bool {
+	for parent := node.Parent; parent != nil; parent = parent.Parent {
+		if utils.IsJSDocTypeCastWrapper(parent) {
+			return true
+		}
+		if parent.Kind != ast.KindParenthesizedExpression {
+			break
+		}
+	}
+	return false
+}
+
 func awaitedPromiseText(sourceFile *ast.SourceFile, element *ast.Node) string {
 	text := utils.TrimmedNodeText(sourceFile, element)
 	if ast.GetExpressionPrecedence(element) < ast.OperatorPrecedenceUnary {
@@ -132,15 +143,18 @@ func switchToPromiseResolve(sourceFile *ast.SourceFile, property, array *ast.Nod
 	return fixes
 }
 
-func fixPromiseAllFirstElement(ctx rule.RuleContext, call, element *ast.Node) []rule.RuleFix {
-	if hasCommentsInside(ctx, call) {
+func fixPromiseAll(ctx rule.RuleContext, call, element *ast.Node) []rule.RuleFix {
+	if hasCommentsInside(ctx, call) || hasJSDocTypeCast(call) {
 		return nil
 	}
 	await := utils.ESTreeParent(call)
-	if await.Kind != ast.KindAwaitExpression {
+	if await.Kind != ast.KindAwaitExpression || hasJSDocTypeCast(await) {
 		return nil
 	}
 	parent := utils.ESTreeParent(await)
+	if parent.Kind == ast.KindExpressionStatement {
+		return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, call, awaitedPromiseText(ctx.SourceFile, element))}
+	}
 	var pattern *ast.Node
 	if parent.Kind == ast.KindVariableDeclaration {
 		declaration := parent.AsVariableDeclaration()
@@ -150,7 +164,7 @@ func fixPromiseAllFirstElement(ctx rule.RuleContext, call, element *ast.Node) []
 		}
 	} else if ast.IsAssignmentExpression(parent, true) &&
 		utils.ESTreeRuntimeExpression(parent.AsBinaryExpression().Right) == await &&
-		utils.ESTreeParent(parent).Kind == ast.KindExpressionStatement {
+		utils.ESTreeParent(parent).Kind == ast.KindExpressionStatement && !hasJSDocTypeCast(parent) {
 		pattern = utils.ESTreeRuntimeExpression(parent.AsBinaryExpression().Left)
 	}
 	if identifier := singleBindingIdentifier(pattern); identifier != nil && !hasCommentsInside(ctx, pattern) {

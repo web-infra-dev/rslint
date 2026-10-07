@@ -605,6 +605,152 @@ func TestNoSinglePromiseInPromiseMethodsExtras(t *testing.T) {
 				},
 			},
 
+			// Declaration @satisfies constrains the original tuple
+			{
+				Code:     "/** @satisfies {[number]} */ const [value] = await Promise.all([Promise.resolve(1)]);",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 64, EndLine: 1, EndColumn: 84,
+					},
+				},
+			},
+
+			// A cast on the promise call constrains its tuple result
+			{
+				Code:     "const [value] = await ((/** @type {Promise<[number]>} */ ((Promise.all([Promise.resolve(1)])))));",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 72, EndLine: 1, EndColumn: 92,
+					},
+				},
+			},
+
+			// A cast on the awaited value constrains the original tuple
+			{
+				Code:     "const [value] = /** @type {[number]} */ (await Promise.all([Promise.resolve(1)]));",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 60, EndLine: 1, EndColumn: 80,
+					},
+				},
+			},
+
+			// A cast on the assignment constrains its tuple result
+			{
+				Code:     "let value; /** @type {[number]} */ (([value] = await Promise.all([Promise.resolve(1)])));",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 66, EndLine: 1, EndColumn: 86,
+					},
+				},
+			},
+
+			// A satisfies cast on the call preserves its promise type
+			{
+				Code:     "const [value] = await /** @satisfies {Promise<[number]>} */ (Promise.all([Promise.resolve(1)]));",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 74, EndLine: 1, EndColumn: 94,
+					},
+				},
+			},
+
+			// A satisfies cast on the awaited result preserves its tuple
+			{
+				Code:     "const [value] = /** @satisfies {[number]} */ (await Promise.all([Promise.resolve(1)]));",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 65, EndLine: 1, EndColumn: 85,
+					},
+				},
+			},
+
+			// A satisfies cast on the whole assignment preserves its tuple
+			{
+				Code:     "let value; /** @satisfies {[number]} */ ([value] = await Promise.all([Promise.resolve(1)]));",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 70, EndLine: 1, EndColumn: 90,
+					},
+				},
+			},
+
+			// A discarded promise still has to satisfy its cast
+			{
+				Code:     "await /** @type {Promise<[number]>} */ (Promise.all([Promise.resolve(1)]));",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 53, EndLine: 1, EndColumn: 73,
+					},
+				},
+			},
+
+			// A discarded awaited value still has to satisfy its cast
+			{
+				Code:     "/** @type {[number]} */ (await Promise.all([Promise.resolve(1)]));",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 44, EndLine: 1, EndColumn: 64,
+					},
+				},
+			},
+
+			// A discarded awaited value retains its satisfies constraint
+			{
+				Code:     "/** @satisfies {[number]} */ (await Promise.all([Promise.resolve(1)]));",
+				FileName: "case.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 49, EndLine: 1, EndColumn: 69,
+					},
+				},
+			},
+
+			// Scalar constraints outside index access remain valid after unwrapping
+			{
+				Code:     "/** @satisfies {number} */ const value = /** @type {number} */ ((await Promise.all([Promise.resolve(1)]))[0]);",
+				FileName: "case.mjs",
+				Output:   []string{"/** @satisfies {number} */ const value = /** @type {number} */ (await Promise.resolve(1));"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 84, EndLine: 1, EndColumn: 104,
+					},
+				},
+			},
+
+			// Scalar declarations and satisfies casts keep the indexed fix
+			{
+				Code:     "/** @type {number} */ const value = /** @satisfies {number} */ ((await Promise.all([Promise.resolve(1)]))[0]);",
+				FileName: "case.mjs",
+				Output:   []string{"/** @type {number} */ const value = /** @satisfies {number} */ (await Promise.resolve(1));"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 84, EndLine: 1, EndColumn: 104,
+					},
+				},
+			},
+
+			// A cast on a scalar assignment keeps the indexed fix
+			{
+				Code:     "let value; /** @type {number} */ (value = (await Promise.all([Promise.resolve(1)]))[0]);",
+				FileName: "case.mjs",
+				Output:   []string{"let value; /** @type {number} */ (value = await Promise.resolve(1));"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "no-single-promise-in-promise-methods/error", Message: "Wrapping single-element array with `Promise.all()` is unnecessary.",
+						Line: 1, Column: 62, EndLine: 1, EndColumn: 82,
+					},
+				},
+			},
+
 			// A tuple annotation remains valid under checkJs
 			{
 				Code:     "/** @type {[number]} */ const [value] = await Promise.all([Promise.resolve(1)]);",

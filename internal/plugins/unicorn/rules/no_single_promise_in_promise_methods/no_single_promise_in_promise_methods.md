@@ -48,7 +48,7 @@ This rule has no options.
 ## Differences from upstream
 
 - `Promise.any([promise])` keeps its diagnostic but has no fixes or suggestions. Unlike eslint-plugin-unicorn v77.0.0, rslint preserves the `AggregateError` and its `.errors` array when the input rejects. For example, `await Promise.any([Promise.reject('failure')])` must not become `await Promise.reject('failure')`.
-- Destructuring with a JSDoc tuple annotation is not automatically unwrapped. For example, `/** @type {[number]} */ const [value] = await Promise.all([promise])` keeps its tuple annotation on the destructuring pattern, avoiding a new type error under `checkJs`.
+- `Promise.all()` is not automatically unwrapped when JSDoc `@type` or `@satisfies` constrains the original promise or tuple result. This includes annotations on destructuring declarations and casts around the call, awaited result, or destructuring assignment. For example, `/** @satisfies {[number]} */ const [value] = await Promise.all([Promise.resolve(1)])` keeps the tuple result required by its annotation, avoiding a new type error under `checkJs`. Annotations on the scalar result of `(await Promise.all([promise]))[0]` still allow the fix.
 - Direct-value suggestions keep parentheses around members whose receiver starts with an object, function, or class expression. For example, `Promise.race([{ value: promise }.value])` becomes `({ value: promise }.value)`, which remains valid as a statement or an arrow function body.
 
 ## Original Documentation
