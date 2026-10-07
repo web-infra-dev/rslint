@@ -1,5 +1,66 @@
 // Ported from eslint-plugin-unicorn v77.0.0 tests and documentation; see LICENSE.
+import path from 'node:path';
+import { lint } from '@rslint/core/internal';
+
 import { RuleTester } from '../rule-tester';
+import { buildConfigForSettings } from '../../src/util/load-test-config';
+
+test.each([
+  {
+    name: 'array returned by map',
+    code: 'const array = [0].map(value => value); array.push(1); array.push(2);',
+    column: 61,
+    endColumn: 65,
+  },
+  {
+    name: 'custom receiver returned by a function',
+    code: 'function makeSink() { return {push(value: number) {}}; } const sink = makeSink(); sink.push(1); sink.push(2);',
+    column: 102,
+    endColumn: 106,
+  },
+])('unicorn/prefer-single-call source-only TypeScript: $name', async (item) => {
+  const { config, configDirectory } = await buildConfigForSettings(
+    path.resolve(import.meta.dirname, '../rslint.config.mjs'),
+    undefined,
+  );
+  const result = await lint({
+    config: [
+      ...config,
+      {
+        languageOptions: {
+          parserOptions: { project: false, projectService: false },
+        },
+        rules: { 'unicorn/prefer-single-call': 'error' },
+      },
+    ],
+    configDirectory,
+    workingDirectory: process.cwd(),
+    fileContents: {
+      [path.resolve(import.meta.dirname, 'source-only.ts')]: item.code,
+    },
+  });
+
+  expect(result.fileCount).toBe(1);
+  expect(result.diagnostics).toHaveLength(1);
+  const [diagnostic] = result.diagnostics;
+  expect(diagnostic).toMatchObject({
+    ruleName: 'unicorn/prefer-single-call',
+    messageId: 'error/array-push',
+    message: 'Do not call `Array#push()` multiple times.',
+    range: {
+      start: { line: 1, column: item.column },
+      end: { line: 1, column: item.endColumn },
+    },
+  });
+  expect(diagnostic.fixes ?? []).toEqual([]);
+  expect(result.fixableErrorCount).toBe(0);
+  expect(diagnostic.suggestions).toHaveLength(1);
+  expect(diagnostic.suggestions![0]).toMatchObject({
+    messageId: 'suggestion',
+    message: 'Merge with previous one.',
+  });
+  expect(diagnostic.suggestions![0].fixes?.length).toBeGreaterThan(0);
+});
 
 // Array push
 new RuleTester().run('prefer-single-call', {} as never, {
@@ -384,8 +445,6 @@ new RuleTester().run('prefer-single-call', {} as never, {
         },
       ],
     },
-    // rslint always supplies TypeScript type information; the identical type-aware upstream case above/below covers this input.
-    // {"code": "const array = [0].map(value => value); array.push(1); array.push(2);", "filename": "case.ts", "errors": [{"messageId": "error/array-push", "message": "Do not call `Array#push()` multiple times."}]},
     {
       code: 'const array = [0].map(value => value); array.push(1); array.push(2);',
       filename: 'case.ts',
@@ -406,8 +465,6 @@ new RuleTester().run('prefer-single-call', {} as never, {
         },
       ],
     },
-    // rslint always supplies TypeScript type information; the identical type-aware upstream case above/below covers this input.
-    // {"code": "function makeSink() { return {push(value: number) {}}; } const sink = makeSink(); sink.push(1); sink.push(2);", "filename": "case.ts", "errors": [{"messageId": "error/array-push", "message": "Do not call `Array#push()` multiple times."}]},
     {
       code: 'const container = {data: {entries: {push(value) { console.log(value); }}}}; container.data.entries.push(1); container.data.entries.push(2);',
       filename: 'case.js',

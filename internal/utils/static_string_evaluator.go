@@ -118,6 +118,9 @@ type staticReferenceFlags uint8
 const (
 	staticReferenceWrite staticReferenceFlags = 1 << iota
 	staticReferencePropertyMutation
+	// A nested write can reach values held in a fresh object or array. A write
+	// to the container itself cannot mutate values copied into that container.
+	staticReferenceNestedMutation
 )
 
 // objectPassThroughMethods are the `Object` methods that return their argument
@@ -1907,9 +1910,12 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 		if node == nil {
 			return
 		}
-		if node.Kind == ast.KindCallExpression && len(node.Arguments()) > 0 {
+		if node.Kind == ast.KindCallExpression {
 			callee := SkipAssertionsAndParens(node.Expression())
 			if name, known := AccessExpressionStaticName(callee); known {
+				if isMutatingArrayMethod(name) {
+					staticEvaluator.markReference(AccessExpressionObject(callee), staticReferencePropertyMutation)
+				}
 				var objectMutation, reflectMutation bool
 				switch name {
 				case "defineProperty", "setPrototypeOf":
@@ -1920,8 +1926,8 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 					reflectMutation = true
 				}
 				object := SkipAssertionsAndParens(AccessExpressionObject(callee))
-				if (objectMutation && staticEvaluator.isBuiltinIdentifier(object, "Object")) ||
-					(reflectMutation && staticEvaluator.isBuiltinIdentifier(object, "Reflect")) {
+				if len(node.Arguments()) > 0 && ((objectMutation && staticEvaluator.isBuiltinIdentifier(object, "Object")) ||
+					(reflectMutation && staticEvaluator.isBuiltinIdentifier(object, "Reflect"))) {
 					staticEvaluator.markReference(SkipAssertionsAndParens(node.Arguments()[0]), staticReferencePropertyMutation)
 					// Reflect.set can define the property on its explicit receiver
 					// even when its target is a different object.
@@ -1929,33 +1935,22 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 						staticEvaluator.markReference(SkipAssertionsAndParens(node.Arguments()[3]), staticReferencePropertyMutation)
 					}
 				}
+			} else if ast.IsAccessExpression(callee) {
+				mutationCandidates = append(mutationCandidates, staticMutationCandidate{reference: AccessExpressionObject(callee), access: callee})
 			}
 		}
 		if node.Kind == ast.KindIdentifier && !IsNonReferenceIdentifier(node) {
 			if IsWriteReference(node) {
 				staticEvaluator.markReference(node, staticReferenceWrite)
 			}
-			parent := node.Parent
-			mayStartAccess := parent != nil && (ast.IsAccessExpression(parent) ||
-				ast.IsOuterExpression(parent, skipTransparentKinds))
-			if mayStartAccess {
-				access, outer := outermostAccessFromReference(node)
-				if access != nil && outer.Parent != nil {
-					if ast.IsAssignmentTarget(outer) {
-						staticEvaluator.markReference(node, staticReferencePropertyMutation)
-					} else if outer.Parent.Kind == ast.KindCallExpression {
-						call := outer.Parent.AsCallExpression()
-						if call.Expression == outer {
-							if methodName, ok := AccessExpressionStaticName(access); ok {
-								if isMutatingArrayMethod(methodName) {
-									staticEvaluator.markReference(node, staticReferencePropertyMutation)
-								}
-							} else {
-								mutationCandidates = append(mutationCandidates, staticMutationCandidate{reference: node, access: access})
-							}
-						}
-					}
-				}
+		}
+		if ast.IsAccessExpression(node) {
+			outer := node
+			for outer.Parent != nil && ast.IsOuterExpression(outer.Parent, skipTransparentKinds) {
+				outer = outer.Parent
+			}
+			if outer.Parent != nil && ast.IsAssignmentTarget(outer) {
+				staticEvaluator.markReference(AccessExpressionObject(node), staticReferencePropertyMutation)
 			}
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
@@ -1973,16 +1968,17 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 }
 
 func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag staticReferenceFlags) {
+	node = SkipAssertionsAndParens(node)
 	for node != nil && ast.IsIdentifier(node) {
 		symbol := staticEvaluator.referenceSymbol(node)
-		if symbol == nil || staticEvaluator.referenceFlags[symbol]&flag != 0 {
+		if symbol == nil || staticEvaluator.referenceFlags[symbol]&flag == flag {
 			return
 		}
 		if staticEvaluator.referenceFlags == nil {
 			staticEvaluator.referenceFlags = make(map[*ast.Symbol]staticReferenceFlags, 8)
 		}
 		staticEvaluator.referenceFlags[symbol] |= flag
-		if flag != staticReferencePropertyMutation || len(symbol.Declarations) != 1 {
+		if flag&staticReferencePropertyMutation == 0 || len(symbol.Declarations) != 1 {
 			return
 		}
 		declaration := ast.GetDeclarationOfKind(symbol, ast.KindVariableDeclaration)
@@ -1995,6 +1991,66 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 		// already-marked check above also terminates circular alias chains.
 		node = SkipAssertionsAndParens(declaration.AsVariableDeclaration().Initializer)
 	}
+	if node == nil || flag&staticReferencePropertyMutation == 0 {
+		return
+	}
+	// Follow only expressions that can return the same reference. Conditions,
+	// computed keys and function bodies do not alias the expression's value.
+	switch node.Kind {
+	case ast.KindConditionalExpression:
+		expression := node.AsConditionalExpression()
+		staticEvaluator.markReference(expression.WhenTrue, flag)
+		staticEvaluator.markReference(expression.WhenFalse, flag)
+	case ast.KindBinaryExpression:
+		expression := node.AsBinaryExpression()
+		switch expression.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken,
+			ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+			staticEvaluator.markReference(expression.Left, flag)
+			staticEvaluator.markReference(expression.Right, flag)
+		case ast.KindCommaToken, ast.KindEqualsToken:
+			staticEvaluator.markReference(expression.Right, flag)
+		}
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		staticEvaluator.markReference(AccessExpressionObject(node), flag|staticReferenceNestedMutation)
+	case ast.KindObjectLiteralExpression:
+		if flag&staticReferenceNestedMutation != 0 {
+			for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
+				switch property.Kind {
+				case ast.KindPropertyAssignment:
+					staticEvaluator.markReference(property.AsPropertyAssignment().Initializer, flag)
+				case ast.KindShorthandPropertyAssignment:
+					staticEvaluator.markReference(property.Name(), flag)
+				case ast.KindSpreadAssignment:
+					staticEvaluator.markReference(property.Expression(), flag)
+				}
+			}
+		}
+	case ast.KindArrayLiteralExpression:
+		if flag&staticReferenceNestedMutation != 0 {
+			for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
+				if ast.IsSpreadElement(element) {
+					element = element.Expression()
+				}
+				staticEvaluator.markReference(element, flag)
+			}
+		}
+	case ast.KindCallExpression:
+		if argument, ok := staticEvaluator.objectPassThroughArgument(node); ok {
+			staticEvaluator.markReference(argument, flag)
+		} else if flag&staticReferenceNestedMutation != 0 {
+			callee := SkipAssertionsAndParens(node.Expression())
+			if name, ok := staticEvaluator.evalAccessExpressionKey(callee); ok && name == "of" &&
+				staticEvaluator.isBuiltinArrayValue(AccessExpressionObject(callee), map[*ast.Symbol]bool{}) {
+				for _, argument := range node.Arguments() {
+					if ast.IsSpreadElement(argument) {
+						argument = argument.Expression()
+					}
+					staticEvaluator.markReference(argument, flag)
+				}
+			}
+		}
+	}
 }
 
 func (staticEvaluator *StaticStringEvaluator) referenceSymbol(node *ast.Node) *ast.Symbol {
@@ -2004,24 +2060,6 @@ func (staticEvaluator *StaticStringEvaluator) referenceSymbol(node *ast.Node) *a
 		}
 	}
 	return GetReferenceSymbol(node, staticEvaluator.typeChecker)
-}
-
-func outermostAccessFromReference(node *ast.Node) (access *ast.Node, outer *ast.Node) {
-	outer = node
-	for outer.Parent != nil {
-		parent := outer.Parent
-		if ast.IsOuterExpression(parent, skipTransparentKinds) && parent.Expression() == outer {
-			outer = parent
-			continue
-		}
-		if ast.IsAccessExpression(parent) && AccessExpressionObject(parent) == outer {
-			access = parent
-			outer = parent
-			continue
-		}
-		break
-	}
-	return access, outer
 }
 
 func isMutatingArrayMethod(name string) bool {

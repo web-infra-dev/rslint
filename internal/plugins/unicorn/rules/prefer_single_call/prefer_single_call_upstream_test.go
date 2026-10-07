@@ -7,10 +7,97 @@ package prefer_single_call_test
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_single_call"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+// Upstream also runs these TypeScript inputs without parser type information.
+// Keep that mode separate from RuleTester's compiler-backed typed counterparts.
+func TestPreferSingleCallUpstreamSourceOnly(t *testing.T) {
+	for _, test := range []struct {
+		name, code, output string
+		column, endColumn  int
+	}{
+		{
+			name:      "array returned by map",
+			code:      "const array = [0].map(value => value); array.push(1); array.push(2);",
+			output:    "const array = [0].map(value => value); array.push(1, 2);",
+			column:    61,
+			endColumn: 65,
+		},
+		{
+			name:      "custom receiver returned by a function",
+			code:      "function makeSink() { return {push(value: number) {}}; } const sink = makeSink(); sink.push(1); sink.push(2);",
+			output:    "function makeSink() { return {push(value: number) {}}; } const sink = makeSink(); sink.push(1, 2);",
+			column:    102,
+			endColumn: 106,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := fixtures.GetRootDir()
+			fileName := tspath.ResolvePath(root.Dir, "source-only.ts")
+			fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: test.code})
+			program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+				RootFileNames:   []string{fileName},
+				Host:            utils.CreateCompilerHost(root.Dir, fs),
+				CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+				SingleThreaded:  true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var diagnostics []rule.RuleDiagnostic
+			linter.LintSingleFile(linter.LintSingleFileOptions{
+				Program: program,
+				File:    fileName,
+				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{{
+						Name:     prefer_single_call.PreferSingleCallRule.Name,
+						Severity: rule.SeverityError,
+						Run: func(ctx rule.RuleContext) rule.RuleListeners {
+							if ctx.TypeChecker != nil {
+								t.Fatal("source-only case unexpectedly received a TypeChecker")
+							}
+							return prefer_single_call.PreferSingleCallRule.Run(ctx, nil)
+						},
+					}}
+				},
+				Consumer: rule.DiagnosticConsumer{
+					Demand: rule.EditDemandAll,
+					Report: func(diagnostic rule.RuleDiagnostic) { diagnostics = append(diagnostics, diagnostic) },
+				},
+			})
+			if len(diagnostics) != 1 {
+				t.Fatalf("expected one diagnostic, got %+v", diagnostics)
+			}
+			diagnostic := diagnostics[0]
+			if diagnostic.Message.Id != "error/array-push" ||
+				diagnostic.Message.Description != "Do not call `Array#push()` multiple times." ||
+				diagnostic.Range.Pos() != test.column-1 || diagnostic.Range.End() != test.endColumn-1 {
+				t.Fatalf("unexpected diagnostic: %+v", diagnostic)
+			}
+			if diagnostic.FixesPtr != nil {
+				t.Fatal("source-only receiver must not receive an automatic fix")
+			}
+			if diagnostic.Suggestions == nil || len(*diagnostic.Suggestions) != 1 ||
+				(*diagnostic.Suggestions)[0].Message.Id != "suggestion" ||
+				(*diagnostic.Suggestions)[0].Message.Description != "Merge with previous one." {
+				t.Fatalf("unexpected suggestions: %+v", diagnostic.Suggestions)
+			}
+			output, unapplied, fixed := linter.ApplyRuleFixes(test.code, *diagnostic.Suggestions)
+			if !fixed || len(unapplied) != 0 || output != test.output {
+				t.Fatalf("suggestion output = %q, want %q; unapplied: %+v", output, test.output, unapplied)
+			}
+		})
+	}
+}
 
 func TestPreferSingleCallUpstream(t *testing.T) {
 	t.Run("Array push", func(t *testing.T) {
@@ -140,19 +227,11 @@ func TestPreferSingleCallUpstream(t *testing.T) {
 			{Code: "function f(foo: number[]) { foo.push(1); foo.push(2); }", FileName: "case.ts", Output: []string{"function f(foo: number[]) { foo.push(1, 2); }"}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 46, EndLine: 1, EndColumn: 50, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 			}},
-			// rslint always supplies TypeScript type information; the identical type-aware upstream case above/below covers this input.
-			{Code: "const array = [0].map(value => value); array.push(1); array.push(2);", FileName: "case.ts", Skip: true, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 61, EndLine: 1, EndColumn: 65, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const array = [0].map(value => value); array.push(1, 2);"}}},
-			}},
 			{Code: "const array = [0].map(value => value); array.push(1); array.push(2);", FileName: "case.ts", Output: []string{"const array = [0].map(value => value); array.push(1, 2);"}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 61, EndLine: 1, EndColumn: 65, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 			}},
 			{Code: "declare const receiver: number[] | {push(value: number): void}; receiver.push(1); receiver.push(2);", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 92, EndLine: 1, EndColumn: 96, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "declare const receiver: number[] | {push(value: number): void}; receiver.push(1, 2);"}}},
-			}},
-			// rslint always supplies TypeScript type information; the identical type-aware upstream case above/below covers this input.
-			{Code: "function makeSink() { return {push(value: number) {}}; } const sink = makeSink(); sink.push(1); sink.push(2);", FileName: "case.ts", Skip: true, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 102, EndLine: 1, EndColumn: 106, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "function makeSink() { return {push(value: number) {}}; } const sink = makeSink(); sink.push(1, 2);"}}},
 			}},
 			{Code: "const container = {data: {entries: {push(value) { console.log(value); }}}}; container.data.entries.push(1); container.data.entries.push(2);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 132, EndLine: 1, EndColumn: 136, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const container = {data: {entries: {push(value) { console.log(value); }}}}; container.data.entries.push(1, 2);"}}},
