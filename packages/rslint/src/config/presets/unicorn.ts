@@ -155,7 +155,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-unnecessary-array-flat-depth': 'error',
     // 'unicorn/no-unnecessary-array-flat-map': 'error', // not implemented
     'unicorn/no-unnecessary-array-splice-count': 'error',
-    // 'unicorn/no-unnecessary-await': 'error', // not implemented
+    'unicorn/no-unnecessary-await': 'error',
     // 'unicorn/no-unnecessary-boolean-comparison': 'error', // not implemented
     // 'unicorn/no-unnecessary-fetch-options': 'error', // not implemented
     // 'unicorn/no-unnecessary-global-this': 'error', // not implemented

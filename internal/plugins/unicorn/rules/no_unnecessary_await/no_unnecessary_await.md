@@ -29,14 +29,23 @@ expressions are reported without a fix.
 
 ## Options
 
-This rule has no options.
+This rule has no options. It is enabled at `error` severity in
+`unicornPlugin.configs.recommended`.
 
 ## Differences from upstream
 
-In JavaScript modules, a top-level `await !value` produces a syntax error
-instead of this rule's diagnostic. Write `await (!value)` to receive the
-diagnostic and automatic fix. This limitation does not affect
-TypeScript files or `await !value` inside an async function.
+In `.js` files without an `import` or `export`, setting
+`languageOptions.sourceType: "module"` alone does not reliably enable this
+rule for top-level `await`. For example, `await []` produces a syntax error,
+while `await (a + b)` is not reported. Add `export {};` or use a tsconfig with
+`compilerOptions.moduleDetection: "force"` selected through
+`languageOptions.parserOptions.project` to check these expressions.
+
+Even when the file is recognized as a module, a top-level `await !value` in
+JavaScript produces a syntax error instead of this rule's diagnostic. Write
+`await (!value)` to receive the diagnostic and automatic fix. This additional
+limitation does not affect TypeScript files or `await !value` inside an async
+function.
 
 ## Original Documentation
 

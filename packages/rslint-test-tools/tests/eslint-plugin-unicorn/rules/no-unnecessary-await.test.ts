@@ -1,26 +1,30 @@
 // Ported from eslint-plugin-unicorn v77.0.0 tests and documentation.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v77.0.0/test/no-unnecessary-await.js
+import path from 'node:path';
+import { expect, test } from 'rstack/test';
+import type { RslintConfigEntry } from '@rslint/core';
+import { lint } from '@rslint/core/internal';
 import { RuleTester } from '../rule-tester';
 
 const cases = {
   valid: [
     // JavaScript
-    { code: 'await {then}', filename: 'src/virtual.tsx' },
-    { code: 'await a ? b : c', filename: 'src/virtual.tsx' },
-    { code: 'await a || b', filename: 'src/virtual.tsx' },
-    { code: 'await a && b', filename: 'src/virtual.tsx' },
-    { code: 'await a ?? b', filename: 'src/virtual.tsx' },
-    { code: 'await new Foo()', filename: 'src/virtual.tsx' },
-    { code: 'await tagged``', filename: 'src/virtual.tsx' },
+    { code: 'await {then}', filename: 'src/virtual.js' },
+    { code: 'await a ? b : c', filename: 'src/virtual.js' },
+    { code: 'await a || b', filename: 'src/virtual.js' },
+    { code: 'await a && b', filename: 'src/virtual.js' },
+    { code: 'await a ?? b', filename: 'src/virtual.js' },
+    { code: 'await new Foo()', filename: 'src/virtual.js' },
+    { code: 'await tagged``', filename: 'src/virtual.js' },
     {
       code: 'class A { async foo() { await this }}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
     },
     {
       code: 'async function * foo() {await (yield bar);}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
     },
-    { code: 'await (1, Promise.resolve())', filename: 'src/virtual.tsx' },
+    { code: 'await (1, Promise.resolve())', filename: 'src/virtual.js' },
     // TypeScript
     {
       code: 'async function f() { return await (a as Promise<number>); }',
@@ -31,17 +35,17 @@ const cases = {
       filename: 'src/virtual.ts',
     },
     // Documentation
-    { code: 'await promise;', filename: 'src/virtual.tsx' },
+    { code: 'await promise;', filename: 'src/virtual.js' },
     {
       code: 'await Promise.allSettled([promise1, promise2]);',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
     },
   ],
   invalid: [
     // JavaScript
     {
       code: 'await []',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -56,7 +60,7 @@ const cases = {
     },
     {
       code: 'await [Promise.resolve()]',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -71,7 +75,7 @@ const cases = {
     },
     {
       code: 'await (() => {})',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -86,7 +90,7 @@ const cases = {
     },
     {
       code: 'await (() => Promise.resolve())',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -101,7 +105,7 @@ const cases = {
     },
     {
       code: 'await (a === b)',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -116,7 +120,7 @@ const cases = {
     },
     {
       code: 'await (a instanceof Promise)',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -131,7 +135,7 @@ const cases = {
     },
     {
       code: 'await (a > b)',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -146,7 +150,7 @@ const cases = {
     },
     {
       code: 'await class {}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -161,7 +165,7 @@ const cases = {
     },
     {
       code: 'await class extends Promise {}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -176,7 +180,7 @@ const cases = {
     },
     {
       code: 'await function() {}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -191,7 +195,7 @@ const cases = {
     },
     {
       code: 'await function name() {}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -206,7 +210,7 @@ const cases = {
     },
     {
       code: 'await function() { return Promise.resolve() }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -221,7 +225,7 @@ const cases = {
     },
     {
       code: 'await (<></>)',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.jsx',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -236,7 +240,7 @@ const cases = {
     },
     {
       code: 'await (<a></a>)',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.jsx',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -251,7 +255,7 @@ const cases = {
     },
     {
       code: 'await 0',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -266,7 +270,7 @@ const cases = {
     },
     {
       code: 'await 1',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -281,7 +285,7 @@ const cases = {
     },
     {
       code: 'await ""',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -296,7 +300,7 @@ const cases = {
     },
     {
       code: 'await "string"',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -311,7 +315,7 @@ const cases = {
     },
     {
       code: 'await true',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -326,7 +330,7 @@ const cases = {
     },
     {
       code: 'await false',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -341,7 +345,7 @@ const cases = {
     },
     {
       code: 'await null',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -356,7 +360,7 @@ const cases = {
     },
     {
       code: 'await 0n',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -371,7 +375,7 @@ const cases = {
     },
     {
       code: 'await 1n',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -386,7 +390,7 @@ const cases = {
     },
     {
       code: 'await `${Promise.resolve()}`',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -401,7 +405,7 @@ const cases = {
     },
     {
       code: 'await !Promise.resolve()',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -416,7 +420,7 @@ const cases = {
     },
     {
       code: 'await void Promise.resolve()',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -431,7 +435,7 @@ const cases = {
     },
     {
       code: 'await +Promise.resolve()',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -446,7 +450,7 @@ const cases = {
     },
     {
       code: 'await ~1',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -461,7 +465,7 @@ const cases = {
     },
     {
       code: 'await ++foo',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -476,7 +480,7 @@ const cases = {
     },
     {
       code: 'await foo--',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -491,7 +495,7 @@ const cases = {
     },
     {
       code: 'await (Promise.resolve(), 1)',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -506,7 +510,7 @@ const cases = {
     },
     {
       code: 'async function foo() {\n\treturn await\n\t\t// comment\n\t\t1;\n}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -521,7 +525,7 @@ const cases = {
     },
     {
       code: 'async function foo() {\n\treturn await\n\t\t// comment\n\t\t1\n}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -536,7 +540,7 @@ const cases = {
     },
     {
       code: 'async function foo() {\n\treturn( await\n\t\t// comment\n\t\t1);\n}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -551,7 +555,7 @@ const cases = {
     },
     {
       code: 'foo()\nawait []',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -566,7 +570,7 @@ const cases = {
     },
     {
       code: 'foo()\nawait +1',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -581,7 +585,7 @@ const cases = {
     },
     {
       code: 'async function foo() {\n\treturn await\n\t\t// comment\n\t\t[];\n}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -596,7 +600,7 @@ const cases = {
     },
     {
       code: 'async function foo() {\n\tthrow await\n\t\t// comment\n\t\t1;\n}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -611,7 +615,7 @@ const cases = {
     },
     {
       code: 'console.log(\n\tawait\n\t\t// comment\n\t\t[]\n);',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -626,7 +630,7 @@ const cases = {
     },
     {
       code: 'async function foo() {+await +1}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -641,7 +645,7 @@ const cases = {
     },
     {
       code: 'async function foo() {-await-1}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -656,7 +660,7 @@ const cases = {
     },
     {
       code: 'async function foo() {+await -1}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -671,7 +675,7 @@ const cases = {
     },
     {
       code: 'async function foo() {+await ++bar}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -686,7 +690,7 @@ const cases = {
     },
     {
       code: 'async function foo() {-await --bar}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -701,7 +705,7 @@ const cases = {
     },
     {
       code: 'async function foo() {const a = +await ++b;}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -716,7 +720,7 @@ const cases = {
     },
     {
       code: 'async function foo() {+await --bar}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -731,7 +735,7 @@ const cases = {
     },
     {
       code: 'async function foo() {-await ++bar}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -746,7 +750,7 @@ const cases = {
     },
     {
       code: 'async function foo() {+await bar++}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -761,7 +765,7 @@ const cases = {
     },
     {
       code: 'async function foo() {~await ~1}',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -838,7 +842,7 @@ const cases = {
     // Microtask ordering
     {
       code: 'async function f() { log("s"); await 1; log("e"); }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -853,7 +857,7 @@ const cases = {
     },
     {
       code: 'async function f() { await 1; log("e"); }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -868,7 +872,7 @@ const cases = {
     },
     {
       code: 'async function f() { if (q) { run(); } await 1; }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -883,7 +887,7 @@ const cases = {
     },
     {
       code: 'async function f() { log("s"); await 1; }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -898,7 +902,7 @@ const cases = {
     },
     {
       code: 'async function f() { await 1; }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -913,7 +917,7 @@ const cases = {
     },
     {
       code: 'async function f() { return await 1; }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -928,7 +932,7 @@ const cases = {
     },
     {
       code: 'async function f() { const x = await 1; }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -943,7 +947,7 @@ const cases = {
     },
     {
       code: 'async function f() { if (q) { await 1; } }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -958,7 +962,7 @@ const cases = {
     },
     {
       code: 'const f = async () => { await 1; };',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -973,7 +977,7 @@ const cases = {
     },
     {
       code: 'async function f() { if (q) { await 1; log("e"); } }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -988,7 +992,7 @@ const cases = {
     },
     {
       code: 'async function f() { log(await 1); }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -1003,7 +1007,7 @@ const cases = {
     },
     {
       code: 'async function f() { for (const x of xs) { await 1; } }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -1018,7 +1022,7 @@ const cases = {
     },
     {
       code: 'async function f() { try { await 1; } finally { log("e"); } }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -1033,7 +1037,7 @@ const cases = {
     },
     {
       code: 'async function outer() { return async () => (await 1, log("e")); }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -1048,7 +1052,7 @@ const cases = {
     },
     {
       code: 'async function outer() { const f = async () => await 1; run(); }',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -1063,7 +1067,7 @@ const cases = {
     },
     {
       code: 'Promise.resolve().then(() => log("a")); await 1; log("b");',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -1078,7 +1082,7 @@ const cases = {
     },
     {
       code: 'run(); await 1;',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -1094,7 +1098,7 @@ const cases = {
     // Documentation
     {
       code: 'await await promise;',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -1109,7 +1113,7 @@ const cases = {
     },
     {
       code: 'await [promise1, promise2];',
-      filename: 'src/virtual.tsx',
+      filename: 'src/virtual.js',
       errors: [
         {
           messageId: 'no-unnecessary-await',
@@ -1125,22 +1129,105 @@ const cases = {
   ],
 };
 
-// These compiler-backed fixtures need an explicit module marker for top-level
-// await. TSX also preserves JSX without tsgo's JS-only `await !` reparse error.
-// The original JS limitation is an explained skip in the Go upstream suite.
+// Match upstream's module parsing without changing the source or JS file type.
+const moduleOptions: RslintConfigEntry['languageOptions'] = {
+  sourceType: 'module',
+  parserOptions: {
+    projectService: false,
+    project: [
+      path.resolve(
+        import.meta.dirname,
+        '../fixtures/no-unnecessary-await/tsconfig.json',
+      ),
+    ],
+  },
+};
+const unsupportedJavaScriptCase = cases.invalid.find(
+  ({ code }) => code === 'await !Promise.resolve()',
+)!;
+
 new RuleTester().run('no-unnecessary-await', {} as never, {
   valid: cases.valid.map((testCase) => ({
     ...testCase,
-    code: `export {};\n${testCase.code}`,
+    languageOptions: moduleOptions,
   })),
-  invalid: cases.invalid.map((testCase) => ({
-    ...testCase,
-    code: `export {};\n${testCase.code}`,
-    errors: testCase.errors.map((error) => ({
-      ...error,
-      line: error.line + 1,
-      endLine: error.endLine + 1,
-    })),
-    output: testCase.output === null ? null : `export {};\n${testCase.output}`,
-  })),
+  // Preserve the known unsupported JS case below as an explicit skipped test.
+  invalid: cases.invalid
+    .filter((testCase) => testCase !== unsupportedJavaScriptCase)
+    .map((testCase) => ({ ...testCase, languageOptions: moduleOptions })),
+});
+
+function javascriptRequest(
+  code: string,
+  languageOptions: RslintConfigEntry['languageOptions'],
+) {
+  return {
+    config: [
+      {
+        plugins: ['unicorn'],
+        languageOptions,
+        rules: { 'unicorn/no-unnecessary-await': 'error' as const },
+      },
+    ],
+    configDirectory: import.meta.dirname,
+    workingDirectory: import.meta.dirname,
+    fileContents: {
+      [path.resolve(import.meta.dirname, '../src/virtual.js')]: code,
+    },
+  };
+}
+
+// Even forced module detection currently rejects bare top-level JS `await !`.
+test.skip('upstream JavaScript await !Promise.resolve() (TS8013)', async () => {
+  const result = await lint(
+    javascriptRequest(unsupportedJavaScriptCase.code, moduleOptions),
+  );
+  expect(result.diagnostics).toMatchObject([
+    { ruleName: 'unicorn/no-unnecessary-await' },
+  ]);
+});
+
+const sourceOnlyOptions: RslintConfigEntry['languageOptions'] = {
+  sourceType: 'module',
+  parserOptions: { project: false, projectService: false },
+};
+
+test.each([
+  { code: 'await []', rules: ['TypeScript(TS1011)'], output: '[]' },
+  { code: 'await (a + b)', rules: [], output: '(a + b)' },
+])(
+  'documents JavaScript module detection for $code',
+  async ({ code, rules, output }) => {
+    const result = await lint(javascriptRequest(code, sourceOnlyOptions));
+    expect(result.fileCount).toBe(1);
+    expect(result.diagnostics.map(({ ruleName }) => ruleName)).toEqual(rules);
+
+    for (const [source, options, expectedOutput] of [
+      [code, moduleOptions, output],
+      [`export {};\n${code}`, sourceOnlyOptions, `export {};\n${output}`],
+    ] as const) {
+      const request = javascriptRequest(source, options);
+      const checked = await lint(request);
+      expect(checked.fileCount).toBe(1);
+      expect(checked.diagnostics).toMatchObject([
+        {
+          ruleName: 'unicorn/no-unnecessary-await',
+          messageId: 'no-unnecessary-await',
+        },
+      ]);
+      const fixed = await lint({ ...request, fix: true });
+      expect(fixed.diagnostics).toEqual([]);
+      expect(Object.values(fixed.output ?? {})).toEqual([expectedOutput]);
+    }
+  },
+);
+
+test('documents the JavaScript await ! limitation even in a module', async () => {
+  const result = await lint(
+    javascriptRequest(unsupportedJavaScriptCase.code, moduleOptions),
+  );
+  expect(result.fileCount).toBe(1);
+  expect(result.diagnostics).toMatchObject([
+    { ruleName: 'TypeScript(TS8013)' },
+  ]);
 });
