@@ -194,7 +194,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-useless-promise-resolve-reject': 'error', // not implemented
     // 'unicorn/no-useless-re-export': 'error', // not implemented
     // 'unicorn/no-useless-recursion': 'error', // not implemented
-    // 'unicorn/no-useless-spread': 'error', // not implemented
+    'unicorn/no-useless-spread': 'error',
     'unicorn/no-useless-switch-case': 'error',
     // 'unicorn/no-useless-template-literals': 'error', // not implemented
     // 'unicorn/no-useless-undefined': 'error', // not implemented

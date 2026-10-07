@@ -50,8 +50,12 @@ func IsKnownNonIndexedCollectionWithOptions(ctx rule.RuleContext, node *ast.Node
 }
 
 // IsArray reports whether node is definitely an Array, ReadonlyArray, or
-// tuple, using syntactic shape first and the type checker as a fallback.
+// tuple. Like IsKnownNonArray, JavaScript uses source-level evidence; only
+// TypeScript uses the type checker as a fallback.
 func IsArray(ctx rule.RuleContext, node *ast.Node) bool {
+	if isSourceOnlyFile(ctx) {
+		return classifySourceOnlyArrayReceiver(ctx, node, arrayTargets, knownNonArrayNames) == arrayClassTarget
+	}
 	return classifyArrayReceiver(ctx, node, arrayTargets, knownNonArrayNames) == arrayClassTarget
 }
 
@@ -97,8 +101,15 @@ var typedArrayNames = []string{
 	"BigInt64Array", "BigUint64Array",
 }
 
+// IsTypedArrayName reports whether name is a built-in typed array name.
+func IsTypedArrayName(name string) bool {
+	return slices.Contains(typedArrayNames, name)
+}
+
 type arrayReceiverStaticEvaluatorFileCacheKey struct{}
-type sourceOnlyArrayReceiverCacheKey struct{}
+type sourceOnlyArrayReceiverCacheKey struct {
+	targetNames, nonTargetNames *utils.Set[string]
+}
 
 type arrayReceiverWalkState struct {
 	options            ArrayReceiverOptions
@@ -132,7 +143,9 @@ func classifySourceOnlyArrayReceiver(
 	node *ast.Node,
 	targetNames, nonTargetNames *utils.Set[string],
 ) arrayClass {
-	memo := rule.CachedByFile(ctx, sourceOnlyArrayReceiverCacheKey{}, func() map[*ast.Symbol]arrayClass {
+	// Plain arrays and indexed collections disagree about typed arrays, so
+	// their const-binding classifications cannot share the same cache entry.
+	memo := rule.CachedByFile(ctx, sourceOnlyArrayReceiverCacheKey{targetNames, nonTargetNames}, func() map[*ast.Symbol]arrayClass {
 		return map[*ast.Symbol]arrayClass{}
 	})
 	return classifyArrayReceiverInner(ctx, node, targetNames, nonTargetNames, &arrayReceiverWalkState{

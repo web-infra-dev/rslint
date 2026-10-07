@@ -6,8 +6,47 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestArrayClassificationQueryOrder(t *testing.T) {
+	for _, arrayFirst := range []bool{false, true} {
+		name := "indexed-first"
+		if arrayFirst {
+			name = "array-first"
+		}
+		t.Run(name, func(t *testing.T) {
+			testRule := rule.Rule{
+				Name: "test/array-classification",
+				Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+					return rule.RuleListeners{ast.KindIdentifier: func(node *ast.Node) {
+						if node.Text() != "value" || node.Parent.Kind != ast.KindCallExpression {
+							return
+						}
+						var isArray, skipIndexed bool
+						if arrayFirst {
+							isArray = IsArray(ctx, node)
+							skipIndexed = ShouldSkipKnownNonArrayReceiver(ctx, node)
+						} else {
+							skipIndexed = ShouldSkipKnownNonArrayReceiver(ctx, node)
+							isArray = IsArray(ctx, node)
+						}
+						// A typed array is an indexed collection, but never a plain
+						// array. Sharing a file cache must not mix those two answers.
+						if isArray || skipIndexed || !IsKnownNonArray(ctx, node) {
+							ctx.ReportNode(node, rule.RuleMessage{Id: "classification", Description: "Typed array classification depends on query order."})
+						}
+					}}
+				},
+			}
+			rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testRule,
+				[]rule_tester.ValidTestCase{{Code: "const value = new Uint8Array(); use(value);", FileName: "file.js"}}, nil)
+		})
+	}
+}
 
 func parseTestSource(code string) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
