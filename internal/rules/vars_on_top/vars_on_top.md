@@ -1,4 +1,4 @@
-# Require `var` declarations at the top of their scope (`vars-on-top`)
+# vars-on-top
 
 The `vars-on-top` rule requires `var` declarations to appear before executable
 statements in the program or in a function body. Directive strings and imports
