@@ -600,6 +600,57 @@ request all edits; production lint entry points bind `DiagnosticConsumer`
 explicitly. The demand neither changes TypeChecker acquisition nor the
 independent serialized eslint-plugin reverse-dispatch protocol.
 
+### Cross-rule variable usage marks
+
+Native rules can call `ctx.MarkVariableAsUsed(name, location)` to mark the nearest
+binding in the syntactic scope at `location`. A nil location starts at the
+SourceFile. The return value says whether a binding was found and marked;
+unknown names, foreign nodes, and contexts without a SourceFile or FileCache
+return false. Manually assembled contexts attach a fresh FileCache per file pass.
+This lookup follows `scope.Manager.Acquire`, including its ESTree interpretation
+of ts-go method nodes. It is distinct from ordinary reference resolution: a
+parameter default can explicitly mark a binding declared in the function body.
+
+`ctx.VariableUsage()` returns a live read-only view of explicit marks, independent
+of normal references. Its queries match the representations native consumers
+already use:
+
+- `IsDeclarationUsed(id)` accepts a binding identifier. For a class declaration,
+  this queries the outer binding; a named class expression has only an inner name.
+- `IsScopeBindingUsed(lexical, name)` queries that exact scope's binding without
+  searching parents, distinguishing class inner names and implicit `arguments`.
+- `IsGlobalUsed(name)` queries the global binding independently of shadowing
+  module, CommonJS wrapper, or function locals. Script-level declarations share
+  the global binding.
+
+A view created before any producer still sees later marks. Reads never create
+usage state or scope graphs. FileCache owns the mutable, monotonic marks in a
+separate lazy field; RuleContext remains the same size. Marks are never written
+to AST nodes, binder symbols, the Program, or RefStore. Different files and new
+passes, including repeated linting of the same Program, get independent owners.
+Rules must not retain the view after their file pass or access it concurrently.
+
+The leaf `scope.Cache` owns the existing option-keyed pure scope graphs;
+`RuleContext.ScopeAnalysis()` supplies their per-file owner, and `scopeanalysis`
+remains the convenience facade for rules. Marking reuses a declaration-capable
+graph when present. Otherwise ts-go's existing lazy source-name index can reject
+absent authored names before building a graph. Globals and implicit arguments
+remain eligible even when their names are absent from the text. Scope lookup
+results, including misses, are cached separately from mutable usage flags.
+Bindings use source-node and lexical-scope identity, so filtered and complete
+reference graphs can share marks without sharing variable object pointers.
+TypeScript's parser-provided type globals can still be marked independently of
+runtime global overrides; normal reference/global APIs retain their own semantics.
+
+All rule `Run` functions register before traversal. Ordinary SourceFile enter and
+exit events bracket its children, including an empty file. A producer's write is
+visible immediately; a consumer must run after every producer it needs to observe.
+A producer in descendant enter/exit listeners and a consumer at SourceFile exit
+work in either rule registration order. Callbacks on the same event still run in
+registration order, including two SourceFile exit callbacks. There is no additional
+completion phase, EOF protocol, sealing step, or deferred reporting queue. Existing
+rules and third-party JS plugin state do not consume these marks automatically.
+
 ### Listener Registration
 
 Rules do not walk the AST themselves. Instead:
@@ -613,7 +664,9 @@ Rules do not walk the AST themselves. Instead:
 6. after traversing a file, the task clears every listener slot and reuses the
    registry's map and per-kind backing slices for its next serial file
 
-This allows one AST traversal to serve many rules.
+This allows one AST traversal to serve many rules. The root SourceFile receives
+normal enter and exit events around the child walk; its exit also runs for empty
+files. The engine uses the actual ts-go SourceFile node for both callbacks.
 
 ### Listener Types
 
