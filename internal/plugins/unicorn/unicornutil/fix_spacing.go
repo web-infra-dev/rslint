@@ -63,3 +63,25 @@ func SpaceAroundKeywordFixes(sourceFile *ast.SourceFile, node *ast.Node) []rule.
 	}
 	return fixes
 }
+
+// ReturnOrThrowParenthesesFixes protects an unparenthesized return or throw
+// expression when removing its leading operator exposes a line terminator.
+func ReturnOrThrowParenthesesFixes(sourceFile *ast.SourceFile, node *ast.Node, operandStart int) []rule.RuleFix {
+	parent := node.Parent
+	if parent == nil || (parent.Kind != ast.KindReturnStatement && parent.Kind != ast.KindThrowStatement) {
+		return nil
+	}
+	keyword, _ := utils.TokenAtOrAfter(sourceFile, utils.TrimNodeTextRange(sourceFile, parent).Pos())
+	if utils.IsSameLine(sourceFile, keyword.Start, operandStart) {
+		return nil
+	}
+	last, _ := utils.TokenBeforePosition(sourceFile, parent.End())
+	end := parent.End()
+	if last.Kind == ast.KindSemicolonToken {
+		end = last.Start
+	}
+	return []rule.RuleFix{
+		rule.RuleFixReplaceRange(core.NewTextRange(keyword.End, keyword.End), " ("),
+		rule.RuleFixReplaceRange(core.NewTextRange(end, end), ")"),
+	}
+}

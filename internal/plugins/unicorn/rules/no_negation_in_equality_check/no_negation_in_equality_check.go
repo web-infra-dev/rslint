@@ -4,7 +4,6 @@ package no_negation_in_equality_check
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -41,7 +40,7 @@ var NoNegationInEqualityCheckRule = rule.Rule{
 				}, func() []rule.RuleSuggestion {
 					fixes := unicornutil.SpaceAroundKeywordFixes(ctx.SourceFile, node)
 					afterBang, _ := utils.TokenAtOrAfter(ctx.SourceFile, bang.End())
-					fixes = append(fixes, returnOrThrowParentheses(ctx.SourceFile, node, afterBang.Start)...)
+					fixes = append(fixes, unicornutil.ReturnOrThrowParenthesesFixes(ctx.SourceFile, node, afterBang.Start)...)
 					prefix := ""
 					if unicornutil.NeedsSemicolonBefore(ctx.SourceFile, node, afterBang.Text) {
 						prefix = ";"
@@ -56,26 +55,4 @@ var NoNegationInEqualityCheckRule = rule.Rule{
 
 func isNegation(node *ast.Node) bool {
 	return node.Kind == ast.KindPrefixUnaryExpression && node.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken
-}
-
-func returnOrThrowParentheses(sourceFile *ast.SourceFile, node *ast.Node, operandStart int) []rule.RuleFix {
-	parent := node.Parent
-	if parent == nil || (parent.Kind != ast.KindReturnStatement && parent.Kind != ast.KindThrowStatement) {
-		return nil
-	}
-	keyword, _ := utils.TokenAtOrAfter(sourceFile, utils.TrimNodeTextRange(sourceFile, parent).Pos())
-	keywordLine, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, keyword.Start)
-	operandLine, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, operandStart)
-	if keywordLine == operandLine {
-		return nil
-	}
-	last, _ := utils.TokenBeforePosition(sourceFile, parent.End())
-	end := parent.End()
-	if last.Kind == ast.KindSemicolonToken {
-		end = last.Start
-	}
-	return []rule.RuleFix{
-		rule.RuleFixReplaceRange(core.NewTextRange(keyword.End, keyword.End), " ("),
-		rule.RuleFixReplaceRange(core.NewTextRange(end, end), ")"),
-	}
 }
