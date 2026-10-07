@@ -7,6 +7,20 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
+// EvalValueIfNoSideEffects folds a value only when evaluation has no side
+// effects or potentially mutable member reads. Unlike control-flow evaluation,
+// this also accepts unmodified let/var bindings, matching Unicorn's merge rules.
+func (staticEvaluator *StaticStringEvaluator) EvalValueIfNoSideEffects(node *ast.Node) (any, bool) {
+	if staticEvaluator == nil || node == nil {
+		return nil, false
+	}
+	safety := staticControlFlowSafety{evaluator: staticEvaluator, visiting: make(map[*ast.Symbol]bool)}
+	if !safety.safeValue(node, false) {
+		return nil, false
+	}
+	return staticEvaluator.EvalValue(node)
+}
+
 // EvalControlFlowValue mirrors unicorn's getStaticValueForControlFlow: reject
 // side effects and unsupported member reads throughout the expression, but
 // reject mutable bindings only on paths that can actually be evaluated.
@@ -59,7 +73,7 @@ func (safety *staticControlFlowSafety) safeValue(node *ast.Node, considerGetters
 	if argument, ok := safety.passThroughArgument(node); ok {
 		return safety.safeValue(argument, false) && safety.evaluator.evalValue(argument).ok
 	}
-	return !controlFlowHasSideEffects(node, considerGetters) && safety.safeReferencesAndMembers(node)
+	return !HasSideEffect(node, considerGetters) && safety.safeReferencesAndMembers(node)
 }
 
 func (safety *staticControlFlowSafety) passThroughArgument(node *ast.Node) (*ast.Node, bool) {
@@ -207,7 +221,10 @@ func safeControlFlowGlobalMember(node, object *ast.Node, key string) bool {
 	return false
 }
 
-func controlFlowHasSideEffects(node *ast.Node, considerGetters bool) bool {
+// HasSideEffect matches eslint-utils' explicit effects, optionally treating
+// member reads as getters. Function bodies and TypeScript types are not evaluated.
+// Implicit coercions and property getters are otherwise ignored, as upstream does.
+func HasSideEffect(node *ast.Node, considerGetters bool) bool {
 	node = SkipAssertionsAndParens(node)
 	if node == nil || ast.IsTypeNode(node) {
 		return false
@@ -232,9 +249,14 @@ func controlFlowHasSideEffects(node *ast.Node, considerGetters bool) bool {
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
 		return false
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		return controlFlowHasSideEffects(node.Name(), considerGetters)
+		for _, decorator := range node.Decorators() {
+			if HasSideEffect(decorator, considerGetters) {
+				return true
+			}
+		}
+		return HasSideEffect(node.Name(), considerGetters)
 	}
-	return node.ForEachChild(func(child *ast.Node) bool { return controlFlowHasSideEffects(child, considerGetters) })
+	return node.ForEachChild(func(child *ast.Node) bool { return HasSideEffect(child, considerGetters) })
 }
 
 func (safety *staticControlFlowSafety) hasMutableBinding(node *ast.Node) bool {

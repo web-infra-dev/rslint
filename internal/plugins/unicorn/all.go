@@ -77,6 +77,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_reflect_apply"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_size"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_single_call"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_trim_start_end"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_structured_clone"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_ternary"
@@ -168,6 +169,7 @@ func GetAllRules() []rule.Rule {
 		prefer_reflect_apply.PreferReflectApplyRule,
 		prefer_set_has.PreferSetHasRule,
 		prefer_set_size.PreferSetSizeRule,
+		prefer_single_call.PreferSingleCallRule,
 		prefer_string_trim_start_end.PreferStringTrimStartEndRule,
 		prefer_structured_clone.PreferStructuredCloneRule,
 		prefer_then_catch.PreferThenCatchRule,

@@ -860,6 +860,8 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		name    string
 		known   bool
 		isArray bool
+		// Known for value evaluation, but rejected as a control-flow input.
+		valueOnly bool
 	}{
 		{name: "scalar", known: true},
 		{name: "array", known: true, isArray: true},
@@ -871,10 +873,10 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		{name: "frozenAlias", known: true, isArray: true},
 		{name: "safeAlias", known: true, isArray: true},
 		{name: "skippedMutable", known: true, isArray: true},
-		{name: "beforeDeclaration"},
+		{name: "beforeDeclaration", valueOnly: true},
 		{name: "skippedBeforeDeclaration", known: true, isArray: true},
-		{name: "reachedMutable"},
-		{name: "voidMutable"},
+		{name: "reachedMutable", valueOnly: true},
+		{name: "voidMutable", valueOnly: true},
 		{name: "assignment"},
 		{name: "assignmentAlias"},
 		{name: "assignmentCondition"},
@@ -894,6 +896,10 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 			assert.Equal(t, isArray, test.isArray)
 			_, known = staticEvaluator.EvalControlFlowTruthiness(node)
 			assert.Equal(t, known, test.known)
+			// Merge rules need the same side-effect/member safety, while stable
+			// let bindings and forward const values do not control a branch.
+			_, known = staticEvaluator.EvalValueIfNoSideEffects(node)
+			assert.Equal(t, known, test.known || test.valueOnly)
 		})
 	}
 
@@ -920,7 +926,9 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 	assert.Assert(t, !known, "conservative evaluation hid a computed property mutation")
 
 	for _, evaluator := range []*StaticStringEvaluator{nil, staticEvaluator} {
-		_, known := evaluator.EvalControlFlowValue(nil)
+		_, known := evaluator.EvalValueIfNoSideEffects(nil)
+		assert.Assert(t, !known)
+		_, known = evaluator.EvalControlFlowValue(nil)
 		assert.Assert(t, !known)
 		isArray, known := evaluator.EvalControlFlowArrayValue(nil)
 		assert.Assert(t, !known && !isArray)

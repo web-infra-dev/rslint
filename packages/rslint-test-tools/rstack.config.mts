@@ -904,6 +904,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/prefer-reflect-apply.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-size.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-single-call.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-string-trim-start-end.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-structured-clone.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-then-catch.test.ts',
