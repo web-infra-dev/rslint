@@ -31,6 +31,9 @@ func TestNoNewBufferExtras(t *testing.T) {
 			fixedNewBufferCase(`const number = 1; new Buffer(number)`, `new Buffer(number)`, "alloc", `const number = 1; Buffer.alloc(number)`),
 			fixedNewBufferCase(`const string = "x"; new Buffer(string)`, `new Buffer(string)`, "from", `const string = "x"; Buffer.from(string)`),
 			fixedNewBufferCase(`const bytes = [1]; new Buffer(bytes)`, `new Buffer(bytes)`, "from", `const bytes = [1]; Buffer.from(bytes)`),
+			// A known symbol is neither a numeric length nor supported buffer data.
+			suggestedNewBufferCase(`new Buffer(Symbol.iterator)`, `new Buffer(Symbol.iterator)`),
+			fixedNewBufferCase(`new Buffer(Symbol.iterator ? 1 : unknown)`, `new Buffer(Symbol.iterator ? 1 : unknown)`, "alloc", `Buffer.alloc(Symbol.iterator ? 1 : unknown)`),
 			suggestedNewBufferCase(`let number = 1; new Buffer(number)`, `new Buffer(number)`),
 			suggestedNewBufferCase(`var string = "x"; new Buffer(string)`, `new Buffer(string)`),
 			fixedNewBufferCase(`new Buffer((1 === 1) ? 1 : value)`, `new Buffer((1 === 1) ? 1 : value)`, "alloc", `Buffer.alloc((1 === 1) ? 1 : value)`),

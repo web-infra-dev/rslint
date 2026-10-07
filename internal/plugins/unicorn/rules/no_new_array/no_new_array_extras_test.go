@@ -59,10 +59,18 @@ func TestNoNewArrayExpressions(t *testing.T) {
 			arrayCase("new Array(({value: 'x'}).value);", "file.js", 1, 1, 1, 32, "[({value: 'x'}).value];", ""),
 			arrayCase("new Array(({value: 'x'})['value']);", "file.js", 1, 1, 1, 35, "[({value: 'x'})['value']];", ""),
 			arrayCase("const object = {value: 'x'}; new Array(object.value);", "file.js", 1, 30, 1, 53, "", ""),
-			// The shared evaluator does not represent built-in objects, functions,
-			// or symbols. Retain diagnostics without upstream's fixes for these
-			// values and their typeof expressions, as documented for this rule.
-			arrayCase("new Array(Symbol.iterator);", "file.js", 1, 1, 1, 27, "", ""),
+			// Symbol support in the shared evaluator must preserve the distinction
+			// between a single non-numeric element and a numeric array length.
+			arrayCase("new Array(Symbol.iterator);", "file.js", 1, 1, 1, 27, "[Symbol.iterator];", ""),
+			arrayCase("new Array(Symbol[\"iterator\"]);", "file.js", 1, 1, 1, 30, "[Symbol[\"iterator\"]];", ""),
+			arrayCase("new Array(Symbol.iterator || 3);", "file.js", 1, 1, 1, 32, "[Symbol.iterator || 3];", ""),
+			arrayCase("new Array(Symbol.iterator ? 3 : 'x');", "file.js", 1, 1, 1, 37, "", ""),
+			arrayCase("new Array(Symbol.iterator ? 'x' : 3);", "file.js", 1, 1, 1, 37, "[Symbol.iterator ? 'x' : 3];", ""),
+			arrayCase("function f(Symbol) { return new Array(Symbol.iterator); }", "file.js", 1, 29, 1, 55, "", ""),
+			arrayCase("new Array(/* keep */ Symbol.iterator);", "file.js", 1, 1, 1, 38, "", ""),
+			arrayCase("const key = Symbol.iterator; new Array(key);", "file.js", 1, 30, 1, 44, "", ""),
+			// Built-in objects, functions, and unsupported typeof expressions
+			// retain diagnostics without fixes, as documented for this rule.
 			arrayCase("new Array(Array);", "file.js", 1, 1, 1, 17, "", ""),
 			arrayCase("new Array(Math);", "file.js", 1, 1, 1, 16, "", ""),
 			arrayCase("new Array(typeof Array);", "file.js", 1, 1, 1, 24, "", ""),
@@ -121,6 +129,7 @@ func TestNoNewArrayGlobals(t *testing.T) {
 		{"new Array(undefined);", "undefined", "off", "", 1, 21},
 		{"new Array(Object.freeze([1]));", "Object", "off", "", 1, 30},
 		{"new Array(typeof NaN);", "NaN", "off", "", 1, 22},
+		{"new Array(Symbol.iterator);", "Symbol", "off", "", 1, 27},
 		{"new Array(undefined);", "undefined", "writable", "[undefined];", 1, 21},
 		{"new Array('x');", "Array", "off", "", 1, 15},
 		{"/* global undefined: off */ new Array(undefined);", "", "", "", 29, 49},

@@ -32,6 +32,8 @@ func TestPreferFlatMathMinMaxExtras(t *testing.T) {
 			{Code: "Math.max(Math.max(Math.max(1, 2), 3), 4);", Output: []string{"Math.max(1, 2, 3, 4);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls."}}},
 			{Code: "let state = 0; const value = {valueOf() { return state; }}; Math.max(Math.max(value), state = -1);", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls."}}},
 			{Code: "Math.max(Math.max(void sideEffect()), state = -1);", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls."}}},
+			// Converting a symbol throws before later arguments are evaluated.
+			{Code: "Math.max(Math.max(Symbol.iterator), sideEffect());", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-flat-math-min-max", Message: "Prefer a flat `Math.max()` call instead of nested calls."}}},
 		},
 	)
 }
