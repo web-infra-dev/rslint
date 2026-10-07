@@ -140,13 +140,9 @@ func (m *ExportMap) mergeFrom(other *ExportMap, includeDefault bool) {
 //
 // The map is read-only and may be shared with every other file of the run that
 // imports the same module; so may any ExportMeta.Namespace reached through it.
-func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, bool) {
-	return GetExportMapForSource(ctx, modules.SourceFromSpecifier(moduleSpecifier))
-}
-
-// GetExportMapForSource returns the effective export view of one authored
+// GetExportMap returns the effective export view of one authored
 // module request, including loader semantics selected by import attributes.
-func GetExportMapForSource(ctx rule.RuleContext, source modules.Source) (*ExportMap, bool) {
+func GetExportMap(ctx rule.RuleContext, source modules.Source) (*ExportMap, bool) {
 	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
 		return nil, false
 	}
@@ -203,7 +199,7 @@ func (builder *exportBuilder) program() *program.Program {
 
 func getExportMap(origin *ast.SourceFile, source modules.Source, builder *exportBuilder) (*ExportMap, bool) {
 	sourceProgram := builder.program()
-	if !sourceProgram.IsValid() || origin == nil || source.Specifier == nil || !ast.IsStringLiteralLike(source.Specifier) {
+	if !sourceProgram.IsValid() || origin == nil || source.Specifier() == nil || !ast.IsStringLiteralLike(source.Specifier()) {
 		return nil, false
 	}
 

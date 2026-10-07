@@ -48,15 +48,15 @@ var NoUselessPathSegmentsRule = rule.Rule{
 		var indexPattern *esregexp.RegExp
 		indexPatternInitialized := false
 		return import_utils.VisitModules(func(source modules.Source) {
-			importPath := source.Specifier.Text()
+			importPath := source.Specifier().Text()
 			if !strings.HasPrefix(importPath, ".") {
 				return
 			}
 			report := func(proposed string) {
-				ctx.ReportNodeWithDeferredFixes(source.Specifier, rule.RuleMessage{
+				ctx.ReportNodeWithDeferredFixes(source.Specifier(), rule.RuleMessage{
 					Description: `Useless path segments for "` + importPath + `", should be "` + proposed + `"`,
 				}, func() []rule.RuleFix {
-					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source.Specifier, quotePath(proposed))}
+					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source.Specifier(), quotePath(proposed))}
 				})
 			}
 			resolved, found := resolve(importPath, source)

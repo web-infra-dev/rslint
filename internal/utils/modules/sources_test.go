@@ -11,7 +11,7 @@ func TestCollectEmptyStaticSources(t *testing.T) {
 	for _, kinds := range []ReferenceKinds{ESModuleReferences, AllModuleReferences} {
 		var names []string
 		for _, source := range Collect(file, kinds) {
-			names = append(names, source.Specifier.Text())
+			names = append(names, source.Specifier().Text())
 		}
 		if want := []string{"first", "", "", "last"}; !reflect.DeepEqual(names, want) {
 			t.Fatalf("kinds %d: sources = %q, want %q", kinds, names, want)
@@ -25,8 +25,8 @@ func TestCollectKeepsSourceExpressions(t *testing.T) {
 	var expressions []string
 	var types []bool
 	for _, source := range sources {
-		expressions = append(expressions, strings.TrimSpace(file.Text()[source.Specifier.Pos():source.Specifier.End()]))
-		types = append(types, source.TypeOnly)
+		expressions = append(expressions, strings.TrimSpace(file.Text()[source.Specifier().Pos():source.Specifier().End()]))
+		types = append(types, source.TypeOnly())
 	}
 	want := []string{"'types'", "'named'", "'exported'", "('dep')", "'typed' as string", "1", "`template`", "dynamic"}
 	if !reflect.DeepEqual(expressions, want) {
@@ -42,7 +42,7 @@ func TestCollectNestedAndNonLiteralSources(t *testing.T) {
 	sources := Collect(file, AllModuleReferences)
 	var expressions []string
 	for _, source := range sources {
-		expressions = append(expressions, strings.TrimSpace(file.Text()[source.Specifier.Pos():source.Specifier.End()]))
+		expressions = append(expressions, strings.TrimSpace(file.Text()[source.Specifier().Pos():source.Specifier().End()]))
 	}
 	if want := []string{"'inner'", "name", "'amd'", "dynamic"}; !reflect.DeepEqual(expressions, want) {
 		t.Fatalf("sources = %q, want %q", expressions, want)
@@ -56,7 +56,7 @@ func TestCollectParenthesizedRequire(t *testing.T) {
 	file := parseModuleSpecifierCacheFile(`(require)('parenthesized'); require?.('optional'); require('two', 'args'); (require as any)('asserted');`)
 	var names []string
 	for _, source := range Collect(file, CommonJSReferences) {
-		names = append(names, source.Specifier.Text())
+		names = append(names, source.Specifier().Text())
 	}
 	if want := []string{"parenthesized", "optional"}; !reflect.DeepEqual(names, want) {
 		t.Fatalf("require sources = %q, want %q", names, want)
@@ -76,22 +76,22 @@ func TestCollectImportAttributes(t *testing.T) {
 	if len(sources) != 6 {
 		t.Fatalf("collected %d sources, want 6", len(sources))
 	}
-	if sources[0].Attributes.Key() == "" || sources[0].Attributes.Key() != sources[1].Attributes.Key() {
-		t.Fatalf("reordered attributes have keys %q and %q", sources[0].Attributes.Key(), sources[1].Attributes.Key())
+	if sources[0].Attributes().Key() == "" || sources[0].Attributes().Key() != sources[1].Attributes().Key() {
+		t.Fatalf("reordered attributes have keys %q and %q", sources[0].Attributes().Key(), sources[1].Attributes().Key())
 	}
-	if value, ok := sources[2].Attributes.Value("type"); !ok || value != "text" {
+	if value, ok := sources[2].Attributes().Value("type"); !ok || value != "text" {
 		t.Fatalf("export type attribute = (%q, %v), want (text, true)", value, ok)
 	}
-	if value, ok := sources[3].Attributes.Value("type"); !ok || value != "json" {
+	if value, ok := sources[3].Attributes().Value("type"); !ok || value != "json" {
 		t.Fatalf("dynamic import type attribute = (%q, %v), want (json, true)", value, ok)
 	}
-	if sources[4].Attributes.State != AttributesDynamic {
-		t.Fatalf("dynamic options state = %v, want AttributesDynamic", sources[4].Attributes.State)
+	if sources[4].Attributes().State != AttributesDynamic {
+		t.Fatalf("dynamic options state = %v, want AttributesDynamic", sources[4].Attributes().State)
 	}
-	if sources[0].Attributes.Key() == sources[2].Attributes.Key() {
+	if sources[0].Attributes().Key() == sources[2].Attributes().Key() {
 		t.Fatal("different attribute values produced the same key")
 	}
-	if sources[5].Attributes.State != AttributesInvalid {
-		t.Fatalf("duplicate attributes state = %v, want AttributesInvalid", sources[5].Attributes.State)
+	if sources[5].Attributes().State != AttributesInvalid {
+		t.Fatalf("duplicate attributes state = %v, want AttributesInvalid", sources[5].Attributes().State)
 	}
 }

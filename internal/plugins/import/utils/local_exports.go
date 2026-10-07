@@ -16,12 +16,8 @@ import (
 // including local export lists and namespace aliases, but not named or star
 // re-exports. It reuses the module index without following export dependencies.
 // Unresolved, ignored, syntactically invalid and non-ES modules return no names.
-func GetLocalExportNames(ctx rule.RuleContext, moduleSpecifier *ast.Node) []string {
-	return GetLocalExportNamesForSource(ctx, modules.SourceFromSpecifier(moduleSpecifier))
-}
-
-// GetLocalExportNamesForSource is the request-aware form used by import rules.
-func GetLocalExportNamesForSource(ctx rule.RuleContext, source modules.Source) []string {
+// GetLocalExportNames returns the local exports visible through one complete module request.
+func GetLocalExportNames(ctx rule.RuleContext, source modules.Source) []string {
 	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
 		return nil
 	}
@@ -255,7 +251,7 @@ func (local *localExports) appendExportDeclaration(sourceProgram *program.Progra
 		}
 		local.Steps = append(local.Steps, exportStep{
 			Kind: exportStepStar,
-			Link: resolveExportLink(sourceProgram, sourceFile, settings, modules.NewSource(exportDecl.ModuleSpecifier, exportDecl.AsNode(), modules.ModuleReferenceExport, exportDecl.IsTypeOnly)),
+			Link: resolveExportLink(sourceProgram, sourceFile, settings, modules.SourceFromSpecifier(exportDecl.ModuleSpecifier)),
 		})
 		return
 	}
@@ -268,7 +264,7 @@ func (local *localExports) appendExportDeclaration(sourceProgram *program.Progra
 		}
 		step := exportStep{Kind: exportStepNamed, FromModule: exportDecl.ModuleSpecifier != nil}
 		if step.FromModule {
-			step.Link = resolveExportLink(sourceProgram, sourceFile, settings, modules.NewSource(exportDecl.ModuleSpecifier, exportDecl.AsNode(), modules.ModuleReferenceExport, exportDecl.IsTypeOnly))
+			step.Link = resolveExportLink(sourceProgram, sourceFile, settings, modules.SourceFromSpecifier(exportDecl.ModuleSpecifier))
 		}
 		for _, spec := range namedExports.Elements.Nodes {
 			if spec == nil || spec.Kind != ast.KindExportSpecifier {
@@ -310,7 +306,7 @@ func importBinding(sourceProgram *program.Program, sourceFile *ast.SourceFile, s
 	if importDecl == nil || importDecl.ImportClause == nil {
 		return binding
 	}
-	binding.Link = resolveExportLink(sourceProgram, sourceFile, settings, modules.NewSource(importDecl.ModuleSpecifier, importDecl.AsNode(), modules.ModuleReferenceImport, importDecl.ImportClause.IsTypeOnly()))
+	binding.Link = resolveExportLink(sourceProgram, sourceFile, settings, modules.SourceFromSpecifier(importDecl.ModuleSpecifier))
 
 	importClause := importDecl.ImportClause.AsImportClause()
 	if importClause == nil || importClause.NamedBindings == nil || importClause.NamedBindings.Kind != ast.KindNamespaceImport {
@@ -326,7 +322,7 @@ func importBinding(sourceProgram *program.Program, sourceFile *ast.SourceFile, s
 // resolveExportLink answers what getExportMap would answer for one specifier,
 // without building the target's map.
 func resolveExportLink(sourceProgram *program.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, source modules.Source) exportLink {
-	if !sourceProgram.IsValid() || source.Specifier == nil || !ast.IsStringLiteralLike(source.Specifier) {
+	if !sourceProgram.IsValid() || source.Specifier() == nil || !ast.IsStringLiteralLike(source.Specifier()) {
 		return exportLink{}
 	}
 	link := resolveExportLinkForLookup(sourceProgram, sourceFile, settings, source)
@@ -342,11 +338,11 @@ func hasNodeDefault(sourceProgram *program.Program, origin *ast.SourceFile, sour
 		return false
 	}
 	// require() reads the CommonJS object itself, not Node's ES namespace.
-	parent := source.Specifier.Parent
+	parent := source.Specifier().Parent
 	if parent == nil || (parent.Kind != ast.KindImportDeclaration && parent.Kind != ast.KindExportDeclaration) {
 		return false
 	}
-	return sourceProgram.GetModeForUsageLocation(origin, source.Specifier) == core.ResolutionModeESM &&
+	return sourceProgram.GetModeForUsageLocation(origin, source.Specifier()) == core.ResolutionModeESM &&
 		sourceProgram.SourceFileMetadata(target).ImpliedNodeFormat == core.ResolutionModeCommonJS
 }
 

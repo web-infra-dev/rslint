@@ -73,7 +73,7 @@ var NoRestrictedPathsRule = rule.Rule{
 		applicable := make([]int, 0, 4)
 
 		return import_utils.VisitModules(func(source modules.Source) {
-			absoluteImportPath, _, ok := ctx.Program().ResolveModule(ctx.SourceFile, source.Specifier)
+			absoluteImportPath, _, ok := ctx.Program().ResolveModule(ctx.SourceFile, source)
 			if !ok {
 				return
 			}
@@ -93,12 +93,12 @@ var NoRestrictedPathsRule = rule.Rule{
 
 				for _, j := range applicable {
 					if !validators[i][j].hasValidExceptions {
-						ctx.ReportNode(source.Specifier, validators[i][j].invalidException)
+						ctx.ReportNode(source.Specifier(), validators[i][j].invalidException)
 					}
 				}
 				for _, j := range applicable {
 					if validators[i][j].hasValidExceptions && !validators[i][j].isPathException(absoluteImportPath) {
-						ctx.ReportNode(source.Specifier, unexpectedPathMessage(source.Specifier.Text(), matchingZones[i].message))
+						ctx.ReportNode(source.Specifier(), unexpectedPathMessage(source.Specifier().Text(), matchingZones[i].message))
 					}
 				}
 			}

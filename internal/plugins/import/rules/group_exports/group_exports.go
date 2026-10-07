@@ -68,7 +68,7 @@ var GroupExportsRule = rule.Rule{
 				if declaration.ModuleSpecifier != nil {
 					key.hasSource = true
 					key.source = declaration.ModuleSpecifier.Text()
-					key.attributes = modules.SourceFromSpecifier(declaration.ModuleSpecifier).Attributes.Key()
+					key.attributes = modules.SourceFromSpecifier(declaration.ModuleSpecifier).Attributes().Key()
 					// All source names, including __proto__, are ordinary map keys.
 				}
 				collect(node, key)

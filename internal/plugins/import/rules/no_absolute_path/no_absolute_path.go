@@ -34,10 +34,10 @@ var NoAbsolutePathRule = rule.Rule{
 		var fromParts []string
 		var cwd string
 		return import_utils.VisitModules(func(source modules.Source) {
-			if !nodeutil.IsAbsolutePath(source.Specifier.Text()) {
+			if !nodeutil.IsAbsolutePath(source.Specifier().Text()) {
 				return
 			}
-			ctx.ReportNodeWithDeferredFixes(source.Specifier, rule.RuleMessage{
+			ctx.ReportNodeWithDeferredFixes(source.Specifier(), rule.RuleMessage{
 				Description: "Do not import modules using an absolute path",
 			}, func() []rule.RuleFix {
 				if fromParts == nil {
@@ -55,12 +55,12 @@ var NoAbsolutePathRule = rule.Rule{
 					}
 					fromParts = posixPathComponents(tspath.GetDirectoryPath(ctx.SourceFile.FileName()), cwd)
 				}
-				relative := relativeImportPath(fromParts, source.Specifier.Text(), cwd)
+				relative := relativeImportPath(fromParts, source.Specifier().Text(), cwd)
 				text, ok := quoteModulePath(relative)
 				if !ok {
 					return nil
 				}
-				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source.Specifier, text)}
+				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source.Specifier(), text)}
 			})
 		}, import_utils.VisitModulesOptions{
 			ESModule: opts["esmodule"] != false,

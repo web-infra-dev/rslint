@@ -119,7 +119,7 @@ func processScope(resolver *importResolver, statements []*ast.Node) {
 			importMap.entries = make(map[string]importEntry)
 		}
 
-		attributes := modules.NewSource(importDecl.ModuleSpecifier, stmt, modules.ModuleReferenceImport, importDecl.ImportClause != nil && importDecl.ImportClause.IsTypeOnly()).Attributes
+		attributes := modules.SourceFromSpecifier(importDecl.ModuleSpecifier).Attributes()
 		identity := resolvedPath + "\x00" + attributes.Key()
 		entry, exists := importMap.entries[identity]
 		if !exists {
@@ -260,11 +260,12 @@ func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, module
 		r.hasNormalMode = true
 	}
 
-	resolved := r.ctx.Program().GetResolvedModule(r.ctx.SourceFile, moduleSpecifier.Text(), mode)
-	if resolved == nil || resolved.ResolvedFileName == "" {
+	source := modules.SourceFromSpecifier(moduleSpecifier)
+	resolvedPath := r.ctx.Program().GetResolvedModulePath(r.ctx.SourceFile, source, mode)
+	if resolvedPath == "" {
 		return "", false
 	}
-	return resolved.ResolvedFileName, true
+	return resolvedPath, true
 }
 
 func (r *importResolver) hasProblematicComments(node *ast.Node) bool {

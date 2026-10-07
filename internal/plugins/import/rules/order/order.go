@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
 	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
@@ -596,7 +597,7 @@ func (classifier *importClassifier) classify(name string, specifier *ast.Node) s
 
 	resolvedPath := ""
 	if sourceProgram := classifier.ctx.Program(); sourceProgram != nil && specifier != nil {
-		resolvedPath, _, _ = sourceProgram.ResolveModule(classifier.ctx.SourceFile, specifier)
+		resolvedPath, _, _ = sourceProgram.ResolveModule(classifier.ctx.SourceFile, modules.SourceFromSpecifier(specifier))
 	}
 	if builtinCandidate && resolvedPath == "" {
 		return "builtin"

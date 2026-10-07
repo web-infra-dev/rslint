@@ -100,7 +100,7 @@ var ExtensionsRule = rule.Rule{
 			return path, found
 		}
 		return import_utils.VisitModules(func(source modules.Source) {
-			written := source.Specifier.Text()
+			written := source.Specifier().Text()
 			if written == "" {
 				return
 			}
@@ -131,7 +131,7 @@ var ExtensionsRule = rule.Rule{
 				mode = opts.defaultMode
 			}
 			if extension == "" || !strings.HasSuffix(name, "."+extension) {
-				if mode != "always" || !opts.checkTypeImports && ast.IsExclusivelyTypeOnlyImportOrExport(source.Declaration) {
+				if mode != "always" || !opts.checkTypeImports && ast.IsExclusivelyTypeOnlyImportOrExport(source.Declaration()) {
 					return
 				}
 				if action == "" && opts.ignorePackages {
@@ -143,14 +143,14 @@ var ExtensionsRule = rule.Rule{
 				if extension != "" {
 					message += "\"" + extension + "\" "
 				}
-				ctx.ReportNode(source.Specifier, rule.RuleMessage{Description: message + "for \"" + written + "\""})
+				ctx.ReportNode(source.Specifier(), rule.RuleMessage{Description: message + "for \"" + written + "\""})
 			} else if mode == "never" {
 				withoutExtension := name[:len(name)-len(extension)-1]
 				otherPath, otherFound := resolve(source, withoutExtension)
 				// Both unresolved is also equality upstream (undefined === undefined).
 				// Builtins are a distinct successful result with no filesystem path.
 				if resolved == otherPath && found == otherFound {
-					ctx.ReportNode(source.Specifier, rule.RuleMessage{Description: "Unexpected use of file extension \"" + extension + "\" for \"" + written + "\""})
+					ctx.ReportNode(source.Specifier(), rule.RuleMessage{Description: "Unexpected use of file extension \"" + extension + "\" for \"" + written + "\""})
 				}
 			}
 		}, import_utils.VisitModulesOptions{ESModule: true, Commonjs: true})

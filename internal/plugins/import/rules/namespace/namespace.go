@@ -80,7 +80,7 @@ func processImportDeclaration(ctx rule.RuleContext, namespaces map[string]*impor
 		return
 	}
 
-	imports, ok := import_utils.GetExportMapForSource(ctx, modules.SourceFromSpecifier(importDecl.ModuleSpecifier))
+	imports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(importDecl.ModuleSpecifier))
 	if !ok {
 		return
 	}
@@ -154,7 +154,7 @@ func checkNamespaceExport(ctx rule.RuleContext, namespaceExport *ast.Node) {
 		return
 	}
 
-	imports, ok := import_utils.GetExportMapForSource(ctx, modules.SourceFromSpecifier(exportDecl.ModuleSpecifier))
+	imports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(exportDecl.ModuleSpecifier))
 	if !ok || imports.Size() > 0 {
 		return
 	}

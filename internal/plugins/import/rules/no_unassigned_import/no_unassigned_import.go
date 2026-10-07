@@ -74,9 +74,9 @@ var NoUnassignedImportRule = rule.Rule{
 		listeners := import_utils.VisitModules(func(source modules.Source) {
 			// A ChainExpression or a used require result is not a bare call
 			// expression statement in ESTree.
-			parent := utils.ESTreeParent(source.Declaration)
-			if !ast.IsOptionalChain(source.Declaration) && parent != nil && parent.Kind == ast.KindExpressionStatement && !isAllowed(source.Specifier.Text()) {
-				ctx.ReportNode(source.Declaration, message)
+			parent := utils.ESTreeParent(source.Declaration())
+			if !ast.IsOptionalChain(source.Declaration()) && parent != nil && parent.Kind == ast.KindExpressionStatement && !isAllowed(source.Specifier().Text()) {
+				ctx.ReportNode(source.Declaration(), message)
 			}
 		}, import_utils.VisitModulesOptions{Commonjs: true})
 		listeners[ast.KindImportDeclaration] = func(node *ast.Node) {

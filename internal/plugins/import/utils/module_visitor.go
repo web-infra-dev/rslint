@@ -16,17 +16,17 @@ import (
 // LiteralModuleSource applies moduleVisitor's string and AMD filters to the
 // shared syntax collection. Callers choose whether to include type-only imports.
 func LiteralModuleSource(ref modules.Source) *ast.Node {
-	if utils.IsJSDocSyntaxNode(ref.Declaration) {
+	if utils.IsJSDocSyntaxNode(ref.Declaration()) {
 		return nil
 	}
-	if ref.Kind == modules.ModuleReferenceAMD && len(ref.Declaration.AsCallExpression().Arguments.Nodes) != 2 {
+	if ref.Kind() == modules.ModuleReferenceAMD && len(ref.Declaration().AsCallExpression().Arguments.Nodes) != 2 {
 		return nil
 	}
-	source := utils.ESTreeRuntimeExpression(ref.Specifier)
+	source := utils.ESTreeRuntimeExpression(ref.Specifier())
 	if source == nil || source.Kind != ast.KindStringLiteral {
 		return nil
 	}
-	if ref.Kind == modules.ModuleReferenceAMD && (source.Text() == "require" || source.Text() == "exports") {
+	if ref.Kind() == modules.ModuleReferenceAMD && (source.Text() == "require" || source.Text() == "exports") {
 		return nil
 	}
 	return source
@@ -66,7 +66,11 @@ func VisitModules(visitor func(source modules.Source), options VisitModulesOptio
 			}
 		}
 
-		visitor(modules.NewSource(source, node, kind, typeOnly))
+		request := modules.SourceFromSpecifier(source)
+		if kind == modules.ModuleReferenceDynamicImport || kind == modules.ModuleReferenceRequire || kind == modules.ModuleReferenceAMD {
+			request = modules.SourceFromCall(source, node, kind)
+		}
+		visitor(request)
 	}
 
 	checkSource := func(node *ast.Node) {

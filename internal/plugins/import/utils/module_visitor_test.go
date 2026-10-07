@@ -28,8 +28,8 @@ obj.define(["member"], cb);
 `, core.ScriptKindTS)
 	var sources []string
 	listeners := import_utils.VisitModules(func(source modules.Source) {
-		sources = append(sources, source.Specifier.Text())
-		if source.Kind == modules.ModuleReferenceAMD && source.Declaration.Kind != ast.KindCallExpression {
+		sources = append(sources, source.Specifier().Text())
+		if source.Kind() == modules.ModuleReferenceAMD && source.Declaration().Kind != ast.KindCallExpression {
 			t.Error("AMD reference did not retain its call declaration")
 		}
 	}, import_utils.VisitModulesOptions{ESModule: true, Commonjs: true, AMD: true, Ignore: []string{"^ignored$"}})
@@ -50,7 +50,7 @@ func TestVisitModulesInvalidIgnore(t *testing.T) {
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/visitor.ts", Path: "/visitor.ts"}, `import "ignored"; import "visited";`, core.ScriptKindTS)
 	var sources []string
 	listeners := import_utils.VisitModules(func(source modules.Source) {
-		sources = append(sources, source.Specifier.Text())
+		sources = append(sources, source.Specifier().Text())
 	}, import_utils.VisitModulesOptions{ESModule: true, Ignore: []string{"[", "^ignored$"}})
 	for _, statement := range file.Statements.Nodes {
 		listeners[statement.Kind](statement)

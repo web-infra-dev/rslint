@@ -77,8 +77,8 @@ var NoUnresolvedRule = rule.Rule{
 // This rule checks only literal strings and skips explicit import/export type
 // declarations, matching moduleVisitor rather than emitted dependencies.
 func unresolvedSource(ref modules.Source) *ast.Node {
-	node := ref.Declaration
-	switch ref.Kind {
+	node := ref.Declaration()
+	switch ref.Kind() {
 	case modules.ModuleReferenceImport:
 		if clause := node.AsImportDeclaration().ImportClause; clause != nil && clause.IsTypeOnly() {
 			return nil

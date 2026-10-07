@@ -76,7 +76,7 @@ func NewImportResolver(ctx rule.RuleContext) *ImportResolver {
 // error. A missing module is not a configuration error. JavaScript resolver
 // plugins cannot execute in the native rule runtime.
 func (r *ImportResolver) Resolve(source modules.Source) (string, bool, string) {
-	return r.ResolveName(source.Specifier.Text(), source)
+	return r.ResolveName(source.Specifier().Text(), source)
 }
 
 // ResolveName resolves a candidate spelling in the original reference's context.
@@ -109,7 +109,7 @@ func (r *ImportResolver) ResolveName(name string, source modules.Source) (string
 			if modules.IsNodeBuiltin(name) {
 				return "", true, ""
 			}
-			if path, _, ok := r.ctx.Program().ResolveModuleNameAt(r.ctx.SourceFile, name, source.Specifier); ok {
+			if path, _, ok := r.ctx.Program().ResolveModuleNameAt(r.ctx.SourceFile, name, source); ok {
 				return path, true, ""
 			}
 		default:

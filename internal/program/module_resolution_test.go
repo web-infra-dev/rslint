@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	utils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 func TestResolveSourceFileFromSourceFile(t *testing.T) {
@@ -22,7 +23,7 @@ func TestResolveSourceFileFromSourceFile(t *testing.T) {
 		"/import-fixture/bar.ts":  "export default 1;\n",
 	}, "/import-fixture/file.ts")
 
-	resolvedPath, target, ok := program.ResolveModule(sourceFile, specifier)
+	resolvedPath, target, ok := program.ResolveModule(sourceFile, modules.SourceFromSpecifier(specifier))
 	if !ok {
 		t.Fatal("ResolveSourceFileFromSourceFile() did not resolve ./bar")
 	}
@@ -46,7 +47,7 @@ func TestResolveSourceFileFromSourceFileInvalidInput(t *testing.T) {
 		"/import-fixture/bar.ts":  "export default 1;\n",
 	}, "/import-fixture/file.ts")
 
-	if resolvedPath, target, ok := program.ResolveModule(sourceFile, nil); ok || resolvedPath != "" || target != nil {
+	if resolvedPath, target, ok := program.ResolveModule(sourceFile, modules.SourceFromSpecifier(nil)); ok || resolvedPath != "" || target != nil {
 		t.Fatalf("ResolveSourceFileFromSourceFile(nil) = (%q, %#v, %v), want empty result", resolvedPath, target, ok)
 	}
 }
@@ -58,7 +59,7 @@ func TestResolveModuleAlternateSpecifier(t *testing.T) {
 		"/import-fixture/bar.ts":  "export default 1;",
 	}, "/import-fixture/file.ts")
 	for _, name := range []string{"./bar", "./bar.js", "./bar.ts"} {
-		resolved, target, ok := program.ResolveModuleNameAt(sourceFile, name, specifier)
+		resolved, target, ok := program.ResolveModuleNameAt(sourceFile, name, modules.SourceFromSpecifier(specifier))
 		if !ok || resolved != "/import-fixture/bar.ts" || target == nil {
 			t.Fatalf("ResolveModuleNameAt(%q) = (%q, %v, %v)", name, resolved, target, ok)
 		}
@@ -66,7 +67,7 @@ func TestResolveModuleAlternateSpecifier(t *testing.T) {
 	if specifier.Text() != "./bar.js?raw" {
 		t.Fatal("resolving an alternate spelling mutated the source AST")
 	}
-	if _, _, ok := program.ResolveModuleNameAt(sourceFile, "./bar", nil); ok {
+	if _, _, ok := program.ResolveModuleNameAt(sourceFile, "./bar", modules.SourceFromSpecifier(nil)); ok {
 		t.Fatal("alternate resolution accepted a missing source reference")
 	}
 }
@@ -119,7 +120,7 @@ func TestResolveFromSourceFileRequire(t *testing.T) {
 				AllowJs: core.TSTrue,
 			})
 
-			resolvedPath, _, ok := program.ResolveModule(sourceFile, specifier)
+			resolvedPath, _, ok := program.ResolveModule(sourceFile, modules.SourceFromSpecifier(specifier))
 			if ok != (test.wantPath != "") {
 				t.Fatalf("ResolveFromSourceFile() ok = %v, want %v (path %q)", ok, test.wantPath != "", resolvedPath)
 			}
@@ -149,7 +150,7 @@ func TestResolveFromSourceFileModuleSuffixes(t *testing.T) {
 		ModuleSuffixes: []string{".ios", ""},
 	})
 
-	resolvedPath, _, ok := program.ResolveModule(sourceFile, specifier)
+	resolvedPath, _, ok := program.ResolveModule(sourceFile, modules.SourceFromSpecifier(specifier))
 	if !ok {
 		t.Fatal("ResolveFromSourceFile() did not resolve ./dep")
 	}
@@ -181,7 +182,7 @@ func TestResolveFromSourceFileUnloadedTarget(t *testing.T) {
 		ModuleSuffixes: []string{".ios", ""},
 	})
 
-	resolvedPath, target, ok := program.ResolveModule(sourceFile, specifier)
+	resolvedPath, target, ok := program.ResolveModule(sourceFile, modules.SourceFromSpecifier(specifier))
 	if !ok {
 		t.Fatal("ResolveFromSourceFile() did not resolve ./dep")
 	}
@@ -229,7 +230,7 @@ func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
 				AllowJs:          core.TSTrue,
 			})
 
-			resolvedPath, _, ok := program.ResolveModule(sourceFile, specifier)
+			resolvedPath, _, ok := program.ResolveModule(sourceFile, modules.SourceFromSpecifier(specifier))
 			if !ok {
 				t.Fatal("ResolveFromSourceFile() did not resolve some-package")
 			}
@@ -238,7 +239,7 @@ func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
 			}
 			// Candidate paths must retain the CommonJS mode of (require), including
 			// when the containing source file is an ES module.
-			alternative, _, ok := program.ResolveModuleNameAt(sourceFile, "some-package/feature", specifier)
+			alternative, _, ok := program.ResolveModuleNameAt(sourceFile, "some-package/feature", modules.SourceFromSpecifier(specifier))
 			if !ok || tspath.NormalizeSlashes(alternative) != requireFile {
 				t.Fatalf("candidate resolved to %q, want %q", alternative, requireFile)
 			}

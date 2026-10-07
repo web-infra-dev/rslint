@@ -36,14 +36,14 @@ var MaxDependenciesRule = rule.Rule{
 		var lastSource *ast.Node
 		listeners := import_utils.VisitModules(func(source modules.Source) {
 			// Even ignored type imports and duplicate paths become the report site.
-			lastSource = source.Specifier
-			if ignoreTypeImports && ast.IsImportDeclaration(source.Declaration) &&
-				source.Declaration.ImportClause() != nil && source.Declaration.ImportClause().IsTypeOnly() {
+			lastSource = source.Specifier()
+			if ignoreTypeImports && ast.IsImportDeclaration(source.Declaration()) &&
+				source.Declaration().ImportClause() != nil && source.Declaration().ImportClause().IsTypeOnly() {
 				return
 			}
 			// Once over the limit, only the last source can affect the report.
 			if float64(len(dependencies)) <= limit {
-				identity := source.Specifier.Text() + "\x00" + source.Attributes.Key()
+				identity := source.Specifier().Text() + "\x00" + source.Attributes().Key()
 				dependencies[identity] = struct{}{}
 			}
 		}, import_utils.VisitModulesOptions{Commonjs: true, ESModule: true})

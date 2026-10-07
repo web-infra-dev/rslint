@@ -40,18 +40,24 @@ func (kinds ReferenceKinds) includes(kind ReferenceKind) bool {
 // that distinguish explicit import/export type keywords inspect Declaration.
 // Collection performs no name resolution, filesystem access or evaluation.
 type Source struct {
-	Specifier   *ast.Node
-	Declaration *ast.Node
-	Kind        ReferenceKind
-	TypeOnly    bool
-	Attributes  ImportAttributes
+	specifier   *ast.Node
+	declaration *ast.Node
+	kind        ReferenceKind
+	typeOnly    bool
+	attributes  ImportAttributes
 }
+
+func (source Source) Specifier() *ast.Node         { return source.specifier }
+func (source Source) Declaration() *ast.Node       { return source.declaration }
+func (source Source) Kind() ReferenceKind          { return source.kind }
+func (source Source) TypeOnly() bool               { return source.typeOnly }
+func (source Source) Attributes() ImportAttributes { return source.attributes }
 
 // WithSpecifier returns the same authored module request with an equivalent
 // source expression. Resolver-facing filters use it after removing transparent
 // ESTree wrappers without dropping declaration attributes.
 func (source Source) WithSpecifier(specifier *ast.Node) Source {
-	source.Specifier = specifier
+	source.specifier = specifier
 	return source
 }
 
@@ -93,7 +99,7 @@ func collectStaticImports(file *ast.SourceFile, kinds ReferenceKinds) []Source {
 		}
 
 		if kinds.includes(kind) {
-			specifiers = append(specifiers, NewSource(specifier, declaration, kind, typeOnly))
+			specifiers = append(specifiers, newSource(specifier, declaration, kind, typeOnly))
 		}
 	}
 	return specifiers
@@ -214,31 +220,38 @@ func appendSpecifier(specifiers *[]Source, specifier *ast.Node, declaration *ast
 	if specifier == nil {
 		return
 	}
-	*specifiers = append(*specifiers, NewSource(specifier, declaration, kind, typeOnly))
+	*specifiers = append(*specifiers, newSource(specifier, declaration, kind, typeOnly))
 }
 
-// NewSource builds the shared syntax description for one module reference.
-// Collection and listener-based rules use the same constructor so attributes
-// cannot disappear merely because a rule observes a different AST event.
-func NewSource(specifier *ast.Node, declaration *ast.Node, kind ReferenceKind, typeOnly bool) Source {
+func newSource(specifier *ast.Node, declaration *ast.Node, kind ReferenceKind, typeOnly bool) Source {
 	source := Source{
-		Specifier:   specifier,
-		Declaration: declaration,
-		Kind:        kind,
-		TypeOnly:    typeOnly,
+		specifier:   specifier,
+		declaration: declaration,
+		kind:        kind,
+		typeOnly:    typeOnly,
 	}
 	if declaration == nil {
 		return source
 	}
 	switch kind {
 	case ModuleReferenceImport:
-		source.Attributes = staticImportAttributes(declaration.AsImportDeclaration().Attributes)
+		source.attributes = staticImportAttributes(declaration.AsImportDeclaration().Attributes)
 	case ModuleReferenceExport:
-		source.Attributes = staticImportAttributes(declaration.AsExportDeclaration().Attributes)
+		source.attributes = staticImportAttributes(declaration.AsExportDeclaration().Attributes)
 	case ModuleReferenceDynamicImport:
-		source.Attributes = dynamicImportAttributes(declaration.AsCallExpression())
+		source.attributes = dynamicImportAttributes(declaration.AsCallExpression())
 	}
 	return source
+}
+
+// SourceFromCall builds a request for a dynamic import, require, or AMD call.
+// Static import and export declarations must use SourceFromSpecifier instead.
+func SourceFromCall(specifier *ast.Node, declaration *ast.Node, kind ReferenceKind) Source {
+	if declaration == nil || declaration.Kind != ast.KindCallExpression ||
+		kind != ModuleReferenceDynamicImport && kind != ModuleReferenceRequire && kind != ModuleReferenceAMD {
+		return Source{}
+	}
+	return newSource(specifier, declaration, kind, false)
 }
 
 // SourceFromSpecifier recovers the shared static module reference that owns a
@@ -250,15 +263,15 @@ func SourceFromSpecifier(specifier *ast.Node) Source {
 	}
 	declaration := ast.TryGetImportFromModuleSpecifier(specifier)
 	if declaration == nil {
-		return NewSource(specifier, nil, ModuleReferenceImport, false)
+		return newSource(specifier, nil, ModuleReferenceImport, false)
 	}
 	switch declaration.Kind {
 	case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
-		return NewSource(specifier, declaration, ModuleReferenceImport, importDeclarationOnlyImportsTypes(declaration.AsImportDeclaration()))
+		return newSource(specifier, declaration, ModuleReferenceImport, importDeclarationOnlyImportsTypes(declaration.AsImportDeclaration()))
 	case ast.KindExportDeclaration:
-		return NewSource(specifier, declaration, ModuleReferenceExport, ast.IsTypeOnlyImportOrExportDeclaration(declaration))
+		return newSource(specifier, declaration, ModuleReferenceExport, ast.IsTypeOnlyImportOrExportDeclaration(declaration))
 	default:
-		return Source{Specifier: specifier, Declaration: declaration, Kind: ModuleReferenceRequire}
+		return newSource(specifier, declaration, ModuleReferenceRequire, false)
 	}
 }
 

@@ -53,7 +53,7 @@ func VisitImports(ctx rule.RuleContext, options ImportVisitorOptions, check func
 	return rule.RuleListeners{
 		rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
 			for _, source := range modules.Collect(ctx.SourceFile, modules.ESModuleReferences) {
-				node, specifier := source.Declaration, source.Specifier
+				node, specifier := source.Declaration(), source.Specifier()
 				typeOnly := false
 				switch node.Kind {
 				case ast.KindImportDeclaration:

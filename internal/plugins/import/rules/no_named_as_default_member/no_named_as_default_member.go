@@ -31,7 +31,7 @@ var NoNamedAsDefaultMemberRule = rule.Rule{
 			if declaration.ImportClause == nil || declaration.ImportClause.Name() == nil {
 				continue
 			}
-			names := import_utils.GetLocalExportNamesForSource(ctx, modules.SourceFromSpecifier(declaration.ModuleSpecifier))
+			names := import_utils.GetLocalExportNames(ctx, modules.SourceFromSpecifier(declaration.ModuleSpecifier))
 			// The default property is always allowed, so a default-only module
 			// cannot produce a diagnostic and needs no expression listeners.
 			if len(names) == 0 || (len(names) == 1 && names[0] == "default") {

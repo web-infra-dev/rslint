@@ -26,7 +26,7 @@ var NoNamedAsDefaultRule = rule.Rule{
 
 			// The shared map supplies module resolution and export metadata.
 			// Parser errors in dependencies are not reproduced as rule reports.
-			exports, ok := import_utils.GetExportMapForSource(ctx, modules.SourceFromSpecifier(declaration.ModuleSpecifier))
+			exports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(declaration.ModuleSpecifier))
 			if !ok || !exports.HasDefault() || exports.Get(name.Text()) == nil {
 				return
 			}

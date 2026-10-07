@@ -21,13 +21,9 @@ import (
 // means that module cannot be inspected. Missing explicit re-exports preserve
 // their failure path, while an unsuccessful star search reports the barrel.
 // Resolution and local export collection reuse the Program's import index.
-func FindExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, name string) (bool, []string) {
-	return FindExportForSource(ctx, modules.SourceFromSpecifier(moduleSpecifier), name)
-}
-
-// FindExportForSource follows an export through the effective module view of
+// FindExport follows an export through the effective module view of
 // one authored request, including its import attributes.
-func FindExportForSource(ctx rule.RuleContext, source modules.Source, name string) (bool, []string) {
+func FindExport(ctx rule.RuleContext, source modules.Source, name string) (bool, []string) {
 	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
 		return false, nil
 	}
@@ -133,13 +129,9 @@ func (builder *exportBuilder) findExport(link exportLink, name string, settings 
 // the fallback from an explicitly enabled esModuleInterop option. The
 // second result is false when no export map is available, matching
 // eslint-plugin-import's "imports == null" branch.
-func HasDefaultExport(ctx rule.RuleContext, moduleSpecifier *ast.Node) (bool, bool) {
-	return HasDefaultExportForSource(ctx, modules.SourceFromSpecifier(moduleSpecifier))
-}
-
-// HasDefaultExportForSource checks the effective view of an authored import.
-func HasDefaultExportForSource(ctx rule.RuleContext, source modules.Source) (bool, bool) {
-	if !ctx.Program().IsValid() || ctx.SourceFile == nil || source.Specifier == nil || !ast.IsStringLiteralLike(source.Specifier) {
+// HasDefaultExport checks the effective view of an authored import.
+func HasDefaultExport(ctx rule.RuleContext, source modules.Source) (bool, bool) {
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil || source.Specifier() == nil || !ast.IsStringLiteralLike(source.Specifier()) {
 		return false, false
 	}
 	builder := newExportBuilder(IndexFor(ctx), ctx.Program())
@@ -150,13 +142,9 @@ func HasDefaultExportForSource(ctx rule.RuleContext, source modules.Source) (boo
 // HasExport resolves moduleSpecifier from ctx.SourceFile and reports whether
 // the resolved module statically exports exportName. The second result is false
 // when the target is unresolved or is not an ES module.
-func HasExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, exportName string) (bool, bool) {
-	return HasExportForSource(ctx, modules.SourceFromSpecifier(moduleSpecifier), exportName)
-}
-
-// HasExportForSource checks an export against the request's effective view.
-func HasExportForSource(ctx rule.RuleContext, source modules.Source, exportName string) (bool, bool) {
-	if !ctx.Program().IsValid() || ctx.SourceFile == nil || source.Specifier == nil || !ast.IsStringLiteralLike(source.Specifier) {
+// HasExport checks an export against the request's effective view.
+func HasExport(ctx rule.RuleContext, source modules.Source, exportName string) (bool, bool) {
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil || source.Specifier() == nil || !ast.IsStringLiteralLike(source.Specifier()) {
 		return false, false
 	}
 	return hasExport(ctx.SourceFile, source, exportName, newExportBuilder(IndexFor(ctx), ctx.Program()))
@@ -191,11 +179,11 @@ func hasExport(origin *ast.SourceFile, source modules.Source, exportName string,
 // resolveExportLink: it stops before the is-an-ES-module test, which
 // sourceFileHasExport applies itself.
 func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.SourceFile, settings *ModuleSettings, source modules.Source) exportLink {
-	view := moduleViewFor(source.Attributes)
+	view := moduleViewFor(source.Attributes())
 	if view == moduleViewUnknown {
 		return exportLink{}
 	}
-	path, sourceFile, ok := sourceProgram.ResolveModule(origin, source.Specifier)
+	path, sourceFile, ok := sourceProgram.ResolveModule(origin, source)
 	if !ok || sourceFile != nil && settings.IsIgnoredPath(sourceFile.FileName()) {
 		return exportLink{}
 	}
@@ -471,7 +459,7 @@ func exportDeclarationHasName(sourceFile *ast.SourceFile, exportDecl *ast.Export
 		if exportDecl.ModuleSpecifier == nil || exportName == defaultExportName {
 			return false, false
 		}
-		found, ok := hasExport(sourceFile, modules.NewSource(exportDecl.ModuleSpecifier, exportDecl.AsNode(), modules.ModuleReferenceExport, exportDecl.IsTypeOnly), exportName, builder)
+		found, ok := hasExport(sourceFile, modules.SourceFromSpecifier(exportDecl.ModuleSpecifier), exportName, builder)
 		if !ok {
 			return true, true
 		}
@@ -508,7 +496,7 @@ func exportDeclarationHasName(sourceFile *ast.SourceFile, exportDecl *ast.Export
 				return false, true
 			}
 
-			hasName, ok := hasExport(sourceFile, modules.NewSource(exportDecl.ModuleSpecifier, exportDecl.AsNode(), modules.ModuleReferenceExport, exportDecl.IsTypeOnly), localName, builder)
+			hasName, ok := hasExport(sourceFile, modules.SourceFromSpecifier(exportDecl.ModuleSpecifier), localName, builder)
 			if !ok {
 				return true, true
 			}

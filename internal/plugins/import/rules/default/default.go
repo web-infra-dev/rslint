@@ -28,8 +28,8 @@ var DefaultRule = rule.Rule{
 				return
 			}
 
-			source := modules.NewSource(importDecl.ModuleSpecifier, node, modules.ModuleReferenceImport, importDecl.ImportClause.IsTypeOnly())
-			hasDefault, ok := import_utils.HasDefaultExportForSource(ctx, source)
+			source := modules.SourceFromSpecifier(importDecl.ModuleSpecifier)
+			hasDefault, ok := import_utils.HasDefaultExport(ctx, source)
 			if !ok || hasDefault {
 				return
 			}

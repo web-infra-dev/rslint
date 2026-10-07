@@ -158,7 +158,7 @@ func (c *collector) collectExport(node *ast.Node) {
 			return
 		}
 	}
-	exports, ok := import_utils.GetExportMapForSource(c.ctx, modules.SourceFromSpecifier(declaration.ModuleSpecifier))
+	exports, ok := import_utils.GetExportMap(c.ctx, modules.SourceFromSpecifier(declaration.ModuleSpecifier))
 	if !ok {
 		return
 	}

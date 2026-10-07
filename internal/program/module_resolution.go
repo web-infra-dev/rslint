@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 // ResolveModule resolves a module specifier under this Program's compiler
@@ -25,17 +26,22 @@ import (
 // nowhere falls back to probing the relative specifier against the files
 // already in the Program, which covers the extension-substitution cases
 // upstream still treats as edges.
-func (p *Program) ResolveModule(sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
+func (p *Program) ResolveModule(sourceFile *ast.SourceFile, source modules.Source) (string, *ast.SourceFile, bool) {
+	moduleSpecifier := source.Specifier()
 	if moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return "", nil, false
 	}
-	return p.ResolveModuleNameAt(sourceFile, moduleSpecifier.Text(), moduleSpecifier)
+	return p.resolveModuleNameAt(sourceFile, moduleSpecifier.Text(), moduleSpecifier)
 }
 
 // ResolveModuleNameAt resolves a candidate name with an existing reference's
 // resolution mode and the same loaded-file fallback as ResolveModule. Callers
 // can compare alternative spellings without constructing synthetic AST nodes.
-func (p *Program) ResolveModuleNameAt(sourceFile *ast.SourceFile, specifier string, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
+func (p *Program) ResolveModuleNameAt(sourceFile *ast.SourceFile, specifier string, source modules.Source) (string, *ast.SourceFile, bool) {
+	return p.resolveModuleNameAt(sourceFile, specifier, source.Specifier())
+}
+
+func (p *Program) resolveModuleNameAt(sourceFile *ast.SourceFile, specifier string, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
 	if !p.IsValid() || !p.OwnsSourceFile(sourceFile) || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return "", nil, false
 	}
@@ -67,6 +73,20 @@ func (p *Program) ResolveModuleNameAt(sourceFile *ast.SourceFile, specifier stri
 	}
 
 	return "", nil, false
+}
+
+// GetResolvedModulePath returns TypeScript's cached path for a complete module
+// request under an explicit mode. Rules that need cache-only resolution still
+// cannot discard the request's attributes at their API boundary.
+func (p *Program) GetResolvedModulePath(sourceFile ast.HasFileName, source modules.Source, mode core.ResolutionMode) string {
+	if source.Specifier() == nil {
+		return ""
+	}
+	resolved := p.GetResolvedModule(sourceFile, source.Specifier().Text(), mode)
+	if resolved == nil {
+		return ""
+	}
+	return resolved.ResolvedFileName
 }
 
 // resolutionMode answers with the mode a specifier resolves under. TypeScript

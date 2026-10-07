@@ -28,7 +28,7 @@ var NamedRule = rule.Rule{
 			}
 		}
 		check := func(source, name *ast.Node) {
-			found, path := import_utils.FindExportForSource(ctx, modules.SourceFromSpecifier(source), name.Text())
+			found, path := import_utils.FindExport(ctx, modules.SourceFromSpecifier(source), name.Text())
 			if found || len(path) == 0 {
 				return
 			}

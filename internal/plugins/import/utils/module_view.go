@@ -51,13 +51,13 @@ func moduleViewFor(attributes modules.ImportAttributes) moduleViewKind {
 // authored dependency and export graph. Attribute-selected data/text views and
 // unknown host loaders do not expose that graph.
 func HasAuthoredModuleView(source modules.Source) bool {
-	return moduleViewFor(source.Attributes) == moduleViewAuthored
+	return moduleViewFor(source.Attributes()) == moduleViewAuthored
 }
 
 // HasDefaultOnlyModuleView reports the built-in data loaders whose request is
 // known not to execute the target as a JavaScript module.
 func HasDefaultOnlyModuleView(source modules.Source) bool {
-	return moduleViewFor(source.Attributes) == moduleViewDefaultOnly
+	return moduleViewFor(source.Attributes()) == moduleViewDefaultOnly
 }
 
 func defaultOnlyExportMap() *ExportMap {
