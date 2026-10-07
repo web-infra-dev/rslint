@@ -334,6 +334,31 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 		return staticEvaluator.evalConditionalExpression(node)
 	case ast.KindVoidExpression:
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+	case ast.KindTypeOfExpression:
+		operand := staticEvaluator.evalValue(node.Expression())
+		if !operand.ok {
+			return staticEvalResult{}
+		}
+		var name string
+		switch staticValueKindOf(operand.value) {
+		case staticKindString:
+			name = "string"
+		case staticKindNumber:
+			name = "number"
+		case staticKindBigInt:
+			name = "bigint"
+		case staticKindBoolean:
+			name = "boolean"
+		case staticKindUndefined:
+			name = "undefined"
+		case staticKindNull:
+			name = "object"
+		default:
+			if staticValueIsAggregate(operand.value) {
+				name = "object"
+			}
+		}
+		return staticEvalResult{value: name, ok: name != ""}
 	case ast.KindObjectLiteralExpression:
 		if result := staticEvaluator.evalObjectLiteral(node); result.ok {
 			return result

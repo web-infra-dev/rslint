@@ -713,6 +713,9 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		const frozenAlias = frozen;
 		const safeAlias = array;
 		const skippedMutable = true ? array : loose;
+		const beforeDeclaration = later;
+		const skippedBeforeDeclaration = true ? array : later;
+		const later = "x";
 		const reachedMutable = loose;
 		const voidMutable = void loose ?? array;
 		const assignment = flag = true;
@@ -755,6 +758,8 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		{name: "frozenAlias", known: true, isArray: true},
 		{name: "safeAlias", known: true, isArray: true},
 		{name: "skippedMutable", known: true, isArray: true},
+		{name: "beforeDeclaration"},
+		{name: "skippedBeforeDeclaration", known: true, isArray: true},
 		{name: "reachedMutable"},
 		{name: "voidMutable"},
 		{name: "assignment"},
@@ -808,6 +813,35 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		assert.Assert(t, !known && !isArray)
 		truthy, known := evaluator.EvalControlFlowTruthiness(nil)
 		assert.Assert(t, !known && !truthy)
+	}
+}
+
+func TestStaticStringEvaluatorTypeof(t *testing.T) {
+	for _, test := range []struct {
+		expression, want string
+		known            bool
+	}{
+		{"typeof 1", "number", true},
+		{"typeof 'x'", "string", true},
+		{"typeof 1n", "bigint", true},
+		{"typeof false", "boolean", true},
+		{"typeof null", "object", true},
+		{"typeof void 0", "undefined", true},
+		{"typeof []", "object", true},
+		{"typeof ({})", "object", true},
+		{"typeof /x/", "object", true},
+		{"typeof typeof 1", "string", true},
+		{"typeof unknown", "", false},
+		{"typeof fn()", "", false},
+	} {
+		t.Run(test.expression, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/typeof.js"}, "const value = "+test.expression+";", core.ScriptKindJS)
+			node := findVariableInitializer(t, source, "value")
+			got, known := NewStaticStringEvaluatorWithoutScope().Eval(node)
+			if got != test.want || known != test.known {
+				t.Fatalf("Eval = (%q, %v), want (%q, %v)", got, known, test.want, test.known)
+			}
+		})
 	}
 }
 
