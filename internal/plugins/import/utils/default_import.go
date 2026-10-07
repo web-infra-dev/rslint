@@ -36,12 +36,34 @@ func (index *ModuleIndex) defaultImportInfoOf(sourceProgram *program.Program, fi
 			return defaultImportInfo{}
 		}
 		info := defaultImportInfo{available: true}
-		if !explicitESModuleInterop(sourceProgram) {
+		interop := explicitESModuleInterop(sourceProgram)
+		syntheticDefault := compilerOptionsAllowSyntheticDefaultImports(sourceProgram, interop)
+		// Only declarations use the implicit-default fallback below.
+		// Export assignments are checked during the subsequent name lookup.
+		if !interop && (!syntheticDefault || !file.IsDeclarationFile) {
+			return info
+		}
+		if !syntheticDefault {
+			// Do not let upstream's local-namespace fallback override an
+			// explicit synthetic-default opt-out for CommonJS declarations
+			// or export assignments. Authored defaults are still checked.
+			if isCommonJSDeclaration(sourceProgram, file) || file.Statements != nil && slices.ContainsFunc(file.Statements.Nodes, func(stmt *ast.Node) bool {
+				return stmt != nil && stmt.Kind == ast.KindExportAssignment && stmt.AsExportAssignment().IsExportEquals
+			}) {
+				return info
+			}
+		}
+		local := index.localExportsOf(sourceProgram, file)
+		if syntheticDefault && file.IsDeclarationFile && local.ImplicitDefault {
+			info.syntheticDefault = true
+			return info
+		}
+		if !interop {
 			return info
 		}
 		// Upstream synthesizes a default only for its local namespace. Named
 		// re-exports and export-star dependencies are stored separately.
-		for _, step := range index.localExportsOf(sourceProgram, file).Steps {
+		for _, step := range local.Steps {
 			if step.Kind == exportStepLocalDefault ||
 				step.Kind == exportStepNames && len(step.Names) != 0 ||
 				step.Kind == exportStepNamed && !step.FromModule && len(step.Specs) != 0 {

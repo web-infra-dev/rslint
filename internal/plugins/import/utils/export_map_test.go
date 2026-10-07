@@ -96,7 +96,7 @@ func TestFindExport(t *testing.T) {
 
 func TestDefaultExportsAcrossNodeModuleFormats(t *testing.T) {
 	root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/default-interop.txtar").Materialize(t, ""))
-	for _, config := range []string{"tsconfig.json", "tsconfig.interop.json", "tsconfig.no-interop.json"} {
+	for _, config := range []string{"tsconfig.json", "tsconfig.interop.json", "tsconfig.no-interop.json", "tsconfig.no-synthetic.json"} {
 		t.Run(config, func(t *testing.T) {
 			raw, err := rslint_utils.CreateProgram(true, osvfs.FS(), root, config, rslint_utils.CreateCompilerHost(root, osvfs.FS()))
 			if err != nil {
@@ -114,7 +114,7 @@ func TestDefaultExportsAcrossNodeModuleFormats(t *testing.T) {
 					want []bool
 				}{
 					{"consumer.mts", []bool{true, false, true, true, false, true, true, false, false, true, true}},
-					{"consumer.cts", []bool{false, false, config != "tsconfig.no-interop.json", false, false, true, false, false, false, false, false}},
+					{"consumer.cts", []bool{false, false, config != "tsconfig.no-interop.json" && config != "tsconfig.no-synthetic.json", false, false, true, false, false, false, false, false}},
 				} {
 					source := sourceProgram.GetSourceFile(tspath.ResolvePath(root, tc.file))
 					if source == nil || source.Statements == nil || len(source.Statements.Nodes) != len(tc.want) {
@@ -129,6 +129,11 @@ func TestDefaultExportsAcrossNodeModuleFormats(t *testing.T) {
 						// import/default follows upstream's explicit interop option,
 						// independently of the native Node default on an import edge.
 						wantImportDefault := config == "tsconfig.interop.json" && i != 10
+						if config == "tsconfig.no-synthetic.json" {
+							// The opt-out applies to CommonJS declarations. Upstream's
+							// explicit interop fallback for other modules is unchanged.
+							wantImportDefault = i != 2 && i != 9 && i != 10
+						}
 						if found, ok := import_utils.HasDefaultExport(ctx, specifier); !ok || found != wantImportDefault {
 							t.Errorf("%s: HasDefaultExport(%s) = (%v, %v), want (%v, true)", tc.file, specifier.Text(), found, ok, wantImportDefault)
 						}
@@ -684,14 +689,16 @@ func TestGetExportMap(t *testing.T) {
 	})
 }
 
-func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
+func TestHasDefaultExportRespectsDefaultImportOptions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name              string
 		source            string
 		esModuleInterop   core.Tristate
+		syntheticDefaults core.Tristate
 		module            core.ModuleKind
+		moduleResolution  core.ModuleResolutionKind
 		wantDefaultExport bool
 		wantDefaultImport bool
 	}{
@@ -707,6 +714,13 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 			source:            "./typescript",
 			module:            core.ModuleKindNodeNext,
 			wantDefaultExport: false,
+		},
+		{
+			name:              "synthetic opt-out preserves explicit interop for named TypeScript exports",
+			source:            "./typescript",
+			esModuleInterop:   core.TSTrue,
+			syntheticDefaults: core.TSFalse,
+			wantDefaultImport: true,
 		},
 		{
 			name:              "named TypeScript exports do not synthesize default when disabled",
@@ -760,6 +774,90 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 			wantDefaultExport: true,
 			wantDefaultImport: true,
 		},
+		{
+			name:              "legacy module defaults do not implicitly enable synthetic defaults",
+			source:            "./typescript-export-assign-default-namespace",
+			wantDefaultExport: false,
+		},
+		{
+			name:              "bundler enables synthetic defaults for export equals namespaces",
+			source:            "./typescript-export-assign-default-namespace",
+			module:            core.ModuleKindESNext,
+			moduleResolution:  core.ModuleResolutionKindBundler,
+			wantDefaultExport: true,
+			wantDefaultImport: true,
+		},
+		{
+			name:              "bundler enables synthetic defaults even without interop",
+			source:            "./typescript-export-assign-default-namespace",
+			esModuleInterop:   core.TSFalse,
+			moduleResolution:  core.ModuleResolutionKindBundler,
+			wantDefaultExport: true,
+			wantDefaultImport: true,
+		},
+		{
+			name:              "explicit synthetic defaults work without interop",
+			source:            "./typescript-export-assign-default-namespace",
+			esModuleInterop:   core.TSFalse,
+			syntheticDefaults: core.TSTrue,
+			wantDefaultExport: true,
+			wantDefaultImport: true,
+		},
+		{
+			name:              "explicitly disabling synthetic defaults overrides interop",
+			source:            "./typescript-export-assign-default-namespace",
+			esModuleInterop:   core.TSTrue,
+			syntheticDefaults: core.TSFalse,
+			wantDefaultExport: false,
+		},
+		{
+			name:              "explicitly disabling synthetic defaults overrides bundler",
+			source:            "./typescript-export-assign-default-namespace",
+			syntheticDefaults: core.TSFalse,
+			moduleResolution:  core.ModuleResolutionKindBundler,
+			wantDefaultExport: false,
+		},
+		{
+			name:              "preserve implies bundler even without interop",
+			source:            "./typescript-export-assign-default-namespace",
+			esModuleInterop:   core.TSFalse,
+			module:            core.ModuleKindPreserve,
+			wantDefaultExport: true,
+			wantDefaultImport: true,
+		},
+		{
+			name:              "system enables synthetic defaults",
+			source:            "./typescript-export-assign-default-namespace",
+			module:            core.ModuleKindSystem,
+			wantDefaultExport: true,
+			wantDefaultImport: true,
+		},
+		{
+			name:              "bundler enables synthetic defaults for CommonJS declarations",
+			source:            "./typescript-export-as-default-namespace",
+			moduleResolution:  core.ModuleResolutionKindBundler,
+			wantDefaultExport: true,
+			wantDefaultImport: true,
+		},
+		{
+			name:              "CommonJS declarations respect explicitly disabled synthetic defaults",
+			source:            "./typescript-export-as-default-namespace",
+			esModuleInterop:   core.TSTrue,
+			syntheticDefaults: core.TSFalse,
+			wantDefaultExport: false,
+		},
+		{
+			name:              "bundler does not synthesize defaults for named TypeScript exports",
+			source:            "./typescript",
+			moduleResolution:  core.ModuleResolutionKindBundler,
+			wantDefaultExport: false,
+		},
+		{
+			name:              "explicit synthetic defaults do not supply defaults for named TypeScript exports",
+			source:            "./typescript",
+			syntheticDefaults: core.TSTrue,
+			wantDefaultExport: false,
+		},
 	}
 
 	for _, tc := range tests {
@@ -767,12 +865,14 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 			t.Parallel()
 
 			ctx, specifier := contextForImportWithCompilerOptions(t, tc.source, &core.CompilerOptions{
-				ESModuleInterop: tc.esModuleInterop, //nolint:staticcheck
-				Module:          tc.module,
+				ESModuleInterop:              tc.esModuleInterop,   //nolint:staticcheck
+				AllowSyntheticDefaultImports: tc.syntheticDefaults, //nolint:staticcheck
+				Module:                       tc.module,
+				ModuleResolution:             tc.moduleResolution,
 			})
 			gotDefaultExport, gotOK := import_utils.HasDefaultExport(ctx, specifier)
 			if gotDefaultExport != tc.wantDefaultImport || !gotOK {
-				t.Fatalf("HasDefaultExport with esModuleInterop=%v = (%v, %v), want (%v, true)", tc.esModuleInterop, gotDefaultExport, gotOK, tc.wantDefaultImport)
+				t.Fatalf("HasDefaultExport = (%v, %v), want (%v, true)", gotDefaultExport, gotOK, tc.wantDefaultImport)
 			}
 			exports, ok := import_utils.GetExportMap(ctx, specifier)
 			if !ok || exports.HasDefault() != tc.wantDefaultExport {

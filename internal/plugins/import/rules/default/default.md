@@ -36,6 +36,24 @@ a default import from `export const value = 1` is accepted with this option.
 The upstream text check can skip a file containing only `import './setup.mjs';`
 or a spaced dynamic `import ('./setup.mjs')`. This rule preserves that behavior.
 
+TypeScript namespace assignments such as `export = React` support default imports
+when `allowSyntheticDefaultImports` is enabled, including implicitly through
+`moduleResolution: "bundler"`, `module: "preserve"`, `module: "system"`, or an
+explicit `esModuleInterop: true`.
+This applies to both `import React from "react"` and
+`import type React from "react"`. An explicit `allowSyntheticDefaultImports: false`
+disables this synthetic default even when `esModuleInterop` is enabled.
+CommonJS declarations also respect this option; enabling it alone does not
+supply a missing default for an ES module.
+
+## Differences from upstream
+
+- For `export = namespace`, rslint respects `allowSyntheticDefaultImports` and
+  its implied defaults; upstream v2.32.0 checks `esModuleInterop` instead.
+  For example, `import type React from "./react"`, where `react.d.ts` declares
+  `export = React; declare namespace React {}`, is valid with
+  `module: "esnext"` and `moduleResolution: "bundler"`.
+
 ## Original Documentation
 
 - [eslint-plugin-import: default](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/default.md)

@@ -144,8 +144,8 @@ func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceF
 	// without declaring a default. Unlike TS implementation files, they do
 	// not imply an emitted __esModule marker. Explicit ES module declarations
 	// and authored default/marker exports do not receive this fallback.
-	if !local.ImplicitDefault && sourceFile.IsDeclarationFile && compilerOptionsESModuleInterop(sourceProgram) &&
-		ast.GetImpliedNodeFormatForEmitWorker(sourceFile.FileName(), sourceProgram.Options().GetEmitModuleKind(), sourceProgram.SourceFileMetadata(sourceFile)) != core.ResolutionModeESM {
+	if !local.ImplicitDefault && isCommonJSDeclaration(sourceProgram, sourceFile) &&
+		compilerOptionsAllowSyntheticDefaultImports(sourceProgram, compilerOptionsESModuleInterop(sourceProgram)) {
 		local.ImplicitDefault = true
 		for _, step := range local.Steps {
 			if step.Kind == exportStepLocalDefault || slices.Contains(step.Names, defaultExportName) || slices.Contains(step.Names, "__esModule") {
@@ -160,6 +160,11 @@ func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceF
 	}
 
 	return local
+}
+
+func isCommonJSDeclaration(sourceProgram *program.Program, sourceFile *ast.SourceFile) bool {
+	return sourceFile.IsDeclarationFile &&
+		ast.GetImpliedNodeFormatForEmitWorker(sourceFile.FileName(), sourceProgram.Options().GetEmitModuleKind(), sourceProgram.SourceFileMetadata(sourceFile)) != core.ResolutionModeESM
 }
 
 func (local *localExports) appendStatement(sourceProgram *program.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, stmt *ast.Node) {
