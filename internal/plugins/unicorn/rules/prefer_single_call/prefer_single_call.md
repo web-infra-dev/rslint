@@ -85,6 +85,9 @@ Both `push` and `unshift` on `stream`, `this`, `this.stream`, `process.stdin`,
 
 rslint offers a suggestion instead of an automatic fix when a spread source is
 modified through a local alias or an operation such as `Object.defineProperty()`.
+This includes aliases created by destructuring and references copied into
+containers by `Object.assign()`. Visible changes to `Array.prototype` or
+`String.prototype` also make affected array or string spreads require a suggestion.
 For example, this custom iterator changes `values` while the second argument is
 evaluated:
 

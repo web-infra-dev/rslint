@@ -34,6 +34,8 @@ type StaticStringEvaluator struct {
 	evaluation             *staticEvaluationState
 	referenceFlagsComputed bool
 	referenceFlags         map[*ast.Symbol]staticReferenceFlags
+	arrayPrototypeMutated  bool
+	stringPrototypeMutated bool
 }
 
 func NewStaticStringEvaluator(typeChecker *checker.Checker) *StaticStringEvaluator {
@@ -1496,7 +1498,7 @@ func (staticEvaluator *StaticStringEvaluator) evalElementValues(nodes []*ast.Nod
 	for _, argumentNode := range nodes {
 		if ast.IsSpreadElement(argumentNode) {
 			spread := staticEvaluator.evalValue(argumentNode.AsSpreadElement().Expression)
-			if !spread.ok {
+			if !spread.ok || staticEvaluator.hasModifiedIterator(spread.value) {
 				return nil, false
 			}
 			if array, ok := spread.value.(*staticArrayValue); ok {
@@ -1875,7 +1877,12 @@ func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Sy
 }
 
 func (staticEvaluator *StaticStringEvaluator) referenceFlagsFor(symbol *ast.Symbol) staticReferenceFlags {
-	if !staticEvaluator.referenceFlagsComputed {
+	staticEvaluator.ensureReferenceFlags()
+	return staticEvaluator.referenceFlags[symbol]
+}
+
+func (staticEvaluator *StaticStringEvaluator) ensureReferenceFlags() {
+	if !staticEvaluator.referenceFlagsComputed && staticEvaluator.sourceFile != nil {
 		// A computed mutator name may depend on a symbol the caller is already
 		// resolving. Analyze it with an independent recursion stack, then publish
 		// the completed facts without disturbing the caller's evaluation.
@@ -1886,14 +1893,25 @@ func (staticEvaluator *StaticStringEvaluator) referenceFlagsFor(symbol *ast.Symb
 		analysis.resolveIdentifiers = staticEvaluator.resolveIdentifiers
 		analysis.computeReferenceFlags()
 		staticEvaluator.referenceFlags = analysis.referenceFlags
+		staticEvaluator.arrayPrototypeMutated = analysis.arrayPrototypeMutated
+		staticEvaluator.stringPrototypeMutated = analysis.stringPrototypeMutated
 		staticEvaluator.referenceFlagsComputed = true
 	}
-	return staticEvaluator.referenceFlags[symbol]
+}
+
+func (staticEvaluator *StaticStringEvaluator) hasModifiedIterator(value any) bool {
+	staticEvaluator.ensureReferenceFlags()
+	if _, ok := value.(*staticArrayValue); ok {
+		return staticEvaluator.arrayPrototypeMutated
+	}
+	if staticValueIsString(value) {
+		return staticEvaluator.stringPrototypeMutated
+	}
+	return staticEvaluator.arrayPrototypeMutated || staticEvaluator.stringPrototypeMutated
 }
 
 type staticMutationCandidate struct {
-	reference *ast.Node
-	access    *ast.Node
+	call, access *ast.Node
 }
 
 func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
@@ -1913,30 +1931,9 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 		if node.Kind == ast.KindCallExpression {
 			callee := SkipAssertionsAndParens(node.Expression())
 			if name, known := AccessExpressionStaticName(callee); known {
-				if isMutatingArrayMethod(name) {
-					staticEvaluator.markReference(AccessExpressionObject(callee), staticReferencePropertyMutation)
-				}
-				var objectMutation, reflectMutation bool
-				switch name {
-				case "defineProperty", "setPrototypeOf":
-					objectMutation, reflectMutation = true, true
-				case "defineProperties", "assign":
-					objectMutation = true
-				case "deleteProperty", "set":
-					reflectMutation = true
-				}
-				object := SkipAssertionsAndParens(AccessExpressionObject(callee))
-				if len(node.Arguments()) > 0 && ((objectMutation && staticEvaluator.isBuiltinIdentifier(object, "Object")) ||
-					(reflectMutation && staticEvaluator.isBuiltinIdentifier(object, "Reflect"))) {
-					staticEvaluator.markReference(SkipAssertionsAndParens(node.Arguments()[0]), staticReferencePropertyMutation)
-					// Reflect.set can define the property on its explicit receiver
-					// even when its target is a different object.
-					if name == "set" && len(node.Arguments()) > 3 {
-						staticEvaluator.markReference(SkipAssertionsAndParens(node.Arguments()[3]), staticReferencePropertyMutation)
-					}
-				}
+				staticEvaluator.markCallMutation(node, callee, name)
 			} else if ast.IsAccessExpression(callee) {
-				mutationCandidates = append(mutationCandidates, staticMutationCandidate{reference: AccessExpressionObject(callee), access: callee})
+				mutationCandidates = append(mutationCandidates, staticMutationCandidate{call: node, access: callee})
 			}
 		}
 		if node.Kind == ast.KindIdentifier && !IsNonReferenceIdentifier(node) {
@@ -1949,7 +1946,7 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 			for outer.Parent != nil && ast.IsOuterExpression(outer.Parent, skipTransparentKinds) {
 				outer = outer.Parent
 			}
-			if outer.Parent != nil && ast.IsAssignmentTarget(outer) {
+			if outer.Parent != nil && (ast.IsAssignmentTarget(outer) || outer.Parent.Kind == ast.KindDeleteExpression) {
 				staticEvaluator.markReference(AccessExpressionObject(node), staticReferencePropertyMutation)
 			}
 		}
@@ -1961,15 +1958,67 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 	visit(&staticEvaluator.sourceFile.Node)
 
 	for _, candidate := range mutationCandidates {
-		if methodName, ok := staticEvaluator.evalAccessExpressionKey(candidate.access); ok && isMutatingArrayMethod(methodName) {
-			staticEvaluator.markReference(candidate.reference, staticReferencePropertyMutation)
+		if methodName, ok := staticEvaluator.evalAccessExpressionKey(candidate.access); ok {
+			staticEvaluator.markCallMutation(candidate.call, candidate.access, methodName)
 		}
+	}
+}
+
+func (staticEvaluator *StaticStringEvaluator) markCallMutation(call, callee *ast.Node, name string) {
+	object := SkipAssertionsAndParens(AccessExpressionObject(callee))
+	if isMutatingArrayMethod(name) {
+		staticEvaluator.markReference(object, staticReferencePropertyMutation)
+	}
+	var objectMutation, reflectMutation bool
+	switch name {
+	case "defineProperty", "setPrototypeOf":
+		objectMutation, reflectMutation = true, true
+	case "defineProperties", "assign":
+		objectMutation = true
+	case "deleteProperty", "set":
+		reflectMutation = true
+	}
+	if len(call.Arguments()) > 0 && ((objectMutation && staticEvaluator.isBuiltinIdentifier(object, "Object")) ||
+		(reflectMutation && staticEvaluator.isBuiltinIdentifier(object, "Reflect"))) {
+		staticEvaluator.markMutationArgument(call.Arguments(), 0)
+		// Reflect.set can define the property on its explicit receiver even
+		// when its target is a different object.
+		if name == "set" {
+			staticEvaluator.markMutationArgument(call.Arguments(), 3)
+		}
+	}
+}
+
+func (staticEvaluator *StaticStringEvaluator) markMutationArgument(arguments []*ast.Node, position int) {
+	spreadSeen := false
+	for _, argument := range arguments {
+		if ast.IsSpreadElement(argument) {
+			// A spread may occupy the requested position or be empty.
+			staticEvaluator.markReference(argument.Expression(), staticReferencePropertyMutation|staticReferenceNestedMutation)
+			spreadSeen = true
+			continue
+		}
+		if position == 0 || spreadSeen {
+			staticEvaluator.markReference(argument, staticReferencePropertyMutation)
+		}
+		if position == 0 {
+			return
+		}
+		position--
 	}
 }
 
 func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag staticReferenceFlags) {
 	node = SkipAssertionsAndParens(node)
 	for node != nil && ast.IsIdentifier(node) {
+		if flag&staticReferenceNestedMutation != 0 {
+			// Destructuring a constructor can reach its prototype without a
+			// property-access node, e.g. const {prototype: proto} = Array.
+			staticEvaluator.arrayPrototypeMutated = staticEvaluator.arrayPrototypeMutated ||
+				staticEvaluator.isBuiltinIdentifier(node, "Array")
+			staticEvaluator.stringPrototypeMutated = staticEvaluator.stringPrototypeMutated ||
+				staticEvaluator.isBuiltinIdentifier(node, "String")
+		}
 		symbol := staticEvaluator.referenceSymbol(node)
 		if symbol == nil || staticEvaluator.referenceFlags[symbol]&flag == flag {
 			return
@@ -1981,8 +2030,25 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 		if flag&staticReferencePropertyMutation == 0 || len(symbol.Declarations) != 1 {
 			return
 		}
-		declaration := ast.GetDeclarationOfKind(symbol, ast.KindVariableDeclaration)
-		if declaration == nil || !ast.IsIdentifier(declaration.Name()) {
+		declaration := symbol.Declarations[0]
+		if declaration.Kind == ast.KindBindingElement {
+			root := EnclosingVariableDeclarationOfBindingElement(declaration)
+			if root == nil {
+				return
+			}
+			for binding := declaration; binding.Kind == ast.KindBindingElement; binding = binding.Parent.Parent {
+				element := binding.AsBindingElement()
+				// Rest creates a fresh container. Only a nested mutation can
+				// reach the references copied into it.
+				if element.DotDotDotToken != nil && flag&staticReferenceNestedMutation == 0 {
+					return
+				}
+				staticEvaluator.markReference(element.Initializer, flag)
+				flag |= staticReferenceNestedMutation
+			}
+			declaration = root
+		}
+		if declaration.Kind != ast.KindVariableDeclaration {
 			return
 		}
 		// A local alias may still share its initializer's aggregate even when
@@ -2038,6 +2104,21 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 	case ast.KindCallExpression:
 		if argument, ok := staticEvaluator.objectPassThroughArgument(node); ok {
 			staticEvaluator.markReference(argument, flag)
+		} else if staticEvaluator.isBuiltinMethodValue(node.Expression(), "Object", "assign", map[*ast.Symbol]bool{}) {
+			for _, argument := range node.Arguments() {
+				spread := ast.IsSpreadElement(argument)
+				argumentFlag := flag
+				if spread {
+					argument = argument.Expression()
+					argumentFlag |= staticReferenceNestedMutation
+				}
+				staticEvaluator.markReference(argument, argumentFlag)
+				// A leading spread may be empty, so the next argument can
+				// still be the target returned by Object.assign.
+				if !spread && flag&staticReferenceNestedMutation == 0 {
+					break
+				}
+			}
 		} else if flag&staticReferenceNestedMutation != 0 {
 			callee := SkipAssertionsAndParens(node.Expression())
 			if name, ok := staticEvaluator.evalAccessExpressionKey(callee); ok && name == "of" &&

@@ -595,6 +595,27 @@ const selfRead = selfMutating[0];`
 			{"comma alias", `const alias = (0, values); alias[0] = "changed";`, false},
 			{"assignment alias", `let other; const alias = (other = values); alias[0] = "changed";`, false},
 			{"object container", `const holder = {values}; holder.values[Symbol.iterator] = function*() { yield "changed"; };`, false},
+			{"object binding alias", `const holder = {values}; const {values: alias} = holder; alias[0] = "changed";`, false},
+			{"array binding alias", `const [alias] = [values]; alias[0] = "changed";`, false},
+			{"nested binding alias", `const {items: [alias]} = {items: [values]}; alias[0] = "changed";`, false},
+			{"binding default alias", `const {alias = values} = {}; alias[0] = "changed";`, false},
+			{"outer binding default alias", `const {items: {alias} = {alias: values}} = {}; alias[0] = "changed";`, false},
+			{"object rest nested mutation", `const {...copy} = {values}; copy.values[0] = "changed";`, false},
+			{"array rest nested mutation", `const [...copy] = [values]; copy[0][0] = "changed";`, false},
+			{"object rest copy", `const {...copy} = values; copy[0] = "changed";`, true},
+			{"array rest copy", `const [...copy] = values; copy[0] = "changed";`, true},
+			{"nested array rest copy", `const [[...copy]] = [values]; copy[0] = "changed";`, true},
+			{"binding replacement", `let [alias] = [values]; alias = [];`, true},
+			{"assign container", `const holder = Object.assign({}, {values}); holder.values[0] = "changed";`, false},
+			{"assign multiple sources", `const holder = Object.assign({}, {other: []}, {values}); holder.values[0] = "changed";`, false},
+			{"assign spread arguments", `const holder = Object.assign(...[{}, {values}]); holder.values[0] = "changed";`, false},
+			{"assign existing target", `const holder = Object.assign(values, {}); holder[0] = "changed";`, false},
+			{"assign target after empty spread", `const holder = Object.assign(...[], values); holder[0] = "changed";`, false},
+			{"assign nested target", `const target = {values}; const holder = Object.assign(target, {}); holder.values[0] = "changed";`, false},
+			{"assign property replacement", `const holder = Object.assign({}, {values}); holder.values = [];`, true},
+			{"assign array copy", `const copy = Object.assign([], values); copy[0] = "changed";`, true},
+			{"assign object copy", `const copy = Object.assign({}, values); copy[0] = "changed";`, true},
+			{"assign copies spread sources", `const copy = Object.assign({}, ...[values]); copy[0] = "changed";`, true},
 			{"renamed object container", `const holder = {items: values}; holder.items.reverse();`, false},
 			{"array container", `const holder = [values]; holder[0].reverse();`, false},
 			{"nested container alias", `const holder = {items: [values]}; const alias = holder.items[0]; alias[0] = "changed";`, false},
@@ -635,6 +656,7 @@ const selfRead = selfMutating[0];`
 			{"getter definition through alias", `const alias = values; Object.defineProperty(alias, "0", {get() { return unknown; }});`, false},
 			{"multiple property definitions", `Object.defineProperties(values, {0: {get() { return unknown; }}});`, false},
 			{"assign", `Object.assign(values, {0: "changed"});`, false},
+			{"assign expanded arguments", `Object.assign(...[values, {0: "changed"}]);`, false},
 			{"prototype mutation", `Object.setPrototypeOf(values, {[Symbol.iterator]() { return unknown; }});`, false},
 			{"reflect definition", `Reflect.defineProperty(values, "0", {get() { return unknown; }});`, false},
 			{"reflect assignment", `Reflect.set(values, "0", "changed");`, false},
@@ -672,6 +694,99 @@ const selfRead = selfMutating[0];`
 			})
 		}
 	})
+}
+
+func TestStaticStringEvaluatorIteratorPrototypeMutations(t *testing.T) {
+	for _, test := range []struct {
+		name, mutation              string
+		arrayMutated, stringMutated bool
+	}{
+		{"array assignment", `Array.prototype[Symbol.iterator] = function*() { yield "changed"; };`, true, false},
+		{"string assignment", `String.prototype[Symbol.iterator] = function*() { yield "changed"; };`, false, true},
+		{"property definition", `Object.defineProperty(Array.prototype, Symbol.iterator, {value: function*() { yield "changed"; }});`, true, false},
+		{"spread property definition", `Object.defineProperty(...[Array.prototype, Symbol.iterator, {value: function*() { yield "changed"; }}]);`, true, false},
+		{"empty spread before target", `Object.defineProperty(...[], String.prototype, Symbol.iterator, {value: function*() { yield "changed"; }});`, false, true},
+		{"spread explicit receiver", `Reflect.set(...[{}, Symbol.iterator, function*() {}, String.prototype]);`, false, true},
+		{"multiple definitions", `Object.defineProperties(String.prototype, {[Symbol.iterator]: {value: function*() { yield "changed"; }}});`, false, true},
+		{"object assign", `Object.assign(Array.prototype, {[Symbol.iterator]: function*() { yield "changed"; }});`, true, false},
+		{"reflect definition", `Reflect.defineProperty(String.prototype, Symbol.iterator, {value: function*() { yield "changed"; }});`, false, true},
+		{"reflect set", `Reflect.set(Array.prototype, Symbol.iterator, function*() { yield "changed"; });`, true, false},
+		{"explicit receiver", `Reflect.set({}, Symbol.iterator, function*() { yield "changed"; }, String.prototype);`, false, true},
+		{"delete", `delete Array.prototype[Symbol.iterator];`, true, false},
+		{"reflect deletion", `Reflect.deleteProperty(String.prototype, Symbol.iterator);`, false, true},
+		{"computed object method", `const method = "defineProperty"; Object[method](Array.prototype, Symbol.iterator, {});`, true, false},
+		{"computed reflect method", `const method = "set"; Reflect[method](String.prototype, Symbol.iterator, function*() {});`, false, true},
+		{"prototype alias", `const proto = Array.prototype; proto[Symbol.iterator] = function*() {};`, true, false},
+		{"constructor alias", `const Constructor = String; Constructor.prototype[Symbol.iterator] = function*() {};`, false, true},
+		{"destructured array prototype", `const {prototype: proto} = Array; proto[Symbol.iterator] = function*() {};`, true, false},
+		{"destructured string prototype", `const {prototype: proto} = String; proto[Symbol.iterator] = function*() {};`, false, true},
+		{"TypeScript wrapper", `(Array.prototype as object)[Symbol.iterator] = function*() {};`, true, false},
+		{"unmodified prototypes", `Array.prototype[Symbol.iterator]; String.prototype[Symbol.iterator];`, false, false},
+		{"shadowed array", `{ const Array = {prototype: {}}; Array.prototype[Symbol.iterator] = function*() {}; }`, false, false},
+		{"shadowed string", `{ const String = {prototype: {}}; String.prototype[Symbol.iterator] = function*() {}; }`, false, false},
+		{"shadowed object", `{ const Object = {defineProperty() {}}; Object.defineProperty(Array.prototype, Symbol.iterator, {}); }`, false, false},
+		{"shadowed reflect", `{ const Reflect = {set() {}}; Reflect.set(String.prototype, Symbol.iterator, null); }`, false, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := fixtures.GetRootDir()
+			filePath := tspath.ResolvePath(root.Dir, "iterator-mutation.ts")
+			code := test.mutation + `
+const arraySpread = [...["stable"]];
+const stringSpread = [..."stable"];
+const arraySource = ["stable"];
+const aliasSpread = [...arraySource];
+const callSpread = Array.of(...["stable"]);
+const arrayProperty = ({...["stable"]})[0];
+const stringProperty = ({..."stable"})[0];
+`
+			fs := NewOverlayVFS(root.FS, map[string]string{filePath: code})
+			program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
+			assert.NilError(t, err)
+			sourceFile := program.GetSourceFile(filePath)
+			assert.Assert(t, sourceFile != nil)
+			typeChecker, done := program.GetTypeChecker(t.Context())
+			defer done()
+			for _, resolution := range []string{"checker", "references"} {
+				for _, first := range []string{"arraySpread", "stringSpread", "aliasSpread", "arrayProperty"} {
+					t.Run(resolution+"/"+first, func(t *testing.T) {
+						evaluator := NewStaticStringEvaluatorWithSourceFile(typeChecker, sourceFile)
+						if resolution == "references" {
+							resolver := &staticEvaluatorTestResolver{resolver: binder.NameResolver{Globals: sourceFile.Locals}}
+							evaluator = NewStaticStringEvaluatorWithReferenceResolver(nil, sourceFile, resolver)
+						}
+						evaluator.EvalValue(findVariableInitializer(t, sourceFile, first))
+						for _, query := range []struct {
+							name    string
+							mutated bool
+						}{
+							{"arraySpread", test.arrayMutated},
+							{"stringSpread", test.stringMutated},
+							{"aliasSpread", test.arrayMutated},
+							{"callSpread", test.arrayMutated},
+						} {
+							initializer := findVariableInitializer(t, sourceFile, query.name)
+							if _, known := evaluator.EvalValue(initializer); known == query.mutated {
+								t.Fatalf("%s known = %v, want %v", query.name, known, !query.mutated)
+							}
+							if query.name != "callSpread" {
+								if _, known := evaluator.EvalValueIfNoSideEffects(initializer); known == query.mutated {
+									t.Fatalf("%s safety = %v, want %v", query.name, known, !query.mutated)
+								}
+								if effect := evaluator.HasSideEffect(initializer, false); effect != query.mutated {
+									t.Fatalf("%s side effect = %v, want %v", query.name, effect, query.mutated)
+								}
+							}
+						}
+						for name, want := range map[string]string{"arrayProperty": "stable", "stringProperty": "s"} {
+							if value, known := evaluator.Eval(findVariableInitializer(t, sourceFile, name)); !known || value != want {
+								t.Fatalf("%s = (%q, %v), want (%q, true)", name, value, known, want)
+							}
+						}
+					})
+				}
+			}
+		})
+	}
 }
 
 func TestStaticStringEvaluatorConfiguredGlobals(t *testing.T) {

@@ -243,6 +243,13 @@ func (staticEvaluator *StaticStringEvaluator) HasSideEffect(node *ast.Node, cons
 		ast.KindYieldExpression, ast.KindDeleteExpression, ast.KindPostfixUnaryExpression,
 		ast.KindDecorator:
 		return true
+	case ast.KindSpreadElement:
+		if staticEvaluator != nil && staticEvaluator.hasModifiedIterator(nil) {
+			value := staticEvaluator.evalValue(node.Expression())
+			if !value.ok || staticEvaluator.hasModifiedIterator(value.value) {
+				return true
+			}
+		}
 	case ast.KindTaggedTemplateExpression:
 		if staticEvaluator == nil || !staticEvaluator.isStringRawTag(node.AsTaggedTemplateExpression().Tag) {
 			return true

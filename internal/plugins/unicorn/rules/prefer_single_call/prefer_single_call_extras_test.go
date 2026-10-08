@@ -310,6 +310,30 @@ func TestPreferSingleCallExtras(t *testing.T) {
 			{Code: "const a=[]; const values=[1]; const alias=values; const alias2=alias; alias2[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 141, EndLine: 1, EndColumn: 145, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; const alias=values; const alias2=alias; alias2[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...values]);"}}},
 			}},
+			{Code: "const a=[]; const values=[1]; const holder={values}; const {values:alias}=holder; alias[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 152, EndLine: 1, EndColumn: 156, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; const holder={values}; const {values:alias}=holder; alias[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...values]);"}}},
+			}},
+			{Code: "const a=[]; const values=[1]; const [alias]=[values]; alias[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 124, EndLine: 1, EndColumn: 128, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; const [alias]=[values]; alias[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...values]);"}}},
+			}},
+			{Code: "const a=[]; const values=[1]; const holder=Object.assign({}, {values}); holder.values[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 150, EndLine: 1, EndColumn: 154, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; const holder=Object.assign({}, {values}); holder.values[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...values]);"}}},
+			}},
+			{Code: "const a=[]; const values=[1]; const holder=Object.assign({}, {values}); holder.values=[]; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{"const a=[]; const values=[1]; const holder=Object.assign({}, {values}); holder.values=[]; a.push(1, [...values]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 104, EndLine: 1, EndColumn: 108, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; const values=[1]; const copy=Object.assign([], values); copy[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{"const a=[]; const values=[1]; const copy=Object.assign([], values); copy[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...values]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 137, EndLine: 1, EndColumn: 141, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; const values=[1]; const copy=Object.assign({}, values); copy[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{"const a=[]; const values=[1]; const copy=Object.assign({}, values); copy[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...values]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 137, EndLine: 1, EndColumn: 141, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; const values=[1]; const [...copy]=values; copy[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{"const a=[]; const values=[1]; const [...copy]=values; copy[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...values]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 123, EndLine: 1, EndColumn: 127, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; const values=[1]; const {...copy}=values; copy[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{"const a=[]; const values=[1]; const {...copy}=values; copy[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...values]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 123, EndLine: 1, EndColumn: 127, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
 			{Code: "const a=[]; const values=[1]; Object.defineProperty(values,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}); a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 131, EndLine: 1, EndColumn: 135, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; Object.defineProperty(values,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}); a.push(1, [...values]);"}}},
 			}},
@@ -339,6 +363,78 @@ func TestPreferSingleCallExtras(t *testing.T) {
 			}},
 			{Code: "const a=[]; const values=[1]; Reflect.set({},Symbol.iterator,function*(){a.push(0);yield 1;},values); a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 116, EndLine: 1, EndColumn: 120, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; Reflect.set({},Symbol.iterator,function*(){a.push(0);yield 1;},values); a.push(1, [...values]);"}}},
+			}},
+		})
+	})
+	t.Run("Built-in iterator mutation", func(t *testing.T) {
+		// Replacing a built-in iterator can mutate the receiver even when the
+		// spread reads a literal. Keep these unsafe upstream fixes as suggestions.
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_single_call.PreferSingleCallRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
+			{Code: "const a=[]; Array.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...[1]]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 92, EndLine: 1, EndColumn: 96, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; Array.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...[1]]);"}}},
+			}},
+			{Code: "const a=[]; const values=[1]; Array.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 110, EndLine: 1, EndColumn: 114, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; Array.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...values]);"}}},
+			}},
+			{Code: "const a=[]; Object.defineProperty(Array.prototype,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}); a.push(1); a.push([...[1]]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 122, EndLine: 1, EndColumn: 126, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; Object.defineProperty(Array.prototype,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}); a.push(1, [...[1]]);"}}},
+			}},
+			{Code: "const a=[]; const values=[1]; Object.assign(Array.prototype,{[Symbol.iterator]:function*(){a.push(0);yield 1;}}); a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 128, EndLine: 1, EndColumn: 132, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; Object.assign(Array.prototype,{[Symbol.iterator]:function*(){a.push(0);yield 1;}}); a.push(1, [...values]);"}}},
+			}},
+			{Code: "const a=[]; Reflect.set(Array.prototype,Symbol.iterator,function*(){a.push(0);yield 1;}); a.push(1); a.push([...[1]]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 104, EndLine: 1, EndColumn: 108, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; Reflect.set(Array.prototype,Symbol.iterator,function*(){a.push(0);yield 1;}); a.push(1, [...[1]]);"}}},
+			}},
+			{Code: "const a=[]; const values=[1]; Reflect.defineProperty(Array.prototype,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}); a.push(1); a.push([...values]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 141, EndLine: 1, EndColumn: 145, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const values=[1]; Reflect.defineProperty(Array.prototype,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}); a.push(1, [...values]);"}}},
+			}},
+			{Code: "const a=[]; String.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...\"ab\"]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 93, EndLine: 1, EndColumn: 97, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; String.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...\"ab\"]);"}}},
+			}},
+			{Code: "const a=[]; const value=\"ab\"; Object.defineProperties(String.prototype,{[Symbol.iterator]:{value:function*(){a.push(0);yield 1;}}}); a.push(1); a.push([...value]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 147, EndLine: 1, EndColumn: 151, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const value=\"ab\"; Object.defineProperties(String.prototype,{[Symbol.iterator]:{value:function*(){a.push(0);yield 1;}}}); a.push(1, [...value]);"}}},
+			}},
+			{Code: "const a=[]; Reflect.set(String.prototype,Symbol.iterator,function*(){a.push(0);yield 1;}); a.push(1); a.push([...\"ab\"]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 105, EndLine: 1, EndColumn: 109, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; Reflect.set(String.prototype,Symbol.iterator,function*(){a.push(0);yield 1;}); a.push(1, [...\"ab\"]);"}}},
+			}},
+			{Code: "const a=[]; Reflect.set({},Symbol.iterator,function*(){a.push(0);yield 1;},String.prototype); a.push(1); a.push([...\"ab\"]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 108, EndLine: 1, EndColumn: 112, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; Reflect.set({},Symbol.iterator,function*(){a.push(0);yield 1;},String.prototype); a.push(1, [...\"ab\"]);"}}},
+			}},
+			{Code: "Array.prototype[Symbol.iterator]=function*(){element.classList.add(\"changed\");yield \"b\";}; element.classList.add(\"a\"); element.classList.add(...[\"b\"]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Element#classList.add()` multiple times.", Line: 1, Column: 138, EndLine: 1, EndColumn: 141, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "Array.prototype[Symbol.iterator]=function*(){element.classList.add(\"changed\");yield \"b\";}; element.classList.add(\"a\", ...[\"b\"]);"}}},
+			}},
+			{Code: "String.prototype[Symbol.iterator]=function*(){importScripts(\"changed\");yield \"b\";}; importScripts(\"a\"); importScripts(...\"b\");", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `importScripts()` multiple times.", Line: 1, Column: 105, EndLine: 1, EndColumn: 118, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "String.prototype[Symbol.iterator]=function*(){importScripts(\"changed\");yield \"b\";}; importScripts(\"a\", ...\"b\");"}}},
+			}},
+			{Code: "const a=[]; const {prototype: proto}=Array; proto[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...[1]]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 114, EndLine: 1, EndColumn: 118, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const {prototype: proto}=Array; proto[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...[1]]);"}}},
+			}},
+			{Code: "const a=[]; const {prototype: proto}=String; proto[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...\"ab\"]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 115, EndLine: 1, EndColumn: 119, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; const {prototype: proto}=String; proto[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...\"ab\"]);"}}},
+			}},
+			{Code: "const a=[]; Object.defineProperty(...[Array.prototype,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}]); a.push(1); a.push([...[1]]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 127, EndLine: 1, EndColumn: 131, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; Object.defineProperty(...[Array.prototype,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}]); a.push(1, [...[1]]);"}}},
+			}},
+			{Code: "const a=[]; Reflect.set(...[{},Symbol.iterator,function*(){a.push(0);yield 1;},String.prototype]); a.push(1); a.push([...\"ab\"]);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 113, EndLine: 1, EndColumn: 117, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const a=[]; Reflect.set(...[{},Symbol.iterator,function*(){a.push(0);yield 1;},String.prototype]); a.push(1, [...\"ab\"]);"}}},
+			}},
+			{Code: "const a=[]; const Array={prototype:{}}; Array.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...[1]]);", FileName: "case.js", Output: []string{"const a=[]; const Array={prototype:{}}; Array.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...[1]]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 120, EndLine: 1, EndColumn: 124, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; const String={prototype:{}}; String.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...\"ab\"]);", FileName: "case.js", Output: []string{"const a=[]; const String={prototype:{}}; String.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...\"ab\"]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 122, EndLine: 1, EndColumn: 126, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; const Object={defineProperty(){}}; Object.defineProperty(Array.prototype,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}); a.push(1); a.push([...[1]]);", FileName: "case.js", Output: []string{"const a=[]; const Object={defineProperty(){}}; Object.defineProperty(Array.prototype,Symbol.iterator,{value:function*(){a.push(0);yield 1;}}); a.push(1, [...[1]]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 157, EndLine: 1, EndColumn: 161, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; const Reflect={set(){}}; Reflect.set(String.prototype,Symbol.iterator,function*(){a.push(0);yield 1;}); a.push(1); a.push([...\"ab\"]);", FileName: "case.js", Output: []string{"const a=[]; const Reflect={set(){}}; Reflect.set(String.prototype,Symbol.iterator,function*(){a.push(0);yield 1;}); a.push(1, [...\"ab\"]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 130, EndLine: 1, EndColumn: 134, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; Array.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...\"ab\"]);", FileName: "case.js", Output: []string{"const a=[]; Array.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...\"ab\"]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 92, EndLine: 1, EndColumn: 96, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			}},
+			{Code: "const a=[]; String.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1); a.push([...[1]]);", FileName: "case.js", Output: []string{"const a=[]; String.prototype[Symbol.iterator]=function*(){a.push(0);yield 1;}; a.push(1, [...[1]]);"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "error/array-push", Message: "Do not call `Array#push()` multiple times.", Line: 1, Column: 93, EndLine: 1, EndColumn: 97, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 			}},
 		})
 	})
