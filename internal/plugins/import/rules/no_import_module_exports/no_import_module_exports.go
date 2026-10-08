@@ -10,7 +10,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
-	"github.com/web-infra-dev/rslint/internal/utils/scope"
 	"github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
@@ -46,6 +45,12 @@ var NoImportModuleExportsRule = rule.Rule{
 			}
 		}
 
+		references := scopeanalysis.References(ctx, map[string]struct{}{"exports": {}, "module": {}})
+		resolvedReferences := make(map[*ast.Node]bool, len(references.References))
+		for _, reference := range references.References {
+			resolvedReferences[reference.Identifier] = reference.Resolved() != nil
+		}
+
 		hasCommonJSExport := false
 		checkMember := func(node *ast.Node) bool {
 			if utils.IsInJsxTagName(node) {
@@ -57,7 +62,7 @@ var NoImportModuleExportsRule = rule.Rule{
 				return false
 			}
 			name := object.Text()
-			return (name == "module" || name == "exports") && isCommonJSExportReference(ctx, name)
+			return (name == "module" || name == "exports") && !resolvedReferences[object]
 		}
 
 		if !isException && entryPoint != fileName {
@@ -77,27 +82,6 @@ var NoImportModuleExportsRule = rule.Rule{
 			},
 		}
 	},
-}
-
-func isCommonJSExportReference(ctx rule.RuleContext, name string) bool {
-	manager := scopeanalysis.Declarations(ctx)
-	var objectScope *scope.Scope
-	for index := len(manager.Scopes) - 1; index >= 0; index-- {
-		candidate := manager.Scopes[index]
-		if len(candidate.Declarations(name)) > 0 {
-			objectScope = candidate
-			break
-		}
-	}
-	if objectScope == nil {
-		return true
-	}
-	declarations := objectScope.Declarations(name)
-	if len(declarations) > 0 && declarations[0].Kind == scope.DefImport {
-		return false
-	}
-	// rslint collapses eslint-scope's top-level module scope into Global.
-	return objectScope == manager.Global && ast.IsExternalModule(ctx.SourceFile)
 }
 
 func packageEntryPoint(ctx rule.RuleContext) string {

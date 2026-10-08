@@ -14,6 +14,8 @@ func TestNoImportModuleExportsExtras(t *testing.T) {
 			{Code: `import value from "value"; function f(module) { module.exports = value; }`},
 			{Code: `import value from "value"; { const exports = {}; exports.value = value; }`},
 			{Code: `import { exports } from "value"; exports.value = 1;`},
+			{Code: `const module = {}; import value from "value"; module.value;`},
+			{Code: `const exports = {}; import value from "value"; exports.value = value;`},
 			{Code: `import value from "value"; (module as any).exports = value;`, FileName: "source.ts"},
 			{Code: `import value from "value"; const element = <module.exports />;`, FileName: "source.tsx", Tsx: true},
 		},
@@ -43,9 +45,10 @@ func TestNoImportModuleExportsExtras(t *testing.T) {
 				FileName: "missing-entrypoint/cli.js",
 				Errors:   importError(1, 1, 1, 27),
 			},
-			// A top-level declaration lives in eslint-scope's module scope and
-			// therefore does not count as a shadowing non-module scope.
-			{Code: `const module = {}; import value from "value"; module.value;`, Errors: importError(1, 20, 1, 46)},
+			{
+				Code:   "import value from 'value';\nmodule.exports = value;\nfunction unrelated(module) {}",
+				Errors: importError(1, 1, 1, 27),
+			},
 			{Code: `import type { Value } from "value"; module.exports = 1;`, FileName: "source.ts", Errors: importError(1, 1, 1, 36)},
 		},
 	)
