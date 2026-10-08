@@ -4,7 +4,10 @@
     {
       "type": "object",
       "properties": {
-        "exceptions": { "type": "array" }
+        "exceptions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       },
       "additionalProperties": false
     }

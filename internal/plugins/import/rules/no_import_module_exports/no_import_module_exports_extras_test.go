@@ -53,3 +53,15 @@ func TestNoImportModuleExportsExtras(t *testing.T) {
 		},
 	)
 }
+
+func TestNoImportModuleExportsSchema(t *testing.T) {
+	valid := []any{map[string]any{"exceptions": []any{"**/*.js"}}}
+	if err := no_import_module_exports.NoImportModuleExportsRule.Schema.Validate(valid); err != nil {
+		t.Fatalf("rejected valid options: %v", err)
+	}
+
+	invalid := []any{map[string]any{"exceptions": []any{42}}}
+	if err := no_import_module_exports.NoImportModuleExportsRule.Schema.Validate(invalid); err == nil {
+		t.Fatalf("accepted non-string exception: %#v", invalid)
+	}
+}
