@@ -188,7 +188,9 @@ func joinRanges(atoms []classAtom, options rewriteOptions) ([]classAtom, error) 
 	for i := 0; i < len(atoms); i++ {
 		if i+2 < len(atoms) && atoms[i+1].kind == classDash {
 			lo, hi := atoms[i], atoms[i+2]
-			if lo.kind == classRune && hi.kind == classRune {
+			// A `-` on either side of the separator is itself a character, so
+			// `[}--]` is the range from `}` down to `-`, which runs backwards.
+			if isClassCharacter(lo) && isClassCharacter(hi) {
 				if lo.lo > hi.lo {
 					return nil, fmt.Errorf("%w: a character range running backwards", ErrUnsupportedSyntax)
 				}
@@ -203,6 +205,10 @@ func joinRanges(atoms []classAtom, options rewriteOptions) ([]classAtom, error) 
 		joined = append(joined, atoms[i])
 	}
 	return joined, nil
+}
+
+func isClassCharacter(atom classAtom) bool {
+	return atom.kind == classRune || atom.kind == classDash
 }
 
 // writeClass writes the members out as a class regexp2 reads the same way,

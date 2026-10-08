@@ -325,6 +325,8 @@ func TestCompileRejects(t *testing.T) {
 		{name: "u identity escape", source: `\a`, flags: "u", is: ErrUnsupportedSyntax},
 		{name: "u set at the end of a range", source: `[\d-A]`, flags: "u", is: ErrUnsupportedSyntax},
 		{name: "range running backwards", source: "[b-a]", is: ErrUnsupportedSyntax},
+		{name: "dash as the end of a range", source: "[}--]", is: ErrUnsupportedSyntax},
+		{name: "legacy class escape property then dash range", source: `[\p{L}--[a-z]]`, is: ErrUnsupportedSyntax},
 		{name: "class that no bracket closes", source: "[abc", is: ErrUnsupportedSyntax},
 		{name: "backslash at the end", source: `a\`, is: ErrUnsupportedSyntax},
 		{name: "duplicate capture names", source: `(?<a>x)|(?<a>y)`, is: ErrUnsupportedSyntax},
@@ -339,6 +341,14 @@ func TestCompileRejects(t *testing.T) {
 				t.Errorf("Compile(%q, %q) error = %v, want %v", test.source, test.flags, err, test.is)
 			}
 		})
+	}
+}
+
+func TestDashAsRangeEndpointAcceptsValidClasses(t *testing.T) {
+	for _, source := range []string{`[--a]`, `[a-]`, `[-a]`, `[--]`, `[a-\d]`} {
+		if _, err := Compile(source, ""); err != nil {
+			t.Errorf("Compile(%q) error = %v, want none", source, err)
+		}
 	}
 }
 
