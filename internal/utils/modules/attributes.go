@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 // AttributeState describes how precisely a module reference's import
@@ -163,9 +165,35 @@ func unwrapTransparentExpression(node *ast.Node) *ast.Node {
 	return ast.SkipOuterExpressions(node, ast.OEKAll)
 }
 
-// isUndefinedValue reports whether an expression evaluates to `undefined`.
+// isUndefinedValue reports whether an expression is known to evaluate to
+// `undefined`. A `void` expression always does; the identifier `undefined`
+// does only when it is the global binding, since a parameter or local
+// declaration can shadow it.
 func isUndefinedValue(node *ast.Node) bool {
-	return node != nil && (node.Kind == ast.KindVoidExpression || node.Kind == ast.KindIdentifier && node.Text() == "undefined")
+	if node == nil {
+		return false
+	}
+	if node.Kind == ast.KindVoidExpression {
+		return true
+	}
+	return node.Kind == ast.KindIdentifier && node.Text() == "undefined" && isGlobalUndefinedReference(node)
+}
+
+// isGlobalUndefinedReference reports whether no binding in the identifier's
+// file shadows the global `undefined`. Without binder data the binding is
+// unknown, so it reports false.
+func isGlobalUndefinedReference(identifier *ast.Node) bool {
+	file := ast.GetSourceFileOfNode(identifier)
+	if file == nil || !file.IsBound() {
+		return false
+	}
+	resolver := binder.NameResolver{CompilerOptions: &core.CompilerOptions{}}
+	if ast.IsGlobalSourceFile(file.AsNode()) {
+		// A script file's top-level declarations are not part of the scope
+		// walk; they are only visible through the globals table.
+		resolver.Globals = file.Locals
+	}
+	return resolver.Resolve(identifier, "undefined", ast.SymbolFlagsValue|ast.SymbolFlagsAlias, nil, true, false) == nil
 }
 
 // isNonObjectPrototypeValue reports whether `__proto__: node` leaves the

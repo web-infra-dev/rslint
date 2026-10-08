@@ -4,6 +4,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
 )
 
 func TestCollectEmptyStaticSources(t *testing.T) {
@@ -222,8 +225,14 @@ func TestImportAttributesOwnWithShadowsPrototype(t *testing.T) {
 	}
 }
 
+func parseBoundModuleFile(source string) *ast.SourceFile {
+	file := parseModuleSpecifierCacheFile(source)
+	binder.BindSourceFile(file)
+	return file
+}
+
 func TestImportAttributesUndefinedWith(t *testing.T) {
-	file := parseModuleSpecifierCacheFile(`
+	file := parseBoundModuleFile(`
 		import("./b", { with: undefined });
 		import("./b", { with: void 0 });
 		import("./b", { __proto__: undefined, with: { type: "json" } });
@@ -245,6 +254,69 @@ func TestImportAttributesUndefinedWith(t *testing.T) {
 		if got := sources[i].Attributes(); got.State != AttributesStatic || got.Key() != want {
 			t.Errorf("source %d = (%v, %q), want static %q", i, got.State, got.Key(), want)
 		}
+	}
+}
+
+func TestImportAttributesShadowedUndefined(t *testing.T) {
+	file := parseBoundModuleFile(`
+		import "a";
+		function load(undefined) {
+			return import("a", { with: undefined });
+		}
+		function local(value) {
+			let undefined = value;
+			return import("a", { with: undefined });
+		}
+		function proto(undefined) {
+			return import("a", { __proto__: undefined });
+		}
+		import("a", { __proto__: undefined });
+		import("a", { with: void 0 });
+	`)
+	sources := Collect(file, ESModuleReferences)
+	if len(sources) != 6 {
+		t.Fatalf("collected %d sources, want 6", len(sources))
+	}
+	for _, i := range []int{1, 2, 3} {
+		if got := sources[i].Attributes().State; got != AttributesDynamic {
+			t.Errorf("source %d state = %v, want AttributesDynamic", i, got)
+		}
+	}
+	for _, i := range []int{4, 5} {
+		if got := sources[i].Attributes().State; got != AttributesNone {
+			t.Errorf("source %d state = %v, want AttributesNone", i, got)
+		}
+	}
+}
+
+func TestImportAttributesShadowedUndefinedImport(t *testing.T) {
+	file := parseBoundModuleFile(`
+		import { value as undefined } from "m";
+		import("a", { with: undefined });
+	`)
+	sources := Collect(file, ESModuleReferences)
+	if len(sources) != 2 {
+		t.Fatalf("collected %d sources, want 2", len(sources))
+	}
+	if got := sources[1].Attributes().State; got != AttributesDynamic {
+		t.Errorf("imported undefined state = %v, want AttributesDynamic", got)
+	}
+}
+
+func TestImportAttributesUnboundUndefined(t *testing.T) {
+	file := parseModuleSpecifierCacheFile(`
+		import("a", { with: undefined });
+		import("a", { with: void 0 });
+	`)
+	sources := Collect(file, ESModuleReferences)
+	if len(sources) != 2 {
+		t.Fatalf("collected %d sources, want 2", len(sources))
+	}
+	if got := sources[0].Attributes().State; got != AttributesDynamic {
+		t.Errorf("unbound undefined state = %v, want AttributesDynamic", got)
+	}
+	if got := sources[1].Attributes().State; got != AttributesNone {
+		t.Errorf("void state = %v, want AttributesNone", got)
 	}
 }
 
