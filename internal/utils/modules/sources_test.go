@@ -95,3 +95,39 @@ func TestCollectImportAttributes(t *testing.T) {
 		t.Fatalf("duplicate attributes state = %v, want AttributesInvalid", sources[5].Attributes().State)
 	}
 }
+
+func TestDynamicImportAttributePresence(t *testing.T) {
+	file := parseModuleSpecifierCacheFile(`
+		import("./b.js");
+		import("./b.js", {});
+		import("./b.js", { signal });
+		import("./b.js", { signal: value });
+		import("./b.js", { ["signal"]: value });
+		import("./b.js", options);
+		import("./b.js", { with: attrs });
+		import("./b.js", { with: attrs, with: other });
+		import("./b.js", { ...options });
+		import("./b.js", { [key]: value });
+	`)
+	sources := Collect(file, ESModuleReferences)
+	want := []AttributeState{
+		AttributesNone,
+		AttributesNone,
+		AttributesNone,
+		AttributesNone,
+		AttributesNone,
+		AttributesDynamic,
+		AttributesDynamic,
+		AttributesDynamic,
+		AttributesDynamic,
+		AttributesDynamic,
+	}
+	if len(sources) != len(want) {
+		t.Fatalf("collected %d sources, want %d", len(sources), len(want))
+	}
+	for i, state := range want {
+		if got := sources[i].Attributes().State; got != state {
+			t.Errorf("source %d state = %v, want %v", i, got, state)
+		}
+	}
+}

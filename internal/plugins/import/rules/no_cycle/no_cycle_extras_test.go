@@ -114,6 +114,10 @@ func TestNoCycleExtras(t *testing.T) {
 			{Code: `import { depthThree } from "./no-cycle/depth-three"; export const rootValue = depthThree; export type RootType = string;`, Options: []interface{}{map[string]interface{}{"maxDepth": json.Number("2")}}},
 		}),
 		withDefaultNoCycleInvalidFileName([]rule_tester.InvalidTestCase{
+			{
+				Code:   `import("./no-cycle/depth-one", {}); ` + rootExports,
+				Errors: []rule_tester.InvalidTestCaseError{cycleError(messageDetected)},
+			},
 			// Local bare aliases are not external when they resolve to local files.
 			{
 				Code:     `import { aliasB } from "@cycles/alias-b"; export const aliasA = aliasB;`,

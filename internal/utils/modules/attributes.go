@@ -103,8 +103,11 @@ func dynamicImportAttributes(call *ast.CallExpression) ImportAttributes {
 	if options == nil || options.Kind != ast.KindObjectLiteralExpression {
 		return unknownImportAttributes(call.Arguments.Nodes[1], AttributesDynamic)
 	}
-	with, ok := staticObjectProperty(options, "with")
-	if !ok {
+	with, lookup := staticObjectProperty(options, "with")
+	switch lookup {
+	case objectPropertyAbsent:
+		return ImportAttributes{State: AttributesNone}
+	case objectPropertyUnknown:
 		return unknownImportAttributes(options, AttributesDynamic)
 	}
 	with = ast.SkipParentheses(with)
@@ -145,36 +148,70 @@ func hasDuplicateAttributeNames(entries []ImportAttribute) bool {
 	return false
 }
 
-func staticObjectProperty(object *ast.Node, wanted string) (*ast.Node, bool) {
+type objectPropertyLookup uint8
+
+const (
+	objectPropertyAbsent objectPropertyLookup = iota
+	objectPropertyFound
+	objectPropertyUnknown
+)
+
+func staticObjectProperty(object *ast.Node, wanted string) (*ast.Node, objectPropertyLookup) {
 	properties := object.AsObjectLiteralExpression().Properties
 	if properties == nil {
-		return nil, false
+		return nil, objectPropertyAbsent
 	}
 	var value *ast.Node
 	found := false
 	for _, propertyNode := range properties.Nodes {
-		if propertyNode == nil || propertyNode.Kind != ast.KindPropertyAssignment {
-			return nil, false
+		if propertyNode == nil || propertyNode.Kind == ast.KindSpreadAssignment {
+			return nil, objectPropertyUnknown
 		}
-		property := propertyNode.AsPropertyAssignment()
-		name, ok := staticAttributeName(property.Name())
+		var nameNode *ast.Node
+		var propertyValue *ast.Node
+		switch propertyNode.Kind {
+		case ast.KindPropertyAssignment:
+			property := propertyNode.AsPropertyAssignment()
+			nameNode = property.Name()
+			propertyValue = property.Initializer
+		case ast.KindShorthandPropertyAssignment:
+			nameNode = propertyNode.AsShorthandPropertyAssignment().Name()
+			propertyValue = nameNode
+		default:
+			nameNode = propertyNode.Name()
+			propertyValue = propertyNode
+		}
+		name, ok := staticAttributeName(nameNode)
 		if !ok {
-			return nil, false
+			return nil, objectPropertyUnknown
 		}
 		if name != wanted {
 			continue
 		}
 		if found {
-			return nil, false
+			return nil, objectPropertyUnknown
 		}
 		found = true
-		value = property.Initializer
+		value = propertyValue
 	}
-	return value, found
+	if !found {
+		return nil, objectPropertyAbsent
+	}
+	return value, objectPropertyFound
 }
 
 func staticAttributeName(node *ast.Node) (string, bool) {
-	if node == nil || node.Kind != ast.KindIdentifier && !ast.IsStringLiteralLike(node) {
+	if node == nil {
+		return "", false
+	}
+	if node.Kind == ast.KindComputedPropertyName {
+		expression := ast.SkipParentheses(node.AsComputedPropertyName().Expression)
+		if expression == nil || !ast.IsStringLiteralLike(expression) && expression.Kind != ast.KindNumericLiteral {
+			return "", false
+		}
+		return expression.Text(), true
+	}
+	if node.Kind != ast.KindIdentifier && !ast.IsStringLiteralLike(node) && node.Kind != ast.KindNumericLiteral {
 		return "", false
 	}
 	return node.Text(), true

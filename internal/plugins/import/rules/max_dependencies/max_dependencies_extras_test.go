@@ -46,6 +46,10 @@ func TestMaxDependenciesExtras(t *testing.T) {
 				Options: []any{map[string]any{"max": 1}},
 			},
 			{
+				Code:    `import("./b.js", {}); import("./b.js", {});`,
+				Options: []any{map[string]any{"max": 1}},
+			},
+			{
 				Code:    "import type Default from \"a\"; import type * as NS from \"b\"; import type { Named } from \"c\";",
 				Options: []any{map[string]any{"max": 0, "ignoreTypeImports": true}},
 			},
