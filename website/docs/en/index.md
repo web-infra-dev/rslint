@@ -15,4 +15,5 @@ hero:
   image:
     src: https://assets.rspack.rs/rslint/rslint-logo.svg
     alt: Logo
+description: 'Lint JavaScript and TypeScript with Rslint, a high-performance ESLint-compatible linter with type-aware rules.'
 ---

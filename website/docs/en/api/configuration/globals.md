@@ -1,3 +1,7 @@
+---
+description: 'Configure predefined JavaScript environment globals in Rslint and combine environment maps through the globals export.'
+---
+
 # globals
 
 `globals` exposes the complete environment catalog from the pinned [`globals`](https://www.npmjs.com/package/globals) package. Each environment map is loaded and cached on first property access, so importing `@rslint/core` does not parse the entire catalog.

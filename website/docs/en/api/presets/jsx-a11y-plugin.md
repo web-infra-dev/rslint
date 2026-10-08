@@ -1,3 +1,7 @@
+---
+description: 'Configure supported JSX accessibility rules with the built-in jsxA11yPlugin presets in Rslint.'
+---
+
 # jsxA11yPlugin
 
 `jsxA11yPlugin` exposes Rslint's built-in implementation of supported rules from [`eslint-plugin-jsx-a11y` 6.x](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/tree/v6.10.2). Its preset follows the upstream flat recommended configuration for the rules Rslint currently supports.

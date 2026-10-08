@@ -1,3 +1,7 @@
+---
+description: 'Configure Node.js linting with Rslint nodePlugin presets and the native node rule prefix.'
+---
+
 # nodePlugin
 
 `nodePlugin` exposes Rslint's built-in implementation of supported rules from [`eslint-plugin-n` 18.x](https://github.com/eslint-community/eslint-plugin-n/tree/v18.3.0). Rules use Rslint's native `node/*` prefix instead of upstream's `n/*`.

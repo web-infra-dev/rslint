@@ -1,3 +1,7 @@
+---
+description: 'Rslint CLI options and usage, including file selection, configuration, rule overrides, and exit codes.'
+---
+
 # CLI Reference
 
 ## Usage

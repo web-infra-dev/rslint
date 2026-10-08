@@ -1,3 +1,7 @@
+---
+description: 'Configure the Rslint VS Code extension for live diagnostics, code actions, automatic fixes, and workspace settings.'
+---
+
 # VSCode Extension
 
 Install the official extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=rstack.rslint). It provides:

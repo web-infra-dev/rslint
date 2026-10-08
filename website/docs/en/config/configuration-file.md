@@ -1,3 +1,7 @@
+---
+description: 'Create Rslint JS or TS flat configuration files and understand file discovery, path resolution, merging, and legacy JSON migration.'
+---
+
 # Configuration File
 
 Rslint uses JS/TS module configuration with a flat config array aligned with ESLint v10.

@@ -1,3 +1,7 @@
+---
+description: 'Create global flat-config ignore entries with globalIgnores to exclude files across an Rslint configuration.'
+---
+
 # globalIgnores
 
 `globalIgnores` creates a flat-config entry whose patterns apply across the entire configuration.

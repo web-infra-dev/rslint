@@ -1,3 +1,7 @@
+---
+description: 'Exclude files in Rslint with global or entry-level ignores, glob patterns, globalIgnores, and .gitignore integration.'
+---
+
 # ignores
 
 - **Type:** `string[]`

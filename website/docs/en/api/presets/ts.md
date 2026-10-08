@@ -1,3 +1,7 @@
+---
+description: 'Choose Rslint TypeScript presets through the ts export, including recommended, type-checked, strict, and stylistic variants.'
+---
+
 # ts
 
 `ts` exposes Rslint's built-in implementation of supported [typescript-eslint 8.x](https://v8--typescript-eslint.netlify.app/rules/) rules and its baseline, type-checked, strict, and stylistic presets.

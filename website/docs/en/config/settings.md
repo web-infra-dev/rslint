@@ -1,3 +1,7 @@
+---
+description: 'Share configuration values with native and compatible ESLint rules through Rslint settings.'
+---
+
 # settings
 
 - **Type:** `Record<string, any>`

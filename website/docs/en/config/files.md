@@ -1,3 +1,7 @@
+---
+description: 'Select files for Rslint config entries with glob patterns, including OR and AND matching and TypeScript project coverage.'
+---
+
 # files
 
 - **Type:** `(string | string[])[]`

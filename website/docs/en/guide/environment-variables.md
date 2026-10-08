@@ -1,3 +1,7 @@
+---
+description: 'Control Rslint terminal colors with NO_COLOR, FORCE_COLOR, and GITHUB_ACTIONS, including CLI flag precedence.'
+---
+
 # Environment Variables
 
 Rslint respects the following environment variables:

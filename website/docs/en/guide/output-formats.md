@@ -1,3 +1,7 @@
+---
+description: 'Choose how Rslint reports diagnostics with --format, including terminal, JSON Lines, and CI output formats.'
+---
+
 # Output Formats
 
 Use the `--format` flag to control how diagnostics are rendered.

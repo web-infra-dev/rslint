@@ -1,3 +1,7 @@
+---
+description: 'Create type-safe Rslint flat configurations with defineConfig and understand its identity-helper behavior.'
+---
+
 # defineConfig
 
 `defineConfig` is the type-safe identity helper for an Rslint flat config.

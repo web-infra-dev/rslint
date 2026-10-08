@@ -1,3 +1,7 @@
+---
+description: 'Configure supported Unicorn rules with the built-in unicornPlugin presets in Rslint.'
+---
+
 # unicornPlugin
 
 `unicornPlugin` exposes Rslint's built-in implementation of supported rules from [`eslint-plugin-unicorn` 73.x](https://github.com/sindresorhus/eslint-plugin-unicorn/tree/v73.0.0). Its preset follows the upstream recommended configuration for the rules Rslint currently supports.

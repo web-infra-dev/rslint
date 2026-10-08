@@ -1,3 +1,7 @@
+---
+description: 'Configure Jest test linting with the built-in jestPlugin presets in Rslint.'
+---
+
 # jestPlugin
 
 `jestPlugin` exposes Rslint's built-in implementation of supported rules from [`eslint-plugin-jest` 29.x](https://github.com/jest-community/eslint-plugin-jest/tree/v29.16.0). Its presets follow the corresponding upstream flat configurations.

@@ -1,3 +1,7 @@
+---
+description: 'Enable supported ESLint core rules with Rslint js presets and review differences from ESLint.'
+---
+
 # js
 
 `js` exposes presets for Rslint's built-in implementation of supported [ESLint 10.x core rules](https://eslint.org/docs/v10.x/rules/). Its preset is based on the configuration published by `@eslint/js` 10.x.

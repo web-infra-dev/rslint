@@ -1,3 +1,7 @@
+---
+description: 'Use the Rslint class to lint files and in-memory code, write fixes, and dispose of programmatic lint sessions.'
+---
+
 # Rslint
 
 The `Rslint` class is the ESLint-style programmatic API for linting files and in-memory source from a JavaScript host.

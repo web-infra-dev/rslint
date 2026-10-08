@@ -1,3 +1,7 @@
+---
+description: 'Configure Rslint rule severities and positional options, including plugin prefixes and merging behavior.'
+---
+
 # rules
 
 - **Type:** `Record<string, RuleSeverity | readonly [RuleSeverity, ...options]>`

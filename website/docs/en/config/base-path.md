@@ -1,3 +1,7 @@
+---
+description: 'Set the directory scope of an Rslint flat-config entry with basePath, including matching and TypeScript project resolution.'
+---
+
 # basePath
 
 - **Type:** `string`
