@@ -124,6 +124,31 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const fromCharCodeSpread = String.fromCharCode(...[72, 69, 65, 68]);\n" +
 		"const arrayOfFirst = Array.of(\"GET\")[0];\n" +
 		"const arrayOfSpread = Array.of(...[\"HEAD\"])[0];\n" +
+		"const spreadNested = [\"a\", ...[\"b\", ...[\"c\"]], \"d\"].join(\"\");\n" +
+		"const spreadEmpty = [...[], ...[]].join(\",\");\n" +
+		"const spreadSparse = [...[, , \"x\"]].join(\"-\");\n" +
+		"const spreadSparseLength = String([...[, , \"x\"]].length);\n" +
+		"const spreadPosition = String([0, ...[1, 2], 3, ...[4]][3]);\n" +
+		"const spreadValues = [\"a\", \"b\"]; const spreadAlias = [...spreadValues].join(\"\");\n" +
+		"const spreadCallArguments = String.fromCharCode(...[...[65, 66]]);\n" +
+		"const spreadStringArguments = Array.of(...\"AB\").join(\"\");\n" +
+		"const spreadUnknown = [...unknown].join(\"\");\n" +
+		"const spreadCall = [...getValues()].join(\"\");\n" +
+		"const spreadNonIterable = [...42].join(\"\");\n" +
+		"const spreadCustomIterator = [...{*[Symbol.iterator]() { yield \"x\"; }}].join(\"\");\n" +
+		"const objectSpread = ({...{value: \"x\"}}).value;\n" +
+		"const objectSpreadOrder = ({value: \"first\", ...{value: \"middle\"}, value: \"last\"}).value;\n" +
+		"const objectSpreadNullish = ({value: \"x\", ...null, ...undefined, ...1, ...true, ...1n}).value;\n" +
+		"const objectSpreadArray = ({...[\"a\", \"b\"]})[1];\n" +
+		"const objectSpreadHole = ({__proto__: {0: \"inherited\"}, ...[, ]})[0];\n" +
+		"const objectSpreadUndefined = String(({__proto__: {0: \"inherited\"}, ...[undefined]})[0]);\n" +
+		"const objectSpreadDensifiedHole = String(({__proto__: {0: \"inherited\"}, ...[...[, ]]})[0]);\n" +
+		"const objectSpreadArrayLength = String(({...[1, 2]}).length);\n" +
+		"const objectSpreadInherited = String(({...{__proto__: {value: \"inherited\"}}}).value);\n" +
+		"const objectSpreadProtoData = ({...{[\"__proto__\"]: \"own\"}}).__proto__;\n" +
+		"const objectSpreadRegExp = String(({.../a/}).lastIndex);\n" +
+		"const objectSpreadUnknown = ({...unknown}).value;\n" +
+		"const objectSpreadGetter = ({...{get value() { return \"x\"; }}}).value;\n" +
 		"const stringSlice = \"xGETy\".slice(1, 4);\n" +
 		"const stringSliceDefault = \"GET\".slice(undefined);\n" +
 		"const stringSliceUtf16 = \"😀GETx\".slice(2, 5);\n" +
@@ -321,6 +346,31 @@ func TestStaticStringEvaluator(t *testing.T) {
 		{name: "fromCharCodeSpread", want: "HEAD", ok: true},
 		{name: "arrayOfFirst", want: "GET", ok: true},
 		{name: "arrayOfSpread", want: "HEAD", ok: true},
+		{name: "spreadNested", want: "abcd", ok: true},
+		{name: "spreadEmpty", want: "", ok: true},
+		{name: "spreadSparse", want: "--x", ok: true},
+		{name: "spreadSparseLength", want: "3", ok: true},
+		{name: "spreadPosition", want: "3", ok: true},
+		{name: "spreadAlias", want: "ab", ok: true},
+		{name: "spreadCallArguments", want: "AB", ok: true},
+		{name: "spreadStringArguments", want: "AB", ok: true},
+		{name: "spreadUnknown"},
+		{name: "spreadCall"},
+		{name: "spreadNonIterable"},
+		{name: "spreadCustomIterator"},
+		{name: "objectSpread", want: "x", ok: true},
+		{name: "objectSpreadOrder", want: "last", ok: true},
+		{name: "objectSpreadNullish", want: "x", ok: true},
+		{name: "objectSpreadArray", want: "b", ok: true},
+		{name: "objectSpreadHole", want: "inherited", ok: true},
+		{name: "objectSpreadUndefined", want: "undefined", ok: true},
+		{name: "objectSpreadDensifiedHole", want: "undefined", ok: true},
+		{name: "objectSpreadArrayLength", want: "undefined", ok: true},
+		{name: "objectSpreadInherited", want: "undefined", ok: true},
+		{name: "objectSpreadProtoData", want: "own", ok: true},
+		{name: "objectSpreadRegExp", want: "undefined", ok: true},
+		{name: "objectSpreadUnknown"},
+		{name: "objectSpreadGetter"},
 		{name: "stringSlice", want: "GET", ok: true},
 		{name: "stringSliceDefault", want: "GET", ok: true},
 		{name: "stringSliceUtf16", want: "GET", ok: true},
@@ -524,6 +574,219 @@ const selfRead = selfMutating[0];`
 			}
 		})
 	}
+
+	t.Run("alias mutations", func(t *testing.T) {
+		for _, test := range []struct {
+			name, mutation string
+			known          bool
+		}{
+			{"iterator alias", `const alias = values; alias[Symbol.iterator] = function*() { yield "changed"; };`, false},
+			{"alias chain", `const alias = values; const second = alias; const third = second; third[0] = "changed";`, false},
+			{"conditional alias", `const alias = true ? values : []; alias[Symbol.iterator] = function*() { yield "changed"; };`, false},
+			{"conditional mutation target", `(true ? values : [])[Symbol.iterator] = function*() { yield "changed"; };`, false},
+			{"literal container mutation target", `({values}).values[Symbol.iterator] = function*() { yield "changed"; };`, false},
+			{"conditional mutator receiver", `(true ? values : []).reverse();`, false},
+			{"literal container mutator receiver", `({values}).values.reverse();`, false},
+			{"conditional computed mutator receiver", `const method = "fill"; (true ? values : [])[method]("changed");`, false},
+			{"conditional alternate alias", `const alias = false ? [] : values; alias[0] = "changed";`, false},
+			{"logical alias", `const alias = values || []; alias[0] = "changed";`, false},
+			{"logical right alias", `const alias = true && values; alias[0] = "changed";`, false},
+			{"nullish alias", `const alias = null ?? values; alias[0] = "changed";`, false},
+			{"comma alias", `const alias = (0, values); alias[0] = "changed";`, false},
+			{"assignment alias", `let other; const alias = (other = values); alias[0] = "changed";`, false},
+			{"object container", `const holder = {values}; holder.values[Symbol.iterator] = function*() { yield "changed"; };`, false},
+			{"object binding alias", `const holder = {values}; const {values: alias} = holder; alias[0] = "changed";`, false},
+			{"array binding alias", `const [alias] = [values]; alias[0] = "changed";`, false},
+			{"nested binding alias", `const {items: [alias]} = {items: [values]}; alias[0] = "changed";`, false},
+			{"binding default alias", `const {alias = values} = {}; alias[0] = "changed";`, false},
+			{"outer binding default alias", `const {items: {alias} = {alias: values}} = {}; alias[0] = "changed";`, false},
+			{"object rest nested mutation", `const {...copy} = {values}; copy.values[0] = "changed";`, false},
+			{"array rest nested mutation", `const [...copy] = [values]; copy[0][0] = "changed";`, false},
+			{"object rest copy", `const {...copy} = values; copy[0] = "changed";`, true},
+			{"array rest copy", `const [...copy] = values; copy[0] = "changed";`, true},
+			{"nested array rest copy", `const [[...copy]] = [values]; copy[0] = "changed";`, true},
+			{"binding replacement", `let [alias] = [values]; alias = [];`, true},
+			{"assign container", `const holder = Object.assign({}, {values}); holder.values[0] = "changed";`, false},
+			{"assign multiple sources", `const holder = Object.assign({}, {other: []}, {values}); holder.values[0] = "changed";`, false},
+			{"assign spread arguments", `const holder = Object.assign(...[{}, {values}]); holder.values[0] = "changed";`, false},
+			{"assign existing target", `const holder = Object.assign(values, {}); holder[0] = "changed";`, false},
+			{"assign target after empty spread", `const holder = Object.assign(...[], values); holder[0] = "changed";`, false},
+			{"assign nested target", `const target = {values}; const holder = Object.assign(target, {}); holder.values[0] = "changed";`, false},
+			{"assign property replacement", `const holder = Object.assign({}, {values}); holder.values = [];`, true},
+			{"assign array copy", `const copy = Object.assign([], values); copy[0] = "changed";`, true},
+			{"assign object copy", `const copy = Object.assign({}, values); copy[0] = "changed";`, true},
+			{"assign copies spread sources", `const copy = Object.assign({}, ...[values]); copy[0] = "changed";`, true},
+			{"renamed object container", `const holder = {items: values}; holder.items.reverse();`, false},
+			{"array container", `const holder = [values]; holder[0].reverse();`, false},
+			{"nested container alias", `const holder = {items: [values]}; const alias = holder.items[0]; alias[0] = "changed";`, false},
+			{"nested object container", `const holder = {outer: {inner: values}}; holder.outer.inner[0] = "changed";`, false},
+			{"frozen container", `const holder = Object.freeze({values}); holder.values[0] = "changed";`, false},
+			{"array factory container", `const holder = Array.of(values); holder[0][0] = "changed";`, false},
+			{"computed array factory container", `const method = "of"; const holder = Array[method](values); holder[0][0] = "changed";`, false},
+			{"aliased array factory container", `const ArrayAlias = Array; const holder = ArrayAlias.of(values); holder[0][0] = "changed";`, false},
+			{"array factory spread container", `const holder = Array.of(...[values]); holder[0][0] = "changed";`, false},
+			{"container mutation after replacement", `const holder = {values}; holder.other = []; holder.values[0] = "changed";`, false},
+			{"object spread container", `const holder = {values}; const copy = {...holder}; copy.values[0] = "changed";`, false},
+			{"array spread container", `const holder = [values]; const copy = [...holder]; copy[0][0] = "changed";`, false},
+			{"nested property definition", `const holder = {values}; Object.defineProperty(holder.values, "0", {value: "changed"});`, false},
+			{"nested explicit receiver", `const holder = {values}; Reflect.set({}, "0", "changed", holder.values);`, false},
+			{"pass-through alias", `const alias = Object.preventExtensions(values); alias[0] = "changed";`, false},
+			{"array copy", `const alias = [...values]; alias[0] = "changed";`, true},
+			{"array factory copy", `const alias = Array.of(...values); alias[0] = "changed";`, true},
+			{"object copy", `const alias = {...values}; alias[0] = "changed";`, true},
+			{"container property replacement", `const holder = {values}; holder.values = [];`, true},
+			{"conditional test is not an alias", `const alias = values ? [] : []; alias[0] = "changed";`, true},
+			{"comma left is not an alias", `const alias = (values, []); alias[0] = "changed";`, true},
+			{"computed key is not an alias", `const holder = {[values]: []}; holder.stable[0] = "changed";`, true},
+			{"computed index is not an alias", `const holder = {stable: []}; const alias = holder[values]; alias[0] = "changed";`, true},
+			{"method body is not an alias", `const holder = {method() { return values; }}; holder.method.other = "changed";`, true},
+			{"unmodified indirect alias", `const holder = {values}; const alias = true ? holder.values : []; alias[0];`, true},
+			{"circular container aliases", `const first = {second}; const second = {first}; first.second.other = "changed";`, true},
+			{"circular container with reachable alias", `const first = {second}; const second = {first, values}; first.second.values[0] = "changed";`, false},
+			{"circular access aliases", `const first = second.value; const second = first.value; first.other = "changed";`, true},
+			{"alias mutator", `const alias = values; alias.reverse();`, false},
+			{"computed alias mutator", `const alias = values; const method = "fill"; alias[method]("changed");`, false},
+			{"mutable alias", `let alias = values; alias[0] = "changed"; alias = [];`, false},
+			{"mutable alias conservatism", `let alias = values; alias = []; alias[0] = "changed";`, false},
+			{"alias replacement", `let alias = values; alias = [];`, true},
+			{"unmodified alias", `const alias = values; const second = alias; second[0];`, true},
+			{"circular aliases", `const first = second; const second = first; first[0] = "changed";`, true},
+			{"self alias", `const alias = alias; alias[0] = "changed";`, true},
+			{"getter definition", `Object.defineProperty(values, "0", {get() { return unknown; }});`, false},
+			{"getter definition through alias", `const alias = values; Object.defineProperty(alias, "0", {get() { return unknown; }});`, false},
+			{"multiple property definitions", `Object.defineProperties(values, {0: {get() { return unknown; }}});`, false},
+			{"assign", `Object.assign(values, {0: "changed"});`, false},
+			{"assign expanded arguments", `Object.assign(...[values, {0: "changed"}]);`, false},
+			{"prototype mutation", `Object.setPrototypeOf(values, {[Symbol.iterator]() { return unknown; }});`, false},
+			{"reflect definition", `Reflect.defineProperty(values, "0", {get() { return unknown; }});`, false},
+			{"reflect assignment", `Reflect.set(values, "0", "changed");`, false},
+			{"reflect explicit receiver", `Reflect.set({}, Symbol.iterator, function*() { yield "changed"; }, values);`, false},
+			{"reflect deletion", `Reflect.deleteProperty(values, "0");`, false},
+			{"shadowed property definition", `{ const Object = {defineProperty() {}}; Object.defineProperty(values, "0", {}); }`, true},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				root := fixtures.GetRootDir()
+				filePath := tspath.ResolvePath(root.Dir, "alias-mutation.ts")
+				code := `const values = ["stable"]; ` + test.mutation + ` const result = [...values].join(""); const spread = [...values];`
+				fs := NewOverlayVFS(root.FS, map[string]string{filePath: code})
+				program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
+				assert.NilError(t, err)
+				sourceFile := program.GetSourceFile(filePath)
+				assert.Assert(t, sourceFile != nil)
+				typeChecker, done := program.GetTypeChecker(t.Context())
+				defer done()
+				for _, resolution := range []string{"checker", "references"} {
+					t.Run(resolution, func(t *testing.T) {
+						staticEvaluator := NewStaticStringEvaluatorWithSourceFile(typeChecker, sourceFile)
+						if resolution == "references" {
+							resolver := &staticEvaluatorTestResolver{resolver: binder.NameResolver{Globals: sourceFile.Locals}}
+							staticEvaluator = NewStaticStringEvaluatorWithReferenceResolver(nil, sourceFile, resolver)
+						}
+						value, known := staticEvaluator.Eval(findVariableInitializer(t, sourceFile, "result"))
+						if known != test.known || known && value != "stable" {
+							t.Fatalf("spread result = (%q, %v), want known = %v", value, known, test.known)
+						}
+						if _, known := staticEvaluator.EvalValueIfNoSideEffects(findVariableInitializer(t, sourceFile, "spread")); known != test.known {
+							t.Fatalf("spread safety = %v, want %v", known, test.known)
+						}
+					})
+				}
+			})
+		}
+	})
+}
+
+func TestStaticStringEvaluatorIteratorPrototypeMutations(t *testing.T) {
+	for _, test := range []struct {
+		name, mutation              string
+		arrayMutated, stringMutated bool
+	}{
+		{"array assignment", `Array.prototype[Symbol.iterator] = function*() { yield "changed"; };`, true, false},
+		{"string assignment", `String.prototype[Symbol.iterator] = function*() { yield "changed"; };`, false, true},
+		{"property definition", `Object.defineProperty(Array.prototype, Symbol.iterator, {value: function*() { yield "changed"; }});`, true, false},
+		{"spread property definition", `Object.defineProperty(...[Array.prototype, Symbol.iterator, {value: function*() { yield "changed"; }}]);`, true, false},
+		{"empty spread before target", `Object.defineProperty(...[], String.prototype, Symbol.iterator, {value: function*() { yield "changed"; }});`, false, true},
+		{"spread explicit receiver", `Reflect.set(...[{}, Symbol.iterator, function*() {}, String.prototype]);`, false, true},
+		{"multiple definitions", `Object.defineProperties(String.prototype, {[Symbol.iterator]: {value: function*() { yield "changed"; }}});`, false, true},
+		{"object assign", `Object.assign(Array.prototype, {[Symbol.iterator]: function*() { yield "changed"; }});`, true, false},
+		{"reflect definition", `Reflect.defineProperty(String.prototype, Symbol.iterator, {value: function*() { yield "changed"; }});`, false, true},
+		{"reflect set", `Reflect.set(Array.prototype, Symbol.iterator, function*() { yield "changed"; });`, true, false},
+		{"explicit receiver", `Reflect.set({}, Symbol.iterator, function*() { yield "changed"; }, String.prototype);`, false, true},
+		{"delete", `delete Array.prototype[Symbol.iterator];`, true, false},
+		{"reflect deletion", `Reflect.deleteProperty(String.prototype, Symbol.iterator);`, false, true},
+		{"computed object method", `const method = "defineProperty"; Object[method](Array.prototype, Symbol.iterator, {});`, true, false},
+		{"computed reflect method", `const method = "set"; Reflect[method](String.prototype, Symbol.iterator, function*() {});`, false, true},
+		{"prototype alias", `const proto = Array.prototype; proto[Symbol.iterator] = function*() {};`, true, false},
+		{"constructor alias", `const Constructor = String; Constructor.prototype[Symbol.iterator] = function*() {};`, false, true},
+		{"destructured array prototype", `const {prototype: proto} = Array; proto[Symbol.iterator] = function*() {};`, true, false},
+		{"destructured string prototype", `const {prototype: proto} = String; proto[Symbol.iterator] = function*() {};`, false, true},
+		{"TypeScript wrapper", `(Array.prototype as object)[Symbol.iterator] = function*() {};`, true, false},
+		{"unmodified prototypes", `Array.prototype[Symbol.iterator]; String.prototype[Symbol.iterator];`, false, false},
+		{"shadowed array", `{ const Array = {prototype: {}}; Array.prototype[Symbol.iterator] = function*() {}; }`, false, false},
+		{"shadowed string", `{ const String = {prototype: {}}; String.prototype[Symbol.iterator] = function*() {}; }`, false, false},
+		{"shadowed object", `{ const Object = {defineProperty() {}}; Object.defineProperty(Array.prototype, Symbol.iterator, {}); }`, false, false},
+		{"shadowed reflect", `{ const Reflect = {set() {}}; Reflect.set(String.prototype, Symbol.iterator, null); }`, false, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := fixtures.GetRootDir()
+			filePath := tspath.ResolvePath(root.Dir, "iterator-mutation.ts")
+			code := test.mutation + `
+const arraySpread = [...["stable"]];
+const stringSpread = [..."stable"];
+const arraySource = ["stable"];
+const aliasSpread = [...arraySource];
+const callSpread = Array.of(...["stable"]);
+const arrayProperty = ({...["stable"]})[0];
+const stringProperty = ({..."stable"})[0];
+`
+			fs := NewOverlayVFS(root.FS, map[string]string{filePath: code})
+			program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
+			assert.NilError(t, err)
+			sourceFile := program.GetSourceFile(filePath)
+			assert.Assert(t, sourceFile != nil)
+			typeChecker, done := program.GetTypeChecker(t.Context())
+			defer done()
+			for _, resolution := range []string{"checker", "references"} {
+				for _, first := range []string{"arraySpread", "stringSpread", "aliasSpread", "arrayProperty"} {
+					t.Run(resolution+"/"+first, func(t *testing.T) {
+						evaluator := NewStaticStringEvaluatorWithSourceFile(typeChecker, sourceFile)
+						if resolution == "references" {
+							resolver := &staticEvaluatorTestResolver{resolver: binder.NameResolver{Globals: sourceFile.Locals}}
+							evaluator = NewStaticStringEvaluatorWithReferenceResolver(nil, sourceFile, resolver)
+						}
+						evaluator.EvalValue(findVariableInitializer(t, sourceFile, first))
+						for _, query := range []struct {
+							name    string
+							mutated bool
+						}{
+							{"arraySpread", test.arrayMutated},
+							{"stringSpread", test.stringMutated},
+							{"aliasSpread", test.arrayMutated},
+							{"callSpread", test.arrayMutated},
+						} {
+							initializer := findVariableInitializer(t, sourceFile, query.name)
+							if _, known := evaluator.EvalValue(initializer); known == query.mutated {
+								t.Fatalf("%s known = %v, want %v", query.name, known, !query.mutated)
+							}
+							if query.name != "callSpread" {
+								if _, known := evaluator.EvalValueIfNoSideEffects(initializer); known == query.mutated {
+									t.Fatalf("%s safety = %v, want %v", query.name, known, !query.mutated)
+								}
+								if effect := evaluator.HasSideEffect(initializer, false); effect != query.mutated {
+									t.Fatalf("%s side effect = %v, want %v", query.name, effect, query.mutated)
+								}
+							}
+						}
+						for name, want := range map[string]string{"arrayProperty": "stable", "stringProperty": "s"} {
+							if value, known := evaluator.Eval(findVariableInitializer(t, sourceFile, name)); !known || value != want {
+								t.Fatalf("%s = (%q, %v), want (%q, true)", name, value, known, want)
+							}
+						}
+					})
+				}
+			}
+		})
+	}
 }
 
 func TestStaticStringEvaluatorConfiguredGlobals(t *testing.T) {
@@ -678,6 +941,45 @@ func TestStaticArrayJoinRejectsExcessiveOutput(t *testing.T) {
 	}
 }
 
+func TestStaticStringEvaluatorSpreadLimits(t *testing.T) {
+	text := strings.Repeat("x", maxStaticArrayLength)
+	for _, test := range []struct {
+		name, expression string
+		known            bool
+	}{
+		{"at limit", `[..."` + text + `"]`, true},
+		{"deep nesting", strings.Repeat("[", 64) + "0" + strings.Repeat(", ...[]]", 64), true},
+		{"string overflow", `[..."` + text + `x"]`, false},
+		{"element overflow", `[...[..."` + text + `"], 1]`, false},
+		{"array overflow", `[...[..."` + text + `"], ...[1]]`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/spread.ts", Path: "/spread.ts",
+			}, "const value = "+test.expression+";", core.ScriptKindTS)
+			evaluator := NewStaticStringEvaluator(nil)
+			isArray, known := evaluator.EvalArrayValue(findVariableInitializer(t, sourceFile, "value"))
+			assert.Equal(t, known, test.known)
+			assert.Equal(t, isArray, test.known)
+		})
+	}
+	for _, test := range []struct {
+		name, expression string
+		known            bool
+	}{
+		{"object overflow", `{..."` + strings.Repeat("x", maxStaticObjectProperties+1) + `"}`, false},
+		{"nested objects", strings.Repeat("{value:", 64) + "0" + strings.Repeat(", ...{}}", 64), true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/spread.ts", Path: "/spread.ts",
+			}, "const value = "+test.expression+";", core.ScriptKindTS)
+			_, known := NewStaticStringEvaluator(nil).EvalValue(findVariableInitializer(t, sourceFile, "value"))
+			assert.Equal(t, known, test.known)
+		})
+	}
+}
+
 func TestStaticStringEvaluatorUTF16Semantics(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
 	filePath := tspath.ResolvePath(rootDir.Dir, "utf16.ts")
@@ -714,6 +1016,13 @@ const objectPair = ({['\uD83D' + '\uDE00']: 'yes'})['😀'];
 const indexedHigh = '😀'[0];
 const indexedLow = '😀'[1];
 const indexedLone = '\uD800'[0];
+const spreadAstral = [...'A😀B'].join('-');
+const spreadAstralLength = String([...'A😀B'].length);
+const spreadLone = [...'\uD800x'][0];
+const spreadPair = String([...('\uD83D' + '\uDE00')].length);
+const objectSpreadAstralHigh = ({...'😀'})[0];
+const objectSpreadAstralLow = ({...'😀'})[1];
+const objectSpreadLone = ({...'\uD800x'})[0];
 `
 	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
@@ -762,6 +1071,13 @@ const indexedLone = '\uD800'[0];
 		{name: "indexedHigh", want: high},
 		{name: "indexedLow", want: low},
 		{name: "indexedLone", want: ecmascript.StringFromCodeUnits([]uint16{0xD800})},
+		{name: "spreadAstral", want: "A-😀-B"},
+		{name: "spreadAstralLength", want: "3"},
+		{name: "spreadLone", want: ecmascript.StringFromCodeUnits([]uint16{0xD800})},
+		{name: "spreadPair", want: "1"},
+		{name: "objectSpreadAstralHigh", want: high},
+		{name: "objectSpreadAstralLow", want: low},
+		{name: "objectSpreadLone", want: ecmascript.StringFromCodeUnits([]uint16{0xD800})},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -860,6 +1176,8 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		name    string
 		known   bool
 		isArray bool
+		// Known for value evaluation, but rejected as a control-flow input.
+		valueOnly bool
 	}{
 		{name: "scalar", known: true},
 		{name: "array", known: true, isArray: true},
@@ -871,10 +1189,10 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		{name: "frozenAlias", known: true, isArray: true},
 		{name: "safeAlias", known: true, isArray: true},
 		{name: "skippedMutable", known: true, isArray: true},
-		{name: "beforeDeclaration"},
+		{name: "beforeDeclaration", valueOnly: true},
 		{name: "skippedBeforeDeclaration", known: true, isArray: true},
-		{name: "reachedMutable"},
-		{name: "voidMutable"},
+		{name: "reachedMutable", valueOnly: true},
+		{name: "voidMutable", valueOnly: true},
 		{name: "assignment"},
 		{name: "assignmentAlias"},
 		{name: "assignmentCondition"},
@@ -894,6 +1212,10 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 			assert.Equal(t, isArray, test.isArray)
 			_, known = staticEvaluator.EvalControlFlowTruthiness(node)
 			assert.Equal(t, known, test.known)
+			// Merge rules need the same side-effect/member safety, while stable
+			// let bindings and forward const values do not control a branch.
+			_, known = staticEvaluator.EvalValueIfNoSideEffects(node)
+			assert.Equal(t, known, test.known || test.valueOnly)
 		})
 	}
 
@@ -920,7 +1242,9 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 	assert.Assert(t, !known, "conservative evaluation hid a computed property mutation")
 
 	for _, evaluator := range []*StaticStringEvaluator{nil, staticEvaluator} {
-		_, known := evaluator.EvalControlFlowValue(nil)
+		_, known := evaluator.EvalValueIfNoSideEffects(nil)
+		assert.Assert(t, !known)
+		_, known = evaluator.EvalControlFlowValue(nil)
 		assert.Assert(t, !known)
 		isArray, known := evaluator.EvalControlFlowArrayValue(nil)
 		assert.Assert(t, !known && !isArray)

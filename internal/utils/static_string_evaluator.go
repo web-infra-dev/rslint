@@ -34,6 +34,8 @@ type StaticStringEvaluator struct {
 	evaluation             *staticEvaluationState
 	referenceFlagsComputed bool
 	referenceFlags         map[*ast.Symbol]staticReferenceFlags
+	arrayPrototypeMutated  bool
+	stringPrototypeMutated bool
 }
 
 func NewStaticStringEvaluator(typeChecker *checker.Checker) *StaticStringEvaluator {
@@ -107,7 +109,8 @@ type staticObjectProperty struct {
 }
 
 type staticArrayValue struct {
-	length   int
+	length int
+	// Nil slots are holes; reading or iterating a hole produces undefined.
 	inline   [2]any
 	overflow []any
 }
@@ -117,6 +120,9 @@ type staticReferenceFlags uint8
 const (
 	staticReferenceWrite staticReferenceFlags = 1 << iota
 	staticReferencePropertyMutation
+	// A nested write can reach values held in a fresh object or array. A write
+	// to the container itself cannot mutate values copied into that container.
+	staticReferenceNestedMutation
 )
 
 // objectPassThroughMethods are the `Object` methods that return their argument
@@ -131,6 +137,11 @@ var objectPassThroughMethods = map[string]bool{
 // allocation. The limit is deliberately much larger than a useful diagnostic
 // message while still bounding nested Array#join coercion.
 const maxStaticStringLength = 1 << 20
+
+// Nested spreads can expand a short expression into a much larger array.
+const maxStaticArrayLength = 1 << 16
+
+const maxStaticObjectProperties = 1 << 16
 
 type staticEvalResult struct {
 	value any
@@ -712,6 +723,12 @@ func (staticEvaluator *StaticStringEvaluator) evalObjectLiteral(node *ast.Node) 
 			valueNode = property.AsPropertyAssignment().Initializer
 		case ast.KindShorthandPropertyAssignment:
 			valueNode = property.Name()
+		case ast.KindSpreadAssignment:
+			spread := staticEvaluator.evalValue(property.AsSpreadAssignment().Expression)
+			if !spread.ok || !value.copyDataProperties(spread.value) {
+				return staticEvalResult{}
+			}
+			continue
 		default:
 			return staticEvalResult{}
 		}
@@ -757,6 +774,46 @@ func (value *staticObjectValue) addProperty(name string, propertyValue any) {
 	value.propertyCount++
 }
 
+// Object spread copies own enumerable data properties, not the prototype.
+func (value *staticObjectValue) copyDataProperties(source any) bool {
+	if text, ok := staticValueAsString(source); ok {
+		units := ecmascript.StringCodeUnits(text)
+		if len(units) > maxStaticObjectProperties-value.propertyCount {
+			return false
+		}
+		for index := range units {
+			value.addProperty(strconv.Itoa(index), ecmascript.StringFromCodeUnits(units[index:index+1]))
+		}
+		return true
+	}
+	switch source := source.(type) {
+	case *staticObjectValue:
+		if source.propertyCount > maxStaticObjectProperties-value.propertyCount {
+			return false
+		}
+		if source.propertyCount > 0 {
+			value.addProperty(source.property.name, source.property.value)
+		}
+		for _, property := range source.extraProperties {
+			value.addProperty(property.name, property.value)
+		}
+	case *staticArrayValue:
+		for index := range source.length {
+			if element, present := source.ownElement(index); present {
+				if value.propertyCount >= maxStaticObjectProperties {
+					return false
+				}
+				value.addProperty(strconv.Itoa(index), element)
+			}
+		}
+	case staticNullValue, staticUndefinedValue, bool, staticNumberValue, *big.Int, *staticRegExpNode:
+		// These values have no own enumerable properties.
+	default:
+		return false
+	}
+	return true
+}
+
 func isObjectLiteralPrototypeSetter(property *ast.Node) bool {
 	return property != nil && property.Kind == ast.KindPropertyAssignment && ast.IsProtoSetter(property.Name())
 }
@@ -765,6 +822,13 @@ func (staticEvaluator *StaticStringEvaluator) evalObjectLiteralMember(node *ast.
 	object := node.AsObjectLiteralExpression()
 	if object == nil || object.Properties == nil {
 		return staticEvalResult{}
+	}
+	if slices.ContainsFunc(object.Properties.Nodes, ast.IsSpreadAssignment) {
+		value := staticEvaluator.evalObjectLiteral(node)
+		if !value.ok {
+			return staticEvalResult{}
+		}
+		return staticMemberValue(value.value, key)
 	}
 
 	var ownValue staticEvalResult
@@ -831,30 +895,41 @@ func (staticEvaluator *StaticStringEvaluator) evalObjectLiteralMember(node *ast.
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalArrayLiteral(node *ast.Node) staticEvalResult {
-	array := node.AsArrayLiteralExpression()
-	if array == nil || array.Elements == nil {
+	value, ok := staticEvaluator.evalArrayLiteralValue(node)
+	if !ok {
 		return staticEvalResult{}
 	}
+	return staticEvalResult{value: &value, ok: true}
+}
 
-	arrayValue := &staticArrayValue{length: len(array.Elements.Nodes)}
+func (staticEvaluator *StaticStringEvaluator) evalArrayLiteralValue(node *ast.Node) (staticArrayValue, bool) {
+	array := node.AsArrayLiteralExpression()
+	if array == nil || array.Elements == nil {
+		return staticArrayValue{}, false
+	}
+	if slices.ContainsFunc(array.Elements.Nodes, ast.IsSpreadElement) {
+		values, ok := staticEvaluator.evalElementValues(array.Elements.Nodes)
+		if !ok {
+			return staticArrayValue{}, false
+		}
+		return *staticArrayFromValues(values), true
+	}
+
+	arrayValue := staticArrayValue{length: len(array.Elements.Nodes)}
 	if arrayValue.length > len(arrayValue.inline) {
 		arrayValue.overflow = make([]any, arrayValue.length-len(arrayValue.inline))
 	}
 	for i, element := range array.Elements.Nodes {
 		if element.Kind == ast.KindOmittedExpression {
-			arrayValue.set(i, staticUndefinedValue{})
 			continue
-		}
-		if element.Kind == ast.KindSpreadElement {
-			return staticEvalResult{}
 		}
 		elementValue := staticEvaluator.evalValue(element)
 		if !elementValue.ok {
-			return staticEvalResult{}
+			return staticArrayValue{}, false
 		}
 		arrayValue.set(i, elementValue.value)
 	}
-	return staticEvalResult{value: arrayValue, ok: true}
+	return arrayValue, true
 }
 
 func (value *staticArrayValue) set(index int, element any) {
@@ -866,10 +941,19 @@ func (value *staticArrayValue) set(index int, element any) {
 }
 
 func (value *staticArrayValue) element(index int) any {
-	if index < len(value.inline) {
-		return value.inline[index]
+	if element, present := value.ownElement(index); present {
+		return element
 	}
-	return value.overflow[index-len(value.inline)]
+	return staticUndefinedValue{}
+}
+
+func (value *staticArrayValue) ownElement(index int) (any, bool) {
+	if index < len(value.inline) {
+		element := value.inline[index]
+		return element, element != nil
+	}
+	element := value.overflow[index-len(value.inline)]
+	return element, element != nil
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalPropertyKey(name *ast.Node) (string, bool) {
@@ -1193,7 +1277,7 @@ func (staticEvaluator *StaticStringEvaluator) evalArrayJoin(node *ast.Node) (val
 		arrayLiteral := literal.AsArrayLiteralExpression()
 		if arrayLiteral != nil && arrayLiteral.Elements != nil &&
 			len(arrayLiteral.Elements.Nodes) <= len((staticArrayValue{}).inline) {
-			array, arrayOK := staticEvaluator.evalInlineArrayLiteral(literal)
+			array, arrayOK := staticEvaluator.evalArrayLiteralValue(literal)
 			if !arrayOK {
 				return "", true, false
 			}
@@ -1221,30 +1305,6 @@ func (staticEvaluator *StaticStringEvaluator) evalArrayJoin(node *ast.Node) (val
 	}
 	value, ok = staticArrayJoin(array, separator)
 	return value, true, ok
-}
-
-func (staticEvaluator *StaticStringEvaluator) evalInlineArrayLiteral(node *ast.Node) (staticArrayValue, bool) {
-	literal := node.AsArrayLiteralExpression()
-	if literal == nil || literal.Elements == nil || len(literal.Elements.Nodes) > len((staticArrayValue{}).inline) {
-		return staticArrayValue{}, false
-	}
-
-	value := staticArrayValue{length: len(literal.Elements.Nodes)}
-	for i, element := range literal.Elements.Nodes {
-		if element.Kind == ast.KindOmittedExpression {
-			value.set(i, staticUndefinedValue{})
-			continue
-		}
-		if element.Kind == ast.KindSpreadElement {
-			return staticArrayValue{}, false
-		}
-		elementValue := staticEvaluator.evalValue(element)
-		if !elementValue.ok {
-			return staticArrayValue{}, false
-		}
-		value.set(i, elementValue.value)
-	}
-	return value, true
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalArrayJoinSeparator(node *ast.Node) (string, bool) {
@@ -1430,17 +1490,45 @@ func indexOfCodeUnits(text, needle []uint16, start int) int {
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalCallArguments(node *ast.Node) ([]any, bool) {
-	values := make([]any, 0, len(node.Arguments()))
-	for _, argumentNode := range node.Arguments() {
+	return staticEvaluator.evalElementValues(node.Arguments())
+}
+
+func (staticEvaluator *StaticStringEvaluator) evalElementValues(nodes []*ast.Node) ([]any, bool) {
+	values := make([]any, 0, len(nodes))
+	for _, argumentNode := range nodes {
 		if ast.IsSpreadElement(argumentNode) {
 			spread := staticEvaluator.evalValue(argumentNode.AsSpreadElement().Expression)
-			array, ok := spread.value.(*staticArrayValue)
-			if !spread.ok || !ok {
+			if !spread.ok || staticEvaluator.hasModifiedIterator(spread.value) {
 				return nil, false
 			}
-			for index := range array.length {
-				values = append(values, array.element(index))
+			if array, ok := spread.value.(*staticArrayValue); ok {
+				if array.length > maxStaticArrayLength-len(values) {
+					return nil, false
+				}
+				for index := range array.length {
+					values = append(values, array.element(index))
+				}
+			} else if text, ok := staticValueAsString(spread.value); ok {
+				// String iteration uses code points, preserving lone surrogates.
+				text = ecmascript.CombineSurrogatePairs(text)
+				for len(text) > 0 {
+					if len(values) == maxStaticArrayLength {
+						return nil, false
+					}
+					_, size := ecmascript.DecodeStringRune(text)
+					values = append(values, text[:size])
+					text = text[size:]
+				}
+			} else {
+				return nil, false
 			}
+			continue
+		}
+		if len(values) == maxStaticArrayLength {
+			return nil, false
+		}
+		if argumentNode.Kind == ast.KindOmittedExpression {
+			values = append(values, nil)
 			continue
 		}
 		argument := staticEvaluator.evalValue(argumentNode)
@@ -1789,7 +1877,12 @@ func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Sy
 }
 
 func (staticEvaluator *StaticStringEvaluator) referenceFlagsFor(symbol *ast.Symbol) staticReferenceFlags {
-	if !staticEvaluator.referenceFlagsComputed {
+	staticEvaluator.ensureReferenceFlags()
+	return staticEvaluator.referenceFlags[symbol]
+}
+
+func (staticEvaluator *StaticStringEvaluator) ensureReferenceFlags() {
+	if !staticEvaluator.referenceFlagsComputed && staticEvaluator.sourceFile != nil {
 		// A computed mutator name may depend on a symbol the caller is already
 		// resolving. Analyze it with an independent recursion stack, then publish
 		// the completed facts without disturbing the caller's evaluation.
@@ -1800,14 +1893,25 @@ func (staticEvaluator *StaticStringEvaluator) referenceFlagsFor(symbol *ast.Symb
 		analysis.resolveIdentifiers = staticEvaluator.resolveIdentifiers
 		analysis.computeReferenceFlags()
 		staticEvaluator.referenceFlags = analysis.referenceFlags
+		staticEvaluator.arrayPrototypeMutated = analysis.arrayPrototypeMutated
+		staticEvaluator.stringPrototypeMutated = analysis.stringPrototypeMutated
 		staticEvaluator.referenceFlagsComputed = true
 	}
-	return staticEvaluator.referenceFlags[symbol]
+}
+
+func (staticEvaluator *StaticStringEvaluator) hasModifiedIterator(value any) bool {
+	staticEvaluator.ensureReferenceFlags()
+	if _, ok := value.(*staticArrayValue); ok {
+		return staticEvaluator.arrayPrototypeMutated
+	}
+	if staticValueIsString(value) {
+		return staticEvaluator.stringPrototypeMutated
+	}
+	return staticEvaluator.arrayPrototypeMutated || staticEvaluator.stringPrototypeMutated
 }
 
 type staticMutationCandidate struct {
-	reference *ast.Node
-	access    *ast.Node
+	call, access *ast.Node
 }
 
 func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
@@ -1824,31 +1928,26 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 		if node == nil {
 			return
 		}
+		if node.Kind == ast.KindCallExpression {
+			callee := SkipAssertionsAndParens(node.Expression())
+			if name, known := AccessExpressionStaticName(callee); known {
+				staticEvaluator.markCallMutation(node, callee, name)
+			} else if ast.IsAccessExpression(callee) {
+				mutationCandidates = append(mutationCandidates, staticMutationCandidate{call: node, access: callee})
+			}
+		}
 		if node.Kind == ast.KindIdentifier && !IsNonReferenceIdentifier(node) {
 			if IsWriteReference(node) {
 				staticEvaluator.markReference(node, staticReferenceWrite)
 			}
-			parent := node.Parent
-			mayStartAccess := parent != nil && (ast.IsAccessExpression(parent) ||
-				ast.IsOuterExpression(parent, skipTransparentKinds))
-			if mayStartAccess {
-				access, outer := outermostAccessFromReference(node)
-				if access != nil && outer.Parent != nil {
-					if ast.IsAssignmentTarget(outer) {
-						staticEvaluator.markReference(node, staticReferencePropertyMutation)
-					} else if outer.Parent.Kind == ast.KindCallExpression {
-						call := outer.Parent.AsCallExpression()
-						if call.Expression == outer {
-							if methodName, ok := AccessExpressionStaticName(access); ok {
-								if isMutatingArrayMethod(methodName) {
-									staticEvaluator.markReference(node, staticReferencePropertyMutation)
-								}
-							} else {
-								mutationCandidates = append(mutationCandidates, staticMutationCandidate{reference: node, access: access})
-							}
-						}
-					}
-				}
+		}
+		if ast.IsAccessExpression(node) {
+			outer := node
+			for outer.Parent != nil && ast.IsOuterExpression(outer.Parent, skipTransparentKinds) {
+				outer = outer.Parent
+			}
+			if outer.Parent != nil && (ast.IsAssignmentTarget(outer) || outer.Parent.Kind == ast.KindDeleteExpression) {
+				staticEvaluator.markReference(AccessExpressionObject(node), staticReferencePropertyMutation)
 			}
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
@@ -1859,18 +1958,179 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 	visit(&staticEvaluator.sourceFile.Node)
 
 	for _, candidate := range mutationCandidates {
-		if methodName, ok := staticEvaluator.evalAccessExpressionKey(candidate.access); ok && isMutatingArrayMethod(methodName) {
-			staticEvaluator.markReference(candidate.reference, staticReferencePropertyMutation)
+		if methodName, ok := staticEvaluator.evalAccessExpressionKey(candidate.access); ok {
+			staticEvaluator.markCallMutation(candidate.call, candidate.access, methodName)
 		}
 	}
 }
 
+func (staticEvaluator *StaticStringEvaluator) markCallMutation(call, callee *ast.Node, name string) {
+	object := SkipAssertionsAndParens(AccessExpressionObject(callee))
+	if isMutatingArrayMethod(name) {
+		staticEvaluator.markReference(object, staticReferencePropertyMutation)
+	}
+	var objectMutation, reflectMutation bool
+	switch name {
+	case "defineProperty", "setPrototypeOf":
+		objectMutation, reflectMutation = true, true
+	case "defineProperties", "assign":
+		objectMutation = true
+	case "deleteProperty", "set":
+		reflectMutation = true
+	}
+	if len(call.Arguments()) > 0 && ((objectMutation && staticEvaluator.isBuiltinIdentifier(object, "Object")) ||
+		(reflectMutation && staticEvaluator.isBuiltinIdentifier(object, "Reflect"))) {
+		staticEvaluator.markMutationArgument(call.Arguments(), 0)
+		// Reflect.set can define the property on its explicit receiver even
+		// when its target is a different object.
+		if name == "set" {
+			staticEvaluator.markMutationArgument(call.Arguments(), 3)
+		}
+	}
+}
+
+func (staticEvaluator *StaticStringEvaluator) markMutationArgument(arguments []*ast.Node, position int) {
+	spreadSeen := false
+	for _, argument := range arguments {
+		if ast.IsSpreadElement(argument) {
+			// A spread may occupy the requested position or be empty.
+			staticEvaluator.markReference(argument.Expression(), staticReferencePropertyMutation|staticReferenceNestedMutation)
+			spreadSeen = true
+			continue
+		}
+		if position == 0 || spreadSeen {
+			staticEvaluator.markReference(argument, staticReferencePropertyMutation)
+		}
+		if position == 0 {
+			return
+		}
+		position--
+	}
+}
+
 func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag staticReferenceFlags) {
-	if symbol := staticEvaluator.referenceSymbol(node); symbol != nil {
+	node = SkipAssertionsAndParens(node)
+	for node != nil && ast.IsIdentifier(node) {
+		if flag&staticReferenceNestedMutation != 0 {
+			// Destructuring a constructor can reach its prototype without a
+			// property-access node, e.g. const {prototype: proto} = Array.
+			staticEvaluator.arrayPrototypeMutated = staticEvaluator.arrayPrototypeMutated ||
+				staticEvaluator.isBuiltinIdentifier(node, "Array")
+			staticEvaluator.stringPrototypeMutated = staticEvaluator.stringPrototypeMutated ||
+				staticEvaluator.isBuiltinIdentifier(node, "String")
+		}
+		symbol := staticEvaluator.referenceSymbol(node)
+		if symbol == nil || staticEvaluator.referenceFlags[symbol]&flag == flag {
+			return
+		}
 		if staticEvaluator.referenceFlags == nil {
 			staticEvaluator.referenceFlags = make(map[*ast.Symbol]staticReferenceFlags, 8)
 		}
 		staticEvaluator.referenceFlags[symbol] |= flag
+		if flag&staticReferencePropertyMutation == 0 || len(symbol.Declarations) != 1 {
+			return
+		}
+		declaration := symbol.Declarations[0]
+		if declaration.Kind == ast.KindBindingElement {
+			root := EnclosingVariableDeclarationOfBindingElement(declaration)
+			if root == nil {
+				return
+			}
+			for binding := declaration; binding.Kind == ast.KindBindingElement; binding = binding.Parent.Parent {
+				element := binding.AsBindingElement()
+				// Rest creates a fresh container. Only a nested mutation can
+				// reach the references copied into it.
+				if element.DotDotDotToken != nil && flag&staticReferenceNestedMutation == 0 {
+					return
+				}
+				staticEvaluator.markReference(element.Initializer, flag)
+				flag |= staticReferenceNestedMutation
+			}
+			declaration = root
+		}
+		if declaration.Kind != ast.KindVariableDeclaration {
+			return
+		}
+		// A local alias may still share its initializer's aggregate even when
+		// the binding has other writes. Propagate only property mutations;
+		// replacing the alias itself must not taint the original value. The
+		// already-marked check above also terminates circular alias chains.
+		node = SkipAssertionsAndParens(declaration.AsVariableDeclaration().Initializer)
+	}
+	if node == nil || flag&staticReferencePropertyMutation == 0 {
+		return
+	}
+	// Follow only expressions that can return the same reference. Conditions,
+	// computed keys and function bodies do not alias the expression's value.
+	switch node.Kind {
+	case ast.KindConditionalExpression:
+		expression := node.AsConditionalExpression()
+		staticEvaluator.markReference(expression.WhenTrue, flag)
+		staticEvaluator.markReference(expression.WhenFalse, flag)
+	case ast.KindBinaryExpression:
+		expression := node.AsBinaryExpression()
+		switch expression.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken,
+			ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+			staticEvaluator.markReference(expression.Left, flag)
+			staticEvaluator.markReference(expression.Right, flag)
+		case ast.KindCommaToken, ast.KindEqualsToken:
+			staticEvaluator.markReference(expression.Right, flag)
+		}
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		staticEvaluator.markReference(AccessExpressionObject(node), flag|staticReferenceNestedMutation)
+	case ast.KindObjectLiteralExpression:
+		if flag&staticReferenceNestedMutation != 0 {
+			for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
+				switch property.Kind {
+				case ast.KindPropertyAssignment:
+					staticEvaluator.markReference(property.AsPropertyAssignment().Initializer, flag)
+				case ast.KindShorthandPropertyAssignment:
+					staticEvaluator.markReference(property.Name(), flag)
+				case ast.KindSpreadAssignment:
+					staticEvaluator.markReference(property.Expression(), flag)
+				}
+			}
+		}
+	case ast.KindArrayLiteralExpression:
+		if flag&staticReferenceNestedMutation != 0 {
+			for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
+				if ast.IsSpreadElement(element) {
+					element = element.Expression()
+				}
+				staticEvaluator.markReference(element, flag)
+			}
+		}
+	case ast.KindCallExpression:
+		if argument, ok := staticEvaluator.objectPassThroughArgument(node); ok {
+			staticEvaluator.markReference(argument, flag)
+		} else if staticEvaluator.isBuiltinMethodValue(node.Expression(), "Object", "assign", map[*ast.Symbol]bool{}) {
+			for _, argument := range node.Arguments() {
+				spread := ast.IsSpreadElement(argument)
+				argumentFlag := flag
+				if spread {
+					argument = argument.Expression()
+					argumentFlag |= staticReferenceNestedMutation
+				}
+				staticEvaluator.markReference(argument, argumentFlag)
+				// A leading spread may be empty, so the next argument can
+				// still be the target returned by Object.assign.
+				if !spread && flag&staticReferenceNestedMutation == 0 {
+					break
+				}
+			}
+		} else if flag&staticReferenceNestedMutation != 0 {
+			callee := SkipAssertionsAndParens(node.Expression())
+			if name, ok := staticEvaluator.evalAccessExpressionKey(callee); ok && name == "of" &&
+				staticEvaluator.isBuiltinArrayValue(AccessExpressionObject(callee), map[*ast.Symbol]bool{}) {
+				for _, argument := range node.Arguments() {
+					if ast.IsSpreadElement(argument) {
+						argument = argument.Expression()
+					}
+					staticEvaluator.markReference(argument, flag)
+				}
+			}
+		}
 	}
 }
 
@@ -1881,24 +2141,6 @@ func (staticEvaluator *StaticStringEvaluator) referenceSymbol(node *ast.Node) *a
 		}
 	}
 	return GetReferenceSymbol(node, staticEvaluator.typeChecker)
-}
-
-func outermostAccessFromReference(node *ast.Node) (access *ast.Node, outer *ast.Node) {
-	outer = node
-	for outer.Parent != nil {
-		parent := outer.Parent
-		if ast.IsOuterExpression(parent, skipTransparentKinds) && parent.Expression() == outer {
-			outer = parent
-			continue
-		}
-		if ast.IsAccessExpression(parent) && AccessExpressionObject(parent) == outer {
-			access = parent
-			outer = parent
-			continue
-		}
-		break
-	}
-	return access, outer
 }
 
 func isMutatingArrayMethod(name string) bool {
