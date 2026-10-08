@@ -12,7 +12,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
-	"github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed no_import_module_exports.schema.json
@@ -46,12 +45,6 @@ var NoImportModuleExportsRule = rule.Rule{
 			}
 		}
 
-		references := scopeanalysis.References(ctx, map[string]struct{}{"exports": {}, "module": {}})
-		resolvedReferences := make(map[*ast.Node]bool, len(references.References))
-		for _, reference := range references.References {
-			resolvedReferences[reference.Identifier] = reference.Resolved() != nil
-		}
-
 		disabled := isException || entryPoint == fileName
 		var importDeclarations []*ast.Node
 		hasCommonJSExport := false
@@ -68,7 +61,11 @@ var NoImportModuleExportsRule = rule.Rule{
 				return
 			}
 			name := object.Text()
-			hasCommonJSExport = (name == "module" || name == "exports") && !resolvedReferences[object]
+			if name != "module" && name != "exports" {
+				return
+			}
+			symbol := ctx.Refs.ResolveInFile(object)
+			hasCommonJSExport = symbol == nil || symbol.Flags&ast.SymbolFlagsModuleExports != 0
 		}
 
 		return rule.RuleListeners{

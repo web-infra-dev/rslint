@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_import_module_exports"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -44,6 +45,12 @@ func TestNoImportModuleExportsExtras(t *testing.T) {
 			},
 			{Code: `import value from "value"; exports["value"];`, Errors: importError(1, 1, 1, 27)},
 			{Code: `import value from "value"; module?.exports;`, Errors: importError(1, 1, 1, 27)},
+			{
+				Code:            `import value from "value"; module.exports = value;`,
+				FileName:        "commonjs-source.js",
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors:          importError(1, 1, 1, 27),
+			},
 			{
 				Code:     `import value from "value"; module.exports = value;`,
 				FileName: "missing-entrypoint/cli.js",
