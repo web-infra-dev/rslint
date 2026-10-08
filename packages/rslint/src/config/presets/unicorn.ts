@@ -341,7 +341,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-while-loop-condition': 'error', // not implemented
     // 'unicorn/relative-url-style': 'error', // not implemented
     'unicorn/require-array-join-separator': 'error',
-    // 'unicorn/require-array-sort-compare': 'error', // not implemented
+    'unicorn/require-array-sort-compare': 'error',
     // 'unicorn/require-css-escape': 'error', // not implemented
     // 'unicorn/require-frontmatter-fields': 'off', // not implemented
     // 'unicorn/require-module-attributes': 'error', // not implemented
