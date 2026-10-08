@@ -348,6 +348,10 @@ func typeProps(node *ast.Node, aliases map[string][]*ast.Node, resolve func(*ast
 		if argument := reactutil.ReactGenericArgument(node.AsTypeReferenceNode().TypeName, node.AsTypeReferenceNode().TypeArguments, resolve); argument != nil {
 			return typeProps(argument, aliases, resolve, seen, prefix)
 		}
+		// Unknown qualified types are opaque, not references to same-named local aliases.
+		if node.AsTypeReferenceNode().TypeName.Kind == ast.KindQualifiedName {
+			return nil
+		}
 		name := reactutil.EntityNameRightmost(node.AsTypeReferenceNode().TypeName)
 		if name == nil || name.Kind != ast.KindIdentifier || seen[name.AsIdentifier().Text] {
 			return nil
