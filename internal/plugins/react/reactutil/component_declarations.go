@@ -104,8 +104,9 @@ func reactImportedName(name *ast.Node, resolve func(*ast.Node) *ast.Symbol, allo
 	}
 	binding := resolve(root)
 	sourceFile := ast.GetSourceFileOfNode(name)
-	if member != "" && root.Text() == DefaultReactPragma &&
-		(binding == nil || allowAmbient && sourceFile != nil && !utils.IsSymbolDeclaredInFile(binding, sourceFile)) {
+	// An unresolved React namespace is ambient too: strict callers still need an import.
+	if allowAmbient && member != "" && root.Text() == DefaultReactPragma &&
+		(binding == nil || sourceFile != nil && !utils.IsSymbolDeclaredInFile(binding, sourceFile)) {
 		return member
 	}
 	imported := ""
@@ -173,6 +174,14 @@ func FunctionComponentType(node *ast.Node, resolve func(*ast.Node) *ast.Symbol) 
 			if callee != nil && call.TypeArguments != nil {
 				if (callee.Kind == ast.KindIdentifier && callee.Text() == "forwardRef") ||
 					(callee.Kind == ast.KindPropertyAccessExpression && componentPropertyName(callee.AsPropertyAccessExpression().Name()) == "forwardRef") {
+					// Keep the existing syntactic React.forwardRef support separate
+					// from type annotations, which must resolve to a React import.
+					if callee.Kind == ast.KindPropertyAccessExpression && resolve != nil {
+						receiver := callee.AsPropertyAccessExpression().Expression
+						if receiver.Kind == ast.KindIdentifier && receiver.Text() == DefaultReactPragma && resolve(receiver) == nil {
+							return reactGenericArgumentAtIndex("forwardRef", call.TypeArguments)
+						}
+					}
 					return ReactGenericArgument(callee, call.TypeArguments, resolve)
 				}
 			}

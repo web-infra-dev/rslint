@@ -13,6 +13,9 @@ import (
 func TestNoUnusedPropTypesExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedPropTypesRule,
 		[]rule_tester.ValidTestCase{
+			// Unrecognized qualified types must not resolve to unrelated local aliases.
+			{Code: `type FC = { phantom: string }; function Foo(props: React.FC<{}>) { return <div />; }`, Tsx: true},
+			{Code: `type PropsWithChildren = { phantom: string }; function Foo(props: React.PropsWithChildren<{}>) { return <div />; }`, Tsx: true},
 			{Code: `import type { FC } from 'react'; function scope() { type FC<T> = (props: T) => unknown; type Props = { phantom: string }; const Foo: FC<Props> = () => <div />; return Foo; }`, Tsx: true},
 			{Code: `import React from 'react'; namespace scope { namespace React { export type FC<T> = (props: T) => unknown; } type Props = { phantom: string }; const Foo: React.FC<Props> = () => <div />; }`, Tsx: true},
 			{Code: `import * as React from 'react'; namespace scope { namespace React { export type FC<T> = (props: T) => unknown; } type Props = { phantom: string }; const Foo: React.FC<Props> = () => <div />; }`, Tsx: true},

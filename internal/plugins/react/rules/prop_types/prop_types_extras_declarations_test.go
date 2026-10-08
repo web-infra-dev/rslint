@@ -1,10 +1,18 @@
 package prop_types
 
 import (
+	"slices"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // TestPropTypesRuleExtrasDeclarations locks in runtime declarations, validator
@@ -103,6 +111,109 @@ func TestPropTypesRuleExtrasDeclarations(t *testing.T) {
 			{Code: `class Hello extends React.Component { static get propTypes() { return; } render() { return <div>{this.props.name}</div>; } }`, Options: map[string]any{"skipUndeclared": true}, Tsx: true, Errors: missingPropTypes("'name' is missing in props validation")},
 		},
 	)
+}
+
+func TestPropTypesRuleExtrasUnresolvedReact(t *testing.T) {
+	root := fixtures.GetRootDir()
+	// The shared ambient declaration makes React resolve even without an import.
+	// Keep it empty here to exercise projects where React is unresolved.
+	root.FS = utils.NewOverlayVFS(root.FS, map[string]string{
+		tspath.ResolvePath(root.Dir, "ambient-react.d.ts"): "",
+	})
+	const props = `type Props = { title: string; LinkComp?: unknown; companyList: string[] }; `
+	const render = `({ title, LinkComp, companyList }) => <div>{title}<LinkComp />{companyList.map(name => <span>{name}</span>)}</div>;`
+
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &PropTypesRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `import React from 'react'; ` + props + `const C: React.FC<Props> = ` + render, Tsx: true},
+			{Code: `import R from 'react'; ` + props + `const C: R.FC<Props> = ` + render, Tsx: true},
+			{Code: `import * as React from 'react'; ` + props + `const C: React.FC<Props> = ` + render, Tsx: true},
+			{Code: `import type * as R from 'react'; ` + props + `const C: R.FC<Props> = ` + render, Tsx: true},
+			{Code: `import { FC } from 'react'; ` + props + `const C: FC<Props> = ` + render, Tsx: true},
+			{Code: `import type { FC as Component } from 'react'; ` + props + `const C: Component<Props> = ` + render, Tsx: true},
+			// Explicit parameter types and opaque qualified types retain their semantics.
+			{Code: `type Props = { name: string }; const C: React.FC<Props> = ({ name }: Props) => <div>{name}</div>;`, Tsx: true},
+			{Code: `function C(props: React.PropsWithChildren<{ name: string }>) { return <div>{props.missing}</div>; }`, Tsx: true},
+			{Code: `type Props = { name: string }; const C = React.forwardRef<HTMLDivElement, Props>((props, ref) => <div ref={ref}>{props.name}</div>);`, Tsx: true},
+		},
+		[]rule_tester.InvalidTestCase{
+			// A variable annotation without a React import must not validate these reads.
+			{Code: props + `export const C: React.FC<Props> = ` + render, Tsx: true, Errors: missingPropTypes(
+				"'title' is missing in props validation",
+				"'LinkComp' is missing in props validation",
+				"'companyList' is missing in props validation",
+				"'companyList.map' is missing in props validation",
+			)},
+			{Code: `import React from 'not-react'; type Props = { name: string }; const C: React.FC<Props> = ({ name }) => <div>{name}</div>;`, Tsx: true, Errors: missingPropTypes("'name' is missing in props validation")},
+			{Code: `import React from 'react'; function outer() { namespace React { export type FC<P> = P; } const C: React.FC<{ name: string }> = ({ name }) => <div>{name}</div>; }`, Tsx: true, Errors: missingPropTypes("'name' is missing in props validation")},
+			{Code: `import React from 'react'; const C: React.FC<{ name: string }> = ({ missing }) => <div>{missing}</div>;`, Tsx: true, Errors: missingPropTypes("'missing' is missing in props validation")},
+		},
+	)
+}
+
+func TestPropTypesRuleExtrasSourceOnlyReactImports(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, prefix, annotation string
+		missing                  bool
+	}{
+		{"unimported", "", "React.FC<Props>", true},
+		{"default import", `import React from 'react';`, "React.FC<Props>", false},
+		{"aliased default import", `import R from 'react';`, "R.FC<Props>", false},
+		{"namespace import", `import * as React from 'react';`, "React.FC<Props>", false},
+		{"aliased namespace import", `import type * as R from 'react';`, "R.FC<Props>", false},
+		{"named import", `import { FC } from 'react';`, "FC<Props>", false},
+		{"aliased named import", `import type { FC as Component } from 'react';`, "Component<Props>", false},
+		{"unrelated import", `import React from 'not-react';`, "React.FC<Props>", true},
+		{"local namespace", `namespace React { export type FC<P> = P; }`, "React.FC<Props>", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := fixtures.GetRootDir()
+			fileName := tspath.ResolvePath(root.Dir, "source-only-react-imports.tsx")
+			code := tc.prefix + `type Props = { title: string; LinkComp?: unknown; companyList: string[] };
+export const C: ` + tc.annotation + ` = ({ title, LinkComp, companyList }) =>
+  <div>{title}<LinkComp />{companyList.map(name => <span>{name}</span>)}</div>;`
+			fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
+			program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+				RootFileNames: []string{fileName},
+				Host:          utils.CreateCompilerHost(root.Dir, fs),
+				CompilerOptions: &core.CompilerOptions{
+					Jsx: core.JsxEmitPreserve, Module: core.ModuleKindESNext, Target: core.ScriptTargetESNext,
+				},
+				SingleThreaded: true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var messages []string
+			linter.LintSingleFile(linter.LintSingleFileOptions{
+				Program: program,
+				File:    fileName,
+				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{{
+						Name: PropTypesRule.Name, Severity: rule.SeverityError,
+						Run: func(ctx rule.RuleContext) rule.RuleListeners {
+							if ctx.TypeChecker != nil {
+								t.Fatal("expected source-only linting without a TypeChecker")
+							}
+							return PropTypesRule.Run(ctx, nil)
+						},
+					}}
+				},
+				Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
+					messages = append(messages, diagnostic.Message.Description)
+				}},
+			})
+			var want []string
+			if tc.missing {
+				want = []string{"'title' is missing in props validation", "'LinkComp' is missing in props validation", "'companyList' is missing in props validation", "'companyList.map' is missing in props validation"}
+			}
+			if !slices.Equal(messages, want) {
+				t.Fatalf("messages = %v, want %v", messages, want)
+			}
+		})
+	}
 }
 
 func missingPropTypes(messages ...string) []rule_tester.InvalidTestCaseError {
