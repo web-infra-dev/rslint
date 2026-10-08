@@ -148,12 +148,12 @@ func TestImportAttributesIgnoreTypeScriptWrappers(t *testing.T) {
 		t.Fatalf("collected %d sources, want 8", len(sources))
 	}
 	want := sources[7].Attributes().Key()
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if got := sources[i].Attributes(); got.State != AttributesStatic || got.Key() != want {
 			t.Errorf("source %d = (%v, %q), want static %q", i, got.State, got.Key(), want)
 		}
 	}
-	if got := sources[5].Attributes(); got.State != AttributesNone && !(got.State == AttributesStatic && got.Key() == "") {
+	if got := sources[5].Attributes(); got.State != AttributesNone {
 		t.Errorf("empty options state = %v, want no attributes", got.State)
 	}
 	if got := sources[6].Attributes(); got.State != AttributesStatic || got.Key() != want {
