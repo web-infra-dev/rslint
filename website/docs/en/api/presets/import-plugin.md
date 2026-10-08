@@ -1,3 +1,7 @@
+---
+description: 'Enable supported import rules with importPlugin.configs.recommended in an Rslint flat configuration.'
+---
+
 # importPlugin
 
 `importPlugin` exposes Rslint's built-in implementation of supported rules from [`eslint-plugin-import` 2.x](https://github.com/import-js/eslint-plugin-import/tree/v2.32.0). Its preset follows the upstream flat recommended configuration for the rules Rslint currently supports.

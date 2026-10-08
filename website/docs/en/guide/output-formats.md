@@ -1,3 +1,7 @@
+---
+description: 'Select Rslint diagnostic output for terminals, JSON Lines, GitHub Actions, or GitLab with the --format flag.'
+---
+
 # Output Formats
 
 Use the `--format` flag to control how diagnostics are rendered.

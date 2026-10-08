@@ -1,3 +1,7 @@
+---
+description: 'Enable supported React rules with reactPlugin.configs.recommended in Rslint.'
+---
+
 # reactPlugin
 
 `reactPlugin` exposes Rslint's built-in implementation of supported rules from [`eslint-plugin-react` 7.x](https://github.com/jsx-eslint/eslint-plugin-react/tree/v7.37.5). Its preset follows the upstream flat recommended configuration for the rules Rslint currently supports.

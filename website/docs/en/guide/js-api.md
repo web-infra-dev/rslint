@@ -1,3 +1,7 @@
+---
+description: 'Integrate Rslint into JavaScript tools to lint files or in-memory projects, apply fixes, and manage session lifecycle.'
+---
+
 # JavaScript API
 
 The JavaScript API lets you run rslint programmatically — lint files or in-memory source from a JavaScript runtime script, an editor integration, or a build tool. It is designed for JavaScript runtime hosts such as Node.js, Bun, or Deno when they can load npm packages and provide the Node-compatible filesystem and process APIs that `@rslint/core` uses. Its surface is aligned with [ESLint](https://eslint.org/docs/latest/integrate/nodejs-api)'s v10 programmatic API shape, so most ESLint API code ports over with minimal changes.

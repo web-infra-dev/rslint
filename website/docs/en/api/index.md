@@ -1,3 +1,7 @@
+---
+description: 'Browse @rslint/core configuration helpers, rule presets, plugin exports, and the programmatic Rslint class.'
+---
+
 # API overview
 
 `@rslint/core` provides configuration helpers and presets for authoring flat configs, plus the `Rslint` class for programmatic linting:

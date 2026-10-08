@@ -1,3 +1,7 @@
+---
+description: 'Disable and re-enable Rslint rules with file and line comments using rslint or eslint directive prefixes.'
+---
+
 # Inline Directives
 
 Rslint supports inline comments to disable or enable rules in source code. Both `rslint-` and `eslint-` prefixed directives are supported and fully equivalent.

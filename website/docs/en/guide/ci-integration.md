@@ -1,3 +1,7 @@
+---
+description: 'Run Rslint in CI with GitHub annotations, type checking, warning thresholds, and filtered diagnostics.'
+---
+
 # CI Integration
 
 ## GitHub Actions

@@ -1,3 +1,7 @@
+---
+description: 'Enable supported React Hooks rules with reactHooksPlugin.configs.recommended in Rslint.'
+---
+
 # reactHooksPlugin
 
 `reactHooksPlugin` exposes Rslint's built-in implementation of supported rules from [`eslint-plugin-react-hooks` 7.x](https://react.dev/reference/eslint-plugin-react-hooks). Its preset follows the upstream flat recommended configuration for the rules Rslint currently supports.

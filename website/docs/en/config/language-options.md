@@ -1,3 +1,7 @@
+---
+description: 'Configure ECMAScript globals, source types, and TypeScript project discovery through Rslint languageOptions.'
+---
+
 # languageOptions
 
 - **Type:** `object`

@@ -1,3 +1,7 @@
+---
+description: 'Run TypeScript checking with Rslint, configure project discovery, and distinguish --type-check from --type-check-only.'
+---
+
 # Type Checking
 
 Rslint can report TypeScript errors alongside lint diagnostics or run type checking on its own. Type checking covers entire configured projects, including imported files, even when the command names a single file.

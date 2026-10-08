@@ -1,3 +1,7 @@
+---
+description: 'Enable supported Promise linting rules with promisePlugin.configs.recommended in Rslint.'
+---
+
 # promisePlugin
 
 `promisePlugin` exposes Rslint's built-in implementation of supported rules from [`eslint-plugin-promise` 7.x](https://github.com/eslint-community/eslint-plugin-promise/tree/v7.3.0). Its preset follows the upstream flat recommended configuration for the rules Rslint currently supports.

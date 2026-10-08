@@ -1,3 +1,7 @@
+---
+description: 'Use Rslint CLI options for file selection, configuration, rule overrides, timing diagnostics, and exit status handling.'
+---
+
 # CLI Reference
 
 ## Usage

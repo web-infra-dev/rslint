@@ -1,3 +1,7 @@
+---
+description: 'Configure Rstest lint rules for dedicated test files and in-source tests with rstestPlugin presets.'
+---
+
 # rstestPlugin
 
 `rstestPlugin` provides Rslint's [rules for Rstest](/rules/?group=rstest). Enable the recommended preset to catch common mistakes in test definitions, assertions, mocks, and snapshots.
