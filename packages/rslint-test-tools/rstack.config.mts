@@ -839,6 +839,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/expiring-todo-comments.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-optional-catch-binding.test.ts',
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
+    './tests/eslint-plugin-unicorn/rules/import-style.test.ts',
     './tests/eslint-plugin-unicorn/rules/max-nested-calls.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-anonymous-default-export.test.ts',
