@@ -58,7 +58,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-abusive-eslint-disable': 'error', // not implemented
     // 'unicorn/no-accessor-recursion': 'error', // not implemented
     // 'unicorn/no-accidental-bitwise-operator': 'error', // not implemented
-    // 'unicorn/no-anonymous-default-export': 'error', // not implemented
+    'unicorn/no-anonymous-default-export': 'error',
     'unicorn/no-array-callback-reference': 'error',
     'unicorn/no-array-concat-in-loop': 'error',
     'unicorn/no-array-fill-with-reference-type': 'error',
@@ -84,7 +84,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-computed-property-existence-check': 'error', // not implemented
     // 'unicorn/no-confusing-array-splice': 'error', // not implemented
     // 'unicorn/no-confusing-array-with': 'error', // not implemented
-    // 'unicorn/no-console-spaces': 'error', // not implemented
+    'unicorn/no-console-spaces': 'error',
     // 'unicorn/no-constant-zero-expression': 'error', // not implemented
     // 'unicorn/no-declarations-before-early-exit': 'error', // not implemented
     'unicorn/no-document-cookie': 'error',
