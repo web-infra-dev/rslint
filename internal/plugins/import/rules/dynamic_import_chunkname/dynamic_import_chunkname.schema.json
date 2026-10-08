@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "importFunctions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowEmpty": {
+          "type": "boolean"
+        },
+        "webpackChunknameFormat": {
+          "type": "string"
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
