@@ -73,7 +73,13 @@ func staticImportAttributes(node *ast.Node) ImportAttributes {
 	if node == nil {
 		return ImportAttributes{State: AttributesNone}
 	}
-	list := node.AsImportAttributes().Attributes
+	attributes := node.AsImportAttributes()
+	if attributes.Token != ast.KindWithKeyword {
+		// The parser recovers `assert` into this node, but it is not `with` and
+		// does not carry the same semantics.
+		return unknownImportAttributes(node, AttributesInvalid)
+	}
+	list := attributes.Attributes
 	if list == nil || len(list.Nodes) == 0 {
 		return ImportAttributes{Node: node, State: AttributesStatic}
 	}
@@ -111,6 +117,9 @@ func dynamicImportAttributes(call *ast.CallExpression) ImportAttributes {
 		return unknownImportAttributes(options, AttributesDynamic)
 	}
 	with = unwrapTransparentExpression(with)
+	if isUndefinedValue(with) {
+		return ImportAttributes{State: AttributesNone}
+	}
 	if with == nil || with.Kind != ast.KindObjectLiteralExpression {
 		return unknownImportAttributes(with, AttributesDynamic)
 	}
@@ -154,6 +163,25 @@ func unwrapTransparentExpression(node *ast.Node) *ast.Node {
 	return ast.SkipOuterExpressions(node, ast.OEKAll)
 }
 
+// isUndefinedValue reports whether an expression evaluates to `undefined`.
+func isUndefinedValue(node *ast.Node) bool {
+	return node != nil && (node.Kind == ast.KindVoidExpression || node.Kind == ast.KindIdentifier && node.Text() == "undefined")
+}
+
+// isNonObjectPrototypeValue reports whether `__proto__: node` leaves the
+// prototype unchanged. The runtime ignores primitives and undefined, and null
+// adds no inherited properties.
+func isNonObjectPrototypeValue(node *ast.Node) bool {
+	if isUndefinedValue(node) || ast.IsStringLiteralLike(node) {
+		return true
+	}
+	switch node.Kind {
+	case ast.KindNullKeyword, ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindTrueKeyword, ast.KindFalseKeyword:
+		return true
+	}
+	return false
+}
+
 // isPrototypeSetter reports whether a property is a non-computed, non-shorthand
 // `__proto__: value`, which sets the prototype instead of creating a property.
 func isPrototypeSetter(propertyNode *ast.Node) bool {
@@ -193,18 +221,22 @@ func staticObjectProperty(object *ast.Node, wanted string) (*ast.Node, objectPro
 	}
 	var value *ast.Node
 	found := false
+	inheritedUnknown := false
 	for _, propertyNode := range properties.Nodes {
 		if propertyNode == nil || propertyNode.Kind == ast.KindSpreadAssignment {
 			return nil, objectPropertyUnknown
 		}
 		if isPrototypeSetter(propertyNode) {
-			// `with` is read through the prototype chain, so only a null
-			// prototype is known not to supply it.
+			// Only an object prototype can supply an inherited `with`; a
+			// non-object value leaves the prototype unchanged.
 			initializer := unwrapTransparentExpression(propertyNode.AsPropertyAssignment().Initializer)
-			if initializer != nil && initializer.Kind == ast.KindNullKeyword {
-				continue
+			if initializer == nil {
+				return nil, objectPropertyUnknown
 			}
-			return nil, objectPropertyUnknown
+			if !isNonObjectPrototypeValue(initializer) {
+				inheritedUnknown = true
+			}
+			continue
 		}
 		var nameNode *ast.Node
 		var propertyValue *ast.Node
@@ -233,10 +265,14 @@ func staticObjectProperty(object *ast.Node, wanted string) (*ast.Node, objectPro
 		found = true
 		value = propertyValue
 	}
-	if !found {
-		return nil, objectPropertyAbsent
+	if found {
+		// An own property shadows anything inherited, whatever its position.
+		return value, objectPropertyFound
 	}
-	return value, objectPropertyFound
+	if inheritedUnknown {
+		return nil, objectPropertyUnknown
+	}
+	return nil, objectPropertyAbsent
 }
 
 func staticAttributeName(node *ast.Node) (string, bool) {

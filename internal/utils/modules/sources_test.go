@@ -187,7 +187,80 @@ func TestImportAttributesPrototypeSetter(t *testing.T) {
 	if got := sources[3].Attributes(); got.State != AttributesStatic || got.Key() != json {
 		t.Errorf("null-prototype options = (%v, %q), want static %q", got.State, got.Key(), json)
 	}
+	if got := sources[4].Attributes(); got.State != AttributesStatic || got.Key() != json {
+		t.Errorf("own with beside object prototype = (%v, %q), want static %q", got.State, got.Key(), json)
+	}
+}
+
+func TestImportAttributesOwnWithShadowsPrototype(t *testing.T) {
+	file := parseModuleSpecifierCacheFile(`
+		import json from "a" with { type: "json" };
+		import("a", { __proto__: {}, with: { type: "json" } });
+		import("a", { with: { type: "json" }, __proto__: {} });
+		import("a", { __proto__: {}, with: {} });
+		import("a", { __proto__: { with: { type: "json" } } });
+		import("a", { __proto__: {}, with: attrs });
+	`)
+	sources := Collect(file, ESModuleReferences)
+	if len(sources) != 6 {
+		t.Fatalf("collected %d sources, want 6", len(sources))
+	}
+	want := sources[0].Attributes().Key()
+	for _, i := range []int{1, 2} {
+		if got := sources[i].Attributes(); got.State != AttributesStatic || got.Key() != want {
+			t.Errorf("source %d = (%v, %q), want static %q", i, got.State, got.Key(), want)
+		}
+	}
+	if got := sources[3].Attributes(); got.State != AttributesStatic || got.Key() != "" {
+		t.Errorf("empty own with = (%v, %q), want empty static", got.State, got.Key())
+	}
 	if got := sources[4].Attributes().State; got != AttributesDynamic {
-		t.Errorf("non-null prototype options state = %v, want AttributesDynamic", got)
+		t.Errorf("inherited with state = %v, want AttributesDynamic", got)
+	}
+	if got := sources[5].Attributes().State; got != AttributesDynamic {
+		t.Errorf("identifier with state = %v, want AttributesDynamic", got)
+	}
+}
+
+func TestImportAttributesUndefinedWith(t *testing.T) {
+	file := parseModuleSpecifierCacheFile(`
+		import("./b", { with: undefined });
+		import("./b", { with: void 0 });
+		import("./b", { __proto__: undefined, with: { type: "json" } });
+		import("./b", { __proto__: 1, with: { type: "json" } });
+		import json from "./b" with { type: "json" };
+		import("./b", { with: undefined, __proto__: {} });
+	`)
+	sources := Collect(file, ESModuleReferences)
+	if len(sources) != 6 {
+		t.Fatalf("collected %d sources, want 6", len(sources))
+	}
+	for _, i := range []int{0, 1, 5} {
+		if got := sources[i].Attributes().State; got != AttributesNone {
+			t.Errorf("source %d state = %v, want AttributesNone", i, got)
+		}
+	}
+	want := sources[4].Attributes().Key()
+	for _, i := range []int{2, 3} {
+		if got := sources[i].Attributes(); got.State != AttributesStatic || got.Key() != want {
+			t.Errorf("source %d = (%v, %q), want static %q", i, got.State, got.Key(), want)
+		}
+	}
+}
+
+func TestImportAttributesRejectAssertKeyword(t *testing.T) {
+	file := parseModuleSpecifierCacheFile(`
+		import json from "./data.json" assert { type: "json" };
+		import data from "./data.json" with { type: "json" };
+	`)
+	sources := Collect(file, ESModuleReferences)
+	if len(sources) != 2 {
+		t.Fatalf("collected %d sources, want 2", len(sources))
+	}
+	if got := sources[0].Attributes().State; got != AttributesInvalid {
+		t.Errorf("assert state = %v, want AttributesInvalid", got)
+	}
+	if got := sources[1].Attributes(); got.State != AttributesStatic || got.Key() == sources[0].Attributes().Key() {
+		t.Errorf("with state = (%v, %q), want static and distinct from assert", got.State, got.Key())
 	}
 }
