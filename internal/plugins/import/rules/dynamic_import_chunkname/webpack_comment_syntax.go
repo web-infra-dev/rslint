@@ -34,8 +34,9 @@ var vmContextGlobals = map[string]struct{}{
 //
 // rslint cannot run JavaScript. It parses the same wrapper text and then looks
 // for the failures that can occur in practice: syntax errors, TypeScript-only
-// syntax, and references to identifiers that a fresh `vm` context does not
-// define. Other runtime errors, such as calling a non-function, are not
+// syntax anywhere in the text (including function and class bodies that are
+// never called), and references to identifiers that a fresh `vm` context does
+// not define. Other runtime errors, such as calling a non-function, are not
 // detected.
 func isValidWebpackCommentBody(body string) bool {
 	text := "(function() {return {" + body + "}})()"
@@ -46,18 +47,57 @@ func isValidWebpackCommentBody(body string) bool {
 	if len(sourceFile.Diagnostics()) != 0 {
 		return false
 	}
+	root := sourceFile.AsNode()
+	return !containsInvalidSyntax(root) && !referencesUndefinedGlobal(root)
+}
 
-	valid := true
+// containsInvalidSyntax reports syntax that is an error in JavaScript but that
+// the TypeScript parser accepts without a parse diagnostic. It visits every
+// node: V8 rejects the whole source even when the offending function or class
+// is never run.
+func containsInvalidSyntax(root *ast.Node) bool {
+	invalid := false
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if isTypeScriptOnlySyntax(node) {
+			invalid = true
+			return true
+		}
+		return node.ForEachChild(visit)
+	}
+	root.ForEachChild(visit)
+	return invalid
+}
+
+func isTypeScriptOnlySyntax(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindAsExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression, ast.KindTypeAssertionExpression,
+		ast.KindTypeParameter, ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration,
+		ast.KindModuleDeclaration:
+		return true
+	case ast.KindExpressionWithTypeArguments:
+		// `class A extends B {}` is JavaScript; type arguments and `implements` are not.
+		return node.AsExpressionWithTypeArguments().TypeArguments != nil ||
+			node.Parent != nil && node.Parent.Kind == ast.KindHeritageClause &&
+				node.Parent.AsHeritageClause().Token == ast.KindImplementsKeyword
+	case ast.KindParameter:
+		parameter := node.AsParameterDeclaration()
+		return parameter.QuestionToken != nil || parameter.Type != nil || parameter.Modifiers() != nil
+	}
+	return ast.IsTypeNode(node)
+}
+
+// referencesUndefinedGlobal reports whether evaluating the wrapper would read
+// an identifier that does not exist in a fresh `vm` context. Only the wrapper
+// function runs, so the bodies of functions and classes created inside it are
+// not searched.
+func referencesUndefinedGlobal(root *ast.Node) bool {
+	undefinedReference := false
 	wrapperVisited := false
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
 		switch node.Kind {
-		case ast.KindAsExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression, ast.KindTypeAssertionExpression:
-			valid = false
-			return true
 		case ast.KindFunctionExpression:
-			// Only the wrapper function runs; later functions are created but
-			// never called.
 			if wrapperVisited {
 				return false
 			}
@@ -68,15 +108,15 @@ func isValidWebpackCommentBody(body string) bool {
 		case ast.KindIdentifier:
 			if isEvaluatedReference(node) {
 				if _, ok := vmContextGlobals[node.Text()]; !ok {
-					valid = false
+					undefinedReference = true
 					return true
 				}
 			}
 		}
 		return node.ForEachChild(visit)
 	}
-	sourceFile.AsNode().ForEachChild(visit)
-	return valid
+	root.ForEachChild(visit)
+	return undefinedReference
 }
 
 // isEvaluatedReference reports whether the identifier is read as a variable
