@@ -93,6 +93,7 @@ centralising
 CHARCLASS
 cerialize
 checkerpool
+chunkname
 Citi
 classnames
 CLASSSET

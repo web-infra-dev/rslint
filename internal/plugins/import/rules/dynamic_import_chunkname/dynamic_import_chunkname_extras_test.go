@@ -366,7 +366,7 @@ func TestDynamicImportChunknameExtras(t *testing.T) {
 			},
 			{
 				Code: `import(
-  /* rspackignore: true */
+  /* rspackIGNORE: true */
   'm',
 )`,
 				Errors: []rule_tester.InvalidTestCaseError{
