@@ -36,9 +36,9 @@ ruleTester.run('no-import-module-exports', null as never, {
     {
       code: "import foo from 'path';\nmodule.exports = foo;",
       filename: exceptionFile,
-      // The exact path keeps this valid inside hidden worktree directories;
-      // the original upstream glob is covered independently by the Go suite.
-      options: [{ exceptions: ['**/*/other/entry-point.js', exceptionFile] }],
+      // An exact path uses backslashes on Windows; the rule normalizes them
+      // the same way minimatch 3 does before compiling the pattern.
+      options: [{ exceptions: [exceptionFile] }],
     },
     {
       code: "import * as process from 'process';\nconsole.log(process.env);",

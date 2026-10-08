@@ -2,6 +2,8 @@ package no_import_module_exports
 
 import (
 	_ "embed"
+	"runtime"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -28,14 +30,13 @@ var NoImportModuleExportsRule = rule.Rule{
 			fileName = tspath.ResolvePath(program.CurrentDirectory(), fileName)
 		}
 		entryPoint := packageEntryPoint(ctx)
-		var exceptions []*minimatch3.Matcher
+		var exceptionPatterns []string
 		if len(options) > 0 {
 			if option, ok := options[0].(map[string]any); ok {
-				for _, pattern := range utils.ToStringSlice(option["exceptions"]) {
-					exceptions = append(exceptions, minimatch3.New(pattern, minimatch3.Options{}))
-				}
+				exceptionPatterns = utils.ToStringSlice(option["exceptions"])
 			}
 		}
+		exceptions := compileExceptionMatchers(exceptionPatterns, runtime.GOOS == "windows")
 
 		isException := false
 		for _, exception := range exceptions {
@@ -82,6 +83,17 @@ var NoImportModuleExportsRule = rule.Rule{
 			},
 		}
 	},
+}
+
+func compileExceptionMatchers(patterns []string, windows bool) []*minimatch3.Matcher {
+	matchers := make([]*minimatch3.Matcher, 0, len(patterns))
+	for _, pattern := range patterns {
+		if windows {
+			pattern = strings.ReplaceAll(pattern, `\`, "/")
+		}
+		matchers = append(matchers, minimatch3.New(pattern, minimatch3.Options{}))
+	}
+	return matchers
 }
 
 func packageEntryPoint(ctx rule.RuleContext) string {
