@@ -48,6 +48,9 @@ func TestPropTypesRuleExtrasBindings(t *testing.T) {
 			{Code: `const O = { C(props) { return <div>{props.name}</div>; } }; O.C.propTypes = { name: PropTypes.string };`, Tsx: true},
 			{Code: `const Hello = class Inner extends React.Component { render() { return <div>{this.props.name}</div>; } }; Inner.propTypes = { name: PropTypes.string };`, Tsx: true},
 			{Code: `const Hello = function Inner(props) { return <div>{props.name}</div>; }; Inner.propTypes = { name: PropTypes.string };`, Tsx: true},
+			// ---- Regression: repeated component path segments remain distinct ----
+			{Code: `const C = { C: props => <div>{props.name}</div> }; C.C.propTypes = { name: PropTypes.string };`, Tsx: true},
+			{Code: `const UI = { C: { C: props => <div>{props.name}</div> } }; UI.C.C.propTypes = { name: PropTypes.string };`, Tsx: true},
 		}, []rule_tester.InvalidTestCase{
 			// ---- Nested owners and special props parameters ----
 			{Code: `function Outer(props) { function Inner(props) { return <span>{props.inner}</span>; } return <Inner />; }`, Tsx: true, Errors: missingPropTypes("'inner' is missing in props validation")},

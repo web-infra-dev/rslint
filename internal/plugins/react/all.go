@@ -5,6 +5,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/boolean_prop_naming"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/button_has_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/checked_requires_onchange_or_readonly"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/default_props_match_prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/destructuring_assignment"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/display_name"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_component_props"
@@ -112,6 +113,7 @@ func GetAllRules() []rule.Rule {
 		boolean_prop_naming.BooleanPropNamingRule,
 		button_has_type.ButtonHasTypeRule,
 		checked_requires_onchange_or_readonly.CheckedRequiresOnchangeOrReadonlyRule,
+		default_props_match_prop_types.DefaultPropsMatchPropTypesRule,
 		destructuring_assignment.DestructuringAssignmentRule,
 		display_name.DisplayNameRule,
 		forbid_component_props.ForbidComponentPropsRule,
