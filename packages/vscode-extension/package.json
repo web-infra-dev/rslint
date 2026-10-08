@@ -21,7 +21,7 @@
     "go"
   ],
   "engines": {
-    "vscode": "^1.131.0"
+    "vscode": "^1.141.0"
   },
   "main": "./dist/main.js",
   "activationEvents": [
@@ -89,7 +89,7 @@
     "@rslint/core": "workspace:*",
     "@types/mocha": "catalog:",
     "@types/node": "catalog:",
-    "@types/vscode": "^1.125.0",
+    "@types/vscode": "^1.140.0",
     "@vscode/test-electron": "catalog:",
     "@vscode/vsce": "catalog:",
     "esbuild": "catalog:",
