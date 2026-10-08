@@ -99,7 +99,7 @@ func dynamicImportAttributes(call *ast.CallExpression) ImportAttributes {
 	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) < 2 {
 		return ImportAttributes{State: AttributesNone}
 	}
-	options := ast.SkipParentheses(call.Arguments.Nodes[1])
+	options := unwrapTransparentExpression(call.Arguments.Nodes[1])
 	if options == nil || options.Kind != ast.KindObjectLiteralExpression {
 		return unknownImportAttributes(call.Arguments.Nodes[1], AttributesDynamic)
 	}
@@ -110,7 +110,7 @@ func dynamicImportAttributes(call *ast.CallExpression) ImportAttributes {
 	case objectPropertyUnknown:
 		return unknownImportAttributes(options, AttributesDynamic)
 	}
-	with = ast.SkipParentheses(with)
+	with = unwrapTransparentExpression(with)
 	if with == nil || with.Kind != ast.KindObjectLiteralExpression {
 		return unknownImportAttributes(with, AttributesDynamic)
 	}
@@ -123,9 +123,14 @@ func dynamicImportAttributes(call *ast.CallExpression) ImportAttributes {
 		if propertyNode == nil || propertyNode.Kind != ast.KindPropertyAssignment {
 			return unknownImportAttributes(with, AttributesDynamic)
 		}
+		if isPrototypeSetter(propertyNode) {
+			// Attributes come from own enumerable properties, so a prototype
+			// setter never contributes an entry.
+			continue
+		}
 		property := propertyNode.AsPropertyAssignment()
 		name, ok := staticAttributeName(property.Name())
-		value := ast.SkipParentheses(property.Initializer)
+		value := unwrapTransparentExpression(property.Initializer)
 		if !ok || value == nil || !ast.IsStringLiteralLike(value) {
 			return unknownImportAttributes(with, AttributesDynamic)
 		}
@@ -134,7 +139,32 @@ func dynamicImportAttributes(call *ast.CallExpression) ImportAttributes {
 	if hasDuplicateAttributeNames(entries) {
 		return unknownImportAttributes(with, AttributesDynamic)
 	}
+	if len(entries) == 0 {
+		return ImportAttributes{Node: with, State: AttributesStatic}
+	}
 	return knownImportAttributes(with, entries)
+}
+
+// unwrapTransparentExpression removes parentheses and TypeScript-only wrappers
+// (`as`, `satisfies`, `<T>x`, `x!`) that have no runtime effect.
+func unwrapTransparentExpression(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	return ast.SkipOuterExpressions(node, ast.OEKAll)
+}
+
+// isPrototypeSetter reports whether a property is a non-computed, non-shorthand
+// `__proto__: value`, which sets the prototype instead of creating a property.
+func isPrototypeSetter(propertyNode *ast.Node) bool {
+	if propertyNode == nil || propertyNode.Kind != ast.KindPropertyAssignment {
+		return false
+	}
+	name := propertyNode.AsPropertyAssignment().Name()
+	if name == nil || (name.Kind != ast.KindIdentifier && !ast.IsStringLiteralLike(name)) {
+		return false
+	}
+	return name.Text() == "__proto__"
 }
 
 func hasDuplicateAttributeNames(entries []ImportAttribute) bool {
@@ -165,6 +195,15 @@ func staticObjectProperty(object *ast.Node, wanted string) (*ast.Node, objectPro
 	found := false
 	for _, propertyNode := range properties.Nodes {
 		if propertyNode == nil || propertyNode.Kind == ast.KindSpreadAssignment {
+			return nil, objectPropertyUnknown
+		}
+		if isPrototypeSetter(propertyNode) {
+			// `with` is read through the prototype chain, so only a null
+			// prototype is known not to supply it.
+			initializer := unwrapTransparentExpression(propertyNode.AsPropertyAssignment().Initializer)
+			if initializer != nil && initializer.Kind == ast.KindNullKeyword {
+				continue
+			}
 			return nil, objectPropertyUnknown
 		}
 		var nameNode *ast.Node

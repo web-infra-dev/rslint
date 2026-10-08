@@ -131,3 +131,63 @@ func TestDynamicImportAttributePresence(t *testing.T) {
 		}
 	}
 }
+
+func TestImportAttributesIgnoreTypeScriptWrappers(t *testing.T) {
+	file := parseModuleSpecifierCacheFile(`
+		import("a", { with: { type: "json" } } as const);
+		import("a", { with: { type: "json" } satisfies object });
+		import("a", { with: ({ type: "json" } as const) });
+		import("a", { with: { type: "json" as const } });
+		import("a", { with: { type: ("json" satisfies string) } });
+		import("a", {} as const);
+		import("a", { with: { type: "json" } }!);
+		import json from "a" with { type: "json" };
+	`)
+	sources := Collect(file, ESModuleReferences)
+	if len(sources) != 8 {
+		t.Fatalf("collected %d sources, want 8", len(sources))
+	}
+	want := sources[7].Attributes().Key()
+	for i := 0; i < 5; i++ {
+		if got := sources[i].Attributes(); got.State != AttributesStatic || got.Key() != want {
+			t.Errorf("source %d = (%v, %q), want static %q", i, got.State, got.Key(), want)
+		}
+	}
+	if got := sources[5].Attributes(); got.State != AttributesNone && !(got.State == AttributesStatic && got.Key() == "") {
+		t.Errorf("empty options state = %v, want no attributes", got.State)
+	}
+	if got := sources[6].Attributes(); got.State != AttributesStatic || got.Key() != want {
+		t.Errorf("non-null options = (%v, %q), want static %q", got.State, got.Key(), want)
+	}
+}
+
+func TestImportAttributesPrototypeSetter(t *testing.T) {
+	file := parseModuleSpecifierCacheFile(`
+		import("./b", { with: { __proto__: null } });
+		import("./b", { with: { "__proto__": null, type: "json" } });
+		import("./b", { with: { ["__proto__"]: "x" } });
+		import("./b", { __proto__: null, with: { type: "json" } });
+		import("./b", { __proto__: proto, with: { type: "json" } });
+		import json from "./b" with { type: "json" };
+	`)
+	sources := Collect(file, ESModuleReferences)
+	if len(sources) != 6 {
+		t.Fatalf("collected %d sources, want 6", len(sources))
+	}
+	if got := sources[0].Attributes(); got.State != AttributesStatic || got.Key() != "" || len(got.Entries()) != 0 {
+		t.Errorf("proto-only set = (%v, %q), want empty static", got.State, got.Key())
+	}
+	json := sources[5].Attributes().Key()
+	if got := sources[1].Attributes(); got.State != AttributesStatic || got.Key() != json {
+		t.Errorf("proto plus type = (%v, %q), want static %q", got.State, got.Key(), json)
+	}
+	if value, ok := sources[2].Attributes().Value("__proto__"); !ok || value != "x" {
+		t.Errorf("computed __proto__ = (%q, %v), want ordinary attribute (x, true)", value, ok)
+	}
+	if got := sources[3].Attributes(); got.State != AttributesStatic || got.Key() != json {
+		t.Errorf("null-prototype options = (%v, %q), want static %q", got.State, got.Key(), json)
+	}
+	if got := sources[4].Attributes().State; got != AttributesDynamic {
+		t.Errorf("non-null prototype options state = %v, want AttributesDynamic", got)
+	}
+}
