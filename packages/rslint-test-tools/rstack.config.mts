@@ -869,6 +869,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/no-nested-ternary.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-null.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-object-as-default-parameter.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-single-promise-in-promise-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-static-only-class.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-thenable.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-this-assignment.test.ts',

@@ -140,7 +140,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-return-array-push': 'error', // not implemented
     // 'unicorn/no-selector-as-dom-name': 'error', // not implemented
     // 'unicorn/no-shorthand-property-overrides': 'error', // not implemented
-    // 'unicorn/no-single-promise-in-promise-methods': 'error', // not implemented
+    'unicorn/no-single-promise-in-promise-methods': 'error',
     'unicorn/no-static-only-class': 'error',
     // 'unicorn/no-subtraction-comparison': 'error', // not implemented
     'unicorn/no-thenable': 'error',
