@@ -1,5 +1,5 @@
 ---
-description: 'Choose Rslint TypeScript presets for recommended, type-checked, strict, and stylistic rules through the ts export.'
+description: 'Choose Rslint TypeScript presets through the ts export, including recommended, type-checked, strict, and stylistic variants.'
 ---
 
 # ts

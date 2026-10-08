@@ -1,5 +1,5 @@
 ---
-description: 'Browse @rslint/core configuration helpers, rule presets, plugin exports, and the programmatic Rslint class.'
+description: 'Public APIs from @rslint/core, including configuration helpers, presets, plugin exports, and the Rslint class.'
 ---
 
 # API overview

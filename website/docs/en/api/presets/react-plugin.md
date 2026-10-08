@@ -1,5 +1,5 @@
 ---
-description: 'Enable supported React rules with reactPlugin.configs.recommended in Rslint.'
+description: 'Configure supported React rules with the built-in reactPlugin presets in Rslint.'
 ---
 
 # reactPlugin

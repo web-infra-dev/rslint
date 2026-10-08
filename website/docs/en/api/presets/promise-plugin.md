@@ -1,5 +1,5 @@
 ---
-description: 'Enable supported Promise linting rules with promisePlugin.configs.recommended in Rslint.'
+description: 'Configure supported Promise rules with the built-in promisePlugin presets in Rslint.'
 ---
 
 # promisePlugin

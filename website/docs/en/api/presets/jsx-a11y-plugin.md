@@ -1,5 +1,5 @@
 ---
-description: 'Enable supported JSX accessibility rules with jsxA11yPlugin.configs.recommended in Rslint.'
+description: 'Configure supported JSX accessibility rules with the built-in jsxA11yPlugin presets in Rslint.'
 ---
 
 # jsxA11yPlugin

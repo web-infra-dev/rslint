@@ -1,5 +1,5 @@
 ---
-description: 'Use Rslint CLI options for file selection, configuration, rule overrides, timing diagnostics, and exit status handling.'
+description: 'Rslint CLI options and usage, including file selection, configuration, rule overrides, and exit codes.'
 ---
 
 # CLI Reference

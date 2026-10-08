@@ -1,5 +1,5 @@
 ---
-description: 'Enable supported import rules with importPlugin.configs.recommended in an Rslint flat configuration.'
+description: 'Configure supported import rules with the built-in importPlugin presets in Rslint.'
 ---
 
 # importPlugin

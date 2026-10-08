@@ -1,5 +1,5 @@
 ---
-description: 'Enable supported Unicorn rules with unicornPlugin.configs.recommended in Rslint.'
+description: 'Configure supported Unicorn rules with the built-in unicornPlugin presets in Rslint.'
 ---
 
 # unicornPlugin

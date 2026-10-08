@@ -1,5 +1,5 @@
 ---
-description: 'Enable supported React Hooks rules with reactHooksPlugin.configs.recommended in Rslint.'
+description: 'Configure supported React Hooks rules with the built-in reactHooksPlugin presets in Rslint.'
 ---
 
 # reactHooksPlugin
