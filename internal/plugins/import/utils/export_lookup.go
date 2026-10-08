@@ -184,7 +184,10 @@ func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.Sour
 		return exportLink{}
 	}
 	path, sourceFile, ok := sourceProgram.ResolveModule(origin, source)
-	if !ok || sourceFile != nil && settings.IsIgnoredPath(sourceFile.FileName()) {
+	if !ok {
+		return exportLink{}
+	}
+	if path != "" && settings.IsIgnoredPath(path) || sourceFile != nil && settings.IsIgnoredPath(sourceFile.FileName()) {
 		return exportLink{}
 	}
 	return exportLink{

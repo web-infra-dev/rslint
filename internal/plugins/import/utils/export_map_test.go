@@ -409,6 +409,37 @@ func TestExportQueriesSupportSourceOnlyProgram(t *testing.T) {
 	})
 }
 
+func TestExportQueriesRespectIgnoredResolvedPathWithoutTargetAST(t *testing.T) {
+	t.Parallel()
+
+	root := fixtures.GetRootDir()
+	consumer := tspath.ResolvePath(root.Dir, "ignored-source-only-consumer.ts")
+	fs := rslint_utils.NewOverlayVFS(root.FS, map[string]string{
+		consumer: `import { value } from "./bar" with { type: "text" };`,
+	})
+	sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames:   []string{consumer},
+		Host:            rslint_utils.CreateCompilerHost(root.Dir, fs),
+		CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := sourceProgram.GetSourceFile(consumer)
+	ctx := (rule.RuleContext{
+		SourceFile: file,
+		Settings:   map[string]interface{}{"import/ignore": []interface{}{`bar\.ts$`}},
+	}).WithProgram(sourceProgram)
+	source := modules.SourceFromSpecifier(firstImportSpecifier(t, file))
+	path, target, ok := sourceProgram.ResolveModule(file, source)
+	if !ok || path == "" || target != nil {
+		t.Fatalf("resolution = (%q, %v, %v), want nonempty path, nil target, true", path, target, ok)
+	}
+	if exports, ok := import_utils.GetExportMap(ctx, source); ok || exports != nil {
+		t.Fatalf("ignored request returned export map (%v, %v)", exports, ok)
+	}
+}
+
 func TestGetExportMap(t *testing.T) {
 	t.Parallel()
 
