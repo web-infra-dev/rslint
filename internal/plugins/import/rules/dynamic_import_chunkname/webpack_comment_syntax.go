@@ -1,11 +1,12 @@
 package dynamic_import_chunkname
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // Names that exist in a fresh `vm` context, so referencing them in a magic
@@ -71,11 +72,33 @@ func containsInvalidSyntax(root *ast.Node) bool {
 	return invalid
 }
 
-// isInvalidRegexLiteral reports a regular expression literal whose pattern or
-// flags are an early error. The TypeScript parser only checks that the literal
-// is terminated, so `/(/` or `/[z-a]/` parse without a diagnostic.
+// isInvalidRegexLiteral reports a regular expression literal that `new RegExp`
+// would reject, since a literal is an early error wherever it appears. The
+// TypeScript parser only checks that the literal is terminated.
 func isInvalidRegexLiteral(node *ast.Node) bool {
-	return node.Kind == ast.KindRegularExpressionLiteral && !ecmascript.IsValidRegexLiteral(node.Text())
+	if node.Kind != ast.KindRegularExpressionLiteral {
+		return false
+	}
+	text := node.Text()
+	end := strings.LastIndexByte(text, '/')
+	if end <= 0 {
+		return true
+	}
+	pattern, flags := text[1:end], text[end+1:]
+	return !isValidRegexFlags(flags) || !utils.IsValidRegexPattern(pattern, utils.ParseRegexFlags(flags))
+}
+
+// isValidRegexFlags reports whether flags is a set of known flags without
+// repeats, and without both u and v.
+func isValidRegexFlags(flags string) bool {
+	seen := map[rune]bool{}
+	for _, flag := range flags {
+		if seen[flag] || !strings.ContainsRune("dgimsuvy", flag) {
+			return false
+		}
+		seen[flag] = true
+	}
+	return !seen['u'] || !seen['v']
 }
 
 func isTypeScriptOnlySyntax(node *ast.Node) bool {
