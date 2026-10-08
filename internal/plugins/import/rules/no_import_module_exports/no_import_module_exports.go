@@ -46,33 +46,35 @@ var NoImportModuleExportsRule = rule.Rule{
 			}
 		}
 
-		var importDeclarations []*ast.Node
-		alreadyReported := false
-		checkMember := func(node *ast.Node) {
-			if alreadyReported || isException || entryPoint == fileName || utils.IsInJsxTagName(node) {
-				return
+		hasCommonJSExport := false
+		checkMember := func(node *ast.Node) bool {
+			if utils.IsInJsxTagName(node) {
+				return false
 			}
 			object, _ := utils.MemberExpressionParts(node)
 			object = utils.ESTreeRuntimeExpression(object)
 			if object == nil || object.Kind != ast.KindIdentifier {
-				return
+				return false
 			}
 			name := object.Text()
-			if name != "module" && name != "exports" || !isCommonJSExportReference(ctx, name) {
-				return
-			}
-			for _, declaration := range importDeclarations {
-				ctx.ReportNode(declaration, rule.RuleMessage{Description: message})
-			}
-			alreadyReported = true
+			return (name == "module" || name == "exports") && isCommonJSExportReference(ctx, name)
+		}
+
+		if !isException && entryPoint != fileName {
+			utils.VisitDescendants(ctx.SourceFile.AsNode(), func(node *ast.Node) bool {
+				if !hasCommonJSExport && (node.Kind == ast.KindPropertyAccessExpression || node.Kind == ast.KindElementAccessExpression) {
+					hasCommonJSExport = checkMember(node)
+				}
+				return true
+			})
 		}
 
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
-				importDeclarations = append(importDeclarations, node)
+				if hasCommonJSExport {
+					ctx.ReportNode(node, rule.RuleMessage{Description: message})
+				}
 			},
-			ast.KindPropertyAccessExpression: checkMember,
-			ast.KindElementAccessExpression:  checkMember,
 		}
 	},
 }
