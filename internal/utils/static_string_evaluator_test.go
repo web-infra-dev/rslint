@@ -1253,6 +1253,43 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 	}
 }
 
+func TestStaticStringEvaluatorControlFlowNullish(t *testing.T) {
+	for _, test := range []struct {
+		expression string
+		nullish    bool
+		known      bool
+	}{
+		{"null", true, true},
+		{"undefined", true, true},
+		{"void 0", true, true},
+		{"(null)", true, true},
+		{"null ?? undefined", true, true},
+		{"0", false, true},
+		{"''", false, true},
+		{"false", false, true},
+		{"NaN", false, true},
+		{"'a'", false, true},
+		{"[]", false, true},
+		{"null ?? 'a'", false, true},
+		{"unknown", false, false},
+		{"fn()", false, false},
+		{"(unknown = null)", false, false},
+	} {
+		t.Run(test.expression, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/nullish.js"}, "const value = "+test.expression+";", core.ScriptKindJS)
+			node := findVariableInitializer(t, source, "value")
+			nullish, known := NewStaticStringEvaluator(nil).EvalControlFlowNullish(node)
+			if nullish != test.nullish || known != test.known {
+				t.Fatalf("EvalControlFlowNullish = (%v, %v), want (%v, %v)", nullish, known, test.nullish, test.known)
+			}
+		})
+	}
+	var evaluator *StaticStringEvaluator
+	if nullish, known := evaluator.EvalControlFlowNullish(nil); nullish || known {
+		t.Fatalf("nil evaluator = (%v, %v), want (false, false)", nullish, known)
+	}
+}
+
 func TestStaticStringEvaluatorTypeof(t *testing.T) {
 	for _, test := range []struct {
 		expression, want string

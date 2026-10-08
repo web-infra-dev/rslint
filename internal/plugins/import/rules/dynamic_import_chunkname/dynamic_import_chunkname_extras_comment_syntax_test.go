@@ -639,3 +639,628 @@ func TestDynamicImportChunknameCommentRegexLiterals(t *testing.T) {
 		},
 	)
 }
+
+// Only code that actually runs can throw a ReferenceError: an operand skipped by ||, &&, ??, a conditional or an optional chain is not evaluated. Conditions that cannot be folded to a constant are not followed, so the code they may skip is not reported. Each expression is the value of a property after a chunk name.
+func TestDynamicImportChunknameCommentShortCircuit(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &dynamic_import_chunkname.DynamicImportChunknameRule,
+		[]rule_tester.ValidTestCase{
+			// an operand that short-circuiting skips is never evaluated
+			{Code: `import(
+  /* webpackChunkName: "a", x: "a" || fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: "a" ?? fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: "a" || fallback || other */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: ("a" || fallback) + "b" */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: "a" || (fallback || other) */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: 1 || fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: true || fallback */
+  'm',
+)`},
+			{Code: "import(\n  /* webpackChunkName: \"a\", x: `a` || fallback */\n  'm',\n)"},
+			{Code: `import(
+  /* webpackChunkName: "a", x: [] || fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: {} || fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: !"" || fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: "" && fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: 0 && fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: null && fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: undefined && fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: false && fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: NaN && fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: void 0 && fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: "a" ?? fallback ?? other */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: 0 ?? fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: "" ?? fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: false ?? fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: true ? "a" : fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: false ? fallback : "a" */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: "x" ? "a" : fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: "" ? fallback : "a" */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: 0 ? fallback : "a" */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: null ? fallback : "a" */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: null ?? "a" */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: undefined ?? "a" */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: (() => fallback) || "a" */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: Infinity || fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: NaN ?? fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: Infinity ?? fallback */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: undefined?.[fallback] */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: null?.[fallback] */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: undefined?.(fallback) */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: null?.a.b(fallback) */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: null?.a[fallback] */
+  'm',
+)`},
+			// assigning to an undeclared name does not read it
+			{Code: `import(
+  /* webpackChunkName: "a", x: fallback = "a" */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: (fallback) = "a" */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: fallback = fallback2 = "a" */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: [fallback] = ["a"] */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: ({ a: fallback } = { a: "a" }) */
+  'm',
+)`},
+		},
+		[]rule_tester.InvalidTestCase{
+			// an operand that short-circuiting skips is never evaluated
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: (undefined) ?? fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: (undefined) || fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: NaN || fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: Infinity && fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			// an operand that is evaluated is still checked
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: "a" && fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: "" || fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: 0 || fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: null || fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: undefined || fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: false || fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: !"a" || fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: null ?? fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: undefined ?? fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: void 0 ?? fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: true && fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: 1 && fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: [] && fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: "a" && "b" && fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: "" || "" || fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: null ?? undefined ?? fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: true ? fallback : "a" */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: false ? "a" : fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: "" ? "a" : fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: 0 ? "a" : fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: null ? "a" : fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: fallback ? "a" : "b" */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: fallback || "a" */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: fallback && "a" */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: fallback ?? "a" */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: ("a" || "b") + fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: "a"?.[fallback] */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: "a"?.b(fallback) */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: ""?.[fallback] */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: 0?.[fallback] */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: "a"?.length + fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: [fallback] */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: { a: fallback } */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: { [fallback]: 1 } */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: "import(\n  /* webpackChunkName: \"a\", x: `${fallback}` */\n  'm',\n)",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: void fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: fallback++ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: fallback += "a" */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: fallback = other */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: fallback.x = "a" */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: "a" + fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: ("a", fallback) */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: !fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: -fallback */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: new fallback() */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+		},
+	)
+}

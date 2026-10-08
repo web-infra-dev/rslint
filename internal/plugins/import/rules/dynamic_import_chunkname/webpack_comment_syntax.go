@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
@@ -98,33 +99,145 @@ func isTypeScriptOnlySyntax(node *ast.Node) bool {
 // referencesUndefinedGlobal reports whether evaluating the wrapper would read
 // an identifier that does not exist in a fresh `vm` context. Only the wrapper
 // function runs, so the bodies of functions and classes created inside it are
-// not searched.
+// not searched, and code that short-circuiting skips is not searched either.
 func referencesUndefinedGlobal(root *ast.Node) bool {
-	undefinedReference := false
-	wrapperVisited := false
-	var visit func(node *ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		switch node.Kind {
-		case ast.KindFunctionExpression:
-			if wrapperVisited {
-				return false
-			}
-			wrapperVisited = true
-		case ast.KindArrowFunction, ast.KindFunctionDeclaration, ast.KindClassExpression,
-			ast.KindClassDeclaration, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+	checker := &referenceChecker{evaluator: utils.NewStaticStringEvaluator(nil)}
+	root.ForEachChild(checker.visit)
+	return checker.found
+}
+
+type referenceChecker struct {
+	evaluator      *utils.StaticStringEvaluator
+	wrapperVisited bool
+	found          bool
+}
+
+// visit reports true to stop the walk. An operand is searched only when it is
+// known to be evaluated: when a condition or the left operand cannot be folded
+// to a constant, the code it may skip is left alone rather than reported.
+func (c *referenceChecker) visit(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindFunctionExpression:
+		if c.wrapperVisited {
 			return false
-		case ast.KindIdentifier:
-			if isEvaluatedReference(node) {
-				if _, ok := vmContextGlobals[node.Text()]; !ok {
-					undefinedReference = true
-					return true
-				}
+		}
+		c.wrapperVisited = true
+	case ast.KindArrowFunction, ast.KindFunctionDeclaration, ast.KindClassExpression,
+		ast.KindClassDeclaration, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		return false
+	case ast.KindIdentifier:
+		if isEvaluatedReference(node) {
+			if _, ok := vmContextGlobals[node.Text()]; !ok {
+				c.found = true
+				return true
 			}
 		}
-		return node.ForEachChild(visit)
+	case ast.KindBinaryExpression:
+		return c.visitBinary(node.AsBinaryExpression())
+	case ast.KindConditionalExpression:
+		conditional := node.AsConditionalExpression()
+		if c.visit(conditional.Condition) {
+			return true
+		}
+		if truthy, known := c.evaluator.EvalControlFlowTruthiness(conditional.Condition); known {
+			if truthy {
+				return c.visit(conditional.WhenTrue)
+			}
+			return c.visit(conditional.WhenFalse)
+		}
+		return false
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression, ast.KindCallExpression:
+		if node.Flags&ast.NodeFlagsOptionalChain != 0 {
+			return c.visitOptionalChain(node)
+		}
 	}
-	root.ForEachChild(visit)
-	return undefinedReference
+	return node.ForEachChild(c.visit)
+}
+
+func (c *referenceChecker) visitBinary(binary *ast.BinaryExpression) bool {
+	switch binary.OperatorToken.Kind {
+	case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
+		if c.visit(binary.Left) {
+			return true
+		}
+		// The right operand runs only for a falsy (`||`), truthy (`&&`) or
+		// nullish (`??`) left operand.
+		var evaluatesRight, known bool
+		switch binary.OperatorToken.Kind {
+		case ast.KindBarBarToken:
+			var truthy bool
+			truthy, known = c.evaluator.EvalControlFlowTruthiness(binary.Left)
+			evaluatesRight = !truthy
+		case ast.KindAmpersandAmpersandToken:
+			evaluatesRight, known = c.evaluator.EvalControlFlowTruthiness(binary.Left)
+		default:
+			evaluatesRight, known = c.evaluator.EvalControlFlowNullish(binary.Left)
+		}
+		return known && evaluatesRight && c.visit(binary.Right)
+	case ast.KindEqualsToken:
+		// Assigning to an undeclared name creates a global in sloppy mode, so
+		// the target is not a read. Destructuring targets are left alone.
+		switch ast.SkipParentheses(binary.Left).Kind {
+		case ast.KindIdentifier, ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
+			return c.visit(binary.Right)
+		}
+	}
+	return binary.Node.ForEachChild(c.visit)
+}
+
+// visitOptionalChain searches the operand of a `?.` chain, and the rest of the
+// chain only when no `?.` in it can short-circuit.
+func (c *referenceChecker) visitOptionalChain(node *ast.Node) bool {
+	var expression *ast.Node
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		expression = node.AsPropertyAccessExpression().Expression
+	case ast.KindElementAccessExpression:
+		expression = node.AsElementAccessExpression().Expression
+	default:
+		expression = node.AsCallExpression().Expression
+	}
+	if c.visit(expression) {
+		return true
+	}
+	if !c.chainEvaluated(node) {
+		return false
+	}
+	return node.ForEachChild(func(child *ast.Node) bool {
+		if child == expression {
+			return false
+		}
+		return c.visit(child)
+	})
+}
+
+// chainEvaluated reports whether every `?.` in the chain below node is known
+// to continue, that is, its operand is a constant that is not null or undefined.
+func (c *referenceChecker) chainEvaluated(node *ast.Node) bool {
+	for node != nil && node.Flags&ast.NodeFlagsOptionalChain != 0 {
+		var expression *ast.Node
+		var questionDot *ast.Node
+		switch node.Kind {
+		case ast.KindPropertyAccessExpression:
+			access := node.AsPropertyAccessExpression()
+			expression, questionDot = access.Expression, access.QuestionDotToken
+		case ast.KindElementAccessExpression:
+			access := node.AsElementAccessExpression()
+			expression, questionDot = access.Expression, access.QuestionDotToken
+		case ast.KindCallExpression:
+			call := node.AsCallExpression()
+			expression, questionDot = call.Expression, call.QuestionDotToken
+		default:
+			return true
+		}
+		if questionDot != nil {
+			if nullish, known := c.evaluator.EvalControlFlowNullish(expression); !known || nullish {
+				return false
+			}
+		}
+		node = expression
+	}
+	return true
 }
 
 // isEvaluatedReference reports whether the identifier is read as a variable

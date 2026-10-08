@@ -57,6 +57,16 @@ func (staticEvaluator *StaticStringEvaluator) EvalControlFlowTruthiness(node *as
 	return staticValueTruthy(value)
 }
 
+// EvalControlFlowNullish selects a branch of `??` or `?.` without requiring the
+// value to fold: nullish reports whether the node is null or undefined.
+func (staticEvaluator *StaticStringEvaluator) EvalControlFlowNullish(node *ast.Node) (nullish bool, known bool) {
+	value, ok := staticEvaluator.EvalControlFlowValue(node)
+	if !ok {
+		return false, false
+	}
+	return staticValueNullish(value), true
+}
+
 type staticControlFlowSafety struct {
 	evaluator *StaticStringEvaluator
 	visiting  map[*ast.Symbol]bool
