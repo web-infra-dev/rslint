@@ -316,3 +316,326 @@ func TestDynamicImportChunknameCommentSyntaxInFunctions(t *testing.T) {
 		},
 	)
 }
+
+// A regular expression literal is an early error when its pattern or flags are invalid, wherever it appears in the comment; the TypeScript parser accepts any terminated literal.
+func TestDynamicImportChunknameCommentRegexLiterals(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &dynamic_import_chunkname.DynamicImportChunknameRule,
+		[]rule_tester.ValidTestCase{
+			// valid regular expression literals
+			{Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /\.json$/ */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", webpackExclude: /^\.\/locale\/[a-z]+$/ */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /a{1,2}/ */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /{/ */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /]/ */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /\1/ */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /[\d-x]/ */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /\p{L}/u */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /(?<=a)b/ */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /a/dgimsuy */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /[\p{L}--[a-z]]/v */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /(?<a>x)|(?<a>y)/ */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: /[/]/ */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: () => /a/ */
+  'm',
+)`},
+			{Code: `import(
+  /* webpackChunkName: "a", x: 1 / 2 / 3 */
+  'm',
+)`},
+		},
+		[]rule_tester.InvalidTestCase{
+			// invalid regular expression literals in include and exclude filters
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /(/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /[z-a]/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackExclude: /a{2,1}/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /)/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackExclude: /(?<a>x)(?<a>y)/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /\p{Foo}/u */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /[\d-x]/u */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /\u{110000}/u */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /a/gg */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /a/x */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /a/uv */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /\k<a>/u */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /(?<a/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /+a/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /(?=a){2}/u */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackInclude: /(/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackExclude: /[z-a]/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", webpackInclude: /(/, webpackExclude: /\.json$/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			// invalid regular expression literals anywhere in the comment
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: /(/.test("a") */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: () => /(/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: function () { return /[z-a]/ } */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: class { m() { return /a{2,1}/ } } */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: { m() { return /(/ } } */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: [/(/] */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: "import(\n  /* webpackChunkName: \"a\", x: `${/(/}` */\n  'm',\n)",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackChunkName: "a", x: (1, /(/) */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a "webpack" comment with valid syntax`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			// valid regular expression literals
+			{
+				Code: `import(
+  /* webpackInclude: /\.json$/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a leading comment in the form /*webpackChunkName: ["']([0-9a-zA-Z-_/.]|\[(request|index)\])+["'],? */`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+			{
+				Code: `import(
+  /* webpackInclude: /(?<lang>en|fr)\.json$/ */
+  'm',
+)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: `dynamic imports require a leading comment in the form /*webpackChunkName: ["']([0-9a-zA-Z-_/.]|\[(request|index)\])+["'],? */`, Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+		},
+	)
+}

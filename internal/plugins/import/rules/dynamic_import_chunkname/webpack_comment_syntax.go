@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // Names that exist in a fresh `vm` context, so referencing them in a magic
@@ -34,10 +35,10 @@ var vmContextGlobals = map[string]struct{}{
 //
 // rslint cannot run JavaScript. It parses the same wrapper text and then looks
 // for the failures that can occur in practice: syntax errors, TypeScript-only
-// syntax anywhere in the text (including function and class bodies that are
-// never called), and references to identifiers that a fresh `vm` context does
-// not define. Other runtime errors, such as calling a non-function, are not
-// detected.
+// syntax and invalid regular expression literals anywhere in the text
+// (including function and class bodies that are never called), and references
+// to identifiers that a fresh `vm` context does not define. Other runtime
+// errors, such as calling a non-function, are not detected.
 func isValidWebpackCommentBody(body string) bool {
 	text := "(function() {return {" + body + "}})()"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
@@ -59,7 +60,7 @@ func containsInvalidSyntax(root *ast.Node) bool {
 	invalid := false
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
-		if isTypeScriptOnlySyntax(node) {
+		if isTypeScriptOnlySyntax(node) || isInvalidRegexLiteral(node) {
 			invalid = true
 			return true
 		}
@@ -67,6 +68,13 @@ func containsInvalidSyntax(root *ast.Node) bool {
 	}
 	root.ForEachChild(visit)
 	return invalid
+}
+
+// isInvalidRegexLiteral reports a regular expression literal whose pattern or
+// flags are an early error. The TypeScript parser only checks that the literal
+// is terminated, so `/(/` or `/[z-a]/` parse without a diagnostic.
+func isInvalidRegexLiteral(node *ast.Node) bool {
+	return node.Kind == ast.KindRegularExpressionLiteral && !ecmascript.IsValidRegexLiteral(node.Text())
 }
 
 func isTypeScriptOnlySyntax(node *ast.Node) bool {
