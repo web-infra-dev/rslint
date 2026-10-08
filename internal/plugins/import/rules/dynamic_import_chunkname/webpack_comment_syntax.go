@@ -1,6 +1,7 @@
 package dynamic_import_chunkname
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -51,7 +52,7 @@ func isValidWebpackCommentBody(body string) bool {
 		return false
 	}
 	root := sourceFile.AsNode()
-	return !containsInvalidSyntax(root) && !referencesUndefinedGlobal(root)
+	return !containsInvalidSyntax(root) && !containsStrictModeError(sourceFile) && !referencesUndefinedGlobal(root)
 }
 
 // containsInvalidSyntax reports syntax that is an error in JavaScript but that
@@ -114,9 +115,53 @@ func isTypeScriptOnlySyntax(node *ast.Node) bool {
 				node.Parent.AsHeritageClause().Token == ast.KindImplementsKeyword
 	case ast.KindParameter:
 		parameter := node.AsParameterDeclaration()
-		return parameter.QuestionToken != nil || parameter.Type != nil || parameter.Modifiers() != nil
+		// `this` names a TypeScript this-parameter, which is not a binding.
+		return parameter.QuestionToken != nil || parameter.Type != nil || parameter.Modifiers() != nil ||
+			node.Name().Kind == ast.KindIdentifier && node.Name().Text() == "this"
+	case ast.KindCallExpression:
+		return node.AsCallExpression().TypeArguments != nil
+	case ast.KindNewExpression:
+		return node.AsNewExpression().TypeArguments != nil
+	case ast.KindTaggedTemplateExpression:
+		return node.AsTaggedTemplateExpression().TypeArguments != nil
+	case ast.KindPropertyDeclaration, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
+		ast.KindConstructor:
+		return isInvalidClassMember(node)
 	}
 	return ast.IsTypeNode(node)
+}
+
+// isInvalidClassMember reports class member syntax that JavaScript rejects:
+// modifiers other than static and async, optional or definite markers, return
+// and property types, and members without a body.
+func isInvalidClassMember(member *ast.Node) bool {
+	switch member.Kind {
+	case ast.KindPropertyDeclaration:
+		return !hasOnlyModifiers(member, ast.KindStaticKeyword) || member.PostfixToken() != nil ||
+			member.AsPropertyDeclaration().Type != nil
+	case ast.KindMethodDeclaration:
+		return !hasOnlyModifiers(member, ast.KindStaticKeyword, ast.KindAsyncKeyword) ||
+			member.PostfixToken() != nil || member.Body() == nil || member.Type() != nil
+	case ast.KindGetAccessor, ast.KindSetAccessor:
+		return !hasOnlyModifiers(member, ast.KindStaticKeyword) || member.Body() == nil || member.Type() != nil
+	case ast.KindConstructor:
+		return member.Modifiers() != nil || member.Body() == nil
+	}
+	return false
+}
+
+// hasOnlyModifiers reports whether every modifier of node is one of allowed.
+func hasOnlyModifiers(node *ast.Node, allowed ...ast.Kind) bool {
+	modifiers := node.Modifiers()
+	if modifiers == nil {
+		return true
+	}
+	for _, modifier := range modifiers.Nodes {
+		if !slices.Contains(allowed, modifier.Kind) {
+			return false
+		}
+	}
+	return true
 }
 
 // referencesUndefinedGlobal reports whether evaluating the wrapper would read
@@ -133,6 +178,60 @@ type referenceChecker struct {
 	evaluator      *utils.StaticStringEvaluator
 	wrapperVisited bool
 	found          bool
+	// strict is set while a class's evaluated parts run: class code is strict.
+	strict bool
+	// scope holds the names bound by the class expressions and static blocks
+	// around the node being visited, innermost last.
+	scope []scopeEntry
+}
+
+// scopeEntry is a name bound by a class expression or a static block. A class
+// name is initialized only after its heritage clause and computed keys run, so
+// it is unbound until then; it is immutable everywhere.
+type scopeEntry struct {
+	name  string
+	bound bool
+	class bool
+}
+
+// lookup returns the innermost entry binding name, or nil.
+func (c *referenceChecker) lookup(name string) *scopeEntry {
+	for i := len(c.scope) - 1; i >= 0; i-- {
+		if c.scope[i].name == name {
+			return &c.scope[i]
+		}
+	}
+	return nil
+}
+
+// readsUnresolved reports whether reading name would throw a ReferenceError,
+// or read a class name before it is initialized.
+func (c *referenceChecker) readsUnresolved(name string) bool {
+	if entry := c.lookup(name); entry != nil {
+		return !entry.bound
+	}
+	_, known := vmContextGlobals[name]
+	return !known
+}
+
+// writesUnresolved reports whether assigning to name throws in strict mode: an
+// inner class name is immutable, an undeclared name is not created, and the
+// non-writable global values are read-only.
+func (c *referenceChecker) writesUnresolved(name string) bool {
+	if entry := c.lookup(name); entry != nil {
+		return entry.class
+	}
+	if !c.strict {
+		return false
+	}
+	if _, known := vmContextGlobals[name]; !known {
+		return true
+	}
+	switch name {
+	case "undefined", "NaN", "Infinity":
+		return true
+	}
+	return false
 }
 
 // invalid records that the comment is certainly rejected by upstream, and
@@ -146,21 +245,24 @@ func (c *referenceChecker) invalid() bool {
 // known to be evaluated: when a condition or the left operand cannot be folded
 // to a constant, the code it may skip is left alone rather than reported.
 func (c *referenceChecker) visit(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
 	switch node.Kind {
 	case ast.KindFunctionExpression:
 		if c.wrapperVisited {
 			return false
 		}
 		c.wrapperVisited = true
-	case ast.KindArrowFunction, ast.KindFunctionDeclaration, ast.KindClassExpression,
+	case ast.KindClassExpression:
+		return c.visitClass(node)
+	case ast.KindArrowFunction, ast.KindFunctionDeclaration,
 		ast.KindClassDeclaration, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 		return false
 	case ast.KindIdentifier:
-		if isEvaluatedReference(node) {
-			if _, ok := vmContextGlobals[node.Text()]; !ok {
-				c.found = true
-				return true
-			}
+		if isEvaluatedReference(node) && c.readsUnresolved(node.Text()) {
+			c.found = true
+			return true
 		}
 	case ast.KindBinaryExpression:
 		return c.visitBinary(node.AsBinaryExpression())
@@ -182,6 +284,121 @@ func (c *referenceChecker) visit(node *ast.Node) bool {
 		}
 	}
 	return node.ForEachChild(c.visit)
+}
+
+// visitClass searches what runs when a class expression is evaluated: the
+// extends clause and computed member names, which run before the class name is
+// initialized, and then static initializers and static blocks, which run after.
+// Method bodies and instance initializers run later, when called or
+// constructed, so they are not searched. Class code is strict.
+func (c *referenceChecker) visitClass(class *ast.Node) bool {
+	savedStrict, savedScope := c.strict, len(c.scope)
+	c.strict = true
+	defer func() {
+		c.strict = savedStrict
+		c.scope = c.scope[:savedScope]
+	}()
+
+	index := -1
+	if name := class.Name(); name != nil {
+		c.scope = append(c.scope, scopeEntry{name: name.Text(), class: true})
+		index = len(c.scope) - 1
+	}
+
+	data := class.AsClassExpression()
+	if data.HeritageClauses != nil {
+		for _, clause := range data.HeritageClauses.Nodes {
+			for _, heritage := range clause.AsHeritageClause().Types.Nodes {
+				if c.visit(heritage.AsExpressionWithTypeArguments().Expression) {
+					return true
+				}
+			}
+		}
+	}
+	for _, member := range class.Members() {
+		if name := member.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+			if c.visit(name.AsComputedPropertyName().Expression) {
+				return true
+			}
+		}
+	}
+
+	if index >= 0 {
+		c.scope[index].bound = true
+	}
+	for _, member := range class.Members() {
+		switch member.Kind {
+		case ast.KindPropertyDeclaration:
+			if !ast.HasStaticModifier(member) {
+				continue
+			}
+			if initializer := member.AsPropertyDeclaration().Initializer; initializer != nil && c.visit(initializer) {
+				return true
+			}
+		case ast.KindClassStaticBlockDeclaration:
+			if c.visitStaticBlock(member.AsClassStaticBlockDeclaration().Body) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// visitStaticBlock searches a static block with the names it declares in
+// scope, so reads of those names are not reported.
+func (c *referenceChecker) visitStaticBlock(block *ast.Node) bool {
+	savedScope := len(c.scope)
+	defer func() { c.scope = c.scope[:savedScope] }()
+	for _, name := range declaredNames(block) {
+		c.scope = append(c.scope, scopeEntry{name: name, bound: true})
+	}
+	return c.visit(block)
+}
+
+// declaredNames returns the simple names that a static block binds for its
+// whole body: `var` and top-level declarations. A let, const, class or function
+// declared inside a nested block is visible only in that block.
+func declaredNames(block *ast.Node) []string {
+	var names []string
+	nested := 0
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		switch node.Kind {
+		case ast.KindBlock, ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement,
+			ast.KindSwitchStatement, ast.KindCatchClause:
+			nested++
+			node.ForEachChild(visit)
+			nested--
+			return false
+		case ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindClassExpression,
+			ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+			// Their declarations are local to them.
+			return false
+		case ast.KindVariableDeclaration, ast.KindBindingElement, ast.KindFunctionDeclaration, ast.KindClassDeclaration:
+			if name := node.Name(); name != nil && name.Kind == ast.KindIdentifier && (nested == 0 || !isLexicalDeclaration(node)) {
+				names = append(names, name.Text())
+			}
+			if node.Kind == ast.KindFunctionDeclaration || node.Kind == ast.KindClassDeclaration {
+				return false
+			}
+		}
+		return node.ForEachChild(visit)
+	}
+	block.ForEachChild(visit)
+	return names
+}
+
+// isLexicalDeclaration reports whether a variable or class or function binding
+// is block scoped: a let or const, or a class or function declaration.
+func isLexicalDeclaration(node *ast.Node) bool {
+	if node.Kind == ast.KindFunctionDeclaration || node.Kind == ast.KindClassDeclaration {
+		return true
+	}
+	list := node
+	for list != nil && list.Kind != ast.KindVariableDeclarationList {
+		list = list.Parent
+	}
+	return list != nil && list.Flags&(ast.NodeFlagsLet|ast.NodeFlagsConst) != 0
 }
 
 func (c *referenceChecker) visitBinary(binary *ast.BinaryExpression) bool {
@@ -289,8 +506,10 @@ func isEvaluatedReference(node *ast.Node) bool {
 	case ast.KindTypeOfExpression, ast.KindDeleteExpression:
 		// `typeof missing` and `delete missing` (sloppy mode) do not throw.
 		return false
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindPropertyDeclaration,
-		ast.KindParameter, ast.KindVariableDeclaration, ast.KindBindingElement, ast.KindFunctionExpression,
+	case ast.KindPropertyDeclaration, ast.KindVariableDeclaration, ast.KindBindingElement, ast.KindParameter:
+		// A declared name is a binding, not a read; its initializer is a read.
+		return parent.Initializer() == child
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindFunctionExpression,
 		ast.KindLabeledStatement, ast.KindBreakStatement, ast.KindContinueStatement, ast.KindMetaProperty,
 		ast.KindQualifiedName:
 		return false
@@ -431,6 +650,9 @@ func (c *referenceChecker) visitTarget(target *ast.Node, source valueSource) boo
 	target = ast.SkipParentheses(target)
 	switch target.Kind {
 	case ast.KindIdentifier:
+		if c.writesUnresolved(target.Text()) {
+			return c.invalid()
+		}
 		return false
 	case ast.KindNumericLiteral, ast.KindStringLiteral, ast.KindBigIntLiteral, ast.KindTrueKeyword,
 		ast.KindFalseKeyword, ast.KindNullKeyword:
