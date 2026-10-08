@@ -35,6 +35,7 @@ module.exports = {
     'internal/plugins/jsx_a11y/rules/aria_proptypes/aria_proptypes.md',
     'internal/plugins/react/rules/no_typos/no_typos.md',
     'internal/plugins/react/rules/no_unused_prop_types/no_unused_prop_types_upstream.json',
+    'internal/plugins/unicorn/rules/name_replacements/testdata/name_replacements_v77.json',
     'website/docs/en/rules/*/',
   ],
   dictionaries: ['dictionary'],

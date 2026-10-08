@@ -1,0 +1,51 @@
+{
+  "type": "array",
+  "additionalItems": false,
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "checkProperties": { "type": "boolean" },
+        "checkVariables": { "type": "boolean" },
+        "checkDefaultAndNamespaceImports": {
+          "type": ["boolean", "string"],
+          "pattern": "internal"
+        },
+        "checkShorthandImports": {
+          "type": ["boolean", "string"],
+          "pattern": "internal"
+        },
+        "checkShorthandProperties": { "type": "boolean" },
+        "checkFilenames": { "type": "boolean" },
+        "extendDefaultReplacements": { "type": "boolean" },
+        "replacements": { "$ref": "#/definitions/nameReplacements" },
+        "extendDefaultAllowList": { "type": "boolean" },
+        "allowList": { "$ref": "#/definitions/booleanObject" },
+        "ignore": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              { "type": "string", "format": "regex-u" },
+              { "type": "object", "additionalProperties": true }
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "nameReplacements": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/replacements" }
+    },
+    "replacements": {
+      "anyOf": [{ "enum": [false] }, { "$ref": "#/definitions/booleanObject" }]
+    },
+    "booleanObject": {
+      "type": "object",
+      "additionalProperties": { "type": "boolean" }
+    }
+  }
+}
