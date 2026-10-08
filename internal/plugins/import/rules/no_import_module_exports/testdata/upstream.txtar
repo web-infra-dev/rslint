@@ -1,0 +1,20 @@
+Fixtures for eslint-plugin-import v2.32.0 tests and documentation examples.
+
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noResolve":true,"module":"esnext","target":"esnext","jsx":"preserve"},"include":["**/*.js","**/*.ts","**/*.tsx"]}
+-- package.json --
+{}
+-- index.js --
+export {};
+-- some/other/entry-point.js --
+export {};
+-- missing-entrypoint/package.json --
+{"bin":"./cli.js"}
+-- missing-entrypoint/cli.js --
+export {};
+-- docs/package.json --
+{"main":"lib/index.js"}
+-- docs/lib/index.js --
+export {};
+-- docs/some-file.js --
+export {};

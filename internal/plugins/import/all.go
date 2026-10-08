@@ -22,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_duplicates"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_dynamic_require"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_empty_named_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_import_module_exports"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_mutable_exports"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_named_as_default"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_named_as_default_member"
@@ -65,6 +66,7 @@ func GetAllRules() []rule.Rule {
 		no_duplicates.NoDuplicatesRule,
 		no_dynamic_require.NoDynamicRequireRule,
 		no_empty_named_blocks.NoEmptyNamedBlocksRule,
+		no_import_module_exports.NoImportModuleExportsRule,
 		no_mutable_exports.NoMutableExportsRule,
 		no_named_as_default.NoNamedAsDefaultRule,
 		no_named_as_default_member.NoNamedAsDefaultMemberRule,
