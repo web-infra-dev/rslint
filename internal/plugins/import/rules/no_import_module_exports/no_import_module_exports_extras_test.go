@@ -1,10 +1,13 @@
 package no_import_module_exports_test
 
 import (
+	"strconv"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_import_module_exports"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoImportModuleExportsExtras(t *testing.T) {
@@ -16,6 +19,7 @@ func TestNoImportModuleExportsExtras(t *testing.T) {
 			{Code: `import { exports } from "value"; exports.value = 1;`},
 			{Code: `const module = {}; import value from "value"; module.value;`},
 			{Code: `const exports = {}; import value from "value"; exports.value = value;`},
+			{Code: `import value from "value"; module.exports = value;`, FileName: "entry-fallback/index.js"},
 			{Code: `import value from "value"; (module as any).exports = value;`, FileName: "source.ts"},
 			{Code: `import value from "value"; const element = <module.exports />;`, FileName: "source.tsx", Tsx: true},
 		},
@@ -49,8 +53,36 @@ func TestNoImportModuleExportsExtras(t *testing.T) {
 				Code:   "import value from 'value';\nmodule.exports = value;\nfunction unrelated(module) {}",
 				Errors: importError(1, 1, 1, 27),
 			},
+			{
+				Code:     `import value from "value"; module.exports = value;`,
+				FileName: "entry-fallback/other.js",
+				Errors:   importError(1, 1, 1, 27),
+			},
 			{Code: `import type { Value } from "value"; module.exports = 1;`, FileName: "source.ts", Errors: importError(1, 1, 1, 36)},
 		},
+	)
+}
+
+func TestNoImportModuleExportsAbsolutePackageMain(t *testing.T) {
+	root := upstreamRoot(t)
+	packageFile := tspath.ResolvePath(root.Dir, "absolute-main/package.json")
+	entryFile := tspath.ResolvePath(root.Dir, "absolute-main/entry.js")
+	root.FS = utils.NewOverlayVFS(root.FS, map[string]string{
+		packageFile: `{"main":` + strconv.Quote(entryFile) + `}`,
+		entryFile:   `export {};`,
+		tspath.ResolvePath(root.Dir, "absolute-main/index.js"): `export {};`,
+	})
+
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &no_import_module_exports.NoImportModuleExportsRule,
+		[]rule_tester.ValidTestCase{{
+			Code:     `import value from "value"; module.exports = value;`,
+			FileName: "absolute-main/entry.js",
+		}},
+		[]rule_tester.InvalidTestCase{{
+			Code:     `import value from "value"; module.exports = value;`,
+			FileName: "absolute-main/index.js",
+			Errors:   importError(1, 1, 1, 27),
+		}},
 	)
 }
 

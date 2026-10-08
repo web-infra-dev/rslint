@@ -12,6 +12,16 @@ export {};
 {"bin":"./cli.js"}
 -- missing-entrypoint/cli.js --
 export {};
+-- entry-fallback/package.json --
+{"main":"dist"}
+-- entry-fallback/index.js --
+export {};
+-- entry-fallback/other.js --
+export {};
+-- entry-fallback/dist/package.json --
+{"main":"entry.js"}
+-- entry-fallback/dist/entry.js --
+export {};
 -- docs/package.json --
 {"main":"lib/index.js"}
 -- docs/lib/index.js --

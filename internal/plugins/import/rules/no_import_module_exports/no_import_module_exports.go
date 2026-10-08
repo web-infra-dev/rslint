@@ -7,10 +7,10 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
-	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 	"github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
@@ -105,15 +105,35 @@ func packageEntryPoint(ctx rule.RuleContext) string {
 	if pkg == nil {
 		return ""
 	}
-	result := moduleresolver.Resolve(program, pkg.Directory(), ctx.SourceFile.FileName(), moduleresolver.Options{
-		Extensions:    []string{".js", ".json", ".node"},
-		MainFields:    []moduleresolver.MainField{{Name: []string{"main"}, ForceRelative: true}},
-		MainFiles:     []string{"index"},
-		IgnoreExports: true,
-		LiteralPaths:  true,
-	})
-	if result.Error != "" || result.Path == "" {
-		return ""
+	return resolveNodePackageEntry(program, pkg)
+}
+
+func resolveNodePackageEntry(program *program.Program, pkg *packagejson.Package) string {
+	if main, ok := pkg.Field("main").(string); ok && main != "" {
+		if runtime.GOOS == "windows" {
+			main = strings.ReplaceAll(main, `\`, "/")
+		}
+		mainPath := tspath.ResolvePath(pkg.Directory(), main)
+		if entry := probeNodeFile(program, mainPath); entry != "" {
+			return entry
+		}
+		if entry := probeNodeFile(program, tspath.ResolvePath(mainPath, "index")); entry != "" {
+			return entry
+		}
 	}
-	return tspath.NormalizePath(result.Path)
+	return probeNodeFile(program, tspath.ResolvePath(pkg.Directory(), "index"))
+}
+
+func probeNodeFile(program *program.Program, base string) string {
+	for _, extension := range []string{"", ".js", ".json", ".node"} {
+		candidate := base + extension
+		if !program.FileExists(candidate) {
+			continue
+		}
+		if realPath := program.FS().Realpath(candidate); realPath != "" {
+			return tspath.NormalizePath(realPath)
+		}
+		return tspath.NormalizePath(candidate)
+	}
+	return ""
 }
