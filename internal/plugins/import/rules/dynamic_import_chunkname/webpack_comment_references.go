@@ -129,19 +129,21 @@ func (c *referenceChecker) visit(node *ast.Node) bool {
 
 func (c *referenceChecker) visitBinary(binary *ast.BinaryExpression) bool {
 	switch binary.OperatorToken.Kind {
-	case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
+	case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken,
+		ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken, ast.KindQuestionQuestionEqualsToken:
+		// The logical assignments `||=`, `&&=` and `??=` short-circuit too: the
+		// left side is read, and the right side is evaluated only for the same
+		// left operands as `||`, `&&` and `??`.
 		if c.visit(binary.Left) {
 			return true
 		}
-		// The right operand runs only for a falsy (`||`), truthy (`&&`) or
-		// nullish (`??`) left operand.
 		var evaluatesRight, known bool
 		switch binary.OperatorToken.Kind {
-		case ast.KindBarBarToken:
+		case ast.KindBarBarToken, ast.KindBarBarEqualsToken:
 			var truthy bool
 			truthy, known = c.evaluator.EvalControlFlowTruthiness(binary.Left)
 			evaluatesRight = !truthy
-		case ast.KindAmpersandAmpersandToken:
+		case ast.KindAmpersandAmpersandToken, ast.KindAmpersandAmpersandEqualsToken:
 			evaluatesRight, known = c.evaluator.EvalControlFlowTruthiness(binary.Left)
 		default:
 			evaluatesRight, known = c.evaluator.EvalControlFlowNullish(binary.Left)
