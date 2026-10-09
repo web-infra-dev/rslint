@@ -29,10 +29,16 @@ type externalSymbolKey struct {
 }
 
 type externalSymbolCollector struct {
-	tc        *checker.Checker
-	semantic  *Semantic
+	tc       *checker.Checker
+	semantic *Semantic
+	// Keep the shortest expansion path within each root to bound cyclic object graphs.
 	expanded  map[externalSymbolKey]string
-	collected map[ast.SymbolId]int
+	collected map[externalSymbolNameKey]bool
+}
+
+type externalSymbolNameKey struct {
+	externalSymbolKey
+	name string
 }
 
 func collectExternalSymbols(program *compiler.Program, tc *checker.Checker, semantic *Semantic) {
@@ -44,7 +50,7 @@ func collectExternalSymbols(program *compiler.Program, tc *checker.Checker, sema
 		tc:        tc,
 		semantic:  semantic,
 		expanded:  make(map[externalSymbolKey]string),
-		collected: make(map[ast.SymbolId]int),
+		collected: make(map[externalSymbolNameKey]bool),
 	}
 	collector.collectGlobals()
 	collector.collectDependencies(program)
@@ -113,6 +119,8 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 			return exports[i].Name < exports[j].Name
 		})
 		for _, symbol := range exports {
+			// Each exported alias is a root in its own right, including its members.
+			clear(c.expanded)
 			c.collect(root.namespace, symbol.Name, symbol)
 		}
 	}
@@ -192,19 +200,19 @@ func isAcceptedTypeOnlySymbolPath(name string) bool {
 
 func (c *externalSymbolCollector) record(namespace string, name string, symbol *ast.Symbol) {
 	symbolID := ast.GetSymbolId(symbol)
-	external := ExternalSymbol{
+	key := externalSymbolNameKey{
+		externalSymbolKey: externalSymbolKey{namespace: namespace, symbolID: symbolID},
+		name:              name,
+	}
+	if c.collected[key] {
+		return
+	}
+	c.collected[key] = true
+	c.semantic.ExternalSymbols = append(c.semantic.ExternalSymbols, ExternalSymbol{
 		SymbolId:  symbolID,
 		Namespace: []byte(namespace),
 		Name:      []byte(name),
-	}
-	if index, exists := c.collected[symbolID]; exists {
-		if preferShorterSymbol(external, c.semantic.ExternalSymbols[index]) {
-			c.semantic.ExternalSymbols[index] = external
-		}
-	} else {
-		c.collected[symbolID] = len(c.semantic.ExternalSymbols)
-		c.semantic.ExternalSymbols = append(c.semantic.ExternalSymbols, external)
-	}
+	})
 }
 
 func externalModuleName(moduleName string) (namespace string, ok bool) {
@@ -227,24 +235,6 @@ func joinExternalName(prefix string, name string) string {
 		return name
 	}
 	return prefix + "." + name
-}
-
-func preferShorterSymbol(candidate ExternalSymbol, current ExternalSymbol) bool {
-	candidateNamespace := string(candidate.Namespace)
-	currentNamespace := string(current.Namespace)
-	if candidateNamespace != currentNamespace {
-		if candidateNamespace == globalNamespace {
-			return true
-		}
-		if currentNamespace == globalNamespace {
-			return false
-		}
-		return candidateNamespace < currentNamespace
-	}
-
-	candidateName := string(candidate.Name)
-	currentName := string(current.Name)
-	return preferShorterName(candidateName, currentName)
 }
 
 func preferShorterName(candidateName string, currentName string) bool {

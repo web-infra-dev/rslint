@@ -157,7 +157,8 @@ type Semantic struct {
 	// ParameterPropertySymbols maps a parameter property name node to the other symbol declared at that location.
 	// The primary symbol remains recorded in Node2sym.
 	ParameterPropertySymbols map[NodeReference]ast.SymbolId `json:"parameter_property_symbols"`
-	// ExternalSymbols contains globals and dependency exports with their qualified external names.
+	// ExternalSymbols contains every distinct qualified name of globals and dependency exports.
+	// Multiple entries can refer to the same symbol ID through aliases or re-exports.
 	ExternalSymbols []ExternalSymbol `json:"external_symbols"`
 }
 
