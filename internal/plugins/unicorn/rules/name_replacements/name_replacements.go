@@ -143,14 +143,6 @@ func cloneBoolMap(source map[string]bool) map[string]bool {
 	return result
 }
 
-func cloneReplacements(source map[string]map[string]bool) map[string]map[string]bool {
-	result := make(map[string]map[string]bool, len(source))
-	for name, replacements := range source {
-		result[name] = cloneBoolMap(replacements)
-	}
-	return result
-}
-
 func parseOptions(raw []any) options {
 	result := options{
 		checkVariables:                  true,
@@ -185,7 +177,7 @@ func parseOptions(raw []any) options {
 		extendDefaults = value
 	}
 	if extendDefaults {
-		result.replacements = cloneReplacements(defaultReplacements)
+		result.replacements = newDefaultReplacements()
 	} else {
 		result.replacements = make(map[string]map[string]bool)
 	}
