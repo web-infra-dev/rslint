@@ -212,32 +212,23 @@ func (c *referenceChecker) chainEvaluated(node *ast.Node) bool {
 }
 
 // isEvaluatedReference reports whether the identifier is read as a variable
-// when the expression is evaluated. Parentheses are transparent, so the parent
-// is the first node around them.
+// when the expression is evaluated: it is not a declared name, a property key,
+// a label or a meta property, and it is not the operand of typeof or delete,
+// which do not throw for a name that does not exist. Parentheses are
+// transparent, so the operand may be wrapped in them.
 func isEvaluatedReference(node *ast.Node) bool {
-	child := node
+	if utils.IsNonReferenceIdentifier(node) {
+		return false
+	}
 	parent := node.Parent
 	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		child = parent
 		parent = parent.Parent
 	}
 	if parent == nil {
 		return false
 	}
 	switch parent.Kind {
-	case ast.KindPropertyAssignment:
-		return parent.AsPropertyAssignment().Initializer == child
-	case ast.KindPropertyAccessExpression:
-		return parent.AsPropertyAccessExpression().Expression == child
 	case ast.KindTypeOfExpression, ast.KindDeleteExpression:
-		// `typeof missing` and `delete missing` (sloppy mode) do not throw.
-		return false
-	case ast.KindPropertyDeclaration, ast.KindVariableDeclaration, ast.KindBindingElement, ast.KindParameter:
-		// A declared name is a binding, not a read; its initializer is a read.
-		return parent.Initializer() == child
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindFunctionExpression,
-		ast.KindLabeledStatement, ast.KindBreakStatement, ast.KindContinueStatement, ast.KindMetaProperty,
-		ast.KindQualifiedName:
 		return false
 	}
 	return true

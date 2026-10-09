@@ -55,7 +55,7 @@ func (c *strictModeChecker) violates(node *ast.Node) bool {
 		return hasLegacyOctalEscape(c.sourceFile.Text()[raw.Pos():raw.End()])
 	case ast.KindIdentifier:
 		name := node.Text()
-		if _, reserved := strictReservedWords[name]; reserved && !isNameOfParent(node) {
+		if _, reserved := strictReservedWords[name]; reserved && !isPropertyKey(node) {
 			return true
 		}
 		return (name == "eval" || name == "arguments") && isAssignedOrBound(node)
@@ -71,17 +71,26 @@ func (c *strictModeChecker) violates(node *ast.Node) bool {
 	return false
 }
 
-// isNameOfParent reports whether node is the name of a property, method or
-// member access, where it is a name rather than a reference.
-func isNameOfParent(node *ast.Node) bool {
+// isPropertyKey reports whether node is the key of a property, method, member
+// access or binding pattern element, or a meta property name. A key is a name
+// rather than an identifier, so a reserved word is allowed there. A name that
+// is bound or referenced is not a key: `{static: value}` binds `value`, while
+// `{static}` binds `static`.
+func isPropertyKey(node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil {
 		return false
 	}
 	switch parent.Kind {
-	case ast.KindPropertyAccessExpression, ast.KindPropertyAssignment, ast.KindMethodDeclaration,
-		ast.KindPropertyDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+	case ast.KindPropertyAccessExpression:
+		return parent.AsPropertyAccessExpression().Name() == node
+	case ast.KindPropertyAssignment, ast.KindMethodDeclaration, ast.KindPropertyDeclaration,
+		ast.KindGetAccessor, ast.KindSetAccessor:
 		return parent.Name() == node
+	case ast.KindBindingElement:
+		return parent.AsBindingElement().PropertyName == node
+	case ast.KindMetaProperty:
+		return true
 	}
 	return false
 }

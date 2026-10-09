@@ -28,6 +28,7 @@ var vmContextGlobals = map[string]struct{}{
 	"parseFloat": {}, "parseInt": {}, "isFinite": {}, "isNaN": {}, "eval": {},
 	"decodeURI": {}, "decodeURIComponent": {}, "encodeURI": {}, "encodeURIComponent": {},
 	"escape": {}, "unescape": {}, "console": {},
+	"Iterator": {}, "Float16Array": {}, "DisposableStack": {}, "AsyncDisposableStack": {}, "SuppressedError": {}, "Temporal": {},
 }
 
 // isValidWebpackCommentBody reports whether the text between the delimiters of
