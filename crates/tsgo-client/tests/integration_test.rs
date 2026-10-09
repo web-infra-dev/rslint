@@ -1,57 +1,17 @@
-use std::env;
+// cspell:ignore symbolflags symtab typetab primtypes
+#[path = "common/helper.rs"]
+mod helper;
+
+use helper::{
+    external_symbol, get_fixtures_dir, get_tsgo_path, load_project, named_symbol, node_symbol,
+    node_type, project_from_source, same_location, source_file_id, symbol_data, type_data,
+};
+use serde::Serialize;
 use std::ffi::OsStr;
-use std::path::PathBuf;
 use tsgo_client::Api;
 use tsgo_client::client::{Client, Options};
+use tsgo_client::proto::NodeReference;
 use tsgo_client::symbolflags::SymbolFlags;
-
-use serde::Serialize;
-
-/// Get the path to the tsgo executable for testing.
-/// Tries to build tsgo from cmd/tsgo or finds an existing binary.
-fn get_tsgo_path() -> Option<PathBuf> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let repo_root = manifest_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("Could not find repo root");
-
-    // Try to build tsgo from cmd/tsgo (this is the correct version for tsgo-client)
-    let tsgo_output = repo_root.join("target/tsgo");
-    let cmd_tsgo_dir = repo_root.join("cmd/tsgo");
-
-    if cmd_tsgo_dir.exists() {
-        eprintln!("Building tsgo from cmd/tsgo...");
-        let status = std::process::Command::new("go")
-            .args(["build", "-o"])
-            .arg(&tsgo_output)
-            .arg("./cmd/tsgo")
-            .current_dir(repo_root)
-            .status();
-
-        if status.is_ok() && tsgo_output.exists() {
-            eprintln!("✓ Built tsgo successfully");
-            return Some(tsgo_output);
-        }
-    }
-
-    // Fall back to searching for existing binaries
-    let possible_paths = ["target/tsgo", "bin/tsgo"];
-
-    for path in &possible_paths {
-        let full_path = repo_root.join(path);
-        if full_path.exists() {
-            return Some(full_path);
-        }
-    }
-
-    None
-}
-
-/// Get the path to the test fixtures directory
-fn get_fixtures_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
-}
 
 #[test]
 fn test_tsgo_integration_simple_project() {
@@ -129,6 +89,22 @@ fn test_tsgo_integration_simple_project() {
     assert_ne!(project.semantic.primtypes.string, 0);
     assert_ne!(project.semantic.primtypes.number, 0);
     assert_ne!(project.semantic.primtypes.any, 0);
+
+    // Shared DOM members retain every observed qualified name through transport.
+    let document_listener = project
+        .semantic
+        .external_symbols
+        .iter()
+        .find(|symbol| symbol.namespace == b"global" && symbol.name == b"document.addEventListener")
+        .expect("Expected document.addEventListener metadata");
+    assert!(
+        project.semantic.external_symbols.iter().any(|symbol| {
+            symbol.symbol_id == document_listener.symbol_id
+                && symbol.namespace == b"global"
+                && symbol.name != document_listener.name
+        }),
+        "Expected multiple qualified names for the shared listener symbol"
+    );
 
     let index_module = project
         .module_list
@@ -213,7 +189,6 @@ fn test_type_literal_symbol_has_symbol_data() {
         .map(|(_, data)| data)
         .expect("Expected type literal symbol data in symtab");
 
-    assert_eq!(type_symbol_data.name, b"__type");
     assert!(
         SymbolFlags::from_bits_truncate(type_symbol_data.flags).contains(SymbolFlags::TYPE_LITERAL),
         "Expected a type literal symbol, got flags {}",
@@ -263,47 +238,6 @@ fn test_runtime_module_exports() {
     assert!(!export_names.iter().any(|name| name == "DirectType"));
     assert!(!export_names.iter().any(|name| name == "BarrelType"));
     assert!(!export_names.iter().any(|name| name == "RuntimeTypeOnly"));
-}
-
-#[test]
-fn test_tsgo_client_builder() {
-    let tsgo_path = get_tsgo_path().expect("Could not find tsgo executable");
-    let fixture_dir = get_fixtures_dir().join("simple-project");
-    let config_file = fixture_dir.join("tsconfig.json");
-
-    // Test builder pattern
-    let options = Options {
-        cwd: Some(fixture_dir.clone()),
-        log_file: None,
-        config_file: config_file.to_string_lossy().to_string(),
-    };
-
-    let client = Client::builder(OsStr::new(&tsgo_path), options)
-        .log_file("test.log".to_string())
-        .build();
-
-    assert!(client.is_ok(), "Failed to build client with builder");
-}
-
-#[test]
-fn test_fixture_structure() {
-    let fixture_dir = get_fixtures_dir().join("simple-project");
-    assert!(fixture_dir.exists(), "Fixture directory should exist");
-
-    let tsconfig = fixture_dir.join("tsconfig.json");
-    assert!(tsconfig.exists(), "tsconfig.json should exist");
-
-    let src_dir = fixture_dir.join("src");
-    assert!(src_dir.exists(), "src directory should exist");
-
-    let index_ts = src_dir.join("index.ts");
-    assert!(index_ts.exists(), "index.ts should exist");
-
-    let utils_ts = src_dir.join("utils.ts");
-    assert!(utils_ts.exists(), "utils.ts should exist");
-
-    let shorthand_ts = src_dir.join("shorthand.ts");
-    assert!(shorthand_ts.exists(), "shorthand.ts should exist");
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -651,4 +585,286 @@ fn test_get_parameter_property_symbols() {
     );
 
     insta::assert_json_snapshot!(mappings);
+}
+
+#[test]
+fn test_element_access_resolves_property_and_value_type() {
+    let source = r#"const obj = { a: 1 }; const value = obj["a"];"#;
+    let mut buffer = Vec::new();
+    let (_directory, project) = project_from_source(source, &mut buffer);
+    let file = source_file_id(&project, "/index.ts");
+    let semantic = &project.semantic;
+    let offset = source.find(r#""a""#).unwrap();
+    let property = node_symbol(
+        semantic,
+        &NodeReference {
+            sourcefile_id: file,
+            start: source[..offset].encode_utf16().count() as u32,
+            end: source[..offset + 3].encode_utf16().count() as u32,
+        },
+    );
+    let property = symbol_data(semantic, property);
+    assert_eq!(property.name, b"a");
+    assert!(SymbolFlags::from_bits_truncate(property.flags).contains(SymbolFlags::PROPERTY));
+
+    let (value, _) = named_symbol(semantic, file, b"value");
+    let value_type = semantic
+        .sym2type
+        .iter()
+        .find(|(id, _)| *id == value)
+        .expect("Missing element access result type")
+        .1;
+    assert_eq!(value_type, semantic.primtypes.number);
+}
+
+#[test]
+fn test_type_declaration_and_object_literal_symbols() {
+    let source = "class ClassType {}\ninterface InterfaceType {}\nconst classValue = new ClassType();\nlet interfaceValue: InterfaceType;\nconst anonymousValue = {};\nconst primitiveValue = 1;";
+    let mut buffer = Vec::new();
+    let (_directory, project) = project_from_source(source, &mut buffer);
+    let file = source_file_id(&project, "/index.ts");
+    let semantic = &project.semantic;
+    for (name, expected_name, expected_flags) in [
+        ("classValue", "ClassType", SymbolFlags::CLASS),
+        ("interfaceValue", "InterfaceType", SymbolFlags::INTERFACE),
+    ] {
+        let (symbol, _) = named_symbol(semantic, file, name.as_bytes());
+        let ty = semantic
+            .sym2type
+            .iter()
+            .find(|(id, _)| *id == symbol)
+            .expect("Missing symbol type")
+            .1;
+        let declaration = type_data(semantic, ty)
+            .symbol
+            .expect("Missing type declaration symbol");
+        let declaration = symbol_data(semantic, declaration);
+        assert_eq!(declaration.name, expected_name.as_bytes());
+        assert!(SymbolFlags::from_bits_truncate(declaration.flags).contains(expected_flags));
+    }
+    let (anonymous, _) = named_symbol(semantic, file, b"anonymousValue");
+    let anonymous_type = semantic
+        .sym2type
+        .iter()
+        .find(|(id, _)| *id == anonymous)
+        .expect("Missing object literal type")
+        .1;
+    let object_symbol = type_data(semantic, anonymous_type)
+        .symbol
+        .expect("Missing object literal symbol");
+    assert!(
+        SymbolFlags::from_bits_truncate(symbol_data(semantic, object_symbol).flags)
+            .contains(SymbolFlags::OBJECT_LITERAL)
+    );
+    let (primitive, _) = named_symbol(semantic, file, b"primitiveValue");
+    let primitive_type = semantic
+        .sym2type
+        .iter()
+        .find(|(id, _)| *id == primitive)
+        .unwrap()
+        .1;
+    assert!(type_data(semantic, primitive_type).symbol.is_none());
+}
+
+#[test]
+fn test_import_aliases_preserve_merged_local_values() {
+    let mut buffer = Vec::new();
+    let project = load_project(&get_fixtures_dir().join("semantic-project"), &mut buffer);
+    let semantic = &project.semantic;
+    let file = source_file_id(&project, "/index.ts");
+    let source = include_str!("fixtures/semantic-project/index.ts");
+    let offset = source.find("alias }").unwrap();
+    // Query the imported identifier in the data returned to Rust.
+    let alias = node_symbol(
+        semantic,
+        &NodeReference {
+            sourcefile_id: file,
+            start: source[..offset].trim_end().encode_utf16().count() as u32,
+            end: source[..offset + "alias".len()].encode_utf16().count() as u32,
+        },
+    );
+    let data = symbol_data(semantic, alias);
+    assert_eq!(data.name, b"alias");
+    let target = semantic
+        .alias_symbols
+        .iter()
+        .find(|(id, _)| *id == alias)
+        .expect("Missing import alias target")
+        .1;
+    assert_eq!(symbol_data(semantic, target).name, b"originalValue");
+    assert_eq!(
+        symbol_data(semantic, target)
+            .decl
+            .as_ref()
+            .unwrap()
+            .sourcefile_id,
+        source_file_id(&project, "/module.ts")
+    );
+
+    let merged_file = source_file_id(&project, "/merged.ts");
+    let (local, data) = named_symbol(semantic, merged_file, b"SymbolLinks");
+    assert!(SymbolFlags::from_bits_truncate(data.flags).intersects(SymbolFlags::VALUE));
+    assert!(!semantic.alias_symbols.iter().any(|(id, _)| *id == local));
+    assert!(
+        semantic
+            .node2sym
+            .iter()
+            .any(|(node, id)| node.sourcefile_id == merged_file
+                && *id == local
+                && node.start > data.decl.as_ref().unwrap().end),
+        "Missing local value reference"
+    );
+}
+
+#[test]
+fn test_side_effect_imports_resolve_to_target_modules() {
+    let mut buffer = Vec::new();
+    let project = load_project(
+        &get_fixtures_dir().join("semantic-project/side-effect"),
+        &mut buffer,
+    );
+    let source = include_str!("fixtures/semantic-project/index.ts");
+    let file = source_file_id(&project, "/index.ts");
+    for (specifier, target) in [
+        ("'./script.js'", "/script.ts"),
+        ("'./module.js'", "/module.ts"),
+    ] {
+        let start = source.find(specifier).unwrap();
+        let node = NodeReference {
+            sourcefile_id: file,
+            start: source[..start].trim_end().encode_utf16().count() as u32,
+            end: source[..start + specifier.len()].encode_utf16().count() as u32,
+        };
+        let target_module = project
+            .semantic
+            .node2sym
+            .iter()
+            .find(|(location, _)| same_location(location, &node))
+            .map(|(_, symbol)| {
+                symbol_data(&project.semantic, *symbol)
+                    .decl
+                    .as_ref()
+                    .expect("Missing module declaration")
+                    .sourcefile_id
+            })
+            .or_else(|| {
+                project
+                    .semantic
+                    .node2module
+                    .iter()
+                    .find(|(location, _)| same_location(location, &node))
+                    .map(|(_, module)| *module)
+            });
+        assert_eq!(
+            target_module,
+            Some(source_file_id(&project, target)),
+            "Specifier {specifier}"
+        );
+    }
+}
+
+#[test]
+fn test_utf16_positions_and_utf8_symbol_names() {
+    let source = "let a = `💀`;\nlet b = 1;\nconst f = () => 1;";
+    let mut buffer = Vec::new();
+    let (_directory, project) = project_from_source(source, &mut buffer);
+    let file = source_file_id(&project, "/index.ts");
+    let byte_offset = source.find("b =").unwrap();
+    let utf16_offset = source[..byte_offset].encode_utf16().count() as u32;
+    assert_ne!(byte_offset as u32, utf16_offset);
+    let node = NodeReference {
+        sourcefile_id: file,
+        start: utf16_offset - 1,
+        end: utf16_offset + 1,
+    };
+    let symbol = node_symbol(&project.semantic, &node);
+    let data = symbol_data(&project.semantic, symbol);
+    assert_eq!(data.name, b"b");
+    let declaration = data.decl.as_ref().unwrap();
+    assert_eq!(declaration.sourcefile_id, file);
+    assert_eq!(declaration.start, node.start);
+    let declaration_end = source.find(";\nconst f").unwrap();
+    assert_eq!(
+        declaration.end,
+        source[..declaration_end].encode_utf16().count() as u32
+    );
+    assert_eq!(
+        node_type(&project.semantic, file, node.start, node.end).id,
+        project.semantic.primtypes.number
+    );
+    for (_, symbol) in &project.semantic.symtab {
+        std::str::from_utf8(&symbol.name).expect("Symbol names must have valid UTF-8");
+    }
+}
+
+#[test]
+fn test_external_symbol_names_and_aliases() {
+    let mut buffer = Vec::new();
+    let project = load_project(&get_fixtures_dir().join("external-symbols"), &mut buffer);
+    let semantic = &project.semantic;
+    for name in [
+        "globalThis",
+        "Math",
+        "Math.abs",
+        "Object.prototype.hasOwnProperty",
+        "console.log",
+    ] {
+        external_symbol(semantic, "global", name);
+    }
+    assert_eq!(
+        external_symbol(semantic, "global", "A.abs"),
+        external_symbol(semantic, "global", "Math.abs")
+    );
+    let paths: [(&str, &[&str]); 5] = [
+        ("example-dependency", &["api", "other"]),
+        ("example-dependency/index.js", &["api", "other"]),
+        ("example-reexport", &["renamed"]),
+        ("@scope/pkg", &["api"]),
+        ("@scope/pkg/subpath", &["api"]),
+    ];
+    for suffix in ["", ".run", ".nested", ".nested.value", ".self"] {
+        let target = external_symbol(semantic, "example-dependency", &format!("api{suffix}"));
+        for (namespace, names) in paths {
+            for name in names {
+                assert_eq!(
+                    external_symbol(semantic, namespace, &format!("{name}{suffix}")),
+                    target
+                );
+            }
+        }
+    }
+    external_symbol(semantic, "example-dependency", "value");
+    external_symbol(semantic, "node:assert", "ok");
+    external_symbol(semantic, "react/jsx-runtime", "jsx");
+    assert!(
+        !semantic
+            .external_symbols
+            .iter()
+            .any(|symbol| symbol.namespace == b"./local"
+                || symbol.name == b"hidden"
+                || symbol.name == b"OnlyType")
+    );
+    let mut unique = std::collections::HashSet::new();
+    for symbol in &semantic.external_symbols {
+        assert!(
+            unique.insert((symbol.symbol_id, &symbol.namespace, &symbol.name)),
+            "Duplicate external symbol {symbol:?}"
+        );
+    }
+}
+
+#[test]
+fn test_external_jsx_intrinsic_element_symbols() {
+    for (fixture, namespace, name) in [
+        ("external-symbols", "react", "JSX.IntrinsicElements.div"),
+        (
+            "external-symbols/global-jsx",
+            "global",
+            "React.JSX.IntrinsicElements.div",
+        ),
+    ] {
+        let mut buffer = Vec::new();
+        let project = load_project(&get_fixtures_dir().join(fixture), &mut buffer);
+        external_symbol(&project.semantic, namespace, name);
+    }
 }

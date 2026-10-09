@@ -1890,7 +1890,7 @@ The current architecture already leaves room for:
 - **Shared Go Test Infrastructure**: `internal/testutil`; package-specific helpers remain beside the owning tests
 - **JS/TS Integration Tests**: `packages/rslint/tests` and `packages/rslint-test-tools/tests`
 - **VS Code Extension Tests**: `packages/vscode-extension/__tests__`
-- **Rust / tsgo Tests**: `crates/tsgo-client/tests` and `cmd/tsgo/semantic_test.go`
+- **Rust / tsgo Tests**: `crates/tsgo-client/tests` verifies exported semantic data through the matching `cmd/tsgo` binary
 
 ### Rule Testing
 
