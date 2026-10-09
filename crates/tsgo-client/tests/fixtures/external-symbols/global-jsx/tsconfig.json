@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["react"]
+  },
+  "include": ["./index.tsx"]
+}

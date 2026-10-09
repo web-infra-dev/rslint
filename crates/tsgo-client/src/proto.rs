@@ -61,7 +61,7 @@ pub struct Semantic {
     // Parameter property declarations create another symbol at the same name node; node2sym keeps the primary symbol.
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub parameter_property_symbols: Vec<(NodeReference, u32)>,
-    // Globals and dependency exports qualified by namespace and name.
+    // All qualified names of globals and dependency exports; symbol IDs may repeat.
     #[serde(default)]
     pub external_symbols: Vec<ExternalSymbol>,
 }

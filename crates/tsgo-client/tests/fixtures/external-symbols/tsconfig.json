@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": [],
+    "paths": {
+      "node:assert": ["./node_modules/node-assert/index.d.ts"]
+    }
+  },
+  "include": ["./index.ts"]
+}
