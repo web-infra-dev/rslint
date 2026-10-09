@@ -1013,5 +1013,36 @@
       "commit": "1f70213d4922b434345f639b441681e470c7cfc1",
       "releaseVersion": null
     }
+  },
+  {
+    "version": "0.9.5",
+    "rules": [
+      "eslint-plugin-react:default-props-match-prop-types",
+      "eslint-plugin-react:prefer-exact-props",
+      "eslint-plugin-react:require-default-props",
+      "eslint-plugin-react:sort-default-props",
+      "eslint-plugin-unicorn:expiring-todo-comments",
+      "eslint-plugin-unicorn:explicit-length-check",
+      "eslint-plugin-unicorn:max-nested-calls",
+      "eslint-plugin-unicorn:no-anonymous-default-export",
+      "eslint-plugin-unicorn:no-array-callback-reference",
+      "eslint-plugin-unicorn:no-console-spaces",
+      "eslint-plugin-unicorn:no-empty-file",
+      "eslint-plugin-unicorn:no-global-object-property-assignment",
+      "eslint-plugin-unicorn:no-lonely-if",
+      "eslint-plugin-unicorn:no-negated-condition",
+      "eslint-plugin-unicorn:no-new-array",
+      "eslint-plugin-unicorn:no-single-promise-in-promise-methods",
+      "eslint-plugin-unicorn:no-typeof-undefined",
+      "eslint-plugin-unicorn:no-unnecessary-await",
+      "eslint-plugin-unicorn:no-useless-spread",
+      "eslint-plugin-unicorn:prefer-flat-math-min-max",
+      "eslint-plugin-unicorn:prefer-single-call",
+      "eslint-plugin-unicorn:prefer-unicode-code-point-escapes"
+    ],
+    "typescript": {
+      "commit": "1f70213d4922b434345f639b441681e470c7cfc1",
+      "releaseVersion": null
+    }
   }
 ]
