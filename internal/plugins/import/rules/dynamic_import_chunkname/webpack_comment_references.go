@@ -396,7 +396,10 @@ func (source valueSource) valueUndefined() (undefined bool, known bool) {
 
 // cannotDestructure reports whether destructuring a known value throws a
 // TypeError: null and undefined never destructure, and an array pattern also
-// rejects a value that is not iterable.
+// rejects a value that is not iterable. A value counts as not iterable only when
+// the literal cannot carry a Symbol.iterator, which needs a computed key, a
+// spread or an inherited prototype, so objects and classes that may have one are
+// left unknown.
 func (source valueSource) cannotDestructure(object bool) bool {
 	if source.absent {
 		return true
@@ -411,11 +414,47 @@ func (source valueSource) cannotDestructure(object bool) bool {
 	case ast.KindIdentifier:
 		return expression.Text() == "undefined"
 	case ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindTrueKeyword, ast.KindFalseKeyword,
-		ast.KindObjectLiteralExpression, ast.KindRegularExpressionLiteral, ast.KindFunctionExpression,
-		ast.KindArrowFunction, ast.KindClassExpression:
+		ast.KindRegularExpressionLiteral, ast.KindFunctionExpression, ast.KindArrowFunction:
 		return !object
+	case ast.KindObjectLiteralExpression:
+		return !object && hasOnlyNamedMembers(expression)
+	case ast.KindClassExpression:
+		return !object && isPlainClass(expression)
 	}
 	return false
+}
+
+// hasOnlyNamedMembers reports an object literal whose keys are all plain names:
+// no spread, computed key or __proto__ that could add a Symbol.iterator or a
+// prototype that has one.
+func hasOnlyNamedMembers(object *ast.Node) bool {
+	for _, property := range object.AsObjectLiteralExpression().Properties.Nodes {
+		switch property.Kind {
+		case ast.KindPropertyAssignment, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+			key, ok := utils.GetStaticPropertyName(property.Name())
+			if !ok || key == "__proto__" {
+				return false
+			}
+		case ast.KindShorthandPropertyAssignment:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// isPlainClass reports a class without a heritage clause or computed member,
+// which cannot inherit or define a static Symbol.iterator.
+func isPlainClass(class *ast.Node) bool {
+	if class.AsClassExpression().HeritageClauses != nil {
+		return false
+	}
+	for _, member := range class.Members() {
+		if name := member.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+			return false
+		}
+	}
+	return true
 }
 
 // element is the source of the index-th element of an array destructuring.
@@ -440,7 +479,19 @@ func (source valueSource) element(index int) valueSource {
 	return valueSource{expression: elements[index]}
 }
 
-// property is the source of the named property of an object destructuring.
+// objectPrototypeNames are the properties every plain object inherits from
+// Object.prototype. One of them that an object literal does not define itself
+// is still defined, so it is never an absent property.
+var objectPrototypeNames = map[string]struct{}{
+	"constructor": {}, "hasOwnProperty": {}, "isPrototypeOf": {}, "propertyIsEnumerable": {},
+	"toLocaleString": {}, "toString": {}, "valueOf": {}, "__proto__": {},
+	"__defineGetter__": {}, "__defineSetter__": {}, "__lookupGetter__": {}, "__lookupSetter__": {},
+}
+
+// property is the source of the named property of an object destructuring. The
+// property is absent only when no own property and no inherited one can supply
+// it: an object literal with a __proto__ key has an unknown prototype, and every
+// object inherits the names of Object.prototype.
 func (source valueSource) property(name string, nameKnown bool) valueSource {
 	if !nameKnown || source.absent || source.expression == nil {
 		return unknownValue
@@ -455,7 +506,7 @@ func (source valueSource) property(name string, nameKnown bool) valueSource {
 		case ast.KindPropertyAssignment:
 			assignment := property.AsPropertyAssignment()
 			key, ok := utils.GetStaticPropertyName(assignment.Name())
-			if !ok {
+			if !ok || key == "__proto__" {
 				return unknownValue
 			}
 			if key == name {
@@ -471,10 +522,13 @@ func (source valueSource) property(name string, nameKnown bool) valueSource {
 			return unknownValue
 		}
 	}
-	if found == nil {
-		return valueSource{absent: true}
+	if found != nil {
+		return valueSource{expression: found}
 	}
-	return valueSource{expression: found}
+	if _, inherited := objectPrototypeNames[name]; inherited {
+		return unknownValue
+	}
+	return valueSource{absent: true}
 }
 
 // visitTarget walks the target of a destructuring or plain assignment. A name
