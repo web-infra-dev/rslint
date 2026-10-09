@@ -91,7 +91,7 @@ func directCyclesFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, sett
 		type backEdge struct{ dynamic, found bool }
 		checked := make(map[*ast.SourceFile]backEdge)
 		for _, ref := range refs {
-			if ref.TypeOnly || ref.Target == nil || ref.Target == self {
+			if ref.TypeOnly || ref.Target == nil || ref.Target == self || !import_utils.HasAuthoredModuleView(ref.Source()) {
 				continue
 			}
 			back, known := checked[ref.Target]
@@ -122,7 +122,7 @@ func directTargetsFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, fil
 	return rule.CachedByProgram(ctx, directTargetsKey{file: file, kinds: kinds}, func() map[*ast.SourceFile]bool {
 		var targets map[*ast.SourceFile]bool
 		for _, ref := range sourceGraph.References(file, kinds) {
-			if ref.TypeOnly || ref.Target == nil {
+			if ref.TypeOnly || ref.Target == nil || !import_utils.HasAuthoredModuleView(ref.Source()) {
 				continue
 			}
 			if targets == nil {
@@ -175,7 +175,7 @@ func buildModuleGraph(ctx rule.RuleContext, sourceGraph program.ModuleGraph, set
 		node.edge = make([]int32, len(refs))
 		for r := range refs {
 			node.edge[r] = -1
-			if refs[r].TypeOnly || refs[r].Target == nil {
+			if refs[r].TypeOnly || refs[r].Target == nil || !import_utils.HasAuthoredModuleView(refs[r].Source()) {
 				continue
 			}
 			if target, ok := graph.index[refs[r].Target]; ok {

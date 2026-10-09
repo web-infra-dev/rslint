@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 const defaultExportName = "default"
@@ -139,11 +140,13 @@ func (m *ExportMap) mergeFrom(other *ExportMap, includeDefault bool) {
 //
 // The map is read-only and may be shared with every other file of the run that
 // imports the same module; so may any ExportMeta.Namespace reached through it.
-func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, bool) {
+// GetExportMap returns the effective export view of one authored
+// module request, including loader semantics selected by import attributes.
+func GetExportMap(ctx rule.RuleContext, source modules.Source) (*ExportMap, bool) {
 	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
 		return nil, false
 	}
-	return getExportMap(ctx.SourceFile, moduleSpecifier, newExportBuilder(IndexFor(ctx), ctx.Program()))
+	return getExportMap(ctx.SourceFile, source, newExportBuilder(IndexFor(ctx), ctx.Program()))
 }
 
 // exportBuilder carries one query's traversal state over the per-file export
@@ -194,15 +197,18 @@ func (builder *exportBuilder) program() *program.Program {
 	return builder.sourceProgram
 }
 
-func getExportMap(origin *ast.SourceFile, moduleSpecifier *ast.Node, builder *exportBuilder) (*ExportMap, bool) {
+func getExportMap(origin *ast.SourceFile, source modules.Source, builder *exportBuilder) (*ExportMap, bool) {
 	sourceProgram := builder.program()
-	if !sourceProgram.IsValid() || origin == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+	if !sourceProgram.IsValid() || origin == nil || source.Specifier() == nil || !ast.IsStringLiteralLike(source.Specifier()) {
 		return nil, false
 	}
 
-	link := resolveExportLink(sourceProgram, origin, builder.index.settings, moduleSpecifier)
+	link := resolveExportLink(sourceProgram, origin, builder.index.settings, source)
 	if !link.Resolved {
 		return nil, false
+	}
+	if link.View == moduleViewDefaultOnly {
+		return defaultOnlyExportMap(), true
 	}
 	exports := builder.exportMapOf(link.Target)
 	if link.NodeDefault && !exports.implicitDefault {
@@ -285,12 +291,12 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports,
 			exports.addUnknown()
 			return
 		}
-		exports.mergeFrom(builder.exportMapOf(step.Link.Target), false)
+		exports.mergeFrom(builder.exportMapForLink(step.Link), false)
 
 	case exportStepNamed:
 		var dependency *ExportMap
 		if step.FromModule && step.Link.Resolved {
-			dependency = builder.exportMapOf(step.Link.Target)
+			dependency = builder.exportMapForLink(step.Link)
 		}
 		for _, spec := range step.Specs {
 			if !step.FromModule {
@@ -311,7 +317,7 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports,
 			if exports.reexports == nil {
 				exports.reexports = make(map[string]string)
 			}
-			exports.reexports[spec.Exported] = step.Link.Target.FileName()
+			exports.reexports[spec.Exported] = step.Link.Path
 			// An explicit re-export declares its public name even when its
 			// target is missing. Resolving the target only supplies metadata.
 			meta := dependency.Get(spec.Local)
@@ -339,12 +345,19 @@ func (builder *exportBuilder) namespaceImportMeta(local *localExports, localName
 		if !binding.Link.Resolved {
 			continue
 		}
-		imports := builder.exportMapOf(binding.Link.Target)
+		imports := builder.exportMapForLink(binding.Link)
 		if binding.NamespaceName == localName {
 			return &ExportMeta{Namespace: imports}, true
 		}
 	}
 	return nil, false
+}
+
+func (builder *exportBuilder) exportMapForLink(link exportLink) *ExportMap {
+	if link.View == moduleViewDefaultOnly {
+		return defaultOnlyExportMap()
+	}
+	return builder.exportMapOf(link.Target)
 }
 
 func moduleExportName(node *ast.Node) (string, bool) {

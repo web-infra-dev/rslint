@@ -6,13 +6,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/isglob"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 //go:embed no_restricted_paths.schema.json
@@ -72,7 +72,7 @@ var NoRestrictedPathsRule = rule.Rule{
 		built := make([]bool, len(matchingZones))
 		applicable := make([]int, 0, 4)
 
-		return import_utils.VisitModules(func(source *ast.StringLiteralLike, node *ast.Node) {
+		return import_utils.VisitModules(func(source modules.Source) {
 			absoluteImportPath, _, ok := ctx.Program().ResolveModule(ctx.SourceFile, source)
 			if !ok {
 				return
@@ -93,12 +93,12 @@ var NoRestrictedPathsRule = rule.Rule{
 
 				for _, j := range applicable {
 					if !validators[i][j].hasValidExceptions {
-						ctx.ReportNode(source, validators[i][j].invalidException)
+						ctx.ReportNode(source.Specifier(), validators[i][j].invalidException)
 					}
 				}
 				for _, j := range applicable {
 					if validators[i][j].hasValidExceptions && !validators[i][j].isPathException(absoluteImportPath) {
-						ctx.ReportNode(source, unexpectedPathMessage(source.Text(), matchingZones[i].message))
+						ctx.ReportNode(source.Specifier(), unexpectedPathMessage(source.Specifier().Text(), matchingZones[i].message))
 					}
 				}
 			}

@@ -7,6 +7,8 @@ dynamic `import()` calls, and direct `require()` calls count when their module
 path is a string literal. Repeated paths count once, even across these forms.
 Paths are compared by their string values without resolving them to files.
 
+Import attributes are part of dependency identity. The same path imported as `type: "json"` and `type: "text"` counts as two dependencies, while equivalent attribute sets count once regardless of property order.
+
 The rule reports once on the last module path when the limit is exceeded. That
 path can be a duplicate or an ignored type import. The rule does not provide
 automatic fixes or suggestions.

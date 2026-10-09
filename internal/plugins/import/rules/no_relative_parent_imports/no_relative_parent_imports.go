@@ -60,7 +60,7 @@ var NoRelativeParentImportsRule = rule.Rule{
 				settings = import_utils.SettingsFor(ctx)
 				resolver = import_utils.NewImportResolver(ctx)
 			}
-			resolvedPath, found, resolveError := resolver.Resolve(source)
+			resolvedPath, found, resolveError := resolver.Resolve(ref.WithSpecifier(source))
 			if resolveError != "" && !reportedResolverError {
 				ctx.ReportRange(core.NewTextRange(0, 0), rule.RuleMessage{Description: "Resolve error: " + resolveError})
 				reportedResolverError = true

@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 // https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/group-exports.js
@@ -12,11 +13,12 @@ var GroupExportsRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		type group struct {
-			container *ast.Node
-			source    string
-			hasSource bool
-			typeOnly  bool
-			commonJS  bool
+			container  *ast.Node
+			source     string
+			hasSource  bool
+			typeOnly   bool
+			commonJS   bool
+			attributes string
 		}
 		type entry struct {
 			node  *ast.Node
@@ -66,6 +68,7 @@ var GroupExportsRule = rule.Rule{
 				if declaration.ModuleSpecifier != nil {
 					key.hasSource = true
 					key.source = declaration.ModuleSpecifier.Text()
+					key.attributes = modules.SourceFromSpecifier(declaration.ModuleSpecifier).Attributes().Key()
 					// All source names, including __proto__, are ordinary map keys.
 				}
 				collect(node, key)

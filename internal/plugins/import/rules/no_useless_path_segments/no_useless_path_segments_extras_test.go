@@ -47,6 +47,7 @@ func TestNoUselessPathSegmentsExtras(t *testing.T) {
 	)
 	invalid := []rule_tester.InvalidTestCase{}
 	for _, test := range []struct{ code, literal, imported, proposed, output string }{
+		{`import source from './deep//a' with { type: 'text' };`, `'./deep//a'`, "./deep//a", "./deep/a", `import source from "./deep/a" with { type: 'text' };`},
 		{`export * from './deep//a';`, `'./deep//a'`, "./deep//a", "./deep/a", `export * from "./deep/a";`},
 		{`export { default as a } from './deep//a';`, `'./deep//a'`, "./deep//a", "./deep/a", `export { default as a } from "./deep/a";`},
 		{`export * as ns from './deep//a';`, `'./deep//a'`, "./deep//a", "./deep/a", `export * as ns from "./deep/a";`},

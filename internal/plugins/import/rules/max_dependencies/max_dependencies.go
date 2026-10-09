@@ -7,6 +7,7 @@ import (
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 //go:embed max_dependencies.schema.json
@@ -33,16 +34,17 @@ var MaxDependenciesRule = rule.Rule{
 
 		dependencies := make(map[string]struct{})
 		var lastSource *ast.Node
-		listeners := import_utils.VisitModules(func(source, node *ast.Node) {
+		listeners := import_utils.VisitModules(func(source modules.Source) {
 			// Even ignored type imports and duplicate paths become the report site.
-			lastSource = source
-			if ignoreTypeImports && ast.IsImportDeclaration(node) &&
-				node.ImportClause() != nil && node.ImportClause().IsTypeOnly() {
+			lastSource = source.Specifier()
+			if ignoreTypeImports && ast.IsImportDeclaration(source.Declaration()) &&
+				source.Declaration().ImportClause() != nil && source.Declaration().ImportClause().IsTypeOnly() {
 				return
 			}
 			// Once over the limit, only the last source can affect the report.
 			if float64(len(dependencies)) <= limit {
-				dependencies[source.Text()] = struct{}{}
+				identity := source.Specifier().Text() + "\x00" + source.Attributes().Key()
+				dependencies[identity] = struct{}{}
 			}
 		}, import_utils.VisitModulesOptions{Commonjs: true, ESModule: true})
 		listeners[rule.ListenerOnExit(ast.KindEndOfFile)] = func(_ *ast.Node) {

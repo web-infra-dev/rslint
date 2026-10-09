@@ -58,7 +58,7 @@ var NoUnresolvedRule = rule.Rule{
 			if resolver == nil {
 				resolver = import_utils.NewImportResolver(ctx)
 			}
-			path, found, resolveError := resolver.Resolve(source)
+			path, found, resolveError := resolver.Resolve(ref.WithSpecifier(source))
 			if resolveError != "" && !reportedResolverError {
 				ctx.ReportRange(core.NewTextRange(0, 0), rule.RuleMessage{Description: "Resolve error: " + resolveError})
 				reportedResolverError = true
@@ -77,8 +77,8 @@ var NoUnresolvedRule = rule.Rule{
 // This rule checks only literal strings and skips explicit import/export type
 // declarations, matching moduleVisitor rather than emitted dependencies.
 func unresolvedSource(ref modules.Source) *ast.Node {
-	node := ref.Declaration
-	switch ref.Kind {
+	node := ref.Declaration()
+	switch ref.Kind() {
 	case modules.ModuleReferenceImport:
 		if clause := node.AsImportDeclaration().ImportClause; clause != nil && clause.IsTypeOnly() {
 			return nil

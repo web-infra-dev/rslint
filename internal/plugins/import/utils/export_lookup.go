@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 // This file provides name lookups, including the re-export path needed when a
@@ -20,12 +21,14 @@ import (
 // means that module cannot be inspected. Missing explicit re-exports preserve
 // their failure path, while an unsuccessful star search reports the barrel.
 // Resolution and local export collection reuse the Program's import index.
-func FindExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, name string) (bool, []string) {
+// FindExport follows an export through the effective module view of
+// one authored request, including its import attributes.
+func FindExport(ctx rule.RuleContext, source modules.Source, name string) (bool, []string) {
 	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
 		return false, nil
 	}
 	index := IndexFor(ctx)
-	link := resolveExportLink(ctx.Program(), ctx.SourceFile, index.settings, moduleSpecifier)
+	link := resolveExportLink(ctx.Program(), ctx.SourceFile, index.settings, source)
 	if !link.Resolved {
 		return false, nil
 	}
@@ -33,6 +36,10 @@ func FindExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, name string) (b
 }
 
 func (builder *exportBuilder) findExport(link exportLink, name string, settings map[string]interface{}) (bool, []string) {
+	path := []string{link.Path}
+	if link.View == moduleViewDefaultOnly {
+		return name == defaultExportName, path
+	}
 	file := link.Target
 	// File extensions and moduleDetection can make tsgo mark a CommonJS file
 	// as external. Upstream requires an authored import/export declaration;
@@ -45,7 +52,6 @@ func (builder *exportBuilder) findExport(link exportLink, name string, settings 
 	if !exportExtensionAllowed(settings, file.FileName()) || len(builder.program().SyntacticDiagnostics(context.Background(), file)) != 0 {
 		return true, nil
 	}
-	path := []string{file.FileName()}
 	if name == defaultExportName && link.NodeDefault {
 		return true, path
 	}
@@ -123,23 +129,25 @@ func (builder *exportBuilder) findExport(link exportLink, name string, settings 
 // the fallback from an explicitly enabled esModuleInterop option. The
 // second result is false when no export map is available, matching
 // eslint-plugin-import's "imports == null" branch.
-func HasDefaultExport(ctx rule.RuleContext, moduleSpecifier *ast.Node) (bool, bool) {
-	if !ctx.Program().IsValid() || ctx.SourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+// HasDefaultExport checks the effective view of an authored import.
+func HasDefaultExport(ctx rule.RuleContext, source modules.Source) (bool, bool) {
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil || source.Specifier() == nil || !ast.IsStringLiteralLike(source.Specifier()) {
 		return false, false
 	}
 	builder := newExportBuilder(IndexFor(ctx), ctx.Program())
 	builder.defaultImport = true
-	return hasExport(ctx.SourceFile, moduleSpecifier, defaultExportName, builder)
+	return hasExport(ctx.SourceFile, source, defaultExportName, builder)
 }
 
 // HasExport resolves moduleSpecifier from ctx.SourceFile and reports whether
 // the resolved module statically exports exportName. The second result is false
 // when the target is unresolved or is not an ES module.
-func HasExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, exportName string) (bool, bool) {
-	if !ctx.Program().IsValid() || ctx.SourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+// HasExport checks an export against the request's effective view.
+func HasExport(ctx rule.RuleContext, source modules.Source, exportName string) (bool, bool) {
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil || source.Specifier() == nil || !ast.IsStringLiteralLike(source.Specifier()) {
 		return false, false
 	}
-	return hasExport(ctx.SourceFile, moduleSpecifier, exportName, newExportBuilder(IndexFor(ctx), ctx.Program()))
+	return hasExport(ctx.SourceFile, source, exportName, newExportBuilder(IndexFor(ctx), ctx.Program()))
 }
 
 // exportKey identifies one (file, name) lookup, so a re-export chain that
@@ -150,8 +158,14 @@ type exportKey struct {
 	name string
 }
 
-func hasExport(origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName string, builder *exportBuilder) (bool, bool) {
-	link := resolveExportLinkForLookup(builder.program(), origin, builder.index.settings, moduleSpecifier)
+func hasExport(origin *ast.SourceFile, source modules.Source, exportName string, builder *exportBuilder) (bool, bool) {
+	link := resolveExportLinkForLookup(builder.program(), origin, builder.index.settings, source)
+	if !link.Resolved {
+		return false, false
+	}
+	if link.View == moduleViewDefaultOnly {
+		return exportName == defaultExportName, true
+	}
 	if link.Target == nil {
 		return false, false
 	}
@@ -164,12 +178,22 @@ func hasExport(origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName str
 // resolveExportLinkForLookup is the name-lookup counterpart of
 // resolveExportLink: it stops before the is-an-ES-module test, which
 // sourceFileHasExport applies itself.
-func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
-	_, sourceFile, ok := sourceProgram.ResolveModule(origin, moduleSpecifier)
-	if !ok || sourceFile == nil || settings.IsIgnoredPath(sourceFile.FileName()) {
+func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.SourceFile, settings *ModuleSettings, source modules.Source) exportLink {
+	view := moduleViewFor(source.Attributes())
+	if view == moduleViewUnknown {
 		return exportLink{}
 	}
-	return exportLink{Target: sourceFile, Resolved: true, NodeDefault: hasNodeDefault(sourceProgram, origin, moduleSpecifier, sourceFile)}
+	path, sourceFile, ok := sourceProgram.ResolveModule(origin, source)
+	if !ok {
+		return exportLink{}
+	}
+	if path != "" && settings.IsIgnoredPath(path) || sourceFile != nil && settings.IsIgnoredPath(sourceFile.FileName()) {
+		return exportLink{}
+	}
+	return exportLink{
+		Target: sourceFile, Path: path, Resolved: true, View: view,
+		NodeDefault: sourceFile != nil && hasNodeDefault(sourceProgram, origin, source, sourceFile),
+	}
 }
 
 func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder *exportBuilder) (bool, bool) {
@@ -438,7 +462,7 @@ func exportDeclarationHasName(sourceFile *ast.SourceFile, exportDecl *ast.Export
 		if exportDecl.ModuleSpecifier == nil || exportName == defaultExportName {
 			return false, false
 		}
-		found, ok := hasExport(sourceFile, exportDecl.ModuleSpecifier, exportName, builder)
+		found, ok := hasExport(sourceFile, modules.SourceFromSpecifier(exportDecl.ModuleSpecifier), exportName, builder)
 		if !ok {
 			return true, true
 		}
@@ -475,7 +499,7 @@ func exportDeclarationHasName(sourceFile *ast.SourceFile, exportDecl *ast.Export
 				return false, true
 			}
 
-			hasName, ok := hasExport(sourceFile, exportDecl.ModuleSpecifier, localName, builder)
+			hasName, ok := hasExport(sourceFile, modules.SourceFromSpecifier(exportDecl.ModuleSpecifier), localName, builder)
 			if !ok {
 				return true, true
 			}

@@ -26,6 +26,8 @@ export { value as renamed } from './values.js';
 
 Unresolved, ignored and non-ES modules are skipped. Declaration-level type imports and exports, and inline type import specifiers, are skipped. Like upstream, inline `export { type Missing } from './values.js'` is checked. Default imports and namespace imports are outside this rule's scope.
 
+The rule checks the module view selected by import attributes. Text and JSON module views provide only a default export, so named imports from them are reported even when the underlying file contains JavaScript named exports. Unknown or dynamic attribute sets are skipped because their export shape is host-defined.
+
 ## Options
 
 This rule accepts an options object with the following default:

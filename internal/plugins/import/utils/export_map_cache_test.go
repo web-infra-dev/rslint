@@ -14,6 +14,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 // exportMapNames is the set of names a map exposes, in a form tests can
@@ -91,18 +92,18 @@ func TestExportMapReuseAcrossFiles(t *testing.T) {
 	}
 
 	shared := contextsForFiles(t, files, "cache-first.ts", "cache-second.ts")
-	firstMap, ok := import_utils.GetExportMap(shared[0], firstImportSpecifier(t, shared[0].SourceFile))
+	firstMap, ok := import_utils.GetExportMap(shared[0], modules.SourceFromSpecifier(firstImportSpecifier(t, shared[0].SourceFile)))
 	if !ok {
 		t.Fatal("GetExportMap returned no map for the first file")
 	}
-	secondMap, ok := import_utils.GetExportMap(shared[1], firstImportSpecifier(t, shared[1].SourceFile))
+	secondMap, ok := import_utils.GetExportMap(shared[1], modules.SourceFromSpecifier(firstImportSpecifier(t, shared[1].SourceFile)))
 	if !ok {
 		t.Fatal("GetExportMap returned no map for the second file")
 	}
 
 	// A separate Program, so nothing is shared with the run above.
 	isolated := contextsForFiles(t, files, "cache-isolated.ts")
-	isolatedMap, ok := import_utils.GetExportMap(isolated[0], firstImportSpecifier(t, isolated[0].SourceFile))
+	isolatedMap, ok := import_utils.GetExportMap(isolated[0], modules.SourceFromSpecifier(firstImportSpecifier(t, isolated[0].SourceFile)))
 	if !ok {
 		t.Fatal("GetExportMap returned no map for the isolated file")
 	}
@@ -142,7 +143,7 @@ func TestExportMapCyclicReexportEntryDependent(t *testing.T) {
 	baseline := make(map[string]map[string]bool)
 	for _, entry := range []string{"enter-alpha.ts", "enter-beta.ts", "enter-outer.ts"} {
 		contexts := contextsForFiles(t, files, entry)
-		exportMap, ok := import_utils.GetExportMap(contexts[0], firstImportSpecifier(t, contexts[0].SourceFile))
+		exportMap, ok := import_utils.GetExportMap(contexts[0], modules.SourceFromSpecifier(firstImportSpecifier(t, contexts[0].SourceFile)))
 		if !ok {
 			t.Fatalf("GetExportMap returned no map for %s", entry)
 		}
@@ -154,7 +155,7 @@ func TestExportMapCyclicReexportEntryDependent(t *testing.T) {
 	entries := []string{"enter-alpha.ts", "enter-beta.ts", "enter-outer.ts"}
 	shared := contextsForFiles(t, files, entries...)
 	for i, ctx := range shared {
-		exportMap, ok := import_utils.GetExportMap(ctx, firstImportSpecifier(t, ctx.SourceFile))
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(firstImportSpecifier(t, ctx.SourceFile)))
 		if !ok {
 			t.Fatalf("GetExportMap returned no map for %s", entries[i])
 		}
@@ -183,11 +184,11 @@ func TestExportMapCyclicReexportRepeatedQuery(t *testing.T) {
 	contexts := contextsForFiles(t, files, "repeat-entry.ts")
 	specifier := firstImportSpecifier(t, contexts[0].SourceFile)
 
-	first, ok := import_utils.GetExportMap(contexts[0], specifier)
+	first, ok := import_utils.GetExportMap(contexts[0], modules.SourceFromSpecifier(specifier))
 	if !ok {
 		t.Fatal("GetExportMap returned no map on the first query")
 	}
-	second, ok := import_utils.GetExportMap(contexts[0], specifier)
+	second, ok := import_utils.GetExportMap(contexts[0], modules.SourceFromSpecifier(specifier))
 	if !ok {
 		t.Fatal("GetExportMap returned no map on the second query")
 	}
@@ -227,7 +228,7 @@ func TestIndexReleasesItsProgram(t *testing.T) {
 		// Reach the index the way import/namespace and import/default do, so
 		// the entry under test is a populated ModuleIndex rather than an
 		// empty one.
-		if _, ok := import_utils.GetExportMap(contexts[0], firstImportSpecifier(t, contexts[0].SourceFile)); !ok {
+		if _, ok := import_utils.GetExportMap(contexts[0], modules.SourceFromSpecifier(firstImportSpecifier(t, contexts[0].SourceFile))); !ok {
 			t.Fatal("GetExportMap returned no map for the fixture")
 		}
 	}()

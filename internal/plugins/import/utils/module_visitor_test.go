@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 func TestVisitModulesAMDAndIgnore(t *testing.T) {
@@ -26,10 +27,10 @@ define(["asserted"] as string[], cb);
 obj.define(["member"], cb);
 `, core.ScriptKindTS)
 	var sources []string
-	listeners := import_utils.VisitModules(func(source, importer *ast.Node) {
-		sources = append(sources, source.Text())
-		if source != importer {
-			t.Error("AMD importer must be the dependency literal, matching upstream")
+	listeners := import_utils.VisitModules(func(source modules.Source) {
+		sources = append(sources, source.Specifier().Text())
+		if source.Kind() == modules.ModuleReferenceAMD && source.Declaration().Kind != ast.KindCallExpression {
+			t.Error("AMD reference did not retain its call declaration")
 		}
 	}, import_utils.VisitModulesOptions{ESModule: true, Commonjs: true, AMD: true, Ignore: []string{"^ignored$"}})
 	var visit func(*ast.Node)
@@ -48,8 +49,8 @@ obj.define(["member"], cb);
 func TestVisitModulesInvalidIgnore(t *testing.T) {
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/visitor.ts", Path: "/visitor.ts"}, `import "ignored"; import "visited";`, core.ScriptKindTS)
 	var sources []string
-	listeners := import_utils.VisitModules(func(source, _ *ast.Node) {
-		sources = append(sources, source.Text())
+	listeners := import_utils.VisitModules(func(source modules.Source) {
+		sources = append(sources, source.Specifier().Text())
 	}, import_utils.VisitModulesOptions{ESModule: true, Ignore: []string{"[", "^ignored$"}})
 	for _, statement := range file.Statements.Nodes {
 		listeners[statement.Kind](statement)

@@ -53,6 +53,9 @@ func TestNoNamedAsDefaultExtras(t *testing.T) {
 			{Code: `import foo from './namespace-members';`},
 			// tsgo accepts this return; this rule does not relay parser errors.
 			{Code: `import foo from './invalid-return.js';`},
+			// Attribute-selected default-only views have no colliding named export.
+			{Code: `import foo from './base' with { type: 'json' };`},
+			{Code: `import foo from './base' with { type: 'text' };`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: `import foo from './base';`, FileName: "consumer.js", Errors: namedDefaultError("foo", 1, 8, 11)},
@@ -61,7 +64,6 @@ func TestNoNamedAsDefaultExtras(t *testing.T) {
 			{Code: `import foo, * as ns from './base';`, Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: `import foo from './base'; const view = <foo />;`, Tsx: true, Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: `import type Shape from './base';`, Errors: namedDefaultError("Shape", 1, 13, 18)},
-			{Code: `import foo from './base' with { type: 'json' };`, Errors: namedDefaultError("foo", 1, 8, 11)},
 			{Code: "import\n  /* local */ foo\n  from './base';", Errors: namedDefaultError("foo", 2, 15, 18)},
 			{Code: `/* 😀 */ import café from './base';`, Errors: namedDefaultError("café", 1, 17, 21)},
 			{Code: `import 𐐀 from './base';`, Errors: namedDefaultError("𐐀", 1, 8, 10)},

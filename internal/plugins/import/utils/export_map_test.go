@@ -18,6 +18,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 func TestGetLocalExportNames(t *testing.T) {
@@ -35,7 +36,7 @@ func TestGetLocalExportNames(t *testing.T) {
 		t.Run(tc.source, func(t *testing.T) {
 			t.Parallel()
 			ctx, specifier, raw := contextForImportWithCompiler(t, tc.source)
-			got := import_utils.GetLocalExportNames(ctx, specifier)
+			got := import_utils.GetLocalExportNames(ctx, modules.SourceFromSpecifier(specifier))
 			if !slices.Equal(got, tc.want) {
 				t.Fatalf("GetLocalExportNames(%q) = %v, want %v", tc.source, got, tc.want)
 			}
@@ -44,17 +45,17 @@ func TestGetLocalExportNames(t *testing.T) {
 				t.Fatal(err)
 			}
 			sourceOnlyContext := (rule.RuleContext{SourceFile: ctx.SourceFile}).WithProgram(standalone)
-			if got := import_utils.GetLocalExportNames(sourceOnlyContext, specifier); !slices.Equal(got, tc.want) {
+			if got := import_utils.GetLocalExportNames(sourceOnlyContext, modules.SourceFromSpecifier(specifier)); !slices.Equal(got, tc.want) {
 				t.Fatalf("source-only GetLocalExportNames(%q) = %v, want %v", tc.source, got, tc.want)
 			}
 		})
 	}
 	ctx, specifier := contextForImport(t, "./named-exports")
 	ctx.Settings = map[string]interface{}{"import/ignore": []interface{}{"named-exports"}}
-	if names := import_utils.GetLocalExportNames(ctx, specifier); len(names) != 0 {
+	if names := import_utils.GetLocalExportNames(ctx, modules.SourceFromSpecifier(specifier)); len(names) != 0 {
 		t.Fatalf("ignored module exposes names: %v", names)
 	}
-	if names := import_utils.GetLocalExportNames(rule.RuleContext{}, nil); len(names) != 0 {
+	if names := import_utils.GetLocalExportNames(rule.RuleContext{}, modules.SourceFromSpecifier(nil)); len(names) != 0 {
 		t.Fatalf("missing Program exposes names: %v", names)
 	}
 }
@@ -82,14 +83,14 @@ func TestFindExport(t *testing.T) {
 			}
 			for _, sourceProgram := range []*lintprogram.Program{ctx.Program(), standalone} {
 				ctx := (rule.RuleContext{SourceFile: ctx.SourceFile}).WithProgram(sourceProgram)
-				found, path := import_utils.FindExport(ctx, specifier, tc.name)
+				found, path := import_utils.FindExport(ctx, modules.SourceFromSpecifier(specifier), tc.name)
 				if found != tc.found || !slices.Equal(path, tc.path) {
 					t.Fatalf("FindExport = (%v, %v), want (%v, %v)", found, path, tc.found, tc.path)
 				}
 			}
 		})
 	}
-	if found, path := import_utils.FindExport(rule.RuleContext{}, nil, "missing"); found || path != nil {
+	if found, path := import_utils.FindExport(rule.RuleContext{}, modules.SourceFromSpecifier(nil), "missing"); found || path != nil {
 		t.Fatalf("lookup without a Program = (%v, %v)", found, path)
 	}
 }
@@ -123,7 +124,7 @@ func TestDefaultExportsAcrossNodeModuleFormats(t *testing.T) {
 					ctx := (rule.RuleContext{SourceFile: source}).WithProgram(sourceProgram)
 					for i, stmt := range source.Statements.Nodes {
 						specifier := stmt.AsImportDeclaration().ModuleSpecifier
-						if found, ok := import_utils.HasExport(ctx, specifier, "default"); !ok || found != tc.want[i] {
+						if found, ok := import_utils.HasExport(ctx, modules.SourceFromSpecifier(specifier), "default"); !ok || found != tc.want[i] {
 							t.Errorf("%s: HasExport(%s, default) = (%v, %v), want (%v, true)", tc.file, specifier.Text(), found, ok, tc.want[i])
 						}
 						// import/default follows upstream's explicit interop option,
@@ -134,13 +135,13 @@ func TestDefaultExportsAcrossNodeModuleFormats(t *testing.T) {
 							// explicit interop fallback for other modules is unchanged.
 							wantImportDefault = i != 2 && i != 9 && i != 10
 						}
-						if found, ok := import_utils.HasDefaultExport(ctx, specifier); !ok || found != wantImportDefault {
+						if found, ok := import_utils.HasDefaultExport(ctx, modules.SourceFromSpecifier(specifier)); !ok || found != wantImportDefault {
 							t.Errorf("%s: HasDefaultExport(%s) = (%v, %v), want (%v, true)", tc.file, specifier.Text(), found, ok, wantImportDefault)
 						}
-						if exports, ok := import_utils.GetExportMap(ctx, specifier); !ok || exports.HasDefault() != tc.want[i] {
+						if exports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier)); !ok || exports.HasDefault() != tc.want[i] {
 							t.Errorf("%s: GetExportMap(%s).HasDefault = %v, want %v", tc.file, specifier.Text(), exports.HasDefault(), tc.want[i])
 						}
-						if found, path := import_utils.FindExport(ctx, specifier, "default"); found != tc.want[i] || len(path) == 0 {
+						if found, path := import_utils.FindExport(ctx, modules.SourceFromSpecifier(specifier), "default"); found != tc.want[i] || len(path) == 0 {
 							t.Errorf("%s: FindExport(%s, default) = (%v, %v), want (%v, nonempty path)", tc.file, specifier.Text(), found, path, tc.want[i])
 						}
 					}
@@ -173,10 +174,10 @@ func TestGetLocalExportNamesWithSyntaxErrors(t *testing.T) {
 				t.Fatalf("expected a parsed dependency with syntax errors: %s", targetName)
 			}
 			specifier := source.Statements.Nodes[i].AsImportDeclaration().ModuleSpecifier
-			if names := import_utils.GetLocalExportNames(ctx, specifier); len(names) != 0 {
+			if names := import_utils.GetLocalExportNames(ctx, modules.SourceFromSpecifier(specifier)); len(names) != 0 {
 				t.Errorf("invalid dependency %s exposes names: %v", targetName, names)
 			}
-			if _, path := import_utils.FindExport(ctx, specifier, "missing"); path != nil {
+			if _, path := import_utils.FindExport(ctx, modules.SourceFromSpecifier(specifier), "missing"); path != nil {
 				t.Errorf("invalid dependency %s produces a named-export lookup: %v", targetName, path)
 			}
 		}
@@ -198,11 +199,11 @@ func TestExportMapsGlobalNamespace(t *testing.T) {
 			source := raw.GetSourceFile(tspath.ResolvePath(root, "consumer.ts"))
 			ctx := (rule.RuleContext{SourceFile: source}).WithProgram(lintprogram.NewFromCompiler(raw))
 			specifier := source.Statements.Nodes[0].AsImportDeclaration().ModuleSpecifier
-			exports, ok := import_utils.GetExportMap(ctx, specifier)
+			exports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 			if !ok || exports.Get("Lib") != nil || (exports.Get("foo") != nil) != interop {
 				t.Fatalf("global alias must not be exported; its members require interop: %+v", exports)
 			}
-			names := import_utils.GetLocalExportNames(ctx, specifier)
+			names := import_utils.GetLocalExportNames(ctx, modules.SourceFromSpecifier(specifier))
 			if slices.Contains(names, "Lib") || slices.Contains(names, "foo") != interop {
 				t.Fatalf("unexpected local exports: %v", names)
 			}
@@ -339,7 +340,7 @@ func TestHasExport(t *testing.T) {
 			t.Parallel()
 
 			ctx, specifier := contextForImport(t, tc.source)
-			gotFound, gotOK := import_utils.HasExport(ctx, specifier, tc.exportName)
+			gotFound, gotOK := import_utils.HasExport(ctx, modules.SourceFromSpecifier(specifier), tc.exportName)
 			if gotFound != tc.wantFound || gotOK != tc.wantOK {
 				t.Fatalf("HasExport(%q, %q) = (%v, %v), want (%v, %v)", tc.source, tc.exportName, gotFound, gotOK, tc.wantFound, tc.wantOK)
 			}
@@ -364,14 +365,14 @@ func TestExportQueriesSupportSourceOnlyProgram(t *testing.T) {
 		SourceFile: programContext.SourceFile,
 	}).WithProgram(standalone)
 
-	if found, ok := import_utils.HasExport(standaloneContext, specifier, "baz"); !ok || !found {
+	if found, ok := import_utils.HasExport(standaloneContext, modules.SourceFromSpecifier(specifier), "baz"); !ok || !found {
 		t.Fatalf("standalone HasExport = (%v, %v), want (true, true)", found, ok)
 	}
-	exportMap, ok := import_utils.GetExportMap(standaloneContext, specifier)
+	exportMap, ok := import_utils.GetExportMap(standaloneContext, modules.SourceFromSpecifier(specifier))
 	if !ok || exportMap == nil || !exportMap.Has("baz") {
 		t.Fatalf("standalone GetExportMap = (%v, %v), want map containing baz", exportMap, ok)
 	}
-	projectMap, ok := import_utils.GetExportMap(programContext, specifier)
+	projectMap, ok := import_utils.GetExportMap(programContext, modules.SourceFromSpecifier(specifier))
 	if !ok || exportMap.HasDefault() != projectMap.HasDefault() || exportMap.ReexportSource("baz") != projectMap.ReexportSource("baz") {
 		t.Fatal("default and re-export metadata must agree across Program providers")
 	}
@@ -397,7 +398,7 @@ func TestExportQueriesSupportSourceOnlyProgram(t *testing.T) {
 			}
 			file := sourceProgram.GetSourceFile(consumer)
 			ctx := (rule.RuleContext{SourceFile: file}).WithProgram(sourceProgram)
-			exports, ok := import_utils.GetExportMap(ctx, firstImportSpecifier(t, file))
+			exports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(firstImportSpecifier(t, file)))
 			if ok != includeDependency {
 				t.Fatalf("export map available = %v, dependency selected = %v", ok, includeDependency)
 			}
@@ -406,6 +407,37 @@ func TestExportQueriesSupportSourceOnlyProgram(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestExportQueriesRespectIgnoredResolvedPathWithoutTargetAST(t *testing.T) {
+	t.Parallel()
+
+	root := fixtures.GetRootDir()
+	consumer := tspath.ResolvePath(root.Dir, "ignored-source-only-consumer.ts")
+	fs := rslint_utils.NewOverlayVFS(root.FS, map[string]string{
+		consumer: `import { value } from "./bar" with { type: "text" };`,
+	})
+	sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames:   []string{consumer},
+		Host:            rslint_utils.CreateCompilerHost(root.Dir, fs),
+		CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := sourceProgram.GetSourceFile(consumer)
+	ctx := (rule.RuleContext{
+		SourceFile: file,
+		Settings:   map[string]interface{}{"import/ignore": []interface{}{`bar\.ts$`}},
+	}).WithProgram(sourceProgram)
+	source := modules.SourceFromSpecifier(firstImportSpecifier(t, file))
+	path, target, ok := sourceProgram.ResolveModule(file, source)
+	if !ok || path == "" || target != nil {
+		t.Fatalf("resolution = (%q, %v, %v), want nonempty path, nil target, true", path, target, ok)
+	}
+	if exports, ok := import_utils.GetExportMap(ctx, source); ok || exports != nil {
+		t.Fatalf("ignored request returned export map (%v, %v)", exports, ok)
+	}
 }
 
 func TestGetExportMap(t *testing.T) {
@@ -429,7 +461,7 @@ func TestGetExportMap(t *testing.T) {
 				ctx, specifier := contextForImportWithCompilerOptions(t, tc.source, &core.CompilerOptions{
 					ESModuleInterop: core.TSFalse, //nolint:staticcheck
 				})
-				exports, ok := import_utils.GetExportMap(ctx, specifier)
+				exports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 				if !ok || exports.HasDefault() != tc.wantDefault {
 					t.Fatalf("HasDefault = %v, want %v (map available: %v)", exports.HasDefault(), tc.wantDefault, ok)
 				}
@@ -447,7 +479,7 @@ func TestGetExportMap(t *testing.T) {
 	t.Run("enumeration preserves declared aliases without their target", func(t *testing.T) {
 		t.Parallel()
 		ctx, specifier := contextForImport(t, "./reexport-missing-as-default")
-		exports, ok := import_utils.GetExportMap(ctx, specifier)
+		exports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok || !slices.Equal(slices.Collect(exports.Names()), []string{"default"}) || !exports.Has("default") {
 			t.Fatal("an explicit re-export must retain its declared name")
 		}
@@ -456,7 +488,7 @@ func TestGetExportMap(t *testing.T) {
 	t.Run("enumeration does not invent unresolved star names", func(t *testing.T) {
 		t.Parallel()
 		ctx, specifier := contextForImport(t, "./unresolved-star-export")
-		exports, ok := import_utils.GetExportMap(ctx, specifier)
+		exports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok || len(slices.Collect(exports.Names())) != 0 || !exports.Has("unknown") {
 			t.Fatal("unknown exports must remain open for lookups but absent from enumeration")
 		}
@@ -466,7 +498,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./named-exports")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -488,7 +520,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./re-export")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -504,7 +536,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./deep-namespace-chain/entry")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -521,7 +553,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./unresolved-star-export")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -537,7 +569,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./typescript-ambient-namespace")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -554,7 +586,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./default-export-string")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -567,7 +599,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./default-export-namespace-string")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -584,7 +616,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./default-from-namespace-import")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -598,7 +630,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./default-from-namespace-import-declaration")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -612,7 +644,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./default-chain-from-namespace-import")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -629,7 +661,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./default-named-class-expression")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -647,7 +679,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./namespace-import-local-reexport")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -661,7 +693,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./namespace-import-source-reexport")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -675,7 +707,7 @@ func TestGetExportMap(t *testing.T) {
 		t.Parallel()
 
 		ctx, specifier := contextForImport(t, "./namespace-import-local-reexport-chain")
-		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		exportMap, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 		if !ok {
 			t.Fatal("GetExportMap returned no map")
 		}
@@ -870,18 +902,18 @@ func TestHasDefaultExportRespectsDefaultImportOptions(t *testing.T) {
 				Module:                       tc.module,
 				ModuleResolution:             tc.moduleResolution,
 			})
-			gotDefaultExport, gotOK := import_utils.HasDefaultExport(ctx, specifier)
+			gotDefaultExport, gotOK := import_utils.HasDefaultExport(ctx, modules.SourceFromSpecifier(specifier))
 			if gotDefaultExport != tc.wantDefaultImport || !gotOK {
 				t.Fatalf("HasDefaultExport = (%v, %v), want (%v, true)", gotDefaultExport, gotOK, tc.wantDefaultImport)
 			}
-			exports, ok := import_utils.GetExportMap(ctx, specifier)
+			exports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
 			if !ok || exports.HasDefault() != tc.wantDefaultExport {
 				t.Fatalf("export map HasDefault = %v, want %v", exports.HasDefault(), tc.wantDefaultExport)
 			}
 			if slices.Contains(slices.Collect(exports.Names()), "default") {
 				t.Fatal("synthetic defaults must not become authored export names")
 			}
-			if found, path := import_utils.FindExport(ctx, specifier, "default"); found != tc.wantDefaultExport || len(path) == 0 {
+			if found, path := import_utils.FindExport(ctx, modules.SourceFromSpecifier(specifier), "default"); found != tc.wantDefaultExport || len(path) == 0 {
 				t.Fatalf("FindExport(default) = (%v, %v), want (%v, nonempty path)", found, path, tc.wantDefaultExport)
 			}
 		})
@@ -896,7 +928,7 @@ func TestHasExportRespectsImportIgnore(t *testing.T) {
 		"import/ignore": []interface{}{"ignored-missing-default"},
 	}
 
-	gotDefaultExport, gotOK := import_utils.HasDefaultExport(ctx, specifier)
+	gotDefaultExport, gotOK := import_utils.HasDefaultExport(ctx, modules.SourceFromSpecifier(specifier))
 	if gotDefaultExport || gotOK {
 		t.Fatalf("HasDefaultExport for ignored import = (%v, %v), want (false, false)", gotDefaultExport, gotOK)
 	}
@@ -946,7 +978,7 @@ func TestHasDefaultExportFollowsHostCaseSensitivity(t *testing.T) {
 				t.Fatalf("resolved = %#v, want resolved %v", resolved, tc.wantResolve)
 			}
 
-			gotFound, gotOK := import_utils.HasDefaultExport(ctx, specifier)
+			gotFound, gotOK := import_utils.HasDefaultExport(ctx, modules.SourceFromSpecifier(specifier))
 			if gotFound != tc.wantFound || gotOK != tc.wantOK {
 				t.Fatalf("HasDefaultExport() = (%v, %v), want (%v, %v)", gotFound, gotOK, tc.wantFound, tc.wantOK)
 			}

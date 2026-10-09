@@ -11,6 +11,7 @@ import (
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 // See https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/export.js.
@@ -157,7 +158,7 @@ func (c *collector) collectExport(node *ast.Node) {
 			return
 		}
 	}
-	exports, ok := import_utils.GetExportMap(c.ctx, declaration.ModuleSpecifier)
+	exports, ok := import_utils.GetExportMap(c.ctx, modules.SourceFromSpecifier(declaration.ModuleSpecifier))
 	if !ok {
 		return
 	}

@@ -101,6 +101,9 @@ func TestNoCycleExtras(t *testing.T) {
 			// Locks in upstream checkSourceValue() arm 2: direct self imports are delegated to import/no-self-import.
 			{Code: `import { rootValue as self } from "./file"; ` + rootExports},
 
+			// Attribute-selected data views do not execute the target module graph.
+			{Code: `import source from "./no-cycle/depth-one" with { type: "text" }; ` + rootExports},
+
 			// Locks in upstream checkSourceValue() arm 3: import type declarations are ignored.
 			{Code: `import type { RootType as LocalType } from "./no-cycle/type-only"; ` + rootExports},
 
@@ -111,6 +114,10 @@ func TestNoCycleExtras(t *testing.T) {
 			{Code: `import { depthThree } from "./no-cycle/depth-three"; export const rootValue = depthThree; export type RootType = string;`, Options: []interface{}{map[string]interface{}{"maxDepth": json.Number("2")}}},
 		}),
 		withDefaultNoCycleInvalidFileName([]rule_tester.InvalidTestCase{
+			{
+				Code:   `import("./no-cycle/depth-one", {}); ` + rootExports,
+				Errors: []rule_tester.InvalidTestCaseError{cycleError(messageDetected)},
+			},
 			// Local bare aliases are not external when they resolve to local files.
 			{
 				Code:     `import { aliasB } from "@cycles/alias-b"; export const aliasA = aliasB;`,

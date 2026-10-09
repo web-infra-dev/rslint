@@ -104,6 +104,7 @@ func TestNoUnresolvedExtras(t *testing.T) {
 	root := unresolvedRoot(t, false)
 	valid := []rule_tester.ValidTestCase{
 		{Code: `import './bar';`, Options: map[string]any{}},
+		{Code: `import source from './bar' with { type: 'text' };`},
 		{Code: `import './bar';`, Options: map[string]any{"esmodule": true, "commonjs": false, "amd": false, "caseSensitive": true, "caseSensitiveStrict": false}},
 		{Code: `import 'missing'; export * from 'missing'; import('missing');`, Options: map[string]any{"esmodule": false}},
 		{Code: "require(`missing`); import(`missing`); import(`${name}`); require('missing' as string); require!( 'missing' ); (require as any)('missing');", Options: map[string]any{"commonjs": true}},

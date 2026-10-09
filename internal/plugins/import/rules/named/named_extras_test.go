@@ -42,6 +42,7 @@ func TestNamedExtras(t *testing.T) {
 			{Code: `const { missing } = require('./common.cjs'); const { other } = require('./unresolved.js')`, Options: []any{map[string]any{"commonjs": true}}},
 			{Code: `function consume({ missing }) {} try {} catch ({ missing }) {}`, Options: []any{map[string]any{"commonjs": true}}},
 		}, []rule_tester.InvalidTestCase{
+			{Code: `import { present } from './leaf.js' with { type: 'text' }`, Errors: []rule_tester.InvalidTestCaseError{{Message: "present not found in './leaf.js'", Line: 1, Column: 10, EndLine: 1, EndColumn: 17}}},
 			{Code: `import { default as value } from './types'`, Errors: []rule_tester.InvalidTestCaseError{{Message: "default not found in './types'", Line: 1, Column: 10, EndLine: 1, EndColumn: 17}}},
 			{Code: `import { default as value } from './types'`, TSConfig: "tsconfig.interop.json", Errors: []rule_tester.InvalidTestCaseError{{Message: "default not found in './types'", Line: 1, Column: 10, EndLine: 1, EndColumn: 17}}},
 			{Code: `import { default as value } from './types'`, TSConfig: "tsconfig.nodenext.json", Errors: []rule_tester.InvalidTestCaseError{{Message: "default not found in './types'", Line: 1, Column: 10, EndLine: 1, EndColumn: 17}}},

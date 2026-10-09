@@ -16,17 +16,17 @@ import (
 // LiteralModuleSource applies moduleVisitor's string and AMD filters to the
 // shared syntax collection. Callers choose whether to include type-only imports.
 func LiteralModuleSource(ref modules.Source) *ast.Node {
-	if utils.IsJSDocSyntaxNode(ref.Declaration) {
+	if utils.IsJSDocSyntaxNode(ref.Declaration()) {
 		return nil
 	}
-	if ref.Kind == modules.ModuleReferenceAMD && len(ref.Declaration.AsCallExpression().Arguments.Nodes) != 2 {
+	if ref.Kind() == modules.ModuleReferenceAMD && len(ref.Declaration().AsCallExpression().Arguments.Nodes) != 2 {
 		return nil
 	}
-	source := utils.ESTreeRuntimeExpression(ref.Specifier)
+	source := utils.ESTreeRuntimeExpression(ref.Specifier())
 	if source == nil || source.Kind != ast.KindStringLiteral {
 		return nil
 	}
-	if ref.Kind == modules.ModuleReferenceAMD && (source.Text() == "require" || source.Text() == "exports") {
+	if ref.Kind() == modules.ModuleReferenceAMD && (source.Text() == "require" || source.Text() == "exports") {
 		return nil
 	}
 	return source
@@ -40,7 +40,7 @@ type VisitModulesOptions struct {
 }
 
 // See https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/utils/moduleVisitor.js
-func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), options VisitModulesOptions) rule.RuleListeners {
+func VisitModules(visitor func(source modules.Source), options VisitModulesOptions) rule.RuleListeners {
 	visitors := rule.RuleListeners{}
 	ignored := make([]*esregexp.RegExp, 0, len(options.Ignore))
 	for _, pattern := range options.Ignore {
@@ -50,7 +50,7 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 		}
 	}
 
-	checkSourceValue := func(source *ast.StringLiteralLike, node *ast.Node) {
+	checkSourceValue := func(source *ast.StringLiteralLike, node *ast.Node, kind modules.ReferenceKind, typeOnly bool) {
 		if source == nil {
 			return
 		}
@@ -66,11 +66,19 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 			}
 		}
 
-		visitor(source, node)
+		request := modules.SourceFromSpecifier(source)
+		if kind == modules.ModuleReferenceDynamicImport || kind == modules.ModuleReferenceRequire || kind == modules.ModuleReferenceAMD {
+			request = modules.SourceFromCall(source, node, kind)
+		}
+		visitor(request)
 	}
 
 	checkSource := func(node *ast.Node) {
-		checkSourceValue(node.ModuleSpecifier(), node)
+		kind := modules.ModuleReferenceImport
+		if node.Kind == ast.KindExportDeclaration {
+			kind = modules.ModuleReferenceExport
+		}
+		checkSourceValue(node.ModuleSpecifier(), node, kind, ast.IsTypeOnlyImportOrExportDeclaration(node))
 	}
 
 	// for esmodule dynamic `import()` calls
@@ -93,12 +101,12 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 			return
 		}
 
-		checkSourceValue(modulePath, call.AsNode())
+		checkSourceValue(modulePath, call.AsNode(), modules.ModuleReferenceDynamicImport, false)
 	}
 
 	// for CommonJS `require` calls
 	checkCommon := func(call *ast.CallExpression) {
-		checkSourceValue(CommonJSRequireSource(call), call.AsNode())
+		checkSourceValue(CommonJSRequireSource(call), call.AsNode(), modules.ModuleReferenceRequire, false)
 	}
 
 	checkAMD := func(call *ast.CallExpression) {
@@ -108,17 +116,17 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 			call.Arguments == nil || len(call.Arguments.Nodes) != 2 {
 			return
 		}
-		modules := utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0])
-		if modules == nil || modules.Kind != ast.KindArrayLiteralExpression {
+		moduleList := utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0])
+		if moduleList == nil || moduleList.Kind != ast.KindArrayLiteralExpression {
 			return
 		}
-		for _, element := range modules.AsArrayLiteralExpression().Elements.Nodes {
+		for _, element := range moduleList.AsArrayLiteralExpression().Elements.Nodes {
 			source := utils.ESTreeRuntimeExpression(element)
 			if source == nil || source.Kind != ast.KindStringLiteral ||
 				source.Text() == "require" || source.Text() == "exports" {
 				continue
 			}
-			checkSourceValue(source, source)
+			checkSourceValue(source, call.AsNode(), modules.ModuleReferenceAMD, false)
 		}
 	}
 

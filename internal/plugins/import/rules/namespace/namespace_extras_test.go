@@ -94,6 +94,12 @@ func TestNamespaceExtras(t *testing.T) {
 			{Code: `import * as Module from './named-exports'; function getItem(name) { return Module[name]; }`, Options: map[string]interface{}{"allowComputed": true}},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: `import * as names from "./named-exports" with { type: "text" }; console.log(names.a);`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "notFound", Message: `'a' not found in imported namespace 'names'.`,
+				}},
+			},
 			// ---- Dimension 4: receiver wrappers, parenthesized receiver still reports missing member ----
 			{
 				Code: `import * as names from "./named-exports"; console.log(((names)).c);`,

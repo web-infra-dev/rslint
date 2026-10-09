@@ -116,6 +116,14 @@ func TestOrderNestedAndSyntaxEdges(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: "import z from './z' with { type: 'text' };\n" +
+					"import a from './a' with { type: 'json' };",
+				Options: alphabetize,
+				Output: []string{"import a from './a' with { type: 'json' };\n" +
+					"import z from './z' with { type: 'text' };\n"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "order", Line: 2}},
+			},
 			// Parent-backed tokens keep named-export fixes local even when an
 			// earlier TSX attribute contains object and template-literal braces.
 			{

@@ -8,13 +8,13 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 //go:embed no_useless_path_segments.schema.json
@@ -33,7 +33,7 @@ var NoUselessPathSegmentsRule = rule.Rule{
 		}
 		var resolver *import_utils.ImportResolver
 		reportedResolverError := false
-		resolve := func(name string, source *ast.Node) (string, bool) {
+		resolve := func(name string, source modules.Source) (string, bool) {
 			if resolver == nil {
 				resolver = import_utils.NewImportResolver(ctx)
 			}
@@ -47,16 +47,16 @@ var NoUselessPathSegmentsRule = rule.Rule{
 		var extensions []string
 		var indexPattern *esregexp.RegExp
 		indexPatternInitialized := false
-		return import_utils.VisitModules(func(source, _ *ast.Node) {
-			importPath := source.Text()
+		return import_utils.VisitModules(func(source modules.Source) {
+			importPath := source.Specifier().Text()
 			if !strings.HasPrefix(importPath, ".") {
 				return
 			}
 			report := func(proposed string) {
-				ctx.ReportNodeWithDeferredFixes(source, rule.RuleMessage{
+				ctx.ReportNodeWithDeferredFixes(source.Specifier(), rule.RuleMessage{
 					Description: `Useless path segments for "` + importPath + `", should be "` + proposed + `"`,
 				}, func() []rule.RuleFix {
-					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source, quotePath(proposed))}
+					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source.Specifier(), quotePath(proposed))}
 				})
 			}
 			resolved, found := resolve(importPath, source)

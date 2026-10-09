@@ -39,6 +39,7 @@ type ModuleReference struct {
 	// resolves nowhere.
 	ResolvedPath string
 	Kind         ModuleReferenceKind
+	source       modules.Source
 	// TypeOnly reports that the syntax cannot survive into emitted
 	// JavaScript: `import type`, `export type *`, and a named import clause
 	// whose every specifier is type-only.
@@ -67,6 +68,11 @@ func (reference ModuleReference) Path() string {
 // loading rather than requiring the module up front.
 func (reference ModuleReference) Dynamic() bool {
 	return reference.Kind == ModuleReferenceDynamicImport
+}
+
+// Source returns the shared authored request behind this resolved reference.
+func (reference ModuleReference) Source() modules.Source {
+	return reference.source
 }
 
 // ModuleGraph answers which modules each file of one Program references and
@@ -131,15 +137,15 @@ func (graph ModuleGraph) resolveAll(file *ast.SourceFile, specifiers []modules.S
 	}
 	var references []ModuleReference
 	for _, source := range specifiers {
-		specifier := ast.SkipParentheses(source.Specifier)
+		specifier := ast.SkipParentheses(source.Specifier())
 		if specifier == nil || !ast.IsStringLiteralLike(specifier) {
 			continue
 		}
 		reference := ModuleReference{
-			Specifier: specifier, Declaration: source.Declaration,
-			From: file, Kind: source.Kind, TypeOnly: source.TypeOnly,
+			Specifier: specifier, Declaration: source.Declaration(),
+			From: file, Kind: source.Kind(), TypeOnly: source.TypeOnly(), source: source.WithSpecifier(specifier),
 		}
-		reference.ResolvedPath, reference.Target, _ = graph.program.ResolveModule(file, specifier)
+		reference.ResolvedPath, reference.Target, _ = graph.program.ResolveModule(file, source.WithSpecifier(specifier))
 		references = append(references, reference)
 	}
 	return references

@@ -18,6 +18,7 @@ func TestNoNamedAsDefaultMemberExtras(t *testing.T) {
 			{Code: `import obj from './base.js'; obj[foo!]; obj[foo as any]; obj[(foo, other)]; (obj, obj).foo;`},
 			// Default-only modules cannot produce member reports
 			{Code: `import obj from './default-only.js'; obj.foo; const {foo} = obj;`},
+			{Code: `import obj from './base.js' with { type: 'text' }; obj.foo; const {foo} = obj;`},
 			// Loop patterns have no initializer
 			{Code: `import obj from './base.js'; for (const {foo} of [obj]) {}`},
 			// Upstream reports the dependency's parser error; rslint does not

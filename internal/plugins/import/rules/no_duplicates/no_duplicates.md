@@ -9,6 +9,13 @@ This rule is similar to ESLint core's `no-duplicate-imports`, but differs in two
 1. The paths in the source code don't have to exactly match — they just have to point to the same module on the filesystem (e.g., `./foo` and `./foo.js`).
 2. This version distinguishes `type` imports from standard imports.
 
+Import attributes are part of a module request. Imports with different attributes are not duplicates, while equivalent attribute sets compare equally regardless of property order. Autofix only merges imports whose attributes are equivalent.
+
+```javascript
+import data from './data.json' with { type: 'json' };
+import source from './data.json' with { type: 'text' };
+```
+
 Examples of **incorrect** code for this rule:
 
 ```javascript

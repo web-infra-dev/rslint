@@ -10,13 +10,13 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 //go:embed no_absolute_path.schema.json
@@ -33,11 +33,11 @@ var NoAbsolutePathRule = rule.Rule{
 		}
 		var fromParts []string
 		var cwd string
-		return import_utils.VisitModules(func(source, _ *ast.Node) {
-			if !nodeutil.IsAbsolutePath(source.Text()) {
+		return import_utils.VisitModules(func(source modules.Source) {
+			if !nodeutil.IsAbsolutePath(source.Specifier().Text()) {
 				return
 			}
-			ctx.ReportNodeWithDeferredFixes(source, rule.RuleMessage{
+			ctx.ReportNodeWithDeferredFixes(source.Specifier(), rule.RuleMessage{
 				Description: "Do not import modules using an absolute path",
 			}, func() []rule.RuleFix {
 				if fromParts == nil {
@@ -55,12 +55,12 @@ var NoAbsolutePathRule = rule.Rule{
 					}
 					fromParts = posixPathComponents(tspath.GetDirectoryPath(ctx.SourceFile.FileName()), cwd)
 				}
-				relative := relativeImportPath(fromParts, source.Text(), cwd)
+				relative := relativeImportPath(fromParts, source.Specifier().Text(), cwd)
 				text, ok := quoteModulePath(relative)
 				if !ok {
 					return nil
 				}
-				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source, text)}
+				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source.Specifier(), text)}
 			})
 		}, import_utils.VisitModulesOptions{
 			ESModule: opts["esmodule"] != false,
