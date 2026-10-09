@@ -61,6 +61,9 @@ func (c *strictModeChecker) violates(node *ast.Node) bool {
 		return (name == "eval" || name == "arguments") && isAssignedOrBound(node)
 	case ast.KindWithStatement:
 		return true
+	case ast.KindLabeledStatement:
+		// A labeled function declaration is allowed only in sloppy mode.
+		return node.AsLabeledStatement().Statement.Kind == ast.KindFunctionDeclaration
 	case ast.KindFunctionExpression, ast.KindFunctionDeclaration, ast.KindArrowFunction,
 		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
 		return hasDuplicateParameter(node)

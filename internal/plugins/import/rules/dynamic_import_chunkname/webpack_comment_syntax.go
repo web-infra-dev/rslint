@@ -52,7 +52,8 @@ func isValidWebpackCommentBody(body string) bool {
 		return false
 	}
 	root := sourceFile.AsNode()
-	return !containsInvalidSyntax(root) && !containsStrictModeError(sourceFile) && !referencesUndefinedGlobal(root)
+	return !containsInvalidSyntax(root) && !containsContextError(root) && !containsStrictModeError(sourceFile) &&
+		!referencesUndefinedGlobal(root)
 }
 
 // containsInvalidSyntax reports syntax that is an error in JavaScript but that

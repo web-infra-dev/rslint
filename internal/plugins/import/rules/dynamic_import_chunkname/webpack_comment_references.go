@@ -127,121 +127,6 @@ func (c *referenceChecker) visit(node *ast.Node) bool {
 	return node.ForEachChild(c.visit)
 }
 
-// visitClass searches what runs when a class expression is evaluated: the
-// extends clause and computed member names, which run before the class name is
-// initialized, and then static initializers and static blocks, which run after.
-// Method bodies and instance initializers run later, when called or
-// constructed, so they are not searched. Class code is strict.
-func (c *referenceChecker) visitClass(class *ast.Node) bool {
-	savedStrict, savedScope := c.strict, len(c.scope)
-	c.strict = true
-	defer func() {
-		c.strict = savedStrict
-		c.scope = c.scope[:savedScope]
-	}()
-
-	index := -1
-	if name := class.Name(); name != nil {
-		c.scope = append(c.scope, scopeEntry{name: name.Text(), class: true})
-		index = len(c.scope) - 1
-	}
-
-	data := class.AsClassExpression()
-	if data.HeritageClauses != nil {
-		for _, clause := range data.HeritageClauses.Nodes {
-			for _, heritage := range clause.AsHeritageClause().Types.Nodes {
-				if c.visit(heritage.AsExpressionWithTypeArguments().Expression) {
-					return true
-				}
-			}
-		}
-	}
-	for _, member := range class.Members() {
-		if name := member.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
-			if c.visit(name.AsComputedPropertyName().Expression) {
-				return true
-			}
-		}
-	}
-
-	if index >= 0 {
-		c.scope[index].bound = true
-	}
-	for _, member := range class.Members() {
-		switch member.Kind {
-		case ast.KindPropertyDeclaration:
-			if !ast.HasStaticModifier(member) {
-				continue
-			}
-			if initializer := member.AsPropertyDeclaration().Initializer; initializer != nil && c.visit(initializer) {
-				return true
-			}
-		case ast.KindClassStaticBlockDeclaration:
-			if c.visitStaticBlock(member.AsClassStaticBlockDeclaration().Body) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// visitStaticBlock searches a static block with the names it declares in
-// scope, so reads of those names are not reported.
-func (c *referenceChecker) visitStaticBlock(block *ast.Node) bool {
-	savedScope := len(c.scope)
-	defer func() { c.scope = c.scope[:savedScope] }()
-	for _, name := range declaredNames(block) {
-		c.scope = append(c.scope, scopeEntry{name: name, bound: true})
-	}
-	return c.visit(block)
-}
-
-// declaredNames returns the simple names that a static block binds for its
-// whole body: `var` and top-level declarations. A let, const, class or function
-// declared inside a nested block is visible only in that block.
-func declaredNames(block *ast.Node) []string {
-	var names []string
-	nested := 0
-	var visit func(node *ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		switch node.Kind {
-		case ast.KindBlock, ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement,
-			ast.KindSwitchStatement, ast.KindCatchClause:
-			nested++
-			node.ForEachChild(visit)
-			nested--
-			return false
-		case ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindClassExpression,
-			ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-			// Their declarations are local to them.
-			return false
-		case ast.KindVariableDeclaration, ast.KindBindingElement, ast.KindFunctionDeclaration, ast.KindClassDeclaration:
-			if name := node.Name(); name != nil && name.Kind == ast.KindIdentifier && (nested == 0 || !isLexicalDeclaration(node)) {
-				names = append(names, name.Text())
-			}
-			if node.Kind == ast.KindFunctionDeclaration || node.Kind == ast.KindClassDeclaration {
-				return false
-			}
-		}
-		return node.ForEachChild(visit)
-	}
-	block.ForEachChild(visit)
-	return names
-}
-
-// isLexicalDeclaration reports whether a variable or class or function binding
-// is block scoped: a let or const, or a class or function declaration.
-func isLexicalDeclaration(node *ast.Node) bool {
-	if node.Kind == ast.KindFunctionDeclaration || node.Kind == ast.KindClassDeclaration {
-		return true
-	}
-	list := node
-	for list != nil && list.Kind != ast.KindVariableDeclarationList {
-		list = list.Parent
-	}
-	return list != nil && list.Flags&(ast.NodeFlagsLet|ast.NodeFlagsConst) != 0
-}
-
 func (c *referenceChecker) visitBinary(binary *ast.BinaryExpression) bool {
 	switch binary.OperatorToken.Kind {
 	case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
@@ -639,7 +524,7 @@ func (c *referenceChecker) visitProperty(property *ast.Node, source valueSource)
 			return c.visitDefault(shorthand.Name(), shorthand.ObjectAssignmentInitializer,
 				source.property(shorthand.Name().Text(), true))
 		}
-		return false
+		return c.visitTarget(shorthand.Name(), unknownValue)
 	case ast.KindSpreadAssignment:
 		return c.visitTarget(property.AsSpreadAssignment().Expression, unknownValue)
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
