@@ -1,7 +1,7 @@
 # cspell:ignore thiserror bitflags insta
 [package]
 name = "tsgo-client"
-version = "0.0.15"
+version = "0.0.16"
 edition = "2024"
 description = "TypeScript Go client library"
 license = "MIT"
