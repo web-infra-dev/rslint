@@ -1,6 +1,7 @@
 package no_import_module_exports_test
 
 import (
+	"runtime"
 	"strconv"
 	"testing"
 
@@ -91,6 +92,31 @@ func TestNoImportModuleExportsAbsolutePackageMain(t *testing.T) {
 			Errors:   importError(1, 1, 1, 27),
 		}},
 	)
+}
+
+func TestNoImportModuleExportsNodeEntryResolution(t *testing.T) {
+	const code = `import value from "value"; module.exports = value;`
+	valid := []rule_tester.ValidTestCase{
+		{Code: code, FileName: "extensionless-index/index.js"},
+		{Code: code, FileName: "directory-index/dist/index.js"},
+	}
+	invalid := []rule_tester.InvalidTestCase{
+		{Code: code, FileName: "extensionless-index/other.js", Errors: importError(1, 1, 1, 27)},
+		{Code: code, FileName: "directory-index/other.js", Errors: importError(1, 1, 1, 27)},
+	}
+	if runtime.GOOS == "windows" {
+		valid = append(valid, rule_tester.ValidTestCase{Code: code, FileName: "backslash-main/dist/entry.js"})
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code: code, FileName: "backslash-main/index.js", Errors: importError(1, 1, 1, 27),
+		})
+	} else {
+		valid = append(valid, rule_tester.ValidTestCase{Code: code, FileName: "backslash-main/index.js"})
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code: code, FileName: "backslash-main/dist/entry.js", Errors: importError(1, 1, 1, 27),
+		})
+	}
+
+	rule_tester.RunRuleTester(upstreamRoot(t), "tsconfig.json", t, &no_import_module_exports.NoImportModuleExportsRule, valid, invalid)
 }
 
 func TestNoImportModuleExportsSchema(t *testing.T) {

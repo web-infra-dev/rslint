@@ -2,6 +2,7 @@ package no_import_module_exports
 
 import (
 	_ "embed"
+	"path"
 	"runtime"
 	"strings"
 
@@ -112,31 +113,70 @@ func packageEntryPoint(ctx rule.RuleContext) string {
 }
 
 func resolveNodePackageEntry(program *program.Program, pkg *packagejson.Package) string {
-	if main, ok := pkg.Field("main").(string); ok && main != "" {
-		if runtime.GOOS == "windows" {
-			main = strings.ReplaceAll(main, `\`, "/")
-		}
-		mainPath := tspath.ResolvePath(pkg.Directory(), main)
-		if entry := probeNodeFile(program, mainPath); entry != "" {
-			return entry
-		}
-		if entry := probeNodeFile(program, tspath.ResolvePath(mainPath, "index")); entry != "" {
-			return entry
-		}
-	}
-	return probeNodeFile(program, tspath.ResolvePath(pkg.Directory(), "index"))
+	return resolveNodePackageEntryForPlatform(program, pkg, runtime.GOOS == "windows")
 }
 
-func probeNodeFile(program *program.Program, base string) string {
-	for _, extension := range []string{"", ".js", ".json", ".node"} {
+func resolveNodePackageEntryForPlatform(program *program.Program, pkg *packagejson.Package, windows bool) string {
+	if main, ok := pkg.Field("main").(string); ok && main != "" {
+		// The Program filesystem uses TypeScript path identity, which treats a
+		// backslash as a separator on every platform. On POSIX, Node instead
+		// treats it as a literal filename character. Such a target cannot be
+		// probed without aliasing it to a different slash-separated file, so
+		// conservatively take Node's package-index fallback.
+		if !windows && strings.Contains(main, `\`) {
+			return probeNodeIndex(program, pkg.Directory())
+		}
+		mainPath := resolveNodeMainPath(pkg.Directory(), main, windows)
+		if entry := probeNodeMainFile(program, mainPath); entry != "" {
+			return entry
+		}
+		if entry := probeNodeIndex(program, mainPath); entry != "" {
+			return entry
+		}
+	}
+	return probeNodeIndex(program, pkg.Directory())
+}
+
+// resolveNodeMainPath matches the host platform's path.resolve semantics.
+// TypeScript paths treat backslashes as separators on every platform, while
+// Node treats them as ordinary filename characters on POSIX.
+func resolveNodeMainPath(directory string, main string, windows bool) string {
+	if windows {
+		return tspath.ResolvePath(directory, main)
+	}
+	if path.IsAbs(main) {
+		return path.Clean(main)
+	}
+	return path.Join(directory, main)
+}
+
+func probeNodeMainFile(program *program.Program, base string) string {
+	if entry := nodeFile(program, base); entry != "" {
+		return entry
+	}
+	return probeNodeExtensions(program, base)
+}
+
+func probeNodeIndex(program *program.Program, directory string) string {
+	return probeNodeExtensions(program, tspath.ResolvePath(directory, "index"))
+}
+
+func probeNodeExtensions(program *program.Program, base string) string {
+	for _, extension := range []string{".js", ".json", ".node"} {
 		candidate := base + extension
-		if !program.FileExists(candidate) {
-			continue
+		if entry := nodeFile(program, candidate); entry != "" {
+			return entry
 		}
-		if realPath := program.FS().Realpath(candidate); realPath != "" {
-			return tspath.NormalizePath(realPath)
-		}
-		return tspath.NormalizePath(candidate)
 	}
 	return ""
+}
+
+func nodeFile(program *program.Program, candidate string) string {
+	if !program.FileExists(candidate) {
+		return ""
+	}
+	if realPath := program.FS().Realpath(candidate); realPath != "" {
+		return tspath.NormalizePath(realPath)
+	}
+	return tspath.NormalizePath(candidate)
 }

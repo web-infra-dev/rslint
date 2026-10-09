@@ -22,6 +22,28 @@ export {};
 {"main":"entry.js"}
 -- entry-fallback/dist/entry.js --
 export {};
+-- extensionless-index/package.json --
+{}
+-- extensionless-index/index --
+not a Node package index
+-- extensionless-index/index.js --
+export {};
+-- extensionless-index/other.js --
+export {};
+-- directory-index/package.json --
+{"main":"dist"}
+-- directory-index/dist/index --
+not a Node directory index
+-- directory-index/dist/index.js --
+export {};
+-- directory-index/other.js --
+export {};
+-- backslash-main/package.json --
+{"main":"dist\\entry.js"}
+-- backslash-main/index.js --
+export {};
+-- backslash-main/dist/entry.js --
+export {};
 -- docs/package.json --
 {"main":"lib/index.js"}
 -- docs/lib/index.js --
