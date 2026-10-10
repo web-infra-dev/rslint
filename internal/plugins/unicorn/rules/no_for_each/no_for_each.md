@@ -48,6 +48,13 @@ for (const [index, element] of array.entries()) {
 }
 ```
 
+## Differences from upstream
+
+Rslint withholds the edit when an ordinary function callback's `this` or
+`arguments` is captured by a nested arrow function. Removing the callback
+boundary would change what those lexical references capture. The diagnostic is
+still reported; rewrite the loop manually when this pattern is intentional.
+
 ## Further reading
 
 - [Upstream documentation](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v77.0.0/docs/rules/no-for-each.md)

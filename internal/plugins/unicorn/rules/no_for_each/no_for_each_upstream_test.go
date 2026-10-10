@@ -3,11 +3,14 @@
 package no_for_each_test
 
 import (
+	_ "embed"
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_for_each"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -60,78 +63,130 @@ func invalid(code, fileName string, output string) rule_tester.InvalidTestCase {
 	return testCase
 }
 
+//go:embed testdata/no_for_each_v77.json
+var upstreamManifestJSON []byte
+
+type upstreamManifest struct {
+	Upstream string                 `json:"upstream"`
+	Commit   string                 `json:"commit"`
+	Valid    []upstreamManifestCase `json:"valid"`
+	Invalid  []upstreamManifestCase `json:"invalid"`
+}
+
+type upstreamManifestCase struct {
+	ID           string                  `json:"id"`
+	Group        string                  `json:"group"`
+	Code         string                  `json:"code"`
+	FileName     string                  `json:"filename"`
+	SourceType   string                  `json:"sourceType"`
+	TypeScript   bool                    `json:"typescript"`
+	GlobalReturn bool                    `json:"globalReturn"`
+	Outputs      []string                `json:"outputs"`
+	Errors       []upstreamManifestError `json:"errors"`
+}
+
+type upstreamManifestError struct {
+	MessageID   string                       `json:"messageId"`
+	Message     string                       `json:"message"`
+	Line        int                          `json:"line"`
+	Column      int                          `json:"column"`
+	EndLine     int                          `json:"endLine"`
+	EndColumn   int                          `json:"endColumn"`
+	Suggestions []upstreamManifestSuggestion `json:"suggestions"`
+}
+
+type upstreamManifestSuggestion struct {
+	MessageID string `json:"messageId"`
+	Output    string `json:"output"`
+}
+
 func TestNoForEachUpstream(t *testing.T) {
-	rule_tester.RunRuleTester(
-		fixtures.GetRootDir(),
-		"tsconfig.json",
-		t,
-		&no_for_each.NoForEachRule,
-		[]rule_tester.ValidTestCase{
-			valid(`new foo.forEach(element => bar())`, "file.js"),
-			valid(`forEach(element => bar())`, "file.js"),
-			valid(`foo.notForEach(element => bar())`, "file.js"),
-			valid(`React.Children.forEach(children, child => {});`, "file.js"),
-			valid(`Children.forEach(children, child => {});`, "file.js"),
-			valid(`await pIteration.forEach(plugins, async pluginName => {});`, "file.js"),
-			valid(`Effect.forEach([1, 2, 3], n => Effect.succeed(n));`, "file.js"),
-			valid(`const map = new Map(); map.forEach(value => console.log(value));`, "file.js"),
-			valid(`const set = new Set(); set.forEach(value => console.log(value));`, "file.js"),
-			valid("import * as CB from 'strict-callbag-basics';\nCB.forEach(x => console.log(x));", "file.js"),
-			valid(`function foo(map: Map<string, string>) { map.forEach(value => console.log(value)); }`, "file.ts"),
-			valid(`function foo(set: ReadonlySet<string>) { set.forEach(value => console.log(value)); }`, "file.ts"),
-			valid(`type Array<T> = Map<T, T>; function foo(value: Array<string>) { value.forEach(x => use(x)); }`, "file.ts"),
-			valid(`type Uint8Array = Set<number>; function foo(value: Uint8Array) { value.forEach(x => use(x)); }`, "file.ts"),
-		},
-		[]rule_tester.InvalidTestCase{
-			invalid(`foo.forEach?.(element => bar(element))`, "file.js", ""),
-			invalid(`foo.forEach(element => bar(element), thisArgument)`, "file.js", ""),
-			invalid(`foo.forEach()`, "file.js", ""),
-			invalid(`const baz = foo.forEach(element => bar(element))`, "file.js", ""),
-			invalid(`foo.forEach(bar)`, "file.js", ""),
-			invalid(`foo.forEach(async function(element) {})`, "file.js", ""),
-			invalid(`foo.forEach(function * (element) {})`, "file.js", ""),
-			invalid(`foo.forEach(() => bar())`, "file.js", ""),
-			invalid(`foo.forEach((element, index, array) => bar())`, "file.js", ""),
-			invalid(`property.forEach(({property}) => bar(property))`, "file.js", ""),
-			invalid(`foo.forEach((element = {}) => call(element))`, "file.js", ""),
-			invalid(`foo.forEach((...args) => bar(...args))`, "file.js", ""),
-			invalid(`[1, 2, 3].forEach(element => bar(element))`, "file.js", `for (const element of [1, 2, 3]) bar(element)`),
-			invalid(`const array = []; array.forEach(element => bar(element));`, "file.js", `const array = []; for (const element of array) bar(element);`),
-			invalid(`const array = []; array.forEach((element, index) => bar(element, index));`, "file.js", `const array = []; for (const [index, element] of array.entries()) bar(element, index);`),
-			invalid(`const array = []; (array).forEach(element => bar(element));`, "file.js", `const array = []; for (const element of (array)) bar(element);`),
-			invalid(`const array = []; array.forEach((element => bar(element)));`, "file.js", `const array = []; for (const element of array) bar(element);`),
-			invalid(`const array = []; array.forEach(element => { bar(element); });`, "file.js", `const array = []; for (const element of array) { bar(element); }`),
-			invalid(`const array = []; array.forEach(element => {/* comment */ bar(element);});`, "file.js", `const array = []; for (const element of array) {/* comment */ bar(element);}`),
-			invalid(`const array = []; array.forEach(/* comment */ element => bar(element));`, "file.js", ""),
-			invalid(`const array = []; array.forEach(element => bar(element),);`, "file.js", `const array = []; for (const element of array) bar(element);`),
-			invalid(`const array = []; array.forEach(async element => bar(element));`, "file.js", ""),
-			invalid(`const array = []; const result = array.forEach(element => bar(element));`, "file.js", ""),
-			invalid(`const array = []; array.forEach(element => { for (const item of element) { return; } });`, "file.js", ""),
-			invalid("const array = [];\narray.forEach(element => { if (element) bar(); else return; });", "file.js", "const array = [];\nfor (const element of array) { if (element) bar(); else continue; }"),
-			invalid("const array = [];\narray.forEach(element => {\n\tfoo()\n\treturn [element]\n});", "file.js", "const array = [];\nfor (const element of array) {\n\tfoo()\n\t ;[element]; continue;\n}"),
-			invalid(`const typedArray = new Uint8Array(); typedArray.forEach(value => console.log(value));`, "file.js", ""),
-			invalid(`function foo(typedArray: Uint8Array) { typedArray.forEach(value => console.log(value)); }`, "file.ts", ""),
-			invalid(`function foo(array: Array<string>) { array.forEach(value => console.log(value)); }`, "file.ts", `function foo(array: Array<string>) { for (const value of array) console.log(value); }`),
-			invalid(`function foo(array: ReadonlyArray<string>) { array.forEach(value => console.log(value)); }`, "file.ts", `function foo(array: ReadonlyArray<string>) { for (const value of array) console.log(value); }`),
-			invalid(`function foo(array: [string, string]) { array.forEach(value => console.log(value)); }`, "file.ts", `function foo(array: [string, string]) { for (const value of array) console.log(value); }`),
-			invalid(`type Strings = string[]; function foo(array: Strings) { array.forEach(value => console.log(value)); }`, "file.ts", `type Strings = string[]; function foo(array: Strings) { for (const value of array) console.log(value); }`),
-			invalid(`type Map = string[]; function foo(array: Map) { array.forEach(value => console.log(value)); }`, "file.ts", `type Map = string[]; function foo(array: Map) { for (const value of array) console.log(value); }`),
-			invalid("interface PageInfo {}\ndeclare const staticPages: string[];\ndeclare const allStaticPages: Set<string>;\ndeclare const pageInfos: Map<string, PageInfo>;\ndeclare const allPageInfos: Map<string, PageInfo>;\n\nstaticPages.forEach(pg => allStaticPages.add(pg));\npageInfos.forEach((info, key) => allPageInfos.set(key, info));", "file.ts", "interface PageInfo {}\ndeclare const staticPages: string[];\ndeclare const allStaticPages: Set<string>;\ndeclare const pageInfos: Map<string, PageInfo>;\ndeclare const allPageInfos: Map<string, PageInfo>;\n\nfor (const pg of staticPages) allStaticPages.add(pg);\npageInfos.forEach((info, key) => allPageInfos.set(key, info));"),
-			invalid("declare const elements: string[];\ndeclare function cloakElement(element: string): string;\nconst cloakVals: string[] = [];\nelements.forEach(element => cloakVals.push(cloakElement(element)));", "file.ts", "declare const elements: string[];\ndeclare function cloakElement(element: string): string;\nconst cloakVals: string[] = [];\nfor (const element of elements) cloakVals.push(cloakElement(element));"),
-			invalid("declare function getStrings(): string[];\ngetStrings().forEach(value => console.log(value));", "file.ts", "declare function getStrings(): string[];\nfor (const value of getStrings()) console.log(value);"),
-			{
-				Code:     `function foo(collection: string[] | {forEach(callback: (value: string) => void): void}) { collection.forEach(value => console.log(value)); }`,
-				FileName: "file.ts",
-				Errors: []rule_tester.InvalidTestCaseError{
-					forEachError(`function foo(collection: string[] | {forEach(callback: (value: string) => void): void}) { collection.forEach(value => console.log(value)); }`, 1),
-				},
-			},
-			invalid(`const element = 5; console.log(element); [1, 2, 3].forEach(element => bar(element));`, "file.js", `const element = 5; console.log(element); for (const element of [1, 2, 3]) bar(element);`),
-			invalid(`const array = []; array.forEach(element => { element = foo(element); bar(element); });`, "file.js", `const array = []; for (let element of array) { element = foo(element); bar(element); }`),
-			invalid("const foo = [1, 2, 3];\nfoo.forEach(x => function () {});", "file.js", "const foo = [1, 2, 3];\nfor (const x of foo) (function () {});"),
-			invalid("const foo = [1, 2, 3];\nfoo.forEach(x => class {});", "file.js", "const foo = [1, 2, 3];\nfor (const x of foo) (class {});"),
-			invalid("const foo = [1, 2, 3];\nfoo.forEach(x => ({bar: x}));", "file.js", "const foo = [1, 2, 3];\nfor (const x of foo) ({bar: x});"),
-			invalid(`const array = []; array.forEach(element => {if (foo) return class {}; bar(element);});`, "file.js", `const array = []; for (const element of array) {if (foo)  { (class {}); continue; } bar(element);}`),
-		},
-	)
+	var manifest upstreamManifest
+	if err := json.Unmarshal(upstreamManifestJSON, &manifest); err != nil {
+		t.Fatalf("decode upstream manifest: %v", err)
+	}
+	if manifest.Upstream != "eslint-plugin-unicorn@77.0.0" ||
+		manifest.Commit != "15f1d646dad6857d1a9cd39939e25cda25d7e4c9" ||
+		len(manifest.Valid) != 28 || len(manifest.Invalid) != 348 {
+		t.Fatalf("unexpected upstream manifest identity/counts: %q, %d valid, %d invalid",
+			manifest.Upstream, len(manifest.Valid), len(manifest.Invalid))
+	}
+	// ESLint's parserOptions.globalReturn accepts top-level return statements.
+	// Rslint follows TypeScript's parser and suppresses native rules on that
+	// malformed product input, so the one valid and twelve invalid cases in the
+	// dedicated global-return group stay present as explicit skips.
+	globalReturnCases := 0
+	for _, testCase := range manifest.Valid {
+		if testCase.GlobalReturn {
+			globalReturnCases++
+		}
+	}
+	for _, testCase := range manifest.Invalid {
+		if testCase.GlobalReturn {
+			globalReturnCases++
+		}
+	}
+	if globalReturnCases != 13 {
+		t.Fatalf("global-return exclusions = %d, want 13", globalReturnCases)
+	}
+
+	validCases := make([]rule_tester.ValidTestCase, 0, len(manifest.Valid))
+	for _, testCase := range manifest.Valid {
+		validCases = append(validCases, rule_tester.ValidTestCase{
+			Code:            testCase.Code,
+			FileName:        manifestFileName(testCase),
+			Skip:            testCase.GlobalReturn,
+			LanguageOptions: languageOptions(testCase.SourceType),
+		})
+	}
+	invalidCases := make([]rule_tester.InvalidTestCase, 0, len(manifest.Invalid))
+	for _, testCase := range manifest.Invalid {
+		errors := make([]rule_tester.InvalidTestCaseError, 0, len(testCase.Errors))
+		for _, expected := range testCase.Errors {
+			suggestions := make([]rule_tester.InvalidTestCaseSuggestion, 0, len(expected.Suggestions))
+			for _, suggestion := range expected.Suggestions {
+				suggestions = append(suggestions, rule_tester.InvalidTestCaseSuggestion{
+					MessageId: suggestion.MessageID,
+					Output:    suggestion.Output,
+				})
+			}
+			errors = append(errors, rule_tester.InvalidTestCaseError{
+				MessageId:   expected.MessageID,
+				Message:     expected.Message,
+				Line:        expected.Line,
+				Column:      expected.Column,
+				EndLine:     expected.EndLine,
+				EndColumn:   expected.EndColumn,
+				Suggestions: suggestions,
+			})
+		}
+		invalidCases = append(invalidCases, rule_tester.InvalidTestCase{
+			Code:            testCase.Code,
+			FileName:        manifestFileName(testCase),
+			Skip:            testCase.GlobalReturn,
+			Output:          testCase.Outputs,
+			Errors:          errors,
+			LanguageOptions: languageOptions(testCase.SourceType),
+		})
+	}
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+		&no_for_each.NoForEachRule, validCases, invalidCases)
+}
+
+func languageOptions(sourceType string) rule.LanguageOptions {
+	if sourceType == "" {
+		return rule.LanguageOptions{}
+	}
+	return rule.LanguageOptions{SourceType: sourceType}
+}
+
+func manifestFileName(testCase upstreamManifestCase) string {
+	if testCase.FileName != "" {
+		return testCase.FileName
+	}
+	if testCase.TypeScript {
+		return "file.ts"
+	}
+	return "file.js"
 }
