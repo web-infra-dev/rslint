@@ -15,7 +15,7 @@
   "keywords": [],
   "author": "",
   "license": "MIT",
-  "packageManager": "pnpm@10.34.4",
+  "packageManager": "pnpm@10.34.6",
   "devDependencies": {
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:"

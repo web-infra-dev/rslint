@@ -24,13 +24,13 @@ oxc_ast_visit = { version = "0.133.0", features = ["serialize"] }
 oxc_parser = "0.133.0"
 oxc_span = "0.133.0"
 # token_map builds the AST cover from the ESTree JSON value.
-serde_json = "1"
+serde_json = "1.0.151"
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+libc = "0.2.190"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Memory"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Memory"] }
 
 [build-dependencies]
 napi-build = "2.3.2"

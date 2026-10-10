@@ -1,6 +1,6 @@
 module github.com/web-infra-dev/rslint
 
-go 1.27.0
+go 1.27.2
 
 replace (
 	github.com/microsoft/TypeScript/tsc/shim/api => ./shim/api
@@ -36,7 +36,7 @@ replace (
 )
 
 require (
-	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/bmatcuk/doublestar/v4 v4.10.2
 	github.com/fatih/color v1.19.0
 	github.com/microsoft/TypeScript/tsc/shim/api/encoder v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/ast v0.0.0
@@ -66,7 +66,7 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/trackingvfs v0.0.0
 	github.com/rivo/uniseg v0.4.7
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/sync v0.22.0
@@ -89,7 +89,7 @@ require (
 
 require (
 	github.com/dlclark/regexp2 v1.12.0
-	github.com/fxamacker/cbor/v2 v2.9.0
+	github.com/fxamacker/cbor/v2 v2.9.6
 	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68
 	github.com/microsoft/TypeScript/tsc v0.0.0-20260904213532-1f70213d4922 // indirect
 	golang.org/x/text v0.41.0
