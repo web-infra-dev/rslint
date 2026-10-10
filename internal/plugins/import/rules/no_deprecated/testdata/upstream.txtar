@@ -1,0 +1,153 @@
+Fixtures from eslint-plugin-import v2.32.0 tests/files and docs/rules/no-deprecated.md.
+
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"commonjs","jsx":"preserve"},"include":["**/*"]}
+-- deprecated.js --
+// some line comment
+/**
+ * this function is terrible
+ * @deprecated please use 'x' instead.
+ * @return null
+ */
+// another line comment
+// with two lines
+export function fn() { return null }
+
+/**
+ * so terrible
+ * @deprecated this is awful, use NotAsBadClass.
+ */
+export default class TerribleClass {
+
+}
+
+/**
+ * some flux action type maybe
+ * @deprecated please stop sending/handling this action type.
+ * @type {String}
+ */
+export const MY_TERRIBLE_ACTION = "ugh"
+
+/**
+ * @deprecated this chain is awful
+ * @type {String}
+ */
+export const CHAIN_A = "a",
+/**
+ * @deprecated so awful
+ * @type {String}
+ */
+             CHAIN_B = "b",
+
+/**
+ * @deprecated still terrible
+ * @type {String}
+ */
+             CHAIN_C = "C"
+
+/**
+ * this one is fine
+ * @return {String} - great!
+ */
+export function fine() { return "great!" }
+
+export function _undocumented() { return "sneaky!" }
+-- deep-deprecated.js --
+import * as deepDep from './deprecated'
+export { deepDep }
+-- deprecated-file.js --
+/**
+ * ugh!
+ * @module some/deprecated
+ * @deprecated this module is the worst.
+ */
+
+/**
+ * this class is great
+ */
+export default class Thing { }
+
+// some other comment
+-- tomdoc-deprecated.js --
+// Deprecated: This function is terrible.
+//
+// With another line comment in description.
+export function fn() { return null }
+
+// Deprecated: this is awful,
+// use NotAsBadClass.
+//
+// Some other description text.
+export default class TerribleClass {
+
+}
+
+// Deprecated: Please stop sending/handling this action type.
+export const MY_TERRIBLE_ACTION = "ugh"
+
+// Public: This one is fine.
+//
+// Returns a String "great!"
+export function fine() { return "great!" }
+
+export function _undocumented() { return "sneaky!" }
+-- ts-deprecated.ts --
+/**
+ * this is what you get when you trust a mouse talk show
+ * @deprecated don't use this!
+ * @returns {string} nonsense
+ */
+export function foo() {
+  return 'bar'
+}
+-- bar.js --
+export default 'bar'
+export function foo() { return 'foo' }
+-- data.json --
+{ "foo": "bar" }
+-- foobar.json --
+{
+  "action": "set",
+  "node": {
+    "key": "/foo",
+    "value": "foo",
+    "modifiedIndex": 1438,
+    "createdIndex": 1438
+  },
+  "prevNode": {
+    "key": "/foo",
+    "value": "bar",
+    "modifiedIndex": 1437,
+    "createdIndex": 1437
+  }
+}
+-- commonjs-namespace/a.js --
+export { default as b } from './b'
+-- commonjs-namespace/b.js --
+module.exports = {}
+-- issue-370-commonjs-namespace/bar.js --
+// bar.js
+export { default as foo } from './foo'
+-- issue-370-commonjs-namespace/foo.js --
+// foo.js
+module.exports = { foo: 'foo' }
+-- ignore.invalid.extension --
+
+-- answer.js --
+
+// @file: ./answer.js
+
+/**
+ * this is what you get when you trust a mouse talk show
+ * @deprecated need to restart the experiment
+ * @returns {Number} nonsense
+ */
+export function multiply(six, nine) {
+  return 42
+}
+-- tomdoc-answer.js --
+// Deprecated: This is what you get when you trust a mouse talk show, need to
+// restart the experiment.
+//
+// Returns a Number nonsense
+export function multiply(six, nine) { return 42 }

@@ -225,10 +225,24 @@ export class RuleTester {
                   `Error at index ${i} has suggestions. Please convert the test error into an object and specify 'suggestions' property on it to test suggestions.`,
                 );
               } else if (typeof error === 'object' && error !== null) {
-                // TODO: handle object error(currently partially implemented)
-                // https://github.com/eslint/eslint/blob/34f0723e2d0faf8ac8dc95ec56e6d181bd6b67f2/lib/rule-tester/rule-tester.js#L1145
                 if (typeof error.message === 'string') {
                   assertMessageMatches(message.message, error.message);
+                }
+                if (error.messageId !== undefined) {
+                  assert.strictEqual(message.messageId, error.messageId);
+                }
+                for (const [expected, actual] of [
+                  [error.line, message.range.start.line],
+                  [error.column, message.range.start.column],
+                  [error.endLine, message.range.end.line],
+                  [error.endColumn, message.range.end.column],
+                ]) {
+                  if (expected !== undefined) {
+                    assert.strictEqual(actual, expected);
+                  }
+                }
+                if (error.suggestions === undefined) {
+                  assert.ok(message.suggestions === undefined);
                 }
               }
             }

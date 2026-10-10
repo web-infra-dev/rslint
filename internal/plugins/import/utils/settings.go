@@ -69,6 +69,7 @@ type ModuleSettings struct {
 	coreModules     map[string]struct{}
 	externalFolders []string
 	key             string
+	docStyles       []string
 }
 
 // settingsKey identifies one compiled ModuleSettings in the source cache.
@@ -94,6 +95,10 @@ func compileModuleSettings(settings map[string]interface{}) *ModuleSettings {
 	compiled := &ModuleSettings{
 		externalFolders: externalModuleFolders(settings),
 		key:             moduleSettingsKey(settings),
+		docStyles:       settingsStringList(settings, "import/docstyle"),
+	}
+	if settings["import/docstyle"] == nil {
+		compiled.docStyles = []string{"jsdoc"}
 	}
 	if names := settingsStringList(settings, "import/core-modules"); len(names) != 0 {
 		compiled.coreModules = make(map[string]struct{}, len(names))
@@ -122,6 +127,13 @@ func moduleSettingsKey(settings map[string]interface{}) string {
 	var key strings.Builder
 	for _, pattern := range settingsStringList(settings, "import/ignore") {
 		key.WriteString(strconv.Quote(pattern))
+	}
+	key.WriteByte('\x00')
+	for _, style := range settingsStringList(settings, "import/docstyle") {
+		key.WriteString(strconv.Quote(style))
+	}
+	if settings["import/docstyle"] == nil {
+		key.WriteString("default-jsdoc")
 	}
 	key.WriteByte('\x00')
 	for _, folder := range externalModuleFolders(settings) {
