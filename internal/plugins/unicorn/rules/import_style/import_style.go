@@ -179,7 +179,7 @@ func actualImportDeclarationStyles(node *ast.Node) []string {
 			styles.add(styleNamed)
 		}
 	}
-	if len(elements) == 0 {
+	if len(elements) == 0 && clause.Name() == nil {
 		return []string{styleUnassigned}
 	}
 	return styles.values()
@@ -231,6 +231,9 @@ func actualAssignmentTargetStyles(target *ast.Node) []string {
 			key := element.PropertyName
 			if key == nil {
 				key = element.Name()
+			}
+			if key != nil && key.Kind == ast.KindComputedPropertyName {
+				key = utils.ESTreeRuntimeExpression(key.AsComputedPropertyName().Expression)
 			}
 			if key != nil && key.Kind == ast.KindIdentifier {
 				if key.Text() == "default" {

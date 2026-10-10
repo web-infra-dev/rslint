@@ -26,6 +26,8 @@ func extraError(message, id string, line, column, endLine, endColumn int) []rule
 
 func TestImportStyleExtras(t *testing.T) {
 	valid := []rule_tester.ValidTestCase{
+		// An empty named-import list does not erase an existing default binding.
+		{Code: `import path, {} from 'node:path';`, FileName: "file.js"},
 		// Parentheses are transparent in ESTree for the callee and module expression.
 		{Code: `(require)(("free"));`, FileName: "file.js", Options: extraOptions("free", map[string]any{"unassigned": true})},
 		// Authored TypeScript wrappers are visible to TSESTree and therefore are not direct require calls.
@@ -42,7 +44,7 @@ func TestImportStyleExtras(t *testing.T) {
 		{Code: "require(String.raw`util`);", FileName: "file.js", Globals: map[string]any{"String": "off"}},
 		// A shadowed require is still matched by upstream's syntax-only helper.
 		{Code: `function f(require) { const {x} = require('named'); }`, FileName: "file.js", Options: extraOptions("named", map[string]any{"named": true})},
-		// Computed object-binding keys are not Identifier keys upstream, so they contribute no style.
+		// Computed literal binding keys are literals in ESTree, so they contribute no style.
 		{Code: `const {['x']: x} = require('named');`, FileName: "file.js", Options: extraOptions("named", map[string]any{"named": true})},
 		// Plain export-all remains namespace style.
 		{Code: `export * from 'module';`, FileName: "file.js", Options: extraOptions("module", map[string]any{"namespace": true})},
@@ -61,6 +63,9 @@ func TestImportStyleExtras(t *testing.T) {
 		{Code: `import('named');`, FileName: "file.js", Options: extraOptions("named", map[string]any{"named": true}), Errors: extraError("Use named import for module `named`.", "importStyle", 1, 1, 1, 16)},
 		{Code: `const value = require('named');`, FileName: "file.js", Options: extraOptions("named", map[string]any{"named": true}), Errors: extraError("Use named import for module `named`.", "importStyle", 1, 7, 1, 31)},
 		{Code: `require('named');`, FileName: "file.js", Options: extraOptions("named", map[string]any{"named": true}), Errors: extraError("Use named import for module `named`.", "importStyle", 1, 1, 1, 17)},
+		// Computed identifier keys remain identifiers in ESTree and are named-style imports.
+		{Code: `const {[key]: value} = require('chalk');`, FileName: "file.js", Errors: extraError("Use default import for module `chalk`.", "importStyle", 1, 7, 1, 40)},
+		{Code: `async function f(){ const {[key]: value} = await import('chalk'); }`, FileName: "file.js", Errors: extraError("Use default import for module `chalk`.", "importStyle", 1, 27, 1, 65)},
 		{Code: "require(String.raw`util`);", FileName: "file.js", Output: []string{}, Errors: extraError("Use named import for module `util`.", "importStyle", 1, 1, 1, 26)},
 		{Code: `export * from 'named';`, FileName: "file.js", Options: extraOptions("named", map[string]any{"named": true}), Errors: extraError("Use named import for module `named`.", "importStyle", 1, 1, 1, 23)},
 
