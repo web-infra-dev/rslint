@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/explicit_timer_delay"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/max_nested_calls"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/name_replacements"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_anonymous_default_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_callback_reference"
@@ -106,6 +107,7 @@ func GetAllRules() []rule.Rule {
 		expiring_todo_comments.ExpiringTodoCommentsRule,
 		filename_case.FilenameCaseRule,
 		max_nested_calls.MaxNestedCallsRule,
+		name_replacements.NameReplacementsRule,
 		new_for_builtins.NewForBuiltinsRule,
 		no_anonymous_default_export.NoAnonymousDefaultExportRule,
 		no_array_callback_reference.NoArrayCallbackReferenceRule,
