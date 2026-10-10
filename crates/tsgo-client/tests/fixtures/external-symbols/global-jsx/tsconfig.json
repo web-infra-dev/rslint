@@ -3,7 +3,7 @@
     "jsx": "preserve",
     "module": "preserve",
     "moduleResolution": "bundler",
-    "types": ["react"]
+    "types": ["react", "scope__typed"]
   },
   "include": ["./index.tsx"]
 }
