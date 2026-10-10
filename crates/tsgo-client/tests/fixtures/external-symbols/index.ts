@@ -1,4 +1,4 @@
-import { api } from 'example-dependency';
+import { api, stringBox, numberBox } from 'example-dependency';
 import 'example-dependency/index.js';
 import 'example-reexport';
 import '@scope/pkg';
@@ -26,3 +26,7 @@ declare global {
 api.run();
 export const value = Math.abs(-1);
 export const text = 'hello'.slice(1);
+export const stringValue = stringBox.value;
+export const numberValue = numberBox.value;
+export const stringResult = stringBox.get();
+export const numberResult = numberBox.get();

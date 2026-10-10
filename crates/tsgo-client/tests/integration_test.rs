@@ -844,6 +844,47 @@ fn test_external_symbol_names_and_aliases() {
     );
     external_symbol(semantic, "global", "String.fromCharCode");
     external_symbol(semantic, "global", "Math.abs");
+    let file = source_file_id(&project, "/external-symbols/index.ts");
+    for (object, primitive) in [
+        ("stringBox", semantic.primtypes.string),
+        ("numberBox", semantic.primtypes.number),
+    ] {
+        for member in ["value", "get"] {
+            let expression = format!("{object}.{member}");
+            let start = source.find(&expression).unwrap() + object.len() + 1;
+            let start = source[..start].encode_utf16().count() as u32;
+            let end = start + member.len() as u32;
+            let symbol = node_symbol(
+                semantic,
+                &NodeReference {
+                    sourcefile_id: file,
+                    start,
+                    end,
+                },
+            );
+            let declaration = external_symbol(
+                semantic,
+                "example-dependency",
+                &format!("GenericBox.{member}"),
+            );
+            assert_ne!(symbol, declaration);
+            assert!(semantic.symbol_targets.contains(&(symbol, declaration)));
+            assert!(
+                semantic
+                    .alias_symbols
+                    .iter()
+                    .all(|(alias, _)| *alias != symbol)
+            );
+            symbol_data(semantic, declaration);
+            if member == "value" {
+                assert_eq!(node_type(semantic, file, start, end).id, primitive);
+                assert!(semantic.sym2type.contains(&(symbol, primitive)));
+            }
+        }
+        let result_name = format!("{}Result", object.strip_suffix("Box").unwrap());
+        let (result, _) = named_symbol(semantic, file, result_name.as_bytes());
+        assert!(semantic.sym2type.contains(&(result, primitive)));
+    }
     for name in [
         "hidden",
         "Box.value",

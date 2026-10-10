@@ -52,6 +52,9 @@ pub struct Semantic {
     // (aliasSymbolId, targetSymbolId)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub alias_symbols: Vec<(u32, u32)>,
+    // Instantiated symbols point to original declarations; their concrete types remain separate.
+    #[serde(default, deserialize_with = "vecmap_or_empty")]
+    pub symbol_targets: Vec<(u32, u32)>,
     // Shorthand property assignment value symbols (node -> value_symbol_id)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub shorthand_symbols: Vec<(NodeReference, u32)>,
