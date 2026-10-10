@@ -1,4 +1,3 @@
-
 // @file: ./answer.js
 
 /**
@@ -7,5 +6,5 @@
  * @returns {Number} nonsense
  */
 export function multiply(six, nine) {
-  return 42
+  return 42;
 }

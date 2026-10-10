@@ -2,4 +2,6 @@
 // restart the experiment.
 //
 // Returns a Number nonsense
-export function multiply(six, nine) { return 42 }
+export function multiply(six, nine) {
+  return 42;
+}
