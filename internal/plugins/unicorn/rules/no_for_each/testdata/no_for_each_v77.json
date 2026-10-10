@@ -752,9 +752,7 @@
       "typescript": false,
       "globalReturn": false,
       "filename": "file.js",
-      "outputs": [
-        "for (const element of [1, 2, 3]) bar(element)"
-      ],
+      "outputs": ["for (const element of [1, 2, 3]) bar(element)"],
       "errors": [
         {
           "messageId": "no-for-each/error",
@@ -4624,9 +4622,7 @@
       "typescript": false,
       "globalReturn": false,
       "filename": "file.js",
-      "outputs": [
-        "if (true) {} else for (const element of [foo]) {}"
-      ],
+      "outputs": ["if (true) {} else for (const element of [foo]) {}"],
       "errors": [
         {
           "messageId": "no-for-each/error",
@@ -7015,9 +7011,7 @@
         }
       ],
       "filename": "file.js",
-      "outputs": [
-        "const foo = [1, 2, 3];\nfor (const x of foo) (class {});"
-      ]
+      "outputs": ["const foo = [1, 2, 3];\nfor (const x of foo) (class {});"]
     },
     {
       "id": "invalid-361",
@@ -7061,9 +7055,7 @@
         }
       ],
       "filename": "file.js",
-      "outputs": [
-        "const foo = [1, 2, 3];\nfor (const x of foo) bar(x);"
-      ]
+      "outputs": ["const foo = [1, 2, 3];\nfor (const x of foo) bar(x);"]
     },
     {
       "id": "invalid-363",
@@ -7130,9 +7122,7 @@
         }
       ],
       "filename": "file.js",
-      "outputs": [
-        "const foo = [1, 2, 3];\nfor (const x of foo) (class {}`t`);"
-      ]
+      "outputs": ["const foo = [1, 2, 3];\nfor (const x of foo) (class {}`t`);"]
     },
     {
       "id": "invalid-366",
@@ -7245,9 +7235,7 @@
         }
       ],
       "filename": "file.js",
-      "outputs": [
-        "const foo = [1, 2, 3];\nfor (const x of foo) ({bar: x});"
-      ]
+      "outputs": ["const foo = [1, 2, 3];\nfor (const x of foo) ({bar: x});"]
     },
     {
       "id": "invalid-371",
@@ -7268,9 +7256,7 @@
         }
       ],
       "filename": "file.js",
-      "outputs": [
-        "const foo = [1, 2, 3];\nfor (const x of foo) (class {});"
-      ]
+      "outputs": ["const foo = [1, 2, 3];\nfor (const x of foo) (class {});"]
     },
     {
       "id": "invalid-372",
