@@ -1,0 +1,114 @@
+Additional documentation, re-export and language cases.
+
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"commonjs","jsx":"preserve"},"include":["**/*"]}
+-- values.js --
+/** @deprecated */
+export const old = {};
+/** @deprecated - use newValue */
+export const dash = 1;
+/**
+ * @deprecated first line
+ *   second line
+ */
+export function multiline() {}
+/** @deprecated ignored earlier block */
+/** plain later block */
+export const plain = 1;
+/* @deprecated ordinary block */
+export const ordinary = 1;
+/** @deprecated first */
+/** @deprecated last */
+export const last = 1;
+/** @deprecated tuple */
+export const [a,b] = [1,2];
+export const ignored=1, /** @deprecated later variable */ later=2;
+/** @deprecated statement */
+export const blocked=1, /* undocumented variable */ clean=2;
+// Deprecated: wrapped
+// over two lines
+//
+// Returns a number
+export const tom = 1;
+/**
+ * @deprecated note
+ * @returns {number} ok
+ */
+export const terminated = 1;
+/** @deprecated repeat first
+ * @deprecated repeat second
+ */
+export const repeated = 1;
+/**
+ * @deprecated unicode space
+ */
+export const unicode = 1;
+/** @deprecated default expression */
+export default old;
+
+-- barrel.js --
+export { old as renamed, default as default } from './values.js'; export * from './values.js';
+-- namespace.js --
+import * as inner from './values.js'; export { inner };
+-- deep.js --
+import * as nested from './namespace.js'; export { nested };
+-- module.js --
+/** @module whole
+ * @deprecated whole module
+ */
+/** @deprecated one export */
+export const old = 1;
+-- first-module.js --
+/** @module first */
+/** @module second
+ * @deprecated ignored second module
+ */
+export const fine=1;
+-- not-module.js --
+/** @deprecated only export */
+export const old=1;
+-- local.js --
+/** @deprecated ignored local declaration */
+const old=1; export { old };
+-- malformed-doc.js --
+/**
+ * @param {broken
+ * @deprecated tolerated malformed type
+ */
+export const old=1;
+-- public.js --
+/* Deprecated: TomDoc
+ * @deprecated JSDoc
+ */
+export const old=1;
+-- empty.js --
+export {};
+-- assigned-barrel.ts --
+export {default as Old} from './assigned-class.ts';
+-- assigned-class.ts --
+/** @deprecated assigned class */
+class Old {}
+export = Old;
+-- assigned-function.ts --
+/** @deprecated ignored runtime declaration */
+function old(){}
+/** @deprecated assignment reason */
+export = old;
+-- assigned-namespace.ts --
+namespace API {
+/** @deprecated member reason */
+export function old(){}
+/** @deprecated variable reason */
+export const value=1;
+/** @deprecated other reason */
+export const other=2;
+}
+export = API;
+-- assigned-value.ts --
+/** @deprecated assigned value */
+const old=1;
+export = old;
+-- ns-default.js --
+import * as ns from './values';
+/** @deprecated namespace reason */
+export default ns;
