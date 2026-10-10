@@ -143,7 +143,10 @@ type Semantic struct {
 	Typetab      map[checker.TypeId]TypeInfo     `json:"typetab"`
 	Sym2type     map[ast.SymbolId]checker.TypeId `json:"sym2type"`
 	AliasSymbols map[ast.SymbolId]ast.SymbolId   `json:"alias_symbols"`
-	Node2sym     map[NodeReference]ast.SymbolId  `json:"node2sym"`
+	// SymbolTargets maps instantiated symbols to their original merged declarations.
+	// Node2sym and Sym2type retain the instantiated symbol and its concrete type.
+	SymbolTargets map[ast.SymbolId]ast.SymbolId  `json:"symbol_targets"`
+	Node2sym      map[NodeReference]ast.SymbolId `json:"node2sym"`
 	// Node2module maps import specifiers without module symbols to resolved source file IDs.
 	Node2module map[NodeReference]SourceFileId   `json:"node2module"`
 	Node2type   map[NodeReference]checker.TypeId `json:"node2type"`
@@ -157,7 +160,10 @@ type Semantic struct {
 	// ParameterPropertySymbols maps a parameter property name node to the other symbol declared at that location.
 	// The primary symbol remains recorded in Node2sym.
 	ParameterPropertySymbols map[NodeReference]ast.SymbolId `json:"parameter_property_symbols"`
-	// ExternalSymbols contains every distinct qualified name of globals and dependency exports.
+	// ExternalSymbols contains shallow global names and qualified external declarations.
+	// External declarations include standard library interface and constructor members.
+	// Dependency declarations include private module, namespace and class members.
+	// Dependency namespaces use package names, without import subpath suffixes.
 	// Multiple entries can refer to the same symbol ID through aliases or re-exports.
 	ExternalSymbols []ExternalSymbol `json:"external_symbols"`
 }
@@ -168,6 +174,7 @@ func NewSemantic() Semantic {
 		Typetab:                  make(map[checker.TypeId]TypeInfo),
 		Sym2type:                 make(map[ast.SymbolId]checker.TypeId),
 		AliasSymbols:             make(map[ast.SymbolId]ast.SymbolId),
+		SymbolTargets:            make(map[ast.SymbolId]ast.SymbolId),
 		Node2sym:                 make(map[NodeReference]ast.SymbolId),
 		Node2module:              make(map[NodeReference]SourceFileId),
 		Node2type:                make(map[NodeReference]checker.TypeId),
@@ -241,7 +248,8 @@ func CollectSemanticInFile(program *compiler.Program, tc *checker.Checker, file 
 	// Type symbols such as anonymous type literals are not necessarily returned by
 	// GetSymbolAtLocation while walking the AST. Record them when they are reached
 	// through a type so every non-zero TypeInfo.Symbol has a Symtab entry.
-	recordSymbolInfo := func(symbol *ast.Symbol) ast.SymbolId {
+	var recordSymbolInfo func(symbol *ast.Symbol) ast.SymbolId
+	recordSymbolInfo = func(symbol *ast.Symbol) ast.SymbolId {
 		if symbol == nil {
 			return 0
 		}
@@ -254,6 +262,12 @@ func CollectSemanticInFile(program *compiler.Program, tc *checker.Checker, file 
 				Flags:      int(symbol.Flags),
 				CheckFlags: int(symbol.CheckFlags),
 				Decl:       nodeReference(symbol.ValueDeclaration),
+			}
+			if symbol.CheckFlags&ast.CheckFlagsInstantiated != 0 {
+				target := tc.GetMergedSymbol(tc.GetTargetSymbol(symbol))
+				if target != nil && target != symbol {
+					semantic.SymbolTargets[symbolID] = recordSymbolInfo(target)
+				}
 			}
 		}
 		return symbolID

@@ -90,20 +90,12 @@ fn test_tsgo_integration_simple_project() {
     assert_ne!(project.semantic.primtypes.number, 0);
     assert_ne!(project.semantic.primtypes.any, 0);
 
-    // Shared DOM members retain every observed qualified name through transport.
-    let document_listener = project
-        .semantic
-        .external_symbols
-        .iter()
-        .find(|symbol| symbol.namespace == b"global" && symbol.name == b"document.addEventListener")
-        .expect("Expected document.addEventListener metadata");
-    assert!(
-        project.semantic.external_symbols.iter().any(|symbol| {
-            symbol.symbol_id == document_listener.symbol_id
-                && symbol.namespace == b"global"
-                && symbol.name != document_listener.name
-        }),
-        "Expected multiple qualified names for the shared listener symbol"
+    external_symbol(&project.semantic, "global", "document");
+    external_symbol(&project.semantic, "global", "Math.abs");
+    external_symbol(
+        &project.semantic,
+        "global",
+        "Object.prototype.hasOwnProperty",
     );
 
     let index_module = project
@@ -805,22 +797,132 @@ fn test_external_symbol_names_and_aliases() {
     for name in [
         "globalThis",
         "Math",
-        "Math.abs",
-        "Object.prototype.hasOwnProperty",
-        "console.log",
+        "Object",
+        "console",
+        "location",
+        "A",
+        "PrototypeNode",
+        "PrototypeAlias",
     ] {
         external_symbol(semantic, "global", name);
     }
-    assert_eq!(
-        external_symbol(semantic, "global", "A.abs"),
-        external_symbol(semantic, "global", "Math.abs")
+    assert!(
+        semantic
+            .external_symbols
+            .iter()
+            .filter(|symbol| symbol.namespace == b"global")
+            .all(|symbol| !symbol.name.starts_with(b"\""))
     );
-    let paths: [(&str, &[&str]); 5] = [
+    assert!(!semantic.external_symbols.iter().any(|symbol| {
+        symbol.namespace == b"global"
+            && [
+                b"console.log".as_slice(),
+                b"location.href".as_slice(),
+                b"A.abs".as_slice(),
+                b"PrototypeNode.prototype.run".as_slice(),
+                b"PrototypeAlias.prototype.run".as_slice(),
+            ]
+            .contains(&symbol.name.as_slice())
+    }));
+    let slice_id = external_symbol(semantic, "global", "String.prototype.slice");
+    assert_eq!(
+        external_symbol(semantic, "global", "String.slice"),
+        slice_id
+    );
+    let source = include_str!("fixtures/external-symbols/index.ts");
+    let slice_start = source.find("'hello'.slice").unwrap() + "'hello'.".len();
+    assert_eq!(
+        node_symbol(
+            semantic,
+            &NodeReference {
+                sourcefile_id: source_file_id(&project, "/external-symbols/index.ts"),
+                start: slice_start as u32,
+                end: (slice_start + "slice".len()) as u32,
+            }
+        ),
+        slice_id
+    );
+    external_symbol(semantic, "global", "String.fromCharCode");
+    external_symbol(semantic, "global", "Math.abs");
+    let file = source_file_id(&project, "/external-symbols/index.ts");
+    for (object, primitive) in [
+        ("stringBox", semantic.primtypes.string),
+        ("numberBox", semantic.primtypes.number),
+    ] {
+        for member in ["value", "get"] {
+            let expression = format!("{object}.{member}");
+            let start = source.find(&expression).unwrap() + object.len() + 1;
+            let start = source[..start].encode_utf16().count() as u32;
+            let end = start + member.len() as u32;
+            let symbol = node_symbol(
+                semantic,
+                &NodeReference {
+                    sourcefile_id: file,
+                    start,
+                    end,
+                },
+            );
+            let declaration = external_symbol(
+                semantic,
+                "example-dependency",
+                &format!("GenericBox.{member}"),
+            );
+            assert_ne!(symbol, declaration);
+            assert!(semantic.symbol_targets.contains(&(symbol, declaration)));
+            assert!(
+                semantic
+                    .alias_symbols
+                    .iter()
+                    .all(|(alias, _)| *alias != symbol)
+            );
+            symbol_data(semantic, declaration);
+            if member == "value" {
+                assert_eq!(node_type(semantic, file, start, end).id, primitive);
+                assert!(semantic.sym2type.contains(&(symbol, primitive)));
+            }
+        }
+        let result_name = format!("{}Result", object.strip_suffix("Box").unwrap());
+        let (result, _) = named_symbol(semantic, file, result_name.as_bytes());
+        assert!(semantic.sym2type.contains(&(result, primitive)));
+    }
+    for name in [
+        "hidden",
+        "Box.value",
+        "typed",
+        "returning",
+        "OnlyType",
+        "PrivateSpace",
+        "PrivateSpace.privateValue",
+        "PrivateSpace.visible",
+        "PrivateSpace.Inner.nested",
+        "PrivateClass",
+        "PrivateClass.create",
+        "PrivateClass.prototype.child",
+        "PrivateClass.prototype.run",
+        "factory",
+        "Cyclic.member",
+    ] {
+        external_symbol(semantic, "example-dependency", name);
+    }
+    assert_eq!(
+        external_symbol(semantic, "example-dependency", "Cyclic"),
+        external_symbol(semantic, "example-dependency", "Cyclic.Self")
+    );
+    assert!(!semantic.external_symbols.iter().any(|symbol| {
+        symbol.namespace == b"example-dependency"
+            && (symbol.name.ends_with(b"functionLocal")
+                || symbol.name.ends_with(b"methodLocal")
+                || symbol.name.ends_with(b"localOnly")
+                || symbol.name.ends_with(b"parameter")
+                || symbol.name == b"PrivateClass.prototype.child.run"
+                || symbol.name == b"typed.value"
+                || symbol.name == b"returning.returned"
+                || symbol.name == b"Cyclic.Self.member")
+    }));
+    let paths: [(&str, &[&str]); 3] = [
         ("example-dependency", &["api", "other"]),
-        ("example-dependency/index.js", &["api", "other"]),
         ("example-reexport", &["renamed"]),
         ("@scope/pkg", &["api"]),
-        ("@scope/pkg/subpath", &["api"]),
     ];
     for suffix in ["", ".run", ".nested", ".nested.value", ".self"] {
         let target = external_symbol(semantic, "example-dependency", &format!("api{suffix}"));
@@ -834,18 +936,26 @@ fn test_external_symbol_names_and_aliases() {
         }
     }
     external_symbol(semantic, "example-dependency", "value");
-    external_symbol(semantic, "node:assert", "ok");
-    external_symbol(semantic, "react/jsx-runtime", "jsx");
+    external_symbol(semantic, "node-assert", "ok");
+    external_symbol(semantic, "react", "jsx");
+    assert!(!semantic.external_symbols.iter().any(|symbol| {
+        [
+            b"example-dependency/index.js".as_slice(),
+            b"@scope/pkg/subpath".as_slice(),
+            b"react/jsx-runtime".as_slice(),
+            b"node:assert".as_slice(),
+        ]
+        .contains(&symbol.namespace.as_slice())
+    }));
     assert!(
         !semantic
             .external_symbols
             .iter()
-            .any(|symbol| symbol.namespace == b"./local"
-                || symbol.name == b"hidden"
-                || symbol.name == b"OnlyType")
+            .any(|symbol| symbol.namespace == b"./local")
     );
     let mut unique = std::collections::HashSet::new();
     for symbol in &semantic.external_symbols {
+        std::str::from_utf8(&symbol.name).expect("External names must have valid UTF-8");
         assert!(
             unique.insert((symbol.symbol_id, &symbol.namespace, &symbol.name)),
             "Duplicate external symbol {symbol:?}"
@@ -859,12 +969,23 @@ fn test_external_jsx_intrinsic_element_symbols() {
         ("external-symbols", "react", "JSX.IntrinsicElements.div"),
         (
             "external-symbols/global-jsx",
-            "global",
-            "React.JSX.IntrinsicElements.div",
+            "react",
+            "JSX.IntrinsicElements.div",
         ),
     ] {
         let mut buffer = Vec::new();
         let project = load_project(&get_fixtures_dir().join(fixture), &mut buffer);
         external_symbol(&project.semantic, namespace, name);
+        if fixture.ends_with("global-jsx") {
+            external_symbol(&project.semantic, "@scope/typed", "scopedValue");
+            external_symbol(&project.semantic, "@scope/typed", "scopedInternal");
+            assert!(
+                !project
+                    .semantic
+                    .external_symbols
+                    .iter()
+                    .any(|symbol| symbol.namespace == b"scope__typed")
+            );
+        }
     }
 }

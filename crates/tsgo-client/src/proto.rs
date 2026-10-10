@@ -52,6 +52,9 @@ pub struct Semantic {
     // (aliasSymbolId, targetSymbolId)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub alias_symbols: Vec<(u32, u32)>,
+    // Instantiated symbols point to original declarations; their concrete types remain separate.
+    #[serde(default, deserialize_with = "vecmap_or_empty")]
+    pub symbol_targets: Vec<(u32, u32)>,
     // Shorthand property assignment value symbols (node -> value_symbol_id)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub shorthand_symbols: Vec<(NodeReference, u32)>,
@@ -61,7 +64,9 @@ pub struct Semantic {
     // Parameter property declarations create another symbol at the same name node; node2sym keeps the primary symbol.
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub parameter_property_symbols: Vec<(NodeReference, u32)>,
-    // All qualified names of globals and dependency exports; symbol IDs may repeat.
+    // Shallow global names and qualified standard library and dependency declarations, including non-exports.
+    // Dependency namespaces use package names, without import subpath suffixes.
+    // Symbol IDs may repeat through aliases or re-exports.
     #[serde(default)]
     pub external_symbols: Vec<ExternalSymbol>,
 }
