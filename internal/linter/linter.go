@@ -13,7 +13,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 var (
@@ -111,11 +110,10 @@ func (r *listenerRegistry) reset() {
 // processing the files associated to it (see the sharding comment in the
 // function body for the invariants this preserves).
 //
-// This is the post-refactor internal implementation behind both RunLinter and
-// LintSingleFile. It does NOT run type-check — type-check is a program-level
-// concern handled by RunLinter directly. consumer is passed separately because
-// edit demand belongs to the reporting pass, not to the immutable plan or the
-// Program itself.
+// This project executor is shared by lintExecution and LintSingleFile.
+// Program-wide type checking is a separate phase coordinated by lintExecution.
+// consumer is passed separately because edit demand belongs to the reporting
+// pass, not to the immutable plan or the Program itself.
 func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consumer rule.DiagnosticConsumer) programLintResult {
 	if plan == nil || !plan.program.IsValid() {
 		return programLintResult{}
@@ -382,7 +380,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		checkerGroups[chk] = append(checkerGroups[chk], filePlan)
 	}
 
-	wg := core.NewWorkGroup(opts.SingleThreaded)
+	wg := newLintWorkGroup(opts.SingleThreaded)
 	queueFiles := func(chk *checker.Checker, tasks []*lintFilePlan) {
 		wg.Queue(func() {
 			registeredListeners := newListenerRegistry()
@@ -447,76 +445,11 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 //
 // See RunLinterOptions for each field's zero-value semantics.
 func RunLinter(opts RunLinterOptions) (*LintResult, error) {
-	if !opts.Consumer.Demand.IsValid() {
-		return nil, errors.New("linter: invalid native edit demand")
+	execution, err := prepareLintExecution(opts)
+	if err != nil {
+		return nil, err
 	}
-	if opts.LintPlan != nil && opts.TypeCheckOnlyPrograms != nil {
-		return nil, errTypeCheckOnlyProgramsWithPlan
-	}
-	consumer := normalizeDiagnosticConsumer(opts.Consumer)
-	var sourcePrograms []*program.Program
-	if opts.LintPlan != nil {
-		for _, programPlan := range opts.LintPlan.programs {
-			if err := validateProgram(programPlan.program); err != nil {
-				return nil, err
-			}
-		}
-		if opts.TypeCheck {
-			sourcePrograms = opts.LintPlan.sourcePrograms()
-		}
-	} else if opts.TypeCheck {
-		sourcePrograms = opts.TypeCheckOnlyPrograms
-		if err := validatePrograms(sourcePrograms); err != nil {
-			return nil, err
-		}
-	}
-
-	executedRules := make(map[string]struct{})
-	var lintedFileCount int32
-
-	// Phase 1: lint rules per Program (parallel). Skipped when no plan was
-	// supplied — see doc above.
-	if opts.LintPlan != nil {
-		plan := opts.LintPlan
-		runOpts := programRunOptions{
-			Cwd:                  opts.Cwd,
-			CollectExecutedRules: true,
-			SingleThreaded:       opts.SingleThreaded,
-			Timing:               opts.Timing,
-		}
-		programResults := make([]programLintResult, len(plan.programs))
-		wg := core.NewWorkGroup(opts.SingleThreaded)
-		for i := range plan.programs {
-			programIndex := i
-			wg.Queue(func() {
-				programResults[programIndex] = runLintRulesInProgram(&plan.programs[programIndex], runOpts, consumer)
-			})
-		}
-		wg.RunAndWait()
-		mergeResult := func(programResult programLintResult) {
-			lintedFileCount += programResult.lintedFileCount
-			for name := range programResult.executedRules {
-				executedRules[name] = struct{}{}
-			}
-		}
-		for _, programResult := range programResults {
-			mergeResult(programResult)
-		}
-	}
-
-	// Phase 2: program-level type-check (tsc-aligned).
-	if opts.TypeCheck {
-		runTypeCheckAcrossPrograms(typeCheckRequest{
-			Programs:       sourcePrograms,
-			SingleThreaded: opts.SingleThreaded,
-			OnDiagnostic:   consumer.Report,
-		})
-	}
-
-	return &LintResult{
-		LintedFileCount: lintedFileCount,
-		ExecutedRules:   executedRules,
-	}, nil
+	return execution.run(normalizeDiagnosticConsumer(opts.Consumer)), nil
 }
 
 // LintSingleFile runs lint rules against one already selected file in one

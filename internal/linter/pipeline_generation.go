@@ -19,8 +19,10 @@ type releaseLease struct {
 func (l *releaseLease) close() {
 	if l != nil {
 		l.once.Do(func() {
-			if l.release != nil {
-				l.release()
+			release := l.release
+			l.release = nil
+			if release != nil {
+				release()
 			}
 		})
 	}
@@ -97,8 +99,10 @@ func projectGenerationTargets(
 	return lintedFiles, ctx.Err()
 }
 
-func readGenerationText(
-	generation Generation,
+type sourceTextReader func(targetPath string, source ast.SourceFileLike) (string, error)
+
+func readTargetText(
+	readText sourceTextReader,
 	snapshot SourceSnapshot,
 	targetPath string,
 	source ast.SourceFileLike,
@@ -106,10 +110,10 @@ func readGenerationText(
 	if text, changed := snapshot.Text(targetPath); changed {
 		return text, nil
 	}
-	if generation.Target.ReadText == nil {
+	if readText == nil {
 		return "", errors.New("target text reader is not configured")
 	}
-	return generation.Target.ReadText(targetPath, source)
+	return readText(targetPath, source)
 }
 
 func projectTargetPath(project func(string) string, sourcePath string) string {

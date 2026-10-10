@@ -7,31 +7,72 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// runNativeObservation executes the native half of one already prepared lint
-// generation and projects its diagnostics and selected files into target path
-// space.
-func runNativeObservation(
-	ctx context.Context,
+// nativeObservationWork contains only consumable execution tasks and the
+// requested output metadata. It never retains the producer Generation or plan.
+type nativeObservationWork struct {
+	execution              *lintExecution
+	diagnostics            []rule.RuleDiagnostic
+	files                  []LintedFile
+	targetPath             func(string) string
+	demand                 rule.EditDemand
+	preserveSourceIdentity bool
+	hasTargetSyntaxErrors  bool
+}
+
+func prepareNativeObservation(
 	generation Generation,
 	plan *LintPlan,
 	demand rule.EditDemand,
 	lintedFiles []LintedFile,
-) (NativeObservation, error) {
+	preserveSourceIdentity bool,
+) (*nativeObservationWork, error) {
+	native := generation.Native
+	options := RunLinterOptions{
+		LintPlan:       plan,
+		SingleThreaded: native.SingleThreaded,
+		Cwd:            native.Cwd,
+		TypeCheck:      native.TypeCheck,
+		Timing:         native.Timing,
+		Consumer:       rule.DiagnosticConsumer{Demand: demand},
+	}
+	if plan == nil {
+		options.TypeCheckOnlyPrograms = native.Programs
+	}
+	execution, err := prepareLintExecution(options)
+	if err != nil {
+		return nil, err
+	}
+	work := &nativeObservationWork{
+		execution:              execution,
+		files:                  lintedFiles,
+		targetPath:             generation.Target.Path,
+		demand:                 demand,
+		preserveSourceIdentity: preserveSourceIdentity,
+		hasTargetSyntaxErrors:  plan.HasSyntacticDiagnostics(),
+	}
+	if plan != nil {
+		work.diagnostics = plan.SyntacticDiagnostics(native.TypeCheck)
+	}
+	if !preserveSourceIdentity {
+		for index := range work.diagnostics {
+			work.diagnostics[index].SourceFile = diagnosticTextSource(work.diagnostics[index].SourceFile)
+		}
+	}
+	return work, nil
+}
+
+// runNativeObservation projects sources before the result channel can become
+// an AST owner. Fix planning keeps exact source identity until text freezing.
+func runNativeObservation(ctx context.Context, work *nativeObservationWork) (NativeObservation, error) {
 	if err := ctx.Err(); err != nil {
 		return NativeObservation{}, err
 	}
-	// A nil plan is the explicit type-check-only/empty-generation shape: Phase 1
-	// has no target projection, while RunLinter may still execute Phase 2 over
-	// NativeGeneration.Programs.
-	var diagnostics []rule.RuleDiagnostic
-	if plan != nil {
-		diagnostics = plan.SyntacticDiagnostics(generation.Native.TypeCheck)
-	}
-	runOptions := generation.runLinterOptions(plan)
-	consumer := rule.DiagnosticConsumer{Demand: demand}
+	diagnostics := work.diagnostics
+	work.diagnostics = nil
+	consumer := rule.DiagnosticConsumer{Demand: work.demand}
 	var diagnosticsWait sync.WaitGroup
 	finishDiagnostics := func() {}
-	if runOptions.SingleThreaded {
+	if work.execution.options.SingleThreaded {
 		consumer.Report = func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		}
@@ -52,37 +93,27 @@ func runNativeObservation(
 			diagnosticsWait.Wait()
 		}
 	}
+	if !work.preserveSourceIdentity {
+		report := consumer.Report
+		consumer.Report = func(diagnostic rule.RuleDiagnostic) {
+			diagnostic.SourceFile = diagnosticTextSource(diagnostic.SourceFile)
+			report(diagnostic)
+		}
+	}
 	var finishOnce sync.Once
 	finish := func() { finishOnce.Do(finishDiagnostics) }
 	defer finish()
-	runOptions.Consumer = consumer
-	lintResult, err := RunLinter(runOptions)
+	lintResult := work.execution.run(consumer)
 	finish()
 
 	for index := range diagnostics {
-		diagnostics[index].FilePath = projectTargetPath(generation.Target.Path, diagnostics[index].FilePath)
+		diagnostics[index].FilePath = projectTargetPath(work.targetPath, diagnostics[index].FilePath)
 	}
 	result := NativeObservation{
 		Diagnostics:           diagnostics,
 		Lint:                  lintResult,
-		Files:                 lintedFiles,
-		HasTargetSyntaxErrors: plan != nil && plan.HasSyntacticDiagnostics(),
+		Files:                 work.files,
+		HasTargetSyntaxErrors: work.hasTargetSyntaxErrors,
 	}
-	return result, joinContextError(err, ctx)
-}
-
-func (generation Generation) runLinterOptions(plan *LintPlan) RunLinterOptions {
-	native := generation.Native
-	options := RunLinterOptions{
-		SingleThreaded: native.SingleThreaded,
-		Cwd:            native.Cwd,
-		TypeCheck:      native.TypeCheck,
-		Timing:         native.Timing,
-	}
-	if plan == nil {
-		options.TypeCheckOnlyPrograms = native.Programs
-	} else {
-		options.LintPlan = plan
-	}
-	return options
+	return result, ctx.Err()
 }

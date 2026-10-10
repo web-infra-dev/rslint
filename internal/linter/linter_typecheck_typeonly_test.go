@@ -78,33 +78,39 @@ func TestTypeCheckOnly_StillReportsTSErrors(t *testing.T) {
 	program, _ := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x: number = 'hello';", // TS2322 type mismatch
 	})
-
-	var diags []rule.RuleDiagnostic
-	_, err := RunLinter(RunLinterOptions{
-		TypeCheckOnlyPrograms: wrapTestPrograms(program),
-		SingleThreaded:        true,
-		TypeCheck:             true,
-		Consumer: rule.DiagnosticConsumer{
-			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
-		},
-	})
-	if err != nil {
-		t.Fatalf("RunLinter returned error: %v", err)
-	}
-
-	tsDiags, _ := classifyDiagnostics(diags)
-	if len(tsDiags) == 0 {
-		t.Fatal("expected TS diagnostics under type-check-only mode, got none")
-	}
-	foundTS2322 := false
-	for _, d := range tsDiags {
-		if strings.Contains(d.RuleName, "TS2322") {
-			foundTS2322 = true
-			break
+	programs := wrapTestPrograms(program)
+	sourceProgram := programs[0]
+	for _, singleThreaded := range []bool{true, false} {
+		var diags []rule.RuleDiagnostic
+		_, err := RunLinter(RunLinterOptions{
+			TypeCheckOnlyPrograms: programs,
+			SingleThreaded:        singleThreaded,
+			TypeCheck:             true,
+			Consumer: rule.DiagnosticConsumer{
+				Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+			},
+		})
+		if err != nil {
+			t.Fatalf("RunLinter returned error (singleThreaded=%t): %v", singleThreaded, err)
 		}
-	}
-	if !foundTS2322 {
-		t.Errorf("expected TS2322 (type mismatch), got: %+v", tsDiags)
+		if programs[0] != sourceProgram {
+			t.Fatal("type-check execution consumed the caller's Program slice")
+		}
+
+		tsDiags, _ := classifyDiagnostics(diags)
+		if len(tsDiags) == 0 {
+			t.Fatal("expected TS diagnostics under type-check-only mode, got none")
+		}
+		foundTS2322 := false
+		for _, d := range tsDiags {
+			if strings.Contains(d.RuleName, "TS2322") {
+				foundTS2322 = true
+				break
+			}
+		}
+		if !foundTS2322 {
+			t.Errorf("expected TS2322 (type mismatch), got: %+v", tsDiags)
+		}
 	}
 }
 

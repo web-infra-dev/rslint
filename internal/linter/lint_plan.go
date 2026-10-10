@@ -361,14 +361,6 @@ func (p *LintPlan) fileCount() int {
 	return fileCount
 }
 
-func (p *LintPlan) sourcePrograms() []*program.Program {
-	programs := make([]*program.Program, len(p.programs))
-	for index, programPlan := range p.programs {
-		programs[index] = programPlan.program
-	}
-	return programs
-}
-
 func resolveExactProgramFiles(sourceProgram *program.Program, targets []string) ([]*ast.SourceFile, error) {
 	// Exact target plans commonly select a Program's complete universe in the
 	// same stable order. Preserve the Program-owned slice when selection makes
