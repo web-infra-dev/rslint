@@ -92,7 +92,7 @@ jobs:
         if: needs.changes.outputs.changed == 'true'
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.27.0
+          go-version: 1.27.1
           cache-name: ci-go-lint
 
       - name: golangci-lint
@@ -286,7 +286,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.27.0
+          go-version: 1.27.1
           cache-name: ci-test-node-windows
 
       - name: Setup Node.js
@@ -409,7 +409,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.27.0
+          go-version: 1.27.1
           cache-name: ci-test-wasm
 
       - name: Setup Node.js
@@ -458,7 +458,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.27.0
+          go-version: 1.27.1
           cache-name: ci-test-wasm
       - name: Build tsgo server
         run: pnpm --filter '@rslint/tsgo-server' build

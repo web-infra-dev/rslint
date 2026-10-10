@@ -47,9 +47,9 @@
     "@typescript/native-preview": "catalog:",
     "zx": "catalog:"
   },
-  "packageManager": "pnpm@10.34.4",
+  "packageManager": "pnpm@10.34.6",
   "engines": {
-    "pnpm": ">=10.34.4"
+    "pnpm": ">=10.34.6"
   },
   "files": []
 }

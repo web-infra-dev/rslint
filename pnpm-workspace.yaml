@@ -17,21 +17,21 @@ catalog:
   '@microsoft/api-extractor': ^7.58.12
   '@napi-rs/cli': ^3.8.2
   '@types/picomatch': ^4.0.3
-  esbuild: ^0.28.1
+  esbuild: ^0.28.2
   fast-glob: ^3.3.3
   jiti: ^2.7.0
   json-schema-to-typescript: ^15.0.4
-  picomatch: ^4.0.5
+  picomatch: ^4.0.7
   rimraf: ^6.1.3
   tinyglobby: ^0.2.17
   '@eslint-community/eslint-plugin-eslint-comments': ^4.8.1
-  '@eslint/plugin-kit': ^0.7.2
+  '@eslint/plugin-kit': ^0.7.3
   '@stylistic/eslint-plugin': ^5.10.0
   '@typescript-eslint/parser': ^8.65.0
   '@typescript-eslint/scope-manager': ^8.65.0
   '@typescript-eslint/visitor-keys': ^8.65.0
   eslint: ^10.9.0
-  eslint-plugin-cypress: ^6.4.3
+  eslint-plugin-cypress: ^6.4.4
   eslint-plugin-es-x: ^9.7.0
   eslint-plugin-playwright: ^2.11.0
   eslint-plugin-promise: 7.3.0
@@ -48,12 +48,12 @@ catalog:
   '@codspeed/tinybench-plugin': ^5.7.1
   tinybench: ^6.1.1
   ajv: ^6.15.0
-  rstack: ^0.8.0
+  rstack: ^0.8.2
   zx: ^8.8.5
   '@types/mocha': ^10.0.10
   '@types/node': ^26.2.0
   '@types/react': ^19.2.17
-  '@typescript/native-preview': 7.0.0-dev.20250904.1
+  '@typescript/native-preview': 7.0.0-dev.20260707.2
   typescript: 6.0.3
   '@vscode/test-electron': ^2.5.2
   '@vscode/vsce': ^3.9.2
@@ -65,13 +65,13 @@ catalog:
   cross-env: ^10.1.0
   esbuild-plugin-polyfill-node: ^0.3.0
   memfs: ^4.68.0
-  '@radix-ui/react-select': ^2.3.5
+  '@radix-ui/react-select': ^2.3.8
   '@radix-ui/react-slot': ^1.3.1
   '@rsbuild/plugin-node-polyfill': ^1.4.6
   '@rsbuild/plugin-sass': ^1.5.3
-  '@rspress/core': ^2.0.18
-  '@rspress/plugin-sitemap': ^2.0.18
-  '@rstackjs/doc-ui': 1.14.9
+  '@rspress/core': ^2.0.23
+  '@rspress/plugin-sitemap': ^2.0.23
+  '@rstackjs/doc-ui': 1.14.11
   '@tailwindcss/postcss': ^4.3.3
   '@types/dagre': ^0.7.54
   '@types/react-dom': ^19.2.3
