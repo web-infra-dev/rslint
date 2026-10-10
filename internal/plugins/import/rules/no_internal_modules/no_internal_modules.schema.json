@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "forbid": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

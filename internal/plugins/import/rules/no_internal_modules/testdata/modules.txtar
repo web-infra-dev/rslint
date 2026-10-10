@@ -1,0 +1,57 @@
+Upstream layout: eslint-plugin-import v2.32.0 tests/files/internal-modules.
+Only module existence matters for this rule.
+
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noResolve":true,"jsx":"preserve","module":"commonjs","baseUrl":".","paths":{"@/*":["internal-modules/*"],"@alias/*":["internal-modules/plugins/plugin2/*"],"alias/*":["internal-modules/plugins/plugin2/*"]}},"include":["**/*.ts","**/*.tsx","**/*.js"]}
+-- package.json --
+{"private":true}
+-- internal-modules/plugins/plugin.js --
+export default 'fixture';
+-- internal-modules/plugins/plugin2/index.js --
+export default 'fixture';
+-- internal-modules/plugins/plugin2/internal.js --
+export default 'fixture';
+-- internal-modules/plugins/plugin2/app/index.js --
+export default 'fixture';
+-- internal-modules/api/service/index.js --
+export default 'fixture';
+-- internal-modules/node_modules/@org/package/index.js --
+module.exports = {};
+-- internal-modules/node_modules/@org/package/internal.js --
+module.exports = {};
+-- internal-modules/node_modules/debug/node.js --
+module.exports = {};
+-- internal-modules/node_modules/lodash.get/index.js --
+module.exports = {};
+-- internal-modules/node_modules/jquery/dist/jquery.js --
+module.exports = {};
+-- internal-modules/node_modules/app/a.js --
+module.exports = {};
+-- internal-modules/node_modules/app/a/b.js --
+module.exports = {};
+-- internal-modules/package.json --
+{"name":"internal-modules","private":true}
+-- my-project/actions/getUser.js --
+export default 'fixture';
+-- my-project/actions/updateUser.js --
+export default 'fixture';
+-- my-project/actions/index.js --
+export default 'fixture';
+-- my-project/reducer/index.js --
+export default 'fixture';
+-- my-project/reducer/user.js --
+export default 'fixture';
+-- my-project/redux/index.js --
+export default 'fixture';
+-- my-project/redux/configureStore.js --
+export default 'fixture';
+-- my-project/app/index.js --
+export default 'fixture';
+-- my-project/app/settings.js --
+export default 'fixture';
+-- my-project/entry.js --
+export default 'fixture';
+-- my-project/node_modules/source-map-support/index.js --
+module.exports = {};
+-- my-project/node_modules/source-map-support/register.js --
+module.exports = {};
