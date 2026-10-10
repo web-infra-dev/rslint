@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	"github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 const (
@@ -40,14 +40,33 @@ var NoForEachRule = rule.Rule{
 	Name:   "unicorn/no-for-each",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		var calls []unicornutil.DotMethodCall
 		staticEvaluator := utils.NewStaticStringEvaluatorWithReferenceResolver(
 			ctx.TypeChecker,
 			ctx.SourceFile,
 			ctx.Refs,
 		)
 
+		reportCall := func(call unicornutil.DotMethodCall) {
+			optionalObject := ast.IsOptionalChainRoot(call.Callee)
+			if optionalObject && staticEvaluator.HasSideEffect(call.Object, false) {
+				ctx.ReportNodeWithDeferredSuggestions(call.Property, messageError, func() []rule.RuleSuggestion {
+					fixes := buildFixes(ctx, call)
+					if len(fixes) == 0 {
+						return nil
+					}
+					return []rule.RuleSuggestion{{Message: messageSuggestion, FixesArr: fixes}}
+				})
+				return
+			}
+
+			ctx.ReportNodeWithDeferredFixes(call.Property, messageError, func() []rule.RuleFix {
+				return buildFixes(ctx, call)
+			})
+		}
+
 		return rule.RuleListeners{
-			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
+			ast.KindCallExpression: func(node *ast.Node) {
 				call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
 					Method:              "forEach",
 					AllowOptionalCall:   true,
@@ -58,31 +77,12 @@ var NoForEachRule = rule.Rule{
 					unicornutil.ShouldSkipKnownNonArrayReceiver(ctx, call.Object) {
 					return
 				}
-
-				if !unicornutil.IsArray(ctx, call.Object) {
-					ctx.ReportNode(call.Property, messageError)
-					return
+				calls = append(calls, call)
+			},
+			rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
+				for _, call := range calls {
+					reportCall(call)
 				}
-
-				plan, ok := buildFixPlan(ctx, call)
-				if !ok {
-					ctx.ReportNode(call.Property, messageError)
-					return
-				}
-
-				optionalObject := ast.IsOptionalChainRoot(call.Callee)
-				if optionalObject && staticEvaluator.HasSideEffect(call.Object, false) {
-					ctx.ReportNodeWithDeferredSuggestions(call.Property, messageError, func() []rule.RuleSuggestion {
-						fixes := plan.fixes()
-						if len(fixes) == 0 {
-							return nil
-						}
-						return []rule.RuleSuggestion{{Message: messageSuggestion, FixesArr: fixes}}
-					})
-					return
-				}
-
-				ctx.ReportNodeWithDeferredFixes(call.Property, messageError, plan.fixes)
 			},
 		}
 	},
@@ -121,85 +121,81 @@ func isStrictCallbagBasicsNamespace(ctx rule.RuleContext, node *ast.Node) bool {
 	return false
 }
 
-type fixPlan struct {
-	replaceRange core.TextRange
-	replacement  string
-}
-
-func (plan fixPlan) fixes() []rule.RuleFix {
-	if plan.replacement == "" {
+func buildFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall) []rule.RuleFix {
+	if !unicornutil.IsArray(ctx, call.Object) {
 		return nil
 	}
-	return []rule.RuleFix{rule.RuleFixReplaceRange(plan.replaceRange, plan.replacement)}
-}
-
-func buildFixPlan(ctx rule.RuleContext, call unicornutil.DotMethodCall) (fixPlan, bool) {
 	// Optional calls (`array.forEach?.(fn)`) do not have an equivalent direct
 	// `for…of` rewrite. Optional member access is handled below.
 	if ast.IsOptionalChainRoot(call.Call) || len(call.Call.Arguments()) != 1 {
-		return fixPlan{}, false
+		return nil
 	}
 
 	callback := utils.ESTreeRuntimeExpression(call.Call.Arguments()[0])
 	if callback == nil || (!ast.IsArrowFunction(callback) && !ast.IsFunctionExpression(callback)) ||
 		ast.HasSyntacticModifier(callback, ast.ModifierFlagsAsync) {
-		return fixPlan{}, false
+		return nil
 	}
 	if ast.IsFunctionExpression(callback) {
 		function := callback.AsFunctionExpression()
-		if function.AsteriskToken != nil || function.Name() != nil {
-			return fixPlan{}, false
+		if function.AsteriskToken != nil {
+			return nil
 		}
 	}
 
 	parameters := callback.Parameters()
 	if len(parameters) < 1 || len(parameters) > 2 {
-		return fixPlan{}, false
+		return nil
 	}
 	for index, parameter := range parameters {
 		if parameter == nil || parameter.Kind != ast.KindParameter {
-			return fixPlan{}, false
+			return nil
 		}
 		data := parameter.AsParameterDeclaration()
 		if data == nil || data.DotDotDotToken != nil || data.Type != nil ||
 			(index == 0 && data.Initializer != nil) ||
 			(index == 1 && (data.Initializer != nil || !ast.IsIdentifier(data.Name()))) {
-			return fixPlan{}, false
+			return nil
 		}
 	}
 
 	outerCall := outermostRuntimeParentheses(call.Call)
 	ancestor := outerCall.Parent
 	arrowBody := false
-	var replaceRange core.TextRange
+	var replaceRange = utils.TrimNodeTextRange(ctx.SourceFile, outerCall)
 	var statement *ast.Node
+	spacingNode := ancestor
 	if ancestor != nil && ast.IsExpressionStatement(ancestor) {
 		statement = ancestor
 		replaceRange = utils.TrimNodeTextRange(ctx.SourceFile, ancestor)
 	} else if ancestor != nil && ast.IsArrowFunction(ancestor) &&
 		ancestor.AsArrowFunction().Body == outerCall {
 		arrowBody = true
-		replaceRange = utils.TrimNodeTextRange(ctx.SourceFile, outerCall)
 	} else {
-		return fixPlan{}, false
+		return nil
 	}
 
 	body := functionBody(callback)
 	returns, returnsSafe := callbackReturnStatements(callback, body)
+	scopes := scopeanalysis.Get(ctx, scope.Options{CollectReferences: true})
+	callbackScope := scopes.Acquire(callback)
+	callScope := scopes.Acquire(call.Call)
 	if body == nil || !returnsSafe || hasUnsafeCallbackSemantics(callback, body) ||
-		!parametersSafeForFix(ctx, call.Call, callback, parameters) {
-		return fixPlan{}, false
+		isNamedFunctionSelfUsed(callback, scopes) ||
+		!parametersSafeForFix(call.Call, callbackScope, callScope, parameters, scopes) {
+		return nil
 	}
 
-	loop, ok := buildLoopText(ctx, call, callback, parameters, body, returns, statement)
+	loop, ok := buildLoopText(ctx, call, parameters, body, returns, statement, callbackScope, scopes)
 	if !ok {
-		return fixPlan{}, false
+		return nil
 	}
 	if arrowBody {
 		loop = "{ " + loop + " }"
 	}
 
-	return fixPlan{replaceRange: replaceRange, replacement: loop}, true
+	fixes := []rule.RuleFix{rule.RuleFixReplaceRange(replaceRange, loop)}
+	return append(fixes, unicornutil.SpaceAroundKeywordFixes(ctx.SourceFile, spacingNode)...)
 }
 
 func outermostRuntimeParentheses(node *ast.Node) *ast.Node {
@@ -283,79 +279,121 @@ func callbackReturnStatements(callback, body *ast.Node) ([]*ast.Node, bool) {
 	return returns, safe
 }
 
-func parametersSafeForFix(ctx rule.RuleContext, call, callback *ast.Node, parameters []*ast.Node) bool {
-	parameterNames := map[string]struct{}{}
-	parameterSymbols := map[*ast.Symbol]struct{}{}
-	for _, parameter := range parameters {
-		duplicate := false
-		utils.CollectBindingNames(parameter.Name(), func(identifier *ast.Node, name string) {
-			if _, exists := parameterNames[name]; exists {
-				duplicate = true
+func isNamedFunctionSelfUsed(callback *ast.Node, manager *scope.Manager) bool {
+	if !ast.IsFunctionExpression(callback) || callback.Name() == nil ||
+		!ast.IsIdentifier(callback.Name()) || manager == nil {
+		return false
+	}
+	name := callback.Name().Text()
+	for _, reference := range manager.References {
+		if reference.Identifier.Text() != name {
+			continue
+		}
+		for _, declaration := range reference.Declarations {
+			if declaration.Kind == scope.DefFnExprName && declaration.DefNode == callback {
+				return true
 			}
-			parameterNames[name] = struct{}{}
-			if ctx.Refs != nil {
-				symbol := identifier.Symbol()
-				if symbol == nil {
-					symbol = ctx.Refs.ResolveInFile(identifier)
-				}
-				if symbol != nil {
-					parameterSymbols[symbol] = struct{}{}
-				}
-			}
-		})
-		if duplicate {
+		}
+	}
+	return false
+}
+
+func parametersSafeForFix(
+	call *ast.Node,
+	callbackScope, callScope *scope.Scope,
+	parameters []*ast.Node,
+	manager *scope.Manager,
+) bool {
+	if callbackScope == nil || callbackScope.Kind != scope.KindFunction ||
+		callbackScope.Block == nil || manager == nil || callScope == nil {
+		return false
+	}
+
+	// sourceCode.getDeclaredVariables(callback) returns one Variable per name,
+	// with every declaration in that function scope collected in `defs`.
+	// Moving the callback parameter into a for-of binding is unsafe whenever
+	// any of those variables has merged/repeated definitions (notably a sloppy
+	// mode `var` redeclaration of a parameter).
+	for _, declarations := range callbackScope.ByName {
+		if len(declarations) != 1 {
 			return false
 		}
 	}
 
-	// A parameter name used by the receiver or another callback parameter
-	// would resolve to a different binding after the callback boundary is
-	// removed. The callback body itself is safe because its references move
-	// together with the declaration into the loop.
+	parameterNames := map[string]struct{}{}
+	for _, parameter := range parameters {
+		utils.CollectBindingNames(parameter.Name(), func(_ *ast.Node, name string) {
+			if _, exists := parameterNames[name]; exists {
+				return
+			}
+			parameterNames[name] = struct{}{}
+		})
+	}
+	for name := range parameterNames {
+		declarations := callbackScope.Declarations(name)
+		if len(declarations) != 1 || declarations[0].Kind != scope.DefParameter {
+			return false
+		}
+	}
+
+	references := make(map[*ast.Node]*scope.Reference, len(manager.References))
+	for _, reference := range manager.References {
+		references[reference.Identifier] = reference
+	}
+
 	unsafe := false
-	var walkOutsideCallback func(*ast.Node)
-	walkOutsideCallback = func(node *ast.Node) {
-		if node == nil || unsafe || node == callback {
+	var walk func(*ast.Node)
+	walk = func(node *ast.Node) {
+		if node == nil || unsafe {
 			return
 		}
 		if ast.IsIdentifier(node) && !utils.IsNonReferenceIdentifier(node) {
 			if _, conflicts := parameterNames[node.Text()]; conflicts {
-				unsafe = true
-				return
+				reference := references[node]
+				if reference == nil || len(reference.Declarations) == 0 {
+					unsafe = true
+					return
+				}
+				resolvedScope := reference.Declarations[0].Scope
+				if resolvedScope == callScope || isScopeAncestor(resolvedScope, callScope) {
+					unsafe = true
+					return
+				}
 			}
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
-			walkOutsideCallback(child)
+			walk(child)
 			return unsafe
 		})
 	}
-	walkOutsideCallback(call)
-	if unsafe {
+	walk(call)
+	return !unsafe
+}
+
+func isScopeAncestor(ancestor, child *scope.Scope) bool {
+	if ancestor == nil || child == nil || ancestor == child {
 		return false
 	}
-
-	// Duplicate/sloppy bindings and unresolved parameter symbols are unsafe to
-	// move. When references are available, every parameter binding must be the
-	// only declaration represented by its symbol.
-	for symbol := range parameterSymbols {
-		if symbol == nil || len(symbol.Declarations) != 1 {
-			return false
+	for current := child.Parent; current != nil; current = current.Parent {
+		if current == ancestor {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func buildLoopText(
 	ctx rule.RuleContext,
 	call unicornutil.DotMethodCall,
-	callback *ast.Node,
 	parameters []*ast.Node,
 	body *ast.Node,
 	returns []*ast.Node,
 	statement *ast.Node,
+	callbackScope *scope.Scope,
+	manager *scope.Manager,
 ) (string, bool) {
 	loopKind := "const"
-	if callbackParametersReassigned(ctx, callback, parameters) {
+	if callbackParametersReassigned(callbackScope, parameters, manager) {
 		loopKind = "let"
 	}
 
@@ -382,7 +420,7 @@ func buildLoopText(
 	if len(returns) > 0 {
 		bodyText = rewriteCallbackReturns(ctx, body, bodyText, returns)
 	}
-	if body.Kind != ast.KindBlock && shouldParenthesizeExpressionStatement(bodyText) {
+	if body.Kind != ast.KindBlock && shouldParenthesizeExpressionStatement(ctx.SourceFile, body) {
 		bodyText = "(" + bodyText + ")"
 	}
 
@@ -428,7 +466,7 @@ func rewriteCallbackReturns(ctx rule.RuleContext, body *ast.Node, bodyText strin
 				gap = ctx.SourceFile.Text()[gapStart:expressionRange.Pos()]
 			}
 			expressionText := utils.TrimmedNodeText(ctx.SourceFile, data.Expression)
-			if shouldParenthesizeExpressionStatement(expressionText) {
+			if shouldParenthesizeExpressionStatement(ctx.SourceFile, data.Expression) {
 				expressionText = "(" + expressionText + ")"
 			}
 			semicolon := ""
@@ -467,60 +505,33 @@ func returnNeedsBlock(returnStatement *ast.Node) bool {
 	}
 }
 
-func callbackParametersReassigned(ctx rule.RuleContext, callback *ast.Node, parameters []*ast.Node) bool {
-	type binding struct {
-		declaration *ast.Node
-		name        string
-		symbol      *ast.Symbol
+func callbackParametersReassigned(
+	callbackScope *scope.Scope,
+	parameters []*ast.Node,
+	manager *scope.Manager,
+) bool {
+	if callbackScope == nil || manager == nil {
+		return false
 	}
-	var bindings []binding
+	parameterNames := map[string]struct{}{}
 	for _, parameter := range parameters {
-		utils.CollectBindingNames(parameter.Name(), func(identifier *ast.Node, name string) {
-			var symbol *ast.Symbol
-			if ctx.TypeChecker != nil {
-				symbol = ctx.TypeChecker.GetSymbolAtLocation(identifier)
-			}
-			bindings = append(bindings, binding{
-				declaration: identifier.Parent,
-				name:        name,
-				symbol:      symbol,
-			})
+		utils.CollectBindingNames(parameter.Name(), func(_ *ast.Node, name string) {
+			parameterNames[name] = struct{}{}
 		})
 	}
-
-	reassigned := false
-	var walk func(*ast.Node)
-	walk = func(node *ast.Node) {
-		if node == nil || reassigned {
-			return
+	for _, reference := range manager.References {
+		name := reference.Identifier.Text()
+		if _, isParameter := parameterNames[name]; !isParameter ||
+			!utils.IsWriteReference(reference.Identifier) {
+			continue
 		}
-		if ast.IsIdentifier(node) && utils.IsWriteReference(node) {
-			for _, binding := range bindings {
-				if node.Text() != binding.name {
-					continue
-				}
-				if ctx.TypeChecker == nil {
-					if !utils.IsNameShadowedBetween(node, callback, binding.name) {
-						reassigned = true
-					}
-					break
-				}
-				referenceSymbol := utils.GetReferenceSymbol(node, ctx.TypeChecker)
-				if referenceSymbol == binding.symbol ||
-					(referenceSymbol != nil && referenceSymbol.ValueDeclaration == binding.declaration) {
-					reassigned = true
-					break
-				}
+		for _, declaration := range reference.Declarations {
+			if declaration.Scope == callbackScope && declaration.Kind == scope.DefParameter {
+				return true
 			}
 		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return reassigned
-		})
 	}
-	walk(functionBody(callback))
-
-	return reassigned
+	return false
 }
 
 func startsWithMemberHazard(text string) bool {
@@ -531,13 +542,21 @@ func startsWithMemberHazard(text string) bool {
 	return first >= '0' && first <= '9'
 }
 
-func shouldParenthesizeExpressionStatement(text string) bool {
-	trimmed := ecmascript.StringTrim(text)
-	if trimmed == "" || strings.HasPrefix(trimmed, "(") {
+func shouldParenthesizeExpressionStatement(sourceFile *ast.SourceFile, node *ast.Node) bool {
+	if sourceFile == nil || node == nil || ast.IsParenthesizedExpression(node) {
 		return false
 	}
-	return strings.HasPrefix(trimmed, "class") ||
-		strings.HasPrefix(trimmed, "function") ||
-		strings.HasPrefix(trimmed, "async function") ||
-		strings.HasPrefix(trimmed, "{")
+	first, ok := utils.TokenAtOrAfter(sourceFile, utils.TrimNodeTextRange(sourceFile, node).Pos())
+	if !ok {
+		return false
+	}
+	switch first.Kind {
+	case ast.KindOpenBraceToken, ast.KindClassKeyword, ast.KindFunctionKeyword:
+		return true
+	}
+	if first.Text != "async" {
+		return false
+	}
+	second, ok := utils.TokenAtOrAfter(sourceFile, first.End)
+	return ok && second.Kind == ast.KindFunctionKeyword
 }
