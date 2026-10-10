@@ -58,9 +58,6 @@ function supportedFilename(filename?: string): boolean {
   if (!filename) {
     return true;
   }
-  if (path.basename(filename).startsWith('.')) {
-    return false;
-  }
   return [
     '.js',
     '.jsx',

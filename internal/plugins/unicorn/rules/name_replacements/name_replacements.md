@@ -27,7 +27,7 @@ const levels = { err: 0 };
 this.evt = 'click';
 ```
 
-Variables with exactly one available replacement are automatically renamed, including their references. Ambiguous variables and checked properties provide editor suggestions. Exported declaration names, exported property aliases, TypeScript parameter properties, and parameters with an attached JSDoc `@param` comment are reported without an edit when a rename could leave another name stale.
+Variables with exactly one available replacement are automatically renamed, including their references. Ambiguous variables and checked properties provide editor suggestions. Named-export declaration names, exported property aliases, TypeScript parameter properties, and parameters with an attached JSDoc `@param` comment are reported without an edit when a rename could leave another name stale. Named default-export declarations can be renamed safely because their local name is not the exported API name.
 
 ## Options
 
@@ -147,7 +147,8 @@ Adds JavaScript regular-expression patterns that suppress a complete name. The b
 
 - Native rslint currently runs this rule on JavaScript and TypeScript source files. The upstream rule also checks JSON, JSONC, JSON5, YAML, TOML, CSS, HTML, Vue, and Markdown identifiers and filenames; those non-JavaScript language hooks are not available. Apply the rule only to JavaScript and TypeScript files when sharing a configuration with ESLint.
 - JavaScript `RegExp` objects do not cross rslint's native configuration boundary. Write `ignore` entries as pattern strings. Flags on a regular-expression literal cannot be represented directly; express equivalent matching in the pattern where possible.
-- A hidden or non-code filename that the TypeScript program does not load cannot produce a native filename diagnostic. JavaScript and TypeScript files selected for linting are checked normally.
+- Rslint reports but does not rename a shorthand binding declared directly by a named export, such as `export const {err} = source`. Upstream renames the exported binding, which changes the module's public API; Rslint leaves that decision to the author.
+- When bindings in nested scopes compete for the same generated replacement, Rslint assigns collision suffixes in source order. Upstream walks scopes breadth-first, so it can assign the underscore to a different binding. Both outputs remain collision-free and deterministic.
 
 ## Original Documentation
 

@@ -94,8 +94,9 @@ func TestNameReplacementsExtras(t *testing.T) {
 				}},
 			},
 			{
-				Code: "const err = () => null; const element = <err />",
-				Tsx:  true,
+				Code:   "const err = () => null; const element = <err />",
+				Tsx:    true,
+				Output: []string{"const error = () => null; const element = <err />"},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "replace", Line: 1, Column: 7, EndLine: 1, EndColumn: 10,
 				}},
@@ -115,14 +116,21 @@ func TestNameReplacementsRejectsInvalidIgnorePattern(t *testing.T) {
 func TestNameReplacementsEditDemand(t *testing.T) {
 	for _, testCase := range []struct {
 		code        string
+		fileName    string
 		wantFix     bool
 		wantSuggest bool
 	}{
 		{code: "const err = 1", wantFix: true},
 		{code: "let e = 1", wantSuggest: true},
+		{code: "function f(err /* keep */ ?: string) { return err }", fileName: "edit-demand.ts", wantFix: true},
+		{code: "/** @param ctx */\nfunction f(ctx) { return ctx }"},
 	} {
 		t.Run(testCase.code, func(t *testing.T) {
-			program, sourceFile, err := rule_tester.NewProgramHelper(fixtures.GetRootDir()).CreateTestProgram(testCase.code, "edit-demand.js", "tsconfig.json")
+			fileName := testCase.fileName
+			if fileName == "" {
+				fileName = "edit-demand.js"
+			}
+			program, sourceFile, err := rule_tester.NewProgramHelper(fixtures.GetRootDir()).CreateTestProgram(testCase.code, fileName, "tsconfig.json")
 			if err != nil {
 				t.Fatal(err)
 			}

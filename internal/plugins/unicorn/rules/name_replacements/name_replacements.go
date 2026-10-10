@@ -64,8 +64,10 @@ type nameReplacements struct {
 	manager                *scope.Manager
 	generatedNamesByScope  map[*scope.Scope]map[string]struct{}
 	reportedPropertyRanges map[core.TextRange]struct{}
-	jsxNames               map[string]struct{}
+	referencesByVariable   map[*scope.Variable][]*scope.Reference
+	classVariablesByID     map[*ast.Node][]*scope.Variable
 	unresolvedScopesByName map[string][]*scope.Scope
+	localeComparer         *ecmascript.LocaleComparer
 }
 
 type preparedOptionsCacheKey struct{ encoded string }
@@ -261,6 +263,22 @@ func isUpperCase(value string) bool {
 	return value == ecmascript.StringToUpperCase(value)
 }
 
+func isUpperFirst(value string) bool {
+	if value == "" {
+		return false
+	}
+	firstByte := value[0]
+	if firstByte < utf8.RuneSelf {
+		return firstByte < 'a' || firstByte > 'z'
+	}
+	first, size := ecmascript.DecodeStringRune(value)
+	if first > 0xffff {
+		return true
+	}
+	character := value[:size]
+	return character == ecmascript.StringToUpperCase(character)
+}
+
 func splitNameWords(value string) []string {
 	if value == "" {
 		return nil
@@ -297,7 +315,7 @@ func (o options) ignored(name string) bool {
 	return false
 }
 
-func (o options) wordReplacements(word string) []string {
+func (o options) wordReplacements(word string, compare func(string, string) int) []string {
 	if isUpperCase(word) || o.allowList[word] {
 		return nil
 	}
@@ -314,8 +332,7 @@ func (o options) wordReplacements(word string) []string {
 	}
 
 	transform := jsLowerFirst
-	first, _ := utf8.DecodeRuneInString(word)
-	if first != utf8.RuneError && !unicode.IsLower(first) {
+	if isUpperFirst(word) {
 		transform = jsUpperFirst
 	}
 	result := make([]string, 0, len(replacements))
@@ -324,15 +341,17 @@ func (o options) wordReplacements(word string) []string {
 			result = append(result, transform(replacement))
 		}
 	}
-	sort.Strings(result)
+	slices.SortStableFunc(result, compare)
 	return result
 }
 
-func (o options) nameReplacements(name string, limit int) replacementResult {
+const maximumRelevantReplacementCount = 103
+
+func (o options) nameReplacements(name string, limit int, compare func(string, string) int) replacementResult {
 	if isUpperCase(name) || o.allowList[name] || o.ignored(name) {
 		return replacementResult{}
 	}
-	if exact := o.wordReplacements(name); len(exact) > 0 {
+	if exact := o.wordReplacements(name, compare); len(exact) > 0 {
 		return replacementResult{total: len(exact), samples: exact[:min(limit, len(exact))]}
 	}
 	allLowerASCII := name != ""
@@ -351,14 +370,18 @@ func (o options) nameReplacements(name string, limit int) replacementResult {
 	hasReplacements := false
 	total := 1
 	for _, word := range words {
-		replacements := o.wordReplacements(word)
+		replacements := o.wordReplacements(word, compare)
 		if len(replacements) == 0 {
 			replacements = []string{word}
 		} else {
 			hasReplacements = true
 		}
 		combinations = append(combinations, replacements)
-		total *= len(replacements)
+		if total > maximumRelevantReplacementCount/len(replacements) {
+			total = maximumRelevantReplacementCount
+		} else {
+			total *= len(replacements)
+		}
 	}
 	if !hasReplacements {
 		return replacementResult{}
@@ -383,6 +406,20 @@ func (o options) nameReplacements(name string, limit int) replacementResult {
 		samples = append(samples, strings.Join(parts, ""))
 	}
 	return replacementResult{total: total, samples: samples}
+}
+
+func (r *nameReplacements) compareReplacements(left, right string) int {
+	if r.localeComparer == nil {
+		r.localeComparer = ecmascript.NewLocaleComparer("")
+	}
+	if result := r.localeComparer.Compare(left, right); result != 0 {
+		return result
+	}
+	return ecmascript.CompareStrings(left, right)
+}
+
+func (r *nameReplacements) nameReplacements(name string, limit int) replacementResult {
+	return r.opts.nameReplacements(name, limit, r.compareReplacements)
 }
 
 func isASCIIAlpha(value string) bool {
@@ -444,7 +481,7 @@ func (r *nameReplacements) checkFilename() {
 	}
 	extension := path.Ext(filename)
 	name := strings.TrimSuffix(filename, extension)
-	replacements := r.opts.nameReplacements(name, 3)
+	replacements := r.nameReplacements(name, 3)
 	if replacements.total == 0 {
 		return
 	}
@@ -461,6 +498,7 @@ func (r *nameReplacements) checkVariables() {
 	}
 	processed := make(map[*scope.Variable]struct{})
 	tasks := make([]variableTask, 0)
+	r.buildBindingIndexes()
 	for _, currentScope := range r.manager.Scopes {
 		for _, variable := range currentScope.Vars {
 			if _, seen := processed[variable]; seen || variable.Anonymous || variable.ID == nil {
@@ -472,7 +510,9 @@ func (r *nameReplacements) checkVariables() {
 			}
 			// The synthetic inner class binding uses the same identifier as the
 			// outer binding. It is folded into the outer variable below.
-			if variable.Kind == scope.DefClassInnerName && r.findOuterClassVariable(variable) != nil {
+			if variable.Kind == scope.DefClassInnerName && slices.ContainsFunc(r.classVariablesByID[variable.ID], func(candidate *scope.Variable) bool {
+				return candidate.Kind == scope.DefClassName
+			}) {
 				continue
 			}
 			tasks = append(tasks, variableTask{variable: variable, declarations: declarations})
@@ -486,25 +526,37 @@ func (r *nameReplacements) checkVariables() {
 	}
 }
 
-func (r *nameReplacements) findOuterClassVariable(inner *scope.Variable) *scope.Variable {
+func (r *nameReplacements) buildBindingIndexes() {
+	if r.referencesByVariable != nil {
+		return
+	}
+	r.referencesByVariable = make(map[*scope.Variable][]*scope.Reference)
+	r.classVariablesByID = make(map[*ast.Node][]*scope.Variable)
+	r.unresolvedScopesByName = make(map[string][]*scope.Scope)
 	for _, currentScope := range r.manager.Scopes {
-		for _, variable := range currentScope.Declarations(inner.Name) {
-			if variable.Kind == scope.DefClassName && variable.ID == inner.ID {
-				return variable
+		for _, variable := range currentScope.Vars {
+			if variable.ID != nil && (variable.Kind == scope.DefClassName || variable.Kind == scope.DefClassInnerName) {
+				r.classVariablesByID[variable.ID] = append(r.classVariablesByID[variable.ID], variable)
 			}
 		}
 	}
-	return nil
+	for _, reference := range r.manager.References {
+		if len(reference.Declarations) == 0 {
+			name := reference.Identifier.Text()
+			r.unresolvedScopesByName[name] = append(r.unresolvedScopesByName[name], reference.From)
+			continue
+		}
+		key := reference.Declarations[0]
+		r.referencesByVariable[key] = append(r.referencesByVariable[key], reference)
+	}
 }
 
 func (r *nameReplacements) classVariables(variable *scope.Variable, declarations []*scope.Variable) []*scope.Variable {
 	result := append([]*scope.Variable(nil), declarations...)
 	if variable.Kind == scope.DefClassName {
-		for _, currentScope := range r.manager.Scopes {
-			for _, candidate := range currentScope.Declarations(variable.Name) {
-				if candidate.Kind == scope.DefClassInnerName && candidate.ID == variable.ID {
-					result = append(result, candidate)
-				}
+		for _, candidate := range r.classVariablesByID[variable.ID] {
+			if !slices.Contains(result, candidate) {
+				result = append(result, candidate)
 			}
 		}
 	}
@@ -516,15 +568,23 @@ func containsVariable(variables []*scope.Variable, candidate *scope.Variable) bo
 }
 
 func (r *nameReplacements) referencesFor(variables []*scope.Variable) []*scope.Reference {
+	keys := make(map[*scope.Variable]struct{}, len(variables))
 	result := make([]*scope.Reference, 0)
-	for _, reference := range r.manager.References {
-		for _, declaration := range reference.Declarations {
-			if containsVariable(variables, declaration) {
-				result = append(result, reference)
-				break
-			}
+	for _, variable := range variables {
+		key := variable
+		if declarations := variable.Scope.Declarations(variable.Name); len(declarations) > 0 {
+			key = declarations[0]
 		}
+		if _, duplicate := keys[key]; duplicate {
+			continue
+		}
+		keys[key] = struct{}{}
+		result = append(result, r.referencesByVariable[key]...)
 	}
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].Identifier.Pos() < result[j].Identifier.Pos()
+	})
+	result = slices.Compact(result)
 	return result
 }
 
@@ -533,7 +593,7 @@ func (r *nameReplacements) checkVariable(variable *scope.Variable, declarations 
 		(!r.opts.checkShorthandProperties && isShorthandBinding(variable)) {
 		return
 	}
-	replacements := r.opts.nameReplacements(variable.Name, 3)
+	replacements := r.nameReplacements(variable.Name, 3)
 	if replacements.total == 0 {
 		return
 	}
@@ -541,11 +601,22 @@ func (r *nameReplacements) checkVariable(variable *scope.Variable, declarations 
 	variables := r.classVariables(variable, declarations)
 	references := r.referencesFor(variables)
 	scopes := make([]*scope.Scope, 0, len(references)+len(variables))
+	scopeSet := make(map[*scope.Scope]struct{}, cap(scopes))
+	appendScope := func(current *scope.Scope) {
+		if current == nil {
+			return
+		}
+		if _, duplicate := scopeSet[current]; duplicate {
+			return
+		}
+		scopeSet[current] = struct{}{}
+		scopes = append(scopes, current)
+	}
 	for _, reference := range references {
-		scopes = append(scopes, reference.From)
+		appendScope(reference.From)
 	}
 	for _, declaration := range variables {
-		scopes = append(scopes, declaration.Scope)
+		appendScope(declaration.Scope)
 	}
 	filtered := replacements.samples[:0]
 	for _, candidate := range replacements.samples {
@@ -559,6 +630,7 @@ func (r *nameReplacements) checkVariable(variable *scope.Variable, declarations 
 	}
 
 	message := replacementMessage(variable.ID.Text(), replacements, "variable")
+	reportRange := utils.GetESTreeBindingIdentifierRange(r.ctx.SourceFile, variable.ID)
 	canRename := r.canRename(variable, variables, references)
 	canFixParameter := r.canFixParameter(variable)
 	if replacements.total == 1 && canRename && canFixParameter {
@@ -571,18 +643,18 @@ func (r *nameReplacements) checkVariable(variable *scope.Variable, declarations 
 			}
 			generated[replacement] = struct{}{}
 		}
-		r.ctx.ReportNodeWithDeferredFixes(variable.ID, message, func() []rule.RuleFix {
+		r.ctx.ReportRangeWithDeferredFixes(reportRange, message, func() []rule.RuleFix {
 			return r.renameFixes(variable, variables, references, replacement)
 		})
 		return
 	}
 	if replacements.total > 1 && canRename && canFixParameter {
-		r.ctx.ReportNodeWithDeferredSuggestions(variable.ID, message, func() []rule.RuleSuggestion {
+		r.ctx.ReportRangeWithDeferredSuggestions(reportRange, message, func() []rule.RuleSuggestion {
 			return r.renameSuggestions(variable, variables, references, replacements.samples)
 		})
 		return
 	}
-	r.ctx.ReportNode(variable.ID, message)
+	r.ctx.ReportRange(reportRange, message)
 }
 
 func isShorthandBinding(variable *scope.Variable) bool {
@@ -711,16 +783,7 @@ func (r *nameReplacements) isSafeName(name string, scopes []*scope.Scope, own []
 }
 
 func (r *nameReplacements) getUnresolvedScopesByName() map[string][]*scope.Scope {
-	if r.unresolvedScopesByName != nil {
-		return r.unresolvedScopesByName
-	}
-	r.unresolvedScopesByName = make(map[string][]*scope.Scope)
-	for _, reference := range r.manager.References {
-		if len(reference.Declarations) == 0 {
-			name := reference.Identifier.Text()
-			r.unresolvedScopesByName[name] = append(r.unresolvedScopesByName[name], reference.From)
-		}
-	}
+	r.buildBindingIndexes()
 	return r.unresolvedScopesByName
 }
 
@@ -761,8 +824,9 @@ func isExportedDeclaration(variable *scope.Variable) bool {
 		return false
 	}
 	for node := variable.DefNode; node != nil && node.Kind != ast.KindSourceFile; node = node.Parent {
-		if node.Kind == ast.KindExportAssignment || ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) {
-			return true
+		flags := ast.GetCombinedModifierFlags(node)
+		if flags&ast.ModifierFlagsExport != 0 {
+			return flags&ast.ModifierFlagsDefault == 0
 		}
 		if node.Kind == ast.KindBlock || ast.IsFunctionLikeDeclaration(node) {
 			break
@@ -788,9 +852,6 @@ func isJSXNamePosition(node *ast.Node) bool {
 }
 
 func (r *nameReplacements) canRename(variable *scope.Variable, variables []*scope.Variable, references []*scope.Reference) bool {
-	if _, usedInJSX := r.getJSXNames()[variable.Name]; usedInJSX {
-		return false
-	}
 	for _, declaration := range variables {
 		if isExportedDeclaration(declaration) || isJSXNamePosition(declaration.ID) {
 			return false
@@ -802,31 +863,6 @@ func (r *nameReplacements) canRename(variable *scope.Variable, variables []*scop
 		}
 	}
 	return true
-}
-
-func (r *nameReplacements) getJSXNames() map[string]struct{} {
-	if r.jsxNames != nil {
-		return r.jsxNames
-	}
-	r.jsxNames = make(map[string]struct{})
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if node == nil || utils.IsJSDocSyntaxNode(node) {
-			return
-		}
-		if node.Kind == ast.KindIdentifier && ast.IsJsxTagName(node) {
-			r.jsxNames[node.Text()] = struct{}{}
-		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
-	}
-	r.ctx.SourceFile.AsNode().ForEachChild(func(child *ast.Node) bool {
-		visit(child)
-		return false
-	})
-	return r.jsxNames
 }
 
 func (r *nameReplacements) canFixParameter(variable *scope.Variable) bool {
@@ -844,35 +880,90 @@ func (r *nameReplacements) canFixParameter(variable *scope.Variable) bool {
 	if function == nil {
 		return true
 	}
-	anchor := function
-	for anchor.Parent != nil {
-		parent := anchor.Parent
-		switch parent.Kind {
-		case ast.KindTypeAliasDeclaration, ast.KindVariableDeclaration, ast.KindVariableStatement,
-			ast.KindPropertySignature, ast.KindMethodSignature, ast.KindMethodDeclaration,
-			ast.KindPropertyDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-			anchor = parent
-		default:
-			parent = nil
-		}
-		if parent == nil {
+	return !r.hasAttachedJSDocParameterComment(function)
+}
+
+func (r *nameReplacements) hasAttachedJSDocParameterComment(function *ast.Node) bool {
+	candidate := function
+	var comment *ast.CommentRange
+	for candidate != nil {
+		previousComment, previousIsComment := r.previousSourceItem(candidate)
+		if previousIsComment {
+			comment = previousComment
 			break
 		}
-	}
-	start := utils.TrimNodeTextRange(r.ctx.SourceFile, anchor).Pos()
-	for _, comment := range r.ctx.Comments.All() {
-		if comment.End() > start {
-			break
+		if candidate.Parent == nil || !isCommentAttachmentParent(candidate.Parent) {
+			return false
 		}
-		text := r.ctx.SourceFile.Text()[comment.Pos():comment.End()]
-		if strings.HasPrefix(text, "/**") && strings.Contains(text, "@param") {
-			between := r.ctx.SourceFile.Text()[comment.End():start]
-			if strings.Count(between, "\n") <= 1 {
-				return false
-			}
-		}
+		candidate = candidate.Parent
 	}
-	return true
+	if comment == nil || comment.Kind != ast.KindMultiLineCommentTrivia {
+		return false
+	}
+	candidateStart := utils.TrimNodeTextRange(r.ctx.SourceFile, candidate).Pos()
+	lineMap := r.ctx.SourceFile.ECMALineMap()
+	if scanner.ComputeLineOfPosition(lineMap, candidateStart)-scanner.ComputeLineOfPosition(lineMap, comment.End()) > 1 {
+		return false
+	}
+	value := utils.CommentValue(r.ctx.SourceFile.Text(), comment)
+	value = strings.TrimLeftFunc(value, ecmascript.IsWhiteSpaceOrLineTerminator)
+	return strings.HasPrefix(value, "*") && containsJSDocParameterTag(value)
+}
+
+func (r *nameReplacements) previousSourceItem(node *ast.Node) (*ast.CommentRange, bool) {
+	start := utils.TrimNodeTextRange(r.ctx.SourceFile, node).Pos()
+	comments := r.ctx.Comments.All()
+	commentIndex := sort.Search(len(comments), func(index int) bool {
+		return comments[index].End() > start
+	})
+	var comment *ast.CommentRange
+	if commentIndex > 0 {
+		comment = comments[commentIndex-1]
+	}
+	token, hasToken := utils.TokenBeforePosition(r.ctx.SourceFile, start)
+	if comment != nil && (!hasToken || comment.End() > token.End) {
+		return comment, true
+	}
+	return nil, false
+}
+
+func isCommentAttachmentParent(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindExportAssignment, ast.KindExpressionStatement,
+		ast.KindMethodDeclaration, ast.KindPropertyAssignment,
+		ast.KindPropertyDeclaration, ast.KindPropertySignature,
+		ast.KindMethodSignature, ast.KindTypeAliasDeclaration,
+		ast.KindVariableDeclaration, ast.KindVariableDeclarationList, ast.KindVariableStatement,
+		ast.KindGetAccessor, ast.KindSetAccessor:
+		return true
+	case ast.KindBinaryExpression:
+		return ast.IsAssignmentOperator(node.AsBinaryExpression().OperatorToken.Kind)
+	default:
+		return false
+	}
+}
+
+func containsJSDocParameterTag(value string) bool {
+	for searchStart := 0; searchStart < len(value); {
+		offset := strings.Index(value[searchStart:], "@param")
+		if offset < 0 {
+			return false
+		}
+		end := searchStart + offset + len("@param")
+		if end == len(value) || !isASCIIWordByte(value[end]) {
+			return true
+		}
+		searchStart = end
+	}
+	return false
+}
+
+func isASCIIWordByte(value byte) bool {
+	return value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z' ||
+		value >= '0' && value <= '9' || value == '_'
 }
 
 func isFunctionLikeWithParameters(node *ast.Node) bool {
@@ -916,16 +1007,16 @@ func (r *nameReplacements) replacementForIdentifier(node *ast.Node, replacement 
 	if parent == nil {
 		return textRange, replacement
 	}
+	bindingRange := utils.GetESTreeBindingIdentifierRange(r.ctx.SourceFile, node)
+	if bindingRange != textRange && r.rangeContainsComment(bindingRange) {
+		return textRange, replacement
+	}
 	if parent.Kind == ast.KindParameter && parent.Name() == node {
 		parameter := parent.AsParameterDeclaration()
 		if parameter.QuestionToken != nil && parameter.Type != nil {
-			text := r.ctx.SourceFile.Text()
-			end := parameter.Type.Pos()
-			for end > textRange.End() && text[end-1] != ':' {
-				end--
-			}
-			if end > textRange.End() && text[end-1] == ':' {
-				return core.NewTextRange(textRange.Pos(), end-1), replacement + "?"
+			if colon, ok := utils.TokenBeforePosition(r.ctx.SourceFile, parameter.Type.Pos()); ok &&
+				colon.Kind == ast.KindColonToken && colon.Start >= textRange.End() {
+				return core.NewTextRange(textRange.Pos(), colon.Start), replacement + "?"
 			}
 		}
 	}
@@ -951,6 +1042,20 @@ func (r *nameReplacements) replacementForIdentifier(node *ast.Node, replacement 
 		}
 	}
 	return textRange, replacement
+}
+
+func (r *nameReplacements) rangeContainsComment(textRange core.TextRange) bool {
+	comments := r.ctx.Comments.All()
+	index := sort.Search(len(comments), func(index int) bool {
+		return comments[index].End() > textRange.Pos()
+	})
+	for ; index < len(comments) && comments[index].Pos() < textRange.End(); index++ {
+		comment := comments[index]
+		if comment.Pos() >= textRange.Pos() && comment.End() <= textRange.End() {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *nameReplacements) renameSuggestions(variable *scope.Variable, variables []*scope.Variable, references []*scope.Reference, replacements []string) []rule.RuleSuggestion {
@@ -983,7 +1088,7 @@ func (r *nameReplacements) checkProperty(node *ast.Node) {
 	if _, duplicate := r.reportedPropertyRanges[textRange]; duplicate {
 		return
 	}
-	replacements := r.opts.nameReplacements(node.Text(), 3)
+	replacements := r.nameReplacements(node.Text(), 3)
 	if replacements.total == 0 {
 		return
 	}
@@ -993,7 +1098,7 @@ func (r *nameReplacements) checkProperty(node *ast.Node) {
 		r.ctx.ReportRangeWithDeferredSuggestions(textRange, message, func() []rule.RuleSuggestion {
 			result := make([]rule.RuleSuggestion, 0, len(replacements.samples))
 			for _, replacement := range replacements.samples {
-				if !validVariableName(replacement) {
+				if !scanner.IsValidIdentifier(replacement) {
 					continue
 				}
 				result = append(result, rule.RuleSuggestion{

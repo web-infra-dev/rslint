@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -163,10 +164,6 @@ func unsupportedNativeTestFilename(filename string) bool {
 	if filename == "" {
 		return false
 	}
-	basename := filepath.Base(filename)
-	if strings.HasPrefix(basename, ".") {
-		return true
-	}
 	switch filepath.Ext(filename) {
 	case ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts":
 		return false
@@ -190,13 +187,33 @@ func lintUpstreamCase(t *testing.T, testCase upstreamCase, globals map[string]an
 		fileName = "name-replacements-upstream-" + strconv.Itoa(index) + extension
 	}
 	resolvedOptions := rule_tester.ResolveTestCaseOptions(t, &name_replacements.NameReplacementsRule, testCase.Options)
-	fs := utils.NewOverlayVFS(root.FS, map[string]string{tspath.ResolvePath(root.Dir, fileName): testCase.Code})
+	resolvedFileName := tspath.ResolvePath(root.Dir, fileName)
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{resolvedFileName: testCase.Code})
 	host := utils.CreateCompilerHost(root.Dir, fs)
-	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", host)
+	var sourceProgram *lintprogram.Program
+	var sourceFile *ast.SourceFile
+	var err error
+	if strings.HasPrefix(filepath.Base(fileName), ".") {
+		sourceProgram, err = lintprogram.NewFromRoots(lintprogram.RootOptions{
+			RootFileNames:   []string{resolvedFileName},
+			Host:            host,
+			CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+			SingleThreaded:  true,
+		})
+		if sourceProgram != nil {
+			sourceFile = sourceProgram.GetSourceFile(resolvedFileName)
+		}
+	} else {
+		var compilerProgram *compiler.Program
+		compilerProgram, err = utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", host)
+		if compilerProgram != nil {
+			sourceProgram = lintprogram.NewFromCompiler(compilerProgram)
+			sourceFile = compilerProgram.GetSourceFile(fileName)
+		}
+	}
 	if err != nil {
 		t.Fatalf("create program: %v\ncode:\n%s", err, testCase.Code)
 	}
-	sourceFile := program.GetSourceFile(fileName)
 	if sourceFile == nil {
 		t.Fatalf("source file %q missing from program", fileName)
 	}
@@ -204,7 +221,7 @@ func lintUpstreamCase(t *testing.T, testCase upstreamCase, globals map[string]an
 	var diagnosticsMu sync.Mutex
 	var diagnostics []rule.RuleDiagnostic
 	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
-		Programs:         []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
+		Programs:         []*lintprogram.Program{sourceProgram},
 		TargetsByProgram: [][]string{{sourceFile.FileName()}},
 		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
