@@ -32,12 +32,11 @@ func (p *cliGenerationProvider) AcquireGeneration(
 	}
 	if snapshot.Empty() && p.initial != nil {
 		generation := p.generation(*p.initial, p.initialFS)
-		return generation, func() {
-			// Drop only the provider's ownership. The published generation and
-			// any requested source artifacts remain immutable and independently live.
-			p.initial = nil
-			p.initialFS = nil
-		}, nil
+		// Transfer this request-local input at acquisition. A ReleaseFunc is
+		// reserved for an actual producer lease, such as an LSP request borrow.
+		p.initial = nil
+		p.initialFS = nil
+		return generation, nil, nil
 	}
 	if p.rebuild == nil {
 		return linter.Generation{}, nil, errors.New("rebuild CLI lint generation: provider is not configured")

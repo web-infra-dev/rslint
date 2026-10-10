@@ -5,18 +5,367 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
+	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+func TestPipelineReclaimsCompletedProgramWhileOtherConsumersRun(t *testing.T) {
+	for _, mode := range []PluginExecution{PluginConcurrentJoined, PluginAfterNativeJoined} {
+		for _, singleThreaded := range []bool{false, true} {
+			for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAll} {
+				t.Run(fmt.Sprintf("mode-%d-serial-%t-demand-%d", mode, singleThreaded, demand), func(t *testing.T) {
+					var completedProgram weak.Pointer[compiler.Program]
+					var completedSource weak.Pointer[ast.SourceFile]
+					otherStarted := make(chan struct{})
+					pluginStarted := make(chan struct{})
+					resume := make(chan struct{})
+					var resumeOnce sync.Once
+					unblock := func() { resumeOnce.Do(func() { close(resume) }) }
+					defer unblock()
+					var releases atomic.Int32
+					provider := GenerationProviderFunc(func(context.Context, SourceSnapshot) (Generation, ReleaseFunc, error) {
+						completed, completedPaths := createTestProgramWithFilesAndCompilerOptions(t,
+							map[string]string{"completed.ts": "const value = 1;"}, `{"noLib":true}`)
+						other, otherPaths := createTestProgramWithFilesAndCompilerOptions(t,
+							map[string]string{"other.ts": "const other = 1;"}, `{"noLib":true}`)
+						completedProgram = weak.Make(completed)
+						completedSource = weak.Make(completed.GetSourceFile(completedPaths["completed.ts"]))
+						// A plugin rule may carry Go-only fields in the prepared plan.
+						// Its wire projection must never keep this native closure.
+						pluginRun := func(rule.RuleContext) rule.RuleListeners {
+							runtime.KeepAlive(completed)
+							return nil
+						}
+						return Generation{
+							Native: NativeGeneration{
+								// Serial work groups execute in reverse queue order.
+								Programs:         []*program.Program{program.NewFromCompiler(other), program.NewFromCompiler(completed)},
+								TargetsByProgram: [][]string{{otherPaths["other.ts"]}, {completedPaths["completed.ts"]}},
+								SingleThreaded:   singleThreaded,
+								RulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
+									if strings.HasSuffix(file.FileName(), "/other.ts") {
+										return []rule.ConfiguredRule{{Name: "native/wait", Run: func(rule.RuleContext) rule.RuleListeners {
+											close(otherStarted)
+											<-resume
+											return nil
+										}}}
+									}
+									return []rule.ConfiguredRule{
+										{Name: "native/check", Run: func(ctx rule.RuleContext) rule.RuleListeners {
+											span := core.NewTextRange(6, 11)
+											ctx.ReportRangeWithDeferredFixes(span, rule.RuleMessage{Description: "native"}, func() []rule.RuleFix {
+												return []rule.RuleFix{rule.RuleFixReplaceRange(span, "replacement")}
+											})
+											return nil
+										}},
+										{Name: "plugin/check", IsEslintPluginRule: true, Run: pluginRun},
+									}
+								},
+							},
+							Target: TargetProjection{ReadText: func(_ string, source ast.SourceFileLike) (string, error) {
+								// Even an adapter reader that captures the compiler is
+								// preparation-only when no source changes are planned.
+								runtime.KeepAlive(completed)
+								return source.Text(), nil
+							}},
+							Plugin: &PluginGeneration{ConfigForFile: func(string) EslintPluginFileConfig { return EslintPluginFileConfig{} }},
+						}, func() { releases.Add(1) }, nil
+					})
+					type outcome struct {
+						result PipelineResult
+						err    error
+					}
+					done := make(chan outcome, 1)
+					t.Cleanup(func() {
+						unblock()
+						<-done
+					})
+					go func() {
+						defer close(done)
+						result, err := RunPipeline(context.Background(), NewLintRequest(provider, ObservationPolicy{
+							Plugin: mode,
+							Demand: ArtifactDemand{Native: demand, Plugin: demand},
+						}, func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+							close(pluginStarted)
+							<-resume
+							return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+								FilePath:    request.Files[0].Path,
+								Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/check", Message: "plugin", StartPos: 6, EndPos: 11}},
+							}}}, nil
+						}))
+						done <- outcome{result, err}
+					}()
+					startedConsumers := []<-chan struct{}{otherStarted}
+					if mode == PluginConcurrentJoined {
+						startedConsumers = append(startedConsumers, pluginStarted)
+					}
+					for _, started := range startedConsumers {
+						select {
+						case <-started:
+						case got := <-done:
+							t.Fatalf("pipeline ended before the blocking consumers started: %v", got.err)
+						}
+					}
+					deadline := time.Now().Add(5 * time.Second)
+					for completedProgram.Value() != nil || completedSource.Value() != nil {
+						if time.Now().After(deadline) {
+							t.Fatal("completed project remains reachable while another project and the plugin are blocked")
+						}
+						runtime.GC()
+						runtime.Gosched()
+					}
+					if releases.Load() != 0 {
+						t.Fatal("producer finalizer ran before all generation consumers joined")
+					}
+					unblock()
+					got := <-done
+					if got.err != nil || releases.Load() != 1 {
+						t.Fatalf("pipeline error/releases = %v/%d", got.err, releases.Load())
+					}
+					if got.result.Observation.Native.Lint.LintedFileCount != 2 || len(got.result.Observation.Native.Diagnostics) != 1 {
+						t.Fatalf("native result = %+v", got.result.Observation.Native)
+					}
+					plugin, joined := got.result.Observation.JoinedPluginOutcome()
+					if !joined || len(plugin.Diagnostics) != 1 ||
+						(mode == PluginConcurrentJoined && plugin.Diagnostics[0].SourceFile != got.result.Observation.Native.Diagnostics[0].SourceFile) {
+						t.Fatal("native/plugin diagnostics lost their exact shared source frame")
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestConcurrentPipelineJoinsPluginBatchesBeforeReleaseOnPanic(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	panicPath := tspath.ResolvePath(root, "panic.ts")
+	waitPath := tspath.ResolvePath(root, "wait.ts")
+	waitStarted := make(chan struct{})
+	waitStopped := make(chan struct{})
+	panicTriggered := make(chan struct{})
+	resume := make(chan struct{})
+	var resumeOnce sync.Once
+	unblock := func() { resumeOnce.Do(func() { close(resume) }) }
+	generation := Generation{
+		Native: NativeGeneration{
+			Programs:         []*program.Program{pipelineTestProgram(t, root, panicPath, "a"), pipelineTestProgram(t, root, waitPath, "b")},
+			TargetsByProgram: [][]string{{panicPath}, {waitPath}},
+			SingleThreaded:   true,
+			RulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
+				name := "plugin/panic"
+				if file.FileName() == waitPath {
+					name = "plugin/wait"
+				}
+				return []rule.ConfiguredRule{{Name: name, IsEslintPluginRule: true}}
+			},
+		},
+		Target: TargetProjection{ReadText: func(_ string, source ast.SourceFileLike) (string, error) { return source.Text(), nil }},
+		Plugin: &PluginGeneration{ConfigForFile: func(string) EslintPluginFileConfig { return EslintPluginFileConfig{} }},
+	}
+	var releases atomic.Int32
+	const marker = "plugin failed"
+	type outcome struct {
+		result PipelineResult
+		err    error
+	}
+	done := make(chan outcome, 1)
+	t.Cleanup(func() { unblock(); <-done })
+	go func() {
+		defer close(done)
+		result, err := RunPipeline(context.Background(), NewLintRequest(
+			pipelineTestProvider(generation, func() {
+				select {
+				case <-waitStopped:
+				default:
+					t.Error("released generation before sibling plugin batch joined")
+				}
+				releases.Add(1)
+			}),
+			ObservationPolicy{PluginFailure: PluginKeepPartialWithSynthetic},
+			func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				if _, waiting := request.Rules["plugin/wait"]; waiting {
+					close(waitStarted)
+					<-resume
+					close(waitStopped)
+					return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+						FilePath:    request.Files[0].Path,
+						Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/wait", Message: "surviving batch"}},
+					}}}, nil
+				}
+				<-waitStarted
+				close(panicTriggered)
+				panic(marker)
+			},
+		))
+		done <- outcome{result, err}
+	}()
+	select {
+	case <-panicTriggered:
+	case got := <-done:
+		t.Fatalf("pipeline ended before the panic batch started: %v", got.err)
+	}
+	select {
+	case got := <-done:
+		t.Fatalf("pipeline returned before its surviving plugin batch joined: %v", got.err)
+	case <-time.After(30 * time.Millisecond):
+	}
+	unblock()
+	got := <-done
+	plugin, joined := got.result.Observation.JoinedPluginOutcome()
+	if got.err != nil || !joined || plugin.DispatchError == nil || !strings.Contains(plugin.DispatchError.Error(), marker) ||
+		len(plugin.Diagnostics) != 2 || releases.Load() != 1 {
+		t.Fatalf("pipeline/plugin/releases = %v/%+v/%d, want recovered plugin error, surviving diagnostics, release once", got.err, plugin, releases.Load())
+	}
+}
+
+func TestConcurrentPipelineJoinsNativeShardsBeforeReleaseOnPanic(t *testing.T) {
+	previousProcs := runtime.GOMAXPROCS(2)
+	defer runtime.GOMAXPROCS(previousProcs)
+	waitStarted := make(chan struct{})
+	waitStopped := make(chan struct{})
+	panicTriggered := make(chan struct{})
+	resume := make(chan struct{})
+	var resumeOnce sync.Once
+	unblock := func() { resumeOnce.Do(func() { close(resume) }) }
+	const marker = "native shard failed"
+	run := func(ctx rule.RuleContext) rule.RuleListeners {
+		switch {
+		case strings.HasSuffix(ctx.SourceFile.FileName(), "/file-000.ts"):
+			<-waitStarted
+			close(panicTriggered)
+			panic(marker)
+		case strings.HasSuffix(ctx.SourceFile.FileName(), "/file-128.ts"):
+			close(waitStarted)
+			<-resume
+			if !ctx.Program().IsValid() || ctx.SourceFile.Text() != "const value = 1;" {
+				t.Error("sibling shard lost its source generation")
+			}
+			ctx.ReportRange(core.NewTextRange(0, 5), rule.RuleMessage{Description: "sibling still reporting"})
+			close(waitStopped)
+		}
+		return nil
+	}
+	options := checkerFreeExecutionTestOptions(t, false, run)
+	plan := options.LintPlan.programs[0]
+	paths := make([]string, len(plan.files))
+	for index, file := range plan.files {
+		paths[index] = file.file.FileName()
+	}
+	generation := Generation{Native: NativeGeneration{
+		Programs:         []*program.Program{plan.program},
+		TargetsByProgram: [][]string{paths},
+		RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{Name: "native/panic", Run: run}}
+		},
+	}}
+	var releases atomic.Int32
+	done := make(chan any, 1)
+	t.Cleanup(func() { unblock(); <-done })
+	go func() {
+		defer close(done)
+		defer func() { done <- recover() }()
+		_, _ = RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, func() {
+			select {
+			case <-waitStopped:
+			default:
+				t.Error("released generation while a native sibling shard still borrowed it")
+			}
+			releases.Add(1)
+		}), ObservationPolicy{}, nil))
+	}()
+	select {
+	case <-panicTriggered:
+	case value := <-done:
+		t.Fatalf("pipeline ended before the panic shard started: %v", value)
+	}
+	select {
+	case value := <-done:
+		t.Fatalf("pipeline propagated panic before its native sibling joined: %v", value)
+	case <-time.After(30 * time.Millisecond):
+	}
+	unblock()
+	if value := <-done; value != marker || releases.Load() != 1 {
+		t.Fatalf("panic/releases = %v/%d, want original panic/1", value, releases.Load())
+	}
+}
+
+func TestPipelineSharedCompilerRemainsValidUntilLastProjectCompletes(t *testing.T) {
+	var firstFacade weak.Pointer[program.Program]
+	var sharedCompiler weak.Pointer[compiler.Program]
+	blocked := make(chan struct{})
+	resume := make(chan struct{})
+	var resumeOnce sync.Once
+	unblock := func() { resumeOnce.Do(func() { close(resume) }) }
+	defer unblock()
+	provider := GenerationProviderFunc(func(context.Context, SourceSnapshot) (Generation, ReleaseFunc, error) {
+		raw, paths := createTestProgramWithFilesAndCompilerOptions(t,
+			map[string]string{"first.ts": "const first = 1;", "second.ts": "const second = 2;"}, `{"noLib":true}`)
+		first := program.NewFromCompiler(raw)
+		second := program.NewFromCompiler(raw)
+		firstFacade = weak.Make(first)
+		sharedCompiler = weak.Make(raw)
+		return Generation{Native: NativeGeneration{
+			Programs:         []*program.Program{second, first},
+			TargetsByProgram: [][]string{{paths["second.ts"]}, {paths["first.ts"]}},
+			SingleThreaded:   true,
+			RulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{Name: "native/shared", Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					if strings.HasSuffix(ctx.SourceFile.FileName(), "/second.ts") {
+						close(blocked)
+						<-resume
+						if !ctx.Program().IsValid() || len(ctx.Program().SourceFiles()) != 2 || ctx.TypeChecker == nil {
+							t.Error("ending the first task invalidated the shared compiler generation")
+						}
+					}
+					ctx.ReportRange(core.NewTextRange(0, 5), rule.RuleMessage{Description: "valid source"})
+					return nil
+				}}}
+			},
+		}}, nil, nil
+	})
+	done := make(chan error, 1)
+	t.Cleanup(func() { unblock(); <-done })
+	go func() {
+		defer close(done)
+		_, err := RunPipeline(context.Background(), NewLintRequest(provider, ObservationPolicy{}, nil))
+		done <- err
+	}()
+	select {
+	case <-blocked:
+	case err := <-done:
+		t.Fatalf("pipeline finished before the second project blocked: %v", err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for firstFacade.Value() != nil {
+		if time.Now().After(deadline) {
+			t.Fatal("completed facade remains reachable")
+		}
+		runtime.GC()
+		runtime.Gosched()
+	}
+	if sharedCompiler.Value() == nil {
+		t.Fatal("shared compiler was collected while the second project still borrowed it")
+	}
+	unblock()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestPipelinePublishesTextDiagnosticSources(t *testing.T) {
 	for _, mode := range []PluginExecution{PluginConcurrentJoined, PluginAfterNativeJoined, pluginProgressiveAfterNative} {

@@ -3,6 +3,7 @@ package linter
 import (
 	"sync"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
@@ -18,6 +19,21 @@ type textSourceFile struct {
 
 func newTextSourceFile(text string) *textSourceFile {
 	return &textSourceFile{text: text}
+}
+
+// A source owns its text projection, with no reference back to the AST. This
+// preserves exact-source identity across concurrent native/plugin producers
+// without a long-lived map whose strong keys retain completed sources.
+var diagnosticTextKey = ast.NewSourceFileDataKey[*textSourceFile]()
+
+func diagnosticTextSource(source ast.SourceFileLike) ast.SourceFileLike {
+	file, ok := source.(*ast.SourceFile)
+	if !ok || file == nil {
+		return source
+	}
+	return ast.GetOrComputeSourceFileData(file, diagnosticTextKey, func(file *ast.SourceFile) *textSourceFile {
+		return newTextSourceFile(file.Text())
+	})
 }
 
 func (f *textSourceFile) Text() string { return f.text }

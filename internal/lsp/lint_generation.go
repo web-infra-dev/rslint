@@ -204,6 +204,7 @@ func newLintGeneration(
 	readText func(targetPath string, source ast.SourceFileLike) (string, error),
 ) linter.Generation {
 	sourceProgram := lintprogram.NewFromCompiler(program)
+	sourcePath := sourceFile.FileName()
 	servedRules := rulesServedToEditors(enabledRules)
 	if !hasTypeInfo {
 		servedRules = rule.FilterNonTypeAwareRules(servedRules)
@@ -220,7 +221,7 @@ func newLintGeneration(
 				return *pluginConfig
 			},
 			WirePath: func(path string) string {
-				if path == sourceFile.FileName() {
+				if path == sourcePath {
 					return target.Path
 				}
 				return path
@@ -230,7 +231,7 @@ func newLintGeneration(
 	return linter.Generation{
 		Native: linter.NativeGeneration{
 			Programs:         []*lintprogram.Program{sourceProgram},
-			TargetsByProgram: [][]string{{sourceFile.FileName()}},
+			TargetsByProgram: [][]string{{sourcePath}},
 			SingleThreaded:   true,
 			Cwd:              processCwd,
 			RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
@@ -239,7 +240,7 @@ func newLintGeneration(
 		},
 		Target: linter.TargetProjection{
 			Path: func(path string) string {
-				if path == sourceFile.FileName() {
+				if path == sourcePath {
 					return target.Path
 				}
 				return path

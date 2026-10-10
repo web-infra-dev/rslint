@@ -28,11 +28,10 @@ func (p *apiGenerationProvider) AcquireGeneration(
 	}
 	if snapshot.Empty() && p.initial != nil {
 		generation := *p.initial
-		return generation, func() {
-			// Published diagnostics and requested source artifacts own their data;
-			// the provider must not retain the initial Program through later rounds.
-			p.initial = nil
-		}, nil
+		// Transfer our ownership while published generation contents remain
+		// immutable. There is no external borrow to finalize for an API request.
+		p.initial = nil
+		return generation, nil, nil
 	}
 	if p.rebuild == nil {
 		return linter.Generation{}, nil, errors.New("rebuild API lint generation: provider is not configured")

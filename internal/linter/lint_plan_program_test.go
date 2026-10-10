@@ -322,21 +322,26 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 		t.Fatalf("prepared a.ts rules = %d, want native and plugin rules", len(pluginTargets[0].Rules))
 	}
 
-	preparedResult, err := RunLinter(RunLinterOptions{
-		SingleThreaded: true,
-		LintPlan:       plan,
-	})
-	if err != nil {
-		t.Fatalf("prepared RunLinter failed: %v", err)
-	}
-	if preparedResult.LintedFileCount != 3 {
-		t.Fatalf("prepared LintedFileCount = %d, want zero-rule files included", preparedResult.LintedFileCount)
-	}
-	if _, ok := preparedResult.ExecutedRules["community/plugin-rule"]; !ok {
-		t.Fatal("prepared ExecutedRules omitted the configured plugin rule")
-	}
-	if _, ok := preparedResult.ExecutedRules["type-aware-rule"]; ok {
-		t.Fatal("prepared ExecutedRules retained a type-aware rule for a gap file")
+	for _, singleThreaded := range []bool{true, false} {
+		preparedResult, err := RunLinter(RunLinterOptions{
+			SingleThreaded: singleThreaded,
+			LintPlan:       plan,
+		})
+		if err != nil {
+			t.Fatalf("prepared RunLinter failed (singleThreaded=%t): %v", singleThreaded, err)
+		}
+		if preparedResult.LintedFileCount != 3 {
+			t.Fatalf("prepared LintedFileCount = %d, want zero-rule files included", preparedResult.LintedFileCount)
+		}
+		if _, ok := preparedResult.ExecutedRules["community/plugin-rule"]; !ok {
+			t.Fatal("prepared ExecutedRules omitted the configured plugin rule")
+		}
+		if _, ok := preparedResult.ExecutedRules["type-aware-rule"]; ok {
+			t.Fatal("prepared ExecutedRules retained a type-aware rule for a gap file")
+		}
+		if !reflect.DeepEqual(plan.Targets(), pluginTargets) {
+			t.Fatal("native execution changed the reusable plugin projection")
+		}
 	}
 	if preparedCalls[paths["a.ts"]] != 1 || preparedCalls[paths["gap.ts"]] != 1 || preparedCalls[paths["zero.ts"]] != 1 {
 		t.Fatalf("prepared callback should run exactly once per eligible file, got %v", preparedCalls)

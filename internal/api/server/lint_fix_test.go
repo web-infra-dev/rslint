@@ -19,7 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func TestAPIGenerationProviderReleasesInitialOwnership(t *testing.T) {
+func TestAPIGenerationProviderTransfersInitialOwnership(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	initial := linter.Generation{Native: linter.NativeGeneration{Cwd: root}}
 	provider := &apiGenerationProvider{initial: &initial}
@@ -29,13 +29,11 @@ func TestAPIGenerationProviderReleasesInitialOwnership(t *testing.T) {
 		t.Fatalf("canceled acquisition changed initial ownership: %v", err)
 	}
 	generation, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
-	if err != nil || release == nil || provider.initial == nil {
+	if err != nil || release != nil || provider.initial != nil {
 		t.Fatalf("initial acquisition = release:%v error:%v", release != nil, err)
 	}
-	release()
-	release()
 	if provider.initial != nil || generation.Native.Cwd != root || initial.Native.Cwd != root {
-		t.Fatal("release retained initial ownership or changed published data")
+		t.Fatal("ownership transfer changed published data")
 	}
 	var rebuilds int
 	wantErr := errors.New("rebuild failure")
