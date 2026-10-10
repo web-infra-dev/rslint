@@ -15,6 +15,7 @@ const defaultExportName = "default"
 
 type ExportMeta struct {
 	Namespace *ExportMap
+	doc       *exportDocSource
 	// unresolved distinguishes a declared re-export from one whose value is
 	// available. Names must retain missing re-exports for import/export.
 	unresolved bool
@@ -34,6 +35,8 @@ type ExportMap struct {
 	hasUnknown      bool
 	reexports       map[string]string
 	implicitDefault bool
+	docFile         *ast.SourceFile
+	defaultDoc      *exportDocSource
 }
 
 func newExportMap() *ExportMap {
@@ -258,6 +261,8 @@ func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap
 
 	local := builder.index.localExportsOf(builder.program(), sourceFile)
 	exports.implicitDefault = local.ImplicitDefault
+	exports.docFile = sourceFile
+	exports.defaultDoc = local.DefaultDoc
 	for _, step := range local.Steps {
 		builder.applyStep(exports, local, step)
 	}
@@ -276,14 +281,16 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports,
 	switch step.Kind {
 	case exportStepNames:
 		for _, name := range step.Names {
-			exports.set(name, nil)
+			exports.set(name, &ExportMeta{doc: step.Docs[name]})
 		}
 
 	case exportStepLocalDefault:
 		if meta, ok := builder.namespaceImportMeta(local, step.Local); ok {
-			exports.set(defaultExportName, meta)
+			defaultMeta := *meta
+			defaultMeta.doc = step.Docs[defaultExportName]
+			exports.set(defaultExportName, &defaultMeta)
 		} else {
-			exports.set(defaultExportName, nil)
+			exports.set(defaultExportName, &ExportMeta{doc: step.Docs[defaultExportName]})
 		}
 
 	case exportStepStar:
@@ -322,10 +329,13 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports,
 			// target is missing. Resolving the target only supplies metadata.
 			meta := dependency.Get(spec.Local)
 			if spec.Local == defaultExportName && (dependency.implicitDefault || step.Link.NodeDefault) && (meta == nil || meta.unresolved) {
-				meta = &ExportMeta{}
+				meta = &ExportMeta{doc: dependency.defaultDoc}
 			}
 			if meta == nil {
 				meta = &ExportMeta{unresolved: true}
+				if spec.Local == defaultExportName {
+					meta.doc = dependency.defaultDoc
+				}
 			}
 			exports.set(spec.Exported, meta)
 		}

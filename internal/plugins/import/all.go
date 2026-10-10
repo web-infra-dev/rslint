@@ -20,6 +20,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_commonjs"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_cycle"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_default_export"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_deprecated"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_duplicates"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_dynamic_require"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_empty_named_blocks"
@@ -65,6 +66,7 @@ func GetAllRules() []rule.Rule {
 		no_commonjs.NoCommonjsRule,
 		no_cycle.NoCycleRule,
 		no_default_export.NoDefaultExportRule,
+		no_deprecated.NoDeprecatedRule,
 		no_duplicates.NoDuplicatesRule,
 		no_dynamic_require.NoDynamicRequireRule,
 		no_empty_named_blocks.NoEmptyNamedBlocksRule,

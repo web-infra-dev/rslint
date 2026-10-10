@@ -73,6 +73,7 @@ type localExports struct {
 	// default to ordinary ES module exports.
 	// It is not an authored name for enumeration or namespace-member checks.
 	ImplicitDefault bool
+	DefaultDoc      *exportDocSource
 }
 
 type exportStepKind uint8
@@ -93,6 +94,7 @@ const (
 type exportStep struct {
 	Kind  exportStepKind
 	Names []string
+	Docs  map[string]*exportDocSource
 	// Local is the identifier `export default` names, empty when the
 	// expression is not a plain identifier.
 	Local string
@@ -147,7 +149,15 @@ func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceF
 		if stmt.Kind == ast.KindImportDeclaration {
 			local.Imports = append(local.Imports, importBinding(sourceProgram, sourceFile, settings, stmt.AsImportDeclaration()))
 		}
+		first := len(local.Steps)
 		local.appendStatement(sourceProgram, sourceFile, settings, stmt)
+		if stmt.Kind == ast.KindExportAssignment && stmt.AsExportAssignment().IsExportEquals ||
+			stmt.Kind == ast.KindNamespaceExportDeclaration && compilerOptionsESModuleInterop(sourceProgram) {
+			local.captureTypeScriptExportDocs(sourceFile, stmt, first)
+		}
+		for i := first; i < len(local.Steps); i++ {
+			captureExportDocSources(sourceFile, &local.Steps[i], stmt)
+		}
 	}
 
 	// CommonJS declarations can describe module.exports with named exports,
