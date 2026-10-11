@@ -1,5 +1,13 @@
 Local fixtures for export rule regressions.
 
+-- base.ts --
+export const value = 1;
+-- other-base.ts --
+export const value = 2;
+-- shared-a.ts --
+export const a = 1; export const b = 1;
+-- shared-b.ts --
+export const a = 2; export const b = 2;
 -- alias-namespace.ts --
 declare namespace API { export import Value = Other.Value; }
 export = API;

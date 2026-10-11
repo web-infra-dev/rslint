@@ -33,11 +33,25 @@ type exportKey struct {
 	name  string
 }
 
+type exportKind uint8
+
+const (
+	explicitExport exportKind = iota
+	typeOnlyExport
+	starExport
+)
+
+type exportOccurrence struct {
+	node *ast.Node
+	kind exportKind
+}
+
 type exportGroup struct {
-	name  string
-	first *ast.Node
+	name           string
+	first          exportOccurrence
+	hasValueExport bool
 	// Allocate the occurrence list only once a name is repeated.
-	nodes []*ast.Node
+	occurrences []exportOccurrence
 }
 
 // Duplicate detection belongs to this file's declarations. Cross-file export
@@ -54,8 +68,10 @@ type exportDiagnostic struct {
 	message rule.RuleMessage
 }
 
-func (c *collector) add(statement, node *ast.Node, name string, typeOnly bool) {
-	if typeOnly {
+func (c *collector) add(statement, node *ast.Node, name string, typeDeclaration bool, kind exportKind) {
+	// Preserve upstream's separate bucket for type declarations. Type-only
+	// specifiers still use the value bucket, but cannot shadow runtime stars.
+	if typeDeclaration {
 		name = "type:" + name
 	}
 	var scope *ast.Node
@@ -63,18 +79,20 @@ func (c *collector) add(statement, node *ast.Node, name string, typeOnly bool) {
 		scope = statement.Parent.Parent
 	}
 	key := exportKey{scope: scope, name: name}
+	occurrence := exportOccurrence{node: node, kind: kind}
 	index, ok := c.byName[key]
 	if !ok {
 		c.byName[key] = len(c.groups)
-		c.groups = append(c.groups, exportGroup{name: name, first: node})
+		c.groups = append(c.groups, exportGroup{name: name, first: occurrence, hasValueExport: kind == explicitExport})
 		return
 	}
 	// ExportMap.Names already deduplicates names reached through several paths.
 	group := &c.groups[index]
-	if group.nodes == nil {
-		group.nodes = []*ast.Node{group.first, node}
+	group.hasValueExport = group.hasValueExport || kind == explicitExport
+	if group.occurrences == nil {
+		group.occurrences = []exportOccurrence{group.first, occurrence}
 	} else {
-		group.nodes = append(group.nodes, node)
+		group.occurrences = append(group.occurrences, occurrence)
 	}
 }
 
@@ -82,7 +100,7 @@ func (c *collector) collect(node *ast.Node) {
 	switch node.Kind {
 	case ast.KindExportAssignment:
 		if !node.AsExportAssignment().IsExportEquals {
-			c.add(node, node, "default", false)
+			c.add(node, node, "default", false, explicitExport)
 		}
 	case ast.KindExportDeclaration:
 		c.collectExport(node)
@@ -123,38 +141,54 @@ func (c *collector) collectDeclaration(node *ast.Node) {
 		return
 	}
 	if ast.HasSyntacticModifier(node, ast.ModifierFlagsDefault) {
-		c.add(node, node, "default", false)
+		c.add(node, node, "default", false, explicitExport)
 		return
 	}
 	switch node.Kind {
 	case ast.KindVariableStatement:
 		utils.ForEachVariableDeclarationBinding(node.AsVariableStatement().DeclarationList, func(_ *ast.Node, identifier *ast.Node, name string) {
-			c.add(node, identifier, name, false)
+			c.add(node, identifier, name, false, explicitExport)
 		})
 	case ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindEnumDeclaration,
 		ast.KindModuleDeclaration, ast.KindTypeAliasDeclaration, ast.KindInterfaceDeclaration, ast.KindImportEqualsDeclaration:
 		if name := node.Name(); name != nil {
-			c.add(node, name, name.Text(), node.Kind == ast.KindTypeAliasDeclaration || node.Kind == ast.KindInterfaceDeclaration)
+			typeDeclaration := node.Kind == ast.KindTypeAliasDeclaration || node.Kind == ast.KindInterfaceDeclaration
+			kind := explicitExport
+			if typeDeclaration || node.Kind == ast.KindImportEqualsDeclaration && node.AsImportEqualsDeclaration().IsTypeOnly {
+				kind = typeOnlyExport
+			}
+			c.add(node, name, name.Text(), typeDeclaration, kind)
 		}
 	}
 }
 
 func (c *collector) collectExport(node *ast.Node) {
 	declaration := node.AsExportDeclaration()
+	kind := explicitExport
+	if declaration.IsTypeOnly {
+		kind = typeOnlyExport
+	}
 	if clause := declaration.ExportClause; clause != nil {
 		if clause.Kind == ast.KindNamedExports {
 			for _, specifier := range clause.AsNamedExports().Elements.Nodes {
 				name := specifier.Name()
 				if text, ok := utils.GetStaticPropertyName(name); ok {
-					// Type-only specifiers share the value export bucket upstream.
-					c.add(node, name, text, false)
+					specifierKind := kind
+					if specifier.AsExportSpecifier().IsTypeOnly {
+						specifierKind = typeOnlyExport
+					}
+					c.add(node, name, text, false, specifierKind)
 				}
 			}
 			return
 		}
-		// Upstream excludes identifier namespace aliases, but treats string
-		// aliases like ordinary star exports (exported.name is absent).
-		if clause.Kind == ast.KindNamespaceExport && clause.Name().Kind == ast.KindIdentifier {
+		// A namespace alias exports one explicit name, not the target's names.
+		if clause.Kind == ast.KindNamespaceExport {
+			if name := clause.Name(); name != nil {
+				if text, ok := utils.GetStaticPropertyName(name); ok {
+					c.add(node, name, text, declaration.IsTypeOnly, kind)
+				}
+			}
 			return
 		}
 	}
@@ -166,7 +200,7 @@ func (c *collector) collectExport(node *ast.Node) {
 	for name := range exports.Names() {
 		if name != "default" {
 			anyNamed = true
-			c.add(node, node, name, false)
+			c.add(node, node, name, false, starExport)
 		}
 	}
 	if !anyNamed {
@@ -179,13 +213,20 @@ func (c *collector) collectExport(node *ast.Node) {
 
 func (c *collector) report() {
 	for _, group := range c.groups {
-		nodes := group.nodes
-		if len(nodes) == 0 {
+		occurrences := group.occurrences
+		// ResolveExport gives explicit value exports precedence over stars.
+		// Wait until collection is complete so statement order cannot matter.
+		if group.hasValueExport {
+			occurrences = slices.DeleteFunc(occurrences, func(occurrence exportOccurrence) bool {
+				return occurrence.kind == starExport
+			})
+		}
+		if len(occurrences) < 2 {
 			continue
 		}
 		kinds := make(map[ast.Kind]int)
-		for _, node := range nodes {
-			kinds[node.Parent.Kind]++
+		for _, occurrence := range occurrences {
+			kinds[occurrence.node.Parent.Kind]++
 		}
 		hasNamespace := kinds[ast.KindModuleDeclaration] > 0
 		if hasNamespace && (len(kinds) == 1 || len(kinds) == 2 &&
@@ -199,7 +240,8 @@ func (c *collector) report() {
 		if group.name == "default" {
 			message = rule.RuleMessage{Id: "multipleDefault", Description: "Multiple default exports."}
 		}
-		for _, node := range nodes {
+		for _, occurrence := range occurrences {
+			node := occurrence.node
 			if node.Parent.Kind == ast.KindModuleDeclaration &&
 				(kinds[ast.KindFunctionDeclaration] > 0 || kinds[ast.KindClassDeclaration] > 0 || kinds[ast.KindEnumDeclaration] > 0) {
 				continue

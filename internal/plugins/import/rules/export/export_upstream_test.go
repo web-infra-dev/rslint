@@ -65,6 +65,9 @@ func TestExportUpstreamJavaScript(t *testing.T) {
 			{
 				Code: `let bar; export { bar }; export * from "./export-all"`,
 			},
+			// Intentional difference: explicit exports shadow stars (issue #2409).
+			{Code: `let foo; export { foo }; export * from "./export-all"`},
+			{Code: `let foo; export { foo as "foo" }; export * from "./export-all"`},
 			{
 				Code: `export * from "./export-all"`,
 			},
@@ -167,13 +170,6 @@ func TestExportUpstreamJavaScript(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			{
-				Code: `let foo; export { foo }; export * from "./export-all"`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'foo'.", Line: 1, Column: 19, EndLine: 1, EndColumn: 22},
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'foo'.", Line: 1, Column: 26, EndLine: 1, EndColumn: 54},
-				},
-			},
-			{
 				Code: `export * from "./malformed.js"`,
 				// tsgo accepts the top-level return rejected by Espree.
 				Skip: true,
@@ -185,13 +181,6 @@ func TestExportUpstreamJavaScript(t *testing.T) {
 				Code: `export * from "./default-export"`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noNamed", Message: "No named exports found in module './default-export'.", Line: 1, Column: 15, EndLine: 1, EndColumn: 33},
-				},
-			},
-			{
-				Code: `let foo; export { foo as "foo" }; export * from "./export-all"`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'foo'.", Line: 1, Column: 26, EndLine: 1, EndColumn: 31},
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'foo'.", Line: 1, Column: 35, EndLine: 1, EndColumn: 63},
 				},
 			},
 			{

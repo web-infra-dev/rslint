@@ -1,11 +1,169 @@
 package export_test
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/export"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+func TestExportShadowing(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		{Code: "const value = 2;\nexport { value };\nexport * from './base.js';"},
+		{Code: "export * from './base.js';\nconst value = 2;\nexport { value };"},
+		// All names may be shadowed without making the star source empty.
+		{Code: `export const a = 0, b = 0; export * from "./shared-a";`},
+		// Each ambient module has its own explicit exports.
+		{Code: `declare module "one" { export const value = 0; export * from "./base"; }
+declare module "two" { export * from "./base"; export const value = 0; }`},
+		// Namespace merging still applies after shadowed stars are removed.
+		{Code: `export * from "./base"; export function value() {} export namespace value {}`},
+		// Namespace aliases export only their alias, even for empty targets.
+		{Code: `export * as value from "./empty"; export * from "./base";`},
+		{Code: `export * as "value" from "./empty"; export * from "./base";`},
+		// Type-only namespace aliases occupy the type namespace.
+		{Code: `export type * as value from "./named"; export * from "./base";`},
+		{Code: `export * from "./base"; export type * as "value" from "./named";`},
+		{Code: `export * from "./empty-name"; const x = 0; export { x as "" }; export * from "./empty-name";`},
+	}
+	stars := []string{`export * from "./base";`, `export * from "./other-base";`}
+	// Try every ordering of two conflicting stars and each explicit export
+	// form. A valid result must not depend on which statement is visited first.
+	for _, explicit := range []string{
+		`const value = 0; export { value };`,
+		`export const value = 0;`,
+		`export const { value } = { value: 0 };`,
+		`export const [value] = [0];`,
+		`export function value() {}`,
+		`export class value {}`,
+		`export { value } from "./base";`,
+		`export { a as value } from "./named";`,
+		`export { default as value } from "./named";`,
+		`const local = 0; export { local as "value" };`,
+		`export const \u0076\u0061\u006c\u0075\u0065 = 0;`,
+		`export * as value from "./named";`,
+		`export * as "value" from "./named";`,
+	} {
+		for order := range 2 {
+			orderedStars := []string{stars[order], stars[1-order]}
+			for position := range 3 {
+				statements := slices.Insert(slices.Clone(orderedStars), position, explicit)
+				valid = append(valid, rule_tester.ValidTestCase{Code: strings.Join(statements, "\n")})
+			}
+		}
+	}
+	invalid := []rule_tester.InvalidTestCase{
+		// The public name, not the local binding name, controls shadowing.
+		{Code: "const value = 0; export { value as other };\nexport * from './base';\nexport * from './other-base';",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "multipleNamed", Line: 2},
+				{MessageId: "multipleNamed", Line: 3},
+			},
+		},
+		// An override removes only its own star conflicts.
+		{Code: "export * from './shared-a';\nexport const a = 0;\nexport * from './shared-b';",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "multipleNamed", Message: "Multiple exports of name 'b'.", Line: 1},
+				{MessageId: "multipleNamed", Message: "Multiple exports of name 'b'.", Line: 3},
+			},
+		},
+		// An explicit export in a different scope cannot resolve these stars.
+		{Code: "export const value = 0;\ndeclare module 'inner' {\nexport * from './base';\nexport * from './other-base';\n}",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "multipleNamed", Line: 3},
+				{MessageId: "multipleNamed", Line: 4},
+			},
+		},
+		{Code: "declare module 'inner' { export const value = 0; }\nexport * from './base';\nexport * from './other-base';",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "multipleNamed", Line: 2},
+				{MessageId: "multipleNamed", Line: 3},
+			},
+		},
+		// Type-only exports are erased and cannot resolve runtime ambiguity.
+		// Preserve the existing upstream grouping of type-only specifiers.
+		{Code: "export type { T as value } from './named';\nexport * from './base';\nexport * from './other-base';",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "multipleNamed", Line: 1},
+				{MessageId: "multipleNamed", Line: 2},
+				{MessageId: "multipleNamed", Line: 3},
+			},
+		},
+		{Code: "export { type T as value } from './named';\nexport * from './base';\nexport * from './other-base';",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "multipleNamed", Line: 1},
+				{MessageId: "multipleNamed", Line: 2},
+				{MessageId: "multipleNamed", Line: 3},
+			},
+		},
+		{Code: "export type value = string;\nexport * from './base';\nexport * from './other-base';",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "multipleNamed", Line: 2},
+				{MessageId: "multipleNamed", Line: 3},
+			},
+		},
+		{Code: "export type * as value from './named';\nexport * from './base';\nexport * from './other-base';",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "multipleNamed", Line: 2},
+				{MessageId: "multipleNamed", Line: 3},
+			},
+		},
+		{Code: "export type * as value from './base';\nexport type * as value from './other-base';",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "multipleNamed", Message: "Multiple exports of name 'value'.", Line: 1},
+				{MessageId: "multipleNamed", Message: "Multiple exports of name 'value'.", Line: 2},
+			},
+		},
+		{Code: "export * as default from './base';\nexport default 0;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "multipleDefault", Line: 1},
+				{MessageId: "multipleDefault", Line: 2},
+			},
+		},
+		// A default override does not hide an empty star source.
+		{Code: `export default 0; export * from "./empty";`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamed"}},
+		},
+		// Namespace aliases are explicit exports, including string names.
+		{Code: `export * as value from "./base"; export * as "value" from "./other-base";`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "multipleNamed", Column: 13, EndColumn: 18},
+				{MessageId: "multipleNamed", Column: 46, EndColumn: 53},
+			},
+		},
+	}
+	// In every ordering, only the two duplicate explicit exports are reported.
+	for declarationIndex := range 4 {
+		for specifierIndex := range 4 {
+			if declarationIndex == specifierIndex {
+				continue
+			}
+			for order := range 2 {
+				statements := make([]string, 4)
+				statements[declarationIndex] = `export const value = 0;`
+				statements[specifierIndex] = `export { value };`
+				starIndex := order
+				for i := range statements {
+					if statements[i] == "" {
+						statements[i] = stars[starIndex]
+						starIndex = 1 - starIndex
+					}
+				}
+				errors := []rule_tester.InvalidTestCaseError{
+					{MessageId: "multipleNamed", Line: declarationIndex + 1, Column: 14, EndColumn: 19},
+					{MessageId: "multipleNamed", Line: specifierIndex + 1, Column: 10, EndColumn: 15},
+				}
+				if declarationIndex > specifierIndex {
+					slices.Reverse(errors)
+				}
+				invalid = append(invalid, rule_tester.InvalidTestCase{Code: strings.Join(statements, "\n"), Errors: errors})
+			}
+		}
+	}
+	rule_tester.RunRuleTester(exportRoot(t, "testdata/extras.txtar"), "tsconfig.json", t, &export.ExportRule, valid, invalid)
+}
 
 // Additional AST and module-boundary cases, compared with eslint-plugin-import
 // v2.32.0 and @typescript-eslint/parser 8.65.0. Upstream uses literal messages;
@@ -36,8 +194,6 @@ export default 1; export default 2;`},
 			{Code: `export function f(x: string): void; export function f(x: number): void; export function f(x: any) {} export namespace f {}`},
 			// function implementations merged upstream
 			{Code: `export function f() {} export function f() {} export namespace f {}`},
-			// namespace export aliases are ignored
-			{Code: `export const ns = 1; export * as ns from "./named"; export * as ns from "./barrel";`},
 			// export assignment is not a default declaration
 			{Code: `const value = 1; export = value; export default value; export as namespace API;`},
 			// unresolved and CommonJS sources
@@ -46,6 +202,12 @@ export default 1; export default 2;`},
 			{Code: `export const a = 1; export * from "./named";`,
 				Settings: map[string]interface{}{"import/ignore": []interface{}{"named"}},
 			},
+			// Explicit exports shadow these discovered names (issue #2409).
+			{Code: `export const Value = 1; export * from "./alias-namespace";`},
+			{Code: `export * as "ns" from "./named"; export const a = 1;`},
+			{Code: `const a = 1; export {a as ""}; export * from "./empty-name";`},
+			{Code: `export const alias = 1; export * from "./missing-name";`},
+			{Code: `export const value = 1; export * from "./namespace";`},
 			// one star node reached twice
 			{Code: `export * from "./barrel";`},
 			// namespace assignment names
@@ -66,11 +228,12 @@ export const C = 1;`,
 					{MessageId: "multipleNamed", Message: "Multiple exports of name 'value'.", Line: 1, Column: 58, EndLine: 1, EndColumn: 63},
 				},
 			},
-			// Namespace export assignments include their import aliases.
-			{Code: `export const Value = 1; export * from "./alias-namespace";`,
+			// Namespace aliases are explicit names and can conflict with each other.
+			{Code: `export const ns = 1; export * as ns from "./named"; export * as ns from "./barrel";`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'Value'.", Line: 1, Column: 14, EndLine: 1, EndColumn: 19},
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'Value'.", Line: 1, Column: 25, EndLine: 1, EndColumn: 59},
+					{MessageId: "multipleNamed"},
+					{MessageId: "multipleNamed"},
+					{MessageId: "multipleNamed"},
 				},
 			},
 			// Exported import assignments are wrapped export declarations upstream.
@@ -120,20 +283,6 @@ export {a};`,
 				Code: `export * from "./return";`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noNamed", Message: "No named exports found in module './return'.", Line: 1, Column: 15, EndLine: 1, EndColumn: 25},
-				},
-			},
-			// string namespace alias follows upstream star handling
-			{Code: `export * as "ns" from "./named"; export const a = 1;`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'a'.", Line: 1, Column: 1, EndLine: 1, EndColumn: 33},
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'a'.", Line: 1, Column: 47, EndLine: 1, EndColumn: 48},
-				},
-			},
-			// empty public name
-			{Code: `const a = 1; export {a as ""}; export * from "./empty-name";`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "multipleNamed", Message: "Multiple exports of name ''.", Line: 1, Column: 27, EndLine: 1, EndColumn: 29},
-					{MessageId: "multipleNamed", Message: "Multiple exports of name ''.", Line: 1, Column: 32, EndLine: 1, EndColumn: 61},
 				},
 			},
 			// decorated default declaration
@@ -285,13 +434,6 @@ export default 0;`,
 					{MessageId: "multipleNamed", Message: "Multiple exports of name 'T'.", Line: 1, Column: 26, EndLine: 1, EndColumn: 51},
 				},
 			},
-			// named reexports still declare missing names
-			{Code: `export const alias = 1; export * from "./missing-name";`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'alias'.", Line: 1, Column: 14, EndLine: 1, EndColumn: 19},
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'alias'.", Line: 1, Column: 25, EndLine: 1, EndColumn: 56},
-				},
-			},
 			// star of unresolved star has no known names
 			{Code: `export * from "./unknown";`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -310,13 +452,6 @@ export default 0;`,
 					{MessageId: "multipleNamed", Message: "Multiple exports of name 'a'.", Line: 1, Column: 14, EndLine: 1, EndColumn: 15},
 					{MessageId: "multipleNamed", Message: "Multiple exports of name 'a'.", Line: 1, Column: 29, EndLine: 1, EndColumn: 30},
 					{MessageId: "noNamed", Message: "No named exports found in module './empty'.", Line: 1, Column: 47, EndLine: 1, EndColumn: 56},
-				},
-			},
-			// namespace assignment collision
-			{Code: `export const value = 1; export * from "./namespace";`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'value'.", Line: 1, Column: 14, EndLine: 1, EndColumn: 19},
-					{MessageId: "multipleNamed", Message: "Multiple exports of name 'value'.", Line: 1, Column: 25, EndLine: 1, EndColumn: 53},
 				},
 			},
 			// dotted namespace assignment collision

@@ -36,6 +36,15 @@ new RuleTester().run('export', null as never, {
       code: 'let bar; export { bar }; export * from "./export-all"',
       filename: testFixturePath('export-rule/consumer.ts'),
     },
+    // Intentional difference: explicit exports shadow stars (issue #2409).
+    {
+      code: 'let foo; export { foo }; export * from "./export-all"',
+      filename: testFixturePath('export-rule/consumer.ts'),
+    },
+    {
+      code: 'let foo; export { foo as "foo" }; export * from "./export-all"',
+      filename: testFixturePath('export-rule/consumer.ts'),
+    },
     {
       code: 'export * from "./export-all"',
       filename: testFixturePath('export-rule/consumer.ts'),
@@ -318,26 +327,6 @@ new RuleTester().run('export', null as never, {
   ],
   invalid: [
     // JavaScript and SYNTAX_CASES
-    {
-      code: 'let foo; export { foo }; export * from "./export-all"',
-      filename: testFixturePath('export-rule/consumer.ts'),
-      errors: [
-        {
-          message: "Multiple exports of name 'foo'.",
-          line: 1,
-          column: 19,
-          endLine: 1,
-          endColumn: 22,
-        },
-        {
-          message: "Multiple exports of name 'foo'.",
-          line: 1,
-          column: 26,
-          endLine: 1,
-          endColumn: 54,
-        },
-      ],
-    },
     // Skipped: tsgo accepts the top-level return that Espree rejects.
     // export * from "./malformed.js"
     // Parse errors in imported module './malformed.js': 'return' outside of function (1:1)
@@ -351,26 +340,6 @@ new RuleTester().run('export', null as never, {
           column: 15,
           endLine: 1,
           endColumn: 33,
-        },
-      ],
-    },
-    {
-      code: 'let foo; export { foo as "foo" }; export * from "./export-all"',
-      filename: testFixturePath('export-rule/consumer.ts'),
-      errors: [
-        {
-          message: "Multiple exports of name 'foo'.",
-          line: 1,
-          column: 26,
-          endLine: 1,
-          endColumn: 31,
-        },
-        {
-          message: "Multiple exports of name 'foo'.",
-          line: 1,
-          column: 35,
-          endLine: 1,
-          endColumn: 63,
         },
       ],
     },
