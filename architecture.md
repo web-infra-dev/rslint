@@ -672,12 +672,14 @@ Counts, path bases, stderr notices, and protocol empty-array rules stay
 integration-owned; lint/fix observation order and fix-round state belong to the
 core pipeline.
 
-Before an observation is published or its generation released, the pipeline
-replaces diagnostic AST references with immutable text frames. Concurrent
-plugin work must finish, source identity checks must pass, and fix text must be
-frozen first. Frames are shared by source object identity, not by file path, and
-compute ECMAScript line maps lazily. Explicitly requested `LintedFiles` artifacts
-still carry their original ASTs; diagnostic projection does not invalidate them.
+Observations that do not plan source changes project diagnostic AST references
+to immutable text frames before aggregation. Observations that plan fixes keep
+the original frames until source identity checks and fix text freezing finish.
+Producer finalization waits for actual generation borrowers; detached plugin
+work continues with frozen inputs. Frames are shared by source object identity,
+not by file path, and compute ECMAScript line maps lazily. Explicitly requested
+`LintedFiles` artifacts still carry their original ASTs; diagnostic projection
+does not invalidate them.
 
 ### Severity Levels
 
@@ -764,7 +766,9 @@ The linter files mirror those responsibilities: `pipeline_contract.go` and
 `pipeline_result.go` define the public boundary; `pipeline.go` is the sealed
 entry; `pipeline_generation.go`, `pipeline_observation.go`, and
 `pipeline_native.go` own one immutable observation; `pipeline_plugin.go` owns
-plugin task materialization; and `pipeline_autofix.go`,
+plugin task materialization. `lint_plan.go` freezes immutable execution input;
+`lint_execution.go` consumes private project tasks and joins their workers;
+`linter.go` executes each project's files and rules. `pipeline_autofix.go`,
 `pipeline_autofix_state.go`, `pipeline_fix_text.go`, and `pipeline_fix.go` own
 the in-memory autofix state machine and its pure text transformations.
 
@@ -1828,7 +1832,9 @@ lint and fix execution still await full config activation.
 - **Short-Lived Per-File Structures**: comment stores, disable managers, and rule contexts are allocated per file and dropped after traversal. A comment slice is allocated only if requested
 - **Bounded Listener Retention**: a listener registry lives only for one checker-shard task. After each file it clears every function slot before shortening the slices, so backing capacity can be reused without retaining closures, source files, checker state, or rule contexts. The registry is dropped when that task completes and is never pooled across runs or LSP requests
 - **Source Snapshot Ownership**: snapshot entries hold an immutable source string plus its 128-bit hash without explicitly copying source bytes; on an AST miss, that string is passed directly to the parser. After generation replacement, a retained unchanged AST may still hold the prior equal string while the fresh snapshot owns the new read. Replaced generations are reclaimed after any in-flight lookup releases them. AST retention and source-generation retention remain deliberately separate lifecycles.
-- **Completed Observation Ownership**: CLI/API providers drop their initial generation references when its pipeline lease is released. Retained initial/final autofix observations own diagnostic text and any explicitly requested AST artifacts, so diagnostics alone cannot keep an earlier compiler graph alive. Release never clears shared Program slices, maps, or source objects.
+- **Execution Task Ownership**: CLI/API providers transfer their initial generation references during acquisition. After complete binding, syntax, rule, target, and plugin preparation, the pipeline retains private consumable project tasks rather than the producer generation or immutable `LintPlan`. Dispatch removes each pending task slot; completion drops only that task's Program/file/rule references. The reusable `RunLinter` API copies private task containers from its borrowed plan and uses the same executor. Program objects, shared slices, maps, and ASTs are never reset or invalidated.
+- **Last Consumer Barriers**: capable Programs retain a second borrow for the existing post-native type-check phase. Cross-project type diagnostics still select survivors in stable Program order. Native project/file workers join before an abnormal exit is re-raised. Native failure cancels and joins concurrent plugin work before release; a handled plugin batch failure still lets other batches finish and preserves their diagnostics. Producer finalization remains exact-once and runs after its actual generation borrowers finish, including LSP watcher coverage checks. A completed finalizer no longer retains its release closure.
+- **Diagnostic and Plugin Ownership**: observations that do not plan source changes project diagnostics to text before aggregation. One lightweight frame is attached to each exact SourceFile without a back-reference or global strong AST-key map, preserving shared-source identity across native and joined plugin producers. Plugin wire tasks retain only rule identity, options, severity and required source text; native Run closures and environments are excluded. Detached fix-source candidates exist only when the observation plans fixes and requests plugin autofixes. Fix planning preserves original source identity through text freezing; retained initial/final observations own diagnostic text and any explicitly requested AST artifacts. Shared loader parse caches keep their existing generation lifetime independently of execution tasks.
 - **Metadata Snapshot Ownership**: metadata strings and extended-config parse entries live only for one loader session. The cache stores successful reads only, and its scope bounds growth to metadata touched by one CLI invocation or API request; no metadata entry survives into another request or the LSP session.
 - **Fix Application Uses Linear Rebuilds**: `ApplyRuleFixes` sorts fixes, skips overlapping edits, and rebuilds the output with `strings.Builder` rather than mutating source buffers in place
 - **Bounded Queues**: CLI diagnostics use a buffered channel of 4096 items; LSP request/outgoing queues are buffered to 100, and debounce/refresh signals are single-slot channels
@@ -1976,10 +1982,13 @@ The production lint path is a one-way handoff:
 ```
 Config / discovery
   → frozen targets and config ownership
-  → Program generation and exact target binding
-  → prepared LintPlan
-  → RunPipeline
-  → integration projection and optional terminal commit
+  → generation, transport, presentation, and optional commit adapters
+  → RunPipeline:
+      acquire the bound Program generation
+      → prepare LintPlan and native/plugin work
+      → consume private execution tasks and join borrowers
+      → finish the observation, in-memory fix rounds, and optional terminal commit
+  → integration result projection
 ```
 
 Downstream stages may validate or project an upstream decision, but do not
@@ -1988,7 +1997,7 @@ repeat it under a second source of truth.
 - **Targets and config**: target selection and config ownership are frozen before Program binding (`target.Plan` for CLI/API and a document snapshot for LSP). Later stages do not add lint targets, rediscover configs, or reassign owners
 - **Program generation**: each published `program.Program` is one logically immutable source, module-resolution, filesystem, and optional-checker generation. CLI/API build it through `internal/program/loader`; LSP adapts its session or isolated overlay without exposing the private backend
 - **Lint plan**: `PrepareLintPlan` accepts only files already bound to those Programs and freezes each file's rules, shared environment, and checker eligibility. Execution does not scan Program roots or resolve config and rules again
-- **Pipeline**: `RunPipeline` is the production orchestration boundary. CLI, API, and LSP choose a complete request and provide generation, plugin transport, presentation, or commit adapters; raw preparation, native lint, plugin dispatch, and fix stages are not product integration APIs
+- **Pipeline**: `RunPipeline` is the production orchestration boundary. CLI, API, and LSP choose a complete request and provide generation, plugin transport, presentation, or commit adapters; raw preparation, native lint, plugin dispatch, and fix stages are not product integration APIs. Preparation validates the whole generation before handing off private project execution tasks and lightweight output metadata. Execution does not retain the preparation plan or repeat upstream decisions; dropping a task's ownership never invalidates its immutable source objects
 - **Autofix**: fix rounds advance only pipeline-owned in-memory snapshots. Integrations receive the final in-memory delta for the operation, and optional persistence is one terminal commit rather than a series of intermediate writes
 - **Rules**: `RuleContext` exposes the bound Program and only the checker granted to that file. Shared structures such as module graphs derive from the Program generation rather than becoming a second authority
 

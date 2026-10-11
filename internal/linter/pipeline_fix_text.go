@@ -15,7 +15,7 @@ import (
 // released without falling back to disk or another mutable source.
 func freezeFixTextsForDiagnostics(
 	ctx context.Context,
-	generation Generation,
+	readText sourceTextReader,
 	snapshot SourceSnapshot,
 	diagnostics []rule.RuleDiagnostic,
 ) (fixTextSnapshot, error) {
@@ -23,12 +23,12 @@ func freezeFixTextsForDiagnostics(
 	if err != nil {
 		return nil, err
 	}
-	return freezeFixTexts(ctx, generation, snapshot, sources)
+	return freezeFixTexts(ctx, readText, snapshot, sources)
 }
 
 func freezeFixTexts(
 	ctx context.Context,
-	generation Generation,
+	readText sourceTextReader,
 	snapshot SourceSnapshot,
 	sources map[string]ast.SourceFileLike,
 ) (fixTextSnapshot, error) {
@@ -49,7 +49,7 @@ func freezeFixTexts(
 		if source == nil {
 			return nil, fmt.Errorf("linter pipeline: fix target %q has no source frame", path)
 		}
-		text, err := readGenerationText(generation, snapshot, path, source)
+		text, err := readTargetText(readText, snapshot, path, source)
 		if err != nil {
 			return nil, fmt.Errorf("linter pipeline: read fix target %q: %w", path, err)
 		}

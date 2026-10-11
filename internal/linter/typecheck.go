@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
@@ -37,12 +36,14 @@ type typeCheckRequest struct {
 // We dedupe on canonical (filePath, code, pos, end, final message), including
 // message chains and related information.
 //
-// req.OnDiagnostic must be non-nil and safe to call from multiple
-// goroutines concurrently — RunLinter is responsible for that contract.
+// req.Programs is a private slice transferred by lintExecution. Each slot is
+// consumed before dispatch; diagnostics, not Programs, survive the phase.
+// req.OnDiagnostic must be non-nil.
 func runTypeCheckAcrossPrograms(req typeCheckRequest) {
 	collected := make([][]collectedTypeCheckDiagnostic, len(req.Programs))
-	wg := core.NewWorkGroup(req.SingleThreaded)
+	wg := newLintWorkGroup(req.SingleThreaded)
 	for i, prog := range req.Programs {
+		req.Programs[i] = nil
 		if !prog.CanProvideProgramDiagnostics() {
 			continue
 		}

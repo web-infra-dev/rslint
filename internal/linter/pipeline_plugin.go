@@ -111,6 +111,7 @@ func materializePluginTask(
 	snapshot SourceSnapshot,
 	policy ObservationPolicy,
 	detached bool,
+	planChanges bool,
 ) (pluginTask, error) {
 	if generation.Plugin == nil {
 		return pluginTask{failure: policy.PluginFailure}, nil
@@ -118,7 +119,12 @@ func materializePluginTask(
 	inputs := BuildEslintPluginFileInputs(plan, generation.Plugin.ConfigForFile)
 	inlineSources := detached || !generation.Plugin.HostReadsInitialText || !snapshot.Empty()
 	targetPathByWire := make(map[string]string, len(inputs))
-	fixCandidates := make([]fixSourceCandidate, 0, len(inputs))
+	var fixCandidates []fixSourceCandidate
+	collectFixes := policy.Demand.Plugin&rule.EditDemandAutofix != 0
+	needsFixSources := detached && planChanges && collectFixes
+	if needsFixSources {
+		fixCandidates = make([]fixSourceCandidate, 0, len(inputs))
+	}
 	targetPaths := make([]string, len(inputs))
 	// Validate the complete path projection before reading or freezing any
 	// source. A malformed later input must not leave observable read side
@@ -139,16 +145,18 @@ func materializePluginTask(
 		}
 		targetPathByWire[wirePath] = targetPath
 		targetPaths[index] = targetPath
-		fixCandidates = append(fixCandidates, fixSourceCandidate{
-			path:   targetPath,
-			source: input.SourceFile,
-		})
+		if needsFixSources {
+			fixCandidates = append(fixCandidates, fixSourceCandidate{
+				path:   targetPath,
+				source: input.SourceFile,
+			})
+		}
 		input.Path = wirePath
 	}
 	for index := range inputs {
 		input := &inputs[index]
 		if inlineSources {
-			text, err := readGenerationText(generation, snapshot, targetPaths[index], input.SourceFile)
+			text, err := readTargetText(generation.Target.ReadText, snapshot, targetPaths[index], input.SourceFile)
 			if err != nil {
 				return pluginTask{}, fmt.Errorf("linter pipeline: freeze plugin source %q: %w", input.Path, err)
 			}
@@ -163,6 +171,19 @@ func materializePluginTask(
 				return pluginTask{}, fmt.Errorf("linter pipeline: freeze plugin input %q: %w", input.Path, err)
 			}
 			inputs[index] = frozen
+		} else {
+			// Joined wire tasks also need only rule identity, options and
+			// severity. Never retain native Run closures or rule environments.
+			rules := make([]rule.ConfiguredRule, len(input.Rules))
+			for ruleIndex, configured := range input.Rules {
+				rules[ruleIndex] = rule.ConfiguredRule{
+					Name:               configured.Name,
+					Severity:           configured.Severity,
+					IsEslintPluginRule: true,
+					Options:            configured.Options,
+				}
+			}
+			input.Rules = rules
 		}
 	}
 	suggestionsMode := SuggestionsModeOff
@@ -179,7 +200,7 @@ func materializePluginTask(
 		inputs:           inputs,
 		targetPathByWire: targetPathByWire,
 		fixCandidates:    fixCandidates,
-		collectFixes:     policy.Demand.Plugin&rule.EditDemandAutofix != 0,
+		collectFixes:     collectFixes,
 		suggestionsMode:  suggestionsMode,
 		timing:           timing,
 		failure:          policy.PluginFailure,

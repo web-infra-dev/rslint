@@ -119,9 +119,9 @@ type EslintPluginLintResult struct {
 }
 
 // EslintPluginDispatcher sends one batch reverse-request to the Node host
-// and returns its result. It must honor ctx and return after cancellation:
-// joined execution cannot release SourceFile-backed generation state while a
-// dispatcher may still read it. The CLI implements this over the generic IPC
+// and returns its result. It must honor ctx and return after cancellation.
+// Concurrent pipeline work joins dispatch before ending its producer lease;
+// detached inputs need no generation borrow. The CLI uses the generic IPC
 // channel; the LSP server over an `rslint/pluginLint` request.
 type EslintPluginDispatcher func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error)
 
@@ -133,12 +133,10 @@ type EslintPluginFileInput struct {
 	// IPC CLI and overlay hosts supply snapshots; only callers that explicitly
 	// enable HostReadsInitialText may omit it for the initial generation.
 	Text *string
-	// SourceFile is the frame Go REBUILDS diagnostics against (Go-local; never
-	// sent on the wire). The CLI sets it to the ts-go *ast.SourceFile the native
-	// pass already loaded (decoded + BOM-stripped), so Go reuses that frame
-	// instead of re-reading/re-decoding the file — and plugin diagnostics share
-	// the exact frame as native ones. nil for the LSP, which rebuilds against
-	// the overlay Text (the worker linted that same string).
+	// SourceFile is the Go-local, decoded, BOM-stripped diagnostic frame; it is
+	// never sent on the wire. Concurrent pipeline work shares the native source's
+	// frame, keeping the original AST only until fix text validation completes.
+	// Detached inputs leave it nil and rebuild against inline Text.
 	SourceFile      ast.SourceFileLike
 	ConfigKey       string
 	LanguageOptions map[string]any
@@ -671,24 +669,14 @@ func applyEslintPluginResults(
 // eslintPluginSourceFile returns the frame Go rebuilds plugin diagnostics
 // against, whose byte offsets must match the worker's wire offsets.
 //
-//   - CLI: f.SourceFile is the ts-go *ast.SourceFile the native pass already
-//     loaded — decoded and BOM-stripped by ts-go's vfs. For well-formed UTF-8
-//     its byte frame is identical to the worker's readFileSync('utf8') frame, so
-//     Go reuses it directly: no disk re-read, no re-decode, and plugin
-//     diagnostics share the exact frame as native ones. The two frames diverge
-//     only where ts-go and the worker decode bytes differently: UTF-16-encoded
-//     files (ts-go transcodes UTF-16→UTF-8; the worker reads utf8) and
-//     byte-malformed UTF-8 (ts-go keeps the raw bytes; the worker substitutes
-//     U+FFFD). On those rare CLI-disk inputs a plugin offset after the
-//     divergence can be byte-shifted (the clamp keeps it in-bounds — never a
-//     panic). The LSP path is immune: it ships req.text and rebuilds against
-//     that identical string.
-//   - LSP: f.Text is the overlay string the worker linted, minus a leading
-//     BOM. A byte order mark is never part of the text an offset indexes \u2014 the
-//     worker slices it before parsing, ts-go decodes it away, and rslint strips
-//     it from caller-supplied source for the same reason \u2014 so stripping it here
-//     puts plugin diagnostics, native diagnostics and source.fixAll in one
-//     coordinate space.
+// Prefer the bound native source frame, whether an original AST or its
+// independent text projection. Detached work instead uses the exact inline
+// text supplied to the worker, minus a leading BOM: neither native nor plugin
+// byte offsets include that mark.
+//
+// Callers enabling HostReadsInitialText must ensure the host's disk decoding
+// agrees with the bound source frame. UTF-16 or malformed UTF-8 decoded
+// differently by the host can shift offsets; clamping only keeps them in bounds.
 //
 // ok=false only if the caller supplied neither (defensive).
 func eslintPluginSourceFile(f EslintPluginFileInput) (ast.SourceFileLike, bool) {

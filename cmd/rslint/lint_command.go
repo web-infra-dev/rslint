@@ -458,6 +458,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		binding loader.LoadResult,
 		generationFS vfs.FS,
 	) linter.Generation {
+		lintTargetBySourcePath := binding.LintTargetBySourcePath
 		var fileConfigResolver *configLint.Resolver
 		var rulesForFile linter.RuleHandler
 		if !typeCheckOnly {
@@ -467,7 +468,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			}
 		}
 		targetPath := func(sourcePath string) string {
-			if lintTarget, ok := target.LookupSourceTarget(binding.LintTargetBySourcePath, sourcePath, generationFS); ok {
+			if lintTarget, ok := target.LookupSourceTarget(lintTargetBySourcePath, sourcePath, generationFS); ok {
 				return lintTarget.Path
 			}
 			return sourcePath

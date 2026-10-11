@@ -22,7 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
 
-func TestCLIGenerationProviderReleasesInitialOwnership(t *testing.T) {
+func TestCLIGenerationProviderTransfersInitialOwnership(t *testing.T) {
 	loaded := loader.LoadResult{Programs: []*program.Program{
 		program.NewFromCompiler(createTestProgram(t, map[string]string{"source.ts": "const value = 1;"})),
 	}}
@@ -42,16 +42,11 @@ func TestCLIGenerationProviderReleasesInitialOwnership(t *testing.T) {
 		t.Fatalf("canceled acquisition changed initial ownership: %v", err)
 	}
 	generation, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
-	if err != nil || release == nil || provider.initial == nil {
+	if err != nil || release != nil || provider.initial != nil || provider.initialFS != nil {
 		t.Fatalf("initial acquisition = release:%v error:%v", release != nil, err)
 	}
-	release()
-	release()
-	if provider.initial != nil || provider.initialFS != nil {
-		t.Fatal("provider retained its initial generation after release")
-	}
 	if generation.Native.Programs[0] != loaded.Programs[0] || len(generation.Native.Programs[0].SourceFiles()) == 0 {
-		t.Fatal("release invalidated published Program artifacts")
+		t.Fatal("ownership transfer invalidated published Program artifacts")
 	}
 	var rebuilds int
 	wantErr := errors.New("rebuild failure")
