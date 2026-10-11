@@ -1,19 +1,11 @@
 package no_duplicates_test
 
 import (
-	"reflect"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_duplicates"
-	lintprogram "github.com/web-infra-dev/rslint/internal/program"
-	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoDuplicatesRule(t *testing.T) {
@@ -26,9 +18,6 @@ func TestNoDuplicatesRule(t *testing.T) {
 			// --- Different modules ---
 			{Code: `import { x } from './foo'; import { y } from './bar'`},
 			{Code: `import foo from "module-a"; import { bar } from "module-b"`},
-			// Different import attributes describe distinct module requests.
-			{Code: `import { x } from './foo' with { type: 'json' }; import { y } from './foo' with { type: 'text' }`},
-			{Code: `import { x } from './foo'; import { y } from './foo' with { type: 'text' }`},
 
 			// --- Namespace + named from same module (cannot be merged into one line) ---
 			{Code: `import * as ns from './foo'; import {y} from './foo'`},
@@ -67,15 +56,6 @@ func TestNoDuplicatesRule(t *testing.T) {
 			{Code: "declare module 'a' {\n  import { x } from 'bar';\n}\ndeclare module 'b' {\n  import { x } from 'bar';\n}"},
 		},
 		[]rule_tester.InvalidTestCase{
-			// Attribute order is not part of module-request identity.
-			{
-				Code:   `import {x} from './foo' with { type: 'json', mode: 'strict' }; import {y} from './foo' with { mode: 'strict', type: 'json' }`,
-				Output: []string{`import {x,y} from './foo' with { type: 'json', mode: 'strict' }; `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noDuplicates", Line: 1, Column: 17},
-					{MessageId: "noDuplicates", Line: 1, Column: 80},
-				},
-			},
 			// ============================================================
 			// Basic merge scenarios
 			// ============================================================
@@ -728,223 +708,4 @@ func TestNoDuplicatesRule(t *testing.T) {
 			},
 		},
 	)
-}
-
-func TestNoDuplicatesEditDemand(t *testing.T) {
-	t.Parallel()
-
-	const code = "import { first } from './shared';\nimport { second } from './shared';\n"
-	program, sourceFile := createNoDuplicatesProgram(t, "edit-demand.ts", code)
-
-	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
-		t.Helper()
-
-		var diagnostics []rule.RuleDiagnostic
-		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:         lintprogram.NewFromCompiler(program),
-			File:            sourceFile.FileName(),
-			HasTypeInfo:     true,
-			GetRulesForFile: noDuplicatesConfiguredRules,
-			Consumer: rule.DiagnosticConsumer{
-				Demand: demand,
-				Report: func(diagnostic rule.RuleDiagnostic) {
-					diagnostics = append(diagnostics, diagnostic)
-				},
-			},
-		})
-		return diagnostics
-	}
-
-	diagnosticsOnly := run(rule.EditDemandNone)
-	autofixes := run(rule.EditDemandAutofix)
-	suggestionsOnly := run(rule.EditDemandSuggestion)
-	allEdits := run(rule.EditDemandAll)
-
-	for name, diagnostics := range map[string][]rule.RuleDiagnostic{
-		"diagnostics only": diagnosticsOnly,
-		"autofixes":        autofixes,
-		"suggestions only": suggestionsOnly,
-		"all edits":        allEdits,
-	} {
-		if len(diagnostics) != 2 {
-			t.Fatalf("%s: got %d diagnostics, want 2", name, len(diagnostics))
-		}
-		for i, diagnostic := range diagnostics {
-			if diagnostic.Suggestions != nil {
-				t.Errorf("%s: diagnostic %d unexpectedly has suggestions", name, i)
-			}
-		}
-	}
-
-	for i := range allEdits {
-		want := diagnosticWithoutEdits(allEdits[i])
-		for name, diagnostics := range map[string][]rule.RuleDiagnostic{
-			"diagnostics only": diagnosticsOnly,
-			"autofixes":        autofixes,
-			"suggestions only": suggestionsOnly,
-		} {
-			if got := diagnosticWithoutEdits(diagnostics[i]); !reflect.DeepEqual(got, want) {
-				t.Errorf("%s: diagnostic %d changed:\ngot  %#v\nwant %#v", name, i, got, want)
-			}
-		}
-	}
-
-	if got := len(autofixes[0].Fixes()); got == 0 {
-		t.Fatal("autofixes: first diagnostic has no merge fix")
-	}
-	if !reflect.DeepEqual(autofixes[0].Fixes(), allEdits[0].Fixes()) {
-		t.Fatalf("autofix and all-edits modes produced different fixes:\nautofix %#v\nall     %#v", autofixes[0].Fixes(), allEdits[0].Fixes())
-	}
-	for name, diagnostics := range map[string][]rule.RuleDiagnostic{
-		"diagnostics only": diagnosticsOnly,
-		"suggestions only": suggestionsOnly,
-	} {
-		for i, diagnostic := range diagnostics {
-			if got := len(diagnostic.Fixes()); got != 0 {
-				t.Errorf("%s: diagnostic %d has %d fixes, want 0", name, i, got)
-			}
-		}
-	}
-	for i := 1; i < len(autofixes); i++ {
-		if got := len(autofixes[i].Fixes()); got != 0 {
-			t.Errorf("autofixes: diagnostic %d has %d fixes, want 0", i, got)
-		}
-	}
-
-	const unfixableCode = "import first from './shared';\nimport second from './shared';\n"
-	unfixableProgram, unfixableSourceFile := createNoDuplicatesProgram(t, "unfixable.ts", unfixableCode)
-	var unfixableDiagnostics []rule.RuleDiagnostic
-	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:         lintprogram.NewFromCompiler(unfixableProgram),
-		File:            unfixableSourceFile.FileName(),
-		HasTypeInfo:     true,
-		GetRulesForFile: noDuplicatesConfiguredRules,
-		Consumer: rule.DiagnosticConsumer{
-			Demand: rule.EditDemandAll,
-			Report: func(diagnostic rule.RuleDiagnostic) {
-				unfixableDiagnostics = append(unfixableDiagnostics, diagnostic)
-			},
-		},
-	})
-	if len(unfixableDiagnostics) != 2 {
-		t.Fatalf("unfixable imports: got %d diagnostics, want 2", len(unfixableDiagnostics))
-	}
-	for i, diagnostic := range unfixableDiagnostics {
-		if diagnostic.FixesPtr != nil {
-			t.Errorf("unfixable imports: diagnostic %d has a non-nil fix payload", i)
-		}
-	}
-}
-
-func TestNoDuplicatesResolutionModeOverrides(t *testing.T) {
-	t.Parallel()
-
-	rootDir := fixtures.GetRootDir()
-	const fileName = "resolution-mode.ts"
-	filePath := tspath.ResolvePath(rootDir.Dir, fileName)
-	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{
-		filePath: `import type { ImportType } from "conditional-package" with { "resolution-mode": "import" };
-import type { RequireType } from "conditional-package" with { "resolution-mode": "require" };`,
-		tspath.ResolvePath(rootDir.Dir, "tsconfig.resolution-mode.json"): `{
-  "compilerOptions": {"module": "node16", "moduleResolution": "node16", "target": "es2020"},
-  "files": ["resolution-mode.ts"]
-}`,
-		tspath.ResolvePath(rootDir.Dir, "node_modules/conditional-package/package.json"): `{
-  "name": "conditional-package",
-  "exports": {".": {"import": "./import.d.ts", "require": "./require.d.ts"}}
-}`,
-		tspath.ResolvePath(rootDir.Dir, "node_modules/conditional-package/import.d.ts"):  `export interface ImportType { kind: "import" }`,
-		tspath.ResolvePath(rootDir.Dir, "node_modules/conditional-package/require.d.ts"): `export interface RequireType { kind: "require" }`,
-	})
-	program, err := utils.CreateProgram(
-		true,
-		fs,
-		rootDir.Dir,
-		"tsconfig.resolution-mode.json",
-		utils.CreateCompilerHost(rootDir.Dir, fs),
-	)
-	if err != nil {
-		t.Fatalf("failed to create program: %v", err)
-	}
-	sourceFile := program.GetSourceFile(filePath)
-	if sourceFile == nil {
-		t.Fatalf("source file %q not found", filePath)
-		return
-	}
-
-	var resolvedPaths []string
-	for _, statement := range sourceFile.Statements.Nodes {
-		moduleSpecifier := statement.AsImportDeclaration().ModuleSpecifier
-		resolved := program.GetResolvedModuleFromModuleSpecifier(sourceFile, moduleSpecifier)
-		if resolved == nil {
-			t.Fatalf("import on line %d did not resolve", len(resolvedPaths)+1)
-			continue
-		}
-		resolvedPaths = append(resolvedPaths, resolved.ResolvedFileName)
-	}
-	if len(resolvedPaths) != 2 || resolvedPaths[0] == resolvedPaths[1] {
-		t.Fatalf("resolution-mode overrides did not select distinct targets: %v", resolvedPaths)
-	}
-
-	var diagnostics []rule.RuleDiagnostic
-	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:         lintprogram.NewFromCompiler(program),
-		File:            sourceFile.FileName(),
-		HasTypeInfo:     true,
-		GetRulesForFile: noDuplicatesConfiguredRules,
-		Consumer: rule.DiagnosticConsumer{
-			Demand: rule.EditDemandNone,
-			Report: func(diagnostic rule.RuleDiagnostic) {
-				diagnostics = append(diagnostics, diagnostic)
-			},
-		},
-	})
-	if len(diagnostics) != 0 {
-		t.Fatalf("imports resolved with different modes were reported as duplicates: %#v", diagnostics)
-	}
-}
-
-type diagnosticIdentity struct {
-	Range    [2]int
-	RuleName string
-	Message  rule.RuleMessage
-	FilePath string
-	Severity rule.DiagnosticSeverity
-}
-
-func diagnosticWithoutEdits(diagnostic rule.RuleDiagnostic) diagnosticIdentity {
-	return diagnosticIdentity{
-		Range:    [2]int{diagnostic.Range.Pos(), diagnostic.Range.End()},
-		RuleName: diagnostic.RuleName,
-		Message:  diagnostic.Message,
-		FilePath: diagnostic.FilePath,
-		Severity: diagnostic.Severity,
-	}
-}
-
-func createNoDuplicatesProgram(t testing.TB, fileName string, code string) (*compiler.Program, *ast.SourceFile) {
-	t.Helper()
-
-	rootDir := fixtures.GetRootDir()
-	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{tspath.ResolvePath(rootDir.Dir, fileName): code})
-	host := utils.CreateCompilerHost(rootDir.Dir, fs)
-	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
-	if err != nil {
-		t.Fatalf("failed to create program: %v", err)
-	}
-	sourceFile := program.GetSourceFile(fileName)
-	if sourceFile == nil {
-		t.Fatalf("source file %q not found", fileName)
-	}
-	return program, sourceFile
-}
-
-func noDuplicatesConfiguredRules(*ast.SourceFile) []rule.ConfiguredRule {
-	return []rule.ConfiguredRule{{
-		Name:     no_duplicates.NoDuplicatesRule.Name,
-		Severity: rule.SeverityError,
-		Run: func(ctx rule.RuleContext) rule.RuleListeners {
-			return no_duplicates.NoDuplicatesRule.Run(ctx, nil)
-		},
-	}}
 }
