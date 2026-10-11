@@ -48,7 +48,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/explicit-timer-delay': 'error',
     'unicorn/filename-case': 'error',
     // 'unicorn/id-match': 'off', // not implemented
-    // 'unicorn/import-style': 'error', // not implemented
+    'unicorn/import-style': 'error',
     // 'unicorn/isolated-functions': 'error', // not implemented
     // 'unicorn/iteration-fallback-style': 'off', // not implemented
     // 'unicorn/logical-assignment-operators': 'error', // not implemented
