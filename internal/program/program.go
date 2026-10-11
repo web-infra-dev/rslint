@@ -75,7 +75,8 @@ func (p *Program) IsValid() bool {
 
 // NewFromCompiler adapts a ts-go Program into rslint's Program facade. The
 // constructor name describes assembly only; consumers cannot recover or test
-// which adapter backs the returned Program.
+// which adapter backs the returned Program. Derived caches remain shared for
+// the raw generation's lifetime, including gaps between temporary facades.
 func NewFromCompiler(raw *compiler.Program) *Program {
 	if raw == nil {
 		return nil
@@ -89,6 +90,30 @@ func NewFromCompilers(rawPrograms []*compiler.Program) []*Program {
 	programs := make([]*Program, len(rawPrograms))
 	for index, raw := range rawPrograms {
 		programs[index] = NewFromCompiler(raw)
+	}
+	return programs
+}
+
+// NewOwnedFromCompilers adapts freshly constructed compiler generations for a
+// load pass that retains their complete facade set. The facades own derived
+// caches directly; duplicate raw inputs share a cache within this call, while
+// separate calls create independent caches. The caller must reuse these
+// facades for this load pass rather than adapting their raw inputs again.
+// Callers that reuse raw generations across facade lifetimes use NewFromCompiler.
+func NewOwnedFromCompilers(rawPrograms []*compiler.Program) []*Program {
+	programs := make([]*Program, len(rawPrograms))
+	caches := make(map[*compiler.Program]*derivedCache, len(rawPrograms))
+	for index, raw := range rawPrograms {
+		if raw == nil {
+			continue
+		}
+		cache := caches[raw]
+		if cache == nil {
+			cache = &derivedCache{values: make(map[any]*derivedValue)}
+			caches[raw] = cache
+		}
+		backend := &compilerBackend{raw: raw}
+		programs[index] = &Program{source: backend, types: backend, cache: cache}
 	}
 	return programs
 }

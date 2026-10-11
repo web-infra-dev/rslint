@@ -3,8 +3,13 @@ package program_test
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
+	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/binder"
@@ -18,6 +23,133 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestOwnedCompilerProgramsShareCacheOnlyWithinBatch(t *testing.T) {
+	raw, _ := specifierCacheProgram(t, specifierCacheFiles(false))
+	other, _ := specifierCacheProgram(t, specifierCacheFiles(true))
+	inputs := []*compiler.Program{nil, raw, raw, other, nil}
+	programs := lintprogram.NewOwnedFromCompilers(inputs)
+	if len(programs) != len(inputs) {
+		t.Fatalf("got %d facades, want %d", len(programs), len(inputs))
+	}
+	for index, input := range inputs {
+		if input == nil {
+			if programs[index] != nil {
+				t.Fatalf("nil input %d became a valid facade", index)
+			}
+			continue
+		}
+		if programs[index].GetSourceFile(specifierCacheImporter) != specifierCacheFile(t, input) {
+			t.Fatalf("facade %d changed source generation or input order", index)
+		}
+	}
+	if programs[1] == programs[2] {
+		t.Fatal("duplicate inputs must retain distinct facade identities")
+	}
+
+	type key struct{}
+	var builds atomic.Int32
+	build := func() *int { value := int(builds.Add(1)); return &value }
+	var first *int
+	for range 2 {
+		var group sync.WaitGroup
+		answers := make([]*int, 32)
+		for index := range answers {
+			group.Go(func() {
+				answers[index] = lintprogram.Cached(programs[1+index%2], key{}, build)
+			})
+		}
+		group.Wait()
+		if first == nil {
+			first = answers[0]
+		}
+		for _, answer := range answers {
+			if answer != first {
+				t.Fatal("duplicate raw inputs published different cache values")
+			}
+		}
+		runtime.GC()
+	}
+	if builds.Load() != 1 {
+		t.Fatalf("built %d times across concurrent requests and GC, want 1", builds.Load())
+	}
+	if answer := lintprogram.Cached(programs[3], key{}, build); answer == first {
+		t.Fatal("different raw generations shared their cache")
+	}
+	separate := lintprogram.NewOwnedFromCompilers([]*compiler.Program{raw})
+	if answer := lintprogram.Cached(separate[0], key{}, build); answer == first {
+		t.Fatal("separate ownership batches shared their cache")
+	}
+	registered := lintprogram.Cached(lintprogram.NewFromCompiler(raw), key{}, build)
+	if registered == first || lintprogram.Cached(lintprogram.NewFromCompiler(raw), key{}, build) != registered {
+		t.Fatal("owned cache polluted the raw generation's shared cache")
+	}
+}
+
+func TestOwnedCompilerCacheReleasesWhileRawGenerationLives(t *testing.T) {
+	raw, _ := specifierCacheProgram(t, specifierCacheFiles(false))
+	type key int
+	type payload [128]byte
+	var cached weak.Pointer[payload]
+	var facade weak.Pointer[lintprogram.Program]
+	var retained []string
+	func() {
+		program := lintprogram.NewOwnedFromCompilers([]*compiler.Program{raw})[0]
+		facade = weak.Make(program)
+		cached = weak.Make(lintprogram.Cached(program, key(0), func() *payload { return &payload{} }))
+		retained = lintprogram.Cached(program, key(1), func() []string { return []string{"immutable answer"} })
+	}()
+	waitForProgramCacheCollection(t, func() bool { return facade.Value() == nil && cached.Value() == nil })
+	if len(retained) != 1 || retained[0] != "immutable answer" {
+		t.Fatal("releasing a cache invalidated its independently retained answer")
+	}
+	if raw.GetSourceFile(specifierCacheImporter) == nil {
+		t.Fatal("raw generation was lost before its owned cache")
+	}
+	runtime.KeepAlive(raw)
+}
+
+func TestCompilerCachePreservesAnswerAcrossFacadeGap(t *testing.T) {
+	files := specifierCacheFiles(false)
+	raw, fsys := specifierCacheProgram(t, files)
+	type key struct{}
+	builds := 0
+	build := func() string {
+		builds++
+		text, ok := fsys.ReadFile(specifierCacheImporter)
+		if !ok {
+			t.Fatal("fixture source is missing")
+		}
+		return text
+	}
+	var facade weak.Pointer[lintprogram.Program]
+	func() {
+		program := lintprogram.NewFromCompiler(raw)
+		facade = weak.Make(program)
+		if got := lintprogram.Cached(program, key{}, build); got != files[specifierCacheImporter] {
+			t.Fatal("initial cache answer did not reflect the source view")
+		}
+	}()
+	files[specifierCacheImporter] = "export const changed = true;"
+	waitForProgramCacheCollection(t, func() bool { return facade.Value() == nil })
+	if got := lintprogram.Cached(lintprogram.NewFromCompiler(raw), key{}, build); got == files[specifierCacheImporter] || builds != 1 {
+		t.Fatal("a temporary facade gap changed the raw generation's cached answer")
+	}
+	runtime.KeepAlive(raw)
+}
+
+func waitForProgramCacheCollection(t *testing.T, collected func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		runtime.GC()
+		if collected() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("unreachable facade or derived cache was retained")
+}
 
 func TestSourceOnlyProgramOwnsBoundUniverseWithoutCheckerCapability(t *testing.T) {
 	const root = "/program-source-only-test"

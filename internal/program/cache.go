@@ -8,11 +8,11 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 )
 
-// derivedCache belongs to one immutable source generation. Compiler-backed
-// Programs that wrap the same ts-go Program share a weakly owned cache;
-// parser-backed Programs own their cache directly. Cached values must not hold
-// a strong reference to Program, because that would keep a weak compiler key
-// alive through its own value.
+// derivedCache belongs to one immutable source generation. Loader-assembled
+// and parser-backed Programs own their caches directly. Adapters for raw
+// generations reused across facade lifetimes share a cache through
+// compilerCaches. Cached values must not hold a strong reference to Program,
+// because that would keep a weak compiler key alive through its own value.
 type derivedCache struct {
 	mu     sync.Mutex
 	values map[any]*derivedValue
@@ -50,9 +50,9 @@ func cacheForCompiler(raw *compiler.Program) *derivedCache {
 // when rules on different files request it concurrently. Keys should use an
 // unexported named type owned by the consumer package.
 //
-// A compiler-backed cache is weakly owned by the underlying ts-go generation,
-// so build must not return a value that strongly references p. Source files,
-// symbols, module edges, and indexes derived from them are safe.
+// Cache ownership is a construction detail, independent of the rule consumer.
+// Keys and values must not strongly reference p or its compiler generation.
+// Source files, symbols, module edges, and indexes derived from them are safe.
 func Cached[T any](p *Program, key any, build func() T) T {
 	if !p.IsValid() || p.cache == nil {
 		return build()
