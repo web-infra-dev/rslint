@@ -118,6 +118,17 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 	if got := moduleresolver.ResolveModule(nil, "pkg", "/input.js", moduleresolver.Options{}); got != "" {
 		t.Errorf("invalid Program resolved %q", got)
 	}
+	t.Run("Node export URL suffixes", func(t *testing.T) {
+		for _, test := range []struct{ name, suffix string }{
+			{"plain", ""}, {"query", "?one"}, {"fragment", "#one"},
+			{"both", "?one#two"}, {"empty-query", "?"}, {"empty-fragment", "#"},
+		} {
+			result := moduleresolver.Resolve(p, "url-targets/"+test.name, "/node-runtime/input.js", moduleresolver.Options{NodeExports: true})
+			if result.Path != "/node-runtime/node_modules/url-targets/shared.js" || result.ResourceSuffix != test.suffix || result.Error != "" {
+				t.Errorf("%s: unexpected result %#v", test.name, result)
+			}
+		}
+	})
 	t.Run("symlinked directory export", func(t *testing.T) {
 		root := tspath.NormalizePath(archive.Materialize(t, ""))
 		target := tspath.ResolvePath(root, "node_modules/custom/directory")

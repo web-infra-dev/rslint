@@ -206,6 +206,71 @@ func TestNoDuplicatesRuntimePaths(t *testing.T) {
 	}
 }
 
+func TestNoDuplicatesPackageURLs(t *testing.T) {
+	root := noDuplicatesRuntimeRoot(t)
+	for _, test := range []struct {
+		name, first, second string
+		diagnostics         int
+	}{
+		{"distinct queries", "query-one", "query-two", 0},
+		{"distinct fragments", "fragment-one", "fragment-two", 0},
+		{"query versus plain", "query-one", "plain", 0},
+		{"fragment versus plain", "fragment-one", "plain", 0},
+		{"empty query versus plain", "empty-query", "plain", 0},
+		{"empty fragment versus plain", "empty-fragment", "plain", 0},
+		{"identical queries", "query-one", "query-alias", 2},
+		{"identical fragments", "fragment-one", "fragment-alias", 2},
+	} {
+		for _, considerQueryString := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/considerQueryString=%v", test.name, considerQueryString), func(t *testing.T) {
+				code := fmt.Sprintf("import { x } from 'url-targets/%s';\nimport { y } from 'url-targets/%s';\n", test.first, test.second)
+				output := code
+				if test.diagnostics != 0 {
+					output = fmt.Sprintf("import { x , y } from 'url-targets/%s';\n", test.first)
+				}
+				assertNoDuplicatesRuntimeResult(t, root, code, []any{map[string]any{"considerQueryString": considerQueryString}}, test.diagnostics, output)
+			})
+		}
+	}
+}
+
+func TestNoDuplicatesPathAliasFallback(t *testing.T) {
+	root := noDuplicatesRuntimeRoot(t)
+	const code = "import { value as first } from 'shared-types/first';\nimport { value as second } from 'shared-types/alias';\n"
+	for _, test := range []struct {
+		name, paths string
+		diagnostics int
+	}{
+		{"missing wildcard target", `{"*": ["./missing/*"]}`, 2},
+		{"missing exact targets", `{"shared-types/first": ["./missing.ts"], "shared-types/alias": ["./missing.ts"]}`, 2},
+		{"missing exact targets outrank existing wildcard", `{"shared-types/first": ["./missing.ts"], "shared-types/alias": ["./missing.ts"], "*": ["./substitution/text.ts"]}`, 2},
+		{"missing specific wildcard outranks existing wildcard", `{"shared-types/*": ["./missing/*"], "*": ["./substitution/text.ts"]}`, 2},
+		{"successful declaration alias inside node_modules", `{"shared-types/first": ["./node_modules/shared-types/shared.d.ts"]}`, 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			caseRoot := root
+			caseRoot.FS = utils.NewOverlayVFS(root.FS, map[string]string{
+				tspath.ResolvePath(root.Dir, "tsconfig.json"): `{"compilerOptions": {"module": "esnext", "moduleResolution": "bundler", "paths": ` + test.paths + `}, "files": ["entry.ts"]}`,
+			})
+			output := code
+			if test.diagnostics != 0 {
+				output = "import { value as first , value as second } from 'shared-types/first';\n"
+			}
+			assertNoDuplicatesRuntimeResult(t, caseRoot, code, nil, test.diagnostics, output)
+		})
+	}
+}
+
+func TestNoDuplicatesCommonJSRuntimePaths(t *testing.T) {
+	root := noDuplicatesRuntimeRoot(t)
+	root.FS = utils.NewOverlayVFS(root.FS, map[string]string{
+		tspath.ResolvePath(root.Dir, "tsconfig.json"): `{"compilerOptions": {"module": "node16", "moduleResolution": "node16"}, "files": ["entry.cts"]}`,
+	})
+	const code = "import { x } from './commonjs/text';\nimport { y } from './commonjs/text.js';\n"
+	const output = "import { x , y } from './commonjs/text';\n"
+	assertNoDuplicatesRuntimeFileResult(t, root, "entry.cts", code, nil, 2, output)
+}
+
 func TestNoDuplicatesRuntimeConditions(t *testing.T) {
 	root := noDuplicatesRuntimeRoot(t)
 	const code = "import { value as first } from 'conditional-runtime/first';\nimport { value as second } from 'conditional-runtime/second';\n"
@@ -322,7 +387,12 @@ func noDuplicatesRuntimeRoot(t *testing.T) embedfs.Root {
 
 func assertNoDuplicatesRuntimeResult(t *testing.T, root embedfs.Root, code string, options []any, wantDiagnostics int, wantOutput string) {
 	t.Helper()
-	filePath := tspath.ResolvePath(root.Dir, "entry.ts")
+	assertNoDuplicatesRuntimeFileResult(t, root, "entry.ts", code, options, wantDiagnostics, wantOutput)
+}
+
+func assertNoDuplicatesRuntimeFileResult(t *testing.T, root embedfs.Root, name, code string, options []any, wantDiagnostics int, wantOutput string) {
+	t.Helper()
+	filePath := tspath.ResolvePath(root.Dir, name)
 	fs := utils.NewOverlayVFS(root.FS, map[string]string{filePath: code})
 	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", utils.CreateCompilerHost(root.Dir, fs))
 	if err != nil {

@@ -13,7 +13,9 @@ Import attributes are part of a module request. Imports with different attribute
 
 Explicit local paths that name existing files use those files as module identities. For example, when both `text.js` and `text.ts` exist, imports of `./text.js` and `./text.ts` are not duplicates, even if TypeScript resolves both to `text.ts`. The same applies to `.jsx`/`.tsx`, `.mjs`/`.mts`, and `.cjs`/`.cts` pairs.
 
-Package lookup uses runtime targets rather than shared type declarations, retaining import/require conditions and the project's custom conditions. Entry points with different type declarations remain separate even when they share a runtime file. TypeScript path aliases take precedence over package lookup.
+Package lookup uses runtime targets rather than shared type declarations, retaining import/require conditions and the project's custom conditions. Entry points with different type declarations remain separate even when they share a runtime file. TypeScript path aliases take precedence when a substitution for the selected pattern resolves; missing substitutions allow package lookup to continue.
+
+Queries and fragments selected by package exports remain part of ESM module identity, independently of `considerQueryString`. CommonJS lookup also resolves relative extensionless requests using Node's runtime extension and directory rules, so adjacent declarations do not hide genuine duplicates.
 
 If the written file does not exist, the rule retains unambiguous TypeScript resolution for aliases and extension substitution. A declaration file alone does not establish runtime identity for a value import. Neither does a result with an existing JavaScript sibling, or one resolved from a different importer directory. In these cases only identical written requests are grouped.
 

@@ -54,6 +54,31 @@ export const value = 'tsx';
 export const value = 'mts';
 -- substitution/text.cts --
 export const value = 'cts';
+-- commonjs/text.js --
+exports.x = 1;
+exports.y = 2;
+-- commonjs/text.d.ts --
+export const x: number;
+export const y: number;
+-- node_modules/url-targets/package.json --
+{
+  "name": "url-targets",
+  "type": "module",
+  "exports": {
+    "./plain": "./shared.js",
+    "./query-one": "./shared.js?one",
+    "./query-two": "./shared.js?two",
+    "./query-alias": "./shared.js?one",
+    "./fragment-one": "./shared.js#one",
+    "./fragment-two": "./shared.js#two",
+    "./fragment-alias": "./shared.js#one",
+    "./empty-query": "./shared.js?",
+    "./empty-fragment": "./shared.js#"
+  }
+}
+-- node_modules/url-targets/shared.js --
+globalThis.loads = (globalThis.loads || 0) + 1;
+export const x = globalThis.loads, y = globalThis.loads;
 -- node_modules/shadowed-package/package.json --
 { "name": "shadowed-package", "main": "./index.js" }
 -- node_modules/shadowed-package/index.js --

@@ -123,7 +123,7 @@ func processScope(resolver *importResolver, statements []*ast.Node) {
 		}
 
 		attributes := modules.SourceFromSpecifier(importDecl.ModuleSpecifier).Attributes()
-		identity := resolved.path + "\x00" + resolved.typePath + "\x00" + attributes.Key()
+		identity := resolved.path + "\x00" + resolved.resourceSuffix + "\x00" + resolved.typePath + "\x00" + attributes.Key()
 		entry, exists := importMap.entries[identity]
 		if !exists {
 			importMap.entries[identity] = importEntry{first: stmt}
@@ -200,8 +200,9 @@ func getModuleSpecifierText(moduleSpecifier *ast.Node, sourceText string) string
 }
 
 type moduleIdentity struct {
-	path     string
-	typePath string
+	path           string
+	typePath       string
+	resourceSuffix string
 }
 
 type importResolver struct {
@@ -213,6 +214,8 @@ type importResolver struct {
 	commentsKnown  bool
 	hasComments    bool
 	commentFactory *ast.NodeFactory
+	pathPatterns   *module.ParsedPatterns
+	aliasResolver  *module.Resolver
 }
 
 // resolve groups imports by their runtime path and any distinct type target.
@@ -302,14 +305,33 @@ func (r *importResolver) hasRuntimeSibling(resolvedPath string) bool {
 	return false
 }
 
-func (r *importResolver) hasPathAlias(sourcePath string) bool {
-	paths := r.ctx.Program().Options().Paths
-	if paths != nil {
-		for name := range paths.Keys() {
-			pattern := core.TryParsePattern(name)
-			if pattern.IsValid() && pattern.Matches(sourcePath) {
-				return true
-			}
+func (r *importResolver) hasPathAlias(sourcePath, fileName string, mode core.ResolutionMode) bool {
+	program := r.ctx.Program()
+	options := program.Options()
+	if options.Paths == nil || options.Paths.Size() == 0 {
+		return false
+	}
+	if r.pathPatterns == nil {
+		r.pathPatterns = module.TryParsePatterns(options.Paths)
+	}
+	pattern := module.MatchPatternOrExact(r.pathPatterns, sourcePath)
+	if !pattern.IsValid() {
+		return false
+	}
+	if r.aliasResolver == nil {
+		// Probe the selected substitutions with TypeScript's normal file lookup,
+		// without reapplying paths or rootDirs to those already mapped targets.
+		aliasOptions := options.Clone()
+		aliasOptions.Paths = nil
+		aliasOptions.RootDirs = nil
+		host := rslintUtils.CreateCompilerHost(program.CurrentDirectory(), program.FS())
+		r.aliasResolver = module.NewResolver(host, aliasOptions, "", "", nil)
+	}
+	base := options.GetPathsBasePath(program.CurrentDirectory())
+	for _, target := range options.Paths.GetOrZero(pattern.Text) {
+		candidate := tspath.ResolvePath(base, strings.Replace(target, "*", pattern.MatchedText(sourcePath), 1))
+		if resolved, _ := r.aliasResolver.ResolveModuleName(candidate, fileName, mode, nil); resolved.IsResolved() {
+			return true
 		}
 	}
 	return false
@@ -352,18 +374,32 @@ func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, source
 		return moduleIdentity{}, false
 	}
 	fileName := r.physicalPath(r.ctx.SourceFile.FileName())
-	if !tspath.IsExternalModuleNameRelative(sourcePath) && !r.hasPathAlias(sourcePath) {
+	relative := tspath.IsExternalModuleNameRelative(sourcePath)
+	if !relative && !r.hasPathAlias(sourcePath, fileName, mode) || relative && mode == core.ResolutionModeCommonJS {
 		// Package entry points can share declarations while loading distinct
 		// runtime files. Use the existing resolver without the automatic types
 		// condition, retaining the request's import/require and custom conditions.
-		options := *program.Options()
+		options := program.Options().Clone()
 		options.NoDtsResolution = core.TSTrue
-		resolved := moduleresolver.ResolveModule(program, sourcePath, fileName, moduleresolver.Options{
-			Conditions: module.GetConditions(&options, mode), NodeExports: true,
+		runtimeOptions := moduleresolver.Options{
+			Conditions: module.GetConditions(options, mode), NodeExports: true,
 			PreserveSymlinks: options.PreserveSymlinks == core.TSTrue,
-		})
-		if resolved != "" {
-			return moduleIdentity{path: r.canonicalPath(resolved)}, true
+		}
+		if mode == core.ResolutionModeCommonJS {
+			// require's extensionless lookup accepts .js, .json and .node;
+			// .mjs and .cjs need an explicit extension.
+			runtimeOptions.Extensions = []string{".js", ".json", ".node"}
+			runtimeOptions.LiteralPaths = true
+		}
+		resolved := moduleresolver.Resolve(program, sourcePath, fileName, runtimeOptions)
+		if resolved.Path != "" {
+			identity := moduleIdentity{path: r.canonicalPath(resolved.Path)}
+			if mode != core.ResolutionModeCommonJS {
+				// Export-target URL suffixes select ESM instances independently of
+				// considerQueryString, which controls the authored request only.
+				identity.resourceSuffix = resolved.ResourceSuffix
+			}
+			return identity, true
 		}
 	}
 

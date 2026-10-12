@@ -417,8 +417,11 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 		// Node accepts an exports or imports target only as an existing file.
 		exactTarget := f.options.NodeExports && strings.HasSuffix(physical, nodeExportSuffix)
 		if exactTarget {
-			if path, ok := f.nodeTargetPath(target); ok {
+			if path, suffix, ok := f.nodeTargetPath(target); ok {
 				resolved = f.probeFile(path)
+				if resolved != "" {
+					f.resourceSuffix = suffix
+				}
 			}
 			f.nodeTarget = f.nodeTarget || resolved != ""
 		} else {
@@ -533,9 +536,9 @@ func (f *nodeResolutionFS) invalidPatternMatch() bool {
 // nodeTargetPath converts an exports or imports target, after any pattern is
 // substituted, to the file Node reads. The part inside the package is a URL:
 // an escaped `/` or `\` anywhere in it is invalid, a query or fragment is
-// dropped, a backslash separates segments, and percent-escapes are decoded to
-// UTF-8 before the path is normalized.
-func (f *nodeResolutionFS) nodeTargetPath(target string) (string, bool) {
+// retained separately, a backslash separates segments, and percent-escapes are
+// decoded to UTF-8 before the path is normalized.
+func (f *nodeResolutionFS) nodeTargetPath(target string) (string, string, bool) {
 	root := ""
 	for _, owner := range []string{f.exportsFile, f.importsFile} {
 		if owner == "" {
@@ -547,24 +550,26 @@ func (f *nodeResolutionFS) nodeTargetPath(target string) (string, bool) {
 		}
 	}
 	if root == "" {
-		return target, true
+		return target, "", true
 	}
 	if f.invalidPatternMatch() || f.unexportedDirectory() {
-		return "", false
+		return "", "", false
 	}
 	inner := target[len(root):]
 	if encodedSeparator.MatchString(inner) {
-		return "", false
+		return "", "", false
 	}
+	suffix := ""
 	if index := strings.IndexAny(inner, "?#"); index >= 0 {
+		suffix = inner[index:]
 		inner = inner[:index]
 	}
 	decoded, err := url.PathUnescape(strings.ReplaceAll(inner, `\`, "/"))
 	// A file path cannot end in a separator.
 	if err != nil || !utf8.ValidString(decoded) || strings.HasSuffix(decoded, "/") {
-		return "", false
+		return "", "", false
 	}
-	return tspath.NormalizePath(root + decoded), true
+	return tspath.NormalizePath(root + decoded), suffix, true
 }
 
 // unexportedDirectory reports a request ending in `/`, such as `pkg/` or
