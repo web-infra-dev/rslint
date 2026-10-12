@@ -551,10 +551,13 @@ func (r *nameReplacements) buildBindingIndexes() {
 	}
 }
 
-func (r *nameReplacements) classVariables(variable *scope.Variable, declarations []*scope.Variable) []*scope.Variable {
+func (r *nameReplacements) classVariables(declarations []*scope.Variable) []*scope.Variable {
 	result := append([]*scope.Variable(nil), declarations...)
-	if variable.Kind == scope.DefClassName {
-		for _, candidate := range r.classVariablesByID[variable.ID] {
+	for _, declaration := range declarations {
+		if declaration.Kind != scope.DefClassName {
+			continue
+		}
+		for _, candidate := range r.classVariablesByID[declaration.ID] {
 			if !slices.Contains(result, candidate) {
 				result = append(result, candidate)
 			}
@@ -598,7 +601,7 @@ func (r *nameReplacements) checkVariable(variable *scope.Variable, declarations 
 		return
 	}
 
-	variables := r.classVariables(variable, declarations)
+	variables := r.classVariables(declarations)
 	references := r.referencesFor(variables)
 	scopes := make([]*scope.Scope, 0, len(references)+len(variables))
 	scopeSet := make(map[*scope.Scope]struct{}, cap(scopes))
@@ -664,7 +667,7 @@ func isShorthandBinding(variable *scope.Variable) bool {
 	for node := variable.ID.Parent; node != nil; node = node.Parent {
 		if node.Kind == ast.KindBindingElement {
 			binding := node.AsBindingElement()
-			return binding.PropertyName == nil && binding.Initializer == nil && node.Parent != nil &&
+			return binding.DotDotDotToken == nil && binding.PropertyName == nil && binding.Initializer == nil && node.Parent != nil &&
 				node.Parent.Kind == ast.KindObjectBindingPattern
 		}
 		if node.Kind == ast.KindShorthandPropertyAssignment {
@@ -697,7 +700,7 @@ func importSource(variable *scope.Variable) string {
 		initializer = ast.SkipParentheses(initializer)
 		if initializer != nil && initializer.Kind == ast.KindCallExpression {
 			call := initializer.AsCallExpression()
-			if call.Expression.Kind == ast.KindIdentifier && call.Expression.Text() == "require" &&
+			if call.QuestionDotToken == nil && call.Expression.Kind == ast.KindIdentifier && call.Expression.Text() == "require" &&
 				len(call.Arguments.Nodes) == 1 && ast.IsStringLiteralLike(call.Arguments.Nodes[0]) {
 				return call.Arguments.Nodes[0].Text()
 			}
@@ -712,21 +715,31 @@ func isInternalSource(source string) bool {
 }
 
 func (r *nameReplacements) shouldCheckImport(variable *scope.Variable) bool {
-	if variable.Kind != scope.DefImport && importSource(variable) == "" {
-		return true
-	}
 	source := importSource(variable)
 	mode := r.opts.checkDefaultAndNamespaceImports
-	if variable.Kind == scope.DefImport && variable.ID != nil && variable.ID.Parent != nil &&
-		variable.ID.Parent.Kind == ast.KindImportSpecifier {
-		specifier := variable.ID.Parent.AsImportSpecifier()
-		if specifier.PropertyName != nil && specifier.PropertyName.Text() == "default" {
-			mode = r.opts.checkDefaultAndNamespaceImports
-		} else if specifier.PropertyName == nil || specifier.PropertyName.Text() == specifier.Name().Text() {
-			mode = r.opts.checkShorthandImports
-		} else {
+	if variable.Kind == scope.DefImport {
+		if variable.ID == nil || variable.ID.Parent == nil {
 			return true
 		}
+		switch variable.ID.Parent.Kind {
+		case ast.KindImportClause, ast.KindNamespaceImport:
+			// Default and namespace imports use the default-import option.
+		case ast.KindImportSpecifier:
+			specifier := variable.ID.Parent.AsImportSpecifier()
+			if specifier.PropertyName == nil {
+				mode = r.opts.checkShorthandImports
+			} else if specifier.PropertyName.Kind != ast.KindIdentifier || specifier.PropertyName.Text() != "default" {
+				// Explicit aliases, including quoted names and `err as err`,
+				// are ordinary local bindings rather than shorthand imports.
+				return true
+			}
+		default:
+			// TypeScript import-equals declarations are neither default
+			// nor namespace import specifiers.
+			return true
+		}
+	} else if source == "" {
+		return true
 	}
 	switch mode {
 	case importCheckNever:
@@ -797,7 +810,7 @@ var typescriptReservedWords = map[string]struct{}{
 	"implements": {}, "interface": {}, "let": {}, "package": {}, "private": {},
 	"protected": {}, "public": {}, "static": {}, "yield": {}, "any": {}, "boolean": {},
 	"constructor": {}, "declare": {}, "get": {}, "module": {}, "require": {}, "number": {},
-	"set": {}, "string": {}, "symbol": {}, "type": {}, "from": {}, "of": {},
+	"set": {}, "string": {}, "symbol": {}, "type": {}, "from": {}, "of": {}, "await": {},
 }
 
 func validVariableName(name string) bool {
@@ -1025,7 +1038,7 @@ func (r *nameReplacements) replacementForIdentifier(node *ast.Node, replacement 
 	}
 	if parent.Kind == ast.KindBindingElement {
 		binding := parent.AsBindingElement()
-		if binding.PropertyName == nil && parent.Parent != nil && parent.Parent.Kind == ast.KindObjectBindingPattern {
+		if binding.DotDotDotToken == nil && binding.PropertyName == nil && parent.Parent != nil && parent.Parent.Kind == ast.KindObjectBindingPattern {
 			return textRange, node.Text() + ": " + replacement
 		}
 	}

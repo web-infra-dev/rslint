@@ -111,6 +111,8 @@ Default: `false`
 
 Checks shorthand bindings in object destructuring, such as `const {err} = value`. A shorthand binding with a default value, such as `const {err = null} = value`, is checked regardless because its ESTree value is an assignment pattern rather than a shorthand identifier.
 
+Rest bindings, such as `const {...err} = value`, are checked regardless of this option and renamed without introducing a property key.
+
 ### `checkProperties`
 
 Type: `boolean`
@@ -149,6 +151,7 @@ Adds JavaScript regular-expression patterns that suppress a complete name. The b
 - JavaScript `RegExp` objects do not cross rslint's native configuration boundary. Write `ignore` entries as pattern strings. Flags on a regular-expression literal cannot be represented directly; express equivalent matching in the pattern where possible.
 - Rslint reports but does not rename a shorthand binding declared directly by a named export, such as `export const {err} = source`. Upstream renames the exported binding, which changes the module's public API; Rslint leaves that decision to the author.
 - When bindings in nested scopes compete for the same generated replacement, Rslint assigns collision suffixes in source order. Upstream walks scopes breadth-first, so it can assign the underscore to a different binding. Both outputs remain collision-free and deterministic.
+- Rslint renames merged interface and class declarations together with the class's inner references. In upstream v77, declaration order can leave references unchanged or rename the merged declarations inconsistently, producing broken code.
 
 ## Original Documentation
 
