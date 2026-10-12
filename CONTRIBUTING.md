@@ -51,6 +51,16 @@ Branch naming and test organization follow [AGENTS.md](./AGENTS.md). Before deli
 
 The existing pre-commit hook runs `rs staged`. Install it through `pnpm run prepare`; `git config --get core.hooksPath` should point to `.rstack/hooks/_`. If a checkout still points to old Husky hooks, inspect them before migrating once with `pnpm exec rs hooks --force`. Keep ordinary `prepare` non-forcing.
 
+## Ecosystem CI
+
+`.github/workflows/ecosystem-ci.yml` dispatches consumer checks to [rstack-ecosystem-ci](https://github.com/rstackjs/rstack-ecosystem-ci). Pushes to main and same-repository release PRs from `chore/release-*` branches run all three suites: Rsbuild, Rslib, and Rstest. Release PR runs use the head commit from the triggering event. To test another PR, run the **Ecosystem CI** workflow from main, enter its PR number, and select one suite or `-` for all suites. Manual runs support fork PRs and freeze the current head commit before dispatching.
+
+The downstream repository owns building Rslint, installing consumer overrides, running builds and type-aware lint, and publishing full-run history. It tests `@rslint/core` with the matching host native package. The independently versioned tsgo server packages keep their published versions.
+
+The shared upstream actions await the remote run and update a PR comment, or post a commit comment on failure. These checks report ecosystem compatibility separately from the main CI checks; the existing actions do not propagate the remote failure as a blocking upstream job failure.
+
+Repository maintainers must configure `REPO_RSLINT_ECO_CI_GITHUB_TOKEN` with access to `rstackjs/rstack-ecosystem-ci` and **Actions read/write** permission. It needs no Contents permission. The workflow's own `GITHUB_TOKEN` writes upstream comments; downstream history uses the downstream token. Merge the downstream integration before enabling this upstream workflow.
+
 ## TypeScript compiler dependency
 
 The `typescript-go/` submodule tracks [microsoft/TypeScript](https://github.com/microsoft/TypeScript). The Go compiler lives under `typescript-go/tsc/`, and its JS AST API lives under `typescript-go/packages/typescript/`. Existing checkouts must run `git submodule sync -- typescript-go` before updating the submodule to pick up the new remote URL.
