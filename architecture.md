@@ -1753,7 +1753,7 @@ lint and fix execution still await full config activation.
 ### Design Principles
 
 - **Direct ts-go Data Model**: rslint Programs preserve ts-go AST objects directly and provide optional checker access without converting through a second AST representation or exposing their private adapter
-- **Unified Program Scheduling**: configured ts-go Program construction uses a bounded, stable-slot worker pool, and `RunLinter` queues subsequent lint work over one ordered rslint Program sequence through `core.NewWorkGroup`; checker-free Programs are additionally split into bounded chunks. `--singleThreaded` forces all of these flows to run serially
+- **Unified Program Scheduling**: configured ts-go Program construction uses a bounded, stable-slot worker pool, and `RunLinter` queues subsequent lint work over one ordered rslint Program sequence, admitting at most `min(GOMAXPROCS, Program count)` native projects at once. Each project keeps its existing checker shards and independent workgroup; checker-free Programs are additionally split into bounded chunks. `--singleThreaded` forces all of these flows to run serially
 - **Single-Walk Rule Dispatch**: each file is traversed once, with rules registering listeners up front and sharing the same AST walk
 - **Early Filtering**: exact lint target plans, skip paths, global-ignore filters, and per-file capability filtering reduce work before listeners run
 - **Shared Prepared Lint Plan**: CLI and native API resolve each selected
