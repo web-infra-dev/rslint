@@ -4,9 +4,18 @@
 >
 > **This extension is retired. Migrate to the [Rstack](https://github.com/rstackjs/rstack-editor) extension.**
 >
-> New editor features land in the unified [Rstack](https://marketplace.visualstudio.com/items?itemName=rstack.rstack) extension (`rstack.rstack`), which covers testing, linting, and formatting in one install. It is also available on the [Open VSX Registry](https://open-vsx.org/extension/rstack/rstack) for Cursor, Trae, VSCodium, and other VS Code forks. This standalone extension stays published and keeps working while the transition is underway, but receives no new features.
+> This is the final release of the standalone Rslint extension. It is no longer maintained and will receive no further releases. It only supports `@rslint/core` `^0.9.0`; for newer cores, install the unified [Rstack](https://marketplace.visualstudio.com/items?itemName=rstack.rstack) extension (`rstack.rstack`), which covers testing, linting, and formatting in one install. It is also available on the [Open VSX Registry](https://open-vsx.org/extension/rstack/rstack) for Cursor, Trae, VSCodium, and other VS Code forks.
 >
-> To switch: install `rstack.rstack`, disable or uninstall `rstack.rslint` so only one copy of Rslint runs, then re-enter your settings under the `rstack.rslint.*` keys. Settings are not migrated automatically. Legacy `rslint.binPath` and `rslint.customBinPath` have no equivalent; use `rstack.rslint.corePath` if you need an override. See the [migration notes](https://github.com/rstackjs/rstack-editor/blob/main/packages/vscode/README.md#coming-from-the-standalone-extensions).
+> To switch: install `rstack.rstack`, uninstall `rstack.rslint`, then reload the window so only one copy of Rslint runs. This extension stands down while Rstack is enabled. Settings are not migrated automatically; re-enter them using the mapping below.
+
+## Migrate settings to Rstack
+
+| Standalone (`rslint.*`)                  | Rstack (`rstack.rslint.*`)                                       |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| `rslint.enable`                          | `rstack.rslint.enable`                                           |
+| `rslint.corePath`                        | `rstack.rslint.corePath`                                         |
+| `rslint.trace.server`                    | `rstack.rslint.trace.server`                                     |
+| `rslint.binPath`, `rslint.customBinPath` | No equivalent; use `rstack.rslint.corePath` to override the core |
 
 The official VS Code extension for [Rslint](https://github.com/web-infra-dev/rslint), a high-performance JavaScript and TypeScript linter written in Go.
 

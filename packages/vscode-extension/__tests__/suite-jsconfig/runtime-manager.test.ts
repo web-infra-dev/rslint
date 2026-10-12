@@ -5,14 +5,16 @@ import {
   type TextDocument,
   type WorkspaceFolder,
 } from 'vscode';
-import type {
-  CoreInstallation,
-  ResolvedCoreRuntime,
+import {
+  UnsupportedCoreVersionError,
+  type CoreInstallation,
+  type ResolvedCoreRuntime,
 } from '../../src/CoreResolver';
 import {
   RuntimeManager,
   type ManagedRslintRuntime,
   type RuntimeCoreResolver,
+  type RuntimeManagerEvents,
   type RuntimeManagerLogger,
 } from '../../src/RuntimeManager';
 import { WorkspaceDocumentRouter } from '../../src/WorkspaceDocumentRouter';
@@ -20,6 +22,7 @@ import { WorkspaceDocumentRouter } from '../../src/WorkspaceDocumentRouter';
 class FakeResolver implements RuntimeCoreResolver {
   readonly keys = new Map<string, string>();
   readonly failures = new Set<string>();
+  readonly unsupportedVersions = new Map<string, string>();
   readonly gates = new Map<string, Deferred<void>>();
   readonly started: string[] = [];
   clearCalls = 0;
@@ -37,6 +40,10 @@ class FakeResolver implements RuntimeCoreResolver {
     await this.gates.get(identity)?.promise;
     if (this.failures.has(identity)) {
       throw new Error(`resolution failed for ${identity}`);
+    }
+    const unsupportedVersion = this.unsupportedVersions.get(identity);
+    if (unsupportedVersion !== undefined) {
+      throw new UnsupportedCoreVersionError(unsupportedVersion);
     }
     // The fake runtime never consumes module factories or the binary.
     // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -182,6 +189,10 @@ suite('local-core runtime manager', () => {
 
   function harness(
     behaviorFor: (identity: string) => RuntimeBehavior = () => ({}),
+    events: RuntimeManagerEvents = {
+      runtimeReady() {},
+      unsupportedCore() {},
+    },
   ) {
     const resolver = new FakeResolver();
     const router = new WorkspaceDocumentRouter();
@@ -205,6 +216,7 @@ suite('local-core runtime manager', () => {
         return runtime;
       },
       silentLogger,
+      events,
       (document) => openDocuments.has(document),
     );
     return { manager, resolver, router, runtimes };
@@ -243,6 +255,44 @@ suite('local-core runtime manager', () => {
 
     assert.deepStrictEqual(resolver.started, []);
     assert.deepStrictEqual(runtimes, []);
+    await manager.close();
+  });
+
+  test('reports every runtime that becomes ready', async () => {
+    let ready = 0;
+    const { manager, resolver } = harness(undefined, {
+      runtimeReady: () => ready++,
+      unsupportedCore() {},
+    });
+    resolver.keys.set(first.uri.toString(), 'first-core');
+    resolver.keys.set(second.uri.toString(), 'second-core');
+
+    await manager.reconcile(first);
+    assert.strictEqual(ready, 1);
+    await manager.reconcile(second);
+    assert.strictEqual(ready, 2);
+    await manager.close();
+  });
+
+  test('routes an unsupported core to the migration event without starting it', async () => {
+    const unsupported: string[] = [];
+    let ready = 0;
+    const { manager, resolver, router, runtimes } = harness(undefined, {
+      runtimeReady: () => ready++,
+      unsupportedCore: (message) => unsupported.push(message),
+    });
+    resolver.keys.set(first.uri.toString(), 'new-core');
+    resolver.keys.set(second.uri.toString(), 'new-core');
+    resolver.unsupportedVersions.set('new-core', '0.10.0');
+
+    await reconcileAll(manager, [first, second]);
+
+    assert.deepStrictEqual(unsupported, [
+      new UnsupportedCoreVersionError('0.10.0').message,
+    ]);
+    assert.strictEqual(ready, 0);
+    assert.strictEqual(runtimes.length, 0);
+    assert.strictEqual(router.getServerOpenOwner(first), undefined);
     await manager.close();
   });
 

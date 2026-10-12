@@ -6,6 +6,7 @@ import { registerCommands } from './commands';
 import { WorkspaceDocumentRouter } from './WorkspaceDocumentRouter';
 import { CoreResolver } from './CoreResolver';
 import { RuntimeManager } from './RuntimeManager';
+import type { MigrationNotices } from './migrationNotice';
 
 const CORE_TOPOLOGY_GLOB =
   '**/{package-lock.json,pnpm-lock.yaml,yarn.lock,node_modules/@rslint/core/package.json}';
@@ -13,6 +14,7 @@ const CORE_TOPOLOGY_GLOB =
 /** Extension-wide owner for shared UI, channels and workspace runtimes. */
 export class Extension {
   private readonly logger: Logger;
+  private readonly notices: MigrationNotices;
   private readonly globalDisposables: Disposable[] = [];
   private outputChannel: OutputChannel | undefined;
   private lspOutputChannel: OutputChannel | undefined;
@@ -21,8 +23,9 @@ export class Extension {
   private closePromise: Promise<void> | undefined;
   private activated = false;
 
-  constructor(logger: Logger) {
+  constructor(logger: Logger, notices: MigrationNotices) {
     this.logger = logger;
+    this.notices = notices;
   }
 
   public activate(): void {
@@ -51,6 +54,11 @@ export class Extension {
           router,
         }),
       this.logger,
+      {
+        runtimeReady: () => void this.notices.runtimeReady(),
+        unsupportedCore: (message) =>
+          void this.notices.showUnsupportedCore(message),
+      },
     );
     this.router = router;
     this.runtimeManager = runtimeManager;

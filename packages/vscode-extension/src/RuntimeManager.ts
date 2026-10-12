@@ -1,5 +1,8 @@
 import { window, workspace, type TextDocument } from 'vscode';
-import { type ResolvedCoreRuntime } from './CoreResolver';
+import {
+  UnsupportedCoreVersionError,
+  type ResolvedCoreRuntime,
+} from './CoreResolver';
 import type {
   DocumentRoutingRuntime,
   WorkspaceDocumentRouter,
@@ -30,6 +33,13 @@ export interface RuntimeManagerLogger {
   debug(message: string, ...args: unknown[]): void;
   info(message: string, ...args: unknown[]): void;
   error(message: string, error?: unknown, ...args: unknown[]): void;
+}
+
+export interface RuntimeManagerEvents {
+  /** A language server became ready. */
+  runtimeReady(): void;
+  /** A document resolved a core outside the supported range. */
+  unsupportedCore(message: string): void;
 }
 
 interface RuntimeEntry {
@@ -72,6 +82,7 @@ export class RuntimeManager {
     private readonly resolver: RuntimeCoreResolver,
     private readonly runtimeFactory: ManagedRslintRuntimeFactory,
     private readonly logger: RuntimeManagerLogger,
+    private readonly events: RuntimeManagerEvents,
     private readonly documentIsOpen: (document: TextDocument) => boolean = (
       document,
     ) => workspace.textDocuments.includes(document),
@@ -239,6 +250,7 @@ export class RuntimeManager {
     this.logger.info(
       `Rslint ${entry.resolved.installation.version} ready for ${entry.resolved.workspaceFolder.name}`,
     );
+    this.events.runtimeReady();
   }
 
   private async releaseRuntime(
@@ -350,6 +362,10 @@ export class RuntimeManager {
     const failureKey = `${workspaceKey ?? 'loose-file'}\0${category}`;
     if (this.reportedFailures.has(failureKey)) return;
     this.reportedFailures.add(failureKey);
+    if (error instanceof UnsupportedCoreVersionError) {
+      this.events.unsupportedCore(message);
+      return;
+    }
     const suffix = existing
       ? ` Keeping Rslint ${existing.resolved.installation.version} active.`
       : '';

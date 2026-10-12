@@ -274,6 +274,25 @@ async function main(): Promise<void> {
       workspace: path.resolve(testsSourceDir, 'fixtures-rule-option-types'),
       tests: path.resolve(__dirname, './suite-rule-option-types'),
     },
+    // Migration prompts fire once per Extension Host, so each case needs a
+    // Host whose first language server starts inside its own test.
+    {
+      name: 'Migration install prompt tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-multiroot'),
+      tests: path.resolve(__dirname, './suite-migration-install'),
+      workspaceEntry: 'multiroot.code-workspace',
+      workspaceFolders: [
+        'parent',
+        'sentinel',
+        'twins/left/app',
+        'twins/right/app',
+      ],
+    },
+    {
+      name: 'Migration unsupported core tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-noconfig'),
+      tests: path.resolve(__dirname, './suite-migration-unsupported-core'),
+    },
     {
       name: 'import/no-cycle tests',
       workspace: path.resolve(testsSourceDir, 'fixtures-import-cycle'),
