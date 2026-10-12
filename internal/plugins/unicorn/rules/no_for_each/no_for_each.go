@@ -153,7 +153,7 @@ func buildFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall) []rule.Rul
 		}
 		data := parameter.AsParameterDeclaration()
 		if data == nil || data.DotDotDotToken != nil || data.Type != nil ||
-			(index == 0 && data.Initializer != nil) ||
+			(index == 0 && len(parameters) == 1 && data.Initializer != nil) ||
 			(index == 1 && (data.Initializer != nil || !ast.IsIdentifier(data.Name()))) {
 			return nil
 		}
@@ -181,6 +181,7 @@ func buildFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall) []rule.Rul
 	callbackScope := scopes.Acquire(callback)
 	callScope := scopes.Acquire(call.Call)
 	if body == nil || !returnsSafe || hasUnsafeCallbackSemantics(callback, body) ||
+		!parameterExpressionsSafe(callback, parameters, scopes) ||
 		isNamedFunctionSelfUsed(callback, scopes) ||
 		!parametersSafeForFix(call.Call, callbackScope, callScope, parameters, scopes) {
 		return nil
@@ -189,6 +190,36 @@ func buildFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall) []rule.Rul
 	loop, ok := buildLoopText(ctx, call, parameters, body, returns, statement, callbackScope, scopes)
 	if !ok {
 		return nil
+	}
+	// Preserve trivia outside the copied body while removing the callback,
+	// call, and expression-statement closing tokens.
+	bodyRange := utils.TrimNodeTextRange(ctx.SourceFile, body)
+	if utils.HasCommentInSpan(ctx.Comments.All(), replaceRange.Pos(), bodyRange.Pos()) {
+		return nil
+	}
+	if utils.HasCommentInSpan(ctx.Comments.All(), bodyRange.End(), replaceRange.End()) {
+		tail := ctx.SourceFile.Text()[bodyRange.End():replaceRange.End()]
+		tokens := utils.TokensOfNode(ctx.SourceFile, outerCall)
+		for index := len(tokens) - 1; index >= 0; index-- {
+			token := tokens[index]
+			if token.Start >= bodyRange.End() && token.End <= replaceRange.End() {
+				if token.Kind != ast.KindCloseParenToken && token.Kind != ast.KindCommaToken {
+					return nil
+				}
+				start, end := token.Start-bodyRange.End(), token.End-bodyRange.End()
+				tail = tail[:start] + tail[end:]
+			}
+		}
+		if statement != nil {
+			if last, ok := utils.TokenBeforePosition(ctx.SourceFile, replaceRange.End()); ok && last.Kind == ast.KindSemicolonToken {
+				if body.Kind == ast.KindBlock {
+					tail = strings.TrimSuffix(tail, ";")
+				} else {
+					loop = strings.TrimSuffix(loop, ";")
+				}
+			}
+		}
+		loop += tail
 	}
 	if arrowBody {
 		loop = "{ " + loop + " }"
@@ -226,6 +257,9 @@ func hasUnsafeCallbackSemantics(callback, body *ast.Node) bool {
 		// Arrow functions capture the callback function's `this` and
 		// `arguments`; ordinary nested functions create their own bindings.
 		if node != callback && ast.IsFunctionLike(node) && !ast.IsArrowFunction(node) {
+			if name := node.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+				walk(name.AsComputedPropertyName().Expression)
+			}
 			return
 		}
 		if ast.IsFunctionExpression(callback) {
@@ -242,6 +276,30 @@ func hasUnsafeCallbackSemantics(callback, body *ast.Node) bool {
 	}
 	walk(body)
 	return unsafe
+}
+
+func parameterExpressionsSafe(callback *ast.Node, parameters []*ast.Node, manager *scope.Manager) bool {
+	for _, parameter := range parameters {
+		if hasUnsafeCallbackSemantics(callback, parameter) {
+			return false
+		}
+	}
+	if len(parameters) != 2 {
+		return true
+	}
+	// entries() initializes the index before the element binding. A reference
+	// to the index from the first parameter would change its original TDZ.
+	for _, reference := range manager.References {
+		if reference.Identifier.Pos() < parameters[0].Pos() || reference.Identifier.End() > parameters[0].End() {
+			continue
+		}
+		for _, declaration := range reference.Declarations {
+			if declaration.Kind == scope.DefParameter && declaration.DefNode == parameters[1] {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func callbackReturnStatements(callback, body *ast.Node) ([]*ast.Node, bool) {
@@ -400,6 +458,9 @@ func buildLoopText(
 	parameterTexts := make([]string, len(parameters))
 	for index, parameter := range parameters {
 		parameterTexts[index] = utils.TrimmedNodeText(ctx.SourceFile, parameter.Name())
+		if parameter.AsParameterDeclaration().Initializer != nil {
+			parameterTexts[index] = utils.TrimmedNodeText(ctx.SourceFile, parameter)
+		}
 	}
 	binding := parameterTexts[0]
 	if len(parameterTexts) == 2 {
@@ -434,13 +495,6 @@ func buildLoopText(
 		loop = "if (" + objectText + ") " + loop
 	}
 
-	// Rebuilding the loop head would otherwise drop comments between the call
-	// start and the callback body.
-	callRange := utils.TrimNodeTextRange(ctx.SourceFile, call.Call)
-	bodyRange := utils.TrimNodeTextRange(ctx.SourceFile, body)
-	if utils.HasCommentInSpan(ctx.Comments.All(), callRange.Pos(), bodyRange.Pos()) {
-		return "", false
-	}
 	return loop, true
 }
 
@@ -456,6 +510,11 @@ func rewriteCallbackReturns(ctx rule.RuleContext, body *ast.Node, bodyText strin
 		}
 
 		data := returnStatement.AsReturnStatement()
+		if data.Expression == nil {
+			// Only replace the keyword: comments and semicolons remain intact.
+			bodyText = bodyText[:start] + "continue" + bodyText[start+len("return"):]
+			continue
+		}
 		replacement := "continue"
 		completeBlockReplacement := false
 		if data.Expression != nil {
@@ -478,6 +537,17 @@ func rewriteCallbackReturns(ctx rule.RuleContext, body *ast.Node, bodyText strin
 			if returnNeedsBlock(returnStatement) {
 				replacement = gap + "{ " + expressionText + "; continue; }"
 				completeBlockReplacement = true
+			}
+			if utils.HasCommentInSpan(ctx.Comments.All(), expressionRange.End(), returnRange.End()) {
+				tail := ctx.SourceFile.Text()[expressionRange.End():returnRange.End()]
+				if last, ok := utils.TokenBeforePosition(ctx.SourceFile, returnRange.End()); ok && last.Kind == ast.KindSemicolonToken {
+					tail = tail[:last.Start-expressionRange.End()] + tail[last.End-expressionRange.End():]
+				}
+				if completeBlockReplacement {
+					replacement = gap + "{ " + expressionText + tail + "; continue; }"
+				} else {
+					replacement = gap + semicolon + expressionText + tail + "; continue"
+				}
 			}
 		}
 		if !completeBlockReplacement &&

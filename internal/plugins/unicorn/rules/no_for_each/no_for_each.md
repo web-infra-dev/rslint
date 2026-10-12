@@ -55,6 +55,17 @@ Rslint withholds the edit when an ordinary function callback's `this` or
 boundary would change what those lexical references capture. The diagnostic is
 still reported; rewrite the loop manually when this pattern is intentional.
 
+The same safety check applies to parameter defaults. Rslint also withholds the
+edit when the first parameter's binding or default references the index
+parameter: converting to `[index, element]` would initialize the index earlier
+than the original callback. Safe defaults in two-parameter callbacks are retained:
+
+```js
+[undefined].forEach((element = 1, index) => use(element, index));
+// Autofix:
+for (const [index, element = 1] of [undefined].entries()) use(element, index);
+```
+
 ## Further reading
 
 - [Upstream documentation](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v77.0.0/docs/rules/no-for-each.md)
