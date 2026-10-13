@@ -123,7 +123,12 @@ func (local *localExports) captureTypeScriptExportDocs(file *ast.SourceFile, exp
 				nodes = []*ast.Node{decl, member}
 			}
 			doc := &exportDocSource{file: file, nodes: nodes}
-			for _, name := range exportedDeclarationNames(member) {
+			names := exportedDeclarationNames(member)
+			// Keep docs for the import aliases appendNamespaceAssignment exposes.
+			if member.Kind == ast.KindImportEqualsDeclaration {
+				names = []string{member.Name().Text()}
+			}
+			for _, name := range names {
 				for i := first; i < len(local.Steps); i++ {
 					if local.Steps[i].Docs == nil {
 						local.Steps[i].Docs = make(map[string]*exportDocSource)

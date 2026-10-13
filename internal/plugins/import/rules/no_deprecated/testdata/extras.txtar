@@ -102,6 +102,8 @@ export function old(){}
 export const value=1;
 /** @deprecated other reason */
 export const other=2;
+/** @deprecated alias reason */
+export import alias = Math;
 }
 export = API;
 -- assigned-value.ts --
