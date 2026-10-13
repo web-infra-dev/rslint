@@ -756,7 +756,7 @@ export class IpcClient {
             if (this.pendingReleases.has(msg.id)) {
               this.close(new Error('duplicate pending shared memory request'));
             } else {
-              this.pendingReleases.set(msg.id, received.release);
+              this.pendingReleases.set(msg.id, received.release.bind(received));
               this.scheduleReleases();
             }
           } else if (batches !== false) {

@@ -379,7 +379,7 @@ export class ConfigModuleHost {
     }
     if (request.protocolVersion !== CONFIG_DISCOVERY_PROTOCOL_VERSION) {
       throw protocolError(
-        `unsupported version ${String(request.protocolVersion)}; expected ${CONFIG_DISCOVERY_PROTOCOL_VERSION}`,
+        `unsupported version ${String(request.protocolVersion)}; expected ${String(CONFIG_DISCOVERY_PROTOCOL_VERSION)}`,
       );
     }
     if (
@@ -408,7 +408,7 @@ export class ConfigModuleHost {
     }
     if (request.protocolVersion !== CONFIG_DISCOVERY_PROTOCOL_VERSION) {
       throw protocolError(
-        `unsupported version ${String(request.protocolVersion)}; expected ${CONFIG_DISCOVERY_PROTOCOL_VERSION}`,
+        `unsupported version ${String(request.protocolVersion)}; expected ${String(CONFIG_DISCOVERY_PROTOCOL_VERSION)}`,
       );
     }
     if (

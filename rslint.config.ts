@@ -31,7 +31,7 @@ export default defineConfig([
   ]),
   // Start from recommended preset, then override rules and parserOptions
   js.configs.recommended,
-  ts.configs.recommended,
+  ts.configs.recommendedTypeChecked,
   {
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
@@ -56,12 +56,8 @@ export default defineConfig([
       '@typescript-eslint/no-unsafe-member-access': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
       '@typescript-eslint/no-unsafe-assignment': 'warn',
-      '@typescript-eslint/no-unsafe-call': 'error',
       '@typescript-eslint/no-confusing-void-expression': 'error',
-      '@typescript-eslint/no-redundant-type-constituents': 'error',
       '@typescript-eslint/no-unsafe-type-assertion': 'error',
-      '@typescript-eslint/no-unsafe-enum-comparison': 'error',
-      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
       '@typescript-eslint/no-var-requires': 'error',
       '@typescript-eslint/no-empty-function': 'error',
       '@typescript-eslint/no-empty-interface': 'error',
