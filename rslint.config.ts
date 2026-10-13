@@ -41,6 +41,12 @@ export default defineConfig([
   ts.configs.recommendedTypeChecked,
   importPlugin.configs.recommended,
   {
+    rules: {
+      // The default Node resolver cannot resolve TypeScript source imports.
+      'import/no-unresolved': 'off',
+    },
+  },
+  {
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parserOptions: {
