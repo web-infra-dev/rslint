@@ -725,6 +725,17 @@ func gitIgnoreNodeGlob(pattern *IgnorePattern) string {
 // `!` and file-level patterns are excluded by Kind. Shared by GetConfigForFile
 // (lint) and canPruneDir (walk).
 func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
+	return isDirAbsolutelyBlockedAboveFloor(dirPath, patterns, 0)
+}
+
+// isDirAbsolutelyBlockedAboveFloor applies the existing matcher with an
+// exclusive lower bound for ancestor candidates. A nonzero floor is used only
+// when an entry's base is above its ConfigArray root.
+func isDirAbsolutelyBlockedAboveFloor(
+	dirPath string,
+	patterns []IgnorePattern,
+	minimumDepth int,
+) bool {
 	var candidates []string
 	firstPattern := true
 	for i := range patterns {
@@ -737,13 +748,19 @@ func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
 		// directory pattern would otherwise repeat every synthetic `/x` value.
 		if firstPattern {
 			firstPattern = false
-			if directoryPatternAbsolutelyBlocks(p, dirPath) {
+			if directoryPatternAbsolutelyBlocks(p, dirPath, minimumDepth) {
 				return true
 			}
 			continue
 		}
 		if candidates == nil {
-			candidates = directoryBlockCandidates(dirPath)
+			// A later pattern may match the complete directory immediately.
+			// Keep that short circuit before materializing ancestor probes.
+			if (minimumDepth <= 0 || 1+strings.Count(dirPath, "/") > minimumDepth) &&
+				ignorePatternMatches(p, dirPath) {
+				return true
+			}
+			candidates = directoryBlockCandidates(dirPath, minimumDepth)
 		}
 		for _, candidate := range candidates {
 			if ignorePatternMatches(p, candidate) {
@@ -754,71 +771,47 @@ func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
 	return false
 }
 
-func directoryPatternAbsolutelyBlocks(pattern IgnorePattern, dirPath string) bool {
-	if ignorePatternMatches(pattern, dirPath) || ignorePatternMatches(pattern, dirPath+"/x") {
+func directoryPatternAbsolutelyBlocks(pattern IgnorePattern, dirPath string, minimumDepth int) bool {
+	if (minimumDepth <= 0 || 1+strings.Count(dirPath, "/") > minimumDepth) &&
+		(ignorePatternMatches(pattern, dirPath) || ignorePatternMatches(pattern, dirPath+"/x")) {
 		return true
 	}
+	depth := 1
 	for slash := strings.IndexByte(dirPath, '/'); slash >= 0; {
-		partial := dirPath[:slash]
-		if ignorePatternMatches(pattern, partial) || ignorePatternMatches(pattern, partial+"/x") {
-			return true
+		if depth > minimumDepth {
+			partial := dirPath[:slash]
+			if ignorePatternMatches(pattern, partial) || ignorePatternMatches(pattern, partial+"/x") {
+				return true
+			}
 		}
 		next := strings.IndexByte(dirPath[slash+1:], '/')
 		if next < 0 {
 			break
 		}
 		slash += next + 1
+		depth++
 	}
 	return false
 }
 
-// isDirAbsolutelyBlockedAboveFloor applies the existing matcher with an
-// exclusive lower bound for ancestor candidates. It is used only when an
-// entry's base is above its ConfigArray root.
-func isDirAbsolutelyBlockedAboveFloor(
-	dirPath string,
-	patterns []IgnorePattern,
-	minimumDepth int,
-) bool {
-	for i := range patterns {
-		pattern := patterns[i]
-		if pattern.Negated || pattern.Kind != dirAbsoluteBlock {
-			continue
-		}
-		if depth := 1 + strings.Count(dirPath, "/"); depth > minimumDepth &&
-			(ignorePatternMatches(pattern, dirPath) || ignorePatternMatches(pattern, dirPath+"/x")) {
-			return true
-		}
-		depth := 1
-		for slash := strings.IndexByte(dirPath, '/'); slash >= 0; {
-			if depth > minimumDepth {
-				partial := dirPath[:slash]
-				if ignorePatternMatches(pattern, partial) || ignorePatternMatches(pattern, partial+"/x") {
-					return true
-				}
-			}
-			next := strings.IndexByte(dirPath[slash+1:], '/')
-			if next < 0 {
-				break
-			}
-			slash += next + 1
-			depth++
-		}
+func directoryBlockCandidates(dirPath string, minimumDepth int) []string {
+	pathDepth := 1 + strings.Count(dirPath, "/")
+	candidates := make([]string, 0, 2*max(pathDepth-max(minimumDepth, 0), 0))
+	if pathDepth > minimumDepth {
+		candidates = append(candidates, dirPath, dirPath+"/x")
 	}
-	return false
-}
-
-func directoryBlockCandidates(dirPath string) []string {
-	candidates := make([]string, 0, 2+2*strings.Count(dirPath, "/"))
-	candidates = append(candidates, dirPath, dirPath+"/x")
+	depth := 1
 	for slash := strings.IndexByte(dirPath, '/'); slash >= 0; {
-		partial := dirPath[:slash]
-		candidates = append(candidates, partial, partial+"/x")
+		if depth > minimumDepth {
+			partial := dirPath[:slash]
+			candidates = append(candidates, partial, partial+"/x")
+		}
 		next := strings.IndexByte(dirPath[slash+1:], '/')
 		if next < 0 {
 			break
 		}
 		slash += next + 1
+		depth++
 	}
 	return candidates
 }

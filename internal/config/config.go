@@ -799,7 +799,7 @@ func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string
 				continue
 			}
 			dirPath, ok := ignoreDirectoryPathForPattern(filePath, cwd, pattern)
-			if ok && directoryPatternAbsolutelyBlocks(pattern, dirPath) {
+			if ok && directoryPatternAbsolutelyBlocks(pattern, dirPath, 0) {
 				return true
 			}
 		}

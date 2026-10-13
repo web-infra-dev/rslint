@@ -334,13 +334,70 @@ func TestIsDirAbsolutelyBlocked_PathShapeDifferential(t *testing.T) {
 	}
 }
 
-func FuzzIsDirAbsolutelyBlockedMatchesStructuredReference(f *testing.F) {
-	f.Add("src/vs/workbench/contrib/chat", "**/dist/**\x00src/**\x00!src/keep/**", false)
-	f.Add("/repo", "foo/..\x00**/node_modules/**", false)
-	f.Add("a///b/", "a/**\x00**/b\x00a/**/*", true)
-	f.Add("α/β/γ", "**/β\x00[αβ]/**", false)
+// Freeze the old floor-aware enumeration independently of the production
+// candidate helpers. Empty components contribute to depth, even for absolute
+// paths and repeated slashes.
+func structuredDirBlockAboveFloorReference(dirPath string, patterns []IgnorePattern, minimumDepth int) bool {
+	segments := strings.Split(dirPath, "/")
+	for _, pattern := range patterns {
+		if pattern.Negated || pattern.Kind != dirAbsoluteBlock {
+			continue
+		}
+		if len(segments) > minimumDepth &&
+			(ignorePatternMatches(pattern, dirPath) || ignorePatternMatches(pattern, dirPath+"/x")) {
+			return true
+		}
+		for depth := 1; depth < len(segments); depth++ {
+			if depth <= minimumDepth {
+				continue
+			}
+			partial := strings.Join(segments[:depth], "/")
+			if ignorePatternMatches(pattern, partial) || ignorePatternMatches(pattern, partial+"/x") {
+				return true
+			}
+		}
+	}
+	return false
+}
 
-	f.Fuzz(func(t *testing.T, dirPath string, encodedPatterns string, caseInsensitive bool) {
+func TestIsDirAbsolutelyBlockedAboveFloor_PathShapeDifferential(t *testing.T) {
+	patternSets := [][]string{
+		{"!a/**", "cover/**/*", "one/*"},
+		{"missing/**"},
+		{"missing/**", "a/x"},
+		{"missing/**", "a/b/**"},
+		{"missing/**", "a/b/x", "a/**", "!a/b/**"},
+		{"missing/**", "foo/..", "**/[bB]", "**/{x,y}/**", "**/β"},
+	}
+	for _, raw := range patternSets {
+		for _, caseInsensitive := range []bool{false, true} {
+			patterns := ParseIgnorePatterns(raw)
+			for i := range patterns {
+				patterns[i].CaseInsensitive = caseInsensitive
+			}
+			for _, dirPath := range []string{
+				"", ".", "/", "//", "/repo", "repo/", "a//b", "a///b/",
+				"a/b/c", "A/B/C", "x/y/z", "α/β/γ", "//server/share/a/b", "C:/repo/a/b",
+			} {
+				for _, floor := range []int{-1, 0, 1, 2, 3, 4, 8, 64} {
+					want := structuredDirBlockAboveFloorReference(dirPath, patterns, floor)
+					if got := isDirAbsolutelyBlockedAboveFloor(dirPath, patterns, floor); got != want {
+						t.Fatalf("dir=%q patterns=%v caseInsensitive=%v floor=%d: got %v, want %v",
+							dirPath, raw, caseInsensitive, floor, got, want)
+					}
+				}
+			}
+		}
+	}
+}
+
+func FuzzIsDirAbsolutelyBlockedMatchesStructuredReference(f *testing.F) {
+	f.Add("src/vs/workbench/contrib/chat", "**/dist/**\x00src/**\x00!src/keep/**", false, uint8(1))
+	f.Add("/repo", "foo/..\x00**/node_modules/**", false, uint8(0))
+	f.Add("a///b/", "missing/**\x00**/b\x00a/**/*", true, uint8(2))
+	f.Add("α/β/γ", "missing/**\x00**/β\x00[αβ]/**", false, uint8(1))
+
+	f.Fuzz(func(t *testing.T, dirPath string, encodedPatterns string, caseInsensitive bool, minimumDepth uint8) {
 		if len(dirPath) > 256 || len(encodedPatterns) > 512 {
 			t.Skip()
 		}
@@ -354,6 +411,12 @@ func FuzzIsDirAbsolutelyBlockedMatchesStructuredReference(f *testing.F) {
 		if got := isDirAbsolutelyBlocked(dirPath, patterns); got != want {
 			t.Fatalf("dir=%q patterns=%q caseInsensitive=%v: got %v, want %v",
 				dirPath, encodedPatterns, caseInsensitive, got, want)
+		}
+		floor := int(minimumDepth)
+		want = structuredDirBlockAboveFloorReference(dirPath, patterns, floor)
+		if got := isDirAbsolutelyBlockedAboveFloor(dirPath, patterns, floor); got != want {
+			t.Fatalf("dir=%q patterns=%q caseInsensitive=%v floor=%d: got %v, want %v",
+				dirPath, encodedPatterns, caseInsensitive, floor, got, want)
 		}
 	})
 }

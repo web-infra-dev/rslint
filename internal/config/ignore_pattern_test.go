@@ -394,6 +394,49 @@ func TestIsDirAbsolutelyBlocked_AncestorScan(t *testing.T) {
 	}
 }
 
+func BenchmarkDirectoryBlocking(b *testing.B) {
+	const directory = "apps/app/src/components/forms/controls/input"
+	misses := []string{
+		"**/node_modules/**", "**/dist/**", "**/build/**", "**/coverage/**",
+		"**/.git/**", "**/.cache/**", "**/vendor/**", "**/generated/**",
+		"**/fixtures/**", "**/snapshots/**", "**/temp/**", "**/logs/**",
+	}
+	for _, test := range []struct {
+		name     string
+		patterns []string
+		want     bool
+	}{
+		{"no directory patterns", []string{"!apps/**", "apps/**/*", "apps/*"}, false},
+		{"first match", []string{"apps/**"}, true},
+		{"second match", []string{misses[0], "apps/**"}, true},
+		{"one miss", misses[:1], false},
+		{"many misses", misses, false},
+		{"late ancestor probe", append(append([]string{}, misses...), "apps/app/src/x"), true},
+	} {
+		for _, floor := range []int{0, 2} {
+			name := test.name + "/unrestricted"
+			if floor != 0 {
+				name = test.name + "/scoped"
+			}
+			b.Run(name, func(b *testing.B) {
+				patterns := ParseIgnorePatterns(test.patterns)
+				b.ReportAllocs()
+				for b.Loop() {
+					var got bool
+					if floor == 0 {
+						got = isDirAbsolutelyBlocked(directory, patterns)
+					} else {
+						got = isDirAbsolutelyBlockedAboveFloor(directory, patterns, floor)
+					}
+					if got != test.want {
+						b.Fatalf("got %v, want %v", got, test.want)
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestDirectoryBlockMatcherCachesLexicalDirectory(t *testing.T) {
 	patterns := ParseIgnorePatterns([]string{"dist/**", "**/build", "!dist/keep.ts"})
 	tests := []struct {
