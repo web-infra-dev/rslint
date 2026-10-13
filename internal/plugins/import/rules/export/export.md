@@ -4,6 +4,8 @@
 
 Reports duplicate named or default exports, including conflicts introduced by `export *`. Every conflicting occurrence is reported because the rule cannot determine which export was intended.
 
+Explicit value exports take precedence over names from `export *`, regardless of statement order. If a name is explicitly exported more than once, only those explicit exports are reported. Star conflicts for other names are still reported.
+
 This rule is enabled in `importPlugin.configs.recommended`.
 
 Examples of **incorrect** code for this rule:
@@ -27,6 +29,13 @@ export const foo = "foo";
 export const bar = "bar";
 ```
 
+```javascript
+// Override value while forwarding the other exports from base.js.
+const value = 2;
+export { value };
+export * from "./base.js";
+```
+
 ```typescript
 export const Foo = 1;
 export type Foo = number;
@@ -47,6 +56,12 @@ A star re-export also reports when its target has no named exports. Default expo
 This rule has no options. It does not provide automatic fixes or suggestions.
 
 ## Differences from upstream
+
+Unlike eslint-plugin-import v2.32.0, Rslint permits explicit value exports to shadow star exports, following [ECMAScript ResolveExport](https://tc39.es/ecma262/multipage/ecmascript-language-scripts-and-modules.html#sec-resolveexport). The example above is valid even when `base.js` exports `value` or several star exports provide that name.
+
+Namespace re-exports such as `export * as ns from "./base.js"` and `export * as "ns" from "./base.js"` declare the single explicit name `ns`. They can shadow a star export named `ns`, and duplicate explicit uses of that name are reported. Upstream skips identifier aliases and treats string aliases as star exports.
+
+Export classification is syntactic: explicit `export type` declarations and `type` specifiers cannot resolve runtime star conflicts. Type-only namespace aliases use the type namespace; the existing upstream grouping of type and value names is otherwise preserved.
 
 Diagnostics for invalid dependency syntax can differ from ESLint. For example, if `dependency.js` contains `return; export {};`, then `export * from "./dependency.js"` reports "No named exports found" in Rslint, while ESLint's default configuration reports a parse error. Check and fix the dependency's syntax before investigating missing exports.
 
