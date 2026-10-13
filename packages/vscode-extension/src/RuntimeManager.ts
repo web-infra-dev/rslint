@@ -80,7 +80,10 @@ export class RuntimeManager {
   public initialize(documents: readonly TextDocument[]): void {
     for (const document of documents) {
       void this.reconcile(document).catch((error: unknown) => {
-        this.logger.error(`Failed to initialize ${document.uri}`, error);
+        this.logger.error(
+          `Failed to initialize ${document.uri.toString()}`,
+          error,
+        );
       });
     }
   }
@@ -117,7 +120,10 @@ export class RuntimeManager {
         await this.detachDocument(document);
         this.documentEpochs.delete(key);
       }).catch((error: unknown) => {
-        this.logger.error(`Failed to release ${document.uri}`, error);
+        this.logger.error(
+          `Failed to release ${document.uri.toString()}`,
+          error,
+        );
       });
     }, 0);
   }
@@ -170,7 +176,7 @@ export class RuntimeManager {
       this.bindings.set(key, replacement);
       switched = true;
       this.logger.debug(
-        `Using ${resolved.installation.packageDirectory} for ${document.uri}`,
+        `Using ${resolved.installation.packageDirectory} for ${document.uri.toString()}`,
       );
     } catch (error) {
       if (replacement && !switched) {
@@ -331,7 +337,7 @@ export class RuntimeManager {
   ): void {
     const message = error instanceof Error ? error.message : String(error);
     this.logger.error(
-      `Could not select Rslint core for ${document.uri}`,
+      `Could not select Rslint core for ${document.uri.toString()}`,
       error,
     );
     const workspaceKey = workspace

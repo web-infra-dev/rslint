@@ -74,7 +74,7 @@ export class Extension {
       workspace.onDidOpenTextDocument((document) => {
         void runtimeManager.reconcile(document).catch((error: unknown) => {
           this.logger.error(
-            `Failed to open ${document.uri} with Rslint`,
+            `Failed to open ${document.uri.toString()} with Rslint`,
             error,
           );
         });

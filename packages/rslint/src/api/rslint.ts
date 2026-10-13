@@ -178,7 +178,9 @@ function deduplicateScanDirectories(directories: Iterable<string>): string[] {
     const key = nativePathIdentity.key(normalized);
     if (!byIdentity.has(key)) byIdentity.set(key, normalized);
   }
-  return [...byIdentity.values()].sort(nativePathIdentity.compare);
+  return [...byIdentity.values()].sort((left, right) =>
+    nativePathIdentity.compare(left, right),
+  );
 }
 
 function normalizeGlobPatternForCwd(pattern: string, cwd: string): string {

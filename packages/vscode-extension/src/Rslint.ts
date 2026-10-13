@@ -193,16 +193,11 @@ async function raceWithAbort<T>(
       reject(abortError(signal));
     };
     signal.addEventListener('abort', onAbort, { once: true });
-    operation.then(
-      (value) => {
+    operation
+      .finally(() => {
         signal.removeEventListener('abort', onAbort);
-        resolve(value);
-      },
-      (error: unknown) => {
-        signal.removeEventListener('abort', onAbort);
-        reject(error);
-      },
-    );
+      })
+      .then(resolve, reject);
   });
 }
 
@@ -890,7 +885,9 @@ export class Rslint implements Disposable {
       ?.getFeature(DidOpenTextDocumentNotification.method)
       .getProvider(document);
     if (!provider) {
-      throw new Error(`didOpen provider is unavailable for ${document.uri}`);
+      throw new Error(
+        `didOpen provider is unavailable for ${document.uri.toString()}`,
+      );
     }
     await provider.send(document);
   }
@@ -900,7 +897,9 @@ export class Rslint implements Disposable {
       ?.getFeature(DidCloseTextDocumentNotification.method)
       .getProvider(document);
     if (!provider) {
-      throw new Error(`didClose provider is unavailable for ${document.uri}`);
+      throw new Error(
+        `didClose provider is unavailable for ${document.uri.toString()}`,
+      );
     }
     await provider.send(document);
   }
