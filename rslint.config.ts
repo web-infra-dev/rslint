@@ -47,14 +47,9 @@ export default defineConfig([
     },
   },
   {
-    files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parserOptions: {
-        projectService: false,
-        project: [
-          './packages/*/tsconfig.build.json',
-          './packages/*/tsconfig.spec.json',
-        ],
+        projectService: true,
       },
     },
     rules: {
@@ -87,6 +82,16 @@ export default defineConfig([
       '@typescript-eslint/switch-exhaustiveness-check': 'warn',
       '@typescript-eslint/unified-signatures': 'warn',
       'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    files: ['website/**'],
+    languageOptions: {
+      parserOptions: {
+        // Keep website linting source-only while typed diagnostics are addressed.
+        projectService: false,
+        project: false,
+      },
     },
   },
   {
