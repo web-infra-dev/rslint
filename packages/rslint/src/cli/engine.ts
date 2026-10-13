@@ -9,8 +9,12 @@
  * Exit codes propagate from the Go child (or 2 on a host-level failure).
  */
 import type { ChildProcess } from 'node:child_process';
-import { spawnIpcProcess, type IpcProcessOptions } from '../ipc/index.js';
-import type { IpcAttachment, IpcMessage } from '../ipc/index.js';
+import {
+  spawnIpcProcess,
+  type IpcProcessOptions,
+  type IpcAttachment,
+  type IpcMessage,
+} from '../ipc/index.js';
 import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,

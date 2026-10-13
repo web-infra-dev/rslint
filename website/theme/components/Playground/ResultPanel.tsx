@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@components/ui/button';
-import { Share2Icon, CheckIcon } from 'lucide-react';
+import { Share2Icon, CheckIcon, AlertCircleIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@components/ui/alert';
-import { AlertCircleIcon } from 'lucide-react';
 import './ResultPanel.css';
 import {
   AstInfoPanel,

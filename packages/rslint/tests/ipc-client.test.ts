@@ -10,7 +10,6 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { IpcClient, encodeFrame, decodeFrame } from '../src/ipc/client.js';
 import { spawnIpcProcess } from '../src/ipc/process.js';
-import type { MessageKind } from '../src/ipc/protocol.js';
 import type { IpcClientOptions } from '../src/ipc/client.js';
 import {
   createMemoryTransport,
@@ -22,6 +21,7 @@ import {
   type MemoryConfiguration,
 } from '../src/native/binding.js';
 import type {
+  MessageKind,
   WireMessage as IpcMessage,
   MemoryBatch,
 } from '../src/ipc/protocol.js';
