@@ -2,14 +2,16 @@ export const AST_NODE_TYPES: any = {};
 export enum AST_TOKEN_TYPES {
   Identifier,
 }
-export const TSESTree: any = {};
-export type TSESTree = any;
+const TSESTree: any = {};
+type TSESTree = any;
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace TSESTree {
+namespace TSESTree {
   export type Program = any;
   export type Node = any;
 }
+
+export { TSESTree };
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace TSESLint {

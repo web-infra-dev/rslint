@@ -1,4 +1,11 @@
-import { defineConfig, globalIgnores, globals, js, ts } from '@rslint/core';
+import {
+  defineConfig,
+  globalIgnores,
+  globals,
+  importPlugin,
+  js,
+  ts,
+} from '@rslint/core';
 
 export default defineConfig([
   globalIgnores([
@@ -32,6 +39,13 @@ export default defineConfig([
   // Start from recommended preset, then override rules and parserOptions
   js.configs.recommended,
   ts.configs.recommendedTypeChecked,
+  importPlugin.configs.recommended,
+  {
+    rules: {
+      // The default Node resolver cannot resolve TypeScript source imports.
+      'import/no-unresolved': 'off',
+    },
+  },
   {
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
