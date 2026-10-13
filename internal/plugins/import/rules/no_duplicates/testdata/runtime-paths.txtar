@@ -1,0 +1,159 @@
+-- tsconfig.json --
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "jsx": "preserve",
+    "allowJs": true,
+    "paths": {
+      "@fixtures/*": ["./*"],
+      "shadowed-package": ["./substitution/text.ts"],
+      "shadowed-wildcard/*": ["./substitution/*"]
+    }
+  },
+  "files": ["entry.ts"]
+}
+-- entry.ts --
+export {};
+-- text.js --
+export const value = 'root';
+-- real/entry.ts --
+export {};
+-- real/text.js --
+export const value = 'real';
+-- only.ts --
+export const value = 'root-ts';
+-- real/only.ts --
+export const value = 'real-ts';
+-- coexisting/text.js --
+export const value = 'js';
+-- coexisting/text.ts --
+export const value = 'ts';
+export type Value = string;
+-- coexisting/text.jsx --
+export const value = 'jsx';
+-- coexisting/text.tsx --
+export const value = 'tsx';
+-- coexisting/text.mjs --
+export const value = 'mjs';
+-- coexisting/text.mts --
+export const value = 'mts';
+-- coexisting/text.cjs --
+exports.value = 'cjs';
+-- coexisting/text.cts --
+export const value = 'cts';
+-- coexisting/sub/keep.txt --
+Keep this directory available for normalized path imports.
+-- substitution/text.ts --
+export const value = 'ts';
+export type Value = string;
+-- substitution/text.tsx --
+export const value = 'tsx';
+-- substitution/text.mts --
+export const value = 'mts';
+-- substitution/text.cts --
+export const value = 'cts';
+-- commonjs/text.js --
+exports.x = 1;
+exports.y = 2;
+-- commonjs/text.d.ts --
+export const x: number;
+export const y: number;
+-- node_modules/url-targets/package.json --
+{
+  "name": "url-targets",
+  "type": "module",
+  "exports": {
+    "./plain": "./shared.js",
+    "./query-one": "./shared.js?one",
+    "./query-two": "./shared.js?two",
+    "./query-alias": "./shared.js?one",
+    "./fragment-one": "./shared.js#one",
+    "./fragment-two": "./shared.js#two",
+    "./fragment-alias": "./shared.js#one",
+    "./empty-query": "./shared.js?",
+    "./empty-fragment": "./shared.js#"
+  }
+}
+-- node_modules/url-targets/shared.js --
+globalThis.loads = (globalThis.loads || 0) + 1;
+export const x = globalThis.loads, y = globalThis.loads;
+-- node_modules/shadowed-package/package.json --
+{ "name": "shadowed-package", "main": "./index.js" }
+-- node_modules/shadowed-package/index.js --
+export const value = 'package';
+-- node_modules/shadowed-wildcard/package.json --
+{ "name": "shadowed-wildcard" }
+-- node_modules/shadowed-wildcard/text.js --
+export const value = 'wildcard-package';
+-- node_modules/extension-pair/package.json --
+{
+  "name": "extension-pair",
+  "exports": { "./text.js": "./text.js", "./text.ts": "./text.ts" }
+}
+-- node_modules/extension-pair/text.js --
+export const value = 'package-js';
+-- node_modules/extension-pair/text.ts --
+export const value = 'package-ts';
+-- node_modules/shared-types/package.json --
+{
+  "name": "shared-types",
+  "exports": {
+    "./first": { "types": "./shared.d.ts", "default": "./first.js" },
+    "./second": { "types": "./shared.d.ts", "default": "./second.js" },
+    "./alias": { "types": "./shared.d.ts", "default": "./first.js" }
+  }
+}
+-- node_modules/shared-types/shared.d.ts --
+export const value: string;
+-- node_modules/shared-types/first.js --
+export const value = 'first';
+-- node_modules/shared-types/second.js --
+export const value = 'second';
+-- node_modules/shared-runtime/package.json --
+{
+  "name": "shared-runtime",
+  "exports": {
+    "./first": { "types": "./first.d.ts", "default": "./shared.js" },
+    "./second": { "types": "./second.d.ts", "default": "./shared.js" }
+  }
+}
+-- node_modules/shared-runtime/first.d.ts --
+export type First = 'first';
+export const value: First;
+-- node_modules/shared-runtime/second.d.ts --
+export type Second = 'second';
+export const value: Second;
+-- node_modules/shared-runtime/shared.js --
+export const value = 'runtime';
+-- node_modules/conditional-runtime/package.json --
+{
+  "name": "conditional-runtime",
+  "exports": {
+    "./first": {
+      "types": "./shared.d.ts",
+      "development": "./dev-first.mjs",
+      "import": "./shared.mjs",
+      "require": "./first.cjs"
+    },
+    "./second": {
+      "types": "./shared.d.ts",
+      "development": "./dev-second.mjs",
+      "import": "./shared.mjs",
+      "require": "./second.cjs"
+    }
+  }
+}
+-- node_modules/conditional-runtime/shared.d.ts --
+export const value: string;
+-- node_modules/conditional-runtime/shared.mjs --
+export const value = 'shared';
+-- node_modules/conditional-runtime/dev-first.mjs --
+export const value = 'dev-first';
+-- node_modules/conditional-runtime/dev-second.mjs --
+export const value = 'dev-second';
+-- node_modules/conditional-runtime/first.cjs --
+exports.value = 'first';
+-- node_modules/conditional-runtime/second.cjs --
+exports.value = 'second';

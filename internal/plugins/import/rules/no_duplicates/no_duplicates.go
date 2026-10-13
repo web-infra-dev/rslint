@@ -7,10 +7,13 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
@@ -108,8 +111,8 @@ func processScope(resolver *importResolver, statements []*ast.Node) {
 			continue
 		}
 
-		resolvedPath := resolver.resolve(importDecl)
-		if resolvedPath == "" {
+		resolved := resolver.resolve(importDecl)
+		if resolved.path == "" {
 			continue
 		}
 
@@ -120,7 +123,7 @@ func processScope(resolver *importResolver, statements []*ast.Node) {
 		}
 
 		attributes := modules.SourceFromSpecifier(importDecl.ModuleSpecifier).Attributes()
-		identity := resolvedPath + "\x00" + attributes.Key()
+		identity := resolved.path + "\x00" + resolved.resourceSuffix + "\x00" + resolved.typePath + "\x00" + attributes.Key()
 		entry, exists := importMap.entries[identity]
 		if !exists {
 			importMap.entries[identity] = importEntry{first: stmt}
@@ -128,7 +131,7 @@ func processScope(resolver *importResolver, statements []*ast.Node) {
 		}
 		if entry.groupIndex == 0 {
 			importMap.groups = append(importMap.groups, duplicateGroup{
-				module: resolvedPath,
+				module: resolved.path,
 				first:  entry.first,
 				rest:   []*ast.Node{stmt},
 			})
@@ -196,6 +199,12 @@ func getModuleSpecifierText(moduleSpecifier *ast.Node, sourceText string) string
 	return raw
 }
 
+type moduleIdentity struct {
+	path           string
+	typePath       string
+	resourceSuffix string
+}
+
 type importResolver struct {
 	ctx            rule.RuleContext
 	opts           ruleOptions
@@ -205,67 +214,186 @@ type importResolver struct {
 	commentsKnown  bool
 	hasComments    bool
 	commentFactory *ast.NodeFactory
+	pathAliases    *moduleresolver.PathAliasResolver
 }
 
-// resolve returns the canonical grouping path for an import. Resolution mode
-// is identical for ordinary import declarations in one source file, so it is
-// computed once. Type-only declarations with a resolution-mode override keep
-// their per-declaration mode.
-func (r *importResolver) resolve(importDecl *ast.ImportDeclaration) string {
+// resolve groups imports by their runtime path and any distinct type target.
+func (r *importResolver) resolve(importDecl *ast.ImportDeclaration) moduleIdentity {
 	moduleSpecifier := importDecl.ModuleSpecifier
 	if moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
-		return ""
+		return moduleIdentity{}
 	}
 
-	sourcePath := getModuleSpecifierText(moduleSpecifier, r.sourceText)
-
-	if r.opts.considerQueryString {
-		idx := strings.Index(sourcePath, "?")
-		if idx >= 0 {
-			query := sourcePath[idx:]
-			if resolved, ok := r.resolveModule(importDecl, moduleSpecifier); ok {
-				return resolved + query
+	sourcePath, query, hasQuery := strings.Cut(getModuleSpecifierText(moduleSpecifier, r.sourceText), "?")
+	identity := moduleIdentity{path: sourcePath}
+	// On POSIX a backslash can name a different file. TypeScript's separator
+	// normalization cannot prove equivalence for these authored requests.
+	posixBackslash := strings.ContainsRune(sourcePath, '\\') && tspath.GetRootLength(r.ctx.Program().CurrentDirectory()) == 1
+	if !posixBackslash {
+		resolvedPath, mode := r.compilerTarget(importDecl, sourcePath)
+		if resolved, ok := r.resolveExistingFile(sourcePath); ok {
+			identity.path = resolved
+		} else if resolved, ok := r.resolveModule(importDecl, sourcePath, resolvedPath, mode); ok {
+			identity = resolved
+		}
+		// Equal runtime targets can expose different type targets, including
+		// through local symlinks. Both must agree before imports can be merged.
+		if resolvedPath != "" {
+			typePath := r.canonicalPath(resolvedPath)
+			if typePath != identity.path {
+				identity.typePath = typePath
 			}
-			return sourcePath[:idx] + query
 		}
 	}
-
-	if resolved, ok := r.resolveModule(importDecl, moduleSpecifier); ok {
-		return resolved
+	if r.opts.considerQueryString && hasQuery {
+		identity.path += "?" + query
 	}
-
-	// Strip query strings when not considering them, so `./bar?a` and `./bar?b`
-	// map to the same key.
-	if !r.opts.considerQueryString {
-		if idx := strings.Index(sourcePath, "?"); idx >= 0 {
-			return sourcePath[:idx]
-		}
-	}
-	return sourcePath
+	return identity
 }
 
-func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, moduleSpecifier *ast.Node) (string, bool) {
-	if !r.ctx.Program().IsValid() {
+// TypeScript substitutes .ts for .js even when both files exist. An existing
+// file named by the import is a stronger identity than its type-checking target.
+func (r *importResolver) resolveExistingFile(sourcePath string) (string, bool) {
+	if !r.ctx.Program().IsValid() || !tspath.IsExternalModuleNameRelative(sourcePath) {
 		return "", false
 	}
+	fileName := r.physicalPath(r.ctx.SourceFile.FileName())
+	filePath := tspath.ResolvePath(tspath.GetDirectoryPath(fileName), sourcePath)
+	if !r.ctx.Program().FileExists(filePath) {
+		return "", false
+	}
+	return r.canonicalPath(filePath), true
+}
 
+func (r *importResolver) canonicalPath(filePath string) string {
+	return tspath.GetCanonicalFileName(r.physicalPath(filePath), r.ctx.Program().FS().UseCaseSensitiveFileNames())
+}
+
+func (r *importResolver) physicalPath(filePath string) string {
+	program := r.ctx.Program()
+	if program.Options().PreserveSymlinks != core.TSTrue {
+		if realPath := program.FS().Realpath(filePath); realPath != "" {
+			filePath = realPath
+		}
+	}
+	return filePath
+}
+
+// A compiler-only alias can also select the .ts side of a .js/.ts pair. In
+// that case its resolved path does not prove runtime equivalence: retain the
+// authored request instead of merging it into an explicit file import.
+func (r *importResolver) hasRuntimeSibling(resolvedPath string) bool {
+	extension := tspath.TryGetExtensionFromPath(resolvedPath)
+	var runtimeExtensions []string
+	switch extension {
+	case tspath.ExtensionTs, tspath.ExtensionTsx, tspath.ExtensionDts:
+		runtimeExtensions = []string{tspath.ExtensionJs, tspath.ExtensionJsx}
+	case tspath.ExtensionMts, tspath.ExtensionDmts:
+		runtimeExtensions = []string{tspath.ExtensionMjs}
+	case tspath.ExtensionCts, tspath.ExtensionDcts:
+		runtimeExtensions = []string{tspath.ExtensionCjs}
+	default:
+		return false
+	}
+	stem := strings.TrimSuffix(resolvedPath, extension)
+	for _, runtimeExtension := range runtimeExtensions {
+		if r.ctx.Program().FileExists(stem + runtimeExtension) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *importResolver) hasPathAlias(importDecl *ast.ImportDeclaration, sourcePath string) bool {
+	if r.pathAliases == nil {
+		r.pathAliases = moduleresolver.NewPathAliasResolver(r.ctx.Program())
+	}
+	return r.pathAliases.HasAliasAt(r.ctx.SourceFile, sourcePath, modules.SourceFromSpecifier(importDecl.ModuleSpecifier))
+}
+
+func (r *importResolver) compilerTarget(importDecl *ast.ImportDeclaration, sourcePath string) (string, core.ResolutionMode) {
+	program := r.ctx.Program()
+	if !program.IsValid() {
+		return "", core.ModuleKindNone
+	}
+	moduleSpecifier := importDecl.ModuleSpecifier
+
+	// Ordinary imports share a mode; type-only declarations can override it.
 	mode := r.normalMode
 	hasOverride := false
 	if importDecl.ImportClause != nil && importDecl.ImportClause.AsImportClause().IsTypeOnly() && importDecl.Attributes != nil {
 		mode, hasOverride = importDecl.Attributes.GetResolutionModeOverride(nil)
 	}
 	if !hasOverride && !r.hasNormalMode {
-		mode = r.ctx.Program().GetModeForUsageLocation(r.ctx.SourceFile, moduleSpecifier)
+		mode = program.GetModeForUsageLocation(r.ctx.SourceFile, moduleSpecifier)
 		r.normalMode = mode
 		r.hasNormalMode = true
 	}
 
 	source := modules.SourceFromSpecifier(moduleSpecifier)
-	resolvedPath := r.ctx.Program().GetResolvedModulePath(r.ctx.SourceFile, source, mode)
-	if resolvedPath == "" {
-		return "", false
+	resolvedPath := program.GetResolvedModulePath(r.ctx.SourceFile, source, mode)
+	if sourcePath != moduleSpecifier.Text() {
+		// Query handling belongs to the grouping key, including when another
+		// request without the query already has a cached type target.
+		if resolved, _, ok := program.ResolveModuleNameAt(r.ctx.SourceFile, sourcePath, source); ok {
+			resolvedPath = resolved
+		}
 	}
-	return resolvedPath, true
+	return resolvedPath, mode
+}
+
+func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, sourcePath, resolvedPath string, mode core.ResolutionMode) (moduleIdentity, bool) {
+	program := r.ctx.Program()
+	if !program.IsValid() {
+		return moduleIdentity{}, false
+	}
+	fileName := r.physicalPath(r.ctx.SourceFile.FileName())
+	relative := tspath.IsExternalModuleNameRelative(sourcePath)
+	if !relative && !r.hasPathAlias(importDecl, sourcePath) || relative && mode == core.ResolutionModeCommonJS {
+		// Package entry points can share declarations while loading distinct
+		// runtime files. Use the existing resolver without the automatic types
+		// condition, retaining the request's import/require and custom conditions.
+		options := program.Options().Clone()
+		options.NoDtsResolution = core.TSTrue
+		runtimeOptions := moduleresolver.Options{
+			Conditions: module.GetConditions(options, mode), NodeExports: true,
+			PreserveSymlinks: options.PreserveSymlinks == core.TSTrue,
+		}
+		if mode == core.ResolutionModeCommonJS {
+			// require's extensionless lookup accepts .js, .json and .node;
+			// .mjs and .cjs need an explicit extension.
+			runtimeOptions.Extensions = []string{".js", ".json", ".node"}
+			runtimeOptions.LiteralPaths = true
+		}
+		resolved := moduleresolver.Resolve(program, sourcePath, fileName, runtimeOptions)
+		if resolved.Path != "" {
+			identity := moduleIdentity{path: r.canonicalPath(resolved.Path)}
+			if mode != core.ResolutionModeCommonJS {
+				// Export-target URL suffixes select ESM instances independently of
+				// considerQueryString, which controls the authored request only.
+				identity.resourceSuffix = resolved.ResourceSuffix
+			}
+			return identity, true
+		}
+	}
+
+	// A symlinked importer can run from a different directory than the one
+	// used by the compiler cache. That cache cannot prove runtime identity.
+	if tspath.GetDirectoryPath(fileName) != r.physicalPath(tspath.GetDirectoryPath(r.ctx.SourceFile.FileName())) {
+		return moduleIdentity{}, false
+	}
+
+	if resolvedPath == "" {
+		return moduleIdentity{}, false
+	}
+	// A declaration alone does not identify the file a value import loads.
+	if tspath.IsDeclarationFileName(resolvedPath) && !modules.SourceFromSpecifier(importDecl.ModuleSpecifier).TypeOnly() {
+		return moduleIdentity{}, false
+	}
+	if r.hasRuntimeSibling(resolvedPath) {
+		return moduleIdentity{}, false
+	}
+	return moduleIdentity{path: r.canonicalPath(resolvedPath)}, true
 }
 
 func (r *importResolver) hasProblematicComments(node *ast.Node) bool {

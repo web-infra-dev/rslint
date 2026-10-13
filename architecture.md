@@ -493,6 +493,14 @@ context fields: generic source references come from `Program().ModuleGraph()`,
 while rule-specific derived indexes use `CachedByProgram`. Both remain keyed by
 the same Program generation and can never become a second source identity.
 
+Import rules resolve authored requests and alternative spellings through
+`modules.Source`-aware APIs. `Program.ResolveModuleNameAt` retains the reference's
+resolution mode when comparing candidate names. The shared
+`moduleresolver.PathAliasResolver` probes only the selected compiler `paths`
+substitutions under that request's mode and attributes, so missing aliases can
+still fall back to package lookup. Low-level TypeScript resolver calls remain
+inside those resolution services.
+
 The linter creates one short-lived `CommentStore` per file. `Comments.All()`
 materializes the scanner-backed, source-ordered, deduplicated comment list only
 for the first consumer; later consumers share that list. A source without `//`
