@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 	"github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
@@ -95,22 +96,24 @@ var NoDeprecatedRule = rule.Rule{
 			return nil
 		}
 		scopes := scopeanalysis.References(ctx, names)
-		moduleScope := func(node *ast.Node, name string) bool {
-			// declaredScope inspects the first same-name reference in the active
-			// scope, rather than resolving the current identifier. Preserve that
-			// behavior for non-reference identifiers such as object property keys.
-			current := scopes.Acquire(node)
-			if current == nil {
+		references := make(map[*ast.Node]*scope.Reference)
+		for _, current := range scopes.Scopes {
+			for _, reference := range current.References {
+				if _, ok := names[reference.Identifier.Text()]; ok {
+					references[reference.Identifier] = reference
+				}
+			}
+		}
+		// Upstream's declaredScope uses the first same-name reference in the
+		// active scope, so it also reports shadowed locals, declarations and
+		// property keys. Resolve the identifier itself instead.
+		moduleScope := func(identifier *ast.Node) bool {
+			reference := references[identifier]
+			if reference == nil {
 				return false
 			}
-			for _, reference := range current.References {
-				if reference.Identifier.Text() != name {
-					continue
-				}
-				resolved := reference.Resolved()
-				return resolved != nil && resolved.Scope == scopes.Global
-			}
-			return false
+			resolved := reference.Resolved()
+			return resolved != nil && resolved.Scope == scopes.Global
 		}
 		checkImport := func(node *ast.Node) {
 			for _, item := range imports[node] {
@@ -130,7 +133,7 @@ var NoDeprecatedRule = rule.Rule{
 				return
 			}
 			namespace := namespaces[object.Text()]
-			if namespace == nil || !moduleScope(node, object.Text()) {
+			if namespace == nil || !moduleScope(object) {
 				return
 			}
 			for current := node; namespace != nil && current != nil; current = utils.ESTreeParent(current) {
@@ -175,7 +178,7 @@ var NoDeprecatedRule = rule.Rule{
 				case ast.KindImportSpecifier, ast.KindNamespaceImport, ast.KindImportClause, ast.KindImportEqualsDeclaration, ast.KindJsxAttribute, ast.KindJsxNamespacedName:
 					return
 				}
-				if moduleScope(node, node.Text()) {
+				if moduleScope(node) {
 					ctx.ReportNode(node, message(dep))
 				}
 			},

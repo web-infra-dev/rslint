@@ -76,6 +76,11 @@ This rule has no autofix or suggestions.
   stops upstream's documentation parser before it sees the deprecation; Rslint
   still reports the deprecated export. Correct the malformed tag to obtain the
   same result in both tools.
+- Each identifier is checked against its own binding. Upstream decides from the
+  first same-name reference in the current scope, so it also reports a local
+  that shadows the import, uses of that local, and object property keys such
+  as `{ old: 1 }` whenever that scope references the import elsewhere. Rslint
+  reports only references that resolve to the deprecated import.
 
 ## References
 
