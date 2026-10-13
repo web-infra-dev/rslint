@@ -148,6 +148,11 @@ func TestNoDuplicatesRuntimePaths(t *testing.T) {
 			options: []any{map[string]any{"prefer-inline": true}},
 		},
 		{
+			name:    "queried shared runtime with distinct type declarations",
+			code:    "import type { First } from 'shared-runtime/first?raw';\nimport type { Second } from 'shared-runtime/second?raw';\n",
+			options: []any{map[string]any{"prefer-inline": true}},
+		},
+		{
 			name: "shared runtime with distinct inline type declarations",
 			code: "import { type First } from 'shared-runtime/first';\nimport { type Second } from 'shared-runtime/second';\n",
 		},

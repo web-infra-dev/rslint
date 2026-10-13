@@ -22,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 func programForResolution(t *testing.T, files map[string]string, fileName string) *program.Program {
@@ -156,6 +157,59 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 			t.Errorf("symlinked directory export = %q, want %q", got, want)
 		}
 	})
+}
+
+func TestPathAliasRequestContext(t *testing.T) {
+	const root = "/alias-context"
+	const fileName = root + "/input.mts"
+	archive := txtarfs.MustParseFile(t, "testdata/node_resolution.txtar")
+	names, err := archive.FileNames("alias-context")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{}
+	for _, name := range names {
+		data, err := archive.ReadFile("alias-context/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[tspath.ResolvePath(root, name)] = string(data)
+	}
+	create := func() *program.Program {
+		fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), files)
+		raw, err := utils.CreateProgram(true, fs, root, "tsconfig.json", utils.CreateCompilerHost(root, fs))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return program.NewFromCompiler(raw)
+	}
+	p := create()
+	sourceFile := p.GetSourceFile(fileName)
+	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 2 {
+		t.Fatal("alias fixture must contain both resolution-mode requests")
+	}
+	resolver := moduleresolver.NewPathAliasResolver(p)
+	for index, want := range []bool{false, true} {
+		source := modules.SourceFromSpecifier(sourceFile.Statements.Nodes[index].AsImportDeclaration().ModuleSpecifier)
+		if got := resolver.HasAliasAt(sourceFile, "alias", source); got != want {
+			t.Errorf("alias request %d resolved = %v, want %v", index, got, want)
+		}
+		if resolver.HasAliasAt(sourceFile, "missing", source) {
+			t.Error("a missing paths pattern resolved")
+		}
+		if resolver.HasAliasAt(create().GetSourceFile(fileName), "alias", source) {
+			t.Error("a source from another Program generation resolved")
+		}
+		if moduleresolver.NewPathAliasResolver(nil).HasAliasAt(sourceFile, "alias", source) {
+			t.Error("an invalid Program resolved")
+		}
+	}
+	if resolver.HasAliasAt(sourceFile, "alias", modules.SourceFromSpecifier(nil)) {
+		t.Error("a missing source reference resolved")
+	}
+	if sourceFile.Text() != files[fileName] {
+		t.Error("alias lookup mutated the source AST")
+	}
 }
 
 func TestImportResolutionProcessDirectory(t *testing.T) {

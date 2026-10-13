@@ -214,8 +214,7 @@ type importResolver struct {
 	commentsKnown  bool
 	hasComments    bool
 	commentFactory *ast.NodeFactory
-	pathPatterns   *module.ParsedPatterns
-	aliasResolver  *module.Resolver
+	pathAliases    *moduleresolver.PathAliasResolver
 }
 
 // resolve groups imports by their runtime path and any distinct type target.
@@ -305,36 +304,11 @@ func (r *importResolver) hasRuntimeSibling(resolvedPath string) bool {
 	return false
 }
 
-func (r *importResolver) hasPathAlias(sourcePath, fileName string, mode core.ResolutionMode) bool {
-	program := r.ctx.Program()
-	options := program.Options()
-	if options.Paths == nil || options.Paths.Size() == 0 {
-		return false
+func (r *importResolver) hasPathAlias(importDecl *ast.ImportDeclaration, sourcePath string) bool {
+	if r.pathAliases == nil {
+		r.pathAliases = moduleresolver.NewPathAliasResolver(r.ctx.Program())
 	}
-	if r.pathPatterns == nil {
-		r.pathPatterns = module.TryParsePatterns(options.Paths)
-	}
-	pattern := module.MatchPatternOrExact(r.pathPatterns, sourcePath)
-	if !pattern.IsValid() {
-		return false
-	}
-	if r.aliasResolver == nil {
-		// Probe the selected substitutions with TypeScript's normal file lookup,
-		// without reapplying paths or rootDirs to those already mapped targets.
-		aliasOptions := options.Clone()
-		aliasOptions.Paths = nil
-		aliasOptions.RootDirs = nil
-		host := rslintUtils.CreateCompilerHost(program.CurrentDirectory(), program.FS())
-		r.aliasResolver = module.NewResolver(host, aliasOptions, "", "", nil)
-	}
-	base := options.GetPathsBasePath(program.CurrentDirectory())
-	for _, target := range options.Paths.GetOrZero(pattern.Text) {
-		candidate := tspath.ResolvePath(base, strings.Replace(target, "*", pattern.MatchedText(sourcePath), 1))
-		if resolved, _ := r.aliasResolver.ResolveModuleName(candidate, fileName, mode, nil); resolved.IsResolved() {
-			return true
-		}
-	}
-	return false
+	return r.pathAliases.HasAliasAt(r.ctx.SourceFile, sourcePath, modules.SourceFromSpecifier(importDecl.ModuleSpecifier))
 }
 
 func (r *importResolver) compilerTarget(importDecl *ast.ImportDeclaration, sourcePath string) (string, core.ResolutionMode) {
@@ -361,8 +335,8 @@ func (r *importResolver) compilerTarget(importDecl *ast.ImportDeclaration, sourc
 	if sourcePath != moduleSpecifier.Text() {
 		// Query handling belongs to the grouping key, including when another
 		// request without the query already has a cached type target.
-		if resolved := program.GetResolvedModule(r.ctx.SourceFile, sourcePath, mode); resolved != nil {
-			resolvedPath = resolved.ResolvedFileName
+		if resolved, _, ok := program.ResolveModuleNameAt(r.ctx.SourceFile, sourcePath, source); ok {
+			resolvedPath = resolved
 		}
 	}
 	return resolvedPath, mode
@@ -375,7 +349,7 @@ func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, source
 	}
 	fileName := r.physicalPath(r.ctx.SourceFile.FileName())
 	relative := tspath.IsExternalModuleNameRelative(sourcePath)
-	if !relative && !r.hasPathAlias(sourcePath, fileName, mode) || relative && mode == core.ResolutionModeCommonJS {
+	if !relative && !r.hasPathAlias(importDecl, sourcePath) || relative && mode == core.ResolutionModeCommonJS {
 		// Package entry points can share declarations while loading distinct
 		// runtime files. Use the existing resolver without the automatic types
 		// condition, retaining the request's import/require and custom conditions.
