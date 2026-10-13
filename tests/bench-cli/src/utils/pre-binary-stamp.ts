@@ -3,8 +3,8 @@ import path from 'node:path';
 export const STAMP_FD = 3;
 
 type SpawnStamp = {
-  interceptedAtMs?: number;
-  file?: string | null;
+  interceptedAtMs: number;
+  file: string;
 };
 
 function parseSpawnStamp(output: string | Buffer | null): {
@@ -28,8 +28,25 @@ function parseSpawnStamp(output: string | Buffer | null): {
     );
   }
 
+  const payload: unknown = JSON.parse(lines[lines.length - 1]);
+  if (
+    typeof payload !== 'object' ||
+    payload === null ||
+    !('interceptedAtMs' in payload) ||
+    typeof payload.interceptedAtMs !== 'number'
+  ) {
+    throw new Error(`Invalid spawn stamp payload: ${rawOutput}`);
+  }
+
+  if (!('file' in payload) || typeof payload.file !== 'string') {
+    throw new Error(`Unexpected spawn target in stamp payload: ${rawOutput}`);
+  }
+
   return {
-    payload: JSON.parse(lines[lines.length - 1]) as SpawnStamp,
+    payload: {
+      interceptedAtMs: payload.interceptedAtMs,
+      file: payload.file,
+    },
     rawOutput,
   };
 }
@@ -43,16 +60,9 @@ export function readPreBinaryLatencyNs(
   // the Go binary).
   const { payload, rawOutput } = parseSpawnStamp(output);
 
-  if (typeof payload.interceptedAtMs !== 'number') {
-    throw new Error(`Invalid spawn stamp payload: ${rawOutput}`);
-  }
-
   const expectedBinaryName =
     process.platform === 'win32' ? 'rslint.exe' : 'rslint';
-  if (
-    typeof payload.file !== 'string' ||
-    path.basename(payload.file) !== expectedBinaryName
-  ) {
+  if (path.basename(payload.file) !== expectedBinaryName) {
     throw new Error(`Unexpected spawn target in stamp payload: ${rawOutput}`);
   }
 
