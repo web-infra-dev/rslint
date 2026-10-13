@@ -2,6 +2,7 @@ package linter
 
 import (
 	"errors"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -80,7 +81,7 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 	result := &LintResult{ExecutedRules: make(map[string]struct{})}
 	programResults := make([]programLintResult, len(e.programs))
 	if len(e.programs) > 0 {
-		work := newLintWorkGroup(e.options.SingleThreaded)
+		work := newProgramLintWorkGroup(e.options.SingleThreaded, len(e.programs))
 		for index := range e.programs {
 			task := e.programs[index]
 			e.programs[index] = nil
@@ -119,8 +120,9 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 // abnormal worker exit. Nested checker shards use the same barrier, so a
 // project task cannot end while one of its file workers still uses it.
 type lintWorkGroup struct {
-	work   core.WorkGroup
-	panics workerPanic
+	admission chan struct{}
+	work      core.WorkGroup
+	panics    workerPanic
 }
 
 // workerPanic preserves the original panic until all sibling borrowers join.
@@ -134,8 +136,22 @@ func newLintWorkGroup(singleThreaded bool) *lintWorkGroup {
 	return &lintWorkGroup{work: core.NewWorkGroup(singleThreaded)}
 }
 
+// newProgramLintWorkGroup bounds active projects to the execution CPU budget.
+// Each project retains its independent checker-shard scheduling.
+func newProgramLintWorkGroup(singleThreaded bool, programCount int) *lintWorkGroup {
+	w := newLintWorkGroup(singleThreaded)
+	if !singleThreaded && programCount > 0 {
+		w.admission = make(chan struct{}, min(runtime.GOMAXPROCS(0), programCount))
+	}
+	return w
+}
+
 func (w *lintWorkGroup) Queue(run func()) {
 	w.work.Queue(func() {
+		if w.admission != nil {
+			w.admission <- struct{}{}
+			defer func() { <-w.admission }()
+		}
 		w.panics.run(run)
 	})
 }

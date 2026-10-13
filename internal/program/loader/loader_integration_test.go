@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
@@ -61,6 +62,106 @@ func (s *Session) buildProjectsForTest(t *testing.T, request ProjectBuildRequest
 		}
 	}
 	return s.BuildProjects(request)
+}
+
+func TestBuildProjectsOwnsCacheAndPreservesItAcrossBindings(t *testing.T) {
+	for _, scope := range []ProjectScope{AllDeclared, ActiveOwners, Targeted} {
+		for _, singleThreaded := range []bool{true, false} {
+			t.Run(strconv.Itoa(int(scope))+"/serial="+strconv.FormatBool(singleThreaded), func(t *testing.T) {
+				dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+				config := rslintconfig.RslintConfig{{
+					Files: []string{"**/*.ts"},
+					LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+						Project: rslintconfig.ProjectPaths{"a/tsconfig.json", "b/tsconfig.json"},
+					}},
+				}}
+				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+				plan, err := target.Resolve(target.Request{
+					Config: config, ConfigDirectory: dir, FS: fsys,
+					Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts")},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				session := NewSession(fsys)
+				configs := map[string]rslintconfig.RslintConfig{dir: config}
+				first, err := session.buildProjectsWithOptionsForTest(t, configs, plan, scope, singleThreaded)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if first.Len() != 2 {
+					t.Fatalf("got %d configured Programs, want 2", first.Len())
+				}
+				type key struct{}
+				builds := 0
+				cached := func(program *lintprogram.Program) *int {
+					return lintprogram.Cached(program, key{}, func() *int { builds++; value := builds; return &value })
+				}
+				answers := []*int{cached(first.Programs()[0]), cached(first.Programs()[1])}
+				runtime.GC()
+				for _, load := range []struct {
+					name string
+					bind func(ProjectSet, target.Plan, string, bool) (LoadResult, error)
+				}{{"CLI", session.LoadCLI}, {"API", session.LoadAPI}} {
+					for range 2 {
+						binding, err := load.bind(first, plan, dir, singleThreaded)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if len(binding.Programs) != first.Len() {
+							t.Fatalf("%s binding changed the configured Program set", load.name)
+						}
+						for index, program := range binding.Programs {
+							if program != first.Programs()[index] || cached(program) != answers[index] {
+								t.Fatalf("%s binding replaced Program %d or its cached answer", load.name, index)
+							}
+						}
+					}
+				}
+				second, err := session.buildProjectsWithOptionsForTest(t, configs, plan, scope, singleThreaded)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if second.Len() != first.Len() {
+					t.Fatal("rebuilding the same Session changed the configured Program count")
+				}
+				for index, program := range second.Programs() {
+					if program == first.Programs()[index] || second.compilerPrograms[index] == first.compilerPrograms[index] || cached(program) == answers[index] {
+						t.Fatalf("a new build reused Program %d or its derived cache", index)
+					}
+					if cached(first.Programs()[index]) != answers[index] {
+						t.Fatalf("a new build displaced the first Program's answer %d", index)
+					}
+				}
+				if builds != 4 {
+					t.Fatalf("built %d cached answers, want one per Program in each set", builds)
+				}
+
+				// Session keeps the initial raw Programs for parse-cache retention.
+				// That bookkeeping must not retain the facades' derived caches.
+				raw := first.compilerPrograms[0]
+				facade := weak.Make(first.Programs()[0])
+				type lifetimeKey struct{}
+				payload := weak.Make(lintprogram.Cached(first.Programs()[0], lifetimeKey{}, func() *[128]byte { return &[128]byte{} }))
+				first, second = ProjectSet{}, ProjectSet{}
+				collected := false
+				deadline := time.Now().Add(10 * time.Second)
+				for time.Now().Before(deadline) {
+					runtime.GC()
+					if facade.Value() == nil && payload.Value() == nil {
+						collected = true
+						break
+					}
+					time.Sleep(5 * time.Millisecond)
+				}
+				runtime.KeepAlive(raw)
+				runtime.KeepAlive(session)
+				if !collected {
+					t.Fatal("loader retained a derived cache after its complete facade set was discarded")
+				}
+			})
+		}
+	}
 }
 
 func TestBuildProjectsSeparatesProjectPolicies(t *testing.T) {

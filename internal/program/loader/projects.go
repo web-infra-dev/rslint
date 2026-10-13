@@ -316,7 +316,7 @@ func (s *Session) executeProjectPlan(plan projectPlan, singleThreaded bool) (Pro
 	}
 	return ProjectSet{
 		compilerPrograms: compilerPrograms,
-		programs:         lintprogram.NewFromCompilers(compilerPrograms),
+		programs:         lintprogram.NewOwnedFromCompilers(compilerPrograms),
 		configOrders:     orders,
 		targetProjects:   plan.targetProjects,
 	}, nil

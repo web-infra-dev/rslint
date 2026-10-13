@@ -1,6 +1,7 @@
 package linter
 
 import (
+	"fmt"
 	"reflect"
 	"runtime"
 	"sync"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -268,4 +271,343 @@ func targetFileNames(targets []LintTarget) []string {
 		fileNames[index] = target.File.FileName()
 	}
 	return fileNames
+}
+
+func TestRunLinterLimitsProgramAdmission(t *testing.T) {
+	previousProcs := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previousProcs) })
+	const programCount = 6
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	entered := make(chan struct{}, programCount)
+	var active, peak, completed atomic.Int32
+	opts, _ := programAdmissionTestOptions(t, programCount, false, func(rule.RuleContext) rule.RuleListeners {
+		current := active.Add(1)
+		updateProgramAdmissionPeak(&peak, current)
+		entered <- struct{}{}
+		<-release
+		active.Add(-1)
+		completed.Add(1)
+		return nil
+	})
+	done := make(chan programAdmissionOutcome, 1)
+	finished := make(chan struct{})
+	t.Cleanup(func() {
+		unblock()
+		joinProgramAdmissionTestWorker(t, finished)
+	})
+	go func() {
+		defer close(finished)
+		result, err := RunLinter(opts)
+		done <- programAdmissionOutcome{result: result, err: err}
+	}()
+	for range 2 {
+		select {
+		case <-entered:
+		case <-time.After(5 * time.Second):
+			t.Fatal("two independent Programs did not become active")
+		}
+	}
+	select {
+	case <-entered:
+		t.Fatal("a third Program entered while two admitted Programs remained blocked")
+	case <-time.After(30 * time.Millisecond):
+	}
+	unblock()
+	select {
+	case got := <-done:
+		if got.err != nil || got.result == nil || got.result.LintedFileCount != programCount ||
+			completed.Load() != programCount || peak.Load() != 2 || active.Load() != 0 {
+			t.Fatalf("result/error/completed/peak/active = %+v/%v/%d/%d/%d", got.result, got.err, completed.Load(), peak.Load(), active.Load())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("admitted and pending Programs did not all complete")
+	}
+}
+
+func TestRunLinterProgramAdmissionSingleWorker(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		procs          int
+		singleThreaded bool
+	}{{name: "GOMAXPROCS-one", procs: 1}, {name: "single-threaded", procs: 2, singleThreaded: true}} {
+		t.Run(test.name, func(t *testing.T) {
+			previousProcs := runtime.GOMAXPROCS(test.procs)
+			defer runtime.GOMAXPROCS(previousProcs)
+			const programCount = 5
+			var active, peak atomic.Int32
+			var orderMu sync.Mutex
+			var gotOrder []string
+			opts, paths := programAdmissionTestOptions(t, programCount, test.singleThreaded, func(ctx rule.RuleContext) rule.RuleListeners {
+				current := active.Add(1)
+				updateProgramAdmissionPeak(&peak, current)
+				orderMu.Lock()
+				gotOrder = append(gotOrder, ctx.SourceFile.FileName())
+				orderMu.Unlock()
+				runtime.Gosched()
+				active.Add(-1)
+				return nil
+			})
+			done := make(chan programAdmissionOutcome, 1)
+			go func() {
+				result, err := RunLinter(opts)
+				done <- programAdmissionOutcome{result: result, err: err}
+			}()
+			select {
+			case got := <-done:
+				if got.err != nil || got.result == nil || got.result.LintedFileCount != programCount || peak.Load() != 1 || active.Load() != 0 {
+					t.Fatalf("result/error/peak/active = %+v/%v/%d/%d", got.result, got.err, peak.Load(), active.Load())
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("single-worker Program admission deadlocked")
+			}
+			if test.singleThreaded {
+				// core's serial workgroup consumes its submitted callbacks in reverse order.
+				// Program admission must keep that existing execution order.
+				wantOrder := make([]string, len(paths))
+				for index := range paths {
+					wantOrder[index] = paths[len(paths)-1-index]
+				}
+				if !reflect.DeepEqual(gotOrder, wantOrder) {
+					t.Fatalf("single-threaded Program order = %v, want %v", gotOrder, wantOrder)
+				}
+			}
+		})
+	}
+}
+
+func TestProgramLintWorkGroupQueuesBeforeAdmission(t *testing.T) {
+	previousProcs := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previousProcs) })
+	const programCount = 8
+	work := newProgramLintWorkGroup(false, programCount)
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	entered := make(chan struct{}, programCount)
+	var completed atomic.Int32
+	callback := func() {
+		entered <- struct{}{}
+		<-release
+		completed.Add(1)
+	}
+	queued := make(chan struct{})
+	submitPending := make(chan struct{})
+	done := make(chan struct{})
+	finished := make(chan struct{})
+	t.Cleanup(func() {
+		unblock()
+		joinProgramAdmissionTestWorker(t, finished)
+	})
+	go func() {
+		defer close(finished)
+		work.Queue(callback)
+		work.Queue(callback)
+		select {
+		case <-submitPending:
+		case <-release:
+		}
+		for range programCount - 2 {
+			work.Queue(callback)
+		}
+		close(queued)
+		work.RunAndWait()
+		close(done)
+	}()
+	for range 2 {
+		select {
+		case <-entered:
+		case <-time.After(5 * time.Second):
+			t.Fatal("admitted callbacks did not start")
+		}
+	}
+	close(submitPending)
+	select {
+	case <-queued:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Queue blocked on Program admission instead of submitting the callback")
+	}
+	select {
+	case <-entered:
+		t.Fatal("pending Program callback bypassed the admission limit")
+	default:
+	}
+	unblock()
+	select {
+	case <-done:
+		if completed.Load() != programCount {
+			t.Fatalf("completed callbacks = %d, want %d", completed.Load(), programCount)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("pending callbacks did not make progress as admission tokens were released")
+	}
+}
+
+func TestProgramLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
+	previousProcs := runtime.GOMAXPROCS(2)
+	defer runtime.GOMAXPROCS(previousProcs)
+	for _, exit := range []string{"panic", "Goexit"} {
+		for _, siblingExits := range []bool{false, true} {
+			name := fmt.Sprintf("%s/sibling-abnormal-%t", exit, siblingExits)
+			t.Run(name, func(t *testing.T) {
+				const programCount = 8
+				const marker = "admitted Program failed"
+				work := newProgramLintWorkGroup(false, programCount)
+				started := make(chan struct{}, 2)
+				releaseFailure := make(chan struct{})
+				releaseSibling := make(chan struct{})
+				failureStopped := make(chan struct{})
+				siblingStopped := make(chan struct{})
+				var failureOnce, siblingOnce sync.Once
+				unblockFailure := func() { failureOnce.Do(func() { close(releaseFailure) }) }
+				unblockSibling := func() { siblingOnce.Do(func() { close(releaseSibling) }) }
+				abort := func() {
+					if exit == "Goexit" {
+						runtime.Goexit()
+					}
+					panic(marker)
+				}
+				var pendingRan atomic.Int32
+				queued := make(chan struct{})
+				submitPending := make(chan struct{})
+				done := make(chan any, 1)
+				finished := make(chan struct{})
+				t.Cleanup(func() {
+					unblockFailure()
+					unblockSibling()
+					joinProgramAdmissionTestWorker(t, finished)
+				})
+				go func() {
+					defer close(finished)
+					defer func() { done <- recover() }()
+					work.Queue(func() {
+						defer close(failureStopped)
+						started <- struct{}{}
+						<-releaseFailure
+						abort()
+					})
+					work.Queue(func() {
+						defer close(siblingStopped)
+						started <- struct{}{}
+						<-releaseSibling
+						if siblingExits {
+							abort()
+						}
+					})
+					select {
+					case <-submitPending:
+					case <-releaseFailure:
+					}
+					for range programCount - 2 {
+						work.Queue(func() { pendingRan.Add(1) })
+					}
+					close(queued)
+					work.RunAndWait()
+				}()
+				for range 2 {
+					select {
+					case <-started:
+					case <-time.After(5 * time.Second):
+						t.Fatal("both admitted Program callbacks did not start")
+					}
+				}
+				close(submitPending)
+				select {
+				case <-queued:
+				case <-time.After(5 * time.Second):
+					t.Fatal("pending Program callbacks could not be submitted")
+				}
+				unblockFailure()
+				select {
+				case <-failureStopped:
+				case <-time.After(5 * time.Second):
+					t.Fatal("abnormal Program callback did not exit")
+				}
+				// The callback's defer precedes workerPanic's abort publication.
+				// Wait for that publication only to arrange the already-aborted scenario.
+				abortDeadline := time.Now().Add(5 * time.Second)
+				for !work.panics.aborted.Load() {
+					if time.Now().After(abortDeadline) {
+						t.Fatal("abnormal Program exit was not recorded")
+					}
+					runtime.Gosched()
+				}
+				select {
+				case got := <-done:
+					t.Fatalf("abnormal exit propagated before admitted sibling joined: %v", got)
+				case <-time.After(30 * time.Millisecond):
+				}
+				unblockSibling()
+				select {
+				case got := <-done:
+					if exit == "panic" && got != marker {
+						t.Fatalf("panic = %v, want original %q", got, marker)
+					}
+					if exit == "Goexit" {
+						err, ok := got.(error)
+						if !ok || err == nil {
+							t.Fatalf("Goexit outcome = %v, want abnormal-worker panic", got)
+						}
+					}
+					select {
+					case <-siblingStopped:
+					default:
+						t.Fatal("workgroup returned before the admitted sibling stopped")
+					}
+					if pendingRan.Load() != 0 {
+						t.Fatalf("%d pending Program callbacks ran after the workgroup aborted", pendingRan.Load())
+					}
+				case <-time.After(5 * time.Second):
+					t.Fatal("admitted or skipped callbacks retained admission tokens and blocked join")
+				}
+			})
+		}
+	}
+}
+
+type programAdmissionOutcome struct {
+	result *LintResult
+	err    error
+}
+
+func updateProgramAdmissionPeak(peak *atomic.Int32, current int32) {
+	for observed := peak.Load(); current > observed; observed = peak.Load() {
+		if peak.CompareAndSwap(observed, current) {
+			return
+		}
+	}
+}
+
+func joinProgramAdmissionTestWorker(t *testing.T, finished <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-finished:
+	case <-time.After(2 * time.Second):
+		t.Error("Program admission worker did not finish during cleanup")
+	}
+}
+
+func programAdmissionTestOptions(t *testing.T, count int, singleThreaded bool, run func(rule.RuleContext) rule.RuleListeners) (RunLinterOptions, []string) {
+	t.Helper()
+	root := tspath.NormalizePath(t.TempDir())
+	programs := make([]*program.Program, count)
+	paths := make([]string, count)
+	targets := make([][]string, count)
+	for index := range programs {
+		paths[index] = tspath.ResolvePath(root, fmt.Sprintf("project-%02d/file.ts", index))
+		// This existing helper builds a distinct parser/binder Program for each root.
+		programs[index] = pipelineTestProgram(t, root, paths[index], "const value = 1;")
+		if programs[index].CanProvideProgramDiagnostics() {
+			t.Fatal("Program admission fixture unexpectedly owns compiler checkers")
+		}
+		targets[index] = []string{paths[index]}
+	}
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs: programs, TargetsByProgram: targets, SingleThreaded: singleThreaded,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{Name: "native/program-admission", Run: run}}
+		},
+	})
+	return RunLinterOptions{LintPlan: plan, SingleThreaded: singleThreaded}, paths
 }

@@ -336,10 +336,10 @@ func (execution *targetedProjectExecution) projectSet(
 			continue
 		}
 		set.compilerPrograms = append(set.compilerPrograms, slot.program)
-		set.programs = append(set.programs, lintprogram.NewFromCompiler(slot.program))
 		set.configOrders = append(set.configOrders, execution.plan.specs[index].configOrders)
 		projectSetIndexByPlanIndex[index] = len(set.compilerPrograms) - 1
 	}
+	set.programs = lintprogram.NewOwnedFromCompilers(set.compilerPrograms)
 	for targetIndex, projectIndex := range directProjectByTarget {
 		if projectIndex < 0 || targetIndex >= len(targets) {
 			continue
