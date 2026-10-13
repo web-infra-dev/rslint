@@ -1617,7 +1617,7 @@ func TestProjectServiceLSPUsesReferencedEditorSources(t *testing.T) {
 				}
 				if test.wantMismatch {
 					foundMismatch := false
-					for _, diagnostic := range program.NoEmitDiagnostics(context.Background()) {
+					for _, diagnostic := range program.DiagnosticSource().NoEmitDiagnostics(context.Background()) {
 						foundMismatch = foundMismatch || diagnostic.Code() == 2322
 						if diagnostic.Code() == 2304 {
 							t.Fatalf("speculative=%v: JS global was missing from the type context", speculative)

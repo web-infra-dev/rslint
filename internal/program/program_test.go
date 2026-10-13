@@ -178,6 +178,9 @@ func TestSourceOnlyProgramOwnsBoundUniverseWithoutCheckerCapability(t *testing.T
 	if !sourceProgram.IsValid() || sourceProgram.CanProvideTypeChecker(a) {
 		t.Fatal("source-only Program exposed a checker capability")
 	}
+	if sourceProgram.DiagnosticSource() != nil {
+		t.Fatal("source-only Program exposed complete-generation diagnostics")
+	}
 	for _, file := range sourceProgram.SourceFiles() {
 		if !file.IsBound() || !sourceProgram.OwnsSourceFile(file) || sourceProgram.GetSourceFile(file.FileName()) != file {
 			t.Fatalf("source Program lost exact source identity for %q", file.FileName())
@@ -318,4 +321,53 @@ type typedNilFSCompilerHost struct {
 func (*typedNilFSCompilerHost) FS() vfs.FS {
 	var fs *typedNilFS
 	return fs
+}
+
+func TestDiagnosticSourceDoesNotRetainOwnedLintFacade(t *testing.T) {
+	files := specifierCacheFiles(false)
+	files[specifierCacheImporter] += "\nconst diagnosticOnly: number = 'wrong';\n"
+	raw, _ := specifierCacheProgram(t, files)
+	generation := weak.Make(raw)
+	type key struct{}
+	type payload [128]byte
+	var facade weak.Pointer[lintprogram.Program]
+	var cached weak.Pointer[payload]
+	var diagnostics *lintprogram.DiagnosticSource
+	func() {
+		program := lintprogram.NewOwnedFromCompilers([]*compiler.Program{raw})[0]
+		facade = weak.Make(program)
+		cached = weak.Make(lintprogram.Cached(program, key{}, func() *payload { return &payload{} }))
+		diagnostics = program.DiagnosticSource()
+		if diagnostics == nil || diagnostics.CurrentDirectory() != program.CurrentDirectory() || diagnostics.FS() != program.FS() {
+			t.Fatal("diagnostic authority changed")
+		}
+	}()
+	raw = nil
+	waitForProgramCacheCollection(t, func() bool { return facade.Value() == nil && cached.Value() == nil })
+	if generation.Value() == nil {
+		t.Fatal("diagnostic capability lost its source generation")
+	}
+	found := false
+	for _, diagnostic := range diagnostics.NoEmitDiagnostics(context.Background()) {
+		if diagnostic.Code() == 2322 && diagnostic.File().FileName() == specifierCacheImporter {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("diagnostic capability lost semantic diagnostics after facade collection")
+	}
+	runtime.KeepAlive(diagnostics)
+}
+
+func TestDiagnosticSourceUnavailableOnInvalidProgram(t *testing.T) {
+	var absent *lintprogram.Program
+	for _, program := range []*lintprogram.Program{absent, {}} {
+		if program.DiagnosticSource() != nil {
+			t.Fatal("invalid program published a diagnostic capability")
+		}
+	}
+	var source *lintprogram.DiagnosticSource
+	if source.NoEmitDiagnostics(context.Background()) != nil || source.FS() != nil || source.CurrentDirectory() != "" {
+		t.Fatal("nil capability is not empty")
+	}
 }

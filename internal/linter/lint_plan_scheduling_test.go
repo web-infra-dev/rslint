@@ -377,11 +377,11 @@ func TestRunLinterProgramAdmissionSingleWorker(t *testing.T) {
 	}
 }
 
-func TestProgramLintWorkGroupQueuesBeforeAdmission(t *testing.T) {
+func TestProgramWorkGroupQueuesBeforeAdmission(t *testing.T) {
 	previousProcs := runtime.GOMAXPROCS(2)
 	t.Cleanup(func() { runtime.GOMAXPROCS(previousProcs) })
 	const programCount = 8
-	work := newProgramLintWorkGroup(false, programCount)
+	work := newProgramWorkGroup(false, programCount)
 	release := make(chan struct{})
 	var releaseOnce sync.Once
 	unblock := func() { releaseOnce.Do(func() { close(release) }) }
@@ -444,7 +444,7 @@ func TestProgramLintWorkGroupQueuesBeforeAdmission(t *testing.T) {
 	}
 }
 
-func TestProgramLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
+func TestProgramWorkGroupJoinsAbnormalWorkers(t *testing.T) {
 	previousProcs := runtime.GOMAXPROCS(2)
 	defer runtime.GOMAXPROCS(previousProcs)
 	for _, exit := range []string{"panic", "Goexit"} {
@@ -453,7 +453,7 @@ func TestProgramLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				const programCount = 8
 				const marker = "admitted Program failed"
-				work := newProgramLintWorkGroup(false, programCount)
+				work := newProgramWorkGroup(false, programCount)
 				started := make(chan struct{}, 2)
 				releaseFailure := make(chan struct{})
 				releaseSibling := make(chan struct{})

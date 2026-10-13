@@ -53,11 +53,11 @@ type PrepareLintPlanOptions struct {
 //     collector, keyed by rule name. Callers may share one collector across
 //     multiple RunLinter invocations (e.g. --fix re-lint passes) to aggregate.
 //
-// Thread-safety: Consumer.Report is invoked from multiple goroutines
-// concurrently — Phase 1 fans out per program AND per file shard within
-// each program (one worker per pool checker), Phase 2 (type-check) fans
-// out per program. Callers MUST make their handler safe for concurrent
-// calls (channel send, mutex-guarded slice append, sync.Map, etc.).
+// Thread-safety: native lint invokes Consumer.Report concurrently from project
+// and file-shard workers (one worker per pool checker). Type-check computes
+// diagnostics concurrently, then reports them serially in Program order after
+// joining all workers. Callers MUST make their handler safe for concurrent
+// native calls (channel send, mutex-guarded slice append, sync.Map, etc.).
 type RunLinterOptions struct {
 	SingleThreaded bool
 	// Cwd is the working directory of the linting run, forwarded verbatim to
