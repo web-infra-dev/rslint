@@ -166,6 +166,12 @@ export class RuntimeManager {
     } catch (error) {
       if (this.isCurrentDocument(document, epoch)) {
         this.reportFailure(document, error, existing);
+        // Unlike other failures, an unsupported core must not keep the
+        // last-good runtime. Report first so the error shows even if the
+        // release fails.
+        if (existing && error instanceof UnsupportedCoreVersionError) {
+          await this.detachDocument(document);
+        }
       }
       return;
     }

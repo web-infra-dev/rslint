@@ -367,6 +367,30 @@ suite('local-core runtime manager', () => {
     await manager.close();
   });
 
+  test('detaches the last-good owner when the core becomes unsupported', async () => {
+    const unsupported: string[] = [];
+    const { manager, resolver, router, runtimes } = harness(undefined, {
+      runtimeReady() {},
+      unsupportedCore: (message) => unsupported.push(message),
+    });
+    resolver.keys.set(first.uri.toString(), 'working-core');
+    await reconcileAll(manager, [first]);
+
+    resolver.keys.set(first.uri.toString(), 'new-core');
+    resolver.unsupportedVersions.set('new-core', '0.10.0');
+    await manager.reconcile(first);
+
+    assert.deepStrictEqual(unsupported, [
+      new UnsupportedCoreVersionError('0.10.0').message,
+    ]);
+    assert.strictEqual(router.getServerOpenOwner(first), undefined);
+    await eventually(
+      () => runtimes[0].closeCalls === 1,
+      'the superseded runtime should be released',
+    );
+    await manager.close();
+  });
+
   test('restores the last-good owner when replacement didOpen fails', async () => {
     const { manager, resolver, router, runtimes } = harness((identity) => ({
       failOpen: identity === 'broken-core',
