@@ -1,0 +1,123 @@
+name: Ecosystem CI
+# cspell:ignore precoded
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'shim/**'
+      - 'crates/**'
+      - 'packages/**'
+      - 'npm/rslint/**'
+      - 'typescript-go'
+      - 'scripts/place-host-build.mjs'
+      - 'tools/dump_rule_schemas/**'
+      - 'package.json'
+      - 'pnpm-*.yaml'
+      - 'go.*'
+      - 'Cargo.*'
+      - 'tsconfig.json'
+      - 'tsconfig.base.json'
+      - 'tsconfig.build.json'
+      - '.gitmodules'
+      - '.github/workflows/ecosystem-ci.yml'
+      - '!**/*.md'
+      - '!**/*.mdx'
+      - '!**/*_test.go'
+      - '!**/tests/**'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: Rslint PR number to test, including fork PRs
+        required: true
+        type: string
+      suite:
+        description: Consumer suite (- runs all suites)
+        type: choice
+        default: '-'
+        options:
+          - '-'
+          - rsbuild
+          - rslib
+          - rstest
+
+permissions: {}
+
+jobs:
+  per-commit:
+    if: github.repository == 'web-infra-dev/rslint' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Run ecosystem CI
+        uses: rstackjs/rstack-ecosystem-ci/.github/actions/ecosystem_ci_per_commit@4b0ec855ccbd27595a0df4781ed58b77e64d25ee # v0.3.5
+        with:
+          github-token: ${{ secrets.REPO_RSLINT_ECO_CI_GITHUB_TOKEN }}
+          ecosystem-owner: web-infra-dev
+          ecosystem-repo: rslint
+          workflow-file: rslint-ecosystem-ci-from-commit.yml
+          client-payload: >-
+            {"commitSHA":"${{ github.sha }}","repo":"web-infra-dev/rslint","suite":"-","suiteRefType":"precoded","suiteRef":"precoded"}
+
+  from-pr:
+    if: >-
+      github.repository == 'web-infra-dev/rslint' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        startsWith(github.head_ref, 'chore/release-')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Resolve the PR head
+        id: prepare
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr-number }}
+          SUITE: ${{ inputs.suite || '-' }}
+        with:
+          script: |
+            const rawNumber = process.env.PR_NUMBER;
+            const number = Number(rawNumber);
+            if (!/^[1-9]\d*$/.test(rawNumber) || !Number.isSafeInteger(number)) {
+              throw new Error('pr-number must be a positive integer');
+            }
+            const suite = process.env.SUITE;
+            if (!['-', 'rsbuild', 'rslib', 'rstest'].includes(suite)) {
+              throw new Error(`Invalid consumer suite: ${suite}`);
+            }
+            const pr = context.payload.pull_request ??
+              (await github.rest.pulls.get({
+                ...context.repo,
+                pull_number: number,
+              })).data;
+            if (!pr.head.repo) {
+              throw new Error('The PR head repository is unavailable');
+            }
+            return {
+              prNumber: String(number),
+              // Freeze the source commit so every matrix job tests the same head.
+              branchName: pr.head.sha,
+              repo: pr.head.repo.full_name,
+              suite,
+              suiteRefType: 'precoded',
+              suiteRef: 'precoded',
+            };
+
+      - name: Run ecosystem CI and update the PR comment
+        uses: rstackjs/rstack-ecosystem-ci/.github/actions/ecosystem_ci_dispatch@4b0ec855ccbd27595a0df4781ed58b77e64d25ee # v0.3.5
+        with:
+          github-token: ${{ secrets.REPO_RSLINT_ECO_CI_GITHUB_TOKEN }}
+          ecosystem-owner: web-infra-dev
+          ecosystem-repo: rslint
+          workflow-file: rslint-ecosystem-ci-from-pr.yml
+          pr-number: ${{ fromJSON(steps.prepare.outputs.result).prNumber }}
+          client-payload: ${{ steps.prepare.outputs.result }}

@@ -51,6 +51,10 @@ Branch naming and test organization follow [AGENTS.md](./AGENTS.md). Before deli
 
 The existing pre-commit hook runs `rs staged`. Install it through `pnpm run prepare`; `git config --get core.hooksPath` should point to `.rstack/hooks/_`. If a checkout still points to old Husky hooks, inspect them before migrating once with `pnpm exec rs hooks --force`. Keep ordinary `prepare` non-forcing.
 
+## Ecosystem CI
+
+[Ecosystem CI](https://github.com/rstackjs/rstack-ecosystem-ci) tests Rslint against Rsbuild, Rslib, and Rstest for source or build changes on `main` and same-repository `chore/release-*` PRs. To test another PR, run **Ecosystem CI** from `main` in GitHub Actions, enter the PR number, and select a suite or `-` for all three. Results are posted to the PR.
+
 ## TypeScript compiler dependency
 
 The `typescript-go/` submodule tracks [microsoft/TypeScript](https://github.com/microsoft/TypeScript). The Go compiler lives under `typescript-go/tsc/`, and its JS AST API lives under `typescript-go/packages/typescript/`. Existing checkouts must run `git submodule sync -- typescript-go` before updating the submodule to pick up the new remote URL.
