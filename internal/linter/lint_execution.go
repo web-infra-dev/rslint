@@ -81,14 +81,19 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 	result := &LintResult{ExecutedRules: make(map[string]struct{})}
 	programResults := make([]programLintResult, len(e.programs))
 	if len(e.programs) > 0 {
-		work := newProgramLintWorkGroup(e.options.SingleThreaded, len(e.programs))
+		work := newLintWorkGroup(e.options.SingleThreaded)
+		var budget *nativeWorkBudget
+		if !e.options.SingleThreaded && len(e.programs) > 1 {
+			budget = newNativeWorkBudget(runtime.GOMAXPROCS(0))
+		}
 		for index := range e.programs {
 			task := e.programs[index]
 			e.programs[index] = nil
 			resultSlot := &programResults[index]
 			options := e.options
-			work.Queue(func() {
+			work.QueueProject(budget, func(lease *nativeWorkLease) {
 				defer func() { *task = programLintPlan{} }()
+				options.nativeLease = lease
 				*resultSlot = runLintRulesInProgram(task, options, consumer)
 			})
 		}
@@ -116,13 +121,94 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 	return result
 }
 
+// nativeWorkBudget bounds overlapping native graphs within one execution.
+// The CPU-sized admission budget reserves capacity before checker preparation;
+// it does not limit goroutines created internally by the compiler. Only one
+// project widens its reservation at a time; its complete shard width remains
+// reserved until all borrowers join. The budget owns no source or compiler data.
+type nativeWorkBudget struct {
+	preparation sync.Mutex
+	workers     chan struct{}
+}
+
+func newNativeWorkBudget(cpuCount int) *nativeWorkBudget {
+	return &nativeWorkBudget{workers: make(chan struct{}, cpuCount)}
+}
+
+// nativeWorkLease is confined to its project coordinator. Shard workers never
+// change admission state. Abnormal-worker joins remain owned by lintWorkGroup.
+type nativeWorkLease struct {
+	budget    *nativeWorkBudget
+	aborted   *atomic.Bool
+	units     int
+	preparing bool
+}
+
+func (b *nativeWorkBudget) prepare(aborted *atomic.Bool) *nativeWorkLease {
+	b.preparation.Lock()
+	lease := &nativeWorkLease{budget: b, aborted: aborted, preparing: true}
+	if aborted.Load() {
+		lease.close()
+		return nil
+	}
+	b.workers <- struct{}{}
+	lease.units = 1
+	if aborted.Load() {
+		lease.close()
+		return nil
+	}
+	return lease
+}
+
+// admit uses the actual planned shard count. A wider project occupies the
+// entire admission budget while preserving its existing checker/file topology.
+func (l *nativeWorkLease) admit(shardCount int) bool {
+	if l == nil {
+		return true
+	}
+	if l.aborted.Load() {
+		return false
+	}
+	width := min(shardCount, cap(l.budget.workers))
+	if width == 0 {
+		<-l.budget.workers
+		l.units = 0
+	}
+	for l.units < width {
+		l.budget.workers <- struct{}{}
+		l.units++
+		if l.aborted.Load() {
+			return false
+		}
+	}
+	l.finishPreparation()
+	return !l.aborted.Load()
+}
+
+func (l *nativeWorkLease) finishPreparation() {
+	if l.preparing {
+		l.preparing = false
+		l.budget.preparation.Unlock()
+	}
+}
+
+func (l *nativeWorkLease) close() {
+	if l == nil {
+		return
+	}
+	for range l.units {
+		<-l.budget.workers
+	}
+	l.units = 0
+	l.finishPreparation()
+}
+
 // lintWorkGroup joins every admitted native borrower before re-raising an
 // abnormal worker exit. Nested checker shards use the same barrier, so a
 // project task cannot end while one of its file workers still uses it.
 type lintWorkGroup struct {
-	admission chan struct{}
-	work      core.WorkGroup
-	panics    workerPanic
+	work   core.WorkGroup
+	panics workerPanic
 }
 
 // workerPanic preserves the original panic until all sibling borrowers join.
@@ -136,23 +222,26 @@ func newLintWorkGroup(singleThreaded bool) *lintWorkGroup {
 	return &lintWorkGroup{work: core.NewWorkGroup(singleThreaded)}
 }
 
-// newProgramLintWorkGroup bounds active projects to the execution CPU budget.
-// Each project retains its independent checker-shard scheduling.
-func newProgramLintWorkGroup(singleThreaded bool, programCount int) *lintWorkGroup {
-	w := newLintWorkGroup(singleThreaded)
-	if !singleThreaded && programCount > 0 {
-		w.admission = make(chan struct{}, min(runtime.GOMAXPROCS(0), programCount))
-	}
-	return w
-}
-
 func (w *lintWorkGroup) Queue(run func()) {
 	w.work.Queue(func() {
-		if w.admission != nil {
-			w.admission <- struct{}{}
-			defer func() { <-w.admission }()
-		}
 		w.panics.run(run)
+	})
+}
+
+// QueueProject composes project admission with the same abnormal-worker join
+// protocol as file tasks. Failure is published before its capacity is returned,
+// so a queued project cannot enter preparation after a sibling aborts.
+func (w *lintWorkGroup) QueueProject(budget *nativeWorkBudget, run func(*nativeWorkLease)) {
+	w.work.Queue(func() {
+		var lease *nativeWorkLease
+		if budget != nil {
+			lease = budget.prepare(&w.panics.aborted)
+			if lease == nil {
+				return
+			}
+		}
+		defer lease.close()
+		w.panics.run(func() { run(lease) })
 	})
 }
 

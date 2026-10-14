@@ -47,6 +47,7 @@ type programRunOptions struct {
 	CollectExecutedRules bool
 	SingleThreaded       bool
 	Timing               *TimingCollector
+	nativeLease          *nativeWorkLease
 }
 
 // Keep checker-free lint shards large enough to amortize their goroutine,
@@ -64,6 +65,35 @@ func checkerFreeLintWorkerCount(fileCount int, maxWorkers int) int {
 type programLintResult struct {
 	lintedFileCount int32
 	executedRules   map[string]struct{}
+}
+
+type checkerLintTask struct {
+	checker *checker.Checker
+	files   []*lintFilePlan
+}
+
+// prepareCheckerLintTasks preserves compiler checker affinity and the existing
+// checker-free chunking policy. Admission uses this exact task set.
+func prepareCheckerLintTasks(groups map[*checker.Checker][]*lintFilePlan, checkerFree, singleThreaded bool) []checkerLintTask {
+	tasks := make([]checkerLintTask, 0, len(groups))
+	for chk, files := range groups {
+		if chk == nil && checkerFree && !singleThreaded && len(files) > 1 {
+			workerCount := checkerFreeLintWorkerCount(len(files), runtime.GOMAXPROCS(0))
+			if workerCount >= 2 {
+				chunkSize := (len(files) + workerCount - 1) / workerCount
+				for worker := range workerCount {
+					start := worker * chunkSize
+					end := min(start+chunkSize, len(files))
+					if start < end {
+						tasks = append(tasks, checkerLintTask{files: files[start:end]})
+					}
+				}
+				continue
+			}
+		}
+		tasks = append(tasks, checkerLintTask{checker: chk, files: files})
+	}
+	return tasks
 }
 
 type listenerRegistry struct {
@@ -326,11 +356,10 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		registeredListeners.reset()
 	}
 
-	// Phase 1 parallelism is per-file within the program: files are grouped
-	// by the checker the pool associated to them (for the compiler pool this
-	// is the stable index%N mapping built in checkerpool.go), and each group
-	// is linted serially by one checker-shard task holding that checker
-	// exclusively.
+	// Files are grouped by the checker delivered by the Program. Each group
+	// is linted serially by one task holding that checker exclusively. The
+	// Program remains the authority for file association; admission only
+	// schedules the resulting tasks.
 	// This keeps three invariants:
 	//   - a checker is never used by two goroutines at once (pool contract:
 	//     checkers must not be accessed concurrently);
@@ -339,14 +368,6 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	//     tie-breaking and reporters rely on this;
 	//   - Phase 2 type-check visits files through the same association,
 	//     reusing the type caches warmed during lint.
-	// The LSP project pool builds its file association dynamically on first
-	// GetChecker instead of precomputing index%N — with this loop's
-	// acquire/release probing, a fresh project pool associates every file
-	// to the first checker, so the grouping collapses to a single group
-	// (no intra-program parallelism on that path; today it is only reached
-	// via LintSingleFile, where one file means one group anyway).
-	// Correctness never depends on the grouping: each task only uses the
-	// checker it acquired exclusively for its own shard.
 	ctx := context.Background()
 	checkerGroups := make(map[*checker.Checker][]*lintFilePlan)
 	checkerFreeGeneration := true
@@ -380,41 +401,24 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		checkerGroups[chk] = append(checkerGroups[chk], filePlan)
 	}
 
+	shards := prepareCheckerLintTasks(checkerGroups, checkerFreeGeneration, opts.SingleThreaded)
+	if !opts.nativeLease.admit(len(shards)) {
+		return result
+	}
 	wg := newLintWorkGroup(opts.SingleThreaded)
-	queueFiles := func(chk *checker.Checker, tasks []*lintFilePlan) {
+	for _, shard := range shards {
 		wg.Queue(func() {
 			registeredListeners := newListenerRegistry()
+			chk := shard.checker
 			if chk != nil {
 				var done func()
-				chk, done = sourceProgram.TypeCheckerForFileExclusive(ctx, tasks[0].file)
+				chk, done = sourceProgram.TypeCheckerForFileExclusive(ctx, shard.files[0].file)
 				defer done()
 			}
-			for _, task := range tasks {
+			for _, task := range shard.files {
 				lintFile(task, chk, &registeredListeners)
 			}
 		})
-	}
-	for chk, tasks := range checkerGroups {
-		// A source generation with no checker capability has no checker-owned
-		// shard topology. Its files are independent, so split the nil-checker
-		// group.
-		if chk == nil && checkerFreeGeneration && !opts.SingleThreaded && len(tasks) > 1 {
-			workerCount := checkerFreeLintWorkerCount(len(tasks), runtime.GOMAXPROCS(0))
-			if workerCount < 2 {
-				queueFiles(nil, tasks)
-				continue
-			}
-			chunkSize := (len(tasks) + workerCount - 1) / workerCount
-			for worker := range workerCount {
-				start := worker * chunkSize
-				end := min(start+chunkSize, len(tasks))
-				if start < end {
-					queueFiles(nil, tasks[start:end])
-				}
-			}
-			continue
-		}
-		queueFiles(chk, tasks)
 	}
 	wg.RunAndWait()
 

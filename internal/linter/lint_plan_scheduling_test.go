@@ -1,6 +1,7 @@
 package linter
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -10,9 +11,12 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestPreparedRuleSetsPublishCompleteConcurrentViews(t *testing.T) {
@@ -381,7 +385,7 @@ func TestProgramLintWorkGroupQueuesBeforeAdmission(t *testing.T) {
 	previousProcs := runtime.GOMAXPROCS(2)
 	t.Cleanup(func() { runtime.GOMAXPROCS(previousProcs) })
 	const programCount = 8
-	work := newProgramLintWorkGroup(false, programCount)
+	work, queue := scheduledProjectTestQueue(2)
 	release := make(chan struct{})
 	var releaseOnce sync.Once
 	unblock := func() { releaseOnce.Do(func() { close(release) }) }
@@ -402,14 +406,14 @@ func TestProgramLintWorkGroupQueuesBeforeAdmission(t *testing.T) {
 	})
 	go func() {
 		defer close(finished)
-		work.Queue(callback)
-		work.Queue(callback)
+		queue(callback)
+		queue(callback)
 		select {
 		case <-submitPending:
 		case <-release:
 		}
 		for range programCount - 2 {
-			work.Queue(callback)
+			queue(callback)
 		}
 		close(queued)
 		work.RunAndWait()
@@ -453,7 +457,7 @@ func TestProgramLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				const programCount = 8
 				const marker = "admitted Program failed"
-				work := newProgramLintWorkGroup(false, programCount)
+				work, queue := scheduledProjectTestQueue(2)
 				started := make(chan struct{}, 2)
 				releaseFailure := make(chan struct{})
 				releaseSibling := make(chan struct{})
@@ -481,13 +485,13 @@ func TestProgramLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
 				go func() {
 					defer close(finished)
 					defer func() { done <- recover() }()
-					work.Queue(func() {
+					queue(func() {
 						defer close(failureStopped)
 						started <- struct{}{}
 						<-releaseFailure
 						abort()
 					})
-					work.Queue(func() {
+					queue(func() {
 						defer close(siblingStopped)
 						started <- struct{}{}
 						<-releaseSibling
@@ -500,7 +504,7 @@ func TestProgramLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
 					case <-releaseFailure:
 					}
 					for range programCount - 2 {
-						work.Queue(func() { pendingRan.Add(1) })
+						queue(func() { pendingRan.Add(1) })
 					}
 					close(queued)
 					work.RunAndWait()
@@ -610,4 +614,400 @@ func programAdmissionTestOptions(t *testing.T, count int, singleThreaded bool, r
 		},
 	})
 	return RunLinterOptions{LintPlan: plan, SingleThreaded: singleThreaded}, paths
+}
+
+func scheduledProjectTestQueue(cpuCount int) (*lintWorkGroup, func(func())) {
+	work := newLintWorkGroup(false)
+	budget := newNativeWorkBudget(cpuCount)
+	return work, func(run func()) {
+		work.QueueProject(budget, func(lease *nativeWorkLease) {
+			if lease.admit(1) {
+				run()
+			}
+		})
+	}
+}
+
+func TestRunLinterSharesCapacityAcrossProjectShards(t *testing.T) {
+	previousProcs := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previousProcs) })
+	const fileCount = minCheckerFreeFilesPerLintWorker * 4
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	entered := make(chan struct{}, fileCount)
+	var active, peak, completed atomic.Int32
+	run := func(rule.RuleContext) rule.RuleListeners {
+		current := active.Add(1)
+		updateProgramAdmissionPeak(&peak, current)
+		entered <- struct{}{}
+		<-release
+		active.Add(-1)
+		completed.Add(1)
+		return nil
+	}
+	first := checkerFreeExecutionTestOptions(t, false, run)
+	second := checkerFreeExecutionTestOptions(t, false, run)
+	plan := &LintPlan{programs: append(append([]programLintPlan(nil), first.LintPlan.programs...), second.LintPlan.programs...)}
+	done := make(chan programAdmissionOutcome, 1)
+	finished := make(chan struct{})
+	t.Cleanup(func() { unblock(); joinProgramAdmissionTestWorker(t, finished) })
+	go func() {
+		defer close(finished)
+		result, err := RunLinter(RunLinterOptions{LintPlan: plan})
+		done <- programAdmissionOutcome{result: result, err: err}
+	}()
+	for range 2 {
+		select {
+		case <-entered:
+		case <-time.After(5 * time.Second):
+			t.Fatal("admitted shards did not run in parallel")
+		}
+	}
+	select {
+	case <-entered:
+		t.Fatal("independent projects multiplied the shared shard capacity")
+	case <-time.After(30 * time.Millisecond):
+	}
+	unblock()
+	select {
+	case got := <-done:
+		if got.err != nil || got.result == nil || got.result.LintedFileCount != fileCount ||
+			completed.Load() != fileCount || peak.Load() != 2 || active.Load() != 0 {
+			t.Fatalf("result/error/completed/peak/active = %+v/%v/%d/%d/%d", got.result, got.err, completed.Load(), peak.Load(), active.Load())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("pending project shards did not complete")
+	}
+}
+
+func TestNativeWorkBudgetReservesPreparationCapacity(t *testing.T) {
+	budget := newNativeWorkBudget(1)
+	var aborted atomic.Bool
+	first := budget.prepare(&aborted)
+	if !first.admit(1) {
+		t.Fatal("first project was not admitted")
+	}
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(first.close) }
+	entered := make(chan struct{})
+	finished := make(chan struct{})
+	t.Cleanup(func() { release(); joinProgramAdmissionTestWorker(t, finished) })
+	go func() {
+		defer close(finished)
+		second := budget.prepare(&aborted)
+		defer second.close()
+		close(entered)
+		if !second.admit(0) {
+			t.Error("zero-task project was not admitted")
+		}
+	}()
+	select {
+	case <-entered:
+		t.Fatal("preparation started while the only CPU unit was occupied")
+	case <-time.After(30 * time.Millisecond):
+	}
+	release()
+	joinProgramAdmissionTestWorker(t, finished)
+	if len(budget.workers) != 0 {
+		t.Fatal("zero-task project retained preparation capacity")
+	}
+}
+
+func TestNativeWorkBudgetHoldsWholeProjectWidth(t *testing.T) {
+	budget := newNativeWorkBudget(3)
+	var aborted atomic.Bool
+	first := budget.prepare(&aborted)
+	if !first.admit(2) {
+		t.Fatal("first project was not admitted")
+	}
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(first.close) }
+	prepared := make(chan struct{})
+	admitted := make(chan struct{})
+	finished := make(chan struct{})
+	t.Cleanup(func() { release(); joinProgramAdmissionTestWorker(t, finished) })
+	go func() {
+		defer close(finished)
+		second := budget.prepare(&aborted)
+		defer second.close()
+		close(prepared)
+		if !second.admit(2) {
+			t.Error("second project was not admitted")
+			return
+		}
+		close(admitted)
+	}()
+	select {
+	case <-prepared:
+	case <-time.After(5 * time.Second):
+		t.Fatal("available capacity could not prepare the next project")
+	}
+	select {
+	case <-admitted:
+		t.Fatal("project started without its complete shard width")
+	case <-time.After(30 * time.Millisecond):
+	}
+	release()
+	joinProgramAdmissionTestWorker(t, finished)
+	select {
+	case <-admitted:
+	default:
+		t.Fatal("project did not start after sibling completion")
+	}
+	if len(budget.workers) != 0 {
+		t.Fatal("joined projects retained capacity")
+	}
+}
+
+func TestNativeWorkBudgetOversizedProjectOccupiesCapacity(t *testing.T) {
+	budget := newNativeWorkBudget(2)
+	var aborted atomic.Bool
+	lease := budget.prepare(&aborted)
+	defer lease.close()
+	if !lease.admit(10) || len(budget.workers) != 2 {
+		t.Fatal("oversized shard set did not occupy the complete CPU capacity")
+	}
+	lease.close()
+	if len(budget.workers) != 0 {
+		t.Fatal("repeated close retained capacity")
+	}
+}
+
+func TestNativeWorkBudgetPreparationAbnormalExit(t *testing.T) {
+	for _, exit := range []string{"panic", "Goexit"} {
+		t.Run(exit, func(t *testing.T) {
+			work := newLintWorkGroup(false)
+			budget := newNativeWorkBudget(2)
+			started := make(chan struct{})
+			release := make(chan struct{})
+			var releaseOnce sync.Once
+			unblock := func() { releaseOnce.Do(func() { close(release) }) }
+			var pendingRan atomic.Int32
+			done := make(chan any, 1)
+			finished := make(chan struct{})
+			t.Cleanup(func() { unblock(); joinProgramAdmissionTestWorker(t, finished) })
+			go func() {
+				defer close(finished)
+				defer func() { done <- recover() }()
+				work.QueueProject(budget, func(*nativeWorkLease) {
+					close(started)
+					<-release
+					if exit == "Goexit" {
+						runtime.Goexit()
+					}
+					panic("preparation failed")
+				})
+				<-started
+				for range 4 {
+					work.QueueProject(budget, func(*nativeWorkLease) { pendingRan.Add(1) })
+				}
+				unblock()
+				work.RunAndWait()
+			}()
+			select {
+			case got := <-done:
+				if exit == "panic" && got != "preparation failed" {
+					t.Fatalf("panic = %v", got)
+				}
+				if exit == "Goexit" {
+					if err, ok := got.(error); !ok || err == nil {
+						t.Fatalf("Goexit outcome = %v", got)
+					}
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("abnormal preparation retained a mutex or CPU unit")
+			}
+			if pendingRan.Load() != 0 || len(budget.workers) != 0 {
+				t.Fatal("failed preparation started pending work or retained capacity")
+			}
+			assertNativeWorkBudgetReusable(t, budget)
+		})
+	}
+}
+
+func TestNativeWorkBudgetAbortsWaitingExpansion(t *testing.T) {
+	for _, exit := range []string{"panic", "Goexit"} {
+		t.Run(exit, func(t *testing.T) {
+			work := newLintWorkGroup(false)
+			budget := newNativeWorkBudget(3)
+			started := make(chan struct{})
+			expanding := make(chan struct{})
+			release := make(chan struct{})
+			var releaseOnce sync.Once
+			unblock := func() { releaseOnce.Do(func() { close(release) }) }
+			var nativeRan, pendingRan atomic.Int32
+			done := make(chan any, 1)
+			finished := make(chan struct{})
+			t.Cleanup(func() { unblock(); joinProgramAdmissionTestWorker(t, finished) })
+			go func() {
+				defer close(finished)
+				defer func() { done <- recover() }()
+				work.QueueProject(budget, func(lease *nativeWorkLease) {
+					if !lease.admit(1) {
+						return
+					}
+					close(started)
+					<-release
+					if exit == "Goexit" {
+						runtime.Goexit()
+					}
+					panic("native failed during expansion")
+				})
+				<-started
+				work.QueueProject(budget, func(lease *nativeWorkLease) {
+					close(expanding)
+					if lease.admit(3) {
+						nativeRan.Add(1)
+					}
+				})
+				<-expanding
+				deadline := time.Now().Add(5 * time.Second)
+				for len(budget.workers) != 3 && time.Now().Before(deadline) {
+					time.Sleep(time.Millisecond)
+				}
+				if len(budget.workers) != 3 {
+					t.Error("second project did not reach partial expansion")
+				}
+				work.QueueProject(budget, func(*nativeWorkLease) { pendingRan.Add(1) })
+				unblock()
+				work.RunAndWait()
+			}()
+			select {
+			case got := <-done:
+				if exit == "panic" && got != "native failed during expansion" {
+					t.Fatalf("panic = %v", got)
+				}
+				if exit == "Goexit" {
+					if err, ok := got.(error); !ok || err == nil {
+						t.Fatalf("Goexit outcome = %v", got)
+					}
+				}
+			case <-time.After(6 * time.Second):
+				t.Fatal("aborted expansion did not join")
+			}
+			if nativeRan.Load() != 0 || pendingRan.Load() != 0 || len(budget.workers) != 0 {
+				t.Fatal("aborted expansion dispatched native work or retained capacity")
+			}
+			assertNativeWorkBudgetReusable(t, budget)
+		})
+	}
+}
+
+func assertNativeWorkBudgetReusable(t *testing.T, budget *nativeWorkBudget) {
+	t.Helper()
+	finished := make(chan struct{})
+	go func() {
+		var fresh atomic.Bool
+		lease := budget.prepare(&fresh)
+		lease.close()
+		close(finished)
+	}()
+	select {
+	case <-finished:
+	case <-time.After(2 * time.Second):
+		t.Fatal("joined projects retained the preparation mutex")
+	}
+}
+
+func TestRunLinterBudgetPreservesCompilerAffinityAndFixOrder(t *testing.T) {
+	previousProcs := runtime.GOMAXPROCS(4)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previousProcs) })
+	for _, singleThreaded := range []bool{false, true} {
+		t.Run(fmt.Sprintf("singleThreaded=%t", singleThreaded), func(t *testing.T) {
+			const filesPerProject = 16
+			var programs []*program.Program
+			var targets [][]string
+			expected := make(map[*ast.SourceFile]*checker.Checker)
+			active := make(map[*checker.Checker]*atomic.Int32)
+			for range 2 {
+				sources := make(map[string]string)
+				for index := range filesPerProject {
+					sources[fmt.Sprintf("file-%02d.ts", index)] = fmt.Sprintf("import { value as peer } from './file-%02d'; export const value: number = peer + 1;", index^1)
+				}
+				raw, paths := createTestProgramWithFilesAndCompilerOptions(t, sources, `{"noLib":true}`)
+				fs := wrapTestPrograms(raw)[0].FS()
+				root := tspath.GetDirectoryPath(paths["file-00.ts"])
+				// The shared fixture defaults to a serial compiler. This case
+				// needs the compiler's real parallel checker pool in both modes.
+				raw, err := utils.CreateProgram(false, fs, root, "tsconfig.json", utils.CreateCompilerHost(root, fs))
+				if err != nil {
+					t.Fatalf("CreateProgram: %v", err)
+				}
+				project := wrapTestPrograms(raw)[0]
+				programs = append(programs, project)
+				var names []string
+				projectCheckers := make(map[*checker.Checker]struct{})
+				for index := range filesPerProject {
+					name := paths[fmt.Sprintf("file-%02d.ts", index)]
+					names = append(names, name)
+					file := project.GetSourceFile(name)
+					chk, release := project.TypeCheckerForFile(context.Background(), file)
+					release()
+					if chk == nil {
+						t.Fatal("compiler fixture did not provide a checker")
+					}
+					expected[file] = chk
+					projectCheckers[chk] = struct{}{}
+					if active[chk] == nil {
+						active[chk] = new(atomic.Int32)
+					}
+				}
+				if len(projectCheckers) < 2 {
+					t.Fatal("selected compiler files did not cover multiple real checker shards")
+				}
+				targets = append(targets, names)
+			}
+			if len(active) < 2 {
+				t.Fatal("compiler fixture did not cover multiple real checkers")
+			}
+			textRange := core.NewTextRange(0, 1)
+			configured := make([]rule.ConfiguredRule, 0, 2)
+			for _, name := range []string{"first", "second"} {
+				configured = append(configured, rule.ConfiguredRule{Name: "native/" + name, RequiresTypeInfo: true, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					if ctx.TypeChecker != expected[ctx.SourceFile] {
+						t.Error("native admission changed compiler checker affinity")
+						return nil
+					}
+					counter := active[ctx.TypeChecker]
+					if counter.Add(1) != 1 {
+						t.Error("one checker was used concurrently")
+					}
+					defer counter.Add(-1)
+					// Widen the overlap window across actual compiler checker tasks.
+					time.Sleep(time.Millisecond)
+					ctx.ReportRangeWithFixes(textRange, rule.RuleMessage{Id: name, Description: name}, rule.RuleFixReplaceRange(textRange, name))
+					return nil
+				}})
+			}
+			plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+				Programs: programs, TargetsByProgram: targets, SingleThreaded: singleThreaded,
+				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule { return configured },
+			})
+			var mu sync.Mutex
+			diagnostics := make(map[string][]rule.RuleDiagnostic)
+			result, err := RunLinter(RunLinterOptions{LintPlan: plan, SingleThreaded: singleThreaded, Consumer: rule.DiagnosticConsumer{
+				Demand: rule.EditDemandAutofix,
+				Report: func(d rule.RuleDiagnostic) {
+					mu.Lock()
+					defer mu.Unlock()
+					diagnostics[d.FilePath] = append(diagnostics[d.FilePath], d)
+				},
+			}})
+			if err != nil || result.LintedFileCount != filesPerProject*2 || len(diagnostics) != filesPerProject*2 {
+				t.Fatalf("result/error/diagnostic files = %+v/%v/%d", result, err, len(diagnostics))
+			}
+			for name, got := range diagnostics {
+				if len(got) != 2 {
+					t.Fatalf("%s: diagnostics = %d", name, len(got))
+				}
+				for index, want := range []string{"first", "second"} {
+					fixes := got[index].Fixes()
+					if got[index].Message.Id != want || got[index].Range != textRange || len(fixes) != 1 || fixes[0] != rule.RuleFixReplaceRange(textRange, want) {
+						t.Fatalf("%s: equal-position diagnostic/fix order changed: %+v", name, got)
+					}
+				}
+			}
+		})
+	}
 }
