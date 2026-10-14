@@ -53,6 +53,7 @@ export default defineConfig([
       // The default Node resolver cannot resolve TypeScript source imports.
       'import/no-unresolved': 'off',
       'import/no-extraneous-dependencies': 'warn',
+      'import/no-relative-packages': 'warn',
     },
   },
   {
