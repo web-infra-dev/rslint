@@ -78,3 +78,34 @@ func TestDependencyCategoryOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestResolvedExternalClassification(t *testing.T) {
+	root := dependencyRoot(t)
+	files := map[string]string{}
+	for name, text := range map[string]string{
+		"node_modules/-pkg/package.json": `{"name":"-pkg","main":"index.js"}`,
+		"node_modules/-pkg/index.js":     `module.exports={};`,
+		"local.js":                       `export default 1;`,
+		"declared/package.json":          `{"dependencies":{"-pkg":"*"}}`,
+	} {
+		files[tspath.ResolvePath(root.Dir, name)] = text
+	}
+	root.FS = utils.NewOverlayVFS(root.FS, files)
+	internalSettings := map[string]any{"import/internal-regex": "^-pkg"}
+	options := map[string]any{"includeInternal": true}
+	invalid := []rule_tester.InvalidTestCase{}
+	for _, code := range []string{`import "-pkg";`, `import "-pkg/index.js";`, `require("-pkg")`, `import("-pkg")`, `export * from "-pkg";`} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: missing("-pkg", 1, 1, 1, len(code)+1)})
+	}
+	invalid = append(invalid, rule_tester.InvalidTestCase{Code: `import "-pkg";`, Settings: internalSettings, Options: options, Errors: missing("-pkg", 1, 1, 1, 15)})
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &NoExtraneousDependenciesRule, []rule_tester.ValidTestCase{
+		{Code: `import "-pkg";`, Options: map[string]any{"packageDir": "declared"}},
+		{Code: `import "-pkg";`, Settings: internalSettings},
+		{Code: `import "-pkg";`, Settings: map[string]any{"import/core-modules": []any{"-pkg"}}},
+		{Code: `import "-missing";`},
+		{Code: `import "./local.js";`, Options: options},
+		{Code: `import "/fixture/node_modules/-pkg/index.js";`, Options: options},
+		{Code: `import "fs"; import "node:fs";`, Options: options},
+		{Code: `import "-pkg";`, Settings: map[string]any{"import/external-module-folders": []any{}}},
+	}, invalid)
+}
