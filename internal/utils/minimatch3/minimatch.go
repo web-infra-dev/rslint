@@ -136,6 +136,8 @@ type patternPart struct {
 	globstar bool
 	literal  string
 	re       *regexp2.Regexp
+	// source is the unanchored part used by minimatch's makeRe API.
+	source string
 	// ASCII literals under /i need neither a regexp nor UTF-16 allocation.
 	asciiNoCase bool
 }
@@ -290,10 +292,13 @@ func (m *Matcher) parsePart(pattern string) (patternPart, bool) {
 
 	re, err := regexp2.Compile("^"+endAnchors(source)+`\z`, regexp2.None)
 	if err != nil {
-		// An invalid regular expression can't match anything.
+		// An invalid regular expression can't match anything through Match.
+		// Upstream returns /$./ without an _src field here, so makeRe joins
+		// this part as an empty source instead of recompiling the invalid one.
 		re = neverMatches
+		source = ""
 	}
-	return patternPart{re: boundMatching(re)}, true
+	return patternPart{re: boundMatching(re), source: source}, true
 }
 
 // endAnchors rewrites the end-of-input anchors a source was built with, from
