@@ -64,11 +64,10 @@ const (
 )
 
 // Version is the IPC protocol version.
-const Version = "3.1.0"
+const Version = "4.0.0"
 
 const CapabilityReversePluginLint = "reversePluginLint"
 const CapabilityReverseConfigLoad = "reverseConfigLoadV1"
-const CapabilityPluginLintAttachments = "pluginLintAttachments"
 
 // HandshakeRequest represents a handshake request
 type HandshakeRequest struct {
@@ -345,7 +344,6 @@ func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, err
 			capabilities = []string{
 				CapabilityReversePluginLint,
 				CapabilityReverseConfigLoad,
-				CapabilityPluginLintAttachments,
 			}
 		}
 		return HandshakeResponse{

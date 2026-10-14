@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1473,15 +1474,13 @@ func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
 		SingleThreaded: true,
 	}
 	for _, test := range []struct {
-		name       string
-		fs         vfs.FS
-		wantInline bool
+		name string
+		fs   vfs.FS
 	}{
 		{name: "production disk host"},
 		{
-			name:       "injected filesystem",
-			fs:         bundled.WrapFS(cachedvfs.From(osvfs.FS())),
-			wantInline: true,
+			name: "injected filesystem",
+			fs:   bundled.WrapFS(cachedvfs.From(osvfs.FS())),
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -1504,13 +1503,9 @@ func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
 			if code != 0 || len(request.Files) != 1 {
 				t.Fatalf("CLI plugin request failed: code=%d request=%+v stdout=%q stderr=%q", code, request, stdout, stderr)
 			}
-			text := request.Files[0].Text
-			if test.wantInline {
-				if text == nil || *text != content {
-					t.Fatalf("injected filesystem text = %v, want %q", text, content)
-				}
-			} else if text != nil {
-				t.Fatalf("production disk host unexpectedly received inline text %q", *text)
+			frame := request.Files[0].Frame
+			if len(frame) < 64 || string(frame[binary.LittleEndian.Uint32(frame[60:]):]) != strings.TrimPrefix(content, "\ufeff") {
+				t.Fatal("CLI frame did not freeze its filesystem generation")
 			}
 		})
 	}

@@ -1,11 +1,7 @@
 /**
- * GENERATED — vendored from oxc-parser@0.133.0 `visitorKeys` (165 node types). DO NOT EDIT BY HAND.
- *
- * This is the runner's authoritative visitor-key table: the walker traverses the AST oxc
- * PRODUCES, so oxc's own table is correct by construction (byte-identical to
- * @typescript-eslint/visitor-keys for shared types — see tests/ast/visitor-keys.test.ts).
- * Vendored (not imported at runtime) so removing the npm `oxc-parser` dep keeps it.
- * To re-vendor after an oxc bump: regenerate from `oxc-parser` and update the test drift guard.
+ * ESTree child order used by frame validation, parent linking, and rule traversal.
+ * Shared node types are checked against @typescript-eslint/visitor-keys and
+ * eslint-visitor-keys. Unsupported syntax is rejected by the Go projector.
  */
 export const VISITOR_KEYS_TABLE: Readonly<Record<string, readonly string[]>> = {
   AccessorProperty: ['decorators', 'key', 'typeAnnotation', 'value'],
@@ -88,7 +84,6 @@ export const VISITOR_KEYS_TABLE: Readonly<Record<string, readonly string[]>> = {
   NewExpression: ['callee', 'typeArguments', 'arguments'],
   ObjectExpression: ['properties'],
   ObjectPattern: ['decorators', 'properties', 'typeAnnotation'],
-  ParenthesizedExpression: ['expression'],
   PrivateIdentifier: [],
   Program: ['body'],
   Property: ['key', 'value'],
@@ -138,9 +133,6 @@ export const VISITOR_KEYS_TABLE: Readonly<Record<string, readonly string[]>> = {
   TSInterfaceHeritage: ['expression', 'typeArguments'],
   TSIntersectionType: ['types'],
   TSIntrinsicKeyword: [],
-  TSJSDocNonNullableType: ['typeAnnotation'],
-  TSJSDocNullableType: ['typeAnnotation'],
-  TSJSDocUnknownType: [],
   TSLiteralType: ['literal'],
   TSMappedType: ['key', 'constraint', 'nameType', 'typeAnnotation'],
   TSMethodSignature: ['key', 'typeParameters', 'params', 'returnType'],
@@ -155,7 +147,6 @@ export const VISITOR_KEYS_TABLE: Readonly<Record<string, readonly string[]>> = {
   TSObjectKeyword: [],
   TSOptionalType: ['typeAnnotation'],
   TSParameterProperty: ['decorators', 'parameter'],
-  TSParenthesizedType: ['typeAnnotation'],
   TSPropertySignature: ['key', 'typeAnnotation'],
   TSQualifiedName: ['left', 'right'],
   TSRestType: ['typeAnnotation'],
@@ -188,7 +179,6 @@ export const VISITOR_KEYS_TABLE: Readonly<Record<string, readonly string[]>> = {
   TryStatement: ['block', 'handler', 'finalizer'],
   UnaryExpression: ['argument'],
   UpdateExpression: ['argument'],
-  V8IntrinsicExpression: ['name', 'arguments'],
   VariableDeclaration: ['declarations'],
   VariableDeclarator: ['id', 'init'],
   WhileStatement: ['test', 'body'],

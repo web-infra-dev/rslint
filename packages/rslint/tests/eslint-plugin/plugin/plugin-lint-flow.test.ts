@@ -1,7 +1,8 @@
 import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 
-import { lintFile } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
+import { lintFile } from '../project-frame.js';
+import { lintFile as lintFrame } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
 import { loadPluginsFromConfigs } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
 import type { LoadedPlugins } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
 
@@ -112,13 +113,13 @@ export function f(x: number | null): boolean {
     // The important guarantee is cancel propagation worked.
   });
 
-  test('parse error is captured per-file, not thrown', async () => {
+  test('invalid frame is captured per-file and never becomes a successful empty lint', () => {
     const loaded: LoadedPlugins = { plugins: [], rules: new Map() };
 
-    const result = lintFile(
+    const result = lintFrame(
       {
         filePath: 'test.ts',
-        text: '!!!! invalid syntax (((((((((((((((((((((((((((((((',
+        frame: new Uint8Array([0]),
         rules: {},
         collectFixes: false,
         suggestionsMode: 'off',
@@ -126,8 +127,7 @@ export function f(x: number | null): boolean {
       loaded,
     );
 
-    // oxc-parser is robust — it may parse this without throwing. So we
-    // assert "no diagnostics, no thrown error" rather than "parseError set".
+    expect(result.parseError).toMatch(/invalid ESTree frame/);
     expect(result.diagnostics).toEqual([]);
   });
 

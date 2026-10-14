@@ -1,174 +1,78 @@
-/**
- * Unit tests for the shared eslintPlugins lint boundary helpers used by
- * both the CLI host (engine.ts) and the LSP host (PluginLintPool.ts).
- *
- * `buildPluginLintTasks` forwards each file's `configKey` verbatim — the
- * worker picks the right `LoadedPlugins` from its per-config map via that
- * key. The helper here is responsible for:
- *
- *   - emitting `configKey` on every task (empty string when absent),
- *   - firing `onUnknownConfigKey` for hosts that want a clearer log
- *     before the worker's internal-error parseError lands,
- *   - propagating the shared `rules` / `collectFixes` / `suggestionsMode`
- *     block to every task,
- *   - forwarding `languageOptions` / `settings` opaquely to the worker.
- */
-
 import { describe, test, expect } from 'rstack/test';
-
 import {
   buildPluginLintTasks,
   buildPluginLintResult,
-  type EslintPluginLintRequest,
   type ResolvedEslintPluginLintRequest,
 } from '../../../src/eslint-plugin/plugin/plugin-lint-protocol.js';
 import type { LintFileResult } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
 import { resolvePluginAttachments } from '../../../src/eslint-plugin/plugin/attachments.js';
 
-describe('shared plugin host attachment references', () => {
-  test('preserves complete text, native capabilities and file metadata', () => {
-    const source = '\ufeffconst café = "😀";\r\n// \u0000';
-    const capability = { lease: 7, offset: 3, length: 2 };
-    const request: EslintPluginLintRequest = {
+describe('binary plugin frame boundary', () => {
+  test('resolves owned bytes and capabilities without decoding either', () => {
+    const owned = new Uint8Array([0, 255, 1]),
+      capability = { lease: 7, offset: 3, length: 2 };
+    const req = {
       collectFixes: true,
-      rules: { 'local/check': {} },
       files: [
-        { path: 'a.ts', textAttachment: 0, configKey: 'config-a' },
-        { path: 'b.ts', text: 'existing inline' },
-        { path: 'c.ts', textAttachment: 1 },
-        { path: 'd.ts' },
+        { path: 'a.ts', frameAttachment: 0, configKey: 'config' },
+        { path: 'b.ts', frame: 'AP8B' },
+        { path: 'c.ts', frameAttachment: 1 },
       ],
     };
-    expect(resolvePluginAttachments(request, [source, capability])).toEqual({
-      ...request,
-      files: [
-        { path: 'a.ts', text: source, configKey: 'config-a' },
-        { path: 'b.ts', text: 'existing inline' },
-        { path: 'c.ts', sharedSource: capability },
-        { path: 'd.ts' },
-      ],
-    });
-    expect(request.files[0]).toHaveProperty('textAttachment', 0);
+    const resolved = resolvePluginAttachments(req, [owned, capability]);
+    expect(resolved.files[0].frame).toBe(owned);
+    expect(resolved.files[1].frame).toEqual(Buffer.from(owned));
+    expect(resolved.files[2].frame).toBe(capability);
+    expect(req.files[0].frameAttachment).toBe(0);
   });
-
-  test('preserves an explicitly empty snapshot', () => {
-    expect(
-      resolvePluginAttachments(
-        {
-          files: [{ path: '/missing.ts', textAttachment: 0 }],
-          collectFixes: false,
-        },
-        [''],
-      ),
-    ).toEqual({
-      files: [{ path: '/missing.ts', text: '' }],
-      collectFixes: false,
-    });
-  });
-
-  test('an explicitly absent attachment remains an inline snapshot', () => {
-    const resolved = resolvePluginAttachments({
-      files: [
-        { path: '/missing.ts', text: 'snapshot', textAttachment: undefined },
-      ],
-      collectFixes: false,
-    });
-    const [task] = buildPluginLintTasks(resolved, { configDirSet: new Set() });
-    expect(task.text).toBe('snapshot');
-    expect(resolved.files[0]).not.toHaveProperty('textAttachment');
-  });
-
-  test('decodes owned binary source at the application boundary', () => {
-    const text = '\ufeffconst café = "😀";\r\n// \u0000';
-    const resolved = resolvePluginAttachments(
-      { files: [{ path: 'a.ts', textAttachment: 0 }], collectFixes: false },
-      [Buffer.from(text, 'utf8')],
-    );
-    expect(resolved.files).toEqual([{ path: 'a.ts', text }]);
-    const tasks = buildPluginLintTasks(resolved, { configDirSet: new Set() });
-    expect(tasks[0].text).toBe(text);
-    expect(tasks[0].sharedSource).toBeUndefined();
-  });
-
-  test.each(
-    [
-      [0xff],
-      [0xc0, 0xaf],
-      [0xed, 0xa0, 0x80],
-      [0xe2, 0x82],
-      [0x61, 0x80, 0x62],
-    ].map((bytes) => ({ bytes })),
-  )(
-    'rejects malformed UTF-8 byte snapshots instead of replacing source text: %j',
-    ({ bytes }) => {
-      expect(() =>
-        resolvePluginAttachments(
-          { files: [{ path: 'a.ts', textAttachment: 0 }], collectFixes: false },
-          [Uint8Array.from(bytes)],
-        ),
-      ).toThrow();
-    },
-  );
-
-  test('preserves a BOM and decodes only the supplied byte view', () => {
-    const text = '\ufeffconst café = "😀";\r\n';
-    const bytes = Buffer.concat([
-      Buffer.from([0xff]),
-      Buffer.from(text),
-      Buffer.from([0xff]),
-    ]);
-    const view = new Uint8Array(
-      bytes.buffer,
-      bytes.byteOffset + 1,
-      bytes.byteLength - 2,
-    );
-    const resolved = resolvePluginAttachments(
-      { files: [{ path: 'a.ts', textAttachment: 0 }], collectFixes: false },
-      [view],
-    );
-    expect(resolved.files[0].text).toBe(text);
-  });
-
   test.each([
-    { files: [{ textAttachment: -1 }] },
-    { files: [{ textAttachment: 0.5 }] },
-    { files: [{ textAttachment: '0' }] },
-    { files: [{ textAttachment: 1 }] },
-    { files: [{ textAttachment: 0, text: '' }] },
-    { files: [{ textAttachment: 0, sharedSource: {} }] },
-    { files: [{ textAttachment: 0 }, { textAttachment: 0 }] },
-    { files: [{}] },
-    { files: [null] },
-  ])('rejects ambiguous or incomplete references: %j', (request) => {
+    {},
+    { text: '' },
+    { textAttachment: 0 },
+    { frameAttachment: -1 },
+    { frameAttachment: 0.5 },
+    { frameAttachment: 1 },
+    { frameAttachment: 0, frame: 'AP8B' },
+    { frame: '***=' },
+    { frame: 'AP8' },
+    { frame: 'AB==' },
+    { sharedSource: {} },
+    { frameAttachment: 0, sourceRange: {} },
+  ])('rejects invalid or obsolete input: %j', (input) => {
     expect(() =>
-      // @ts-expect-error Exercise the runtime guard with malformed wire input.
-      resolvePluginAttachments(request, ['complete source']),
+      resolvePluginAttachments(
+        { collectFixes: false, files: [{ path: 'a.ts', ...input }] } as never,
+        [new Uint8Array([1])],
+      ),
     ).toThrow();
   });
-
-  test.each([
-    { sharedSource: { lease: 1, offset: 0, length: 0 } },
-    { sourceRange: { offset: 0, length: 0 } },
-    { sourceIndex: 0 },
-  ])(
-    'rejects native or legacy wire fields without attachments: %j',
-    (source) => {
-      expect(() =>
-        resolvePluginAttachments({
-          files: [{ path: '/missing.ts', ...source }],
-          collectFixes: false,
-        }),
-      ).toThrow('invalid plugin source file');
-    },
-  );
-
-  test('a missing attachment cannot become a filesystem read', () => {
+  test('rejects text attachments and unused attachments', () => {
     expect(() =>
-      resolvePluginAttachments({
-        files: [{ path: '/missing.ts', textAttachment: 0 }],
-        collectFixes: false,
-      }),
-    ).toThrow('invalid plugin source attachment');
+      resolvePluginAttachments(
+        { collectFixes: false, files: [{ path: 'a.ts', frameAttachment: 0 }] },
+        ['source'],
+      ),
+    ).toThrow();
+    expect(() =>
+      resolvePluginAttachments(
+        { collectFixes: false, files: [{ path: 'a.ts', frame: 'AP8B' }] },
+        [new Uint8Array([1])],
+      ),
+    ).toThrow();
+  });
+  test('rejects repeated attachment indices', () => {
+    expect(() =>
+      resolvePluginAttachments(
+        {
+          collectFixes: false,
+          files: [
+            { path: 'a.ts', frameAttachment: 0 },
+            { path: 'b.ts', frameAttachment: 0 },
+          ],
+        },
+        [new Uint8Array([1]), new Uint8Array([1])],
+      ),
+    ).toThrow();
   });
 });
 
@@ -176,37 +80,32 @@ function input(
   files: ResolvedEslintPluginLintRequest['files'],
   opts: Partial<ResolvedEslintPluginLintRequest> = {},
 ): ResolvedEslintPluginLintRequest {
-  return {
-    files,
-    rules: opts.rules ?? { 'uc/no-null': { options: [] } },
-    collectFixes: opts.collectFixes ?? false,
-    suggestionsMode: opts.suggestionsMode,
-  };
+  return { files, collectFixes: false, ...opts };
 }
 
 describe('buildPluginLintTasks', () => {
   test('rejects an unresolved wire range instead of reading disk', () => {
     const request: EslintPluginLintRequest = {
-      files: [{ path: '/missing.ts', textAttachment: 0 }],
+      files: [{ path: '/missing.ts', frameAttachment: 0 }],
       collectFixes: false,
     };
     expect(() =>
       // @ts-expect-error A wire request must pass through the attachment adapter.
       buildPluginLintTasks(request, { configDirSet: new Set() }),
-    ).toThrow('unresolved shared plugin source');
+    ).toThrow('unresolved plugin frame');
   });
   test('forwards native source capabilities without decoding or reading files', () => {
-    const sharedSource = { lease: 1, offset: 0, length: 12 };
+    const frame = { lease: 1, offset: 0, length: 12 };
     const tasks = buildPluginLintTasks(
-      input([{ path: '/missing.ts', sharedSource }]),
+      input([{ path: '/missing.ts', frame }]),
       { configDirSet: new Set() },
     );
-    expect(tasks[0].sharedSource).toBe(sharedSource);
+    expect(tasks[0].frame).toBe(frame);
     expect(tasks[0].text).toBeUndefined();
   });
   test('configKey absent on file → empty string on task', () => {
     const tasks = buildPluginLintTasks(
-      input([{ path: '/a.ts', text: 'const x = 1;' }]),
+      input([{ path: '/a.ts', frame: new Uint8Array([1]) }]),
       { configDirSet: new Set() },
     );
     expect(tasks).toHaveLength(1);
@@ -215,7 +114,13 @@ describe('buildPluginLintTasks', () => {
 
   test('configKey known in set → passed through verbatim', () => {
     const tasks = buildPluginLintTasks(
-      input([{ path: '/proj/pkg-a/a.ts', text: '', configKey: '/proj/pkg-a' }]),
+      input([
+        {
+          path: '/proj/pkg-a/a.ts',
+          frame: new Uint8Array([1]),
+          configKey: '/proj/pkg-a',
+        },
+      ]),
       { configDirSet: new Set(['/proj/pkg-a']) },
     );
     expect(tasks).toHaveLength(1);
@@ -225,7 +130,9 @@ describe('buildPluginLintTasks', () => {
   test('configKey unknown → onUnknownConfigKey fires, key still passed through', () => {
     const warnings: Array<{ filePath: string; configKey: string }> = [];
     const tasks = buildPluginLintTasks(
-      input([{ path: '/x.ts', text: '', configKey: '/nowhere' }]),
+      input([
+        { path: '/x.ts', frame: new Uint8Array([1]), configKey: '/nowhere' },
+      ]),
       {
         configDirSet: new Set(['/proj/pkg-a']),
         onUnknownConfigKey: (filePath, configKey) =>
@@ -242,7 +149,9 @@ describe('buildPluginLintTasks', () => {
 
   test('configKey unknown without onUnknownConfigKey → still no throw', () => {
     const tasks = buildPluginLintTasks(
-      input([{ path: '/x.ts', text: '', configKey: '/nowhere' }]),
+      input([
+        { path: '/x.ts', frame: new Uint8Array([1]), configKey: '/nowhere' },
+      ]),
       { configDirSet: new Set() },
     );
     expect(tasks[0].configKey).toBe('/nowhere');
@@ -252,8 +161,8 @@ describe('buildPluginLintTasks', () => {
     const tasks = buildPluginLintTasks(
       input(
         [
-          { path: '/a.ts', text: '' },
-          { path: '/b.ts', text: '' },
+          { path: '/a.ts', frame: new Uint8Array([1]) },
+          { path: '/b.ts', frame: new Uint8Array([1]) },
         ],
         {
           rules: {
@@ -282,7 +191,10 @@ describe('buildPluginLintTasks', () => {
 
   test('rules / collectFixes / suggestionsMode defaults are sensible', () => {
     const tasks = buildPluginLintTasks(
-      { files: [{ path: '/a.ts', text: '' }], collectFixes: false },
+      {
+        files: [{ path: '/a.ts', frame: new Uint8Array([1]) }],
+        collectFixes: false,
+      },
       { configDirSet: new Set() },
     );
     expect(tasks[0].collectFixes).toBe(false);
@@ -297,7 +209,7 @@ describe('buildPluginLintTasks', () => {
       input([
         {
           path: '/a.tsx',
-          text: '',
+          frame: new Uint8Array([1]),
           languageOptions: langOpts,
           settings,
         },

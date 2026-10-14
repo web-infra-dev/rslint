@@ -1,19 +1,13 @@
 /**
- * Rebuild ESLint-shape `Token[]` from the native parser's columnar token stream
- * (the napi parser's `parse()` returns `tokenTypes`/`tokenStarts`/`tokenEnds`,
- * all UTF-16 offsets). This is the JS half of the token path: the Rust
- * side already mapped each oxc `Kind` to an ESLint token *type* (parser-driven, so regex-vs-
- * division / template / JSX / TS `<` are correct); here we attach `value` (sliced from the
- * ORIGINAL source so lone surrogates survive), `loc` (lazy-line-column), and the
- * `regex` field, applying the few value side-paths that aren't a verbatim slice.
+ * Rebuild ESLint Token objects from Go-projected token columns with UTF-16
+ * offsets. Go uses the Program AST to disambiguate regex, template and JSX
+ * tokens. Values come from the exact frame source; loc and regex metadata
+ * follow ESLint's token API.
  *
- * Rebuild is lazy (driven by `SourceCode.ensureTokens` on first token-API use), so a file
- * whose rules never touch tokens pays nothing here.
+ * SourceCode builds queried tokens on demand and uses the full rebuild when
+ * exposing a complete array. Files whose rules never touch tokens pay nothing here.
  */
-import {
-  offsetToLineColumn,
-  type SourceLocation,
-} from '../ast/normalize-ast.js';
+import { offsetToLineColumn, type SourceLocation } from './positions.js';
 import { decodeJsxText } from './decode-entities.js';
 
 export type TokenType =
@@ -50,9 +44,9 @@ export interface Comment {
   loc: SourceLocation;
 }
 
-// Indexed by the Rust `token_map::TokenType as u8` code. Codes 11 (JsxText) and 12
+// Indexed by the Go-projected token code. Codes 11 (JsxText) and 12
 // (JsxTextAttr) BOTH surface as the ESLint "JSXText" type but take different value paths
-// below, which is the whole reason the Rust side keeps them as distinct codes.
+// below, so the language frame retains two distinct codes.
 const TYPE_BY_CODE: readonly TokenType[] = [
   'Identifier', // 0
   'Keyword', // 1
@@ -78,9 +72,8 @@ const CODE_JSX_TEXT = 11;
 const REGEX_LITERAL_RE = /^\/(.*)\/([a-z]*)$/su;
 
 /**
- * Rebuild the token array from the columnar native output. `text` is the ORIGINAL source
- * (BOM-stripped, same as the parser saw) so `slice(range)` recovers values verbatim,
- * including lone surrogates the Rust side can't represent. `lso` is the line-
+ * Rebuild the token array from projected columns. `text` is the Program source
+ * (BOM-stripped) so `slice(range)` recovers values verbatim. `lso` is the line-
  * start-offset table for lazy loc.
  */
 export function buildTokens(
@@ -93,45 +86,53 @@ export function buildTokens(
   const n = types.length;
   const out: Token[] = new Array(n);
   for (let i = 0; i < n; i++) {
-    const code = types[i];
-    const start = starts[i];
-    const end = ends[i];
-    const raw = text.slice(start, end);
-
-    let value = raw;
-    let regex: { pattern: string; flags: string } | undefined;
-    switch (code) {
-      case CODE_PRIVATE_IDENTIFIER:
-        value = raw.slice(1); // strip leading '#': espree's value excludes it
-        break;
-      case CODE_IDENTIFIER:
-        // espree decodes unicode escapes in identifier values (`abc` → `abc`).
-        if (raw.indexOf('\\') !== -1) value = decodeIdentEscapes(raw);
-        break;
-      case CODE_JSX_TEXT:
-        value = decodeJsxText(raw); // entity decode + CRLF→LF (JSX text only, NOT attr string)
-        break;
-      case CODE_REGEXP: {
-        const m = REGEX_LITERAL_RE.exec(raw);
-        regex = m ? { pattern: m[1], flags: m[2] } : { pattern: '', flags: '' };
-        break;
-      }
-      // default (incl. JsxTextAttr=12): value is the verbatim slice.
-    }
-
-    const tok: Token = {
-      type: TYPE_BY_CODE[code],
-      value,
-      range: [start, end],
-      loc: {
-        start: offsetToLineColumn(start, lso),
-        end: offsetToLineColumn(end, lso),
-      },
-    };
-    if (regex !== undefined) tok.regex = regex;
-    out[i] = tok;
+    out[i] = buildToken(types[i], starts[i], ends[i], text, lso);
   }
   return out;
+}
+
+/** Materialize one ordinary token from the owned language columns. */
+export function buildToken(
+  code: number,
+  start: number,
+  end: number,
+  text: string,
+  lso: number[],
+): Token {
+  const raw = text.slice(start, end);
+
+  let value = raw;
+  let regex: { pattern: string; flags: string } | undefined;
+  switch (code) {
+    case CODE_PRIVATE_IDENTIFIER:
+      value = raw.slice(1); // strip leading '#': espree's value excludes it
+      break;
+    case CODE_IDENTIFIER:
+      // espree decodes unicode escapes in identifier values (`abc` → `abc`).
+      if (raw.indexOf('\\') !== -1) value = decodeIdentEscapes(raw);
+      break;
+    case CODE_JSX_TEXT:
+      value = decodeJsxText(raw); // entity decode + CRLF→LF (JSX text only, NOT attr string)
+      break;
+    case CODE_REGEXP: {
+      const m = REGEX_LITERAL_RE.exec(raw);
+      regex = m ? { pattern: m[1], flags: m[2] } : { pattern: '', flags: '' };
+      break;
+    }
+    // default (incl. JsxTextAttr=12): value is the verbatim slice.
+  }
+
+  const tok: Token = {
+    type: TYPE_BY_CODE[code],
+    value,
+    range: [start, end],
+    loc: {
+      start: offsetToLineColumn(start, lso),
+      end: offsetToLineColumn(end, lso),
+    },
+  };
+  if (regex !== undefined) tok.regex = regex;
+  return tok;
 }
 
 // ── identifier unicode-escape decoding ───────────────────────────────

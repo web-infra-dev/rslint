@@ -411,10 +411,10 @@ func runCLI(args []string) int {
 	// over the IPC channel and decode its result. Runs concurrently with the
 	// native lint pass (handleLintCommand awaits it before output / --fix).
 	dispatch := func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-		wire, texts := req.WithTextAttachments()
-		attachments := make([]ipc.Attachment, len(texts))
-		for i, text := range texts {
-			attachments[i] = ipc.Text(text)
+		wire, frames := req.WithFrameAttachments()
+		attachments := make([]ipc.Attachment, len(frames))
+		for i, frame := range frames {
+			attachments[i] = ipc.Bytes(frame)
 		}
 		msg, err := ch.SendRequest(ctx, kindPluginLint, wire, attachments...)
 		if err != nil {

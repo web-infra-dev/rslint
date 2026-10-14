@@ -36,7 +36,7 @@ function onMessage(msg) {
       kind: 'response',
       id: msg.id,
       data: {
-        version: '3.1.0',
+        version: '4.0.0',
         ok: true,
         capabilities: ['reversePluginLint'],
       },

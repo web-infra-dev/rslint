@@ -1,3 +1,4 @@
+import { projectFrame } from '../languages/js/project-frame.js';
 import { describe, test, expect } from 'rstack/test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -55,7 +56,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       const results = await pool.lintBatch([
         {
           filePath: 'a.ts',
-          text: NULL_SRC,
+          frame: projectFrame('fixture.ts', NULL_SRC),
           rules: { 'pkgA/no-null': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'off',
@@ -63,7 +64,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         },
         {
           filePath: 'b.ts',
-          text: NULL_SRC,
+          frame: projectFrame('fixture.ts', NULL_SRC),
           rules: { 'pkgB/no-null': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'off',
@@ -88,7 +89,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       const cross = await pool.lintBatch([
         {
           filePath: 'cross.ts',
-          text: NULL_SRC,
+          frame: projectFrame('fixture.ts', NULL_SRC),
           rules: { 'pkgB/no-null': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'off',
@@ -145,7 +146,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       const results = await pool.lintBatch([
         {
           filePath: 'x.ts',
-          text: SRC,
+          frame: projectFrame('fixture.ts', SRC),
           rules: { 'px/no-foo': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'off',
@@ -153,7 +154,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         },
         {
           filePath: 'y.ts',
-          text: SRC,
+          frame: projectFrame('fixture.ts', SRC),
           rules: { 'py/no-bar': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'off',
@@ -181,7 +182,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       const cross = await pool.lintBatch([
         {
           filePath: 'cross-x-asks-y.ts',
-          text: SRC,
+          frame: projectFrame('fixture.ts', SRC),
           rules: { 'py/no-bar': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'off',
@@ -189,7 +190,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         },
         {
           filePath: 'cross-y-asks-x.ts',
-          text: SRC,
+          frame: projectFrame('fixture.ts', SRC),
           rules: { 'px/no-foo': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'off',
@@ -232,7 +233,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       const results = await pool.lintBatch([
         {
           filePath: 'rogue.ts',
-          text: 'const x = null;',
+          frame: projectFrame('fixture.ts', 'const x = null;'),
           rules: { 'pkgA/no-null': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'off',
@@ -338,7 +339,7 @@ export default [{ plugins: { r4: p } }];
         await pool.lintBatch([
           {
             filePath: 't.ts',
-            text: 'const trigger = 1;',
+            frame: projectFrame('fixture.ts', 'const trigger = 1;'),
             rules: { 'r4/bad-fix': { options: [] } },
             collectFixes: true,
             suggestionsMode: 'off',

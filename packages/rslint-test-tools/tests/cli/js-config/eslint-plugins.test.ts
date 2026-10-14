@@ -102,6 +102,35 @@ async function lint(
 
 describe('CLI community plugins (object-form) end-to-end', () => {
   test.each([
+    ['no plugin', ''],
+    [
+      'disabled plugin rules',
+      `{ files: ['**/*.ts'], plugins: { local }, rules: { 'local/no-null': 'off' } },`,
+    ],
+    [
+      'unmatched plugin files',
+      `{ files: ['**/other.ts'], plugins: { local }, rules: { 'local/no-null': 'error' } },`,
+    ],
+  ])('%s preserves native diagnostics', async (_label, pluginConfig) => {
+    const { dir, exitCode, diags } = await lint({
+      'local-plugin.mjs': LOCAL_PLUGIN,
+      'rslint.config.mjs': `import local from './local-plugin.mjs';
+export default [
+  { files: ['**/*.ts'], rules: { 'no-debugger': 'error' } },
+  ${pluginConfig}
+];`,
+      'a.ts': 'debugger;\nconst value = null;\n',
+    });
+    try {
+      expect(exitCode).toBe(1);
+      expect(diags.map((diag) => diag.ruleName)).toEqual(['no-debugger']);
+      expect(diags[0].range.start.line).toBe(1);
+    } finally {
+      await cleanupTempDir(dir);
+    }
+  });
+
+  test.each([
     ['n', 'prefer-global/url'],
     ['custom', 'a/b/c'],
     ['@scope/plugin', 'rule'],

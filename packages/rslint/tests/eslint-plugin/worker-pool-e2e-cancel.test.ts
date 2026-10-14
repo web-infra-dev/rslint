@@ -1,3 +1,4 @@
+import { projectFrame } from '../languages/js/project-frame.js';
 import { describe, test, expect } from 'rstack/test';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
@@ -66,7 +67,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
           [
             {
               filePath: 'q.ts',
-              text: 'const x = null;\n',
+              frame: projectFrame('fixture.ts', 'const x = null;\n'),
               rules: { 'local/no-null': { options: [] } },
               collectFixes: false,
               suggestionsMode: 'off',
@@ -125,7 +126,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       const batchP = pool.lintBatch(
         [1, 2, 3].map((i) => ({
           filePath: `q${i}.ts`,
-          text: 'const x = null;\n',
+          frame: projectFrame('fixture.ts', 'const x = null;\n'),
           rules: { 'local/no-null': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'off',

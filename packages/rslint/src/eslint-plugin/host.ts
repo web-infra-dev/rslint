@@ -7,7 +7,7 @@
  *
  * Also built as the CLI's private `dist/eslint-plugin/host.js` entry. Keep
  * runtime imports limited to worker coordination and protocol conversion;
- * plugin loading, parsing, and rule execution belong in `lint-worker.js`.
+ * plugin loading, frame decoding, and rule execution belong in `lint-worker.js`.
  */
 import { WorkerPool, type WorkerPoolOptions } from './worker-pool.js';
 import {

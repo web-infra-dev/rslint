@@ -2,7 +2,7 @@ import { describe, test, expect } from 'rstack/test';
 
 import { buildDiagnostic } from '../../../src/eslint-plugin/linter/diagnostic-builder.js';
 import { makeFixer } from '../../../src/eslint-plugin/linter/fixer.js';
-import { lintFile } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
+import { lintFile } from '../project-frame.js';
 import type { LoadedPlugins } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
 
 /**

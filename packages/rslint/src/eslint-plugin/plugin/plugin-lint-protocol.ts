@@ -38,13 +38,10 @@ export interface EslintPluginLintRequest {
   generation?: string;
   files: ReadonlyArray<{
     path: string;
-    /**
-     * Complete inline snapshot. Hosts that explicitly permit filesystem reads
-     * may omit both text and textAttachment; overlays and autofix retain snapshots.
-     */
-    text?: string;
-    /** Index into the request's text/byte attachments, mutually exclusive with text. */
-    textAttachment?: number;
+    /** Complete final ESTree frame, base64 only on LSP's JSON transport. */
+    frame?: string;
+    /** Index into binary IPC attachments, mutually exclusive with frame. */
+    frameAttachment?: number;
     /**
      * Per-file `languageOptions`, computed by Go via `GetConfigForFile`
      * (flat-config files-glob match + deep merge). Opaque here; the
@@ -74,11 +71,13 @@ export interface ResolvedEslintPluginLintRequest extends Omit<
   'files'
 > {
   files: ReadonlyArray<
-    Omit<EslintPluginLintRequest['files'][number], 'textAttachment'> & {
-      /** Only the attachment adapter can install this private native capability. */
-      sharedSource?: SharedBytes;
-      /** Wire attachment references must be resolved before task construction. */
-      textAttachment?: never;
+    Omit<
+      EslintPluginLintRequest['files'][number],
+      'frameAttachment' | 'frame'
+    > & {
+      /** Node-owned bytes or a request-scoped native capability. */
+      frame: Uint8Array | SharedBytes;
+      frameAttachment?: never;
     }
   >;
 }
@@ -130,8 +129,8 @@ export function buildPluginLintTasks(
   return input.files.map((f) => {
     // Only the plugin application adapter can resolve attachment references. A
     // missing/older adapter must not turn a shared snapshot into a disk read.
-    if ('textAttachment' in f || 'sourceRange' in f) {
-      throw new Error('unresolved shared plugin source');
+    if ('frameAttachment' in f || 'text' in f || 'sharedSource' in f) {
+      throw new Error('unresolved plugin frame');
     }
     const configKey = f.configKey ?? '';
     if (configKey !== '' && !options.configDirSet.has(configKey)) {
@@ -139,8 +138,7 @@ export function buildPluginLintTasks(
     }
     return {
       filePath: f.path,
-      text: f.text,
-      sharedSource: f.sharedSource,
+      frame: f.frame,
       languageOptions: f.languageOptions as never,
       settings: f.settings,
       rules: sharedRules,

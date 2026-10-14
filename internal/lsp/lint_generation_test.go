@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"os"
 	"path/filepath"
@@ -156,7 +157,7 @@ func TestLSPGenerationReleaseLifecycle(t *testing.T) {
 		if err != nil || outcome.DispatchError != nil {
 			t.Fatalf("plugin work errors = %v/%v", err, outcome.DispatchError)
 		}
-		if len(request.Files) != 1 || request.Files[0].Text == nil || *request.Files[0].Text != content {
+		if len(request.Files) != 1 || len(request.Files[0].Frame) < 64 || string(request.Files[0].Frame[binary.LittleEndian.Uint32(request.Files[0].Frame[60:]):]) != content {
 			t.Fatalf("detached plugin request = %+v", request.Files)
 		}
 	})

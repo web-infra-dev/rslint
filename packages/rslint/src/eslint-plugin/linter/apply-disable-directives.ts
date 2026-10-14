@@ -47,9 +47,9 @@
  */
 
 import { ConfigCommentParser } from '@eslint/plugin-kit';
-import type { Comment } from '../source-code/token-builder.js';
+import type { Comment } from '../../languages/js/token-builder.js';
 import type { Diagnostic } from './diagnostic-builder.js';
-import { lineStartOffset } from '../source-code/source-code-helpers.js';
+import { lineStartOffset } from '../../languages/js/positions.js';
 
 // Reused across files (parser is stateless after construction; cheap to
 // share — plugin-kit's parser doesn't hold per-call state).

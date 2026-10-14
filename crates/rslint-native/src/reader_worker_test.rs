@@ -12,7 +12,7 @@ struct State {
     lease: u32,
     entered: bool,
     resume: bool,
-    program: Option<String>,
+    bytes: Option<Vec<u8>>,
 }
 
 static BARRIER: OnceLock<(Mutex<State>, Condvar)> = OnceLock::new();
@@ -30,7 +30,9 @@ pub struct WorkerTerminationFixture {
 /// A single fixture per isolated process. The writer uses the native platform
 /// mapping implementation, so the JavaScript test never handles an fd or handle.
 #[napi]
-pub fn create_worker_termination_fixture(text: String) -> Result<WorkerTerminationFixture> {
+pub fn create_worker_termination_fixture(
+    bytes: napi::bindgen_prelude::Buffer,
+) -> Result<WorkerTerminationFixture> {
     let config = MemoryConfiguration {
         version: 1,
         slot_count: 1,
@@ -38,7 +40,7 @@ pub fn create_worker_termination_fixture(text: String) -> Result<WorkerTerminati
         header_size: 64 * 1024,
         publication_stride: 4,
     };
-    if text.is_empty() || text.len() > config.slot_size as usize {
+    if bytes.is_empty() || bytes.len() > config.slot_size as usize {
         return Err(Error::from_reason(
             "invalid worker termination fixture source",
         ));
@@ -51,8 +53,8 @@ pub fn create_worker_termination_fixture(text: String) -> Result<WorkerTerminati
     }
     let mut arena = MemoryArena::new()?;
     arena.configure(config)?;
-    arena.publish_for_test(0, 1, text.as_bytes())?;
-    let length = text.len() as u32;
+    arena.publish_for_test(0, 1, &bytes)?;
+    let length = bytes.len() as u32;
     let lease = arena.register(vec![MemoryBatch {
         slot: 0,
         generation: 1,
@@ -70,13 +72,13 @@ pub fn create_worker_termination_fixture(text: String) -> Result<WorkerTerminati
 }
 
 /// Change only the publication word, leaving the pinned payload untouched. A
-/// A rejected registration must prove a live lease, not a stale generation.
+/// Rejected registration must prove a live lease, not a stale generation.
 #[napi]
 pub fn republish_worker_fixture(arena: &MemoryArena) -> Result<()> {
     arena.publish_for_test(0, 2, &[])
 }
 
-pub(crate) fn before_parse(lease: u32) {
+pub(crate) fn before_read(lease: u32) {
     let (mutex, changed) = barrier();
     let mut state = mutex.lock().unwrap();
     if state.lease != lease {
@@ -89,17 +91,17 @@ pub(crate) fn before_parse(lease: u32) {
     }
 }
 
-pub(crate) fn after_parse(lease: u32, program: &str) {
+pub(crate) fn after_read(lease: u32, bytes: &[u8]) {
     let mut state = barrier().0.lock().unwrap();
     if state.lease == lease {
-        state.program = Some(program.to_owned());
+        state.bytes = Some(bytes.to_owned());
     }
 }
 
-/// Wait for an observed event, never an assumed parser duration. The timeout
+/// Wait for an observed event, never an assumed read duration. The timeout
 /// only fails a worker that never reached the barrier (for example load errors).
 #[napi]
-pub fn wait_for_worker_parse() -> Result<()> {
+pub fn wait_for_worker_read() -> Result<()> {
     let (mutex, changed) = barrier();
     let state = mutex.lock().unwrap();
     let (state, _) = changed
@@ -107,20 +109,20 @@ pub fn wait_for_worker_parse() -> Result<()> {
         .unwrap();
     if !state.entered {
         return Err(Error::from_reason(
-            "worker did not enter the native parse barrier",
+            "worker did not enter the native read barrier",
         ));
     }
     Ok(())
 }
 
 #[napi]
-pub fn resume_worker_parse() {
+pub fn resume_worker_read() {
     let (mutex, changed) = barrier();
     mutex.lock().unwrap().resume = true;
     changed.notify_all();
 }
 
 #[napi]
-pub fn worker_parsed_program() -> Option<String> {
-    barrier().0.lock().unwrap().program.clone()
+pub fn worker_read_bytes() -> Option<napi::bindgen_prelude::Buffer> {
+    barrier().0.lock().unwrap().bytes.clone().map(Into::into)
 }

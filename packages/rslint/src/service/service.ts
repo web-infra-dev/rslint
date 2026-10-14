@@ -9,7 +9,6 @@ import type {
 } from '../types.js';
 import {
   API_PROTOCOL_VERSION,
-  API_PLUGIN_LINT_ATTACHMENTS_CAPABILITY,
   API_REVERSE_CONFIG_LOAD_CAPABILITY,
   API_REVERSE_PLUGIN_LINT_CAPABILITY,
 } from './protocol.js';
@@ -65,14 +64,10 @@ export class RSLintService {
 
       this.activeLintHandlers = handlers;
       try {
-        return await this.lintExclusive(
-          options,
-          {
-            pluginLint: Boolean(handlers.pluginLint),
-            configLoad: hasLoadConfigs && hasActivateConfigs,
-          },
-          Boolean(handlers.pluginLint && handlers.pluginLintAttachments),
-        );
+        return await this.lintExclusive(options, {
+          pluginLint: Boolean(handlers.pluginLint),
+          configLoad: hasLoadConfigs && hasActivateConfigs,
+        });
       } finally {
         this.activeLintHandlers = null;
       }
@@ -82,7 +77,6 @@ export class RSLintService {
   private async lintExclusive(
     options: LintOptions,
     requiredReverse: { pluginLint: boolean; configLoad: boolean },
-    pluginLintAttachments: boolean,
   ): Promise<LintResponse> {
     const {
       files,
@@ -98,7 +92,7 @@ export class RSLintService {
       fix,
     } = options;
 
-    await this.handshake(requiredReverse, pluginLintAttachments);
+    await this.handshake(requiredReverse);
 
     // Send lint request
     return this.service.sendMessage('lint', {
@@ -201,23 +195,16 @@ export class RSLintService {
     await this.closePromise;
   }
 
-  private async handshake(
-    requiredReverse: {
-      pluginLint: boolean;
-      configLoad: boolean;
-    },
-    pluginLintAttachments = false,
-  ): Promise<void> {
+  private async handshake(requiredReverse: {
+    pluginLint: boolean;
+    configLoad: boolean;
+  }): Promise<void> {
     const requestedCapabilities: string[] = [];
     if (requiredReverse.pluginLint) {
       requestedCapabilities.push(API_REVERSE_PLUGIN_LINT_CAPABILITY);
     }
     if (requiredReverse.configLoad) {
       requestedCapabilities.push(API_REVERSE_CONFIG_LOAD_CAPABILITY);
-    }
-    // This is optional acceleration: older peers can retain inline file text.
-    if (pluginLintAttachments) {
-      requestedCapabilities.push(API_PLUGIN_LINT_ATTACHMENTS_CAPABILITY);
     }
     const response: unknown = await this.service.sendMessage('handshake', {
       version: API_PROTOCOL_VERSION,

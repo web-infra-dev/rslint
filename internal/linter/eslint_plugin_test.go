@@ -1,15 +1,25 @@
 package linter
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
+	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+	"weak"
+
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -23,7 +33,7 @@ func pluginRule(name string, opts []any, sev rule.DiagnosticSeverity) rule.Confi
 
 func TestDispatchEslintPluginRulesAsyncPublishesStructuredOutcome(t *testing.T) {
 	dispatchError := errors.New("transport closed")
-	outcomeCh := DispatchEslintPluginRulesAsync(
+	outcomeCh := testDispatchEslintPluginRulesAsync(
 		context.Background(),
 		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			return nil, dispatchError
@@ -130,7 +140,7 @@ func TestDispatchEslintPlugin_EmptyShortCircuit(t *testing.T) {
 		called++
 		return &EslintPluginLintResult{}, nil
 	}
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, nil, false, "off", nil, func(rule.RuleDiagnostic) {}); err != nil {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch, nil, false, "off", nil, func(rule.RuleDiagnostic) {}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if called != 0 {
@@ -163,7 +173,7 @@ func TestDispatchEslintPlugin_GroupsBySignature(t *testing.T) {
 		}
 		return &EslintPluginLintResult{Results: results}, nil
 	}
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(rule.RuleDiagnostic) {}); err != nil {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(rule.RuleDiagnostic) {}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(batches) != 3 {
@@ -210,7 +220,7 @@ func TestDispatchEslintPlugin_SeverityDoesNotFragmentBatches(t *testing.T) {
 		return &EslintPluginLintResult{Results: results}, nil
 	}
 	sevByPath := map[string]rule.DiagnosticSeverity{}
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		sevByPath[d.FilePath] = d.Severity
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -262,7 +272,7 @@ func TestDispatchEslintPlugin_ConcurrentBatchesAllEmitted(t *testing.T) {
 		return &EslintPluginLintResult{Results: results}, nil
 	}
 	seen := map[string]int{}
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		seen[d.FilePath]++
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -308,7 +318,7 @@ func TestDispatchEslintPlugin_BatchFailureDoesNotAbortOthers(t *testing.T) {
 		}}}, nil
 	}
 	seen := map[string]int{}
-	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
+	err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		seen[d.FilePath]++
 	})
 	if !errors.Is(err, wantErr) {
@@ -350,7 +360,7 @@ func TestDispatchEslintPlugin_FirstBatchErrorWins(t *testing.T) {
 			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: req.Files[0].Path}}}, nil
 		}
 	}
-	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(rule.RuleDiagnostic) {})
+	err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(rule.RuleDiagnostic) {})
 	if !errors.Is(err, errEarly) {
 		t.Fatalf("expected the first-in-batch-order error (f2's), got %v", err)
 	}
@@ -372,7 +382,7 @@ func TestDispatchEslintPlugin_SeverityReattachAndClamp(t *testing.T) {
 		}}}, nil
 	}
 	var diags []rule.RuleDiagnostic
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		diags = append(diags, d)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -412,7 +422,7 @@ func TestDispatchEslintPlugin_ParseErrorClasses(t *testing.T) {
 			return &EslintPluginLintResult{Results: []EslintPluginFileResult{fr}}, nil
 		}
 		var diags []rule.RuleDiagnostic
-		if err := DispatchEslintPluginRules(context.Background(), dispatch, mkFiles(), false, "off", nil, func(d rule.RuleDiagnostic) {
+		if err := testDispatchEslintPluginRules(context.Background(), dispatch, mkFiles(), false, "off", nil, func(d rule.RuleDiagnostic) {
 			diags = append(diags, d)
 		}); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -483,7 +493,7 @@ func TestDispatchEslintPlugin_Cancelled(t *testing.T) {
 	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: "/a.ts", Cancelled: true}}}, nil
 	}
-	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(rule.RuleDiagnostic) {})
+	err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(rule.RuleDiagnostic) {})
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got %v", err)
 	}
@@ -496,7 +506,7 @@ func TestDispatchEslintPlugin_MissingResultNoPanic(t *testing.T) {
 		return &EslintPluginLintResult{Results: nil}, nil // no result for /a.ts
 	}
 	var diags []rule.RuleDiagnostic
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		diags = append(diags, d)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -532,7 +542,7 @@ func TestEslintPluginSourceFile(t *testing.T) {
 	const code = "const x = 1;"
 
 	// (a) CLI: the provided SourceFile is returned verbatim (reused, not copied).
-	sf := newTextSourceFile(code)
+	sf := pluginSyntax("/a.ts", code)
 	if got, ok := eslintPluginSourceFile(EslintPluginFileInput{SourceFile: sf}); !ok || got != sf {
 		t.Errorf("SourceFile branch must reuse the provided frame verbatim")
 	}
@@ -559,7 +569,7 @@ func TestEslintPluginSourceFile(t *testing.T) {
 func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 	// (a) CLI SourceFile-reuse with a multi-byte frame: the two CJK chars occupy
 	// bytes 6..12 (two 3-byte runes), so a [6,12] worker offset must land on them.
-	sf := newTextSourceFile("const 变量 = 1;")
+	sf := pluginSyntax("/a.ts", "const 变量 = 1;")
 	files := []EslintPluginFileInput{
 		{Path: "/a.ts", ConfigKey: "/cfg", SourceFile: sf, Rules: []rule.ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}},
 	}
@@ -570,7 +580,7 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 		}}}, nil
 	}
 	var diags []rule.RuleDiagnostic
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		diags = append(diags, d)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -602,7 +612,7 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 		}}}, nil
 	}
 	var diags2 []rule.RuleDiagnostic
-	if err := DispatchEslintPluginRules(context.Background(), dispatch2, files2, true, "eager", nil, func(d rule.RuleDiagnostic) {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch2, files2, true, "eager", nil, func(d rule.RuleDiagnostic) {
 		diags2 = append(diags2, d)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -637,7 +647,7 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 		}}}, nil
 	}
 	var diags3 []rule.RuleDiagnostic
-	if err := DispatchEslintPluginRules(context.Background(), dispatch3, files3, false, "off", nil, func(d rule.RuleDiagnostic) {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch3, files3, false, "off", nil, func(d rule.RuleDiagnostic) {
 		diags3 = append(diags3, d)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -655,43 +665,28 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 // start) would drop data on the wire without a compile error, so assert every
 // field explicitly: the request keys via marshal, the result fields via decode
 // of a Node-shaped payload.
-func TestEslintPluginWire_TextAttachmentsPreserveSnapshotsAndMetadata(t *testing.T) {
-	texts := []string{"", "\ufeffconst café = '😀';\r\n// \x00", string([]byte{0xff}), strings.Repeat("x", 32)}
-	files := make([]EslintPluginLintFile, len(texts)+1)
-	for i := range texts {
-		files[i] = EslintPluginLintFile{
-			Path: fmt.Sprintf("/%d.js", i), Text: &texts[i], ConfigKey: "config",
-			LanguageOptions: map[string]any{"ecmaVersion": 2024},
-			Settings:        map[string]any{"plugin": map[string]any{"enabled": true}},
-		}
+func TestEslintPluginWire_FrameAttachmentsPreserveBytesAndMetadata(t *testing.T) {
+	frames := [][]byte{{0, 255, 1}, {}, []byte("\ufeffconst café = '😀';")}
+	files := make([]EslintPluginLintFile, len(frames))
+	for i, frame := range frames {
+		files[i] = EslintPluginLintFile{Path: strconv.Itoa(i), Frame: frame, ConfigKey: "config", Settings: map[string]any{"x": true}}
 	}
-	req := EslintPluginLintRequest{
-		Generation: "generation", Files: files,
-		Rules:        map[string]EslintPluginRuleConfig{"plugin/rule": {Options: []any{true}}},
-		CollectFixes: true, CollectTiming: true, SuggestionsMode: SuggestionsModeEager,
+	req := EslintPluginLintRequest{Files: files, Generation: "generation", CollectFixes: true}
+	wire, attachments := req.WithFrameAttachments()
+	if !reflect.DeepEqual(attachments, frames) {
+		t.Fatal("frame bytes changed")
 	}
-	wire, attachments := req.WithTextAttachments()
-	if !reflect.DeepEqual(attachments, texts) {
-		t.Fatalf("snapshot bytes changed: %q", attachments)
-	}
-	for i := range texts {
-		file := wire.Files[i]
-		if file.Text != nil || file.TextAttachment == nil || int(*file.TextAttachment) != i || file.Path != files[i].Path || file.ConfigKey != files[i].ConfigKey {
-			t.Fatalf("incorrect attachment projection for file %d: %+v", i, file)
+	for i, file := range wire.Files {
+		if file.Frame != nil || file.FrameAttachment == nil || int(*file.FrameAttachment) != i || !reflect.DeepEqual(file.Settings, files[i].Settings) {
+			t.Fatal("frame attachment projection")
 		}
-		if !reflect.DeepEqual(file.LanguageOptions, files[i].LanguageOptions) || !reflect.DeepEqual(file.Settings, files[i].Settings) {
-			t.Fatalf("attachment projection changed file %d configuration", i)
+		if req.Files[i].FrameAttachment != nil {
+			t.Fatal("request mutated")
 		}
-		if req.Files[i].Text != &texts[i] || req.Files[i].TextAttachment != nil {
-			t.Fatalf("projection modified original file %d", i)
-		}
-	}
-	if wire.Files[len(texts)].TextAttachment != nil || len(wire.Files) != len(files) {
-		t.Fatal("source-less file acquired an attachment or request was split")
 	}
 	wire.Files = req.Files
 	if !reflect.DeepEqual(wire, req) {
-		t.Fatal("attachment projection changed request metadata")
+		t.Fatal("request metadata changed")
 	}
 }
 
@@ -700,7 +695,7 @@ func TestEslintPluginWire_RoundTrip(t *testing.T) {
 	req := EslintPluginLintRequest{
 		Files: []EslintPluginLintFile{{
 			Path:            "/proj/a.ts",
-			Text:            &text,
+			Frame:           []byte(text),
 			ConfigKey:       "/proj",
 			LanguageOptions: map[string]any{"sourceType": "module"},
 			Settings:        map[string]any{"foo": "bar"},
@@ -726,7 +721,7 @@ func TestEslintPluginWire_RoundTrip(t *testing.T) {
 		t.Error(`request JSON unexpectedly contains obsolete key "fix"`)
 	}
 	f0 := got["files"].([]any)[0].(map[string]any)
-	for _, k := range []string{"path", "text", "configKey", "languageOptions", "settings"} {
+	for _, k := range []string{"path", "frame", "configKey", "languageOptions", "settings"} {
 		if _, ok := f0[k]; !ok {
 			t.Errorf("request file JSON missing key %q", k)
 		}
@@ -797,7 +792,7 @@ func TestDispatchEslintPlugin_MultipleRulesPerFile(t *testing.T) {
 		}}}, nil
 	}
 	sevByRule := map[string]rule.DiagnosticSeverity{}
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		sevByRule[d.RuleName] = d.Severity
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -850,7 +845,7 @@ func TestDispatchEslintPlugin_DeadlineExceededSurfaces(t *testing.T) {
 		}}}, nil
 	}
 	emitted := map[string]bool{}
-	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
+	err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		emitted[d.FilePath] = true
 	})
 	if !errors.Is(err, context.DeadlineExceeded) {
@@ -887,7 +882,7 @@ func TestDispatchEslintPlugin_FixAndSuggestionsRebuilt(t *testing.T) {
 	}
 	var got rule.RuleDiagnostic
 	gotN := 0
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, true, "eager", nil, func(d rule.RuleDiagnostic) {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch, files, true, "eager", nil, func(d rule.RuleDiagnostic) {
 		got = d
 		gotN++
 	}); err != nil {
@@ -942,7 +937,7 @@ func TestDispatchEslintPlugin_EmitsInBatchOrderDespiteOutOfOrderCompletion(t *te
 		}}}, nil
 	}
 	var order []string
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
+	if err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		order = append(order, d.FilePath)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -975,7 +970,7 @@ func TestDispatchEslintPlugin_RealErrorOutranksCanceled(t *testing.T) {
 		}
 		return nil, boom // later batch: a real transport failure
 	}
-	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {})
+	err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {})
 	if !errors.Is(err, boom) {
 		t.Fatalf("expected the real transport error to surface, got %v", err)
 	}
@@ -1068,7 +1063,7 @@ func TestDispatchEslintPluginRulesWithOutcomeSurfacesFailure(t *testing.T) {
 		}}}, nil
 	}
 
-	outcome := DispatchEslintPluginRulesWithOutcome(
+	outcome := testDispatchEslintPluginRulesWithOutcome(
 		context.Background(),
 		dispatch,
 		files,
@@ -1101,7 +1096,7 @@ func TestDispatchEslintPluginRulesWithOutcomePreservesCancellation(t *testing.T)
 	dispatch := func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return nil, context.Canceled
 	}
-	outcome := DispatchEslintPluginRulesWithOutcome(
+	outcome := testDispatchEslintPluginRulesWithOutcome(
 		context.Background(),
 		dispatch,
 		[]EslintPluginFileInput{{
@@ -1135,7 +1130,7 @@ func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T
 			Rules: []rule.ConfiguredRule{pluginRule("external/configured", nil, rule.SeverityWarning)},
 		},
 	}
-	outcome := DispatchEslintPluginRulesWithOutcome(
+	outcome := testDispatchEslintPluginRulesWithOutcome(
 		context.Background(),
 		func(_ context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
@@ -1169,7 +1164,7 @@ func TestDispatchEslintPluginRulesWithOutcomeSkipsEmptyInput(t *testing.T) {
 		called = true
 		return &EslintPluginLintResult{}, nil
 	}
-	outcome := DispatchEslintPluginRulesWithOutcome(
+	outcome := testDispatchEslintPluginRulesWithOutcome(
 		context.Background(),
 		dispatch,
 		nil,
@@ -1182,5 +1177,307 @@ func TestDispatchEslintPluginRulesWithOutcomeSkipsEmptyInput(t *testing.T) {
 	}
 	if called {
 		t.Error("dispatch called for empty input")
+	}
+}
+
+func TestDispatchEslintPluginReleasesProjectedFrameAfterTransfer(t *testing.T) {
+	text := "const value = '" + strings.Repeat("x", 1<<20) + "';"
+	input := EslintPluginFileInput{
+		Path:       "/repo/file.ts",
+		Text:       &text,
+		SourceFile: pluginSyntax("/repo/file.ts", text),
+		Rules:      []rule.ConfiguredRule{pluginRule("plugin/check", nil, rule.SeverityError)},
+	}
+	outcome := DispatchEslintPluginRulesWithOutcome(context.Background(),
+		func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			if len(request.Files) != 1 || len(request.Files[0].Frame) < 1<<20 {
+				return nil, errors.New("expected a large projected frame")
+			}
+			wire, frames := request.WithFrameAttachments()
+			frame := weak.Make(&frames[0][0])
+			// Model completed publication without mutating the request. Only the
+			// transport's copy and frame-free wire metadata are needed from here.
+			published := bytes.Clone(frames[0])
+			runtime.GC()
+			if frame.Value() != nil {
+				return nil, errors.New("projected frame remains reachable after transfer")
+			}
+			runtime.KeepAlive(published)
+			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: wire.Files[0].Path}}}, nil
+		}, []EslintPluginFileInput{input}, false, SuggestionsModeOff, nil)
+	if outcome.DispatchError != nil {
+		t.Fatal(outcome.DispatchError)
+	}
+}
+
+func pluginSyntax(path, text string) *ast.SourceFile {
+	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: path, Path: tspath.Path(tspath.NormalizePath(path))}, strings.TrimPrefix(text, "\ufeff"), core.GetScriptKindFromFileName(path))
+}
+
+// Dispatcher tests exercise batching/result policies with real frames, while
+// retaining their authored diagnostic source setup independently.
+func pluginTestFrames(inputs []EslintPluginFileInput) []EslintPluginFileInput {
+	inputs = append([]EslintPluginFileInput(nil), inputs...)
+	var builder estree.Builder
+	for index, input := range inputs {
+		if input.Frame != nil || input.FrameError != "" {
+			continue
+		}
+		file := input.SourceFile
+		if file == nil {
+			text := ""
+			if input.Text != nil {
+				text = *input.Text
+			}
+			file = pluginSyntax(input.Path, text)
+		}
+		sourceType := "module"
+		if value, ok := input.LanguageOptions["sourceType"].(string); ok {
+			sourceType = value
+		}
+		frame, err := builder.Build(context.Background(), file, estree.Options{SourceType: sourceType})
+		if err != nil {
+			panic(err)
+		}
+		inputs[index].Frame = frame
+	}
+	return inputs
+}
+func testDispatchEslintPluginRules(ctx context.Context, dispatch EslintPluginDispatcher, inputs []EslintPluginFileInput, fixes bool, suggestions string, timing *TimingCollector, emit DiagnosticHandler) error {
+	return DispatchEslintPluginRules(ctx, dispatch, pluginTestFrames(inputs), fixes, suggestions, timing, emit)
+}
+func testDispatchEslintPluginRulesWithOutcome(ctx context.Context, dispatch EslintPluginDispatcher, inputs []EslintPluginFileInput, fixes bool, suggestions string, timing *TimingCollector) EslintPluginDispatchOutcome {
+	return DispatchEslintPluginRulesWithOutcome(ctx, dispatch, pluginTestFrames(inputs), fixes, suggestions, timing)
+}
+func testDispatchEslintPluginRulesAsync(ctx context.Context, dispatch EslintPluginDispatcher, inputs []EslintPluginFileInput, fixes bool, suggestions string, timing *TimingCollector) <-chan EslintPluginDispatchOutcome {
+	return DispatchEslintPluginRulesAsync(ctx, dispatch, pluginTestFrames(inputs), fixes, suggestions, timing)
+}
+func pluginFrameText(data []byte) string { return string(data[binary.LittleEndian.Uint32(data[60:]):]) }
+
+func TestDispatchEslintPluginProjectionWindowsOwnFrames(t *testing.T) {
+	t.Run("bounded output blocks preserve every borrowed view", func(t *testing.T) {
+		var builder pluginProjectionBuffers
+		for round := range 2 {
+			var frames [][]byte
+			for index, size := range []int{1, 64 << 10, 1<<20 + 3, 2<<20 + 7, 32 << 10, 4<<20 + 1} {
+				frame := builder.allocate(size)
+				if len(frame) != size || cap(frame) != size {
+					t.Fatal("output view can extend into another frame")
+				}
+				for offset := range frame {
+					frame[offset] = byte(index + round)
+				}
+				frames = append(frames, frame)
+				for previous, borrowed := range frames {
+					for _, value := range borrowed {
+						if value != byte(previous+round) {
+							t.Fatal("allocation changed an earlier borrowed frame")
+						}
+					}
+				}
+			}
+			capacity := 0
+			for _, block := range builder.output {
+				capacity += cap(block)
+			}
+			if capacity != builder.outputCapacity || capacity > 4<<20 {
+				t.Fatal("retained output exceeded the cache bound")
+			}
+			builder.reset()
+			for _, block := range builder.output {
+				if len(block) != 0 {
+					t.Fatal("reset retained a reserved output span")
+				}
+			}
+		}
+	})
+	inputs := make([]EslintPluginFileInput, 65)
+	for index := range inputs {
+		path := fmt.Sprintf("/repo/file%d.ts", index)
+		// Vary frame sizes enough to allocate several stable output blocks
+		// and exceed its cache bound within each complete window.
+		text := fmt.Sprintf("const value%d = %d; /*%s*/", index, index, strings.Repeat("pad ", (index%pluginWindowFiles+1)*2048))
+		inputs[index] = EslintPluginFileInput{Path: path, Text: &text, SourceFile: pluginSyntax(path, text), Rules: []rule.ConfiguredRule{pluginRule("plugin/check", nil, rule.SeverityError)}}
+	}
+	var windows []int
+	var frames [][]byte
+	dispatch := func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		windows = append(windows, len(request.Files))
+		results := make([]EslintPluginFileResult, len(request.Files))
+		for index, file := range request.Files {
+			if !strings.HasPrefix(pluginFrameText(file.Frame), "const value") {
+				t.Fatal("request lost its source")
+			}
+			// Dispatch borrows newly projected bytes until it returns. A
+			// retained snapshot, like shared/inline transport, owns its copy.
+			frames = append(frames, bytes.Clone(file.Frame))
+			results[index].FilePath = file.Path
+		}
+		return &EslintPluginLintResult{Results: results}, nil
+	}
+	ownedInputs := slices.Clone(inputs)
+	if err := dispatchOneBatch(context.Background(), dispatch, ownedInputs, make(chan *pluginProjectionBuffers, 1), false, SuggestionsModeOff, nil, func(rule.RuleDiagnostic) {}, func(EslintPluginProtocolNotice) {}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(windows, []int{32, 32, 1}) {
+		t.Fatalf("unbounded windows: %v", windows)
+	}
+	for index, frame := range frames {
+		if ownedInputs[index].SourceFile != nil || ownedInputs[index].Text != nil {
+			t.Fatal("completed projection retained an owned input slot")
+		}
+		if pluginFrameText(frame) != *inputs[index].Text {
+			t.Fatal("later projection overwrote an earlier frame")
+		}
+		if inputs[index].Frame != nil {
+			t.Fatal("dispatch retained a whole-group frame cache")
+		}
+	}
+	t.Run("byte limit transfers lookahead ownership", func(t *testing.T) {
+		inputs := make([]EslintPluginFileInput, 3)
+		for index := range inputs {
+			path := fmt.Sprintf("/repo/lookahead%d.ts", index)
+			text := fmt.Sprintf("const lookahead%d = %d;", index, index)
+			inputs[index] = EslintPluginFileInput{Path: path, Text: &text, SourceFile: pluginSyntax(path, text), Rules: []rule.ConfiguredRule{pluginRule("plugin/check", nil, rule.SeverityError)}}
+		}
+		// Frozen inputs are opaque to the scheduler. Fill the byte window so
+		// a small newly projected frame must survive into the next request.
+		inputs[0].Frame = make([]byte, pluginWindowBytes)
+		calls := 0
+		dispatch := func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			calls++
+			for _, file := range request.Files {
+				if file.Path != inputs[0].Path {
+					for _, input := range inputs[1:] {
+						if file.Path == input.Path && pluginFrameText(file.Frame) != *input.Text {
+							t.Fatal("recycled storage overwrote the pending frame")
+						}
+					}
+				}
+			}
+			return &EslintPluginLintResult{}, nil
+		}
+		if err := dispatchOneBatch(context.Background(), dispatch, slices.Clone(inputs), make(chan *pluginProjectionBuffers, 1), false, SuggestionsModeOff, nil, func(rule.RuleDiagnostic) {}, func(EslintPluginProtocolNotice) {}); err != nil {
+			t.Fatal(err)
+		}
+		if calls != 2 {
+			t.Fatalf("byte-bounded requests = %d, want 2", calls)
+		}
+	})
+}
+
+func TestDispatchEslintPluginProjectionFailureCannotFallBack(t *testing.T) {
+	current := "const current = 1;"
+	stale := "const stale = 2;"
+	input := EslintPluginFileInput{Path: "/repo/file.ts", Text: &stale, SourceFile: pluginSyntax("/repo/file.ts", current), Rules: []rule.ConfiguredRule{pluginRule("plugin/check", nil, rule.SeverityError)}}
+	var diagnostics []rule.RuleDiagnostic
+	called := false
+	outcome := DispatchEslintPluginRulesWithOutcome(context.Background(), func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		called = true
+		return &EslintPluginLintResult{}, nil
+	}, []EslintPluginFileInput{input}, false, SuggestionsModeOff, nil)
+	diagnostics = outcome.Diagnostics
+	if called || len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Message.Description, "does not match Program syntax") {
+		t.Fatalf("projection failure became a successful lint: %v/%+v", called, outcome)
+	}
+	input.Text = nil
+	var builder estree.Builder
+	if _, err := projectPluginFrame(context.Background(), &builder, input, nil); err == nil {
+		t.Fatal("missing snapshot accepted")
+	}
+	input.Text = &current
+	input.SourceFile.Statements.Nodes[0].Kind = ast.KindUnknown
+	if frame, err := projectPluginFrame(context.Background(), &builder, input, nil); err == nil || frame != nil {
+		t.Fatal("unknown syntax accepted")
+	}
+}
+
+func TestDispatchEslintPluginHomogeneousWindowsOverlapAndKeepOrder(t *testing.T) {
+	limit := dispatchConcurrency()
+	inputs := make([]EslintPluginFileInput, pluginWindowFiles*(limit+3)+1)
+	for index := range inputs {
+		text := fmt.Sprintf("const value%d = %d;", index, index)
+		path := fmt.Sprintf("/repo/%d.ts", index)
+		inputs[index] = EslintPluginFileInput{Path: path, Text: &text, SourceFile: pluginSyntax(path, text), Rules: []rule.ConfiguredRule{pluginRule("plugin/check", nil, rule.SeverityError)}}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	started := make(chan struct{}, limit)
+	release := make(chan struct{})
+	dispatch := func(ctx context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		before := make([][]byte, len(request.Files))
+		for index, file := range request.Files {
+			before[index] = bytes.Clone(file.Frame)
+		}
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		select {
+		case <-release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		results := make([]EslintPluginFileResult, len(request.Files))
+		for index, file := range request.Files {
+			runtime.Gosched()
+			if !bytes.Equal(file.Frame, before[index]) {
+				return nil, errors.New("another request reused an in-flight output buffer")
+			}
+			results[index] = EslintPluginFileResult{FilePath: file.Path, Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/check", Message: "diagnostic", StartPos: 0, EndPos: 1}}}
+		}
+		return &EslintPluginLintResult{Results: results}, nil
+	}
+	outcomes := make(chan EslintPluginDispatchOutcome, 1)
+	go func() {
+		outcomes <- DispatchEslintPluginRulesWithOutcome(ctx, dispatch, inputs, false, SuggestionsModeOff, nil)
+	}()
+	for range limit {
+		select {
+		case <-started:
+		case <-ctx.Done():
+			<-outcomes
+			t.Fatal("homogeneous windows did not use existing dispatch concurrency")
+		}
+	}
+	close(release)
+	outcome := <-outcomes
+	if outcome.DispatchError != nil || len(outcome.Diagnostics) != len(inputs) {
+		t.Fatalf("outcome = %+v", outcome)
+	}
+	for index, diagnostic := range outcome.Diagnostics {
+		if diagnostic.FilePath != inputs[index].Path {
+			t.Fatal("concurrent projection windows reordered diagnostics")
+		}
+	}
+}
+
+func TestDispatchEslintPluginProjectionErrorsKeepFileOrder(t *testing.T) {
+	inputs := make([]EslintPluginFileInput, 3)
+	for index := range inputs {
+		path := fmt.Sprintf("/repo/%d.ts", index)
+		text := "const x = 1;"
+		inputs[index] = EslintPluginFileInput{Path: path, Text: &text, SourceFile: pluginSyntax(path, text), Rules: []rule.ConfiguredRule{pluginRule("plugin/check", nil, rule.SeverityError)}}
+	}
+	stale := "const stale = 1;"
+	inputs[1].Text = &stale
+	dispatch := func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		if len(request.Files) != 2 {
+			t.Fatalf("failed file sent to worker: %+v", request.Files)
+		}
+		results := make([]EslintPluginFileResult, len(request.Files))
+		for index, file := range request.Files {
+			results[index] = EslintPluginFileResult{FilePath: file.Path, Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/check", Message: "diagnostic", StartPos: 0, EndPos: 1}}}
+		}
+		return &EslintPluginLintResult{Results: results}, nil
+	}
+	outcome := DispatchEslintPluginRulesWithOutcome(context.Background(), dispatch, inputs, false, SuggestionsModeOff, nil)
+	if outcome.DispatchError != nil || len(outcome.Diagnostics) != 3 {
+		t.Fatalf("outcome = %+v", outcome)
+	}
+	for index, diagnostic := range outcome.Diagnostics {
+		if diagnostic.FilePath != inputs[index].Path {
+			t.Fatalf("projection errors reordered results: %+v", outcome.Diagnostics)
+		}
 	}
 }

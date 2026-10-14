@@ -1,26 +1,9 @@
-/**
- * JSX value decoding — AST differential vs espree.
- *
- * `normalize-ast`'s `applyJsxValueDecoding` decodes JSX character references
- * into the ESTree node `.value` (espree / acorn-jsx parity):
- *   - JSXText           → decode + CRLF→LF fold
- *   - JSXAttribute str  → decode only, CRLF preserved
- *   - ordinary JS string Literal → NOT decoded (negative guard)
- *
- * Ported (AST half) from the deleted `lexer/jsx-entity-decoding.test.ts`
- * after the M4 tokenizer removal: the TOKEN half now lives in
- * `token-differential.test.ts`, but the AST path (`normalize-ast.ts:381`
- * `applyJsxValueDecoding`) otherwise lost its coverage. espree is the
- * oracle — every case runs through the native parser AND espree.
- */
+/** Differential JSX value tests: Go-projected AST and ESLint's Espree API. */
 import { describe, test, expect } from 'rstack/test';
 import * as espree from 'espree';
-import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
+import { projectSyntax } from './project-frame.js';
 
-import {
-  normalizeAst,
-  buildLineStartOffsets,
-} from '../../../src/eslint-plugin/ast/normalize-ast.js';
+import { buildLineStartOffsets } from '../../../src/languages/js/positions.js';
 
 interface AnyObj {
   type?: string;
@@ -76,9 +59,9 @@ function collectJsStringLiterals(root: unknown): string[] {
 }
 
 function runnerAst(src: string): unknown {
-  const parsed = nativeParse('test.jsx', src, 'module', true);
-  const ast = JSON.parse(parsed.program);
-  normalizeAst(ast as never, buildLineStartOffsets(src), src);
+  const parsed = projectSyntax('test.jsx', src, 'module');
+  const ast = parsed.ast;
+
   return ast;
 }
 

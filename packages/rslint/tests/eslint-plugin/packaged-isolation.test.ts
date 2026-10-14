@@ -1,3 +1,4 @@
+import { projectFrame } from '../languages/js/project-frame.js';
 import { describe, test, expect, beforeAll, afterAll } from 'rstack/test';
 import { rspack, type Rspack } from 'rstack/lib';
 import { spawnSync } from 'node:child_process';
@@ -19,17 +20,13 @@ import { platformTuple } from '../../src/native/platform-tuple.js';
  *
  * This test reproduces the packaged layout under `os.tmpdir()` — OFF any
  * `@rslint/core` / workspace `node_modules` resolution path — and runs the host
- * in a SUBPROCESS (so it neither inherits this suite's `setWorkerEntryForTests`
- * override nor any in-process module cache). It asserts the worker loads the
- * native parser from a nested platform package and a plugin rule fires. The
- * lightweight host imports without that package, but creating workers must
- * still reject. The full public entry rejects during import instead. Neither
- * entry may fall back to a workspace platform package.
+ * in a SUBPROCESS with only staged dependencies. Owned frame input needs no
+ * native addon; shared capabilities load the staged byte transport on demand.
+ * Both entries must preserve plugin diagnostics without workspace fallback.
  *
- * The complete CLI case additionally proves that its arena and worker parser
- * share the staged native registry, preserving Go's snapshot after a disk edit.
- * The termination case builds a separate feature-only addon to stop a real
- * worker inside parseSharedBytes while its native reader holds the mapping.
+ * The CLI case proves its arena and worker share the staged native registry,
+ * preserving Go's snapshot after a disk edit. The termination case stops a
+ * real worker inside readBytes while its native reader pins the mapping.
  *
  * Requires `dist/`, the host Go binary (built by `pnpm build`) and the host
  * platform package's `.node` (built by `pnpm --filter @rslint/native build`).
@@ -47,7 +44,7 @@ const PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS = 30 * 60_000;
 const PACKAGED_OUTER_DEADLOCK_SENTINEL_MS = 35 * 60_000;
 
 // A self-contained `.mjs` plugin + config — `.mjs` needs no `jiti`, isolating
-// this test to the native-parser resolution it is meant to guard.
+// this test to the packaged byte transport resolution it is meant to guard.
 const LOCAL_PLUGIN = `export default {
   meta: { name: 'lp', version: '1' },
   rules: {
@@ -79,12 +76,13 @@ const { createPluginLintHost } = await import(
 const host = await createPluginLintHost([
   { configPath: path.join(cfgDir, 'rslint.config.mjs'), configDirectory: cfgDir },
 ]);
+const shared = process.argv[3] === 'shared';
 const res = await host.lint({
-  files: [{ path: 'a.ts', text: 'const x = null;', configKey: cfgDir }],
+  files: [{ path: 'a.ts', ...(shared ? {frameAttachment: 0} : {frame: ${JSON.stringify(projectFrame('a.ts', 'const x = null;').toString('base64'))}}), configKey: cfgDir }],
   rules: { 'pkg/no-null': { options: [] } },
   collectFixes: false,
   suggestionsMode: 'off',
-});
+}, undefined, shared ? [{lease: 1, offset: 0, length: 1}] : undefined);
 await host.shutdown();
 const d = res.results?.[0]?.diagnostics ?? [];
 if (d.length === 1 && d[0].ruleName === 'pkg/no-null') {
@@ -132,9 +130,9 @@ native.MemoryArena.prototype.register = function(batches) {
   assert.equal(configured, 1);
   const lease = register.call(this, batches);
   const length = batches.reduce((total, batch) => total + batch.length, 0);
-  const source = native.parseSharedBytes(file, { lease, offset: 0, length }, 'module', false);
-  assert.equal(source.sourceText, original.slice(1));
-  assert.equal(source.hadBom, true);
+  const frame = native.readBytes({ lease, offset: 0, length });
+  assert.equal(frame.subarray(frame.readUInt32LE(60)).toString('utf8'), original.slice(1));
+  assert.equal(frame.readUInt32LE(12), 1);
   registered++;
   // Observe the real CLI registration after Go published its snapshot, before
   // the adapter sends the capability to the real worker. No transport is mocked.
@@ -145,7 +143,7 @@ const { run } = await import(pathToFileURL(path.join(here, 'dist', 'cli.js')).hr
 const code = await run(parentRequire.resolve(nativePackage + '/bin'), ['--no-color', file], Date.now());
 assert.equal(code, 1);
 assert.equal(configured, 1, 'CLI must configure storage through its Go peer');
-assert.equal(registered, 1, 'CLI must register shared source, not use inline fallback');
+assert.equal(registered, 1, 'CLI must register shared frames, not use inline fallback');
 assert.equal(fs.readFileSync(file, 'utf8'), changed);
 console.log('PACKAGED_SHARED_OK');
 `;
@@ -185,9 +183,8 @@ const native = require(nativePath);
 const { WorkerPool } = await import(pathToFileURL(entry).href);
 const closeBeforeResume = process.argv[2] === 'close';
 const cfgDir = path.join(here, 'cfg');
-const text = '\\ufeffconst pinned = null; // café 😀 retained through arena.close()\\r\\n';
-const expected = native.parse('pinned.ts', text.slice(1), 'module', false).program;
-const { arena, source } = native.createWorkerTerminationFixture(text);
+const expected = Buffer.from(${JSON.stringify(projectFrame('pinned.ts', '\ufeffconst pinned = null; // café 😀 retained through arena.close()\r\n').toString('base64'))}, 'base64');
+const { arena, source } = native.createWorkerTerminationFixture(expected);
 const logs = [];
 const pool = new WorkerPool({
   configs: [{ configPath: path.join(cfgDir, 'rslint.config.mjs'), configDirectory: cfgDir }],
@@ -201,16 +198,15 @@ try {
   await pool.init();
   const response = pool.lintBatch([{
     filePath: 'pinned.ts',
-    sharedSource: source,
+    frame: source,
     configKey: cfgDir,
     rules: { 'pkg/no-null': { options: [] } },
     collectFixes: false,
     suggestionsMode: 'off',
   }]);
-  // This event is emitted only after with_bytes has pinned the lease and the
-  // real native parser entry has decoded UTF-8/BOM. Blocking this JS thread
-  // keeps the task timer from firing until the worker has entered the barrier.
-  native.waitForWorkerParse();
+  // The barrier proves readBytes pinned the lease before termination; no
+  // scheduler delay or assumed read duration stands in for that event.
+  native.waitForWorkerRead();
   // The pool timeout callback requests Worker.terminate() before this promise
   // continuation runs. The worker is still blocked inside the native call.
   const result = await response;
@@ -218,7 +214,7 @@ try {
   assert.equal(result[0].parseError, 'task_timeout');
   assert.deepEqual(result[0].diagnostics, []);
   assert.equal(arena.release(source.lease), false, 'an active native reader must prevent reuse');
-  assert.throws(() => native.parseSharedBytes('pinned.ts', source, 'module', false), /invalid or expired/);
+  assert.throws(() => native.readBytes(source), /invalid or expired/);
   native.republishWorkerFixture(arena);
   assert.throws(() => arena.register([{ slot: 0, generation: 2, length: source.length }]), /invalid or expired/);
   if (closeBeforeResume) {
@@ -226,23 +222,23 @@ try {
     assert.throws(() => arena.descriptor(), /invalid or expired/);
   }
   // Node termination is pending while synchronous native code runs. Releasing
-  // this barrier lets Oxc finish, including after the optional arena.close().
-  native.resumeWorkerParse();
+  // this barrier lets the native byte copy finish, including after the optional arena.close().
+  native.resumeWorkerRead();
   await pool.shutdown();
-  assert.equal(native.workerParsedProgram(), expected, 'Oxc must finish from the pinned bytes');
+  assert.deepEqual(native.workerReadBytes(), expected, 'the native copy must finish from pinned bytes');
   if (!closeBeforeResume) {
     assert.equal(arena.release(source.lease), true, 'reader exit must restore capacity in the same arena');
     assert.equal(arena.release(source.lease), false, 'reclamation must succeed exactly once');
     const lease = arena.register([{ slot: 0, generation: 2, length: source.length }]);
-    assert.throws(() => native.parseSharedBytes('pinned.ts', source, 'module', false), /invalid or expired/);
-    assert.equal(native.parseSharedBytes('pinned.ts', { ...source, lease }, 'module', false).parsed.program, expected);
+    assert.throws(() => native.readBytes(source), /invalid or expired/);
+    assert.deepEqual(native.readBytes({ ...source, lease }), expected);
     assert.equal(arena.release(lease), true);
   }
   assert.equal(logs.some((record) => record.level === 'error'), false);
   console.log('PACKAGED_TERMINATION_OK');
 } finally {
   arena.close();
-  native.resumeWorkerParse();
+  native.resumeWorkerRead();
   await pool.shutdown();
 }
 `;
@@ -520,7 +516,7 @@ export default [{ files: ['**/*.ts'], plugins: { pkg: lp }, rules: { 'pkg/no-nul
     );
 
     test.each(HOST_ENTRIES)(
-      '%s worker loads the nested platform package and a plugin rule fires',
+      '%s runs projected frames in the packaged layout',
       (entry) => {
         const root = path.join(tmp, `ok-${entry}`);
         fs.mkdirSync(root, { recursive: true });
@@ -556,6 +552,64 @@ export default [{ files: ['**/*.ts'], plugins: { pkg: lp }, rules: { 'pkg/no-nul
       PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
     );
 
+    test('retained AST and SourceCode release their input frame', () => {
+      const root = path.join(tmp, 'retained-frame');
+      fs.mkdirSync(root, { recursive: true });
+      stage(root, { withNative: false });
+      const text = 'var value = 1;';
+      const frame = projectFrame('a.js', text).toString('base64');
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--expose-gc',
+          '--input-type=module',
+          '-e',
+          `import assert from 'node:assert/strict';
+import { setImmediate } from 'node:timers/promises';
+import { lintFile } from './eslint-plugin/index.js';
+let sourceCode;
+const languageOptions = { ecmaVersion: 2015 };
+const loaded = { rules: new Map([['keep/ast', {
+  meta: { schema: [] },
+  create(context) { sourceCode = context.sourceCode; return {}; },
+}]]) };
+function run() {
+  const frame = Uint8Array.from(Buffer.from(${JSON.stringify(frame)}, 'base64'));
+  const reference = new WeakRef(frame);
+  const result = lintFile({filePath: 'a.js', frame, languageOptions,
+    rules: {'keep/ast': {options: []}}, collectFixes: false,
+    suggestionsMode: 'off'}, loaded);
+  assert.equal(result.parseError, undefined);
+  assert.equal(result.ruleErrors?.length ?? 0, 0);
+  return reference;
+}
+const reference = run();
+// GC is exposed only in this isolated lifecycle regression process.
+for (let round = 0; round < 3; round++) { await setImmediate(); global.gc(); }
+assert.equal(reference.deref(), undefined, 'SourceCode retained the transport frame');
+assert.equal(sourceCode.getText(), ${JSON.stringify(text)});
+assert.equal(sourceCode.ast.body[0].declarations[0].init.value, 1);
+assert.equal(sourceCode.getTokens(sourceCode.ast).length, 5);
+// The lazy factory still reads the same metadata object after lint returns.
+languageOptions.ecmaVersion = 2022;
+assert.ok(sourceCode.scopeManager.globalScope.set.has('globalThis'));
+console.log('FRAME_RELEASED');`,
+        ],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+          killSignal: 'SIGKILL',
+          env: { ...process.env, NODE_PATH: '' },
+        },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.signal).toBeNull();
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout.trim()).toBe('FRAME_RELEASED');
+      expect(result.stderr.trim()).toBe('');
+    });
+
     test('lightweight host imports without loading the worker runtime', () => {
       const root = path.join(tmp, 'host-without-native');
       fs.mkdirSync(root, { recursive: true });
@@ -590,9 +644,9 @@ console.log('HOST_OK');`,
     });
 
     test.each(HOST_ENTRIES)(
-      '%s rejects without the nested platform package (no workspace fallback)',
+      '%s owned frames execute without a native addon',
       (entry) => {
-        const root = path.join(tmp, `no-native-${entry}`);
+        const root = path.join(tmp, `owned-no-native-${entry}`);
         fs.mkdirSync(root, { recursive: true });
         stage(root, { withNative: false });
         const result = spawnSync(process.execPath, ['runner.mjs', entry], {
@@ -600,15 +654,41 @@ console.log('HOST_OK');`,
           encoding: 'utf8',
           timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
           killSignal: 'SIGKILL',
-          maxBuffer: 16 * 1024 * 1024,
           env: { ...process.env, NODE_PATH: '' },
         });
         expect(result.error).toBeUndefined();
         expect(result.signal).toBeNull();
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout.trim()).toBe('PACKAGED_OK');
+        expect(result.stderr.trim()).toBe('');
+      },
+    );
+
+    test.each(HOST_ENTRIES)(
+      '%s shared frames require the staged byte transport without workspace fallback',
+      (entry) => {
+        const root = path.join(tmp, `no-native-${entry}`);
+        fs.mkdirSync(root, { recursive: true });
+        stage(root, { withNative: false });
+        const result = spawnSync(
+          process.execPath,
+          ['runner.mjs', entry, 'shared'],
+          {
+            cwd: root,
+            encoding: 'utf8',
+            timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+            killSignal: 'SIGKILL',
+            maxBuffer: 16 * 1024 * 1024,
+            env: { ...process.env, NODE_PATH: '' },
+          },
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.signal).toBeNull();
         expect(result.status).toBe(1);
-        // The public entry fails at import; the lightweight host propagates
-        // its worker's initialization error and still drains every worker.
-        expect(result.stderr).toContain('failed to load the native parser');
+        // Missing byte transport is a per-file frame failure; both hosts drain.
+        expect(result.stderr).toContain(
+          'failed to load the native byte transport',
+        );
         expect(result.stderr).toContain(`@rslint/${PKG_BASE}`);
         expect(`${result.stdout}\n${result.stderr}`).not.toMatch(
           /task_timeout|worker_crashed|EXPECTED-NATIVE-ABORT/,
