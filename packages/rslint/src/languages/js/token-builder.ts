@@ -44,9 +44,8 @@ export interface Comment {
   loc: SourceLocation;
 }
 
-// Indexed by the Go-projected token code. Codes 11 (JsxText) and 12
-// (JsxTextAttr) BOTH surface as the ESLint "JSXText" type but take different value paths
-// below, so the language frame retains two distinct codes.
+// JSXText has two value modes: Espree's decoded JS text, and verbatim
+// attribute strings or TypeScript ESTree text. Both expose type "JSXText".
 const TYPE_BY_CODE: readonly TokenType[] = [
   'Identifier', // 0
   'Keyword', // 1
@@ -60,7 +59,7 @@ const TYPE_BY_CODE: readonly TokenType[] = [
   'PrivateIdentifier', // 9
   'JSXIdentifier', // 10
   'JSXText', // 11  JsxText      → entity-decoded + CRLF-folded value
-  'JSXText', // 12  JsxTextAttr  → raw value (incl. quotes), no decode
+  'JSXText', // 12  JSX attribute strings and TS text → verbatim source
 ];
 
 // Value side-paths keyed by code (everything else is a verbatim slice).
@@ -119,7 +118,7 @@ export function buildToken(
       regex = m ? { pattern: m[1], flags: m[2] } : { pattern: '', flags: '' };
       break;
     }
-    // default (incl. JsxTextAttr=12): value is the verbatim slice.
+    // default (incl. raw JSXText=12): value is the verbatim slice.
   }
 
   const tok: Token = {

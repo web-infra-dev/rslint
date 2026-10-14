@@ -1,6 +1,9 @@
 import { describe, test, expect } from 'rstack/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { Linter } from 'eslint';
+import * as typescriptParser from '@typescript-eslint/parser';
 import { runRslint, createTempDir, cleanupTempDir } from './helpers.js';
 
 // A self-contained mock ESLint plugin (mirrors tests/eslint-plugin/
@@ -53,6 +56,37 @@ const LOCAL_PLUGIN = `export default {
               messageId: 'replace',
               fix: (fixer) => fixer.replaceTextRange([index, index + 1], '1'),
             });
+          },
+        };
+      },
+    },
+    'projection-probe': {
+      meta: { fixable: 'code', schema: [] },
+      create(context) {
+        const sc = context.sourceCode;
+        return {
+          AssignmentPattern(node) {
+            context.report({ node, message: 'remove default', fix: fixer => fixer.replaceText(node, sc.getText(node.left)) });
+          },
+          BinaryExpression(node) {
+            if (node.operator !== '>=') return;
+            const operator = sc.getFirstTokenBetween(node.left, node.right);
+            context.report({ node: operator, message: 'replace operator', fix: fixer => fixer.replaceText(operator, '>') });
+          },
+          MethodDefinition(node) {
+            if (node.kind !== 'constructor' || node.key.type !== 'Identifier') return;
+            context.report({ node: node.key, message: 'quote key', fix: fixer => fixer.replaceText(node.key, '"constructor"') });
+          },
+          JSXAttribute(node) {
+            if (node.name.name !== 'value' || node.value.value === 'fixed') return;
+            context.report({ node: node.value, message: 'replace attribute', fix: fixer => fixer.replaceText(node.value, '"fixed"') });
+          },
+          TemplateElement(node) {
+            if (!node.value.raw.includes('\\n') || node.parent.type !== 'TemplateLiteral' || node.parent.expressions.length) return;
+            context.report({ node: node.parent, message: 'replace template', fix: fixer => fixer.replaceText(node.parent, '\`fixed\`') });
+          },
+          ExportNamedDeclaration(node) {
+            if (node.declaration?.declare && node.exportKind !== 'type') throw new Error('wrong ambient export kind');
           },
         };
       },
@@ -223,6 +257,95 @@ export default [{ files: ['**/*.ts'],
       await cleanupTempDir(dir);
     }
   });
+
+  test.each([
+    [
+      'binding.ts',
+      '\ufeff// 😀\r\nconst {source: local = 1, nested: {value = 2} = fallback} = input;\r\n',
+      '\ufeff// 😀\r\nconst {source: local, nested: {value}} = input;\r\n',
+    ],
+    [
+      'operator.ts',
+      '// 😀\nconst value = left >= right; left >>= 1;\n',
+      '// 😀\nconst value = left > right; left >>= 1;\n',
+    ],
+    [
+      'constructor.ts',
+      '// 😀\nclass C { private /* constructor */ constructor() {} static constructor() {} }\n',
+      '// 😀\nclass C { private /* constructor */ "constructor"() {} static constructor() {} }\n',
+    ],
+    [
+      'attribute.tsx',
+      'const element = <A value="\\" />; /* after */ next();\n',
+      'const element = <A value="fixed" />; /* after */ next();\n',
+    ],
+    [
+      'attribute.jsx',
+      'const element = <A value="first\r\nsecond" />; next();\n',
+      'const element = <A value="fixed" />; next();\n',
+    ],
+    [
+      'template.js',
+      '// 😀\nconst value = `first\r\nlast`;\n',
+      '// 😀\nconst value = `fixed`;\n',
+    ],
+    [
+      'ambient.ts',
+      'export declare const value: T; export declare function f<T>(x: T): T;\n',
+      'export declare const value: T; export declare function f<T>(x: T): T;\n',
+    ],
+  ])(
+    'ESTree ranges survive the complete --fix pipeline: %s',
+    async (filePath, text, expected) => {
+      const dir = await createTempDir({
+        'local-plugin.mjs': LOCAL_PLUGIN,
+        'rslint.config.mjs': `import local from './local-plugin.mjs'; export default [{files: ['**/*.{js,jsx,ts,tsx}'], plugins: {local}, rules: {'local/projection-probe': 'error'}}];`,
+        'tsconfig.json': JSON.stringify({
+          compilerOptions: {
+            target: 'ESNext',
+            module: 'ESNext',
+            allowJs: true,
+            jsx: 'preserve',
+          },
+          include: ['**/*'],
+        }),
+        [filePath]: text,
+      });
+      try {
+        const { default: plugin } = await import(
+          /* webpackIgnore: true */ pathToFileURL(
+            path.join(dir, 'local-plugin.mjs'),
+          ).href
+        );
+        const upstream = new Linter().verifyAndFix(
+          text,
+          [
+            {
+              files: ['**/*.{js,jsx,ts,tsx}'],
+              languageOptions: {
+                parser: typescriptParser,
+                sourceType: 'module',
+                ecmaVersion: 'latest',
+                parserOptions: { ecmaFeatures: { jsx: true } },
+              },
+              plugins: { local: plugin },
+              rules: { 'local/projection-probe': 'error' },
+            },
+          ],
+          { filename: filePath },
+        );
+        expect(upstream.messages).toEqual([]);
+        expect(upstream.output).toBe(expected);
+        const result = await runRslint(['--fix'], dir);
+        expect(result.exitCode).toBe(0);
+        expect(await fs.readFile(path.join(dir, filePath), 'utf8')).toBe(
+          upstream.output,
+        );
+      } finally {
+        await cleanupTempDir(dir);
+      }
+    },
+  );
 
   test('--fix performs a final verification after the tenth write pass', async () => {
     const config = `import local from './local-plugin.mjs';

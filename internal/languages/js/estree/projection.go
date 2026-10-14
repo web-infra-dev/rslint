@@ -318,6 +318,9 @@ func (p *estreeProjector) hasModifier(node *ast.Node, flag ast.ModifierFlags) bo
 }
 
 func (p *estreeProjector) decorators(node *ast.Node) uint32 {
+	if p.isJavaScriptFile() && (node == nil || len(node.Decorators()) == 0) {
+		return undefinedValue()
+	}
 	if node == nil {
 		return p.listValue(nil)
 	}

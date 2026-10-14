@@ -133,7 +133,7 @@ var schemas = []nodeSchema{
 	{"JSXOpeningElement", []string{"name", "attributes", "selfClosing", "typeArguments"}},
 	{"JSXClosingElement", []string{"name"}},
 	{"JSXFragment", []string{"openingFragment", "children", "closingFragment"}},
-	{"JSXOpeningFragment", []string{}},
+	{"JSXOpeningFragment", []string{"attributes", "selfClosing"}},
 	{"JSXClosingFragment", []string{}},
 	{"JSXIdentifier", []string{"name"}},
 	{"JSXMemberExpression", []string{"object", "property"}},
@@ -169,7 +169,7 @@ var schemas = []nodeSchema{
 	{"TSNullKeyword", []string{}},
 }
 
-const schemaHash uint32 = 0x4c5bef1e
+const schemaHash uint32 = 0xc424f4a8
 
 var typeIDs = func() map[string]uint16 {
 	result := make(map[string]uint16, len(schemas))

@@ -2,6 +2,7 @@
 
 import { describe, test, expect } from 'rstack/test';
 import { parse as parseUpstream } from '@typescript-eslint/parser';
+import { visitorKeys as upstreamVisitorKeys } from '@typescript-eslint/visitor-keys';
 import {
   decodeFrame,
   FrameCancelled,
@@ -17,6 +18,8 @@ import {
 } from '../../../src/languages/js/positions.js';
 import type { ESTreeNode } from '../../../src/languages/js/types.js';
 import type { RuleContext } from '../../../src/eslint-plugin/linter/context.js';
+import { CONFORMANCE_CASES } from './conformance-cases.js';
+import { parseReference } from './conformance-oracle.js';
 
 function projectAST(filePath: string, text: string): ESTreeNode {
   const parsed = projectSyntax(filePath, text, 'module');
@@ -366,7 +369,16 @@ function canonical(value: unknown): unknown {
   const fields = type
     ? FRAME_SCHEMAS.find(([name]) => name === type)?.[1]
     : undefined;
-  for (const key of fields ? ['type', 'range', ...fields] : Object.keys(node)) {
+  const descriptors = Object.getOwnPropertyDescriptors(node);
+  const publicFields = Object.keys(node).filter(
+    (key) =>
+      !descriptors[key].get &&
+      descriptors[key].value !== undefined &&
+      !['parent', 'start', 'end', 'loc', 'tokens', 'comments'].includes(key),
+  );
+  for (const key of fields
+    ? new Set(['type', 'range', ...fields, ...publicFields])
+    : publicFields) {
     if (key.startsWith('$')) continue;
     result[key] = canonical(node[key]);
   }
@@ -420,6 +432,66 @@ describe('Go projection matches canonical ESTree', () => {
           }
         }
       }
+    });
+  }
+});
+
+describe('systematic AST conformance', () => {
+  test('the corpus exercises every projected node schema', () => {
+    const types = new Set<string>();
+    const visit = (node: ESTreeNode): void => {
+      types.add(node.type);
+      const keys = upstreamVisitorKeys[node.type];
+      if (!keys) throw new Error(`missing upstream visitor keys: ${node.type}`);
+      for (const key of keys) {
+        const value = node[key];
+        for (const child of Array.isArray(value) ? value : [value]) {
+          if (child != null) visit(child as ESTreeNode);
+        }
+      }
+    };
+    for (const fixture of CONFORMANCE_CASES)
+      visit(parseReference(fixture) as unknown as ESTreeNode);
+    expect(
+      FRAME_SCHEMAS.map(([type]) => type).filter((type) => !types.has(type)),
+    ).toEqual([]);
+  });
+  for (const fixture of CONFORMANCE_CASES) {
+    test(fixture.name, () => {
+      const actual = projectSyntax(
+        fixture.filePath,
+        fixture.text,
+        fixture.sourceType,
+      ).ast;
+      const expected = parseReference(fixture);
+      expect(canonical(actual)).toEqual(canonical(expected));
+      const visit = (node: ESTreeNode, reference: ESTreeNode): void => {
+        expect(node.type).toBe(reference.type);
+        expect(node.loc).toEqual(reference.loc);
+        const keys = upstreamVisitorKeys[reference.type];
+        if (!keys)
+          throw new Error(`missing upstream visitor keys: ${reference.type}`);
+        expect([...VISITOR_KEYS[node.type]].sort()).toEqual([...keys].sort());
+        for (const key of keys) {
+          const children = node[key];
+          const expectedChildren = reference[key];
+          if (Array.isArray(expectedChildren)) {
+            expect(Array.isArray(children)).toBe(true);
+            expect((children as unknown[]).length).toBe(
+              expectedChildren.length,
+            );
+            for (const [index, child] of expectedChildren.entries()) {
+              if (child == null) continue;
+              expect((children as ESTreeNode[])[index].parent).toBe(node);
+              visit((children as ESTreeNode[])[index], child as ESTreeNode);
+            }
+          } else if (expectedChildren != null) {
+            expect((children as ESTreeNode).parent).toBe(node);
+            visit(children as ESTreeNode, expectedChildren as ESTreeNode);
+          }
+        }
+      };
+      visit(actual, expected as unknown as ESTreeNode);
     });
   }
 });
@@ -584,13 +656,15 @@ describe('projected ranges used by plugin diagnostics and fixes', () => {
   });
 });
 
-test('parenthesized constructor type arguments stay on NewExpression', () => {
+test('parenthesized constructor instantiation retains its own type arguments', () => {
   const ast = projectSyntax('file.ts', 'new (f<T>)(x)').ast as ESTreeNode & {
     body: Array<{ expression: Record<string, unknown> }>;
   };
   const node = ast.body[0].expression;
-  expect((node.callee as ESTreeNode).type).toBe('Identifier');
-  expect((node.typeArguments as ESTreeNode).type).toBe(
+  const callee = node.callee as ESTreeNode;
+  expect(callee.type).toBe('TSInstantiationExpression');
+  expect(node.typeArguments).toBeNull();
+  expect((callee.typeArguments as ESTreeNode).type).toBe(
     'TSTypeParameterInstantiation',
   );
 });

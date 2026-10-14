@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"unicode"
 
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	jsxtx "github.com/microsoft/TypeScript/tsc/shim/transformers/jsxtransforms"
 )
 
 func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
@@ -171,7 +173,7 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 	case ast.KindStringLiteral:
 		if node.Parent != nil && node.Parent.Kind == ast.KindJsxAttribute {
 			raw := p.rawText(node)
-			return p.addLiteral(node, p.stringValue(ecmascript.DecodeJSXAttribute(raw[1:len(raw)-1])), undefinedValue(), undefinedValue(), undefinedValue())
+			return p.addLiteral(node, p.stringValue(p.jsxValue(raw[1:len(raw)-1], false)), undefinedValue(), undefinedValue(), undefinedValue())
 		}
 		return p.addLiteral(node, p.stringValue(node.Text()), undefinedValue(), undefinedValue(), undefinedValue())
 	case ast.KindNumericLiteral:
@@ -290,18 +292,9 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 		if n.Arguments != nil {
 			arguments = n.Arguments.Nodes
 		}
-		callee, typeArguments := n.Expression, n.TypeArguments
-		inner := callee
-		for inner != nil && inner.Kind == ast.KindParenthesizedExpression {
-			inner = inner.AsParenthesizedExpression().Expression
-		}
-		if inner != nil && inner.Kind == ast.KindExpressionWithTypeArguments {
-			instantiation := inner.AsExpressionWithTypeArguments()
-			callee, typeArguments = instantiation.Expression, instantiation.TypeArguments
-		}
 		return p.addNode("NewExpression", node,
-			nodeValue(p.convert(callee, false)), p.convertList(arguments, false),
-			p.typeParameters(typeArguments, false))
+			nodeValue(p.convert(n.Expression, false)), p.convertList(arguments, false),
+			p.typeParameters(n.TypeArguments, false))
 	case ast.KindArrayLiteralExpression:
 		elements := p.convertListWithNulls(node.AsArrayLiteralExpression().Elements.Nodes, pattern)
 		if pattern {
@@ -622,7 +615,11 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 			nodeValue(p.convert(n.OpeningFragment, false)), p.convertList(n.Children.Nodes, false),
 			nodeValue(p.convert(n.ClosingFragment, false)))
 	case ast.KindJsxOpeningFragment:
-		return p.addNode("JSXOpeningFragment", node)
+		attributes, selfClosing := undefinedValue(), undefinedValue()
+		if p.isJavaScriptFile() {
+			attributes, selfClosing = p.listValue(nil), boolValue(false)
+		}
+		return p.addNode("JSXOpeningFragment", node, attributes, selfClosing)
 	case ast.KindJsxClosingFragment:
 		return p.addNode("JSXClosingFragment", node)
 	case ast.KindJsxAttribute:
@@ -636,7 +633,7 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 		return p.convertJsxExpression(node)
 	case ast.KindJsxText, ast.KindJsxTextAllWhiteSpaces:
 		raw := p.rawTextFull(node)
-		return p.addNode("JSXText", node, p.stringValue(ecmascript.DecodeJSXText(raw)), p.stringValue(raw))
+		return p.addNode("JSXText", node, p.stringValue(p.jsxValue(raw, true)), p.stringValue(raw))
 	case ast.KindJsxNamespacedName:
 		n := node.AsJsxNamespacedName()
 		return p.addNode("JSXNamespacedName", node,
@@ -687,7 +684,7 @@ func (p *estreeProjector) wrapExport(node *ast.Node, declaration uint32) uint32 
 	p.nodes[declaration-1].start = p.offsets.At(start)
 
 	kind := "value"
-	if node.Kind == ast.KindInterfaceDeclaration || node.Kind == ast.KindTypeAliasDeclaration {
+	if node.Kind == ast.KindInterfaceDeclaration || node.Kind == ast.KindTypeAliasDeclaration || p.hasModifier(node, ast.ModifierFlagsAmbient) {
 		kind = "type"
 	}
 	var result uint32
@@ -1009,7 +1006,7 @@ func (p *estreeProjector) convertNoSubstitutionTemplate(node *ast.Node) uint32 {
 		raw = raw[1 : len(raw)-1]
 	}
 	element := p.add("TemplateElement", start, end,
-		boolValue(true), p.templateCooked(node), p.stringValue(raw))
+		boolValue(true), p.templateCooked(node), p.stringValue(templateRaw(node, raw)))
 	return p.addNode("TemplateLiteral", node, p.listValue(nil), p.listValue([]uint32{element}))
 }
 
@@ -1030,7 +1027,69 @@ func (p *estreeProjector) convertTemplateElement(node *ast.Node) uint32 {
 	tail := node.Kind == ast.KindTemplateTail
 	raw := node.RawText()
 	return p.addNode("TemplateElement", node,
-		boolValue(tail), p.templateCooked(node), p.stringValue(raw))
+		boolValue(tail), p.templateCooked(node), p.stringValue(templateRaw(node, raw)))
+}
+
+func templateRaw(node *ast.Node, raw string) string {
+	// TypeScript template-literal types preserve source newlines in raw;
+	// expression templates use ECMAScript's normalized template raw value.
+	if node.Parent != nil {
+		switch node.Parent.Kind {
+		case ast.KindLiteralType, ast.KindTemplateLiteralType, ast.KindTemplateLiteralTypeSpan:
+			return raw
+		}
+	}
+	return strings.ReplaceAll(strings.ReplaceAll(raw, "\r\n", "\n"), "\r", "\n")
+}
+
+func (p *estreeProjector) jsxValue(raw string, text bool) string {
+	if !p.isJavaScriptFile() {
+		return decodeTypeScriptJSX(raw)
+	}
+	if text {
+		return ecmascript.DecodeJSXText(raw)
+	}
+	return ecmascript.DecodeJSXAttribute(raw)
+}
+
+func decodeTypeScriptJSX(raw string) string {
+	if !strings.ContainsRune(raw, '&') {
+		return raw
+	}
+	var result strings.Builder
+	result.Grow(len(raw))
+	for {
+		amp := strings.IndexByte(raw, '&')
+		if amp < 0 {
+			break
+		}
+		result.WriteString(raw[:amp])
+		raw = raw[amp:]
+		semi := strings.IndexByte(raw, ';')
+		if semi < 0 {
+			break
+		}
+		// Only the last ampersand before this semicolon can start a reference.
+		// Consume its literal prefix once, including runs of invalid ampersands.
+		if lastAmp := strings.LastIndexByte(raw[1:semi], '&'); lastAmp >= 0 {
+			prefix := lastAmp + 1
+			result.WriteString(raw[:prefix])
+			raw = raw[prefix:]
+			semi -= prefix
+		}
+		// TypeScript ESTree leaves invalid code points verbatim; tsgo's JSX
+		// transformer replaces them. Decode only validated references.
+		decoded, ok := jsxtx.DecodeEntity(raw[1:semi])
+		if ok && decoded >= 0 && decoded <= unicode.MaxRune {
+			result.WriteString(jsxtx.DecodeEntities(raw[:semi+1]))
+			raw = raw[semi+1:]
+		} else {
+			result.WriteString(raw[:semi+1])
+			raw = raw[semi+1:]
+		}
+	}
+	result.WriteString(raw)
+	return result.String()
 }
 
 func (p *estreeProjector) convertClass(node *ast.Node, declaration bool) uint32 {

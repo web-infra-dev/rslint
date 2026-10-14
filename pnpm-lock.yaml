@@ -325,6 +325,9 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20250904.1
+      eslint:
+        specifier: 'catalog:'
+        version: 10.9.0(jiti@2.7.0)
       eslint-scope:
         specifier: 'catalog:'
         version: 9.1.2

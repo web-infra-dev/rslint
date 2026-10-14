@@ -14,6 +14,8 @@ import { projectSyntax } from '../../languages/js/project-frame.js';
 
 import { buildTokens } from '../../../src/languages/js/token-builder.js';
 import { buildLineStartOffsets } from '../../../src/languages/js/positions.js';
+import { CONFORMANCE_CASES } from '../../languages/js/conformance-cases.js';
+import { parseReference } from '../../languages/js/conformance-oracle.js';
 
 type Lang = 'js' | 'cjs' | 'jsx';
 
@@ -202,6 +204,45 @@ describe('token differential: Go frame tokens == espree.parse tokens (.js/.jsx)'
   for (const [label, src, lang] of JS_CASES) {
     test(label, () => {
       expect(projectedTokens(src, lang)).toEqual(espreeTokens(src, lang));
+    });
+  }
+});
+
+describe('systematic token and comment conformance', () => {
+  for (const fixture of CONFORMANCE_CASES) {
+    test(fixture.name, () => {
+      const src = fixture.text.replace(/^\ufeff/, '');
+      const p = projectSyntax(
+        fixture.filePath,
+        fixture.text,
+        fixture.sourceType,
+      );
+      const actual = buildTokens(
+        p.tokenTypes,
+        p.tokenStarts,
+        p.tokenEnds,
+        src,
+        buildLineStartOffsets(src),
+      );
+      const expected = parseReference(fixture);
+      expect(actual.map(fmt)).toEqual(expected.tokens!.map(fmt));
+      expect(
+        p.comments.map((comment) => ({
+          type: comment.type,
+          value: comment.value,
+          range: [comment.start, comment.end],
+        })),
+      ).toEqual(
+        // The frame excludes shebang metadata; the SDK comparison below
+        // exercises SourceCode's synthesized Shebang entry.
+        expected
+          .comments!.filter((comment) => comment.type !== 'Hashbang')
+          .map((comment) => ({
+            type: comment.type,
+            value: comment.value,
+            range: comment.range,
+          })),
+      );
     });
   }
 });

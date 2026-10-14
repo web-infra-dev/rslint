@@ -11,6 +11,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -22,6 +23,30 @@ import (
 
 func source(path, text string) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: path, Path: tspath.Path(path)}, text, core.GetScriptKindFromFileName(path))
+}
+
+type nativeSyntaxState struct {
+	kind       ast.Kind
+	flags      ast.NodeFlags
+	parent     *ast.Node
+	start, end int
+	children   []*ast.Node
+}
+
+func snapshotNativeSyntax(file *ast.SourceFile) map[*ast.Node]nativeSyntaxState {
+	states := make(map[*ast.Node]nativeSyntaxState)
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		state := nativeSyntaxState{kind: node.Kind, flags: node.Flags, parent: node.Parent, start: node.Pos(), end: node.End()}
+		node.ForEachChild(func(child *ast.Node) bool {
+			state.children = append(state.children, child)
+			return visit(child)
+		})
+		states[node] = state
+		return false
+	}
+	visit(file.AsNode())
+	return states
 }
 
 func TestSchemaMatchesNodeDecoder(t *testing.T) {
@@ -64,6 +89,14 @@ func TestSchemaMatchesNodeDecoder(t *testing.T) {
 	if fingerprint.Sum32() != schemaHash {
 		t.Fatal("schema fingerprint drifted")
 	}
+	match := regexp.MustCompile(`FRAME_SCHEMA_HASH = (0x[0-9a-f]+)`).FindSubmatch(data)
+	if len(match) != 2 {
+		t.Fatal("missing Node schema fingerprint")
+	}
+	nodeHash, err := strconv.ParseUint(string(match[1]), 0, 32)
+	if err != nil || uint32(nodeHash) != schemaHash {
+		t.Fatalf("Node schema fingerprint drifted: %s", match[1])
+	}
 }
 
 func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
@@ -94,9 +127,14 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 	var builder Builder
 	for path, text := range cases {
 		t.Run(path, func(t *testing.T) {
-			data, err := builder.Build(context.Background(), source(path, text), Options{SourceType: "module"})
+			file := source(path, text)
+			original := snapshotNativeSyntax(file)
+			data, err := builder.Build(context.Background(), file, Options{SourceType: "module"})
 			if err != nil {
 				t.Fatal(err)
+			}
+			if file.Text() != text || !reflect.DeepEqual(original, snapshotNativeSyntax(file)) {
+				t.Fatal("projection changed native source syntax")
 			}
 			saved := bytes.Clone(data)
 			if builder.p.file != nil || builder.p.text != "" || builder.p.sourceType != "" || builder.p.offsets.positions != nil || len(builder.p.stringOffsets) != 0 {

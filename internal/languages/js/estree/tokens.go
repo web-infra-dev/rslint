@@ -76,8 +76,8 @@ func scanTokensAndCommentsInto(
 		// The syntax tree resolves contexts a plain scanner cannot: compound
 		// '>' operators versus generic closers, and JSX strings without JS escapes.
 		if covered && (isReplacementKind(cover.kind) || cover.typeCode == tokenPunctuator ||
-			cover.typeCode == tokenJSXTextAttribute ||
-			(cover.typeCode == tokenJSXIdentifier && coverEnd > end)) {
+			cover.typeCode == tokenJSXTextRaw ||
+			(cover.kind == ast.KindIdentifier && coverEnd > end)) {
 			kind = cover.kind
 			end = coverEnd
 			scan.ResetTokenState(end)
@@ -119,6 +119,12 @@ func coverForNode(file *ast.SourceFile, node *ast.Node) (tokenCover, int, bool) 
 	start := node.Pos()
 	cover := tokenCover{kind: node.Kind, end: uint32(node.End())}
 	switch node.Kind {
+	case ast.KindThisKeyword:
+		if (file.ScriptKind != core.ScriptKindJS && file.ScriptKind != core.ScriptKindJSX) || !isJSXIdentifier(node) {
+			return tokenCover{}, 0, false
+		}
+		start = scanner.GetTokenPosOfNode(node, file, false)
+		cover.typeCode = tokenJSXIdentifier
 	case ast.KindGreaterThanEqualsToken, ast.KindGreaterThanGreaterThanToken,
 		ast.KindGreaterThanGreaterThanGreaterThanToken, ast.KindGreaterThanGreaterThanEqualsToken,
 		ast.KindGreaterThanGreaterThanGreaterThanEqualsToken:
@@ -129,6 +135,9 @@ func coverForNode(file *ast.SourceFile, node *ast.Node) (tokenCover, int, bool) 
 		cover.typeCode = tokenIdentifier
 		if isJSXIdentifier(node) {
 			cover.typeCode = tokenJSXIdentifier
+			if file.ScriptKind == core.ScriptKindTSX && node.Parent != nil && node.Parent.Kind == ast.KindJsxNamespacedName {
+				cover.typeCode = tokenIdentifier
+			}
 		}
 	case ast.KindPrivateIdentifier:
 		start = scanner.GetTokenPosOfNode(node, file, false)
@@ -137,7 +146,7 @@ func coverForNode(file *ast.SourceFile, node *ast.Node) (tokenCover, int, bool) 
 		start = scanner.GetTokenPosOfNode(node, file, false)
 		cover.typeCode = tokenString
 		if node.Parent != nil && node.Parent.Kind == ast.KindJsxAttribute {
-			cover.typeCode = tokenJSXTextAttribute
+			cover.typeCode = tokenJSXTextRaw
 		}
 	case ast.KindNumericLiteral, ast.KindBigIntLiteral:
 		start = scanner.GetTokenPosOfNode(node, file, false)
@@ -153,6 +162,9 @@ func coverForNode(file *ast.SourceFile, node *ast.Node) (tokenCover, int, bool) 
 		cover.typeCode = tokenTemplate
 	case ast.KindJsxText, ast.KindJsxTextAllWhiteSpaces:
 		cover.typeCode = tokenJSXText
+		if file.ScriptKind == core.ScriptKindTSX {
+			cover.typeCode = tokenJSXTextRaw
+		}
 	default:
 		return tokenCover{}, 0, false
 	}
@@ -197,7 +209,7 @@ const (
 	tokenPrivateIdentifier
 	tokenJSXIdentifier
 	tokenJSXText
-	tokenJSXTextAttribute
+	tokenJSXTextRaw
 )
 
 func classifyTokenKind(kind ast.Kind, isTypeScript bool) uint8 {

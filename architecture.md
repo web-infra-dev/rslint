@@ -1700,6 +1700,10 @@ it alongside tokens, preserving the last cover at repeated source positions.
 Parsed compound operators retain their full spans while TypeScript generic
 closers remain separate. JSX attribute strings use their parsed boundaries,
 including literal backslashes and line breaks.
+Projection follows Espree's JS/JSX data contract and TypeScript ESTree's TS/TSX
+contract, selected by the SourceFile's script kind. This includes JSX entity
+values, token classifications, optional fields and template raw values; it
+does not change syntax admission, rule execution or diagnostic/fix policy.
 After the transport copies frames into shared storage or encodes inline fallback,
 oversized original buffers can be collected while Node executes rules. Shared slots still
 require the existing reader release acknowledgement before reuse. A single
