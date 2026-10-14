@@ -6,7 +6,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/linter"
 	target "github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_relative_packages"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -68,7 +67,7 @@ func TestNoRelativePackagesExtras(t *testing.T) {
 	runPackages(t, valid, invalid)
 }
 
-func TestNoRelativePackagesEditDemand(t *testing.T) {
+func TestNoRelativePackagesUnverifiedEditDemand(t *testing.T) {
 	root := packageRoot(t)
 	file := tspath.ResolvePath(root.Dir, "tests/files/package/index.js")
 	code := `import '../package-named';`
@@ -94,16 +93,8 @@ func TestNoRelativePackagesEditDemand(t *testing.T) {
 		if got.Suggestions != nil {
 			t.Fatal("unexpected suggestions")
 		}
-		if demand&rule.EditDemandAutofix != 0 {
-			if got.FixesPtr == nil || !reflect.DeepEqual(got.FixesPtr, all.FixesPtr) {
-				t.Fatal("missing or changed fix")
-			}
-			output, _, fixed := linter.ApplyRuleFixes(code, diagnostics)
-			if !fixed || output != `import "package-named";` {
-				t.Fatalf("unexpected output %q", output)
-			}
-		} else if got.FixesPtr != nil {
-			t.Fatal("unexpected fix")
+		if got.FixesPtr != nil {
+			t.Fatal("unexpected autofix")
 		}
 		want := all
 		got.FixesPtr, want.FixesPtr = nil, nil
