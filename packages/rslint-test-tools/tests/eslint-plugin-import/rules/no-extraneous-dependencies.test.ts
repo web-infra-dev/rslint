@@ -23,9 +23,12 @@ for (let i = 1; i < chunks.length; i += 2) {
 }
 afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
 const suites = JSON.parse(
-  fs
-    .readFileSync(path.join(dataDir, 'upstream-cases.json'), 'utf8')
-    .replaceAll('/fixture', root),
+  fs.readFileSync(path.join(dataDir, 'upstream-cases.json'), 'utf8'),
+  // Relocate decoded strings: Windows separators are not JSON escapes.
+  (_key, value) =>
+    typeof value === 'string'
+      ? value.replaceAll('/fixture', () => root)
+      : value,
 );
 function adapt(item: any) {
   const { fileName, skip, skipReason, ...rest } = item;
@@ -42,7 +45,9 @@ function adapt(item: any) {
       ]) {
         if (Array.isArray(options[key]))
           options[key] = options[key].map((glob: string) =>
-            glob.startsWith('*.') ? path.join(root, glob) : glob,
+            glob.startsWith('*.')
+              ? path.join(root, glob).split(path.sep).join('/')
+              : glob,
           );
       }
     }
