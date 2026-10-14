@@ -68,6 +68,7 @@
     "@typescript-eslint/scope-manager": "catalog:",
     "@typescript-eslint/visitor-keys": "catalog:",
     "@typescript/native-preview": "catalog:",
+    "eslint": "catalog:",
     "eslint-scope": "catalog:",
     "eslint-visitor-keys": "catalog:",
     "espree": "catalog:",

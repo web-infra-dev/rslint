@@ -302,7 +302,7 @@ export const FRAME_SCHEMAS: ReadonlyArray<
   ['JSXOpeningElement', ['name', 'attributes', 'selfClosing', 'typeArguments']],
   ['JSXClosingElement', ['name']],
   ['JSXFragment', ['openingFragment', 'children', 'closingFragment']],
-  ['JSXOpeningFragment', []],
+  ['JSXOpeningFragment', ['attributes', 'selfClosing']],
   ['JSXClosingFragment', []],
   ['JSXIdentifier', ['name']],
   ['JSXMemberExpression', ['object', 'property']],
@@ -404,4 +404,4 @@ export const FRAME_SCHEMAS: ReadonlyArray<
   ['TSNamespaceExportDeclaration', ['id']],
   ['TSNullKeyword', []],
 ];
-export const FRAME_SCHEMA_HASH = 0x4c5bef1e;
+export const FRAME_SCHEMA_HASH = 0xc424f4a8;
