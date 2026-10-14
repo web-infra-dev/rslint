@@ -146,8 +146,6 @@ export interface LintInboundHandlers {
     request: unknown,
     attachments?: readonly IpcAttachment[],
   ) => unknown;
-  /** Opt into file textAttachment indices; omitted for legacy inline-text hosts. */
-  pluginLintAttachments?: boolean;
   loadConfigs?: (request: LoadConfigsRequest) => unknown;
   activateConfigs?: (request: ActivateConfigsRequest) => unknown;
 }

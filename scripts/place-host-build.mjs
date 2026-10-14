@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Place host-platform build outputs into the matching `@rslint/native-<tuple>`
- * platform package, so the core loader (`load-binding.ts`) and the bin launcher
+ * platform package, so the core loader (`native/binding.ts`) and the bin launcher
  * (`bin/rslint.js`) resolve them in dev EXACTLY as in prod — no dev-only path.
  *
  *   node scripts/place-host-build.mjs bin [--debug]   # go build the rslint CLI

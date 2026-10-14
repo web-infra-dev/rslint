@@ -1,10 +1,7 @@
 /**
- * Native binding loader shared by IPC memory transport and worker parser.
+ * Native binding loader shared by the IPC host and worker byte reader.
  *
- * Resolves and loads the platform-specific `.node` — the oxc-based JS/TS/JSX
- * parser exposed as `parse` — from the matching `@rslint/native-<tuple>`
- * platform package. This replaces the former standalone `@rslint/native`
- * wrapper package whose napi-generated loader did the same dispatch.
+ * Loads the matching platform byte-transport addon. AST projection lives in Go.
  *
  * Resolution is IDENTICAL in dev and prod — the host only ever has one
  * platform, so there is no dev-only branch:
@@ -22,16 +19,14 @@
 import { createRequire } from 'node:module';
 
 import { platformPackageName } from './platform-tuple.js';
-import type { MemoryArena, ParseResult, SharedBytes } from './types.js';
+import type { MemoryArena, SharedBytes } from './types.js';
 
 export type {
   ByteInput,
-  CommentObj,
   MemoryArena,
   MemoryBatch,
   MemoryConfiguration,
   NativeMemoryMapping,
-  ParseResult,
   SharedBytes,
 } from './types.js';
 
@@ -40,18 +35,6 @@ const require = createRequire(import.meta.url);
 export interface NativeBinding {
   MemoryArena: new () => MemoryArena;
   readBytes(bytes: SharedBytes): Buffer;
-  parseSharedBytes(
-    filename: string,
-    source: SharedBytes,
-    sourceType: string,
-    jsx: boolean,
-  ): { parsed: ParseResult; sourceText: string; hadBom: boolean };
-  parse(
-    filename: string,
-    source: string,
-    sourceType: string,
-    jsx: boolean,
-  ): ParseResult;
 }
 
 let binding: NativeBinding | undefined;
@@ -68,7 +51,7 @@ export function getNativeBinding(): NativeBinding {
     return binding;
   } catch (cause) {
     const err = new Error(
-      `@rslint/core: failed to load the native parser from "${pkg}". ` +
+      `@rslint/core: failed to load the native byte transport from "${pkg}". ` +
         `Ensure the matching optional dependency is installed (reinstall after ` +
         `removing node_modules and the lockfile if it is missing).`,
     );

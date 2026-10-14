@@ -24,14 +24,10 @@ func (h *Handler) HandleLintWithContext(ctx context.Context, req api.LintRequest
 	var dispatch linter.EslintPluginDispatcher
 	if requester != nil {
 		dispatch = func(reqCtx context.Context, pluginReq linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-			var attachments []ipc.Attachment
-			if peer, ok := requester.(api.PeerCapabilityRequester); ok && peer.PeerSupportsCapability(api.CapabilityPluginLintAttachments) {
-				var texts []string
-				pluginReq, texts = pluginReq.WithTextAttachments()
-				attachments = make([]ipc.Attachment, len(texts))
-				for i, text := range texts {
-					attachments[i] = ipc.Text(text)
-				}
+			pluginReq, frames := pluginReq.WithFrameAttachments()
+			attachments := make([]ipc.Attachment, len(frames))
+			for index, frame := range frames {
+				attachments[index] = ipc.Bytes(frame)
 			}
 			msg, err := requester.SendRequest(reqCtx, api.KindPluginLint, pluginReq, attachments...)
 			if err != nil {

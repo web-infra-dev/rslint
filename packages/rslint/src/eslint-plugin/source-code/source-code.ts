@@ -2,7 +2,8 @@
 /**
  * ESLint-compatible `SourceCode` for plugins running inside the runner
  * Worker; tracks ESLint v10. Split from `context.ts` (which owns `report()`
- * wiring) — this file owns token/comment/scope/spacing/AST querying.
+ * wiring) — this file adapts `languages/js` data and operations to the
+ * token/comment/scope/spacing/AST query APIs.
  *
  * Supported surface (members removed in v10 are intentionally absent):
  *
@@ -23,12 +24,12 @@
  * Lazy resources (computed on first access, then cached on the
  * SourceCode instance):
  *
- *   - tokens / comments   token rebuild runs on first token-API call
+ *   - tokens / comments   queries materialize owned objects as needed
  *   - scopeManager        scope-factory thunk fires on first scope call
  */
 
 // Use the runner's canonical visitor-key table (vendored from
-// oxc-parser 0.133, drift-guarded against ESLint's keys; see
+// canonical ESTree child order; see
 // `visitor-keys.ts`). The bare `eslint-visitor-keys` `KEYS` covers
 // only ESTree, missing every TS-specific node type (TSEnumDeclaration,
 // TSInterfaceDeclaration, TSAsExpression, TSMappedType, …). Using it
@@ -38,13 +39,13 @@
 import {
   VISITOR_KEYS as RUNNER_VISITOR_KEYS,
   getVisitorKeys,
-} from '../ast/visitor-keys.js';
+} from '../../languages/js/visitor-keys.js';
 import {
   buildLineStartOffsets,
   offsetToLineColumn,
   type LocPosition,
   type SourceLocation,
-} from '../ast/normalize-ast.js';
+} from '../../languages/js/positions.js';
 import {
   getDeclaredVariablesFromScopeManager,
   getScopeForNode,
@@ -55,12 +56,14 @@ import {
   paddedTokenSlice,
 } from './source-code-helpers.js';
 import {
+  buildToken,
   buildTokens,
   spanIndexStartingAtOrAfter,
   type Comment,
   type Token,
-} from './token-builder.js';
+} from '../../languages/js/token-builder.js';
 import { ConfigCommentParser } from '@eslint/plugin-kit';
+import type { ESTreeNode } from '../../languages/js/types.js';
 
 // Shared parser instance — `parseDirective` doesn't hold per-call state
 // (matches ESLint v10's internal usage in source-code.js).
@@ -69,15 +72,6 @@ const directiveParser = new ConfigCommentParser();
 // ─────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────
-
-/** Compact node shape — what plugin code reads through `context.sourceCode`. */
-export interface ESTreeNode {
-  type: string;
-  range: [number, number];
-  loc: SourceLocation;
-  parent?: ESTreeNode;
-  [key: string]: unknown;
-}
 
 export interface SourceCode {
   text: string;
@@ -290,17 +284,7 @@ export interface SourceCodeBuildInput {
   text: string;
   ast: ESTreeNode;
   scopeManagerFactory: () => unknown;
-  /**
-   * Whether the on-disk source file started with a UTF-8 BOM. The
-   * caller is expected to STRIP the BOM byte from `text` before
-   * passing it in — both the native parser and downstream offset-aware code
-   * see the same byte view that way, and `SourceCode.hasBOM` still
-   * reflects the original file faithfully via this flag.
-   *
-   * When omitted, the factory falls back to detecting the BOM on
-   * `text[0]` itself (and strips internally) for legacy callers that
-   * passed BOM-containing text directly.
-   */
+  /** Original-file BOM flag. Text has already had exactly one BOM removed. */
   hasBOM?: boolean;
   /**
    * Optional parser-emitted comments. When provided, `getAllComments`
@@ -309,8 +293,8 @@ export interface SourceCodeBuildInput {
    * the full text tokenizer just to recover the same comments. Tokenize is
    * still invoked lazily if a rule asks for the full token stream.
    *
-   * Shape from the native parser: `{ type: 'Line' | 'Block', value, start, end }`.
-   * oxc does not emit shebang comments — we synthesize a Shebang entry
+   * Shape from the Go frame: `{ type: 'Line' | 'Block', value, start, end }`.
+   * The frame omits shebang comments — we synthesize a Shebang entry
    * here when `text` starts with `#!`, matching ESLint's getAllComments
    * contract on shebang files.
    */
@@ -321,11 +305,9 @@ export interface SourceCodeBuildInput {
     end: number;
   }>;
   /**
-   * Native-parser token stream in columnar form (the napi parser's `parse()`:
-   * `tokenTypes`/`tokenStarts`/`tokenEnds`, all UTF-16 offsets). The token
-   * getters lazily rebuild `Token[]` from these via {@link token-builder.buildTokens} on
-   * first use. When omitted, the token stream is empty (the main lint path always supplies
-   * it; a SourceCode built without it simply has no tokens, matching "no token APIs used").
+   * Owned Go-projected token columns with UTF-16 offsets. Queries materialize
+   * ordinary token objects on demand; complete public arrays reuse these same
+   * objects. When omitted, the token stream is empty.
    */
   parsedTokens?: {
     types: Uint8Array;
@@ -350,16 +332,16 @@ export interface SourceCodeBuildInput {
 export const LINE_TERMINATOR_RE = /\r\n|[\r\n\u2028\u2029]/g;
 
 /**
- * Build ESLint-shape `Comment[]` from the native parser's compact comment list.
+ * Build ESLint-shape `Comment[]` from the Go-projected compact comment list.
  *
- * oxc emits `{ type: 'Line' | 'Block', value, start, end }`. ESLint
+ * Go projects `{ type: 'Line' | 'Block', value, start, end }`. ESLint
  * rules expect `{ type, value, range: [start, end], loc: {start, end} }`
  * where loc positions are 1-indexed line + 0-indexed column. Building
  * those four extra fields per comment is O(N_comments) and skips the
  * O(text_length) full text scan the a full-text scan would have
  * paid for the same comment list.
  *
- * Shebang handling: oxc does not surface `#!` lines as comments
+ * Shebang handling: Go excludes shebang trivia from the comment column
  * (they're file-preamble metadata in its grammar), but ESLint's
  * `getAllComments` contract treats shebang as a leading `Shebang`-type
  * comment so rules that inspect the entire comment stream see it. We
@@ -377,16 +359,13 @@ function buildCommentsFromParsed(
   lso: number[],
 ): Comment[] {
   const out: Comment[] = [];
-  // ESLint's `getAllComments` reports a leading `#!` as `type: 'Shebang'`.
-  // The native parser (oxc 0.133) puts the shebang solely on `program.hashbang`
-  // for ALL languages and never emits it as a comment, so this relabel is a
-  // defensive no-op on the current parser — the synthesis block further down is
-  // the path that actually produces the Shebang entry. The relabel is kept so a
-  // parser that DID emit a `#!` Line at offset 0 would still be reported correctly.
+  // The projected comment column excludes shebang trivia. SourceCode exposes
+  // the leading shebang as a comment, matching ESLint's public API.
   const hasShebang =
     text.charCodeAt(0) === 0x23 /* # */ && text.charCodeAt(1) === 0x21; /* ! */
   for (let i = 0; i < parsedComments.length; i++) {
     const c = parsedComments[i];
+    // SourceCode's direct API also accepts a caller-provided leading Line entry.
     const isShebangEntry = hasShebang && i === 0 && c.start === 0;
     out.push({
       type: isShebangEntry ? 'Shebang' : c.type,
@@ -398,12 +377,6 @@ function buildCommentsFromParsed(
       },
     });
   }
-  // Synthesize a `Shebang` entry from the source text when the file starts with
-  // `#!` but no offset-0 Shebang was produced above. With oxc 0.133 this is the
-  // path taken for every language (the shebang lives on `program.hashbang`, not in
-  // `comments`). ESLint v10's `getAllComments()` always reports a leading `#!` as a
-  // `Shebang` token, so we match its shape (value strips `#!`, range spans to the
-  // first line terminator — same shape espree produces).
   if (hasShebang && !(out.length > 0 && out[0].type === 'Shebang')) {
     let end = text.length;
     for (let k = 2; k < text.length; k++) {
@@ -427,18 +400,6 @@ function buildCommentsFromParsed(
   return out;
 }
 
-/**
- * Re-export of `normalize-ast.ts`'s `buildLineStartOffsets` for
- * callers that already import from this module. Both AST nodes (via
- * `normalizeAst`) and the SourceCode API surface (via `getLso()`
- * below) compute line/column with this one implementation —
- * guaranteeing `node.loc.line === sourceCode.getLocFromIndex(node.range[0]).line`
- * for every node, regardless of which ECMAScript line terminator
- * family the file uses. Pre-fix the two surfaces ran separate copies
- * that disagreed on bare CR / LS / PS files.
- */
-export { buildLineStartOffsets as buildLineStartOffsetsLocal };
-
 // ─────────────────────────────────────────────────────────────────────
 // Factory
 // ─────────────────────────────────────────────────────────────────────
@@ -447,19 +408,16 @@ export { buildLineStartOffsets as buildLineStartOffsetsLocal };
  * Construct a SourceCode. All non-trivial computations are lazy.
  */
 export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
-  let text = input.text;
+  const text = input.text;
   const ast = input.ast;
-  // Detect BOM either via the explicit flag from the caller (ecma-
-  // language-plugin strips before parsing and threads the flag) OR
-  // via a leading 0xFEFF on the text itself (legacy / direct
-  // callers). When the BOM is still present we strip it here so
-  // `SourceCode.text` matches ESLint's contract (no leading BOM).
-  const hasBOM = input.hasBOM === true || text.charCodeAt(0) === 0xfeff;
-  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  // `text` is already normalized by the Go generation; a second leading
+  // U+FEFF is authored whitespace and must remain addressable by ranges.
+  const hasBOM = input.hasBOM === true;
 
   // Lazy state — instantiated on first access of the relevant API family.
   let _lso: number[] | null = null;
   let _tokens: Token[] | null = null;
+  let _tokenCache: Array<Token | undefined> | null = null;
   let _comments: Comment[] | null = null;
   let _scope: unknown = null;
   let _scopeInit = false;
@@ -480,6 +438,9 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
   // lifetime, so a single allocation suffices regardless of how many
   // rules call comment-aware token APIs (`getTokenBefore`, etc.).
   let _mergedStream: readonly Token[] | null = null;
+  // Nonnegative entries refer to code-token indices; negative entries refer
+  // to comments. This freezes merge order without constructing unseen tokens.
+  let _mergedIndices: number[] | null = null;
   // Cache for `text.split(LINE_TERMINATOR_RE)`. Matches ESLint v10
   // (`SourceCode#lines` is computed once in the constructor and shared).
   let _lines: string[] | null = null;
@@ -493,19 +454,41 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
 
   const ensureTokens = (): { tokens: Token[]; comments: Comment[] } => {
     if (_tokens == null) {
-      // Lazily rebuild Token[] from the native parser's columnar token stream;
+      // Lazily rebuild Token[] from the Go-projected columnar token stream;
       // value is sliced from the original `text`, loc is line/column from `getLso()`. A
       // SourceCode built without parser tokens simply has an empty token stream.
       const pt = input.parsedTokens;
-      _tokens = pt
-        ? buildTokens(pt.types, pt.starts, pt.ends, text, getLso())
-        : [];
+      if (pt && _tokenCache) {
+        const tokens = _tokenCache as Token[];
+        for (let i = 0; i < tokens.length; i++) {
+          tokens[i] =
+            tokens[i] ??
+            buildToken(pt.types[i], pt.starts[i], pt.ends[i], text, getLso());
+        }
+        _tokens = tokens;
+        _tokenCache = null;
+      } else {
+        _tokens = pt
+          ? buildTokens(pt.types, pt.starts, pt.ends, text, getLso())
+          : [];
+      }
+      if (_mergedIndices) {
+        const comments = ensureComments();
+        _mergedStream = comments.length
+          ? _mergedIndices.map((index) =>
+              index >= 0
+                ? _tokens![index]
+                : (comments[-index - 1] as unknown as Token),
+            )
+          : _tokens;
+        _mergedIndices = null;
+      }
     }
     return { tokens: _tokens, comments: ensureComments() };
   };
 
   /**
-   * Comments come from the native parser's compact comment list (`parsedComments`), built
+   * Comments come from the Go-projected compact comment list (`parsedComments`), built
    * into ESLint-shape `Comment[]` on first access (`getAllComments`, `applyDisableDirectives`,
    * rules like `ban-ts-comment`). When absent, the SourceCode simply has no comments.
    */
@@ -518,6 +501,80 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     return _comments ?? [];
   };
 
+  // Queries need offsets and their candidate tokens, not the entire object
+  // stream. Once exposed, a token's mutable range takes precedence over its
+  // columns. Full-stream APIs reuse every previously returned object.
+  const tokenCount = (): number =>
+    _tokens?.length ?? input.parsedTokens?.types.length ?? 0;
+  const tokenStart = (index: number): number => {
+    if (_tokens) return _tokens[index].range[0];
+    const token = _tokenCache?.[index];
+    return token ? token.range[0] : input.parsedTokens!.starts[index];
+  };
+  const tokenEnd = (index: number): number => {
+    if (_tokens) return _tokens[index].range[1];
+    const token = _tokenCache?.[index];
+    return token ? token.range[1] : input.parsedTokens!.ends[index];
+  };
+  const tokenAt = (index: number): Token => {
+    if (_tokens) return _tokens[index];
+    const cached = _tokenCache?.[index];
+    if (cached) return cached;
+    const pt = input.parsedTokens!;
+    const token = buildToken(
+      pt.types[index],
+      pt.starts[index],
+      pt.ends[index],
+      text,
+      getLso(),
+    );
+    (_tokenCache ??= new Array<Token | undefined>(pt.types.length))[index] =
+      token;
+    return token;
+  };
+  const mergedIndices = (): number[] => {
+    if (_mergedIndices) return _mergedIndices;
+    const comments = ensureComments();
+    const indices: number[] = [];
+    let i = 0,
+      j = 0;
+    while (i < tokenCount() && j < comments.length) {
+      if (tokenStart(i) <= comments[j].range[0]) indices.push(i++);
+      else indices.push(-++j);
+    }
+    while (i < tokenCount()) indices.push(i++);
+    while (j < comments.length) indices.push(-++j);
+    return (_mergedIndices = indices);
+  };
+  const streamCount = (include: boolean): number =>
+    include ? (_mergedStream?.length ?? mergedIndices().length) : tokenCount();
+  const streamStart = (index: number, include: boolean): number => {
+    if (!include) return tokenStart(index);
+    if (_mergedStream) return _mergedStream[index].range[0];
+    const entry = mergedIndices()[index];
+    return entry >= 0
+      ? tokenStart(entry)
+      : ensureComments()[-entry - 1].range[0];
+  };
+  const streamAt = (index: number, include: boolean): Token => {
+    if (!include) return tokenAt(index);
+    if (_mergedStream) return _mergedStream[index];
+    const entry = mergedIndices()[index];
+    return entry >= 0
+      ? tokenAt(entry)
+      : (ensureComments()[-entry - 1] as unknown as Token);
+  };
+  const tokenIndexAtOrAfter = (offset: number, include = false): number => {
+    let lo = 0,
+      hi = streamCount(include);
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (streamStart(mid, include) < offset) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo < streamCount(include) ? lo : -1;
+  };
+
   /**
    * Build a tokens-OR-tokens+comments stream sorted by `range[0]`.
    *
@@ -527,10 +584,11 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
    * Falls back to the tokens array as-is when comments aren't wanted,
    * avoiding the merge cost on the hot path.
    */
-  const streamFor = (include: boolean): readonly Token[] => {
+  const fullStreamFor = (include: boolean): readonly Token[] => {
     if (!include) return ensureTokens().tokens;
     if (_mergedStream != null) return _mergedStream;
     const { tokens, comments } = ensureTokens();
+    if (_mergedStream != null) return _mergedStream;
     if (comments.length === 0) {
       _mergedStream = tokens;
       return tokens;
@@ -549,6 +607,32 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     while (j < comments.length) merged.push(comments[j++] as unknown as Token);
     _mergedStream = merged;
     return merged;
+  };
+
+  // Private views keep query loops identical for sparse columns and public
+  // arrays. They expose no indexed properties or proxies to plugins.
+  const codeStream = {
+    get length(): number {
+      return streamCount(false);
+    },
+    at: (index: number): Token => streamAt(index, false),
+    indexAtOrAfter: (offset: number): number => tokenIndexAtOrAfter(offset),
+  };
+  const commentStream = {
+    get length(): number {
+      return streamCount(true);
+    },
+    at: (index: number): Token => streamAt(index, true),
+    indexAtOrAfter: (offset: number): number =>
+      tokenIndexAtOrAfter(offset, true),
+  };
+  const streamFor = (include: boolean): typeof codeStream => {
+    ensureComments();
+    if (include && _mergedStream == null) {
+      if (_tokens != null) fullStreamFor(true);
+      else mergedIndices();
+    }
+    return include ? commentStream : codeStream;
   };
 
   // Scope — lazy
@@ -601,10 +685,10 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     // with comments, sorted by `range[0]`. Reuses the lazy/cached `streamFor`
     // merge (same array `getTokens(..., {includeComments:true})` uses).
     get tokensAndComments(): readonly Token[] {
-      return streamFor(true);
+      return fullStreamFor(true);
     },
     // Full ESTree + TypeScript visitor-keys map (vendored from
-    // oxc-parser 0.133, drift-guarded against ESLint's keys; see
+    // canonical ESTree child order; see
     // `visitor-keys.ts`). The runner needs the TS-aware set because
     // plugin rules iterate `sourceCode.visitorKeys[node.type]` on .ts
     // files and expect to recurse into TSEnumDeclaration /
@@ -728,10 +812,9 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
           // on an offset inside a TS construct stopped at the wrapper
           // node instead of descending to the actual child.
           // Fall back to `getVisitorKeys` for types not in the static
-          // table — same convention as `listener-merge.ts:644` and
-          // `normalize-ast.ts:300`. The static table covers the common
+          // table, matching the listener traversal. The static table covers the common
           // case path; the helper handles parser-specific node types
-          // that may not be enumerated upfront (oxc-specific extensions,
+          // that may not be enumerated upfront (nonstandard nodes,
           // future TS additions). Pre-fix the bare `?? []` made the
           // walk stop at unknown nodes, mismatching the main visitor.
           const keys =
@@ -767,14 +850,14 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       // Binary-search the first token starting at/after `targetStart`;
       // the backward scan starts just before it. Only a token that
       // CONTAINS `targetStart` can still trip the range guard below.
-      const idxAfter = spanIndexStartingAtOrAfter(stream, targetStart);
+      const idxAfter = stream.indexAtOrAfter(targetStart);
       let skipped = 0;
       for (
         let i = idxAfter < 0 ? stream.length - 1 : idxAfter - 1;
         i >= 0;
         i--
       ) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[1] > targetStart) continue;
         if (filter && !filter(t)) continue;
         if (skipped < skip) {
@@ -791,11 +874,11 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const targetEnd = node.range[1];
       // Binary search guarantees every token from `start` on has
       // `range[0] >= targetEnd`, so no per-token range guard is needed.
-      const start = spanIndexStartingAtOrAfter(stream, targetEnd);
+      const start = stream.indexAtOrAfter(targetEnd);
       if (start < 0) return null;
       let skipped = 0;
       for (let i = start; i < stream.length; i++) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (filter && !filter(t)) continue;
         if (skipped < skip) {
           skipped++;
@@ -810,11 +893,11 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const stream = streamFor(includeComments);
       // Binary search to the first token starting inside the node's
       // range; from there every token has `range[0] >= node.range[0]`.
-      const start = spanIndexStartingAtOrAfter(stream, node.range[0]);
+      const start = stream.indexAtOrAfter(node.range[0]);
       if (start < 0) return null;
       let skipped = 0;
       for (let i = start; i < stream.length; i++) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[1] > node.range[1]) break;
         if (filter && !filter(t)) continue;
         if (skipped < skip) {
@@ -831,14 +914,14 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       // Binary-search the first token starting at/after the node's end;
       // the backward scan starts just before it. Only a token that
       // straddles `node.range[1]` can still trip the range guard below.
-      const idxAfter = spanIndexStartingAtOrAfter(stream, node.range[1]);
+      const idxAfter = stream.indexAtOrAfter(node.range[1]);
       let skipped = 0;
       for (
         let i = idxAfter < 0 ? stream.length - 1 : idxAfter - 1;
         i >= 0;
         i--
       ) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[1] > node.range[1]) continue;
         if (t.range[0] < node.range[0]) break;
         if (filter && !filter(t)) continue;
@@ -879,10 +962,10 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const out: Token[] = [];
       // Binary search to the node's start; stop once tokens begin at/after
       // the node's end (no non-empty token starting there can be contained).
-      const start = spanIndexStartingAtOrAfter(stream, node.range[0]);
+      const start = stream.indexAtOrAfter(node.range[0]);
       if (start < 0) return out;
       for (let i = start; i < stream.length; i++) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[0] >= node.range[1]) break;
         if (t.range[1] <= node.range[1]) {
           if (!filter || filter(t)) out.push(t);
@@ -907,10 +990,10 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       }
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const start = spanIndexStartingAtOrAfter(stream, left.range[1]);
+      const start = stream.indexAtOrAfter(left.range[1]);
       if (start < 0) return out;
       for (let i = start; i < stream.length; i++) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[0] >= right.range[0]) break;
         if (t.range[1] <= right.range[0]) {
           if (!filter || filter(t)) out.push(t);
@@ -926,11 +1009,11 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     getFirstTokenBetween(left, right, opts) {
       const { skip, filter, includeComments } = normalizeSkipOpts(opts);
       const stream = streamFor(includeComments);
-      const start = spanIndexStartingAtOrAfter(stream, left.range[1]);
+      const start = stream.indexAtOrAfter(left.range[1]);
       if (start < 0) return null;
       let matched = 0;
       for (let i = start; i < stream.length; i++) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[1] > right.range[0]) break;
         if (filter && !filter(t)) continue;
         if (matched++ < skip) continue;
@@ -942,10 +1025,10 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const start = spanIndexStartingAtOrAfter(stream, left.range[1]);
+      const start = stream.indexAtOrAfter(left.range[1]);
       if (start < 0) return out;
       for (let i = start; i < stream.length; i++) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[1] > right.range[0]) break;
         if (filter && !filter(t)) continue;
         // Check cap BEFORE push so count:0 returns [] (not [t]). count
@@ -961,10 +1044,10 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const stream = streamFor(includeComments);
       // Collect all candidates first, then walk from the end.
       const matches: Token[] = [];
-      const start = spanIndexStartingAtOrAfter(stream, left.range[1]);
+      const start = stream.indexAtOrAfter(left.range[1]);
       if (start < 0) return null;
       for (let i = start; i < stream.length; i++) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[1] > right.range[0]) break;
         if (filter && !filter(t)) continue;
         matches.push(t);
@@ -976,10 +1059,10 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const matches: Token[] = [];
-      const start = spanIndexStartingAtOrAfter(stream, left.range[1]);
+      const start = stream.indexAtOrAfter(left.range[1]);
       if (start < 0) return matches;
       for (let i = start; i < stream.length; i++) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[1] > right.range[0]) break;
         if (filter && !filter(t)) continue;
         matches.push(t);
@@ -991,10 +1074,10 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const start = spanIndexStartingAtOrAfter(stream, node.range[0]);
+      const start = stream.indexAtOrAfter(node.range[0]);
       if (start < 0) return out;
       for (let i = start; i < stream.length; i++) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[1] > node.range[1]) break;
         if (filter && !filter(t)) continue;
         // Check cap BEFORE push so count:0 returns [] (not [t]). count
@@ -1009,13 +1092,13 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const idxAfter = spanIndexStartingAtOrAfter(stream, node.range[1]);
+      const idxAfter = stream.indexAtOrAfter(node.range[1]);
       for (
         let i = idxAfter < 0 ? stream.length - 1 : idxAfter - 1;
         i >= 0;
         i--
       ) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[1] > node.range[1]) continue;
         if (t.range[0] < node.range[0]) break;
         if (filter && !filter(t)) continue;
@@ -1031,13 +1114,13 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const idxAfter = spanIndexStartingAtOrAfter(stream, node.range[0]);
+      const idxAfter = stream.indexAtOrAfter(node.range[0]);
       for (
         let i = idxAfter < 0 ? stream.length - 1 : idxAfter - 1;
         i >= 0;
         i--
       ) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (t.range[1] > node.range[0]) continue;
         if (filter && !filter(t)) continue;
         // Check cap BEFORE push so count:0 returns [] (not [t]). count
@@ -1052,10 +1135,10 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const start = spanIndexStartingAtOrAfter(stream, node.range[1]);
+      const start = stream.indexAtOrAfter(node.range[1]);
       if (start < 0) return out;
       for (let i = start; i < stream.length; i++) {
-        const t = stream[i];
+        const t = stream.at(i);
         if (filter && !filter(t)) continue;
         // Check cap BEFORE push so count:0 returns [] (not [t]). count
         // is Infinity when caller omits the cap, so omitted-opts paths
@@ -1076,9 +1159,9 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       // Stream is sorted by range[0]; binary search to the candidate
       // index, then verify exact match (range[0] could equal `start - 1`
       // if `start` lands in a gap).
-      const idx = spanIndexStartingAtOrAfter(stream, start);
+      const idx = stream.indexAtOrAfter(start);
       if (idx < 0) return null;
-      const t = stream[idx];
+      const t = stream.at(idx);
       return t.range[0] === start ? t : null;
     },
 
@@ -1104,14 +1187,14 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     // every declaration (`local/jsdoc-format` in the TypeScript repo, any
     // JSDoc-driven rule) was quadratic in a JSDoc-heavy file.
     getCommentsBefore(node) {
-      const { tokens, comments } = ensureTokens();
+      const comments = ensureComments();
       // tokens are sorted by range[0]. The nearest code token *before*
       // `node` sits at index `spanIndexStartingAtOrAfter(node.range[0]) - 1`
       // (or the last token if no token starts at/after node).
       let prevTokenEnd = 0;
-      const idxAfter = spanIndexStartingAtOrAfter(tokens, node.range[0]);
-      const prevIdx = idxAfter < 0 ? tokens.length - 1 : idxAfter - 1;
-      if (prevIdx >= 0) prevTokenEnd = tokens[prevIdx].range[1];
+      const idxAfter = tokenIndexAtOrAfter(node.range[0]);
+      const prevIdx = idxAfter < 0 ? tokenCount() - 1 : idxAfter - 1;
+      if (prevIdx >= 0) prevTokenEnd = tokenEnd(prevIdx);
       const out: Comment[] = [];
       const start = spanIndexStartingAtOrAfter(comments, prevTokenEnd);
       if (start < 0) return out;
@@ -1126,10 +1209,10 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       return out;
     },
     getCommentsAfter(node) {
-      const { tokens, comments } = ensureTokens();
+      const comments = ensureComments();
       // First code token whose start >= node.range[1] — binary search.
-      const idx = spanIndexStartingAtOrAfter(tokens, node.range[1]);
-      const nextTokenStart = idx < 0 ? text.length : tokens[idx].range[0];
+      const idx = tokenIndexAtOrAfter(node.range[1]);
+      const nextTokenStart = idx < 0 ? text.length : tokenStart(idx);
       const out: Comment[] = [];
       const start = spanIndexStartingAtOrAfter(comments, node.range[1]);
       if (start < 0) return out;
@@ -1141,7 +1224,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       return out;
     },
     getCommentsInside(node) {
-      const { comments } = ensureTokens();
+      const comments = ensureComments();
       const out: Comment[] = [];
       const start = spanIndexStartingAtOrAfter(comments, node.range[0]);
       if (start < 0) return out;
@@ -1160,7 +1243,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
 
     // ── spacing ──
     commentsExistBetween(left, right) {
-      const { comments } = ensureTokens();
+      const comments = ensureComments();
       // comments are sorted by range[0]. Binary search to the first
       // candidate, then O(1) check that it ends before `right`.
       const idx = spanIndexStartingAtOrAfter(comments, left.range[1]);
@@ -1204,20 +1287,20 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       // identity check works because streamFor reuses the live
       // token/comment objects without cloning (starts are unique, so a
       // stream member is found exactly at its own index).
-      let i = spanIndexStartingAtOrAfter(stream, startAnchor.range[0]);
-      if (i < 0 || stream[i] !== startAnchor) {
+      let i = stream.indexAtOrAfter(startAnchor.range[0]);
+      if (i < 0 || stream.at(i) !== startAnchor) {
         // Fallback: if the anchor isn't a tokenizer-emitted object
         // (e.g. the caller passed a raw Token literal we don't know
         // about), binary-search to the last token whose start < the
         // anchor's end — i.e. first index where range[0] >= anchor.end,
         // minus one.
-        const after = spanIndexStartingAtOrAfter(stream, startAnchor.range[1]);
+        const after = stream.indexAtOrAfter(startAnchor.range[1]);
         i = after < 0 ? stream.length - 1 : after - 1;
         if (i < 0) i = 0;
       }
       while (i + 1 < stream.length) {
-        const cur = stream[i];
-        const next = stream[i + 1];
+        const cur = stream.at(i);
+        const next = stream.at(i + 1);
         if (cur === endAnchor) break;
         // Positional stop, in case `endAnchor` is not a stream member (the
         // fallback branch above accepts a caller-built Token literal). The
@@ -1314,7 +1397,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       // `getInlineConfigNodes` to surface ALL directives (so users can
       // see "global foo" annotations alongside disables) only saw a
       // subset. Empirically pinned against ESLint v10.3.
-      const { comments } = ensureTokens();
+      const comments = ensureComments();
       // ESLint v10's `directivesPattern` requires the label to be
       // followed by whitespace or the end of the directive — bare
       // `startsWith` lets `eslint-disable-foo` look like a real

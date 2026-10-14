@@ -1,5 +1,5 @@
 /**
- * Differential token test (DESIGN §10): the native oxc token stream, rebuilt by
+ * Differential token test: the Go-projected token stream, rebuilt by
  * `token-builder` (the real path used by SourceCode), must match espree's `parse({tokens:true})`
  * tokens — the ESLint token contract rules consume — for `.js`/`.jsx`. This replaces the deleted
  * hand-written-tokenizer unit tests with a live oracle, so the contract is pinned against
@@ -9,10 +9,10 @@
  */
 import { describe, test, expect } from 'rstack/test';
 import * as espree from 'espree';
-import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
+import { projectSyntax } from '../../languages/js/project-frame.js';
 
-import { buildTokens } from '../../../src/eslint-plugin/source-code/token-builder.js';
-import { buildLineStartOffsets } from '../../../src/eslint-plugin/ast/normalize-ast.js';
+import { buildTokens } from '../../../src/languages/js/token-builder.js';
+import { buildLineStartOffsets } from '../../../src/languages/js/positions.js';
 
 type Lang = 'js' | 'cjs' | 'jsx';
 
@@ -29,10 +29,10 @@ function fmt(t: {
   return t.regex ? `${base}|re(${t.regex.pattern}/${t.regex.flags})` : base;
 }
 
-function oxcTokens(src: string, lang: Lang): string[] {
+function projectedTokens(src: string, lang: Lang): string[] {
   const jsx = lang === 'jsx';
   const st = lang === 'cjs' ? 'script' : 'module';
-  const p = nativeParse(jsx ? 't.jsx' : 't.js', src, st, jsx);
+  const p = projectSyntax(jsx ? 't.jsx' : 't.js', src, st);
   return buildTokens(
     p.tokenTypes,
     p.tokenStarts,
@@ -159,19 +159,19 @@ const JS_CASES: ReadonlyArray<readonly [string, string, Lang]> = [
   ['accented identifier', "const café = 'résumé'", 'js'],
 ];
 
-describe('token differential: oxc token stream == espree.parse tokens (.js/.jsx)', () => {
+describe('token differential: Go frame tokens == espree.parse tokens (.js/.jsx)', () => {
   for (const [label, src, lang] of JS_CASES) {
     test(label, () => {
-      expect(oxcTokens(src, lang)).toEqual(espreeTokens(src, lang));
+      expect(projectedTokens(src, lang)).toEqual(espreeTokens(src, lang));
     });
   }
 });
 
 // .ts: espree can't parse TypeScript. Hand-pinned `type:value` expectations, verified against
 // @typescript-eslint/typescript-estree during the M3 spike (keyword split + this + as-const).
-describe('token differential: oxc token types for TypeScript (.ts)', () => {
+describe('token differential: Go frame token types for TypeScript (.ts)', () => {
   function tsTokens(src: string): string[] {
-    const p = nativeParse('t.ts', src, 'module', false);
+    const p = projectSyntax('t.ts', src, 'module');
     return buildTokens(
       p.tokenTypes,
       p.tokenStarts,

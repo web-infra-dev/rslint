@@ -64,6 +64,7 @@
     "@rslint/api": "workspace:*",
     "@types/node": "catalog:",
     "@types/picomatch": "catalog:",
+    "@typescript-eslint/parser": "catalog:",
     "@typescript-eslint/scope-manager": "catalog:",
     "@typescript-eslint/visitor-keys": "catalog:",
     "@typescript/native-preview": "catalog:",

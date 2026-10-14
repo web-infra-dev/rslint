@@ -74,8 +74,8 @@ func JSXTextTokenValuesEqual(left, right string) bool {
 		return true
 	}
 
-	leftUnits := jsxTextCodeUnits{raw: left}
-	rightUnits := jsxTextCodeUnits{raw: right}
+	leftUnits := jsxTextCodeUnits{raw: left, foldCRLF: true}
+	rightUnits := jsxTextCodeUnits{raw: right, foldCRLF: true}
 	for {
 		leftUnit, leftOK := leftUnits.next()
 		rightUnit, rightOK := rightUnits.next()
@@ -92,6 +92,7 @@ func JSXTextTokenValuesEqual(left, right string) bool {
 }
 
 type jsxTextCodeUnits struct {
+	foldCRLF   bool
 	raw        string
 	pos        int
 	pending    uint16
@@ -123,7 +124,7 @@ func (it *jsxTextCodeUnits) next() (uint16, bool) {
 		it.pos++
 		return '&', true
 	case '\r':
-		if it.pos+1 < len(it.raw) && it.raw[it.pos+1] == '\n' {
+		if it.foldCRLF && it.pos+1 < len(it.raw) && it.raw[it.pos+1] == '\n' {
 			it.pos += 2
 			return '\n', true
 		}
@@ -189,4 +190,23 @@ func decodeJSXEntityValue(entity string) (first, second uint16, count int, ok bo
 	}
 	high, low := utf16.EncodeRune(decoded)
 	return uint16(high), uint16(low), 2, true
+}
+
+// DecodeJSXText exposes the value of a JSX text node, preserving UTF-16 units
+// and folding source CRLF in the same way as the JSX scanner.
+func DecodeJSXText(raw string) string { return decodeJSXValue(raw, true) }
+
+// DecodeJSXAttribute exposes a quoted JSX attribute's unquoted value.
+func DecodeJSXAttribute(raw string) string { return decodeJSXValue(raw, false) }
+func decodeJSXValue(raw string, fold bool) string {
+	iterator := jsxTextCodeUnits{raw: raw, foldCRLF: fold}
+	units := make([]uint16, 0, len(raw))
+	for {
+		unit, ok := iterator.next()
+		if !ok {
+			break
+		}
+		units = append(units, unit)
+	}
+	return StringFromCodeUnits(units)
 }

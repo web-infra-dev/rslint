@@ -1,13 +1,12 @@
 // cspell:ignore Ingvar Stepanyan
 /**
- * Decode JSX text / string-attribute values exactly as ESLint v10 does.
+ * Decode JSX text token values exactly as ESLint v10 does.
  *
  * ESLint's default parser (espree) lexes JSX through acorn-jsx, which
- * resolves character references while reading JSX text (`jsx_readText`)
- * and attribute strings (`jsx_readString`). The runner's native parser
- * (napi/oxc) leaves both `.value` and `.raw` as the verbatim source, so
- * the runner must reproduce acorn-jsx's decoding to make JSX node /
- * token `.value`s byte-identical to ESLint v10.
+ * resolves character references while reading JSX text (`jsx_readText`).
+ * Token values are rebuilt from raw frame source, so the token adapter
+ * applies the same decoding.
+ * AST values have already been decoded by Go and never pass through this helper.
  *
  * Ported (bug-for-bug) from acorn-jsx@5.3.2 `index.js`:
  *   - `jsx_readEntity`  → {@link readEntityAt} (named + numeric refs)
@@ -79,7 +78,7 @@ function readEntityAt(
 }
 
 /**
- * Decode the value of a JSX **text** node / token (the characters
+ * Decode the value of a JSX **text** token (the characters
  * between tags). Resolves character references AND normalizes a source
  * `\r\n` to `\n` — acorn-jsx `jsx_readText` runs `jsx_readNewLine(true)`
  * on line breaks. A lone `\r` (no following `\n`) is left as-is, and a
@@ -101,31 +100,6 @@ export function decodeJsxText(raw: string): string {
     } else if (ch === '\r' && raw[i + 1] === '\n') {
       out += '\n';
       i += 2;
-    } else {
-      out += ch;
-      i++;
-    }
-  }
-  return out;
-}
-
-/**
- * Decode the value of a JSX **string attribute** (`foo="…"`), given the
- * already-unquoted inner text. Resolves character references but does
- * NOT normalize line endings — acorn-jsx `jsx_readString` runs
- * `jsx_readNewLine(false)`, which preserves `\r\n` verbatim.
- */
-export function decodeJsxAttributeValue(raw: string): string {
-  if (!raw.includes('&')) return raw;
-  let out = '';
-  let i = 0;
-  const len = raw.length;
-  while (i < len) {
-    const ch = raw[i];
-    if (ch === '&') {
-      const { decoded, next } = readEntityAt(raw, i);
-      out += decoded;
-      i = next;
     } else {
       out += ch;
       i++;

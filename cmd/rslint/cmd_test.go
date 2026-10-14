@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1489,9 +1490,9 @@ func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
 			if code != 0 || len(request.Files) != 1 {
 				t.Fatalf("CLI plugin request failed: code=%d request=%+v stdout=%q stderr=%q", code, request, stdout, stderr)
 			}
-			text := request.Files[0].Text
-			if text == nil || *text != content {
-				t.Fatalf("frozen generation text = %v, want %q", text, content)
+			frame := request.Files[0].Frame
+			if len(frame) < 64 || string(frame[binary.LittleEndian.Uint32(frame[60:]):]) != strings.TrimPrefix(content, "\ufeff") {
+				t.Fatal("CLI frame did not freeze its filesystem generation")
 			}
 		})
 	}

@@ -17,13 +17,13 @@
  */
 import { describe, test, expect } from 'rstack/test';
 
-import { lintFile } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
+import { lintFile } from '../../eslint-plugin/project-frame.js';
 import type { LoadedPlugins } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
 import type { RuleContext } from '../../../src/eslint-plugin/linter/context.js';
 import {
   seedEcmaGlobals,
   seedGlobals,
-} from '../../../src/eslint-plugin/ast/scope-factory.js';
+} from '../../../src/languages/js/scope-factory.js';
 
 interface Probe {
   globalScopeType?: string;

@@ -1,10 +1,11 @@
 // Subprocess entry for process-isolated worker-pool scenarios.
 //
-// Forced termination of a worker containing the native parser can abort below
+// Forced termination of a worker containing native byte transport can abort below
 // JavaScript on Windows. This process confines that abort. The parent accepts
 // it only when the last durable journal record is emitted by a wrapper around
 // the real Worker.prototype.terminate call.
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -163,7 +164,10 @@ function captureTimeout(delayMs, action) {
 
 const localTask = (filePath, text, rule = 'local/no-null') => ({
   filePath,
-  text,
+  frame: execFileSync(process.env.RSLINT_ESTREE_PROJECTOR, {
+    input: JSON.stringify({ filePath, text, sourceType: 'module' }),
+    maxBuffer: 64 * 1024 * 1024,
+  }),
   rules: { [rule]: { options: [] } },
   collectFixes: false,
   suggestionsMode: 'off',

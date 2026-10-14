@@ -126,17 +126,12 @@ type TargetProjection struct {
 // third-party plugin work. WirePath is independent from TargetProjection.Path:
 // nil preserves the Program source path used by disk-backed plugin hosts,
 // while an overlay-backed host may project it to its public document identity.
-// HostReadsInitialText asserts that the external host can read the exact text
-// of this initial generation by wire path, allowing a joined observation to
-// omit inline text. Detached work and every non-initial in-memory generation
-// ignore this optimization and freeze every plugin target from the
-// generation's unified text view, so one observation never mixes post-fix
-// memory with stale disk. ConfigForFile and WirePath must be deterministic and
-// side-effect free for the lifetime of the generation.
+// Detached observations freeze ESTree before releasing the generation. Joined
+// observations project inside their plugin goroutine. ConfigForFile and WirePath
+// must be deterministic and side-effect free for the generation's lifetime.
 type PluginGeneration struct {
-	ConfigForFile        EslintPluginFileConfigResolver
-	WirePath             func(sourcePath string) string
-	HostReadsInitialText bool
+	ConfigForFile EslintPluginFileConfigResolver
+	WirePath      func(sourcePath string) string
 }
 
 // ArtifactDemand states which optional observation artifacts producers must

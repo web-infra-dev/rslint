@@ -24,7 +24,7 @@
  *   - **Listener throws on a node**
  *       caught inside the worker (ecma-language-plugin), surfaced in
  *       result.ruleErrors; not a pool concern.
- *   - **Parse / normalize fails for one file**
+ *   - **Frame decoding fails for one file**
  *       result.parseError set; lintBatch continues with other files.
  *   - **Per-task timeout (default 30s)**
  *       terminate the worker, respawn, mark only that task as plugin-lint-failed.
@@ -812,7 +812,7 @@ export class WorkerPool {
       // listener is re-thrown by Node as an UNCAUGHT exception that would
       // kill the host, so we listen and no-op. NOTE: this handles only the
       // JS-level pipe error; it is NOT the fix for the separate
-      // windows-latest *native* abort during terminate of an oxc-loaded
+      // windows-latest *native* abort during terminate of a native-loaded
       // worker (see the note on `terminateWorker`).
       const ignorePipeError = (): void => {
         /* best-effort log pipe; teardown errors are expected */
@@ -877,7 +877,7 @@ export class WorkerPool {
           // has already set the worker's `process.exitCode = 1` and
           // dropped its inbound listener, so the thread is winding itself
           // down. Calling `terminate()` on a worker that is concurrently
-          // tearing down its own native (oxc) bindings + piped stdio is a
+          // tearing down its own native byte transport + piped stdio is a
           // prime trigger for the windows-latest native abort. Reject
           // immediately (init failed; message preserved), let the worker
           // exit on its own, and fall back to terminate() only if it

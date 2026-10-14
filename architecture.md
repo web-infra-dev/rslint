@@ -118,6 +118,7 @@ The directory map below folds the high-level module relationships into the packa
 | `internal/inspector/`          | AST/type/symbol/signature/flow inspection for Playground                                                                       | Auxiliary backend used mainly by website Playground inspect panels; builds rich semantic data from `typescript-go` programs                                                                                                                                                                                                                                                                                                                                     |
 | `internal/program/`            | Immutable rslint Program facade and source-generation indexes                                                                  | Privately adapts project/compiler and root-parser hosts into one source, filesystem, syntax, optional checker, module-resolution, and module-reference contract. `Program.ModuleGraph()` and generation-scoped caches derive from that same authority; adapter identity is not observable by linter or rules                                                                                                                                                    |
 | `internal/program/loader/`     | Run-scoped Program construction and lint-target binding for CLI/API                                                            | Consumes target-owned lint plans, selects configured projects for matched targets in every CLI/API mode, binds targets by governing-config order and physical identity, and returns one backend-agnostic Program sequence plus its execution projection. Construction choices and ts-go compatibility details remain private; LSP wraps session-owned Programs directly and does not use this request-scoped loader                                             |
+| `internal/languages/js/estree/`      | JS-plugin-only ESTree projection and binary frame codec                                                                        | Projects a selected JS plugin target's existing Program SourceFile into independently owned bytes. Native traversal and Go rules keep their original AST and utilities. It imports syntax and ECMAScript helpers, and owns no Program generation, parser invocation, filesystem, configuration, scheduler, transport, checker, or rule policy.                                                                                              |
 | `internal/linter/`             | Unified lint pipeline, immutable lint plans, core engine, plugin dispatch, traversal, and bounded autofix lifecycle            | Owns `RunPipeline`: generation acquisition/release, exact `LintPlan` preparation, native/plugin scheduling, diagnostic aggregation, pure fix planning, all in-memory fix rounds, re-observation, and optional one-shot terminal change commit. It imports no config discovery, Program loader, persistence medium, output, API, or LSP protocol                                                                                                                 |
 | `internal/lsp/`                | Language Server Protocol implementation                                                                                        | Wraps `typescript-go project.Session`, owns transactional config discovery and last-good config state, and supplies document/speculative-generation plus progressive-presentation adapters to `internal/linter`; fix-all maps the core's final in-memory delta to one `TextEdit` and never mutates editor/session state while computing it                                                                                                                      |
 | `internal/rule/`               | Rule framework, immutable rule catalogs, configured-rule descriptors, context, diagnostics, fixes, and disable manager         | Defines catalog snapshots and exact object-form ESLint-plugin catalog derivation shared by entry points; `internal/linter` consumes its immutable rule environments, listeners, reporting APIs, and Program-derived cache helper                                                                                                                                                                                                                                |
@@ -129,6 +130,8 @@ The directory map below folds the high-level module relationships into the packa
 | `internal/plugins/import/`     | Import plugin rule implementations                                                                                             | Its `all.go` contributes rules to `internal/rules` and they participate in normal config-driven linting                                                                                                                                                                                                                                                                                                                                                         |
 | `internal/utils/`              | Shared utilities for JSONC, compiler hosts, invocation-scoped compiler construction, overlay VFS, and AST/type helpers         | Provides the low-level compiler-construction and snapshot services privately composed by `internal/program/loader`; command entry points do not coordinate compiler hosts or source generations directly. LSP, rule tests, and auxiliary entry points reuse lower-level compiler helpers. Source-generation module resolution belongs to `internal/program`                                                                                                     |
 | `packages/rslint/`             | Main npm package with JavaScript API and CLI wrapper                                                                           | Spawns `cmd/rslint --api` in JavaScript runtime environments and uses `internal/api` message shapes                                                                                                                                                                                                                                                                                                                                                             |
+| `packages/rslint/src/languages/js/`  | JavaScript/TypeScript ESTree operations for JS plugins                                                                         | Owns ESTree types, frame decoding/schema, positions, visitor keys, token reconstruction, JSX token decoding, built-in globals and scope analysis. It imports no plugin host, RuleContext, SourceCode, configuration loader, native binding or IPC implementation.                                                                                                                                                                           |
+| `packages/rslint/src/eslint-plugin/` | ESLint plugin SDK, rule execution and worker coordination                                                                      | Adapts final language data to SourceCode and RuleContext, diagnostics, directives and listeners. Host, protocol and WorkerPool coordinate requests without decoding ASTs. It depends on `languages/js`; language modules never depend on it.                                                                                                                                                                                                |
 | `packages/rslint-api/`         | Frontend-facing encoded source file / AST decoding helpers                                                                     | Used mainly by website Playground to decode AST/source data returned from the Go API                                                                                                                                                                                                                                                                                                                                                                            |
 | `packages/rslint-test-tools/`  | Testing utilities and cross-ecosystem rule tests                                                                               | Supports package-side and integration-style tests around the linter and rule ecosystem                                                                                                                                                                                                                                                                                                                                                                          |
 | `packages/rslint-wasm/`        | Browser/WASM package for running `rslint --api` in a worker                                                                    | Starts the browser worker, hosts the wasm runtime, and bridges website Playground requests through `internal/api` and `internal/api/server` to `internal/linter` and `internal/inspector`                                                                                                                                                                                                                                                                       |
@@ -1511,7 +1514,7 @@ and mutation sequencing do not.
 7. **Core Request**: CLI/API/LSP choose a sealed `RunPipeline` request kind and provide semantic adapters. They do not call `PrepareLintPlan`, `RunLinter`, plugin dispatch, or fix application as separate stages.
 8. **Rule Plan Preparation**: for each acquired generation, the core calls `PrepareLintPlan()` with one ordered Program sequence, its exact parallel target projection, and the generation's rule resolver. Planning never discovers, excludes, or scans for fallback targets; a target absent from its bound Program is an invariant error. The immutable result owns that Program sequence, freezes rare syntax diagnostics in a sparse plan-level projection, and keeps each hot per-file execution unit limited to its source, a shared prepared rule set, and checker capability. Prepared sets own eligibility, ordered native/plugin projections and rule-derived environments; execution consumes these views without filtering rules again. Syntax-error and zero-rule files remain selected, and the same non-empty file/rule projection feeds third-party plugin dispatch. Worker results are joined in stable Program/file order; cancellation cannot publish a partial plan, and callback panics return through the caller so the enclosing generation lifecycle remains exact-once.
 9. **Rule Execution**: the core invokes `RunLinter()` only with the prepared plan plus scheduling, diagnostic, timing, and optional program-wide type-check concerns. A nil plan explicitly skips lint for `--type-check-only`. Execution never recollects files, re-resolves rules, or accepts a second Program authority alongside a plan. Plans bind exact Program pointers, so every autofix re-observation constructs a fresh Program and plan over the current in-memory snapshot. When `--type-check` is enabled, Phase 2 schedules only Programs that expose complete program diagnostics.
-10. **Fix Rounds and Aggregation**: `RunPipeline` joins native/plugin results, projects stable target paths, computes whole-file changes, applies them to private memory, and reacquires a generation until stable or bounded. A file may move between Program generations when its import graph changes, but the target plan remains stable. CLI/API plugin inputs carry the exact generation text inline. CLI independently supplies a terminal committer and therefore touches disk only once after the last successful observation; API and LSP consume the returned memory delta without a committer. The CLI committer accepts only selected caller paths and uses their frozen canonical destinations for both fresh stale-content preflight and writes. Errors and confirmed paths retain caller spelling. Integrations retain only presentation policy for structured plugin notices, path conversion, and output/protocol mapping.
+10. **Fix Rounds and Aggregation**: `RunPipeline` joins native/plugin results, projects stable target paths, computes whole-file changes, applies them to private memory, and reacquires a generation until stable or bounded. A file may move between Program generations when its import graph changes, but the target plan remains stable. Every plugin frame uses that observation's exact Program syntax and source snapshot. Joined CLI/API work holds the generation lease through projection and plugin completion; detached LSP work freezes bytes and metadata before release. CLI independently supplies a terminal committer and therefore touches disk only once after the last successful observation; API and LSP consume the returned memory delta without a committer. The CLI committer accepts only selected caller paths and uses their frozen canonical destinations for both fresh stale-content preflight and writes. Errors and confirmed paths retain caller spelling. Integrations retain only presentation policy for structured plugin notices, path conversion, and output/protocol mapping.
 11. **Report Assembly**: the CLI's concrete, side-effect-free report projection validates final post-fix diagnostics and converts them from rule-domain values to output-owned values. It computes error/warning/type-error counts and one outcome from the same snapshot plus `--max-warnings`; the completed `Report` supplies that outcome to both status rendering and exit policy. Only the default format requests a `Summary` and immutable source snapshots for code frames. Before `RunPipeline`, the loader freezes roots from the actual type-capable Programs selected for the run, combines their identities with already-frozen lint-target identities, and immediately reduces them to the canonical-union file count consumed after execution. Machine formats consume projected positions, do not request root identities, and do not construct fake zero-valued summaries. `--quiet` filters rendering only.
 12. **Output Formatting**: after config/rule preflight and before Program/target work, the CLI asks `internal/output` to emit a default-format start line. A complete report ends with a mode-specific success/error status, while a post-start runtime failure uses a separate incomplete-run status. The package consumes only the completed presentation report and owns its text, format dispatch, and ANSI spans; the command owns lifecycle ordering and report/outcome assembly. JSON line, GitHub workflow command, and GitLab Code Quality formats remain diagnostics-only and never emit lifecycle text or ANSI styling.
 13. **Output Synchronization**: in the default IPC CLI, Go sends the rendered lifecycle start as an acknowledged `output` request; Node responds only after the real-stdout write callback completes, so post-start work cannot emit inherited stderr ahead of the start line. Remaining stdout text uses ordered, bounded `output` notifications for large diagnostic sets. Go then sends its terminal `shutdown` request. Node seals forwarding and waits for every remaining real-stdout write callback before acknowledging; only after Go receives that acknowledgement does it emit deferred stderr (currently the `--timing` table), so merged `2>&1` output cannot place the table before or inside the report.
@@ -1645,7 +1648,7 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    `@rslint/core/eslint-plugin` entry without evaluating it, then loads the private
    sibling `host.js`. Anchoring this path to the installed package preserves
    consumers that bundle the API into a different directory. This entry excludes the per-file lint runtime
-   and native parser, which load inside `lint-worker.js`. The existing
+   and frame decoder, which load inside `lint-worker.js`. The existing
    `eslint-plugin/index.js` entry retains the full exported runtime for direct
    callers and LSP consumers. Both entries bundle the same host implementation
    and resolve the sibling `lint-worker.js` relative to their module URL. The host
@@ -1665,11 +1668,81 @@ Node-to-Go attachments use the same text/binary contract inline.
 One logical request can use multiple memory slots. The channel packs complete
 attachments into the available storage, including attachments that span slots,
 without splitting the application request or merging application results.
-The linter retains its existing rule/config grouping and scheduling. Its
-`WithTextAttachments` wire projection only associates file text with attachment
-indices. CLI and capable native API hosts consume that projection; legacy API
-hosts and LSP retain inline file text. There is no separate plugin transport
-package or second plugin scheduler.
+The linter retains its rule/config grouping, splits lightweight inputs into
+32-file work items, and uses its existing bounded concurrency for both
+homogeneous and fragmented groups.
+Only files whose prepared lint plan contains enabled JS plugin rules enter
+`internal/languages/js/estree.Builder`. When plugins are absent, their rules
+are disabled or their targets do not match, the pipeline produces no ESTree
+frames or plugin attachments.
+The builder reads the acquired Program's concrete SourceFile without modifying
+its AST or invoking a second parser. Native Go rules continue to traverse the
+original ts-go AST. Each window exclusively borrows projection scratch and sends
+at most 32 files and 64 MiB of frame bytes. The scheduler supplies caller-owned
+output storage through `Builder.BuildInto`; the language encoder requests the
+exact final size and knows nothing about reuse or transport. Small frames share
+stable output blocks whose combined capacity is bounded; growth never copies
+completed frames or changes their views. Retained scratch and output capacity
+are each capped at 4 MiB per window (80 MiB combined with the usual ten dispatch slots).
+Frames that do not fit the remaining block capacity use independent storage.
+Before dispatch the scheduler drops frame references from result metadata,
+discards source references and oversized scratch buffers. The output blocks stay
+exclusively leased until the dispatcher returns, including error/cancellation,
+then enters the invocation-local cache. A dispatcher
+retaining bytes after return must copy them. The cache never owns Program
+references and cannot reuse an in-flight or lookahead frame. Already frozen LSP
+input frames retain independent ownership and never enter this output cache.
+Projection reuses the SourceFile's existing sparse position map and writes UTF-16
+strings without a temporary code-unit array. Empty wire lists share a single
+record, while each Node-side read still creates an independent mutable array.
+Token coverage uses a private, source-ordered scalar buffer; the scanner walks
+it alongside tokens, preserving the last cover at repeated source positions.
+After the transport copies frames into shared storage or encodes inline fallback,
+oversized original buffers can be collected while Node executes rules. Shared slots still
+require the existing reader release acknowledgement before reuse. A single
+prepared lookahead frame may wait for the next window; no whole-group
+frame cache is retained. Private pipeline input slots transfer their syntax
+references to the bounded projection windows and are cleared as consumed.
+Diagnostic metadata shares the native source's independent text frame for
+read-only observations, preserving exact source identity without retaining
+syntax. Fix planning retains the original diagnostic source until its existing
+text validation completes. Public dispatch helpers preserve caller-owned input
+slices. The Node host applies `--singleThreaded` to its worker count; reverse
+requests keep the existing bounded scheduler.
+Projection checks cancellation and a 64 MiB per-frame limit while generating
+nodes, strings, lists and tokens. Unsupported syntax fails explicitly rather
+than producing a generic node or an empty successful lint.
+The temporary token-cover index stores 32-bit byte offsets within this limit.
+It contains no AST pointers and is discarded when the builder resets.
+
+The frame contains the final ESTree schema, UTF-16 node/token/comment offsets,
+UTF-16 literal strings, numeric values, the BOM-stripped UTF-8 source, and an
+explicit original-BOM flag. A version and schema fingerprint reject mismatched
+Go/Node builds. Go preserves source ranges, authored modifiers and binding
+contexts while excluding compiler-created JSDoc syntax. SourceType, ecmaVersion,
+syntax-error admission, rule selection, reporting, disable directives and fix
+policy remain in their existing owners.
+
+The plugin SDK's SourceCode queries the owned token columns through private
+views. Individual and bounded queries construct only visited token objects;
+comments use their own projected data and token offsets. A per-file indexed
+cache preserves object identity and observes mutations of returned tokens.
+The merged token/comment order is cached as numeric indices until a complete
+array is requested. Program.tokens and SourceCode.tokensAndComments still
+expose ordinary arrays containing those same mutable objects; after exposure,
+queries observe the public arrays. These views retain no transport capability
+or original frame buffer. Token value/range/location construction remains in
+languages/js, while caching and ESLint query behavior belong to SourceCode.
+
+`WithFrameAttachments` associates each file with exactly one binary attachment.
+CLI and native API use it unconditionally; LSP serializes the same owned bytes
+inline as base64 through its existing JSON-RPC route. API protocol 4.0.0 requires
+matching peers, with no old text-input negotiation or parser fallback. Detached
+LSP continuations contain owned frames, diagnostic text and cloned JSON
+metadata, with no SourceFile, checker, mutable observer or native rule graph.
+The generation lease ends before worker execution. Joined CLI/API tasks finish
+within the original generation lease. There is no new transport package, AST
+cache, plugin scheduler or Program authority.
 
 Mapping descriptors, published batches and release acknowledgements belong to
 the transport envelope, never to plugin requests or results. The private pool
@@ -1686,12 +1759,11 @@ On Node, CLI and the resident API share `spawnIpcProcess` and `IpcClient` for
 process startup, framing, request matching and reverse-request dispatch. The
 API adapter owns only process lifetime, activity-based `ref`/`unref` and the
 projection from response envelopes to API payloads, retaining generic attachment
-context for inbound handlers. Native API sessions can negotiate the same memory
-transport as CLI sessions. The optional `pluginLintAttachments` application
-capability controls whether Go projects plugin file text into attachments;
-storage negotiation alone does not imply that an older plugin handler can
-interpret attachment indices. API request serialization and configuration
-generations remain in their application owners.
+context for inbound handlers. Native API sessions negotiate the same generic memory transport as CLI
+sessions. Reverse config/plugin capabilities describe application handlers;
+frame attachments are mandatory for plugin requests in this API version.
+API request serialization and configuration generations remain in their
+application owners.
 
 `IpcClient` has one terminal cleanup path for explicit close, input EOF/close,
 read errors and output errors/close/finish. It detaches its listeners, rejects
@@ -1734,9 +1806,10 @@ channel close; the control frame never resolves an application request. Both
 queues are bounded by occupied slots. Closing the session cancels the timer and
 discards pending reclamation; outstanding native readers still pin their mapping.
 The shared plugin host resolves file attachment indices before worker dispatch.
-Its wire request type carries `textAttachment` indices; a separate resolved
-request type carries inline text or private native capabilities. Task construction
-accepts only the resolved type, keeping native capabilities out of the wire model.
+Its wire request type carries an inline frame or `frameAttachment` index;
+the resolved type contains owned inline bytes or a private native capability.
+Task construction accepts only the resolved type. Each attachment must be
+binary, referenced once in order, and accompanied by no surplus attachments.
 
 Linux uses a sealed anonymous memory file, macOS an immediately unlinked POSIX
 shared-memory object, and Windows an anonymous pagefile mapping whose handle
@@ -1752,25 +1825,68 @@ fence between Go and Rust. The native reader holds a writable control view for
 atomic references and a separate read-only data view. `MemoryArena` registers
 all batches atomically. A `SharedBytes` capability addresses their logical byte
 space using a lease, offset and length; offsets count actual published bytes,
-not slot capacity. A reader pins both views for every batch. A range within one
-slot is borrowed directly; a range spanning slots is assembled in Rust before
-the consumer decodes it. The generic `readBytes` entry returns an independent,
-Node-owned Buffer: JavaScript writes cannot mutate a published snapshot, and
-Buffer lifetime does not delay slot reuse.
+not slot capacity. A reader pins both views for every batch. The generic `readBytes` entry pins those views and copies all requested
+chunks directly into one independent, Node-owned Buffer. JavaScript writes
+cannot mutate a published snapshot, and Buffer lifetime does not delay slot
+reuse. Rust contains no parser, ESTree schema, filename, BOM or plugin policy.
 
-The plugin parser is one consumer of this byte access. Its `parseSharedBytes`
-entry handles UTF-8/BOM normalization, parser size limits, ESTree parsing and
-direct construction of the required JavaScript SourceCode string. The memory
-module contains none of those policies; ESTree JSON is unchanged. Revocation
-removes the capability from the reader registry immediately. If any reader is
-still active, the arena retains the revoked lease and keeps all of its slots
-occupied. A release retry can succeed only after the last reader returns, and
-only once; old capabilities remain invalid after slot reuse. Reader completion
-restores capacity without restarting the IPC session. Native lease tracking
-contains no request IDs, timers, wire messages or worker scheduling policy.
-Worker termination may remain pending until synchronous native parsing returns.
-Both parser entries preserve N-API's pending exception or termination state
-during result conversion instead of trying to throw a second exception.
+JavaScript language data lives in `packages/rslint/src/languages/js`:
+ESTree types, the frame schema/decoder, source positions, visitor keys, token
+reconstruction, JSX token text decoding, built-in globals and scope analyzers.
+These modules consume syntax data and explicit language options; they import
+no ESLint plugin runtime, native binding, IPC, config loader or worker host.
+The dependency direction is `eslint-plugin → languages/js`. SourceCode and
+RuleContext adapt that data to the ESLint API; diagnostics use language position
+functions directly, rather than importing SourceCode or obtaining language
+helpers through RuleContext. The plugin host, attachment adapter and WorkerPool
+retain request routing, byte access and execution coordination. These language
+modules serve JS plugins; they do not replace the native Go AST model. Go's
+counterpart is `internal/languages/js/estree`, called only by the linter
+plugin dispatcher for selected plugin targets. It reads existing syntax helpers
+from `internal/utils`; native traversal and Go rules retain those helpers in
+their original module and never depend on `languages/js`. Projection owns only
+its output bytes, not the input AST. No language registry or provider abstraction
+is introduced.
+
+The worker TypeScript project includes the language modules. Library projects
+exclude them from file discovery, while public plugin entry points continue to
+export their types from the modules that own them. There are no old internal
+path forwarding modules.
+
+The worker checks cancellation before capability reads, validates the complete
+frame layout and references before allocating AST objects, then eagerly
+materializes ordinary ESTree objects, ranges, loc, canonical parent links and
+owned token columns. Schema-local constructors allocate each node's own present
+fields together; they retain schema constants only and preserve the ordinary
+Object prototype, mutable data properties and absent optional fields. String
+validation and decoding share one index, and decoding uses one temporary byte
+view for the string table instead of a Buffer wrapper per string. Tagged words
+use signed reads to avoid boxed unsigned magnitudes while preserving their tag
+and payload bits; a byte per list word indexes validated record boundaries.
+No input view
+survives materialization. BigInt and RegExp values are created in JavaScript. No
+mapped Buffer, lazy AST proxy or capability escapes to plugin code; plugins may
+retain any AST node or SourceCode after lint returns. Existing scope, listener,
+SourceCode, report and fix execution consumes this final tree.
+Listener dispatch uses one callback and a private reversed-ancestor buffer per
+traversal. The synchronous selector matcher borrows that buffer; rule callbacks
+receive only the ordinary AST node. Nested traversals have independent buffers,
+and no AST or traversal buffer enters the worker's selector compilation cache.
+Lazy scope resources capture language metadata and the owned AST, never the
+transport request. Retaining SourceCode therefore does not retain an inline
+frame Buffer or a shared-memory capability after decoding.
+The decoder rejects concurrently writable SharedArrayBuffer input and uses
+wire node IDs directly for tree validation and parent assignment. SourceCode's
+generic visitor fallback for caller-created nodes and its shebang comment API
+remain SDK behavior; framed production syntax accepts only the fixed schema.
+
+Revocation removes the capability from the reader registry immediately. Active
+readers keep the revoked lease and all its slots occupied. Reuse is acknowledged
+only after the last reader returns, and only once; old capabilities remain
+invalid after reuse. Worker termination may wait for a synchronous native byte
+copy. Native conversion preserves pending exception or termination state,
+without attempting a second exception. Native lease tracking contains no
+request IDs, timers, wire messages or scheduling policy.
 
 `internal/ipc/protocol.go` owns the storage settings: slot count, slot size,
 control-region size and publication stride. They travel to Node and Rust at
@@ -1789,8 +1905,8 @@ IPC. These value types live in `native/types.ts`, which has no Node dependencies
 browser and WASM protocol consumers do not import the Node binding loader.
 The loader and its Buffer-returning API stay in `native/binding.ts`.
 IPC owns the wire envelope and converts nullable native mapping
-fields at that boundary. Worker parser types therefore do not depend on the
-IPC protocol or its build inputs.
+fields at that boundary. Frame types and decoding do not depend on the
+IPC storage layout or its build inputs.
 
 Other invariants:
 

@@ -193,6 +193,57 @@ func TestPipelineRejectsMissingJoinedPluginDispatcher(t *testing.T) {
 	}
 }
 
+func TestPipelineNativeOnlySkipsPluginSourceMaterialization(t *testing.T) {
+	for _, mode := range []PluginExecution{PluginConcurrentJoined, PluginAfterNativeJoined} {
+		for _, registered := range []bool{false, true} {
+			t.Run(fmt.Sprintf("mode-%d/plugin-registered-%t", mode, registered), func(t *testing.T) {
+				root := tspath.NormalizePath(t.TempDir())
+				fileName := tspath.ResolvePath(root, "source.ts")
+				var originalStatement *ast.Node
+				nativeVisits := 0
+				generation := pipelineTestGeneration(t, root, fileName, "debugger;", []rule.ConfiguredRule{{
+					Name:     "native/check",
+					Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return rule.RuleListeners{ast.KindDebuggerStatement: func(node *ast.Node) {
+							nativeVisits++
+							if node != originalStatement {
+								t.Fatal("native traversal replaced the Program AST node")
+							}
+							ctx.ReportNode(node, rule.RuleMessage{Description: "native debugger"})
+						}}
+					},
+				}}, nil)
+				originalStatement = generation.Native.Programs[0].GetSourceFile(fileName).Statements.Nodes[0]
+				if registered {
+					generation.Plugin = &PluginGeneration{ConfigForFile: func(string) EslintPluginFileConfig {
+						t.Fatal("native-only target resolved plugin config")
+						return EslintPluginFileConfig{}
+					}}
+				}
+				generation.Target.ReadText = func(string, ast.SourceFileLike) (string, error) {
+					return "", errors.New("native-only lint must not materialize plugin source")
+				}
+				result, err := RunPipeline(context.Background(), NewLintRequest(
+					pipelineTestProvider(generation, nil),
+					ObservationPolicy{Plugin: mode},
+					nil,
+				))
+				if err != nil {
+					t.Fatal(err)
+				}
+				diagnostics, complete := result.Observation.CompleteDiagnostics()
+				if nativeVisits != 1 || !complete || len(diagnostics) != 1 || diagnostics[0].RuleName != "native/check" {
+					t.Fatalf("native visits/complete/diagnostics = %d/%t/%+v", nativeVisits, complete, diagnostics)
+				}
+				if len(result.PluginOutcomes()) != 0 {
+					t.Fatal("native-only lint dispatched plugin work")
+				}
+			})
+		}
+	}
+}
+
 func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	paths := []string{
@@ -239,7 +290,7 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 			Target: TargetProjection{ReadText: func(_ string, source ast.SourceFileLike) (string, error) {
 				return source.Text(), nil
 			}},
-			Plugin: &PluginGeneration{HostReadsInitialText: true},
+			Plugin: &PluginGeneration{},
 		}, nil, nil
 	})
 
@@ -259,13 +310,11 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 				dispatchValidationErr = fmt.Errorf("plugin files = %+v", request.Files)
 			}
 			for _, file := range request.Files {
-				if dispatches == 1 && file.Text != nil {
-					dispatchValidationErr = fmt.Errorf("initial disk-backed input %q was inlined", file.Path)
+				if dispatches == 1 && pluginFrameText(file.Frame) != initial[file.Path] {
+					dispatchValidationErr = errors.New("initial generation frame mismatch")
 				}
-				if dispatches == 2 {
-					if file.Text == nil || *file.Text != expectedSecond[file.Path] {
-						dispatchValidationErr = fmt.Errorf("memory-generation input = %+v", file)
-					}
+				if dispatches == 2 && pluginFrameText(file.Frame) != expectedSecond[file.Path] {
+					dispatchValidationErr = errors.New("memory-generation frame mismatch")
 				}
 			}
 			results := make([]EslintPluginFileResult, len(request.Files))

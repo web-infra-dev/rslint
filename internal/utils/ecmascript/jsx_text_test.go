@@ -2,7 +2,10 @@
 
 package ecmascript
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestJSXTextTokenValuesEqual(t *testing.T) {
 	t.Parallel()
@@ -66,5 +69,16 @@ func TestDecodeJSXEntities(t *testing.T) {
 				t.Errorf("DecodeJSXEntities(%q) = %q, want %q", tt.raw, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestProjectedJSXValuesPreserveCodeUnitsAndSourceNewlines(t *testing.T) {
+	raw := "&amp;amp;\r\n&#13;\n&#xD800;"
+	text := StringCodeUnits(DecodeJSXText(raw))
+	attribute := StringCodeUnits(DecodeJSXAttribute(raw))
+	wantText := []uint16{'&', 'a', 'm', 'p', ';', '\n', '\r', '\n', 0xd800}
+	wantAttribute := []uint16{'&', 'a', 'm', 'p', ';', '\r', '\n', '\r', '\n', 0xd800}
+	if !slices.Equal(text, wantText) || !slices.Equal(attribute, wantAttribute) {
+		t.Fatalf("JSX values = %x/%x", text, attribute)
 	}
 }
