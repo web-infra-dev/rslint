@@ -10,8 +10,6 @@ import {
 
 export default defineConfig([
   globalIgnores([
-    'node_modules/**',
-    '**/dist/**',
     'typescript-go/**',
 
     // Release CI artifacts (downloaded binaries + tsgo lib files copied
@@ -26,11 +24,6 @@ export default defineConfig([
 
     // VSCode extension test artifacts
     'packages/vscode-extension/__tests__/**',
-    'packages/vscode-extension/.vscode-test/**',
-
-    // Generated / build artifacts
-    'website/doc_build/**',
-    'website/generated/**',
 
     // Files that need special handling
     'packages/rslint-wasm/src/worker.ts',
@@ -69,32 +62,32 @@ export default defineConfig([
       },
     },
     rules: {
-      // --- Override recommended rules to warn ---
+      // Override recommended rules to warn
       '@typescript-eslint/no-explicit-any': 'warn',
-
-      // --- Additional rules not in recommended ---
-      '@typescript-eslint/non-nullable-type-assertion-style': 'error',
-      '@typescript-eslint/promise-function-async': 'error',
       '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/no-unsafe-return': 'warn',
-      '@typescript-eslint/return-await': 'error',
-      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      '@typescript-eslint/no-misused-promises': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
       '@typescript-eslint/no-unsafe-assignment': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      '@typescript-eslint/no-unsafe-return': 'warn',
+      '@typescript-eslint/require-await': 'warn',
+
+      // Additional rules
       '@typescript-eslint/no-confusing-void-expression': 'error',
-      '@typescript-eslint/no-unsafe-type-assertion': 'error',
-      '@typescript-eslint/no-var-requires': 'error',
+      '@typescript-eslint/no-dynamic-delete': 'error',
       '@typescript-eslint/no-empty-function': 'error',
       '@typescript-eslint/no-empty-interface': 'error',
-      '@typescript-eslint/no-misused-promises': 'warn',
-      '@typescript-eslint/require-await': 'warn',
+      '@typescript-eslint/no-non-null-assertion': 'warn',
+      '@typescript-eslint/no-unsafe-type-assertion': 'error',
+      '@typescript-eslint/no-var-requires': 'error',
+      '@typescript-eslint/non-nullable-type-assertion-style': 'error',
+      '@typescript-eslint/prefer-includes': 'error',
       '@typescript-eslint/prefer-readonly': 'error',
       '@typescript-eslint/prefer-readonly-parameter-types': 'warn',
-      '@typescript-eslint/no-non-null-assertion': 'warn',
-      '@typescript-eslint/no-dynamic-delete': 'error',
-      '@typescript-eslint/prefer-includes': 'error',
       '@typescript-eslint/prefer-regexp-exec': 'error',
       '@typescript-eslint/prefer-ts-expect-error': 'error',
+      '@typescript-eslint/promise-function-async': 'error',
+      '@typescript-eslint/return-await': 'error',
       '@typescript-eslint/switch-exhaustiveness-check': 'warn',
       '@typescript-eslint/unified-signatures': 'warn',
       'no-console': ['error', { allow: ['warn', 'error'] }],
