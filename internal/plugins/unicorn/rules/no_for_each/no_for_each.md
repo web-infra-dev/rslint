@@ -66,6 +66,11 @@ than the original callback. Safe defaults in two-parameter callbacks are retaine
 for (const [index, element = 1] of [undefined].entries()) use(element, index);
 ```
 
+Rslint also withholds the edit when the callback declares a `var` binding.
+Removing the function boundary would hoist that binding into the surrounding
+scope, where it could conflict with an outer `let` or `const` declaration or
+leak state between iterations. A `var` inside a nested function is unaffected.
+
 ## Further reading
 
 - [Upstream documentation](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v77.0.0/docs/rules/no-for-each.md)

@@ -371,10 +371,18 @@ func parametersSafeForFix(
 	// with every declaration in that function scope collected in `defs`.
 	// Moving the callback parameter into a for-of binding is unsafe whenever
 	// any of those variables has merged/repeated definitions (notably a sloppy
-	// mode `var` redeclaration of a parameter).
+	// mode `var` redeclaration of a parameter). A callback-local `var` is also
+	// unsafe: removing the function boundary hoists it into the surrounding
+	// scope, where it can conflict with lexical declarations or leak state.
 	for _, declarations := range callbackScope.ByName {
 		if len(declarations) != 1 {
 			return false
+		}
+		if declarations[0].Kind == scope.DefVariable {
+			declarationList := ast.FindAncestorKind(declarations[0].DefNode, ast.KindVariableDeclarationList)
+			if declarationList != nil && utils.IsVarKeyword(declarationList) {
+				return false
+			}
 		}
 	}
 
