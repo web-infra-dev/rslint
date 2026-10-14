@@ -1,0 +1,34 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "devDependencies": {
+          "type": ["boolean", "array"]
+        },
+        "optionalDependencies": {
+          "type": ["boolean", "array"]
+        },
+        "peerDependencies": {
+          "type": ["boolean", "array"]
+        },
+        "bundledDependencies": {
+          "type": ["boolean", "array"]
+        },
+        "packageDir": {
+          "type": ["string", "array"]
+        },
+        "includeInternal": {
+          "type": ["boolean"]
+        },
+        "includeTypes": {
+          "type": ["boolean"]
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

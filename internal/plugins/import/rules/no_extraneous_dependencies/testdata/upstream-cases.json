@@ -1,0 +1,1505 @@
+[
+  {
+    "name": "no-extraneous-dependencies",
+    "valid": [
+      {
+        "code": "import \"@org/package\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo, { bar } from \"@org/package\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "require(\"@org/package\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var foo = require(\"@org/package\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export { foo } from \"@org/package\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export * from \"@org/package\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"esm-package\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo, { bar } from \"esm-package\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "require(\"esm-package\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var foo = require(\"esm-package\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export { foo } from \"esm-package\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export * from \"esm-package\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"jquery\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo, { bar } from \"jquery\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "require(\"jquery\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var foo = require(\"jquery\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export { foo } from \"jquery\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export * from \"jquery\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"lodash.cond\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo, { bar } from \"lodash.cond\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "require(\"lodash.cond\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var foo = require(\"lodash.cond\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export { foo } from \"lodash.cond\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export * from \"lodash.cond\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"find-up\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo, { bar } from \"find-up\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "require(\"find-up\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var foo = require(\"find-up\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export { foo } from \"find-up\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export * from \"find-up\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"rxjs\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo, { bar } from \"rxjs\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "require(\"rxjs\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var foo = require(\"rxjs\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export { foo } from \"rxjs\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export * from \"rxjs\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"glob\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo, { bar } from \"glob\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "require(\"glob\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var foo = require(\"glob\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export { foo } from \"glob\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export * from \"glob\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"eslint\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo, { bar } from \"eslint\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "require(\"eslint\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var foo = require(\"eslint\")",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export { foo } from \"eslint\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export * from \"eslint\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"eslint/lib/api\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"fs\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"./foo\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"electron\"",
+        "settings": {
+          "import/core-modules": ["electron"]
+        },
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"eslint\"",
+        "options": [
+          {
+            "peerDependencies": true
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"importType\"",
+        "settings": {
+          "import/resolver": {
+            "node": {
+              "paths": ["/fixture/tests/files"]
+            }
+          }
+        },
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import chai from \"chai\"",
+        "options": [
+          {
+            "devDependencies": ["*.spec.js"]
+          }
+        ],
+        "fileName": "foo.spec.js"
+      },
+      {
+        "code": "import chai from \"chai\"",
+        "options": [
+          {
+            "devDependencies": ["*.spec.js"]
+          }
+        ],
+        "fileName": "foo.spec.js"
+      },
+      {
+        "code": "import chai from \"chai\"",
+        "options": [
+          {
+            "devDependencies": ["*.test.js", "*.spec.js"]
+          }
+        ],
+        "fileName": "foo.spec.js"
+      },
+      {
+        "code": "require(6)",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"doctrine\"",
+        "options": [
+          {
+            "packageDir": "/fixture/"
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import type MyType from \"myflowtyped\";",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/with-flow-typed"
+          }
+        ],
+        "fileName": "tests/files/foo.ts"
+      },
+      {
+        "code": "\n        // @flow\n        import typeof TypeScriptModule from 'typescript';\n      ",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/with-flow-typed"
+          }
+        ],
+        "fileName": "tests/files/foo.ts",
+        "skip": true,
+        "skipReason": "Flow typeof syntax or executable webpack resolver is not supported by the native runtime."
+      },
+      {
+        "code": "import react from \"react\";",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/monorepo/packages/nested-package"
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import leftpad from \"left-pad\";",
+        "options": [
+          {
+            "packageDir": [
+              "/fixture/tests/files/monorepo/packages/nested-package",
+              "/fixture/tests/files/monorepo"
+            ]
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import leftpad from \"left-pad\";",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/monorepo"
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import leftpad from \"left-pad\";",
+        "options": [
+          {
+            "packageDir": [
+              "/fixture/tests/files/empty-folder",
+              "/fixture/tests/files/monorepo"
+            ]
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import leftpad from \"left-pad\";",
+        "options": [
+          {
+            "packageDir": [
+              "/fixture/tests/files/monorepo",
+              "/fixture/tests/files/empty-folder"
+            ]
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import react from \"react\";",
+        "options": [
+          {
+            "packageDir": [
+              "/fixture/tests/files/monorepo",
+              "/fixture/tests/files/monorepo/packages/nested-package"
+            ]
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import leftpad from \"left-pad\";",
+        "options": [
+          {
+            "packageDir": [
+              "/fixture/tests/files/monorepo",
+              "/fixture/tests/files/monorepo/packages/nested-package"
+            ]
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import rightpad from \"right-pad\";",
+        "options": [
+          {
+            "packageDir": [
+              "/fixture/tests/files/monorepo",
+              "/fixture/tests/files/monorepo/packages/nested-package"
+            ]
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo from \"@generated/foo\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo from \"@generated/foo\"",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/bundled-dependencies/as-array-bundle-deps"
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo from \"@generated/foo\"",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/bundled-dependencies/as-object"
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo from \"@generated/foo\"",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/bundled-dependencies/race-condition"
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export function getToken() {}",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export class Component extends React.Component {}",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export function Component() {}",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export const Component = () => {}",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"not-a-dependency\"",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/monorepo"
+          }
+        ],
+        "settings": {
+          "import/core-modules": ["not-a-dependency"]
+        },
+        "fileName": "tests/files/monorepo/foo.js"
+      },
+      {
+        "code": "import \"@generated/bar/module\"",
+        "settings": {
+          "import/core-modules": ["@generated/bar"]
+        },
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"@generated/bar/and/sub/path\"",
+        "settings": {
+          "import/core-modules": ["@generated/bar"]
+        },
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"rxjs/operators\"",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"esm-package/esm-module\";",
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "\n        import \"alias/esm-package/esm-module\";\n        import 'expose-loader?exposes[]=$&exposes[]=jQuery!jquery';\n      ",
+        "settings": {
+          "import/resolver": "webpack"
+        },
+        "fileName": "tests/files/foo.js",
+        "skip": true,
+        "skipReason": "Flow typeof syntax or executable webpack resolver is not supported by the native runtime."
+      },
+      {
+        "code": "import \"@custom-internal-alias/api/service\";",
+        "settings": {
+          "import/resolver": {
+            "webpack": {
+              "config": {
+                "resolve": {
+                  "alias": {
+                    "@custom-internal-alias": "/fixture/tests/files/internal-modules"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "fileName": "tests/files/foo.js",
+        "skip": true,
+        "skipReason": "Flow typeof syntax or executable webpack resolver is not supported by the native runtime."
+      }
+    ],
+    "invalid": [
+      {
+        "code": "import \"not-a-dependency\"",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/monorepo"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 26
+          }
+        ],
+        "fileName": "tests/files/monorepo/foo.js"
+      },
+      {
+        "code": "import \"not-a-dependency\"",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/monorepo"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 26
+          }
+        ],
+        "fileName": "tests/files/monorepo/packages/nested-package/foo.js"
+      },
+      {
+        "code": "import \"not-a-dependency\"",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/monorepo"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 26
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"not-a-dependency\"",
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 26
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var donthaveit = require(\"@org/not-a-dependency\")",
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'@org/not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S @org/not-a-dependency' to add it",
+            "line": 1,
+            "column": 18,
+            "endLine": 1,
+            "endColumn": 50
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var donthaveit = require(\"@org/not-a-dependency/foo\")",
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'@org/not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S @org/not-a-dependency' to add it",
+            "line": 1,
+            "column": 18,
+            "endLine": 1,
+            "endColumn": 54
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"eslint\"",
+        "options": [
+          {
+            "devDependencies": false,
+            "peerDependencies": false
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'eslint' should be listed in the project's dependencies, not devDependencies.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 16
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"lodash.isarray\"",
+        "options": [
+          {
+            "optionalDependencies": false
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'lodash.isarray' should be listed in the project's dependencies, not optionalDependencies.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 24
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var foo = require(\"not-a-dependency\")",
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 11,
+            "endLine": 1,
+            "endColumn": 38
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "var glob = require(\"glob\")",
+        "options": [
+          {
+            "devDependencies": false
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'glob' should be listed in the project's dependencies, not devDependencies.",
+            "line": 1,
+            "column": 12,
+            "endLine": 1,
+            "endColumn": 27
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import chai from \"chai\"",
+        "options": [
+          {
+            "devDependencies": ["*.test.js"]
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'chai' should be listed in the project's dependencies, not devDependencies.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 24
+          }
+        ],
+        "fileName": "foo.tes.js"
+      },
+      {
+        "code": "import chai from \"chai\"",
+        "options": [
+          {
+            "devDependencies": ["*.test.js"]
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'chai' should be listed in the project's dependencies, not devDependencies.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 24
+          }
+        ],
+        "fileName": "foo.tes.js"
+      },
+      {
+        "code": "import chai from \"chai\"",
+        "options": [
+          {
+            "devDependencies": ["*.test.js", "*.spec.js"]
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'chai' should be listed in the project's dependencies, not devDependencies.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 24
+          }
+        ],
+        "fileName": "foo.tes.js"
+      },
+      {
+        "code": "import chai from \"chai\"",
+        "options": [
+          {
+            "devDependencies": ["*.test.js", "*.spec.js"]
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'chai' should be listed in the project's dependencies, not devDependencies.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 24
+          }
+        ],
+        "fileName": "foo.tes.js"
+      },
+      {
+        "code": "var eslint = require(\"lodash.isarray\")",
+        "options": [
+          {
+            "optionalDependencies": false
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'lodash.isarray' should be listed in the project's dependencies, not optionalDependencies.",
+            "line": 1,
+            "column": 14,
+            "endLine": 1,
+            "endColumn": 39
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"not-a-dependency\"",
+        "options": [
+          {
+            "packageDir": "/fixture/"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 26
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"bar\"",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/src/rules/doesn-exist/"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "The package.json file could not be found.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 1
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo from \"foo\"",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/with-syntax-error"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "The package.json file could not be parsed: invalid character '{' looking for beginning of object key string",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 1
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import leftpad from \"left-pad\";",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/monorepo/packages/nested-package"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'left-pad' should be listed in the project's dependencies. Run 'npm i -S left-pad' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 32
+          }
+        ],
+        "fileName": "tests/files/monorepo/packages/nested-package/foo.js"
+      },
+      {
+        "code": "import react from \"react\";",
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'react' should be listed in the project's dependencies. Run 'npm i -S react' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 27
+          }
+        ],
+        "fileName": "tests/files/monorepo/foo.js"
+      },
+      {
+        "code": "import react from \"react\";",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/monorepo"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'react' should be listed in the project's dependencies. Run 'npm i -S react' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 27
+          }
+        ],
+        "fileName": "tests/files/monorepo/packages/nested-package/foo.js"
+      },
+      {
+        "code": "import \"react\";",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/empty"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'react' should be listed in the project's dependencies. Run 'npm i -S react' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 16
+          }
+        ],
+        "fileName": "tests/files/empty/index.js"
+      },
+      {
+        "code": "import bar from \"@generated/bar\"",
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'@generated/bar' should be listed in the project's dependencies. Run 'npm i -S @generated/bar' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 33
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import foo from \"@generated/foo\"",
+        "options": [
+          {
+            "bundledDependencies": false
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'@generated/foo' should be listed in the project's dependencies. Run 'npm i -S @generated/foo' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 33
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import bar from \"@generated/bar\"",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/bundled-dependencies/race-condition"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'@generated/bar' should be listed in the project's dependencies. Run 'npm i -S @generated/bar' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 33
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export { foo } from \"not-a-dependency\";",
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 40
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "export * from \"not-a-dependency\";",
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 34
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import chai from \"alias/chai\";",
+        "settings": {
+          "import/resolver": "webpack"
+        },
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'chai' should be listed in the project's dependencies. Run 'npm i -S chai' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 31
+          }
+        ],
+        "fileName": "tests/files/foo.js",
+        "skip": true,
+        "skipReason": "Flow typeof syntax or executable webpack resolver is not supported by the native runtime."
+      },
+      {
+        "code": "import \"esm-package-not-in-pkg-json/esm-module\";",
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'esm-package-not-in-pkg-json' should be listed in the project's dependencies. Run 'npm i -S esm-package-not-in-pkg-json' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 49
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import \"not-a-dependency\"",
+        "settings": {
+          "import/resolver": {
+            "node": {
+              "paths": ["/fixture/tests/files"]
+            }
+          },
+          "import/internal-regex": "^not-a-dependency.*"
+        },
+        "options": [
+          {
+            "includeInternal": true
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 26
+          }
+        ],
+        "fileName": "tests/files/foo.js"
+      }
+    ]
+  },
+  {
+    "name": "no-extraneous-dependencies",
+    "valid": [
+      {
+        "code": "import type T from \"a\";",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/with-typescript-dev-dependencies",
+            "devDependencies": false
+          }
+        ],
+        "settings": {
+          "import/parsers": {
+            "typescript": [".ts"]
+          },
+          "import/resolver": ["node", "typescript"]
+        },
+        "fileName": "tests/files/foo.ts"
+      },
+      {
+        "code": "import type { T } from \"a\"; export type { T };",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/with-typescript-dev-dependencies",
+            "devDependencies": false
+          }
+        ],
+        "settings": {
+          "import/parsers": {
+            "typescript": [".ts"]
+          },
+          "import/resolver": ["node", "typescript"]
+        },
+        "fileName": "tests/files/foo.ts"
+      },
+      {
+        "code": "export type { T } from \"a\";",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/with-typescript-dev-dependencies",
+            "devDependencies": false
+          }
+        ],
+        "settings": {
+          "import/parsers": {
+            "typescript": [".ts"]
+          },
+          "import/resolver": ["node", "typescript"]
+        },
+        "fileName": "tests/files/foo.ts"
+      }
+    ],
+    "invalid": [
+      {
+        "code": "import T from \"a\";",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/with-typescript-dev-dependencies",
+            "devDependencies": false
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'a' should be listed in the project's dependencies, not devDependencies.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 19
+          }
+        ],
+        "settings": {
+          "import/parsers": {
+            "typescript": [".ts"]
+          },
+          "import/resolver": ["node", "typescript"]
+        },
+        "fileName": "tests/files/foo.js"
+      },
+      {
+        "code": "import type T from \"a\";",
+        "options": [
+          {
+            "packageDir": "/fixture/tests/files/with-typescript-dev-dependencies",
+            "devDependencies": false,
+            "includeTypes": true
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'a' should be listed in the project's dependencies, not devDependencies.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 24
+          }
+        ],
+        "settings": {
+          "import/parsers": {
+            "typescript": [".ts"]
+          },
+          "import/resolver": ["node", "typescript"]
+        },
+        "fileName": "tests/files/foo.ts"
+      }
+    ]
+  },
+  {
+    "name": "no-extraneous-dependencies typescript type imports",
+    "valid": [
+      {
+        "code": "import type MyType from \"not-a-dependency\";",
+        "fileName": "tests/files/no-unused-modules/typescript/file-ts-a.ts"
+      },
+      {
+        "code": "import type { MyType } from \"not-a-dependency\";",
+        "fileName": "tests/files/no-unused-modules/typescript/file-ts-a.ts"
+      },
+      {
+        "code": "import { type MyType } from \"not-a-dependency\";",
+        "fileName": "tests/files/no-unused-modules/typescript/file-ts-a.ts"
+      },
+      {
+        "code": "import { type MyType, type OtherType } from \"not-a-dependency\";",
+        "fileName": "tests/files/no-unused-modules/typescript/file-ts-a.ts"
+      }
+    ],
+    "invalid": [
+      {
+        "code": "import type { MyType } from \"not-a-dependency\";",
+        "options": [
+          {
+            "includeTypes": true
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 48
+          }
+        ],
+        "fileName": "tests/files/no-unused-modules/typescript/file-ts-a.ts"
+      },
+      {
+        "code": "import type { Foo } from 'not-a-dependency';",
+        "options": [
+          {
+            "includeTypes": true
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 45
+          }
+        ],
+        "fileName": "tests/files/no-unused-modules/typescript/file-ts-a.ts"
+      },
+      {
+        "code": "import Foo, { type MyType } from \"not-a-dependency\";",
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 53
+          }
+        ],
+        "fileName": "tests/files/no-unused-modules/typescript/file-ts-a.ts"
+      },
+      {
+        "code": "import { type MyType, Foo } from \"not-a-dependency\";",
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'not-a-dependency' should be listed in the project's dependencies. Run 'npm i -S not-a-dependency' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 53
+          }
+        ],
+        "fileName": "tests/files/no-unused-modules/typescript/file-ts-a.ts"
+      }
+    ]
+  },
+  {
+    "name": "documentation examples (pinned implementation behavior)",
+    "valid": [
+      {
+        "code": "var path = require('path');",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ]
+      },
+      {
+        "code": "var foo = require('./foo');",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ]
+      },
+      {
+        "code": "import test from 'ava';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ]
+      },
+      {
+        "code": "import find from 'lodash.find';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ]
+      },
+      {
+        "code": "import isArray from 'lodash.isarray';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ]
+      },
+      {
+        "code": "import foo from '\"@generated/foo\"';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ]
+      },
+      {
+        "code": "import type { MyType } from 'foo';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ]
+      },
+      {
+        "code": "import react from 'react';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ]
+      },
+      {
+        "code": "import foo from './foo';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ]
+      },
+      {
+        "code": "import react from 'react';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ]
+      },
+      {
+        "code": "import foo from './foo';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs",
+            "includeInternal": true
+          }
+        ]
+      },
+      {
+        "code": "var foo = require('./foo');",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs",
+            "includeInternal": true
+          }
+        ]
+      },
+      {
+        "code": "import foo from '\"@generated/foo\"';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs",
+            "bundledDependencies": false
+          }
+        ]
+      },
+      {
+        "code": "var foo = require('\"@generated/foo\"');",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs",
+            "bundledDependencies": false
+          }
+        ]
+      }
+    ],
+    "invalid": [
+      {
+        "code": "var _ = require('lodash');",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'lodash' should be listed in the project's dependencies. Run 'npm i -S lodash' to add it",
+            "line": 1,
+            "column": 9,
+            "endLine": 1,
+            "endColumn": 26
+          }
+        ]
+      },
+      {
+        "code": "import _ from 'lodash';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs"
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'lodash' should be listed in the project's dependencies. Run 'npm i -S lodash' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 24
+          }
+        ]
+      },
+      {
+        "code": "import test from 'ava';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs",
+            "devDependencies": false
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'ava' should be listed in the project's dependencies, not devDependencies.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 24
+          }
+        ]
+      },
+      {
+        "code": "var test = require('ava');",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs",
+            "devDependencies": false
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'ava' should be listed in the project's dependencies, not devDependencies.",
+            "line": 1,
+            "column": 12,
+            "endLine": 1,
+            "endColumn": 26
+          }
+        ]
+      },
+      {
+        "code": "import isArray from 'lodash.isarray';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs",
+            "optionalDependencies": false
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'lodash.isarray' should be listed in the project's dependencies, not optionalDependencies.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 38
+          }
+        ]
+      },
+      {
+        "code": "var isArray = require('lodash.isarray');",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs",
+            "optionalDependencies": false
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'lodash.isarray' should be listed in the project's dependencies, not optionalDependencies.",
+            "line": 1,
+            "column": 15,
+            "endLine": 1,
+            "endColumn": 40
+          }
+        ]
+      },
+      {
+        "code": "import type { MyType } from 'foo';",
+        "fileName": "docs/example.ts",
+        "options": [
+          {
+            "packageDir": "/fixture/docs",
+            "includeTypes": true
+          }
+        ],
+        "errors": [
+          {
+            "messageId": "",
+            "message": "'foo' should be listed in the project's dependencies. Run 'npm i -S foo' to add it",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 35
+          }
+        ]
+      }
+    ]
+  }
+]
