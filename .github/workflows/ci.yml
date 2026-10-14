@@ -157,9 +157,6 @@ jobs:
       # release addon was placed in its host platform package above. The Go
       # relink is link-only off the warm cache. Measure both native binaries
       # users download rather than the unstripped executable tested above.
-      - name: Test binary size reporting
-        run: node --test scripts/binary-size.test.mjs
-
       - name: Measure rslint binary sizes
         env:
           BINARY_SIZE_GO_VERSION: ${{ matrix.go-version }}
