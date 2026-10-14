@@ -35,7 +35,9 @@ func packageRoot(t *testing.T) rule_tester.Root {
 	return root
 }
 
-func packageCase(file, code, literal, imported, proposed string, options any) rule_tester.InvalidTestCase {
+// The final string records the upstream replacement; Rslint deliberately
+// does not apply that replacement automatically.
+func packageCase(file, code, literal, imported, _ string, options any) rule_tester.InvalidTestCase {
 	start := strings.Index(code, literal)
 	if start < 0 {
 		panic("missing literal")
@@ -47,8 +49,8 @@ func packageCase(file, code, literal, imported, proposed string, options any) ru
 	line, column := position(start)
 	endLine, endColumn := position(start + len(literal))
 	return rule_tester.InvalidTestCase{FileName: file, Code: code, Options: options,
-		Errors: []rule_tester.InvalidTestCaseError{{MessageId: "", Message: fmt.Sprintf("Relative import from another package is not allowed. Use `%s` instead of `%s`", proposed, imported), Line: line, Column: column, EndLine: endLine, EndColumn: endColumn}},
-		Output: []string{strings.Replace(code, literal, fmt.Sprintf("%q", proposed), 1)},
+		Errors: []rule_tester.InvalidTestCaseError{{MessageId: "", Message: fmt.Sprintf("Relative import from another package is not allowed. Use a package import instead of `%s`", imported), Line: line, Column: column, EndLine: endLine, EndColumn: endColumn}},
+		Output: nil, // Intentional safety difference: never autofix these upstream cases.
 	}
 }
 

@@ -2,17 +2,23 @@ package utils
 
 import (
 	"maps"
+	"path"
 	"slices"
+	"strings"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
 type importResolver struct {
-	name    string
-	options moduleresolver.Options
+	name          string
+	options       moduleresolver.Options
+	defaultConfig bool
 }
 
 // ImportResolver adapts import/resolver settings to existing resolution
@@ -32,7 +38,7 @@ func NewImportResolver(ctx rule.RuleContext) *ImportResolver {
 		raw = map[string]any{"node": ctx.Settings["import/resolve"]}
 	}
 	set := func(name string, config map[string]any) {
-		entry := importResolver{name: name}
+		entry := importResolver{name: name, defaultConfig: len(config) == 0}
 		if name == "node" || name == "eslint-import-resolver-node" {
 			entry.options = nodeResolveOptions(ctx, config)
 		}
@@ -150,4 +156,111 @@ func nodeResolveOptions(ctx rule.RuleContext, config map[string]any) moduleresol
 		opts.Modules = append(opts.Modules, tspath.ResolvePath(cwd, path))
 	}
 	return opts
+}
+
+// EquivalentNodeCandidate verifies a plain JavaScript request under default
+// Node resolution, independently of the legacy import resolver's exports-blind
+// lookup. Unknown runtime policy is a reason to omit a suggestion, not to guess.
+func (r *ImportResolver) EquivalentNodeCandidate(source modules.Source, candidate, packageRoot string) bool {
+	if len(r.resolvers) != 1 || !r.resolvers[0].defaultConfig || len(r.core) != 0 {
+		return false
+	}
+	switch r.resolvers[0].name {
+	case "node", "eslint-import-resolver-node":
+	default:
+		return false
+	}
+	// A configured legacy resolver is also outside the default Node contract.
+	if legacy := r.ctx.Settings["import/resolve"]; legacy != nil {
+		config, ok := legacy.(map[string]any)
+		if !ok || len(config) != 0 {
+			return false
+		}
+	}
+	switch path.Ext(r.ctx.SourceFile.FileName()) {
+	case ".js", ".cjs", ".mjs":
+	default:
+		return false
+	}
+	if source.TypeOnly() || source.Kind() == modules.ModuleReferenceAMD || source.Attributes().State != modules.AttributesNone {
+		return false
+	}
+	imported := source.Specifier().Text()
+	if strings.ContainsAny(imported+candidate, `\%?#`) {
+		return false
+	}
+	// Do not select a conditional or fallback export without the project's
+	// runtime conditions. Flat string targets (including patterns) are verified
+	// by the existing resolver; this does not invert exports into guessed aliases.
+	pkg := packagejson.Read(r.ctx.Program(), packageRoot)
+	if pkg == nil || !plainExports(pkg.Field("exports")) {
+		return false
+	}
+	require := source.Kind() == modules.ModuleReferenceRequire
+	if !require && path.Ext(r.ctx.SourceFile.FileName()) == ".cjs" {
+		return false
+	}
+	if require {
+		// tsgo can mark .cjs as an external module with a synthetic SourceFile
+		// indicator. Only authored ESM syntax excludes Node's ordinary require.
+		if path.Ext(r.ctx.SourceFile.FileName()) == ".mjs" || r.ctx.SourceFile.ExternalModuleIndicator != nil && r.ctx.SourceFile.ExternalModuleIndicator.Kind != ast.KindSourceFile {
+			return false
+		}
+		if path.Ext(r.ctx.SourceFile.FileName()) == ".js" {
+			owner := packagejson.FindNearest(r.ctx.Program(), r.ctx.SourceFile.FileName())
+			if owner != nil && owner.Field("type") == "module" {
+				return false
+			}
+		}
+		callee := utils.ESTreeCallCallee(source.Declaration().AsCallExpression().Expression)
+		if r.ctx.Refs.ResolveInFile(callee) != nil {
+			return false
+		}
+	}
+	condition := "import"
+	if require {
+		condition = "require"
+	}
+	options := moduleresolver.Options{
+		Extensions: []string{".js", ".json", ".node"},
+		Conditions: []string{"node", condition},
+		MainFields: []moduleresolver.MainField{{Name: []string{"main"}, ForceRelative: true}},
+		MainFiles:  []string{"index"}, NodeExports: true,
+		FullySpecified: !require, NoDirectory: !require, LiteralPaths: require,
+	}
+	// Default Node resolves relative to the real importer directory and
+	// canonicalizes symlinks. Do not compare two merely equal lexical spellings.
+	fileName := r.ctx.SourceFile.FileName()
+	directory := r.ctx.Program().FS().Realpath(tspath.GetDirectoryPath(fileName))
+	fileName = tspath.ResolvePath(directory, tspath.GetBaseFileName(fileName))
+	original := moduleresolver.Resolve(r.ctx.Program(), imported, fileName, options)
+	if original.Error != "" || original.Path == "" || original.ResourceSuffix != "" {
+		return false
+	}
+	switch path.Ext(original.Path) {
+	case ".js", ".cjs", ".mjs":
+	default:
+		return false
+	}
+	proposed := moduleresolver.Resolve(r.ctx.Program(), candidate, fileName, options)
+	return proposed.Error == "" && proposed.Path == original.Path && proposed.ResourceSuffix == ""
+}
+
+func plainExports(value any) bool {
+	switch exports := value.(type) {
+	case nil, string:
+		return true
+	case map[string]any:
+		for subpath, target := range exports {
+			if subpath != "." && !strings.HasPrefix(subpath, "./") {
+				return false
+			}
+			if _, ok := target.(string); !ok {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }

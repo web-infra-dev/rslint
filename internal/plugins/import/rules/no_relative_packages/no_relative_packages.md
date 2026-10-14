@@ -26,9 +26,21 @@ An optional object accepts:
 
 ## Autofix
 
-Replace the source literal with a double-quoted package import, preserving the written basename and target's subdirectory as upstream does. Scoped package names are supported.
+This rule does not provide automatic fixes. Running `--fix` leaves these imports unchanged.
+
+## Suggestions
+
+A manual suggestion can replace the relative path with a package import when both requests resolve to the same JavaScript file under default Node resolution. The check respects package entry points, public `exports` entries, the import or require mode, and default symlink resolution. The package name must resolve to the original package rather than a different installed copy.
+
+The candidate preserves the written request within the package. For example, `../b/sub` can suggest `b/sub`, and `../b` can suggest `b`, even when the entry is `dist/entry.js`. These suggestions appear only after the same-file check succeeds.
+
+Suggestions are limited to `.js`, `.cjs`, and `.mjs` inputs and targets. They are omitted for TypeScript, AMD, shadowed `require`, configured resolvers, import attributes, URL-like paths, conditional exports, or fallback export arrays. Public export aliases are not inferred: if `b/api` exposes `hidden.js` but `b/hidden.js` is private, choose the public entry manually.
+
+Suggestions assume default Node runtime behavior. Projects using custom conditions, symlink flags, or a bundler should review the suggested change against their own resolution settings.
 
 ## Differences from upstream
+
+Upstream v2.32.0 offers unconditional autofixes based on the resolved file directory and the written basename. This can duplicate directory names, lose a package's `main` entry semantics, mistake a file named like its package directory for the package root, turn `..` into `.`, or select a private or different exports target. Rslint intentionally offers no autofix and only verified manual suggestions. Its diagnostic names the original import without promising an unverified replacement path.
 
 Native resolution supports the Node and TypeScript resolvers. Custom JavaScript resolver plugins cannot execute in the native runtime and produce a resolve error. Configure `import/resolver` as `node` or `typescript`.
 

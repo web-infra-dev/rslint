@@ -59,20 +59,30 @@ var NoRelativePackagesRule = rule.Rule{
 			if importName == "" || contextName == "" || importName == contextName {
 				return
 			}
-			properPath, err := filepath.Rel(importRoot, resolved)
-			if err != nil {
-				return
-			}
-			base := filepath.Base(imported)
-			if base == filepath.Base(importRoot) {
-				base = ""
-			}
-			properImport := filepath.Join(importName, filepath.Dir(properPath), base)
-			ctx.ReportNodeWithDeferredFixes(source.Specifier(), rule.RuleMessage{Description: fmt.Sprintf(
-				"Relative import from another package is not allowed. Use `%s` instead of `%s`", properImport, imported,
-			)}, func() []rule.RuleFix {
-				quoted := utils.Must(core.StringifyJson(strings.ReplaceAll(properImport, `\`, "/"), "", ""))
-				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source.Specifier(), quoted)}
+
+			ctx.ReportNodeWithDeferredSuggestions(source.Specifier(), rule.RuleMessage{
+				Description: fmt.Sprintf("Relative import from another package is not allowed. Use a package import instead of `%s`", imported),
+			}, func() []rule.RuleSuggestion {
+				// Preserve the authored request's path within the named package, not
+				// the resolved entry's directory plus its original basename. This keeps
+				// directory requests, root main entries and file/root name collisions distinct.
+				requested := tspath.ResolvePath(tspath.GetDirectoryPath(ctx.SourceFile.FileName()), imported)
+				relative, err := filepath.Rel(importRoot, requested)
+				if err != nil || relative == ".." || strings.HasPrefix(filepath.ToSlash(relative), "../") {
+					return nil
+				}
+				candidate := importName
+				if relative != "." {
+					candidate += "/" + filepath.ToSlash(relative)
+				}
+				if !resolver.EquivalentNodeCandidate(source, candidate, importRoot) {
+					return nil
+				}
+				quoted := utils.Must(core.StringifyJson(candidate, "", ""))
+				return []rule.RuleSuggestion{{
+					Message:  rule.RuleMessage{Id: "usePackageImport", Description: fmt.Sprintf("Replace with package import `%s`", candidate)},
+					FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, source.Specifier(), quoted)},
+				}}
 			})
 		}, visitorOptions)
 	},
