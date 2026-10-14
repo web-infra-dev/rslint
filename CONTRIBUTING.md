@@ -53,7 +53,7 @@ The existing pre-commit hook runs `rs staged`. Install it through `pnpm run prep
 
 ## Ecosystem CI
 
-Pushes to `main` and same-repository `chore/release-*` PRs run [ecosystem CI](https://github.com/rstackjs/rstack-ecosystem-ci) against Rsbuild, Rslib, and Rstest. To test another PR, run **Ecosystem CI** from `main` in GitHub Actions, enter the PR number, and select a suite or `-` for all three. Results are posted to the PR.
+[Ecosystem CI](https://github.com/rstackjs/rstack-ecosystem-ci) tests Rslint against Rsbuild, Rslib, and Rstest for source or build changes on `main` and same-repository `chore/release-*` PRs. To test another PR, run **Ecosystem CI** from `main` in GitHub Actions, enter the PR number, and select a suite or `-` for all three. Results are posted to the PR.
 
 ## TypeScript compiler dependency
 

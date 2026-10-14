@@ -4,6 +4,29 @@ name: Ecosystem CI
 on:
   push:
     branches: [main]
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'shim/**'
+      - 'crates/**'
+      - 'packages/**'
+      - 'npm/rslint/**'
+      - 'typescript-go'
+      - 'scripts/place-host-build.mjs'
+      - 'tools/dump_rule_schemas/**'
+      - 'package.json'
+      - 'pnpm-*.yaml'
+      - 'go.*'
+      - 'Cargo.*'
+      - 'tsconfig.json'
+      - 'tsconfig.base.json'
+      - 'tsconfig.build.json'
+      - '.gitmodules'
+      - '.github/workflows/ecosystem-ci.yml'
+      - '!**/*.md'
+      - '!**/*.mdx'
+      - '!**/*_test.go'
+      - '!**/tests/**'
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
