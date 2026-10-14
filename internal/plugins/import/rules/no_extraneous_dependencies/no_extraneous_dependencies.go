@@ -64,7 +64,9 @@ var NoExtraneousDependenciesRule = rule.Rule{
 			if !found || resolved == "" {
 				return
 			}
-			external := settings.IsExternalModule(ctx, name, resolved)
+			// importType classifies resolved paths before checking lexical package
+			// names. IsExternalModule adds a different leading-character filter.
+			external := settings.IsExternalResolvedImport(ctx, name, resolved)
 			// importType calls a bare, resolved alias internal after excluding builtin,
 			// absolute and relative spellings. includeInternal does not include siblings.
 			internal := settings.IsInternalSpecifier(name) || !tspath.IsExternalModuleNameRelative(name) && !tspath.IsRootedDiskPath(name) && !external
