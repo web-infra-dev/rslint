@@ -9,6 +9,7 @@ import (
 )
 
 func TestNoInternalModulesExtras(t *testing.T) {
+	const failedPartPattern = "{plugin2/*,@(api|lib)!(test).@(js|ts)}"
 	runInternalTests(t, []rule_tester.ValidTestCase{
 		// Empty forbid.
 		{Code: "import \"./plugin2/internal\"", Options: []any{map[string]any{"forbid": []any{}}}},
@@ -20,6 +21,8 @@ func TestNoInternalModulesExtras(t *testing.T) {
 		{Code: "import \"./plugin2/internal\"", Options: []any{map[string]any{"allow": []any{"/plugin2/internal"}}}},
 		// dot and parent segment normalization.
 		{Code: "import \"./plugin2/../plugin2//./internal\"", Options: []any{map[string]any{"allow": []any{"plugin2/internal"}}}},
+		// A failed regexp alternative does not disable a valid brace alternative.
+		{Code: "import \"./plugin2/internal\"", Options: []any{map[string]any{"allow": []any{failedPartPattern}}}},
 		// dotfile wildcard excludes a dot.
 		{Code: "import \"./plugin2/.private\"", Options: []any{map[string]any{"forbid": []any{"plugin2/*"}}}},
 		// builtin and absolute types excluded.
@@ -48,6 +51,8 @@ func TestNoInternalModulesExtras(t *testing.T) {
 		{Code: "import \"./plugin2/internal\"", Options: []any{map[string]any{"forbid": []any{"!plugin2/app/*"}}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Reaching to \"./plugin2/internal\" is not allowed.", Line: 1, Column: 8, EndLine: 1, EndColumn: 28}}},
 		// brace and extglob patterns.
 		{Code: "import \"./plugin2/internal\"", Options: []any{map[string]any{"forbid": []any{"plugin{1,2}/@(internal|other)"}}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Reaching to \"./plugin2/internal\" is not allowed.", Line: 1, Column: 8, EndLine: 1, EndColumn: 28}}},
+		// A failed regexp alternative does not disable a valid brace alternative.
+		{Code: "import \"./plugin2/internal\"", Options: []any{map[string]any{"forbid": []any{failedPartPattern}}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Reaching to \"./plugin2/internal\" is not allowed.", Line: 1, Column: 8, EndLine: 1, EndColumn: 28}}},
 		// dotfile explicit pattern.
 		{Code: "import \"./plugin2/.private\"", Options: []any{map[string]any{"forbid": []any{"plugin2/.*"}}}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Reaching to \"./plugin2/.private\" is not allowed.", Line: 1, Column: 8, EndLine: 1, EndColumn: 28}}},
 		// internal regex takes precedence over builtin type.

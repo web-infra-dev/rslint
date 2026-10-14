@@ -61,6 +61,7 @@ func TestMakeRe(t *testing.T) {
 		{"x", "a/x", minimatch3.Options{MatchBase: true}, false},
 		{"!x", "x", minimatch3.Options{FlipNegate: true}, false},
 		{"a/?(b)", "a/(b)", minimatch3.Options{NoExt: true}, false},
+		{"{plugin2/*,@(api|lib)!(test).@(js|ts)}", "plugin2/internal", minimatch3.Options{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.pattern+"/"+tt.path, func(t *testing.T) {

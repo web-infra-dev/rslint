@@ -292,8 +292,11 @@ func (m *Matcher) parsePart(pattern string) (patternPart, bool) {
 
 	re, err := regexp2.Compile("^"+endAnchors(source)+`\z`, regexp2.None)
 	if err != nil {
-		// An invalid regular expression can't match anything.
+		// An invalid regular expression can't match anything through Match.
+		// Upstream returns /$./ without an _src field here, so makeRe joins
+		// this part as an empty source instead of recompiling the invalid one.
 		re = neverMatches
+		source = ""
 	}
 	return patternPart{re: boundMatching(re), source: source}, true
 }
