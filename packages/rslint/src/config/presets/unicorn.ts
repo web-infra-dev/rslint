@@ -53,7 +53,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/iteration-fallback-style': 'off', // not implemented
     // 'unicorn/logical-assignment-operators': 'error', // not implemented
     'unicorn/max-nested-calls': 'error',
-    // 'unicorn/name-replacements': 'error', // not implemented
+    'unicorn/name-replacements': 'error',
     'unicorn/new-for-builtins': 'error',
     // 'unicorn/no-abusive-eslint-disable': 'error', // not implemented
     // 'unicorn/no-accessor-recursion': 'error', // not implemented

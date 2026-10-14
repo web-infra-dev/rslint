@@ -1,0 +1,3614 @@
+[
+  {
+    "kind": "javascript",
+    "cases": {
+      "testerOptions": {
+        "languageOptions": {
+          "globals": {
+            "document": "readonly",
+            "event": "readonly",
+            "Response": "readonly"
+          }
+        }
+      },
+      "valid": [
+        "let x",
+        "({x: 1})",
+        "({x() {}})",
+        "({[err]() {}})",
+        "let error",
+        "const {error} = {}",
+        "({error: 1})",
+        "({[err]: 1})",
+        "error => {}",
+        "({error}) => ({error})",
+        "httpError => {}",
+        "({httpError}) => ({httpError})",
+        "(function (error) {})",
+        "(function ({error}) {})",
+        "function f(x) {}",
+        "function f({x: y}) {}",
+        "(class {})",
+        "(class C {})",
+        "class C {}",
+        "const i18n = new I18n({ locales: [\"en\", \"fr\"] })",
+        "const i18nData = {}",
+        "const l10n = new L10n()",
+        "const e2e = 1",
+        "const e2eTests = []",
+        "const a11y = {}",
+        "const iOS = true",
+        "const jQueryEvent = true",
+        "(class {\n\terror() {}\n})",
+        "(class {\n\t[err]() {}\n})",
+        "class C {\n\tx() {}\n}",
+        "foo.error",
+        "foo.x",
+        "let E",
+        "let ESLint",
+        "let isJPEG",
+        "let NODE_ENV",
+        "let id",
+        "let url",
+        "let cwd",
+        "let regex",
+        "let min",
+        "let max",
+        "let repository",
+        "let repositoryUrl",
+        "({err: 1})",
+        "({e: 1})",
+        "this.e = 1",
+        "({e() {}})",
+        "(class {e() {}})",
+        "this.eResDir = 1",
+        "this.err = 1",
+        "({err() {}})",
+        "(class {err() {}})",
+        "this.errCbOptsObj = 1",
+        "this.successCb = 1",
+        "this.btnColor = 1",
+        "({evt: 1})",
+        "foo.evt = 1",
+        "const foo = {\n\terr() {}\n};",
+        "foo.err = 1",
+        "foo.bar.err = 1",
+        "class C {\n\terr() {}\n}",
+        "this._err = 1",
+        "this.__err__ = 1",
+        "this.e_ = 1",
+        "({Err: 1})",
+        "({Res: 1})",
+        "Foo.customProps = {}",
+        "class Foo {\n\tstatic getDerivedContextFromProps() {}\n}",
+        "foo.err",
+        "foo.err()",
+        "foo.bar.err",
+        "foo.err.bar",
+        "this.err",
+        "({err: error}) => error",
+        "const {err: httpError} = {}",
+        "console.log(err)",
+        "({\"err\": 1})",
+        "let c",
+        {
+          "code": "var c",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "code": "class cb {}",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "code": "function e() {}",
+          "options": [
+            {
+              "replacements": {
+                "e": false,
+                "c": {
+                  "custom": true
+                },
+                "cb": {
+                  "callback": false,
+                  "circuitBreacker": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "code": "let err",
+          "options": [
+            {
+              "checkVariables": false
+            }
+          ]
+        },
+        {
+          "code": "({__proto__: null})",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "code": "const propTypes = 2;const err = 2;",
+          "options": [
+            {
+              "allowList": {
+                "err": true
+              },
+              "extendDefaultAllowList": true
+            }
+          ]
+        },
+        {
+          "code": "let arr",
+          "options": [
+            {
+              "replacements": {
+                "arr": {
+                  "array": false
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "code": "let e",
+          "errors": [
+            {
+              "message": "Please rename the variable `e`. Suggested names are: `error`, `event_`. A more descriptive name will do too.",
+              "suggestions": [
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "error"
+                  },
+                  "output": "let error"
+                },
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "event_"
+                  },
+                  "output": "let event_"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "let eCbOpts",
+          "errors": [
+            {
+              "message": "Please rename the variable `eCbOpts`. Suggested names are: `errorCallbackOptions`, `eventCallbackOptions`. A more descriptive name will do too.",
+              "suggestions": [
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "errorCallbackOptions"
+                  },
+                  "output": "let errorCallbackOptions"
+                },
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "eventCallbackOptions"
+                  },
+                  "output": "let eventCallbackOptions"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "({e: 1})",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "Please rename the property `e`. Suggested names are: `error`, `event`. A more descriptive name will do too.",
+              "suggestions": [
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "error"
+                  },
+                  "output": "({error: 1})"
+                },
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "event"
+                  },
+                  "output": "({event: 1})"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "this.e = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "Please rename the property `e`. Suggested names are: `error`, `event`. A more descriptive name will do too.",
+              "suggestions": [
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "error"
+                  },
+                  "output": "this.error = 1"
+                },
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "event"
+                  },
+                  "output": "this.event = 1"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "({e() {}})",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "Please rename the property `e`. Suggested names are: `error`, `event`. A more descriptive name will do too.",
+              "suggestions": 2
+            }
+          ]
+        },
+        {
+          "code": "(class {e() {}})",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "Please rename the property `e`. Suggested names are: `error`, `event`. A more descriptive name will do too.",
+              "suggestions": 2
+            }
+          ]
+        },
+        {
+          "code": "this.eResDir = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "Please rename the property `eResDir`. Suggested names are: `errorResourceDirection`, `errorResourceDirectory`, `errorResponseDirection`, ... (9 more omitted). A more descriptive name will do too.",
+              "suggestions": 3
+            }
+          ]
+        },
+        {
+          "code": "const foo = 1;",
+          "options": [
+            {
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "foo": {
+                  "name0": true,
+                  "name1": true,
+                  "name2": true,
+                  "name3": true,
+                  "name4": true,
+                  "name5": true,
+                  "name6": true,
+                  "name7": true,
+                  "name8": true,
+                  "name9": true,
+                  "name10": true,
+                  "name11": true,
+                  "name12": true,
+                  "name13": true,
+                  "name14": true,
+                  "name15": true,
+                  "name16": true,
+                  "name17": true,
+                  "name18": true,
+                  "name19": true,
+                  "name20": true,
+                  "name21": true,
+                  "name22": true,
+                  "name23": true,
+                  "name24": true,
+                  "name25": true,
+                  "name26": true,
+                  "name27": true,
+                  "name28": true,
+                  "name29": true,
+                  "name30": true,
+                  "name31": true,
+                  "name32": true,
+                  "name33": true,
+                  "name34": true,
+                  "name35": true,
+                  "name36": true,
+                  "name37": true,
+                  "name38": true,
+                  "name39": true,
+                  "name40": true,
+                  "name41": true,
+                  "name42": true,
+                  "name43": true,
+                  "name44": true,
+                  "name45": true,
+                  "name46": true,
+                  "name47": true,
+                  "name48": true,
+                  "name49": true,
+                  "name50": true,
+                  "name51": true,
+                  "name52": true,
+                  "name53": true,
+                  "name54": true,
+                  "name55": true,
+                  "name56": true,
+                  "name57": true,
+                  "name58": true,
+                  "name59": true,
+                  "name60": true,
+                  "name61": true,
+                  "name62": true,
+                  "name63": true,
+                  "name64": true,
+                  "name65": true,
+                  "name66": true,
+                  "name67": true,
+                  "name68": true,
+                  "name69": true,
+                  "name70": true,
+                  "name71": true,
+                  "name72": true,
+                  "name73": true,
+                  "name74": true,
+                  "name75": true,
+                  "name76": true,
+                  "name77": true,
+                  "name78": true,
+                  "name79": true,
+                  "name80": true,
+                  "name81": true,
+                  "name82": true,
+                  "name83": true,
+                  "name84": true,
+                  "name85": true,
+                  "name86": true,
+                  "name87": true,
+                  "name88": true,
+                  "name89": true,
+                  "name90": true,
+                  "name91": true,
+                  "name92": true,
+                  "name93": true,
+                  "name94": true,
+                  "name95": true,
+                  "name96": true,
+                  "name97": true,
+                  "name98": true,
+                  "name99": true,
+                  "name100": true,
+                  "name101": true,
+                  "name102": true
+                }
+              }
+            }
+          ],
+          "errors": [
+            {
+              "message": "Please rename the variable `foo`. Suggested names are: `name0`, `name1`, `name10`, ... (99+ more omitted). A more descriptive name will do too.",
+              "suggestions": 3
+            }
+          ]
+        },
+        {
+          "code": "this.foo = 1;",
+          "options": [
+            {
+              "checkProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "foo": {
+                  "foo-bar": true,
+                  "foo-baz": true
+                }
+              }
+            }
+          ],
+          "errors": [
+            {
+              "message": "Please rename the property `foo`. Suggested names are: `foo-bar`, `foo-baz`. A more descriptive name will do too.",
+              "suggestions": []
+            }
+          ]
+        },
+        {
+          "code": "const a = 1;\nconst var_ = 1;\nconst used = 1;",
+          "options": [
+            {
+              "replacements": {
+                "a": {
+                  "var": true,
+                  "const": true,
+                  "used": true
+                },
+                "var": false
+              }
+            }
+          ],
+          "errors": [
+            {
+              "message": "Please rename the variable `a`. Suggested names are: `const_`, `used_`, `var__`. A more descriptive name will do too.",
+              "suggestions": [
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "const_"
+                  },
+                  "output": "const const_ = 1;\nconst var_ = 1;\nconst used = 1;"
+                },
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "used_"
+                  },
+                  "output": "const used_ = 1;\nconst var_ = 1;\nconst used = 1;"
+                },
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "var__"
+                  },
+                  "output": "const var__ = 1;\nconst var_ = 1;\nconst used = 1;"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "let err",
+          "output": "let error",
+          "errors": [
+            {
+              "message": "The variable `err` should be named `error`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let errCbOptsObj",
+          "output": "let errorCallbackOptionsObject",
+          "errors": [
+            {
+              "message": "The variable `errCbOptsObj` should be named `errorCallbackOptionsObject`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let stdDev",
+          "output": "let standardDeviation",
+          "errors": [
+            {
+              "message": "The variable `stdDev` should be named `standardDeviation`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let application",
+          "output": "let app",
+          "errors": [
+            {
+              "message": "The variable `application` should be named `app`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let applications",
+          "output": "let apps",
+          "errors": [
+            {
+              "message": "The variable `applications` should be named `apps`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let webApplication",
+          "output": "let webApp",
+          "errors": [
+            {
+              "message": "The variable `webApplication` should be named `webApp`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let webApplications",
+          "output": "let webApps",
+          "errors": [
+            {
+              "message": "The variable `webApplications` should be named `webApps`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let cmd",
+          "output": "let command",
+          "errors": [
+            {
+              "message": "The variable `cmd` should be named `command`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let configuration",
+          "output": "let config",
+          "errors": [
+            {
+              "message": "The variable `configuration` should be named `config`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let buildConfiguration",
+          "output": "let buildConfig",
+          "errors": [
+            {
+              "message": "The variable `buildConfiguration` should be named `buildConfig`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let cfg",
+          "output": "let config",
+          "errors": [
+            {
+              "message": "The variable `cfg` should be named `config`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let dep",
+          "output": "let dependency",
+          "errors": [
+            {
+              "message": "The variable `dep` should be named `dependency`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let deps",
+          "output": "let dependencies",
+          "errors": [
+            {
+              "message": "The variable `deps` should be named `dependencies`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let exportDecls",
+          "output": "let exportDeclarations",
+          "errors": [
+            {
+              "message": "The variable `exportDecls` should be named `exportDeclarations`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let astExpr",
+          "output": "let astExpression",
+          "errors": [
+            {
+              "message": "The variable `astExpr` should be named `astExpression`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let astExprs",
+          "output": "let astExpressions",
+          "errors": [
+            {
+              "message": "The variable `astExprs` should be named `astExpressions`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let exportDecl",
+          "output": "let exportDeclaration",
+          "errors": [
+            {
+              "message": "The variable `exportDecl` should be named `exportDeclaration`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let ident",
+          "output": "let identifier",
+          "errors": [
+            {
+              "message": "The variable `ident` should be named `identifier`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let idents",
+          "output": "let identifiers",
+          "errors": [
+            {
+              "message": "The variable `idents` should be named `identifiers`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let nodeStmt",
+          "output": "let nodeStatement",
+          "errors": [
+            {
+              "message": "The variable `nodeStmt` should be named `nodeStatement`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let stmts",
+          "output": "let statements",
+          "errors": [
+            {
+              "message": "The variable `stmts` should be named `statements`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let perfBudget",
+          "output": "let performanceBudget",
+          "errors": [
+            {
+              "message": "The variable `perfBudget` should be named `performanceBudget`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let repo",
+          "output": "let repository",
+          "errors": [
+            {
+              "message": "The variable `repo` should be named `repository`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let repoUrl",
+          "output": "let repositoryUrl",
+          "errors": [
+            {
+              "message": "The variable `repoUrl` should be named `repositoryUrl`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let proto",
+          "output": "let prototype",
+          "errors": [
+            {
+              "message": "The variable `proto` should be named `prototype`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let bufferBuf",
+          "output": "let bufferBuffer",
+          "errors": [
+            {
+              "message": "The variable `bufferBuf` should be named `bufferBuffer`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "({err: 1})",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "The property `err` should be named `error`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "this.cmd = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "The property `cmd` should be named `command`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "this.err = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "The property `err` should be named `error`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "({err() {}})",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "The property `err` should be named `error`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "(class {err() {}})",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "The property `err` should be named `error`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "this.errCbOptsObj = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "The property `errCbOptsObj` should be named `errorCallbackOptionsObject`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let successCb",
+          "output": "let successCallback",
+          "errors": 1
+        },
+        {
+          "code": "let btnColor",
+          "output": "let buttonColor",
+          "errors": 1
+        },
+        {
+          "code": "this.successCb = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "this.btnColor = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let CbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbECbE",
+          "output": "let CallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackECallbackE",
+          "errors": 1
+        },
+        {
+          "code": "let evt",
+          "output": "let event_",
+          "errors": [
+            {
+              "message": "The variable `evt` should be named `event_`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "({evt: 1})",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "The property `evt` should be named `event`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "foo.evt = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "The property `evt` should be named `event`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let args",
+          "output": "let arguments_",
+          "errors": 1
+        },
+        {
+          "code": "let args",
+          "output": "let arguments_",
+          "options": [
+            {
+              "replacements": {
+                "e": false,
+                "c": {
+                  "custom": true
+                },
+                "cb": {
+                  "callback": false,
+                  "circuitBreacker": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let args",
+          "output": "let arguments_",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let c",
+          "output": "let custom",
+          "options": [
+            {
+              "replacements": {
+                "e": false,
+                "c": {
+                  "custom": true
+                },
+                "cb": {
+                  "callback": false,
+                  "circuitBreacker": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "function cb() {}",
+          "output": "function callback() {}",
+          "errors": 1
+        },
+        {
+          "code": "class cb {}",
+          "output": "class circuitBreacker {}",
+          "options": [
+            {
+              "replacements": {
+                "e": false,
+                "c": {
+                  "custom": true
+                },
+                "cb": {
+                  "callback": false,
+                  "circuitBreacker": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let e",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let err",
+          "output": "let error",
+          "options": [
+            {
+              "replacements": {
+                "e": false,
+                "c": {
+                  "custom": true
+                },
+                "cb": {
+                  "callback": false,
+                  "circuitBreacker": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let err",
+          "output": "let error",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let errCb",
+          "output": "let errorCallback",
+          "errors": 1
+        },
+        {
+          "code": "let errCb",
+          "output": "let errorCircuitBreacker",
+          "options": [
+            {
+              "replacements": {
+                "e": false,
+                "c": {
+                  "custom": true
+                },
+                "cb": {
+                  "callback": false,
+                  "circuitBreacker": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let errCb",
+          "output": "let handleError",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let ErrCb",
+          "output": "let HandleError",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let ErrCb",
+          "output": "let ErrorCircuitBreacker",
+          "options": [
+            {
+              "replacements": {
+                "e": false,
+                "c": {
+                  "custom": true
+                },
+                "cb": {
+                  "callback": false,
+                  "circuitBreacker": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let fooErrCb",
+          "output": "let fooErrorCb",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let errCbFoo",
+          "output": "let errorCbFoo",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let e;\nconsole.log(e);",
+          "errors": [
+            {
+              "message": "Please rename the variable `e`. Suggested names are: `error`, `event_`. A more descriptive name will do too.",
+              "suggestions": [
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "error"
+                  },
+                  "output": "let error;\nconsole.log(error);"
+                },
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "event_"
+                  },
+                  "output": "let event_;\nconsole.log(event_);"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "let err;\nconsole.log(err);",
+          "output": "let error;\nconsole.log(error);",
+          "errors": 1
+        },
+        {
+          "code": "let error;\n{\n\tlet err;\n}",
+          "output": "let error;\n{\n\tlet error_;\n}",
+          "errors": 1
+        },
+        {
+          "code": "let error;\nlet error_;\n{\n\tlet err;\n}",
+          "output": "let error;\nlet error_;\n{\n\tlet error__;\n}",
+          "errors": 1
+        },
+        {
+          "code": "let error;\n{\n\tlet err;\n\tconsole.log(error);\n}",
+          "output": "let error;\n{\n\tlet error_;\n\tconsole.log(error);\n}",
+          "errors": 1
+        },
+        {
+          "code": "let error;\n{\n\tlet err;\n\tconsole.log(error, err);\n}",
+          "output": "let error;\n{\n\tlet error_;\n\tconsole.log(error, error_);\n}",
+          "errors": 1
+        },
+        {
+          "code": "err => err",
+          "output": "error => error",
+          "errors": 1
+        },
+        {
+          "code": "ctx => ctx.body",
+          "output": "context => context.body",
+          "errors": 1
+        },
+        {
+          "code": "function middleware(ctx) {\n\treturn ctx.body;\n}",
+          "output": "function middleware(context) {\n\treturn context.body;\n}",
+          "errors": 1
+        },
+        {
+          "code": "/**\n * @param {object} ctx Koa context.\n */\nfunction middleware(ctx) {\n\treturn ctx.body;\n}",
+          "errors": 1
+        },
+        {
+          "code": "/**\n * @param {unknown} e Value.\n */\nfunction handle(e) {\n\treturn e;\n}",
+          "errors": [
+            {
+              "message": "Please rename the variable `e`. Suggested names are: `error`, `event_`. A more descriptive name will do too.",
+              "suggestions": []
+            }
+          ]
+        },
+        {
+          "code": "/**\n * @param {object} ctx Koa context.\n */\nconst middleware = ctx => ctx.body;",
+          "errors": 1
+        },
+        {
+          "code": "/**\n * @param {object} ctx Koa context.\n */\nexport function middleware(ctx) {\n\treturn ctx.body;\n}",
+          "errors": 1
+        },
+        {
+          "code": "/**\n * @param {object} ctx Koa context.\n */\nexport default function middleware(ctx) {\n\treturn ctx.body;\n}",
+          "errors": 1
+        },
+        {
+          "code": "const middleware = {\n\t/**\n\t * @param {object} ctx Koa context.\n\t */\n\thandle(ctx) {\n\t\treturn ctx.body;\n\t},\n};",
+          "errors": 1
+        },
+        {
+          "code": "class Middleware {\n\t/**\n\t * @param {object} ctx Koa context.\n\t */\n\thandle(ctx) {\n\t\treturn ctx.body;\n\t}\n}",
+          "errors": 1
+        },
+        {
+          "code": "class Middleware {\n\t/**\n\t * @param {object} ctx Koa context.\n\t */\n\thandle = ctx => ctx.body;\n}",
+          "errors": 1
+        },
+        {
+          "code": "/**\n * @param {object} ctx Koa context.\n */\nmodule.exports = function middleware(ctx) {\n\treturn ctx.body;\n};",
+          "errors": 1
+        },
+        {
+          "code": "/**\n * @param {object} ctx Koa context.\n */\n\nfunction middleware(ctx) {\n\treturn ctx.body;\n}",
+          "output": "/**\n * @param {object} ctx Koa context.\n */\n\nfunction middleware(context) {\n\treturn context.body;\n}",
+          "errors": 1
+        },
+        {
+          "code": "const opts = {};\nconsole.log(opts);",
+          "output": "const options = {};\nconsole.log(options);",
+          "errors": 1
+        },
+        {
+          "code": "var opts = 1;\nvar opts = 2;\nconsole.log(opts);",
+          "output": "var options = 1;\nvar options = 2;\nconsole.log(options);",
+          "errors": 1
+        },
+        {
+          "code": "const err = {};\nconst foo = {err};",
+          "output": "const error = {};\nconst foo = {err: error};",
+          "errors": 1
+        },
+        {
+          "code": "const err = {};\nconst foo = {\n\ta: 1,\n\terr,\n\tb: 2\n};",
+          "output": "const error = {};\nconst foo = {\n\ta: 1,\n\terr: error,\n\tb: 2\n};",
+          "errors": 1
+        },
+        {
+          "code": "({err}) => err",
+          "output": "({err: error}) => error",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "err => ({err})",
+          "output": "error => ({err: error})",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "const {err} = foo;",
+          "output": "const {err: error} = foo;",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "const foo = {err: 1}",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "const foo = {\n\terr() {}\n};",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "foo.err = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "foo.bar.err = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "class C {\n\terr() {}\n}",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "this._err = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "The property `_err` should be named `_error`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "this.__err__ = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "The property `__err__` should be named `__error__`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "this.e_ = 1",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "Please rename the property `e_`. Suggested names are: `error_`, `event_`. A more descriptive name will do too.",
+              "suggestions": 2
+            }
+          ]
+        },
+        {
+          "code": "let err_",
+          "output": "let error_",
+          "errors": 1
+        },
+        {
+          "code": "let __err__",
+          "output": "let __error__",
+          "errors": 1
+        },
+        {
+          "code": "let _e",
+          "errors": [
+            {
+              "message": "Please rename the variable `_e`. Suggested names are: `_error`, `_event`. A more descriptive name will do too.",
+              "suggestions": 2
+            }
+          ]
+        },
+        {
+          "code": "class Err {}",
+          "output": "class Error_ {}",
+          "errors": [
+            {
+              "message": "The variable `Err` should be named `Error_`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "class Cb {}",
+          "output": "class Callback {}",
+          "errors": [
+            {
+              "message": "The variable `Cb` should be named `Callback`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "class Res {}",
+          "errors": [
+            {
+              "message": "Please rename the variable `Res`. Suggested names are: `Resource`, `Response_`, `Result`. A more descriptive name will do too.",
+              "suggestions": 3
+            }
+          ]
+        },
+        {
+          "code": "const Err = 1;",
+          "output": "const Error_ = 1;",
+          "errors": 1
+        },
+        {
+          "code": "const _Err_ = 1;",
+          "output": "const _Error_ = 1;",
+          "errors": 1
+        },
+        {
+          "code": "({Err: 1})",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "The property `Err` should be named `Error`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "({Res: 1})",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "Please rename the property `Res`. Suggested names are: `Resource`, `Response`, `Result`. A more descriptive name will do too.",
+              "suggestions": 3
+            }
+          ]
+        },
+        {
+          "code": "let doc",
+          "output": "let document_",
+          "errors": 1
+        },
+        {
+          "code": "function fn() {\n\tfor (let i = 0; i<10; i++) {\n\t\tfor (let j = 0; j<10; j++) {\n\t\t\tconsole.log(i, j)\n\t\t}\n\t}\n}\nconst func = fn;",
+          "output": "function function_() {\n\tfor (let i = 0; i<10; i++) {\n\t\tfor (let j = 0; j<10; j++) {\n\t\t\tconsole.log(i, j)\n\t\t}\n\t}\n}\nconst func = function_;",
+          "errors": [
+            {
+              "message": "The variable `fn` should be named `function_`. A more descriptive name will do too."
+            },
+            {
+              "message": "The variable `i` should be named `index`. A more descriptive name will do too."
+            },
+            {
+              "message": "The variable `j` should be named `index_`. A more descriptive name will do too."
+            },
+            {
+              "message": "The variable `func` should be named `function__`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "function function_() {\n\tfor (let i = 0; i<10; i++) {\n\t\tfor (let j = 0; j<10; j++) {\n\t\t\tconsole.log(i, j)\n\t\t}\n\t}\n}\nconst func = function_;",
+          "output": "function function_() {\n\tfor (let index = 0; index<10; index++) {\n\t\tfor (let j = 0; j<10; j++) {\n\t\t\tconsole.log(index, j)\n\t\t}\n\t}\n}\nconst function__ = function_;",
+          "errors": [
+            {
+              "message": "The variable `i` should be named `index`. A more descriptive name will do too."
+            },
+            {
+              "message": "The variable `j` should be named `index_`. A more descriptive name will do too."
+            },
+            {
+              "message": "The variable `func` should be named `function__`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "function function_() {\n\tfor (let index = 0; index<10; index++) {\n\t\tfor (let j = 0; j<10; j++) {\n\t\t\tconsole.log(index, j)\n\t\t}\n\t}\n}\nconst function__ = function_;",
+          "output": "function function_() {\n\tfor (let index = 0; index<10; index++) {\n\t\tfor (let index_ = 0; index_<10; index_++) {\n\t\t\tconsole.log(index, index_)\n\t\t}\n\t}\n}\nconst function__ = function_;",
+          "errors": [
+            {
+              "message": "The variable `j` should be named `index_`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let pkg",
+          "output": "let package_",
+          "errors": 1
+        },
+        {
+          "code": "\"use strict\";\nlet pkg;",
+          "output": "\"use strict\";\nlet package_;",
+          "errors": [
+            {
+              "message": "The variable `pkg` should be named `package_`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "\"use strict\";\nlet pkg = 1;\nlet package_ = 2;",
+          "output": "\"use strict\";\nlet package__ = 1;\nlet package_ = 2;",
+          "errors": [
+            {
+              "message": "The variable `pkg` should be named `package__`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "\"use strict\";\nfunction foo() {\n\tconst args = [...arguments];\n\tconst pkg = 1;\n}",
+          "output": "\"use strict\";\nfunction foo() {\n\tconst arguments_ = [...arguments];\n\tconst package_ = 1;\n}",
+          "errors": [
+            {
+              "message": "The variable `args` should be named `arguments_`. A more descriptive name will do too."
+            },
+            {
+              "message": "The variable `pkg` should be named `package_`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "let y",
+          "output": "let yield_",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "let errCb, errorCb",
+          "output": "let errorCallback, errorCallback_",
+          "errors": 2
+        },
+        {
+          "code": "{ let errCb }; { let errorCb }",
+          "output": "{ let errorCallback }; { let errorCallback }",
+          "errors": 2
+        },
+        {
+          "code": "let errCb;\n{\n\tlet errorCb;\n\tconsole.log(errCb, errorCb);\n}",
+          "output": "let errorCallback;\n{\n\tlet errorCb;\n\tconsole.log(errorCallback, errorCb);\n}",
+          "errors": 2
+        },
+        {
+          "code": "let err;\n({a: err = 1} = 2);",
+          "output": "let error;\n({a: error = 1} = 2);",
+          "errors": 1
+        },
+        {
+          "code": "'use strict';\nlet args;",
+          "output": "'use strict';\nlet arguments_;",
+          "errors": 1
+        },
+        {
+          "code": "class A {\n\tmethod(...args) {\n\t\treturn super.method(...args) + 1;\n\t}\n}",
+          "output": "class A {\n\tmethod(...arguments_) {\n\t\treturn super.method(...arguments_) + 1;\n\t}\n}",
+          "errors": 1
+        },
+        {
+          "code": "class A extends B {\n\tconstructor(...args) {\n\t\tsuper(...args);\n\t}\n}",
+          "output": "class A extends B {\n\tconstructor(...arguments_) {\n\t\tsuper(...arguments_);\n\t}\n}",
+          "errors": 1
+        },
+        {
+          "code": "const f = (...args) => {\n\treturn args;\n}",
+          "output": "const f = (...arguments_) => {\n\treturn arguments_;\n}",
+          "errors": 1
+        },
+        {
+          "code": "let args;\nconst f = () => {\n\treturn args;\n}",
+          "output": "let arguments_;\nconst f = () => {\n\treturn arguments_;\n}",
+          "errors": 1
+        },
+        {
+          "code": "let args;\nfunction f() {\n\treturn args;\n}",
+          "output": "let arguments_;\nfunction f() {\n\treturn arguments_;\n}",
+          "errors": 1
+        },
+        {
+          "code": "let args;\nfunction f() {\n\treturn arguments + args;\n}",
+          "output": "let arguments_;\nfunction f() {\n\treturn arguments + arguments_;\n}",
+          "errors": 1
+        },
+        {
+          "code": "let args;\nfunction f() {\n\treturn g.apply(this, arguments) + args;\n}",
+          "output": "let arguments_;\nfunction f() {\n\treturn g.apply(this, arguments) + arguments_;\n}",
+          "errors": 1
+        },
+        {
+          "code": "function unicorn (unicorn) {\n\tconst {prop = {}} = unicorn;\n\treturn property;\n}",
+          "output": "function unicorn (unicorn) {\n\tconst {prop: property_ = {}} = unicorn;\n\treturn property;\n}",
+          "errors": 1
+        },
+        {
+          "code": "const {prop} = {};",
+          "output": "const {prop: property} = {};",
+          "options": [
+            {
+              "checkShorthandProperties": true
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "const [prop] = [];",
+          "output": "const [property] = [];",
+          "errors": 1
+        },
+        {
+          "code": "const {prop: prop} = {};",
+          "output": "const {prop: property} = {};",
+          "errors": 1
+        },
+        {
+          "code": "const {prop = 1} = {};",
+          "output": "const {prop: property = 1} = {};",
+          "errors": 1
+        },
+        {
+          "code": "const [prop = 1] = [];",
+          "output": "const [property = 1] = [];",
+          "errors": 1
+        },
+        {
+          "code": "const {prop: prop = 1} = {};",
+          "output": "const {prop: property = 1} = {};",
+          "errors": 1
+        },
+        {
+          "code": "const property = '';\nfunction unicorn() {\n\tconst prop = 1;\n\treturn property;\n}",
+          "output": "const property = '';\nfunction unicorn() {\n\tconst property_ = 1;\n\treturn property;\n}",
+          "errors": 1
+        },
+        {
+          "code": "function unicorn() {\n\tconst prop = 1;\n\treturn function () {\n\t\treturn property;\n\t};\n}",
+          "output": "function unicorn() {\n\tconst property_ = 1;\n\treturn function () {\n\t\treturn property;\n\t};\n}",
+          "errors": 1
+        },
+        {
+          "code": "let property;\nfunction unicorn() {\n\tconst prop = 1;\n\treturn property;\n}",
+          "output": "let property;\nfunction unicorn() {\n\tconst property_ = 1;\n\treturn property;\n}",
+          "errors": 1
+        },
+        {
+          "code": "/*global property:true*/\nfunction unicorn() {\n\tconst prop = 1;\n\treturn property;\n}",
+          "output": "/*global property:true*/\nfunction unicorn() {\n\tconst property_ = 1;\n\treturn property;\n}",
+          "errors": 1
+        },
+        {
+          "code": "/*global property:false*/\nfunction unicorn() {\n\tconst prop = 1;\n\treturn property;\n}",
+          "output": "/*global property:false*/\nfunction unicorn() {\n\tconst property_ = 1;\n\treturn property;\n}",
+          "errors": 1
+        },
+        {
+          "code": "const propTypes = 2;const err = 2;",
+          "output": "const propertyTypes = 2;const err = 2;",
+          "options": [
+            {
+              "allowList": {
+                "err": true
+              },
+              "extendDefaultAllowList": false
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "const expectedRetVal = \"that should be ok\";",
+          "output": "const expectedReturnValue = \"that should be ok\";",
+          "errors": 1
+        },
+        {
+          "code": "const retVal = \"that should be ok\";",
+          "output": "const returnValue = \"that should be ok\";",
+          "errors": 1
+        },
+        {
+          "code": "const retValue = \"that should be ok\";",
+          "output": "const returnValue = \"that should be ok\";",
+          "errors": 1
+        },
+        {
+          "code": "const returnVal = \"that should be ok\";",
+          "output": "const returnValue = \"that should be ok\";",
+          "errors": 1
+        },
+        {
+          "code": "const sendDmMessage = () => {};",
+          "output": "const sendDirectMessage = () => {};",
+          "options": [
+            {
+              "replacements": {
+                "dm": {
+                  "directMessage": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "const ret_val = \"that should be ok\";",
+          "output": "const returnValue_value = \"that should be ok\";",
+          "errors": 1
+        },
+        {
+          "code": "let docs",
+          "output": "let documents",
+          "options": [
+            {
+              "replacements": {
+                "docs": {
+                  "documentation": false
+                }
+              }
+            }
+          ],
+          "errors": 1
+        }
+      ]
+    }
+  },
+  {
+    "kind": "javascript",
+    "cases": {
+      "valid": [
+        "import {err as foo} from \"foo\"",
+        "let foo;\nexport {foo as err};",
+        "import err from \"./node_modules/err\"",
+        "import err from \"err\"",
+        "import err, {foo as bar} from \"err\"",
+        "import {default as err, foo as bar} from \"err\"",
+        "import * as err from \"err\"",
+        "import foo, * as err from \"err\"",
+        "const err = require(\"err\")",
+        "import {err} from \"err\"",
+        "import foo, {err} from \"err\"",
+        "import {default as foo, err} from \"err\"",
+        "const {err} = require(\"err\")",
+        "const {err} = foo",
+        "function f({err}) {}",
+        {
+          "code": "const err = require(\"err\")",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "const err = require(\"./err\")",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "import foo, * as err from \"err\"",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "import foo, * as err from \"./err\"",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "import { default as err, foo as bar } from \"err\"",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "import { default as err, foo as bar } from \"./err\"",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "import err, { foo as bar } from \"err\"",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "import err, { foo as bar } from \"./err\"",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "import * as err from \"err\"",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "import * as err from \"./err\"",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "import err from \"err\"",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "import err from \"./err\"",
+          "options": [
+            {
+              "checkDefaultAndNamespaceImports": false
+            }
+          ]
+        },
+        {
+          "code": "import { err } from \"err\"",
+          "options": [
+            {
+              "checkShorthandImports": false
+            }
+          ]
+        },
+        {
+          "code": "import { err } from \"./err\"",
+          "options": [
+            {
+              "checkShorthandImports": false
+            }
+          ]
+        },
+        {
+          "code": "import { default as foo, err } from \"err\"",
+          "options": [
+            {
+              "checkShorthandImports": false
+            }
+          ]
+        },
+        {
+          "code": "import { default as foo, err } from \"./err\"",
+          "options": [
+            {
+              "checkShorthandImports": false
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "code": "import err from 'err';",
+          "output": "import error from 'err';",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "import {err} from 'err';",
+          "output": "import {err as error} from 'err';",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "import {err as err} from \"err\";",
+          "output": "import {err as error} from \"err\";",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "import {\n\tbar,\n\terr,\n\tbuz,\n} from 'foo';",
+          "output": "import {\n\tbar,\n\terr as error,\n\tbuz,\n} from 'foo';",
+          "options": [
+            {
+              "checkProperties": true,
+              "checkDefaultAndNamespaceImports": true,
+              "checkShorthandImports": true,
+              "checkShorthandProperties": true,
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "args": {
+                  "arguments": true
+                },
+                "e": {
+                  "error": true,
+                  "event": true,
+                  "element": true
+                },
+                "err": {
+                  "error": true
+                },
+                "y": {
+                  "yield": true
+                },
+                "errCb": {
+                  "handleError": true
+                },
+                "proto": {
+                  "prototype": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "import {err as cb} from 'err';",
+          "output": "import {err as callback} from 'err';",
+          "errors": 1
+        },
+        {
+          "code": "const {err: cb} = foo;",
+          "output": "const {err: callback} = foo;",
+          "errors": 1
+        },
+        {
+          "code": "const err = require(\"../err\")",
+          "output": "const error = require(\"../err\")",
+          "errors": 1
+        },
+        {
+          "code": "const err = require(\"/err\")",
+          "output": "const error = require(\"/err\")",
+          "errors": 1
+        },
+        {
+          "code": "import err from \"./err\"",
+          "output": "import error from \"./err\"",
+          "errors": 1
+        },
+        {
+          "code": "import err, {foo as bar} from \"./err\"",
+          "output": "import error, {foo as bar} from \"./err\"",
+          "errors": 1
+        },
+        {
+          "code": "import {default as err, foo as bar} from \"./err\"",
+          "output": "import {default as error, foo as bar} from \"./err\"",
+          "errors": 1
+        },
+        {
+          "code": "import * as err from \"./err\"",
+          "output": "import * as error from \"./err\"",
+          "errors": 1
+        },
+        {
+          "code": "import foo, * as err from \"./err\"",
+          "output": "import foo, * as error from \"./err\"",
+          "errors": 1
+        },
+        {
+          "code": "import {err} from \"./err\"",
+          "output": "import {err as error} from \"./err\"",
+          "errors": 1
+        },
+        {
+          "code": "import {default as foo, err} from \"./err\"",
+          "output": "import {default as foo, err as error} from \"./err\"",
+          "errors": 1
+        },
+        {
+          "code": "let err;\nexport {err};",
+          "output": "let error;\nexport {error as err};",
+          "errors": 1
+        },
+        {
+          "code": "let err;\nexport {err as err};",
+          "output": "let error;\nexport {error as err};",
+          "errors": 1
+        },
+        {
+          "code": "export const err = {}",
+          "errors": 1
+        },
+        {
+          "code": "export let err",
+          "errors": 1
+        },
+        {
+          "code": "export var err",
+          "errors": 1
+        },
+        {
+          "code": "export function err() {}",
+          "errors": 1
+        },
+        {
+          "code": "export class err {}",
+          "errors": 1
+        },
+        {
+          "code": "const err = {};\nexport const error = err;",
+          "output": "const error_ = {};\nexport const error = error_;",
+          "errors": 1
+        },
+        {
+          "code": "class err {};\nconsole.log(err);",
+          "output": "class error {};\nconsole.log(error);",
+          "errors": 1
+        },
+        {
+          "code": "class err {\n\tconstructor() {\n\t\tconsole.log(err);\n\t}\n};\nconsole.log(err);",
+          "output": "class error {\n\tconstructor() {\n\t\tconsole.log(error);\n\t}\n};\nconsole.log(error);",
+          "errors": 1
+        },
+        {
+          "code": "let foo;\nexport {foo as err};",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "const foo = 1;\nconst bar = 2;\nexport {foo as e, bar as error};",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "errors": [
+            {
+              "message": "Please rename the property `e`. Suggested names are: `error`, `event`. A more descriptive name will do too.",
+              "suggestions": 0
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "kind": "typescript",
+    "cases": {
+      "testerOptions": {
+        "languageOptions": {
+          "globals": {
+            "document": "readonly",
+            "event": "readonly",
+            "Response": "readonly"
+          }
+        }
+      },
+      "valid": [
+        {
+          "code": "const usr = 1; console.log(usr);",
+          "options": [
+            {
+              "replacements": {
+                "usr": {
+                  "a-b": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "code": "const fast = 1; console.log(fast);",
+          "options": [
+            {
+              "replacements": {
+                "fast": {
+                  "2fast": true
+                }
+              }
+            }
+          ]
+        },
+        "enum Foo {\n\terr,\n}\nconsole.log(Foo.err);",
+        {
+          "code": "enum Foo {\n\terr,\n}\nconsole.log(Foo.err);",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        "interface ImportMetaEnv {}",
+        "declare namespace NodeJS {\n\tinterface ProcessEnv {\n\t\tFILE_PATH: string;\n\t}\n}"
+      ],
+      "invalid": [
+        {
+          "code": "declare const prop: string;",
+          "output": "declare const property: string;",
+          "errors": 1
+        },
+        {
+          "code": "declare var prop: number;",
+          "output": "declare var property: number;",
+          "errors": 1
+        },
+        {
+          "code": "declare let prop: any;",
+          "output": "declare let property: any;",
+          "errors": 1
+        },
+        {
+          "code": "declare class prop {}",
+          "output": "declare class property {}",
+          "errors": 1
+        },
+        {
+          "code": "const prop: SomeThing<boolean> = func();",
+          "output": "const property: SomeThing<boolean> = func();",
+          "errors": 1
+        },
+        {
+          "code": "const foo = (extraParams?: string) => {}",
+          "output": "const foo = (extraParameters?: string) => {}",
+          "errors": 1
+        },
+        {
+          "code": "class ValidationException {\n\tconstructor(private readonly err: JsonRpcErrorLocal) {}\n\n\tgetError(): JsonRpcErrorLocal {\n\t\treturn this.err;\n\t}\n}",
+          "errors": [
+            {
+              "message": "The variable `err` should be named `error`. A more descriptive name will do too.",
+              "suggestions": []
+            }
+          ]
+        },
+        {
+          "code": "class ValidationException {\n\tconstructor(private err = 123) {}\n\n\tgetError() {\n\t\treturn this.err;\n\t}\n}",
+          "errors": [
+            {
+              "message": "The variable `err` should be named `error`. A more descriptive name will do too.",
+              "suggestions": []
+            }
+          ]
+        },
+        {
+          "code": "class ValidationException {\n\tconstructor(private readonly e: Error) {}\n\n\tgetError(): Error {\n\t\treturn this.e;\n\t}\n}",
+          "errors": [
+            {
+              "message": "Please rename the variable `e`. Suggested names are: `error`, `event_`. A more descriptive name will do too.",
+              "suggestions": []
+            }
+          ]
+        },
+        {
+          "code": "function getError(err = 123) {\n\treturn err;\n}",
+          "output": "function getError(error = 123) {\n\treturn error;\n}",
+          "errors": 1
+        },
+        {
+          "code": "const foo = (extr\\u{61}Params     ?    :    string) => {}",
+          "output": "const foo = (extraParameters?:    string) => {}",
+          "errors": 1
+        },
+        {
+          "code": "const isString = (val: unknown) => typeof val === \"string\"",
+          "output": "const isString = (value: unknown) => typeof value === \"string\"",
+          "errors": 1
+        },
+        {
+          "code": "type Callback = (val: unknown) => string",
+          "output": "type Callback = (value: unknown) => string",
+          "errors": 1
+        },
+        {
+          "code": "type Constructor = new (ctx: object) => object",
+          "output": "type Constructor = new (context: object) => object",
+          "errors": 1
+        },
+        {
+          "code": "interface Middleware { handle: (ctx: object) => void; }",
+          "output": "interface Middleware { handle: (context: object) => void; }",
+          "errors": 1
+        },
+        {
+          "code": "declare function middleware(ctx: object): void;",
+          "output": "declare function middleware(context: object): void;",
+          "errors": 1
+        },
+        {
+          "code": "abstract class Middleware { abstract handle(ctx: object): void; }",
+          "output": "abstract class Middleware { abstract handle(context: object): void; }",
+          "errors": 1
+        },
+        {
+          "code": "class Middleware { handle = ctx => ctx.body; }",
+          "output": "class Middleware { handle = context => context.body; }",
+          "errors": 1
+        },
+        {
+          "code": "abstract class Middleware { abstract handle: (ctx: object) => void; }",
+          "output": "abstract class Middleware { abstract handle: (context: object) => void; }",
+          "errors": 1
+        },
+        {
+          "code": "const isString = (val: unknown): val is string => typeof val === \"string\"",
+          "output": "const isString = (value: unknown): value is string => typeof value === \"string\"",
+          "errors": 1
+        },
+        {
+          "code": "type Predicate = (val: unknown) => val is string",
+          "output": "type Predicate = (value: unknown) => value is string",
+          "errors": 1
+        },
+        {
+          "code": "interface Predicate { (val: unknown): val is string; }",
+          "output": "interface Predicate { (value: unknown): value is string; }",
+          "errors": 1
+        },
+        {
+          "code": "interface Predicate { isString(val: unknown): val is string; }",
+          "output": "interface Predicate { isString(value: unknown): value is string; }",
+          "errors": 1
+        },
+        {
+          "code": "declare function isString(val: unknown): val is string;",
+          "output": "declare function isString(value: unknown): value is string;",
+          "errors": 1
+        },
+        {
+          "code": "abstract class Predicate { abstract isString(val: unknown): val is string; }",
+          "output": "abstract class Predicate { abstract isString(value: unknown): value is string; }",
+          "errors": 1
+        },
+        {
+          "code": "function assertString(val: unknown): asserts val is string {\n\tif (typeof val !== \"string\") {\n\t\tthrow new TypeError();\n\t}\n}",
+          "output": "function assertString(value: unknown): asserts value is string {\n\tif (typeof value !== \"string\") {\n\t\tthrow new TypeError();\n\t}\n}",
+          "errors": 1
+        },
+        {
+          "code": "function assertValue(val: unknown): asserts val {\n\tif (!val) {\n\t\tthrow new TypeError();\n\t}\n}",
+          "output": "function assertValue(value: unknown): asserts value {\n\tif (!value) {\n\t\tthrow new TypeError();\n\t}\n}",
+          "errors": 1
+        },
+        {
+          "code": "type AssertString = (val: unknown) => asserts val is string",
+          "output": "type AssertString = (value: unknown) => asserts value is string",
+          "errors": 1
+        },
+        {
+          "code": "interface AssertString { (val: unknown): asserts val is string; }",
+          "output": "interface AssertString { (value: unknown): asserts value is string; }",
+          "errors": 1
+        },
+        {
+          "code": "interface AssertString { assertString(val: unknown): asserts val is string; }",
+          "output": "interface AssertString { assertString(value: unknown): asserts value is string; }",
+          "errors": 1
+        },
+        {
+          "code": "declare function assertString(val: unknown): asserts val is string;",
+          "output": "declare function assertString(value: unknown): asserts value is string;",
+          "errors": 1
+        },
+        {
+          "code": "abstract class AssertString { abstract assertString(val: unknown): asserts val is string; }",
+          "output": "abstract class AssertString { abstract assertString(value: unknown): asserts value is string; }",
+          "errors": 1
+        },
+        {
+          "code": "const isError = (e: unknown): e is Error => e instanceof Error",
+          "errors": [
+            {
+              "message": "Please rename the variable `e`. Suggested names are: `error`, `event_`. A more descriptive name will do too.",
+              "suggestions": [
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "error"
+                  },
+                  "output": "const isError = (error: unknown): error is Error => error instanceof Error"
+                },
+                {
+                  "messageId": "rename",
+                  "data": {
+                    "replacement": "event_"
+                  },
+                  "output": "const isError = (event_: unknown): event_ is Error => event_ instanceof Error"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "/**\n * @param val Value.\n */\nfunction isString(val: unknown): val is string {\n\treturn typeof val === \"string\";\n}",
+          "errors": 1
+        },
+        {
+          "code": "/**\n * @param e Value.\n */\nfunction isError(e: unknown): e is Error {\n\treturn e instanceof Error;\n}",
+          "errors": [
+            {
+              "message": "Please rename the variable `e`. Suggested names are: `error`, `event_`. A more descriptive name will do too.",
+              "suggestions": []
+            }
+          ]
+        },
+        {
+          "code": "/**\n * @param ctx Koa context.\n */\ntype Middleware = (ctx: object) => void;",
+          "errors": 1
+        },
+        {
+          "code": "/**\n * @param e Value.\n */\ntype Constructor = new (e: unknown) => object;",
+          "errors": [
+            {
+              "message": "Please rename the variable `e`. Suggested names are: `error`, `event_`. A more descriptive name will do too.",
+              "suggestions": []
+            }
+          ]
+        },
+        {
+          "code": "/**\n * @param ctx Koa context.\n */\ndeclare function middleware(ctx: object): void;",
+          "errors": 1
+        },
+        {
+          "code": "interface Middleware {\n\t/**\n\t * @param ctx Koa context.\n\t */\n\thandle: (ctx: object) => void;\n}",
+          "errors": 1
+        },
+        {
+          "code": "interface Middleware {\n\t/**\n\t * @param ctx Koa context.\n\t */\n\thandle(ctx: object): void;\n}",
+          "errors": 1
+        },
+        {
+          "code": "type Middleware = {\n\t/**\n\t * @param ctx Koa context.\n\t */\n\thandle: (ctx: object) => void;\n};",
+          "errors": 1
+        },
+        {
+          "code": "abstract class Middleware {\n\t/**\n\t * @param ctx Koa context.\n\t */\n\tabstract handle(ctx: object): void;\n}",
+          "errors": 1
+        },
+        {
+          "code": "abstract class Middleware {\n\t/**\n\t * @param ctx Koa context.\n\t */\n\tabstract handle: (ctx: object) => void;\n}",
+          "errors": 1
+        },
+        {
+          "code": "interface Prop {\n\t\tid: number;\n}\n\nconst Prop: Prop = { id: 1 };\n\nexport default Prop;",
+          "output": "interface Property {\n\t\tid: number;\n}\n\nconst Property: Property = { id: 1 };\n\nexport default Property;",
+          "errors": 1
+        },
+        {
+          "code": "export type Props = string",
+          "errors": 1
+        },
+        {
+          "code": "function onKeyDown(e: KeyboardEvent) {\n\tif (e.keyCode) {}\n}",
+          "output": "function onKeyDown(event_: KeyboardEvent) {\n\tif (event_.keyCode) {}\n}",
+          "options": [
+            {
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "e": {
+                  "event": true
+                }
+              }
+            }
+          ],
+          "errors": 1
+        },
+        {
+          "code": "export type PreloadProps<TExtraProps = null> = {}",
+          "output": "export type PreloadProps<TExtraProperties = null> = {}",
+          "errors": 2
+        },
+        {
+          "code": "export type PreloadProps<TExtraProps = null> = {};",
+          "output": "export type PreloadProps<TExtraProperties = null> = {};",
+          "errors": 2
+        },
+        {
+          "code": "enum Btn {\n\tPrimary,\n}\nlet test: Btn;",
+          "output": "enum Button {\n\tPrimary,\n}\nlet test: Button;",
+          "errors": 1
+        },
+        {
+          "code": "class Btn {}\nlet test: Btn;",
+          "output": "class Button {}\nlet test: Button;",
+          "errors": 1
+        },
+        {
+          "code": "interface Btn {\n\tid: number;\n}\nlet test: Btn;",
+          "output": "interface Button {\n\tid: number;\n}\nlet test: Button;",
+          "errors": 1
+        },
+        {
+          "code": "type Btn = {};",
+          "output": "type Button = {};",
+          "errors": 1
+        },
+        {
+          "code": "interface Btn {}",
+          "output": "interface Button {}",
+          "errors": 1
+        },
+        {
+          "code": "export interface Btn {\n\tid: number;\n}\nlet test: Btn;",
+          "errors": 1
+        },
+        {
+          "code": "export enum Btn {\n\tPrimary,\n}\nlet test: Btn;",
+          "errors": 1
+        }
+      ]
+    }
+  },
+  {
+    "kind": "typescript",
+    "cases": {
+      "testerOptions": {
+        "languageOptions": {
+          "parserOptions": {
+            "ecmaFeatures": {
+              "jsx": true
+            }
+          }
+        }
+      },
+      "valid": [],
+      "invalid": [
+        {
+          "code": "import DocPage from '../components/DocPage';\nexport default () => (\n\t<DocPage title=\"Focus Trap Zone\"></DocPage>\n);",
+          "errors": 1
+        }
+      ]
+    }
+  },
+  {
+    "kind": "javascript",
+    "cases": {
+      "valid": [
+        {
+          "code": "foo();",
+          "filename": "http-error.js"
+        },
+        {
+          "code": "foo();",
+          "filename": "http-err.js",
+          "options": [
+            {
+              "checkFilenames": false
+            }
+          ]
+        },
+        {
+          "code": "foo();",
+          "filename": "err/http-error.js"
+        },
+        {
+          "code": "foo();",
+          "filename": "Мiръ.html"
+        },
+        {
+          "code": "foo();",
+          "filename": "e2e.js"
+        },
+        {
+          "code": "foo();",
+          "filename": "vite-env.d.ts"
+        },
+        {
+          "code": "const e_at_start = 1;\nconst end_with_e = 2;",
+          "filename": "some.spec.e2e.test.js",
+          "options": [
+            {
+              "ignore": [
+                {
+                  "__regexp": "^e_",
+                  "flags": ""
+                },
+                {
+                  "__regexp": "_e$",
+                  "flags": "i"
+                },
+                "\\.e2e\\."
+              ]
+            }
+          ]
+        },
+        {
+          "code": "foo();",
+          "filename": "tsconfig.lib.json",
+          "options": [
+            {
+              "ignore": [
+                {
+                  "__regexp": "tsconfig\\.lib$",
+                  "flags": ""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "const e_at_start = 1;\nconst end_with_e = 2;",
+          "filename": "index.js",
+          "options": [
+            {
+              "ignore": [
+                {
+                  "__regexp": "^e_",
+                  "flags": "g"
+                },
+                {
+                  "__regexp": "_e$",
+                  "flags": "g"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "code": "foo();",
+          "filename": "err/http-err.js",
+          "errors": 1
+        },
+        {
+          "code": "foo();",
+          "filename": "http-err.js",
+          "errors": 1
+        },
+        {
+          "code": "foo();",
+          "filename": "/path/to/doc/__prev-Attr$1Err__.conf.js",
+          "errors": [
+            {
+              "message": "The filename `__prev-Attr$1Err__.conf.js` should be named `__previous-Attribute$1Error__.config.js`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "foo();",
+          "filename": ".http.err.js",
+          "errors": [
+            {
+              "message": "The filename `.http.err.js` should be named `.http.error.js`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "foo();",
+          "filename": "e.js",
+          "errors": [
+            {
+              "message": "Please rename the filename `e.js`. Suggested names are: `error.js`, `event.js`. A more descriptive name will do too.",
+              "suggestions": 0
+            }
+          ]
+        },
+        {
+          "code": "foo();",
+          "filename": "c.js",
+          "options": [
+            {
+              "replacements": {
+                "e": false,
+                "c": {
+                  "custom": true
+                },
+                "cb": {
+                  "callback": false,
+                  "circuitBreacker": true
+                }
+              }
+            }
+          ],
+          "errors": [
+            {
+              "message": "The filename `c.js` should be named `custom.js`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "foo();",
+          "filename": "cb.js",
+          "options": [
+            {
+              "replacements": {
+                "e": false,
+                "c": {
+                  "custom": true
+                },
+                "cb": {
+                  "callback": false,
+                  "circuitBreacker": true
+                }
+              }
+            }
+          ],
+          "errors": [
+            {
+              "message": "The filename `cb.js` should be named `circuitBreacker.js`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "const e_at_start = 1;\nconst end_with_e = 2;",
+          "filename": "some.spec.e2e.test.js",
+          "errors": [
+            {
+              "message": "Please rename the variable `e_at_start`. Suggested names are: `error_at_start`, `event_at_start`. A more descriptive name will do too.",
+              "suggestions": 2
+            },
+            {
+              "message": "Please rename the variable `end_with_e`. Suggested names are: `end_with_error`, `end_with_event`. A more descriptive name will do too.",
+              "suggestions": 2
+            }
+          ]
+        },
+        {
+          "code": "foo();",
+          "filename": "tsconfig.lib.json",
+          "options": [
+            {
+              "ignore": [
+                {
+                  "__regexp": "tsconfig\\.lib\\.json$",
+                  "flags": ""
+                }
+              ]
+            }
+          ],
+          "errors": [
+            {
+              "message": "The filename `tsconfig.lib.json` should be named `tsconfig.library.json`. A more descriptive name will do too."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "kind": "vue",
+    "cases": {
+      "valid": [],
+      "invalid": [
+        {
+          "code": "<template>\n\t<button @click=\"goToPrev\"/>\n</template>\n<script setup>\nconst goToPrev = () => {}\n</script>",
+          "errors": 1
+        },
+        {
+          "code": "<template><button/></template>\n<script setup>\nconst goToPrev = () => {}\n</script>",
+          "output": "<template><button/></template>\n<script setup>\nconst goToPrevious = () => {}\n</script>",
+          "errors": 1
+        }
+      ]
+    }
+  },
+  {
+    "kind": "non-javascript",
+    "cases": {
+      "valid": [
+        {
+          "code": "{\"btn\": \"err\"}",
+          "language": "json/json"
+        },
+        {
+          "code": "{\"button\": \"btn\"}",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "language": "json/json"
+        },
+        {
+          "code": "{\"btn\": 1}",
+          "options": [
+            {
+              "checkProperties": true,
+              "allowList": {
+                "btn": true
+              }
+            }
+          ],
+          "language": "json/json"
+        },
+        {
+          "code": "{\"btn\": \"err\"}",
+          "language": "json/jsonc"
+        },
+        {
+          "code": "{\"button\": \"btn\"}",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "language": "json/jsonc"
+        },
+        {
+          "code": "{\"btn\": 1}",
+          "options": [
+            {
+              "checkProperties": true,
+              "allowList": {
+                "btn": true
+              }
+            }
+          ],
+          "language": "json/jsonc"
+        },
+        {
+          "code": "{\"btn\": \"err\"}",
+          "language": "json/json5"
+        },
+        {
+          "code": "{\"button\": \"btn\"}",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ],
+          "language": "json/json5"
+        },
+        {
+          "code": "{\"btn\": 1}",
+          "options": [
+            {
+              "checkProperties": true,
+              "allowList": {
+                "btn": true
+              }
+            }
+          ],
+          "language": "json/json5"
+        }
+      ],
+      "invalid": [
+        {
+          "code": "{\"btn\": 1}",
+          "language": "json/json",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "{\"btn-group\": {\"err\": 1}}",
+          "language": "json/json",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "{\"b\\u0074n\": 1}",
+          "language": "json/json",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "{\"btn\": 1}",
+          "language": "json/jsonc",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "{\"btn-group\": {\"err\": 1}}",
+          "language": "json/jsonc",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "{\"b\\u0074n\": 1}",
+          "language": "json/jsonc",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "{\"btn\": 1}",
+          "language": "json/json5",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "{\"btn-group\": {\"err\": 1}}",
+          "language": "json/json5",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "{\"b\\u0074n\": 1}",
+          "language": "json/json5",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "kind": "non-javascript",
+    "cases": {
+      "valid": [
+        {
+          "code": ".button { --button: red; }",
+          "language": "css/css"
+        },
+        {
+          "code": ".btn {}",
+          "options": [
+            {
+              "checkVariables": false
+            }
+          ],
+          "language": "css/css"
+        },
+        {
+          "code": ".btn {}",
+          "options": [
+            {
+              "allowList": {
+                "btn": true
+              }
+            }
+          ],
+          "language": "css/css"
+        },
+        {
+          "code": "a { color: red; content: \"btn\"; }",
+          "language": "css/css"
+        }
+      ],
+      "invalid": [
+        {
+          "code": ".btn {}",
+          "language": "css/css"
+        },
+        {
+          "code": "#btn-group {}",
+          "language": "css/css"
+        },
+        {
+          "code": "a { --btn: var(--err); }",
+          "language": "css/css"
+        },
+        {
+          "code": "@keyframes btn {}",
+          "language": "css/css"
+        },
+        {
+          "code": "@layer btn {}",
+          "language": "css/css"
+        },
+        {
+          "code": "@media (--btn) {}",
+          "language": "css/css"
+        },
+        {
+          "code": "a { container: btn / inline-size; }",
+          "language": "css/css"
+        }
+      ]
+    }
+  },
+  {
+    "kind": "non-javascript",
+    "cases": {
+      "valid": [],
+      "invalid": [
+        {
+          "code": "{btn: 1}",
+          "language": "json/json5",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "kind": "non-javascript",
+    "cases": {
+      "valid": [
+        {
+          "code": ".btn {}",
+          "language": "css/css",
+          "options": [
+            {
+              "ignore": ["^btn$"]
+            }
+          ]
+        },
+        {
+          "code": "a { --btn: 1; }",
+          "language": "css/css",
+          "options": [
+            {
+              "allowList": {
+                "--btn": true
+              }
+            }
+          ]
+        },
+        {
+          "code": ".btn { color: red; }",
+          "language": "css/css",
+          "options": [
+            {
+              "extendDefaultReplacements": false
+            }
+          ]
+        },
+        {
+          "code": "{}",
+          "language": "json/json",
+          "filename": "btn.json",
+          "options": [
+            {
+              "checkFilenames": false
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "code": "{}",
+          "language": "json/json",
+          "filename": "btn.json"
+        },
+        {
+          "code": "a {}",
+          "language": "css/css",
+          "filename": "btn.css"
+        },
+        {
+          "code": ".widget {}",
+          "language": "css/css",
+          "options": [
+            {
+              "extendDefaultReplacements": false,
+              "replacements": {
+                "widget": {
+                  "component": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "kind": "non-javascript",
+    "cases": {
+      "valid": [
+        {
+          "code": "btn: err",
+          "language": "yml/yaml"
+        },
+        {
+          "code": "button: btn\n123: err\n? [btn, err]\n: value",
+          "language": "yml/yaml",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "btn = \"err\"",
+          "language": "toml/toml"
+        },
+        {
+          "code": "button = \"btn\"",
+          "language": "toml/toml",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "<div id=\"button\" class=\"error button-group\" title=\"btn\"></div>",
+          "language": "html/html"
+        },
+        {
+          "code": "<div id=\"btn\" class=\"err\"></div>",
+          "language": "html/html",
+          "options": [
+            {
+              "checkVariables": false
+            }
+          ]
+        },
+        {
+          "code": "<div class=\"btn\"></div>",
+          "language": "html/html",
+          "options": [
+            {
+              "allowList": {
+                "btn": true
+              }
+            }
+          ]
+        },
+        {
+          "code": "<div id=\"prefix-{{btn}}\" class=\"{{btn}}\"></div>",
+          "language": "html/html"
+        },
+        {
+          "code": "<div class=\"<%= btn %>\"></div>",
+          "language": "html/html"
+        }
+      ],
+      "invalid": [
+        {
+          "code": "btn: 1\nnested: {err: 2}\n\"b\\u0074n-group\": 3",
+          "language": "yml/yaml",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "[btn.\"err-group\"]\n\"b\\u0074n\".args = \"btn\"",
+          "language": "toml/toml",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "[[btn]]\nvalue = {err = 1}",
+          "language": "toml/toml",
+          "options": [
+            {
+              "checkProperties": true
+            }
+          ]
+        },
+        {
+          "code": "<div id=\"btn\" class=\"good err-group\targs\"></div>",
+          "language": "html/html"
+        },
+        {
+          "code": "<div ID=btn CLASS=\"b&#116;n&#32;err\"></div>",
+          "language": "html/html"
+        }
+      ]
+    }
+  },
+  {
+    "kind": "non-javascript",
+    "cases": {
+      "valid": [
+        {
+          "code": "a { animation-name: button, \"error\", none; }",
+          "language": "css/css"
+        },
+        {
+          "code": "a { animation: btn 1s; }",
+          "language": "css/css"
+        },
+        {
+          "code": "a { animation-name: btn; }",
+          "options": [
+            {
+              "checkVariables": false
+            }
+          ],
+          "language": "css/css"
+        }
+      ],
+      "invalid": [
+        {
+          "code": "a { animation-name: btn; }",
+          "language": "css/css"
+        },
+        {
+          "code": "a { animation-name: btn, \"err\"; }",
+          "language": "css/css"
+        },
+        {
+          "code": "a { animation-name: b\\74 n; }",
+          "language": "css/css"
+        },
+        {
+          "code": "a { -webkit-animation-name: \"btn\"; }",
+          "language": "css/css"
+        }
+      ]
+    }
+  },
+  {
+    "kind": "javascript",
+    "cases": {
+      "valid": [
+        {
+          "code": "# Markdown filename",
+          "filename": "error.md",
+          "language": "markdown/commonmark",
+          "plugins": {}
+        },
+        {
+          "code": "# Markdown filename",
+          "filename": "err.md",
+          "options": [
+            {
+              "checkFilenames": false
+            }
+          ],
+          "language": "markdown/commonmark",
+          "plugins": {}
+        },
+        {
+          "code": "# Markdown filename",
+          "filename": "error.md",
+          "language": "markdown/gfm",
+          "plugins": {}
+        },
+        {
+          "code": "# Markdown filename",
+          "filename": "err.md",
+          "options": [
+            {
+              "checkFilenames": false
+            }
+          ],
+          "language": "markdown/gfm",
+          "plugins": {}
+        }
+      ],
+      "invalid": [
+        {
+          "code": "# Markdown filename",
+          "filename": "err.md",
+          "language": "markdown/commonmark",
+          "plugins": {},
+          "errors": [
+            {
+              "message": "The filename `err.md` should be named `error.md`. A more descriptive name will do too."
+            }
+          ]
+        },
+        {
+          "code": "# Markdown filename",
+          "filename": "err.md",
+          "language": "markdown/gfm",
+          "plugins": {},
+          "errors": [
+            {
+              "message": "The filename `err.md` should be named `error.md`. A more descriptive name will do too."
+            }
+          ]
+        }
+      ]
+    }
+  }
+]
