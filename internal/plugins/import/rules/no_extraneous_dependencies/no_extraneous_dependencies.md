@@ -30,6 +30,8 @@ An empty or missing manifest still permits diagnostics for resolved, undeclared 
 
 ## Differences from upstream
 
+- Multiple `packageDir` manifests combine bundled dependencies by package name. If one declares `["first"]` and another declares `["second"]`, both packages are allowed, regardless of directory order. Upstream 2.32.0 replaces array entries by index and can incorrectly report the earlier package as missing. This also applies to object declarations and the `bundleDependencies` spelling.
+
 - Invalid `package.json` errors retain the `The package.json file could not be parsed:` prefix but use Go's JSON parser explanation. For example, `{{` produces a different syntax explanation. Manifest errors point to the start of the source file; upstream uses a synthetic line zero location.
 - JavaScript resolver plugins such as `import/resolver: "webpack"` cannot run in native rules. Use the supported Node or TypeScript resolver and TypeScript path mappings for aliases. Flow `import typeof` syntax is unsupported; TypeScript type-only imports are supported.
 

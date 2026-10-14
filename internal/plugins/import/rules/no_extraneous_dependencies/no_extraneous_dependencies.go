@@ -167,7 +167,6 @@ func readDependencies(ctx rule.RuleContext, configured any, cwd string) dependen
 	if configured == "" {
 		dirs = nil
 	}
-	bundled := map[int]string{}
 	explicit := len(dirs) > 0
 	if !explicit {
 		dirs = []string{ctx.Program().NearestPackageJSONDirectory(tspath.GetDirectoryPath(ctx.SourceFile.FileName()))}
@@ -201,8 +200,10 @@ func readDependencies(ctx rule.RuleContext, configured any, cwd string) dependen
 				if !truthy(pkg["bundleDependencies"]) {
 					value = raw["bundledDependencies"]
 				}
-				for index, name := range bundleNames(value) {
-					bundled[index] = name
+				// Combine package names across manifests; upstream assigns array
+				// indices and can overwrite an earlier bundled declaration.
+				for _, name := range bundleNames(value) {
+					result[i][name] = true
 				}
 			} else if obj, ok := pkg[field].(map[string]any); ok {
 				for name := range obj {
@@ -210,9 +211,6 @@ func readDependencies(ctx rule.RuleContext, configured any, cwd string) dependen
 				}
 			}
 		}
-	}
-	for _, name := range bundled {
-		result[4][name] = true
 	}
 	return result
 }
@@ -240,35 +238,23 @@ func realPackageName(ctx rule.RuleContext, resolved string) string {
 	return ""
 }
 
-// JSON object key order matters because upstream converts object bundles to
-// arrays and merges multiple manifests by array index. Decode keys in order.
+// npm accepts bundled declarations as either an array or an object. Since
+// manifests are combined by package name, object key order is irrelevant.
 func bundleNames(raw json.RawMessage) []string {
 	var values []string
 	if json.Unmarshal(raw, &values) == nil {
 		return values
 	}
-	decoder := json.NewDecoder(strings.NewReader(string(raw)))
-	token, err := decoder.Token()
-	if err != nil || token != json.Delim('{') {
+	var object map[string]json.RawMessage
+	if json.Unmarshal(raw, &object) != nil {
 		return nil
 	}
-	for decoder.More() {
-		key, err := decoder.Token()
-		if err != nil {
-			return nil
-		}
-		var ignored json.RawMessage
-		if decoder.Decode(&ignored) != nil {
-			return nil
-		}
-		name, ok := key.(string)
-		if !ok {
-			return nil
-		}
+	for name := range object {
 		values = append(values, name)
 	}
 	return values
 }
+
 func truthy(value any) bool {
 	switch value := value.(type) {
 	case nil:
