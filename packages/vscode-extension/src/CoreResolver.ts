@@ -53,6 +53,19 @@ export class CoreNotFoundError extends Error {
   }
 }
 
+/**
+ * The final standalone release only drives the `@rslint/core` line it was
+ * released against; later lines belong to the Rstack extension.
+ */
+export class UnsupportedCoreVersionError extends Error {
+  public constructor(version: string) {
+    super(
+      `Rslint has moved into the [Rstack](https://github.com/rstackjs/rstack-editor) extension. The Rslint extension only supports ${CORE_PACKAGE_NAME} ^0.9.0 (found ${version}). Please install Rstack.`,
+    );
+    this.name = 'UnsupportedCoreVersionError';
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -150,6 +163,11 @@ async function loadInstallation(
   physicalDirectory: string,
 ): Promise<CoreInstallation> {
   const packageJson = await readPackageJson(packageDirectory);
+  // Reject an unsupported core before any of its modules run in this process.
+  // `^0.9.0`, including 0.9.x prereleases such as `0.9.4-canary.*`.
+  if (!/^0\.9\.\d+(?:[-+]|$)/.test(packageJson.version)) {
+    throw new UnsupportedCoreVersionError(packageJson.version);
+  }
   const configLoaderPath = resolveExport(packageDirectory, 'config-loader');
   const pluginHostPath = resolveExport(packageDirectory, 'eslint-plugin');
   const configLoaderModule = loadModule(configLoaderPath);

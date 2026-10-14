@@ -134,7 +134,7 @@ The directory map below folds the high-level module relationships into the packa
 | `packages/rslint-wasm/`        | Browser/WASM package for running `rslint --api` in a worker                                                                    | Starts the browser worker, hosts the wasm runtime, and bridges website Playground requests through `internal/api` and `internal/api/server` to `internal/linter` and `internal/inspector`                                                                                                                                                                                                                                                   |
 | `packages/rule-tester/`        | Forked `@typescript-eslint/rule-tester` package used in tests                                                                  | JS-side rule testing support that complements Go-side helpers                                                                                                                                                                                                                                                                                                                                                                               |
 | `packages/utils/`              | Shared JavaScript utilities                                                                                                    | Shared support package for the JS/website tooling layer                                                                                                                                                                                                                                                                                                                                                                                     |
-| `packages/vscode-extension/`   | VS Code extension for IDE integration                                                                                          | Activation first checks whether `rstack.rstack` with `rstack.rslint.enable` on takes over; if so, this extension stands down and shows only its migration status bar item. Otherwise it resolves the nearest project-local `@rslint/core` per open document, launches that installation's `cmd/rslint --lsp`, serves reverse config/plugin requests, and routes diagnostics/code actions to the document's selected runtime                 |
+| `packages/vscode-extension/`   | VS Code extension for IDE integration                                                                                          | Activation first checks whether an enabled `rstack.rstack` takes over; if so, this extension stands down to a status bar item and an uninstall prompt. Otherwise it resolves the nearest project-local `@rslint/core` per open document, rejects cores outside `^0.9.0`, launches that installation's `cmd/rslint --lsp`, serves reverse config/plugin requests, and routes diagnostics/code actions to the document's selected runtime     |
 | `packages/tsgo/`               | `@rslint/tsgo-server` JS wrapper package for the `tsgo` tool                                                                   | JavaScript-facing wrapper around `cmd/tsgo` output; resolves the matching `@rslint/tsgo-server-<platform>-<arch>` binary package                                                                                                                                                                                                                                                                                                            |
 | `typescript-go/`               | Git submodule containing TypeScript compiler Go port                                                                           | Provides parser, AST, checker, `Program`, `project.Session`, diagnostics, scanner, and VFS primitives used throughout the backend                                                                                                                                                                                                                                                                                                           |
 | `shim/`                        | Generated bridge packages exposing ts-go internals                                                                             | Bridge layer between repository Go code and `typescript-go` internals; generated and updated by `tools/`                                                                                                                                                                                                                                                                                                                                    |
@@ -1052,19 +1052,25 @@ The transport and target phase differ by surface:
   ignores and negations therefore participate in staged reachability and are
   published exactly once; an empty catalog uses the same override directly.
 - Extension activation makes a one-time stand-down decision through
-  `rstackEditorTakesOver()`. The migration notice in `src/migrationNotice.ts`
-  is always created, but when `rstack.rstack` has `rstack.rslint.enable` on,
-  `Extension`, `RuntimeManager`, and LSP startup are skipped entirely. A live
-  language client cannot be added or removed safely after activation, so later
-  Rstack state changes only switch the notice to a reload prompt. Whichever
+  `rstackEditorTakesOver()`: an enabled `rstack.rstack` alone takes over, and
+  `Extension`, `RuntimeManager`, and LSP startup are skipped entirely. The
+  migration status bar item and prompts in `src/migrationNotice.ts` never block
+  activation; the prompts keep their "Don't show again" flags in `globalState`.
+  Standing down prompts to uninstall this extension. Otherwise `RuntimeManager`
+  reports each ready runtime; the first one prompts once to install Rstack
+  unless an unsupported core was reported earlier. A live language client
+  cannot be added or removed safely after activation, so later Rstack state
+  changes only switch the status bar item to a reload prompt. Whichever
   extension activated the Rslint language server retains ownership of it.
 - The extension owns shared UI, commands, and output channels once. For each
   open supported file, `CoreResolver` follows normal `node_modules` ancestry or
   the resource-scoped `rslint.corePath` override to an exact
   `@rslint/core` package. There is no bundled fallback and no alternate PnP
-  execution path. That package supplies the Go binary, config-module host,
-  protocol version, and lazily loaded ESLint-plugin worker host as one coherent
-  runtime boundary.
+  execution path. The final standalone release reads that package's
+  `package.json` version before loading any core module and rejects versions
+  outside `^0.9.0` with an Install Rstack error; no runtime starts for them.
+  That package supplies the Go binary, config-module host, protocol version,
+  and lazily loaded ESLint-plugin worker host as one coherent runtime boundary.
 - LSP tracing has one window-scoped policy and one extension-owned output
   channel across all runtimes. Each `LanguageClient` uses the same `rslint`
   client ID, so `vscode-languageclient` is the sole authority that reads

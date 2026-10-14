@@ -12,6 +12,7 @@ import {
   CoreNotFoundError,
   CoreResolver,
   resolveCorePackageDirectory,
+  UnsupportedCoreVersionError,
 } from '../../src/CoreResolver';
 
 // require.resolve can retain a Windows 8.3 alias (RUNNER~1) while fs.realpath
@@ -148,7 +149,7 @@ suite('local core resolver', () => {
       '@rslint',
       'core',
     );
-    await createLoadableCore(packageDirectory, '1.2.3');
+    await createLoadableCore(packageDirectory, '0.9.3');
     const first = await createSource('packages/first/src/index.ts');
     const second = await createSource('packages/second/src/index.ts');
 
@@ -162,7 +163,7 @@ suite('local core resolver', () => {
       firstResolution.installation,
       secondResolution.installation,
     );
-    assert.strictEqual(firstResolution.installation.version, '1.2.3');
+    assert.strictEqual(firstResolution.installation.version, '0.9.3');
     await assertSamePhysicalPath(
       firstResolution.installation.packageDirectory,
       packageDirectory,
@@ -187,8 +188,8 @@ suite('local core resolver', () => {
       'core',
     );
     await Promise.all([
-      createLoadableCore(firstCore, '1.0.0'),
-      createLoadableCore(secondCore, '2.0.0'),
+      createLoadableCore(firstCore, '0.9.0'),
+      createLoadableCore(secondCore, '0.9.5'),
     ]);
     const first = await createSource('packages/first/src/index.ts');
     const second = await createSource('packages/second/src/index.ts');
@@ -200,8 +201,8 @@ suite('local core resolver', () => {
     ]);
 
     assert.notStrictEqual(firstResolution.key, secondResolution.key);
-    assert.strictEqual(firstResolution.installation.version, '1.0.0');
-    assert.strictEqual(secondResolution.installation.version, '2.0.0');
+    assert.strictEqual(firstResolution.installation.version, '0.9.0');
+    assert.strictEqual(secondResolution.installation.version, '0.9.5');
   });
 
   test('does not merge separate package copies by version text alone', async () => {
@@ -222,8 +223,8 @@ suite('local core resolver', () => {
       'core',
     );
     await Promise.all([
-      createLoadableCore(firstCore, '1.0.0'),
-      createLoadableCore(secondCore, '1.0.0'),
+      createLoadableCore(firstCore, '0.9.5'),
+      createLoadableCore(secondCore, '0.9.5'),
     ]);
     const first = await createSource('packages/first/src/index.ts');
     const second = await createSource('packages/second/src/index.ts');
@@ -247,7 +248,7 @@ suite('local core resolver', () => {
       'vendor',
       'rslint-core',
     );
-    await createLoadableCore(packageDirectory, '3.0.0');
+    await createLoadableCore(packageDirectory, '0.9.4-canary.1790213192');
     const document = await createSource('src/index.ts');
 
     const resolved = await new CoreResolver().resolve(
@@ -260,7 +261,10 @@ suite('local core resolver', () => {
       resolved.installation.packageDirectory,
       packageDirectory,
     );
-    assert.strictEqual(resolved.installation.version, '3.0.0');
+    assert.strictEqual(
+      resolved.installation.version,
+      '0.9.4-canary.1790213192',
+    );
   });
 
   test('rejects a core package whose binary is missing', async () => {
@@ -270,13 +274,59 @@ suite('local core resolver', () => {
       '@rslint',
       'core',
     );
-    await createLoadableCore(packageDirectory, '1.0.0');
+    await createLoadableCore(packageDirectory, '0.9.5');
     await fs.rm(path.join(packageDirectory, 'rslint'));
     const document = await createSource('src/index.ts');
 
     await assert.rejects(
       new CoreResolver().resolve(document, temporaryWorkspaceFolder()),
       /Rslint binary does not exist/,
+    );
+  });
+
+  for (const version of ['0.10.0', '0.10.0-canary.1', '0.8.2']) {
+    test(`rejects core ${version} before loading its modules`, async () => {
+      const packageDirectory = path.join(
+        temporaryDirectory,
+        'node_modules',
+        '@rslint',
+        'core',
+      );
+      await createLoadableCore(packageDirectory, version);
+      // Any module load would throw this sentinel instead of the guard error.
+      await fs.writeFile(
+        path.join(packageDirectory, 'config-loader.js'),
+        'throw new Error("unsupported core module was loaded");\n',
+      );
+      const document = await createSource('src/index.ts');
+
+      await assert.rejects(
+        new CoreResolver().resolve(document, temporaryWorkspaceFolder()),
+        (error: unknown) => {
+          assert.ok(error instanceof UnsupportedCoreVersionError);
+          assert.ok(
+            error.message.includes(
+              `only supports @rslint/core ^0.9.0 (found ${version})`,
+            ),
+          );
+          return true;
+        },
+      );
+    });
+  }
+
+  test('rejects an unsupported configured corePath', async () => {
+    const packageDirectory = path.join(temporaryDirectory, 'vendor', 'core');
+    await createLoadableCore(packageDirectory, '0.10.0');
+    const document = await createSource('src/index.ts');
+
+    await assert.rejects(
+      new CoreResolver().resolve(
+        document,
+        temporaryWorkspaceFolder(),
+        './vendor/core',
+      ),
+      UnsupportedCoreVersionError,
     );
   });
 

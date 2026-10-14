@@ -1,6 +1,6 @@
 {
   "name": "rslint",
-  "displayName": "Rslint",
+  "displayName": "Rslint (moved to Rstack)",
   "description": "Language support for Rslint",
   "version": "0.9.5",
   "icon": "images/icon.png",

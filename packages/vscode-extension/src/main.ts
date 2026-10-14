@@ -3,6 +3,7 @@ import { Extension } from './Extension';
 import { Logger } from './logger';
 import {
   createMigrationNotice,
+  MigrationNotices,
   rstackEditorTakesOver,
 } from './migrationNotice';
 
@@ -13,11 +14,19 @@ export async function activate(context: ExtensionContext): Promise<void> {
   const logger = new Logger('Rslint (extension)').useDefaultLogLevel();
   context.subscriptions.push(logger);
 
+  const notices = new MigrationNotices(
+    context.globalState,
+    context.extension.id,
+    logger,
+  );
   const standingDown = rstackEditorTakesOver();
   createMigrationNotice(context, standingDown, logger);
-  if (standingDown) return;
+  if (standingDown) {
+    void notices.showMigrationPrompt(true);
+    return;
+  }
 
-  extension = new Extension(logger);
+  extension = new Extension(logger, notices);
 
   try {
     extension.activate();
