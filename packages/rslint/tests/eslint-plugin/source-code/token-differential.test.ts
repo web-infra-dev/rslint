@@ -9,6 +9,7 @@
  */
 import { describe, test, expect } from 'rstack/test';
 import * as espree from 'espree';
+import { parse as parseUpstream } from '@typescript-eslint/parser';
 import { projectSyntax } from '../../languages/js/project-frame.js';
 
 import { buildTokens } from '../../../src/languages/js/token-builder.js';
@@ -23,9 +24,13 @@ function fmt(t: {
   type: string;
   value: string;
   range: readonly [number, number];
+  loc: {
+    start: { line: number; column: number };
+    end: { line: number; column: number };
+  };
   regex?: { pattern: string; flags: string } | null;
 }): string {
-  const base = `${t.type}:${t.value}@${t.range[0]}-${t.range[1]}`;
+  const base = `${t.type}:${t.value}@${t.range[0]}-${t.range[1]}:${t.loc.start.line}:${t.loc.start.column}-${t.loc.end.line}:${t.loc.end.column}`;
   return t.regex ? `${base}|re(${t.regex.pattern}/${t.regex.flags})` : base;
 }
 
@@ -50,6 +55,7 @@ function espreeTokens(src: string, lang: Lang): string[] {
     ecmaFeatures: { jsx: lang === 'jsx' },
     tokens: true,
     range: true,
+    loc: true,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any) as any;
   return ast.tokens.map(fmt);
@@ -57,6 +63,19 @@ function espreeTokens(src: string, lang: Lang): string[] {
 
 // [label, source, lang] — covers what the deleted lexer unit tests exercised.
 const JS_CASES: ReadonlyArray<readonly [string, string, Lang]> = [
+  ...['>', '>=', '>>', '>>>', '>>=', '>>>='].map(
+    (operator) =>
+      [
+        `greater-than operator ${operator}`,
+        `let left = 8; left ${operator} 1;`,
+        'js',
+      ] as const,
+  ),
+  [
+    'compound operators surrounded by trivia',
+    '// 😀\nlet left = 8; left /* > */ >>= /* > */ 1; left /* >= */ >>>= 1;',
+    'js',
+  ],
   // regex vs division (parser-driven disambiguation)
   ['regex after ctrl-paren', 'if (x) /re/.test(y)', 'js'],
   ['division after call', 'const a = f(x) / 2', 'js'],
@@ -138,6 +157,26 @@ const JS_CASES: ReadonlyArray<readonly [string, string, Lang]> = [
     'jsx',
   ],
   ['jsx namespaced name', 'const e = <a:b c:d="e" />', 'jsx'],
+  [
+    'jsx attribute ending in backslash',
+    String.raw`const e = <A value="\" />; next();`,
+    'jsx',
+  ],
+  [
+    'jsx single-quoted attribute ending in backslash',
+    String.raw`const e = <A value='\' />; next();`,
+    'jsx',
+  ],
+  [
+    'jsx multiline attribute',
+    'const e = <A value="first\nsecond" other="end" />; next();',
+    'jsx',
+  ],
+  [
+    'jsx multiline attribute with backslash and Unicode',
+    'const e = <A value="😀\\\r\n世界" />; next();',
+    'jsx',
+  ],
   ['jsx nested children', 'const e = <ul><li>a</li><li>b</li></ul>', 'jsx'],
   ['jsx entity text', 'const e = <p>a &amp; b &#169;</p>', 'jsx'],
   [
@@ -170,6 +209,32 @@ describe('token differential: Go frame tokens == espree.parse tokens (.js/.jsx)'
 // .ts: espree can't parse TypeScript. Hand-pinned `type:value` expectations, verified against
 // @typescript-eslint/typescript-estree during the M3 spike (keyword split + this + as-const).
 describe('token differential: Go frame token types for TypeScript (.ts)', () => {
+  for (const src of [
+    'let left = 8; left >= 1; left >> 1; left >>> 1; left >>= 1; left >>>= 1;',
+    'type T = A<B<C<D>>>; let value: A<B<C>>=input; const shifted=left>>right;',
+    'const result = f<A<B<C>>>(left >>> 1); const check = left >= right;',
+    'type T = A<B<C>>; const e = <A value="\\" />; const shifted = left >> right;',
+  ]) {
+    test(`contextual greater-than tokens: ${src}`, () => {
+      const filePath = src.includes('<A value=') ? 't.tsx' : 't.ts';
+      const p = projectSyntax(filePath, src);
+      const actual = buildTokens(
+        p.tokenTypes,
+        p.tokenStarts,
+        p.tokenEnds,
+        src,
+        buildLineStartOffsets(src),
+      );
+      const expected = parseUpstream(src, {
+        filePath,
+        range: true,
+        loc: true,
+        tokens: true,
+      });
+      expect(actual.map(fmt)).toEqual(expected.tokens!.map(fmt));
+    });
+  }
+
   function tsTokens(src: string): string[] {
     const p = projectSyntax('t.ts', src, 'module');
     return buildTokens(

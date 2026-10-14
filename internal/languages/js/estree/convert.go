@@ -909,9 +909,13 @@ func (p *estreeProjector) convertBindingElement(node *ast.Node) uint32 {
 			p.listValue(nil), nodeValue(value), boolValue(false), undefinedValue())
 	}
 	if n.Initializer != nil {
+		start := p.nodes[value-1].start
 		value = p.addNode("AssignmentPattern", node,
 			p.listValue(nil), nodeValue(value), boolValue(false),
 			nodeValue(p.convert(n.Initializer, false)), undefinedValue())
+		// A renamed object's BindingElement includes its source property key;
+		// only the binding value belongs to the AssignmentPattern.
+		p.nodes[value-1].start = start
 	}
 	// Object binding elements become ESTree Property nodes, but array binding
 	// elements are patterns directly. tsgo uses BindingElement for both shapes;
@@ -932,6 +936,7 @@ func (p *estreeProjector) convertBindingElement(node *ast.Node) uint32 {
 
 func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 	n := node.AsBinaryExpression()
+	p.recordTokenCover(n.OperatorToken)
 	operator := scanner.TokenToString(n.OperatorToken.Kind)
 	if n.OperatorToken.Kind == ast.KindCommaToken {
 		left := p.convert(n.Left, false)
@@ -1111,28 +1116,21 @@ func (p *estreeProjector) convertMethod(node *ast.Node) uint32 {
 	}
 	p.nodes[value-1].start = p.offsets.At(functionStart)
 	kind := "method"
+	var key uint32
 	switch node.Kind {
 	case ast.KindGetAccessor:
 		kind = "get"
 	case ast.KindSetAccessor:
 		kind = "set"
 	case ast.KindConstructor:
-		kind = "constructor"
-		if name == nil {
-			start, end := p.rangeOf(node)
-			name = nil
-			key := p.add("Identifier", start, min(end, start+11),
-				p.listValue(nil), p.stringValue("constructor"), boolValue(false), undefinedValue())
-			if node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
-				return p.addNode("Property", node,
-					nodeValue(key), nodeValue(value), p.stringValue("init"), boolValue(true),
-					boolValue(false), boolValue(false), boolValue(false))
-			}
-			return p.addNode("MethodDefinition", node,
-				p.accessibility(node), boolValue(false), p.decorators(node), nodeValue(key),
-				p.stringValue(kind), boolValue(false), boolValue(p.hasModifier(node, ast.ModifierFlagsOverride)),
-				boolValue(p.hasModifier(node, ast.ModifierFlagsStatic)), nodeValue(value))
+		// tsgo also uses Constructor for a static method named constructor.
+		if !p.hasModifier(node, ast.ModifierFlagsStatic) {
+			kind = "constructor"
 		}
+		key = p.constructorKey(node)
+	}
+	if key == 0 {
+		key = p.convert(name, false)
 	}
 	computed := name != nil && name.Kind == ast.KindComputedPropertyName
 	optional := false
@@ -1145,7 +1143,7 @@ func (p *estreeProjector) convertMethod(node *ast.Node) uint32 {
 			propertyKind = "init"
 		}
 		return p.addNode("Property", node,
-			nodeValue(p.convert(name, false)), nodeValue(value), p.stringValue(propertyKind), boolValue(kind == "method"),
+			nodeValue(key), nodeValue(value), p.stringValue(propertyKind), boolValue(kind == "method"),
 			boolValue(false), boolValue(computed), boolValue(optional))
 	}
 	methodType := "MethodDefinition"
@@ -1153,9 +1151,36 @@ func (p *estreeProjector) convertMethod(node *ast.Node) uint32 {
 		methodType = "TSAbstractMethodDefinition"
 	}
 	return p.addNode(methodType, node,
-		p.accessibility(node), boolValue(computed), p.decorators(node), nodeValue(p.convert(name, false)),
+		p.accessibility(node), boolValue(computed), p.decorators(node), nodeValue(key),
 		p.stringValue(kind), boolValue(optional), boolValue(p.hasModifier(node, ast.ModifierFlagsOverride)),
 		boolValue(p.hasModifier(node, ast.ModifierFlagsStatic)), nodeValue(value))
+}
+
+func (p *estreeProjector) constructorKey(node *ast.Node) uint32 {
+	// tsgo omits the constructor name node. The keyword or quoted name is
+	// the first token after its parsed modifiers, regardless of trivia.
+	start := node.Pos()
+	if modifiers := node.Modifiers(); modifiers != nil && len(modifiers.Nodes) > 0 {
+		start = modifiers.Nodes[len(modifiers.Nodes)-1].End()
+	}
+	scan := scanner.NewScanner()
+	scan.SetText(p.text)
+	scan.SetSkipTrivia(true)
+	scan.ResetTokenState(start)
+	kind := scan.Scan()
+	start, end := scan.TokenStart(), scan.TokenEnd()
+	switch kind {
+	case ast.KindConstructorKeyword:
+		return p.add("Identifier", p.offsets.At(start), p.offsets.At(end),
+			p.listValue(nil), p.stringValue("constructor"), boolValue(false), undefinedValue())
+	case ast.KindStringLiteral:
+		if scan.TokenValue() == "constructor" {
+			return p.add("Literal", p.offsets.At(start), p.offsets.At(end),
+				p.stringValue("constructor"), p.stringValue(p.text[start:end]),
+				undefinedValue(), undefinedValue(), undefinedValue())
+		}
+	}
+	panic(errors.New("missing constructor name token"))
 }
 
 func (p *estreeProjector) convertPropertyDefinition(node *ast.Node) uint32 {

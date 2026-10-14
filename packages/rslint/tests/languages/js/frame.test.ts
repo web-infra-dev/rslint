@@ -16,6 +16,7 @@ import {
   buildUtf16ToByteMap,
 } from '../../../src/languages/js/positions.js';
 import type { ESTreeNode } from '../../../src/languages/js/types.js';
+import type { RuleContext } from '../../../src/eslint-plugin/linter/context.js';
 
 function projectAST(filePath: string, text: string): ESTreeNode {
   const parsed = projectSyntax(filePath, text, 'module');
@@ -376,6 +377,11 @@ function canonical(value: unknown): unknown {
 
 describe('Go projection matches canonical ESTree', () => {
   const cases = [
+    'const {source: local = 1, [key]: other = 2, nested: {value} = fallback} = input; function f({source: local = 1}) {} const [item = 1] = list;',
+    '// 😀\nclass C { private /* constructor in trivia */ constructor /* ( */ () {} } class D { protected\nconstructor() {} }',
+    'class C { private constructor(x: number); private constructor(x: number) {} }',
+    String.raw`class C { "constructor"() {} } class D { 'constr\u0075ctor'() {} }`,
+    'class C { static constructor() {} static "constructor"() {} }',
     'function f(...xs: string[]) {} function g(x?: number, y: number = 1) {} class C { constructor(public readonly x: number = 1) {} }',
     'abstract class C<T> extends Base<T> implements ns.I<T> { abstract f(x?: T): T; accessor x = 1; readonly y!: T; constructor(public a: T) {} static { init() } get z() { return this.y; } set z(v:T) {} }',
     'export interface I<T extends string = string> extends ns.Base<T> { readonly x?: T; f<U>(x: U): T; [key: string]: T; new(x: T): I<T> } type A<T> = { -readonly [K in keyof T as K]-?: T[K] }; type B = (x: number) => string; type C = [a: string, ...rest: number[], b?: string]; type D<T> = T extends infer U ? U : never; type E = (string | null); type G = new<T>(x:T) => I<T>;',
@@ -416,6 +422,166 @@ describe('Go projection matches canonical ESTree', () => {
       }
     });
   }
+});
+
+describe('projected ranges used by plugin diagnostics and fixes', () => {
+  const cases = [
+    {
+      text: '// 😀\nconst { source: local = 1 } = input;',
+      selector: 'AssignmentPattern',
+      target: 'local = 1',
+      replacement: 'local',
+      expected: '// 😀\nconst { source: local } = input;',
+    },
+    {
+      text: 'const { [key]: local = 1 } = input;',
+      selector: 'AssignmentPattern',
+      target: 'local = 1',
+      replacement: 'local',
+      expected: 'const { [key]: local } = input;',
+    },
+    {
+      text: 'const [local = 1] = input;',
+      selector: 'AssignmentPattern',
+      target: 'local = 1',
+      replacement: 'local',
+      expected: 'const [local] = input;',
+    },
+    {
+      text: '// 😀\nclass C { private /* constructor */ constructor() {} }',
+      selector: 'MethodDefinition[kind="constructor"]',
+      target: 'constructor',
+      replacement: '"constructor"',
+      expected:
+        '// 😀\nclass C { private /* constructor */ "constructor"() {} }',
+    },
+    {
+      text: 'const valid = left >= right;',
+      selector: 'BinaryExpression',
+      target: '>=',
+      replacement: '>',
+      expected: 'const valid = left > right;',
+    },
+  ];
+  for (const fixture of cases) {
+    test(fixture.text, async () => {
+      const { lintFile } = await import('../../eslint-plugin/project-frame.js');
+      const result = lintFile(
+        {
+          filePath: 'ranges.ts',
+          text: fixture.text,
+          rules: { 'probe/range': { options: [] } },
+          collectFixes: true,
+          suggestionsMode: 'off',
+        },
+        {
+          plugins: [],
+          rules: new Map([
+            [
+              'probe/range',
+              {
+                meta: { fixable: 'code' },
+                create(ctx: RuleContext) {
+                  return {
+                    [fixture.selector](candidate: ESTreeNode) {
+                      const node =
+                        candidate.type === 'MethodDefinition'
+                          ? (candidate.key as ESTreeNode)
+                          : candidate.type === 'BinaryExpression'
+                            ? (ctx.sourceCode.getFirstTokenBetween(
+                                candidate.left as ESTreeNode,
+                                candidate.right as ESTreeNode,
+                              )! as unknown as ESTreeNode)
+                            : candidate;
+                      expect(ctx.sourceCode.getText(node)).toBe(fixture.target);
+                      ctx.report({
+                        node,
+                        message: 'selected range',
+                        fix: (fixer) =>
+                          fixer.replaceText(node, fixture.replacement),
+                      });
+                    },
+                  };
+                },
+              },
+            ],
+          ]),
+        },
+      );
+      expect(result.diagnostics).toHaveLength(1);
+      const start = Buffer.byteLength(
+        fixture.text.slice(0, fixture.text.lastIndexOf(fixture.target)),
+      );
+      const end = start + Buffer.byteLength(fixture.target);
+      expect(result.diagnostics[0].startPos).toBe(start);
+      expect(result.diagnostics[0].endPos).toBe(end);
+      expect(result.fixes).toEqual([
+        { range: [start, end], text: fixture.replacement },
+      ]);
+      const bytes = Buffer.from(fixture.text);
+      const applied = Buffer.concat([
+        bytes.subarray(0, start),
+        Buffer.from(result.fixes[0].text),
+        bytes.subarray(end),
+      ]).toString();
+      expect(applied).toBe(fixture.expected);
+      expect(() =>
+        parseUpstream(applied, { filePath: 'ranges.ts' }),
+      ).not.toThrow();
+    });
+  }
+
+  test('JSX attribute boundaries preserve subsequent tokens and comments', async () => {
+    const { lintFile } = await import('../../eslint-plugin/project-frame.js');
+    const text = String.raw`const e = <A value="\" />; /* after */ next();`;
+    let visited = false;
+    const result = lintFile(
+      {
+        filePath: 'attribute.jsx',
+        text,
+        rules: { 'probe/tokens': { options: [] } },
+        collectFixes: false,
+        suggestionsMode: 'off',
+      },
+      {
+        plugins: [],
+        rules: new Map([
+          [
+            'probe/tokens',
+            {
+              create(ctx: RuleContext) {
+                return {
+                  JSXOpeningElement(node: ESTreeNode) {
+                    visited = true;
+                    const attributes = node.attributes as ESTreeNode[];
+                    const value = attributes[0].value as ESTreeNode;
+                    expect(ctx.sourceCode.getText(value)).toBe(String.raw`"\"`);
+                    expect(ctx.sourceCode.getTokenAfter(value)!.value).toBe(
+                      '/',
+                    );
+                    expect(ctx.sourceCode.getLastToken(node)!.value).toBe('>');
+                    const comments = ctx.sourceCode.getAllComments();
+                    expect(comments.map((comment) => comment.value)).toEqual([
+                      ' after ',
+                    ]);
+                    expect(
+                      ctx.sourceCode.getTokenAfter(node, { skip: 1 })!.value,
+                    ).toBe('next');
+                    expect(
+                      ctx.sourceCode.getTokenAfter(node, { skip: 1 })!.loc.start
+                        .column,
+                    ).toBe(text.indexOf('next'));
+                  },
+                };
+              },
+            },
+          ],
+        ]),
+      },
+    );
+    expect(visited).toBe(true);
+    expect(result.ruleErrors ?? []).toEqual([]);
+  });
 });
 
 test('parenthesized constructor type arguments stay on NewExpression', () => {
