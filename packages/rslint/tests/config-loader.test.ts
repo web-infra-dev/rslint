@@ -176,7 +176,7 @@ describe('normalizeConfig', () => {
   });
 
   test.each([3, 'fatal', [], [3], {}, null])(
-    'rejects invalid rule configuration %p',
+    'rejects invalid rule configuration %j',
     (ruleValue) => {
       expect(() =>
         normalizeConfig([{ rules: { example: ruleValue } }]),
@@ -237,7 +237,7 @@ describe('normalizeConfig', () => {
   });
 
   test.each([null, undefined, 42, 'string'])(
-    'rejects non-object config entry %p',
+    'rejects non-object config entry %j',
     (entry) => {
       expect(() => normalizeConfig([entry])).toThrow(/must be an object|null/);
     },
@@ -313,7 +313,7 @@ describe('normalizeConfig', () => {
   });
 
   test.each([null, undefined, 42, {}, []])(
-    'rejects invalid basePath %p',
+    'rejects invalid basePath %j',
     (basePath) => {
       expect(() => normalizeConfig([{ basePath }])).toThrow(
         '"basePath" must be a string',
@@ -355,7 +355,7 @@ describe('normalizeConfig', () => {
   });
 
   test.each([null, [], { value: 'invalid' }, { ' padded ': 'readonly' }])(
-    'rejects invalid globals value %p',
+    'rejects invalid globals value %j',
     (globals) => {
       expect(() => normalizeConfig([{ languageOptions: { globals } }])).toThrow(
         /globals|global/,

@@ -4,6 +4,7 @@ import {
   globals,
   importPlugin,
   js,
+  rstestPlugin,
   ts,
 } from '@rslint/core';
 
@@ -40,6 +41,20 @@ export default defineConfig([
   js.configs.recommended,
   ts.configs.recommendedTypeChecked,
   importPlugin.configs.recommended,
+  {
+    files: ['**/*.test.{ts,tsx,mjs}'],
+    ...rstestPlugin.configs.recommended,
+    rules: {
+      ...rstestPlugin.configs.recommended.rules,
+      // Parameterized tests use branches to assert mode-specific behavior.
+      'rstest/no-conditional-expect': 'off',
+      'rstest/valid-expect': ['error', { maxArgs: 2 }],
+      'rstest/expect-expect': [
+        'warn',
+        { assertFunctionNames: ['expect', 'assert', 'runExitFixture'] },
+      ],
+    },
+  },
   {
     rules: {
       // The default Node resolver cannot resolve TypeScript source imports.

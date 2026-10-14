@@ -2227,6 +2227,7 @@ describe('IpcClient terminal cleanup', () => {
       const memory = createMemoryTransport();
       const client = new IpcClient(input, output, { memoryTransport: memory });
       let completed = 0;
+      // eslint-disable-next-line rstest/valid-expect-in-promise -- Awaited below after triggering session termination.
       const completedSession = client.done.then((reason) => {
         completed++;
         // Completion observes fully detached streams and released storage.
