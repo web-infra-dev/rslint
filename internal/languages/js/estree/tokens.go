@@ -73,7 +73,10 @@ func scanTokensAndCommentsInto(
 			cover = covers[coverIndex-1]
 		}
 		coverEnd := int(cover.end)
-		if covered && (isReplacementKind(cover.kind) ||
+		// The syntax tree resolves contexts a plain scanner cannot: compound
+		// '>' operators versus generic closers, and JSX strings without JS escapes.
+		if covered && (isReplacementKind(cover.kind) || cover.typeCode == tokenPunctuator ||
+			cover.typeCode == tokenJSXTextAttribute ||
 			(cover.typeCode == tokenJSXIdentifier && coverEnd > end)) {
 			kind = cover.kind
 			end = coverEnd
@@ -116,6 +119,11 @@ func coverForNode(file *ast.SourceFile, node *ast.Node) (tokenCover, int, bool) 
 	start := node.Pos()
 	cover := tokenCover{kind: node.Kind, end: uint32(node.End())}
 	switch node.Kind {
+	case ast.KindGreaterThanEqualsToken, ast.KindGreaterThanGreaterThanToken,
+		ast.KindGreaterThanGreaterThanGreaterThanToken, ast.KindGreaterThanGreaterThanEqualsToken,
+		ast.KindGreaterThanGreaterThanGreaterThanEqualsToken:
+		start = scanner.GetTokenPosOfNode(node, file, false)
+		cover.typeCode = tokenPunctuator
 	case ast.KindIdentifier:
 		start = scanner.GetTokenPosOfNode(node, file, false)
 		cover.typeCode = tokenIdentifier

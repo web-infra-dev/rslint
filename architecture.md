@@ -1697,6 +1697,9 @@ strings without a temporary code-unit array. Empty wire lists share a single
 record, while each Node-side read still creates an independent mutable array.
 Token coverage uses a private, source-ordered scalar buffer; the scanner walks
 it alongside tokens, preserving the last cover at repeated source positions.
+Parsed compound operators retain their full spans while TypeScript generic
+closers remain separate. JSX attribute strings use their parsed boundaries,
+including literal backslashes and line breaks.
 After the transport copies frames into shared storage or encodes inline fallback,
 oversized original buffers can be collected while Node executes rules. Shared slots still
 require the existing reader release acknowledgement before reuse. A single
