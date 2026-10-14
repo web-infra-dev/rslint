@@ -39,6 +39,7 @@ func TestExtras(t *testing.T) {
 		{Code: `import "alias";`, Options: map[string]any{"packageDir": "aliases"}},
 		{Code: `import "@generated/foo";`, Options: map[string]any{"packageDir": []any{"broken", "tests/files"}}},
 		{Code: `import "@generated/bar";`, Options: map[string]any{"packageDir": []any{"one", "two"}}},
+		{Code: `import "@generated/foo";`, Options: map[string]any{"packageDir": []any{"one", "two"}}},
 		{Code: `import "alias";`, Options: map[string]any{"packageDir": "tests/files/monorepo/packages/nested-package"}},
 		{Code: `import "alias/sub";`, Options: map[string]any{"packageDir": "tests/files/monorepo/packages/nested-package"}},
 		{Code: `import "eslint";`, Options: map[string]any{"devDependencies": false, "peerDependencies": true, "packageDir": "tests/files"}},
@@ -46,7 +47,6 @@ func TestExtras(t *testing.T) {
 		{Code: `import("not-a-dependency")`, Errors: missing("not-a-dependency", 1, 1, 1, 27)},
 		{Code: `(require)("not-a-dependency")`, Errors: missing("not-a-dependency", 1, 1, 1, 30)},
 		{Code: "// 🙂\nimport {\n  value\n} from 'not-a-dependency';", Errors: missing("not-a-dependency", 2, 1, 4, 27)},
-		{Code: `import "@generated/foo";`, Options: map[string]any{"packageDir": []any{"one", "two"}}, Errors: missing("@generated/foo", 1, 1, 1, 25)},
 		{Code: `import "alias";`, Options: map[string]any{"packageDir": "empty"}, Errors: missing("react", 1, 1, 1, 16)},
 		{Code: `import "not-a-dependency";`, Options: map[string]any{"includeInternal": true}, Settings: map[string]any{"import/internal-regex": "^not-a-dependency"}, Errors: missing("not-a-dependency", 1, 1, 1, 27)},
 		{Code: `import {type A, B} from "not-a-dependency";`, Errors: missing("not-a-dependency", 1, 1, 1, 44)},
@@ -108,4 +108,45 @@ func TestResolvedExternalClassification(t *testing.T) {
 		{Code: `import "fs"; import "node:fs";`, Options: options},
 		{Code: `import "-pkg";`, Settings: map[string]any{"import/external-module-folders": []any{}}},
 	}, invalid)
+}
+
+func TestBundledPackageDirUnion(t *testing.T) {
+	for _, manifests := range []struct{ name, first, second string }{
+		{"arrays", `{"bundledDependencies":["first"]}`, `{"bundledDependencies":["second"]}`},
+		{"array-object", `{"bundleDependencies":["first"]}`, `{"bundledDependencies":{"second":"*"}}`},
+		{"object-array", `{"bundledDependencies":{"first":"*"}}`, `{"bundleDependencies":["second"]}`},
+		{"objects", `{"bundleDependencies":{"first":"*"}}`, `{"bundleDependencies":{"second":"*"}}`},
+	} {
+		t.Run(manifests.name, func(t *testing.T) {
+			root := dependencyRoot(t)
+			files := map[string]string{}
+			for name, text := range map[string]string{
+				"one/package.json":                 manifests.first,
+				"two/package.json":                 manifests.second,
+				"node_modules/first/package.json":  `{"name":"first","main":"index.js"}`,
+				"node_modules/first/index.js":      `module.exports={};`,
+				"node_modules/second/package.json": `{"name":"second","main":"index.js"}`,
+				"node_modules/second/index.js":     `module.exports={};`,
+				"priority/package.json":            `{"bundleDependencies":["first"],"bundledDependencies":["second"]}`,
+				"priority-empty/package.json":      `{"bundleDependencies":[],"bundledDependencies":["first"]}`,
+			} {
+				files[tspath.ResolvePath(root.Dir, name)] = text
+			}
+			root.FS = utils.NewOverlayVFS(root.FS, files)
+			code := "import \"first\";\nimport \"second\";"
+			errors := append(missing("first", 1, 1, 1, 16), missing("second", 2, 1, 2, 17)...)
+			valid := []rule_tester.ValidTestCase{{Code: `import "first";`, Options: map[string]any{"packageDir": "priority"}}}
+			invalid := []rule_tester.InvalidTestCase{
+				{Code: `import "second";`, Options: map[string]any{"packageDir": "one"}, Errors: missing("second", 1, 1, 1, 17)},
+				{Code: `import "second";`, Options: map[string]any{"packageDir": "priority"}, Errors: missing("second", 1, 1, 1, 17)},
+				{Code: `import "first";`, Options: map[string]any{"packageDir": "priority-empty"}, Errors: missing("first", 1, 1, 1, 16)},
+			}
+			for _, dirs := range [][]any{{"one", "two"}, {"two", "one"}, {"one", "two", "one"}} {
+				valid = append(valid, rule_tester.ValidTestCase{Code: code, Options: map[string]any{"packageDir": dirs}})
+				invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: map[string]any{"packageDir": dirs, "bundledDependencies": false}, Errors: errors})
+			}
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: map[string]any{"packageDir": []any{"one", "two"}, "bundledDependencies": []any{}}, Errors: errors})
+			rule_tester.RunRuleTester(root, "tsconfig.json", t, &NoExtraneousDependenciesRule, valid, invalid)
+		})
+	}
 }
