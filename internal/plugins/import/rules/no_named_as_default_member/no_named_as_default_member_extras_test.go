@@ -132,3 +132,69 @@ func TestNoNamedAsDefaultMemberExtras(t *testing.T) {
 		},
 	)
 }
+
+func TestNoNamedAsDefaultMemberModuleFormats(t *testing.T) {
+	for _, config := range []string{"tsconfig.json", "tsconfig.bundler.json", "tsconfig.force.json", "tsconfig.jsx.json", "tsconfig.jsx-dev.json"} {
+		t.Run(config, func(t *testing.T) {
+			root := defaultMemberRoot(t, "testdata/module-formats.txtar")
+			for _, tc := range []struct {
+				source string
+				warn   bool
+			}{
+				{"mixed/mjs.mjs", true},
+				{"mixed/mts.mjs", true},
+				{"mixed/dmts.mjs", true},
+				{"generic-esm", true},
+				{"generic-esm-commonjs-scope", true},
+				{"generic-esm-syntax", true},
+				{"generic-esm-import-meta", true},
+				{"generic-esm-named-only", true},
+				{"dcts-esm", true},
+				{"typed-esm", true},
+				{"conditional", true},
+				{"conditional/feature", true},
+				{"custom-condition", true},
+				{"mapped/esm", true},
+				{"#esm", true},
+				{"declarations-only", true},
+				{"./only-cjs.cjs", false},
+				{"./only-esm.mjs", true},
+				{"generic-cjs", false},
+				{"package.d.ts", false},
+				{"null-exports-cjs", false},
+				{"generic-cjs-dynamic-import", false},
+				{"generic-cjs-jsx-opening", false},
+				{"generic-cjs-jsx-self-closing", false},
+				{"generic-cjs-jsx-fragment", false},
+				{"dmts-cjs", false},
+				{"typed-cjs", false},
+				{"esm-scope-cjs", false},
+			} {
+				t.Run(tc.source, func(t *testing.T) {
+					code := "import obj from '" + tc.source + "'; obj.foo; const {foo} = obj;"
+					var valid []rule_tester.ValidTestCase
+					var invalid []rule_tester.InvalidTestCase
+					if tc.warn {
+						invalid = []rule_tester.InvalidTestCase{{Code: code, FileName: "consumer.mts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamedAsDefaultMember"}, {MessageId: "noNamedAsDefaultMember"}}}}
+					} else {
+						valid = []rule_tester.ValidTestCase{{Code: code, FileName: "consumer.mts"}}
+					}
+					rule_tester.RunRuleTester(root, config, t, &no_named_as_default_member.NoNamedAsDefaultMemberRule, valid, invalid)
+				})
+			}
+		})
+	}
+	t.Run("json-runtime", func(t *testing.T) {
+		// A CommonJS consumer receives the JSON object itself as its default,
+		// even when declarations expose the object's keys as named exports.
+		rule_tester.RunRuleTester(defaultMemberRoot(t, "testdata/module-formats.txtar"), "tsconfig.json-runtime.json", t, &no_named_as_default_member.NoNamedAsDefaultMemberRule,
+			[]rule_tester.ValidTestCase{{Code: `import obj from 'json-runtime'; obj.foo; const {foo} = obj;`, FileName: "consumer.cts"}}, nil,
+		)
+	})
+	// Both consumers resolve the same declaration file. The implementation
+	// cache must still distinguish the request's import and require conditions.
+	rule_tester.RunRuleTester(defaultMemberRoot(t, "testdata/module-formats.txtar"), "tsconfig.json", t, &no_named_as_default_member.NoNamedAsDefaultMemberRule,
+		[]rule_tester.ValidTestCase{{Code: `import obj from 'conditional'; obj.foo;`, FileName: "consumer.cts"}},
+		[]rule_tester.InvalidTestCase{{Code: `import obj from 'conditional'; obj.foo;`, FileName: "consumer.mts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamedAsDefaultMember"}}}},
+	)
+}

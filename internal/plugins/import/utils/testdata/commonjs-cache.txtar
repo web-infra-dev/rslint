@@ -1,0 +1,24 @@
+-- tsconfig.json --
+{"compilerOptions":{"noLib":true,"allowJs":true,"noEmit":true,"target":"esnext","module":"nodenext"},"files":["consumer.mts","consumer.cts","second-consumer.mts","node_modules/shared/cjs/index.js"]}
+-- tsconfig.forced.json --
+{"extends":"./tsconfig.json","compilerOptions":{"moduleDetection":"force"}}
+-- package.json --
+{}
+-- consumer.mts --
+import value from "shared";
+-- consumer.cts --
+import value from "shared";
+-- second-consumer.mts --
+import value from "shared/commonjs";
+-- node_modules/shared/package.json --
+{"name":"shared","exports":{".":{"types":"./index.d.ts","import":"./esm/index.js","require":"./cjs/index.js"},"./commonjs":{"types":"./index.d.ts","default":"./cjs/index.js"}},"typesVersions":{"*":{"*":["types/current"]}}}
+-- node_modules/shared/index.d.ts --
+export const foo: number;
+-- node_modules/shared/esm/index.js --
+export default {}; export const foo = 1;
+-- node_modules/shared/cjs/index.js --
+module.exports = {foo: 1};
+-- node_modules/shared/types/current.d.ts --
+export const foo: number;
+-- node_modules/shared/types/current.js --
+module.exports = {foo: 1};

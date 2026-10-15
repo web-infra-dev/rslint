@@ -46,6 +46,13 @@ This rule has no options. It does not provide automatic fixes or suggestions.
 
 ## Differences from upstream
 
+- **CommonJS declarations are checked against their implementation.** For
+  example, `fsExtra.outputFileSync()` is allowed even though `@types/fs-extra`
+  declares `outputFileSync` as a named export. The check follows the importing
+  file's resolution settings and runtime export conditions. Explicit `.mjs` and
+  `.mts` implementations remain ES modules even inside a `type: 'commonjs'`
+  package. If the implementation is unavailable, a generic `.d.ts` file alone
+  does not suppress warnings; an explicit `.d.cts` extension identifies CommonJS.
 - **Checking imports requires access to the imported files.** If you disable both
   `languageOptions.parserOptions.project` and `projectService`, include imported
   files in the lint targets too. For example, checking `app.ts` alone will not
