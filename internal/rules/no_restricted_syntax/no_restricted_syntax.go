@@ -113,16 +113,7 @@ var NoRestrictedSyntaxRule = rule.Rule{
 
 		listeners := make(rule.RuleListeners, len(plan.buckets))
 		for k, bucket := range plan.buckets {
-			switch k {
-			case ast.KindSourceFile:
-				// The engine starts at SourceFile's children. Program enter runs
-				// eagerly, and EOF provides the matching Program exit event.
-				visit(ctx.SourceFile.AsNode(), bucket)
-			case rule.ListenerOnExit(ast.KindSourceFile):
-				listeners[rule.ListenerOnExit(ast.KindEndOfFile)] = func(*ast.Node) { visit(ctx.SourceFile.AsNode(), bucket) }
-			default:
-				listeners[k] = func(node *ast.Node) { visit(node, bucket) }
-			}
+			listeners[k] = func(node *ast.Node) { visit(node, bucket) }
 		}
 		return listeners
 	},
