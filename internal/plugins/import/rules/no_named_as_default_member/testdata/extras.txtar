@@ -64,3 +64,23 @@ declare namespace Lib { const foo: number; } export as namespace Lib; export {};
 {"compilerOptions":{"module":"nodenext"},"include":["**/*"]}
 -- implicit/global-members.ts --
 declare namespace Lib { const foo: number; } export as namespace Lib; export {};
+-- node_modules/fs-extra/package.json --
+{"name":"fs-extra","main":"./lib/index.js","types":"./index.d.ts"}
+-- node_modules/fs-extra/lib/index.js --
+module.exports = { outputFileSync: function() {}, remove: function() {}, readdir: function() {} };
+-- node_modules/fs-extra/index.d.ts --
+export function outputFileSync(file: string, data: string): void;
+export function remove(file: string): void;
+export function readdir(dir: string): string[];
+-- node_modules/cjs-package/package.json --
+{"name":"cjs-package","type":"commonjs","main":"./index.js"}
+-- node_modules/cjs-package/index.js --
+module.exports = { foo: 1 };
+-- node_modules/cjs-package/index.d.ts --
+export const foo: number;
+-- node_modules/esm-package/package.json --
+{"name":"esm-package","type":"module","main":"./index.js","types":"./index.d.ts"}
+-- node_modules/esm-package/index.d.ts --
+export default function esmPackage(): void;
+export const foo: number;
+

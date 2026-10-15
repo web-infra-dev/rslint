@@ -55,6 +55,9 @@ func TestNoNamedAsDefaultMemberExtras(t *testing.T) {
 			{Code: `import obj from './base.js'; const view = <obj.foo />; type A = obj.foo; type B = typeof obj.foo;`, Tsx: true},
 			// Default properties are excluded
 			{Code: `import obj from './base.js'; obj.default; const {default: value} = obj;`},
+			// CommonJS modules like fs-extra do not generate invalid named import suggestions
+			{Code: `import fse from 'fs-extra'; fse.outputFileSync('a', 'text'); fse.remove('a'); fse.readdir('.'); const {outputFileSync} = fse;`},
+			{Code: `import cjs from 'cjs-package'; cjs.foo; const {foo} = cjs;`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// rslint follows TypeScript's implicit interop default for NodeNext;
@@ -124,6 +127,8 @@ func TestNoNamedAsDefaultMemberExtras(t *testing.T) {
 			{Code: `import type obj from './types'; const a = obj.Shape; const {Alias} = obj; obj.Kind;`, Errors: []rule_tester.InvalidTestCaseError{defaultMemberError("obj", "Shape", "./types", 1, 43, 1, 52), defaultMemberError("obj", "Alias", "./types", 1, 61, 1, 66), defaultMemberError("obj", "Kind", "./types", 1, 75, 1, 83)}},
 			// TypeScript namespace export assignment
 			{Code: `import obj from './export-equals'; obj.foo;`, Errors: []rule_tester.InvalidTestCaseError{defaultMemberError("obj", "foo", "./export-equals", 1, 36, 1, 43)}},
+			// ES module packages in node_modules still report named import collisions
+			{Code: `import esmPkg from 'esm-package'; esmPkg.foo;`, Errors: []rule_tester.InvalidTestCaseError{defaultMemberError("esmPkg", "foo", "esm-package", 1, 35, 1, 45)}},
 		},
 	)
 }
