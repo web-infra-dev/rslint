@@ -153,19 +153,23 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      # `Build` already compiled every package behind ./cmd/rslint, so this
-      # relink is link-only off the warm cache. It measures the stripped
-      # executable users download, not the unstripped one tested above.
-      - name: Measure rslint binary size
+      # `Build` already compiled every package behind ./cmd/rslint, and the
+      # release addon was placed in its host platform package above. The Go
+      # relink is link-only off the warm cache. Measure both native binaries
+      # users download rather than the unstripped executable tested above.
+      - name: Measure rslint binary sizes
         env:
           BINARY_SIZE_GO_VERSION: ${{ matrix.go-version }}
         run: |
           go build -ldflags="-s -w" -o "${RUNNER_TEMP}/rslint-release" ./cmd/rslint
-          node scripts/binary-size.mjs record "${RUNNER_TEMP}/rslint-release" "${RUNNER_TEMP}/binary-size.json"
+          node scripts/binary-size.mjs record \
+            "${RUNNER_TEMP}/rslint-release" \
+            "npm/rslint/linux-x64-gnu/rslint.linux-x64-gnu.node" \
+            "${RUNNER_TEMP}/binary-size.json"
 
       # Uploaded on every run, main included: a pull request's baseline is the
       # artifact of the run that measured the commit its build was merged onto.
-      - name: Upload rslint binary size
+      - name: Upload rslint binary sizes
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: rslint-binary-size

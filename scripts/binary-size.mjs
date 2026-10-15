@@ -1,25 +1,25 @@
 #!/usr/bin/env node
 /**
- * Binary size monitoring for the `rslint` executable.
+ * Binary size monitoring for the `rslint` executable and native addon.
  *
- *   node scripts/binary-size.mjs record <binary> <out.json>
+ *   node scripts/binary-size.mjs record <binary> <native-addon> <out.json>
  *   node scripts/binary-size.mjs base-run <head.json>       # -> $GITHUB_OUTPUT
  *   node scripts/binary-size.mjs report <head.json> [base.json]
  *   node scripts/binary-size.mjs comment <report.md>
  *
  * The measurement itself is produced inside the existing `Test npm packages`
- * job, which has already compiled every package behind ./cmd/rslint — so the
- * release relink it measures is a link-only action off a warm Go build cache
- * rather than a second build. Each run stores its number as a workflow
- * artifact; a pull request reads back the artifact of the run that measured
- * the commit its build was merged onto. That keeps the whole system on the
- * built-in GITHUB_TOKEN: no data branch, no personal access token, no
- * repository writes.
+ * job, which has already built the host N-API addon and compiled every package
+ * behind ./cmd/rslint. The release relink it measures is therefore a link-only
+ * action off a warm Go build cache rather than a second build. Each run stores
+ * its number as a workflow artifact; a pull request reads back the artifact of
+ * the run that measured the commit its build was merged onto. That keeps the
+ * whole system on the built-in GITHUB_TOKEN: no data branch, no personal
+ * access token, no repository writes.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 // Ties an update to the comment this workflow posted last time, instead of
 // opening a new thread on every push.
@@ -110,9 +110,10 @@ function headCommitSha() {
   }
 }
 
-/** Measure `binary` and write the record this run will publish as an artifact. */
-function record(binary, out) {
+/** Measure the native binaries and write the record this run will publish. */
+function record(binary, nativeAddon, out) {
   const size = fs.statSync(binary).size;
+  const nativeAddonSize = fs.statSync(nativeAddon).size;
   const measurement = {
     schemaVersion: SCHEMA_VERSION,
     sha: process.env.GITHUB_SHA || '',
@@ -124,6 +125,7 @@ function record(binary, out) {
     goVersion: process.env.BINARY_SIZE_GO_VERSION || '',
     buildFlags: '-ldflags=-s -w',
     size,
+    nativeAddonSize,
     measuredAt: new Date().toISOString(),
   };
   fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
@@ -301,6 +303,18 @@ function formatPercent(delta, base) {
   return `${sign}${Math.abs(percent).toFixed(2)}%`;
 }
 
+function sizeRow(label, headSize, baseSize) {
+  const delta = baseSize === undefined ? undefined : headSize - baseSize;
+  return [
+    label,
+    baseSize === undefined ? '—' : formatBytes(baseSize),
+    formatBytes(headSize),
+    delta === undefined
+      ? '—'
+      : `${formatDelta(delta)} (${formatPercent(delta, baseSize)})`,
+  ];
+}
+
 /** Link a commit by its short SHA, so a reader can open exactly what was measured. */
 function commitLink(sha) {
   if (!sha) return '`unknown`';
@@ -358,17 +372,27 @@ function report(headPath, basePath) {
     ? `Base size was measured at main commit ${commitLink(baseOn.measuredSha)}. The Ubuntu measurement job was skipped for the following ${skippedShas.length === 1 ? 'main commit' : `${skippedShas.length} main commits`}: ${skippedShas.map(commitLink).join(', ')}.`
     : '';
 
-  // One table either way: an em dash where a missing measurement would go says
-  // everything a sentence about it would.
-  const delta = base ? head.size - base.size : undefined;
-  const row = [
-    `\`rslint\` (${head.target})`,
-    base ? formatBytes(base.size) : '—',
-    formatBytes(head.size),
-    delta === undefined
-      ? '—'
-      : `${formatDelta(delta)} (${formatPercent(delta, base.size)})`,
-  ];
+  // Keep `size` as the executable measurement so schema-v1 and schema-v2
+  // artifacts remain comparable in both directions. Native-addon comparisons
+  // begin once the base branch has published a schema-v2 artifact.
+  const rows = [sizeRow(`\`rslint\` (${head.target})`, head.size, base?.size)];
+  const hasNativeAddon = Number.isSafeInteger(head.nativeAddonSize);
+  const baseNativeAddonSize = Number.isSafeInteger(base?.nativeAddonSize)
+    ? base.nativeAddonSize
+    : undefined;
+  if (hasNativeAddon) {
+    rows.push(
+      sizeRow(
+        `\`rslint.node\` (${head.target})`,
+        head.nativeAddonSize,
+        baseNativeAddonSize,
+      ),
+    );
+  }
+  const nativeBaselineNote =
+    base && hasNativeAddon && baseNativeAddonSize === undefined
+      ? 'The base artifact predates native-addon measurement. Its delta will be available after the base branch publishes its first schema-v2 measurement.'
+      : '';
 
   const goVersion = head.goVersion ? `Go ${head.goVersion}, ` : '';
   const server = process.env.GITHUB_SERVER_URL;
@@ -384,12 +408,13 @@ function report(headPath, basePath) {
     '',
     `Commit ${commitLink(head.headSha)} merged into base ${commitLink(baseOn.sha)}${formatSubject(baseOn.subject)}.`,
     ...(skippedNote ? ['', skippedNote] : []),
+    ...(nativeBaselineNote ? ['', nativeBaselineNote] : []),
     '',
     '| Binary | Base | This PR | Change |',
     '| --- | ---: | ---: | ---: |',
-    `| ${row.join(' | ')} |`,
+    ...rows.map((row) => `| ${row.join(' | ')} |`),
     '',
-    `<sub>Stripped \`go build -ldflags="-s -w" ./cmd/rslint\`, ${goVersion}linux/amd64 · ${run} · ${formatTimestamp(head.measuredAt)}</sub>`,
+    `<sub>\`rslint\`: stripped \`go build -ldflags="-s -w" ./cmd/rslint\`; \`rslint.node\`: release \`@rslint/native\` build; ${goVersion}linux/amd64 · ${run} · ${formatTimestamp(head.measuredAt)}</sub>`,
     '',
   ].join('\n');
 }
@@ -440,11 +465,17 @@ async function main() {
 
   switch (command) {
     case 'record': {
-      const [binary, out] = args;
-      if (!binary || !out) throw new Error('usage: record <binary> <out.json>');
-      const measurement = record(binary, out);
+      const [binary, nativeAddon, out] = args;
+      if (!binary || !nativeAddon || !out) {
+        throw new Error('usage: record <binary> <native-addon> <out.json>');
+      }
+      const measurement = record(binary, nativeAddon, out);
       process.stdout.write(
-        `${measurement.target} rslint: ${measurement.size} bytes (${formatBytes(measurement.size)})\n`,
+        [
+          `${measurement.target} rslint: ${measurement.size} bytes (${formatBytes(measurement.size)})`,
+          `${measurement.target} rslint.node: ${measurement.nativeAddonSize} bytes (${formatBytes(measurement.nativeAddonSize)})`,
+          '',
+        ].join('\n'),
       );
       break;
     }
