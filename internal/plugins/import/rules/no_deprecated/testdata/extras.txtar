@@ -105,6 +105,11 @@ export const other=2;
 /** @deprecated alias reason */
 export import alias = Math;
 export /** @deprecated inner reason */ const inner=3;
+/** @deprecated declared reason */
+export declare /* ordinary */ const declared: number;
+export declare /** @deprecated ignored after declare */ const afterDeclare: number;
+/** @deprecated local declared reason */
+declare /* ordinary */ const localDeclared: number;
 }
 export = API;
 -- assigned-value.ts --

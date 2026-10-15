@@ -120,9 +120,18 @@ func (local *localExports) captureTypeScriptExportDocs(file *ast.SourceFile, exp
 		for _, member := range body.AsModuleBlock().Statements.Nodes {
 			nodes := []*ast.Node{member}
 			if member.Kind == ast.KindVariableStatement {
-				// Upstream checks the namespace, the VariableDeclaration starting at
-				// `const`, then the export statement.
-				nodes = []*ast.Node{decl, member.AsVariableStatement().DeclarationList, member}
+				// Upstream checks the namespace, the VariableDeclaration, then the
+				// export statement. The declaration starts at `declare` when present.
+				declaration := member.AsVariableStatement().DeclarationList
+				if modifiers := member.Modifiers(); modifiers != nil {
+					for _, modifier := range modifiers.Nodes {
+						if modifier.Kind == ast.KindDeclareKeyword {
+							declaration = modifier
+							break
+						}
+					}
+				}
+				nodes = []*ast.Node{decl, declaration, member}
 			}
 			doc := &exportDocSource{file: file, nodes: nodes}
 			names := exportedDeclarationNames(member)
