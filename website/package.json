@@ -25,7 +25,6 @@
     "@rslint/api": "workspace:*",
     "@rslint/core": "workspace:*",
     "@rspress/core": "catalog:",
-    "@rspress/plugin-sitemap": "catalog:",
     "@rstackjs/doc-ui": "catalog:",
     "@tailwindcss/postcss": "catalog:",
     "@types/dagre": "catalog:",

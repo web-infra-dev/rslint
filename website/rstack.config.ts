@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { pluginNodePolyfill } from '@rsbuild/plugin-node-polyfill';
 import { pluginSass } from '@rsbuild/plugin-sass';
-import { pluginSitemap } from '@rspress/plugin-sitemap';
 import { define } from 'rstack';
 import { pluginGoogleAnalytics } from 'rsbuild-plugin-google-analytics';
 import { pluginOpenGraph } from 'rsbuild-plugin-open-graph';
@@ -13,6 +12,7 @@ const logo = 'https://assets.rspack.rs/rslint/rslint-logo.svg';
 const description = 'The high-performance TypeScript linter';
 
 define.doc({
+  siteOrigin: siteUrl,
   title: 'Rslint',
   icon: logo,
   logo,
@@ -31,7 +31,6 @@ define.doc({
     exclude: ['**/zh/shared/**', '**/en/shared/**', './theme'],
   },
   globalStyles: path.join(import.meta.dirname, 'styles/index.css'),
-  llms: true,
   markdown: {
     link: {
       checkAnchors: true,
@@ -59,11 +58,7 @@ define.doc({
       },
     ],
   },
-  plugins: [
-    pluginRuleManifest(),
-    pluginFontOpenSans(),
-    pluginSitemap({ siteUrl }),
-  ],
+  plugins: [pluginRuleManifest(), pluginFontOpenSans()],
   builderConfig: {
     tools: {
       rspack(config) {

@@ -1,5 +1,3 @@
-<!-- cspell:ignore pascalcase -->
-
 # name-replacements
 
 ## Rule Details
@@ -52,7 +50,7 @@ Extends the default replacements. Set a replacement to `false` to disable it, or
 }
 ```
 
-Lowercase entries match complete camelcase and pascalcase words. A camelcase entry such as `errCb` matches only that complete identifier (and `ErrCb`), not a word inside a longer identifier.
+Lowercase entries match complete camelCase and PascalCase words. A camelCase entry such as `errCb` matches only that complete identifier (and `ErrCb`), not a word inside a longer identifier.
 
 ### `extendDefaultReplacements`
 
