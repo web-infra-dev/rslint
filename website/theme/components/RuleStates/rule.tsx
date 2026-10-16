@@ -213,19 +213,21 @@ const RuleImplementationStatus: React.FC = () => {
       <Card>
         <CardHeader>
           <Heading>All Rules</Heading>
-          <TableSelector
-            searchValue={searchValue}
-            groupValue={groupValue}
-            statusValue={statusValue}
-            presetValue={presetValue}
-            onSearchChange={setSearchValue}
-            onGroupChange={hooksFilter(setGroupValue)}
-            onStatusChange={hooksFilter(setStatusValue)}
-            onPresetChange={hooksFilter(setPresetValue)}
-            groups={availableGroups}
-            statuses={availableStatuses}
-            presetOptions={availablePresets}
-          />
+          {!import.meta.env.SSG_MD && (
+            <TableSelector
+              searchValue={searchValue}
+              groupValue={groupValue}
+              statusValue={statusValue}
+              presetValue={presetValue}
+              onSearchChange={setSearchValue}
+              onGroupChange={hooksFilter(setGroupValue)}
+              onStatusChange={hooksFilter(setStatusValue)}
+              onPresetChange={hooksFilter(setPresetValue)}
+              groups={availableGroups}
+              statuses={availableStatuses}
+              presetOptions={availablePresets}
+            />
+          )}
         </CardHeader>
         <CardBody>
           <div className="overflow-x-auto">
