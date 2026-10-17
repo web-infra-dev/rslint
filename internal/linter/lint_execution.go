@@ -15,9 +15,9 @@ import (
 // producer slices are borrowed only during preparation, never during execution.
 // Closing a task drops our references without modifying its Program or ASTs.
 type lintExecution struct {
-	programs          []*programLintPlan
-	typeCheckPrograms []*program.Program
-	options           programRunOptions
+	programs         []*programLintPlan
+	typeCheckSources []*program.DiagnosticSource
+	options          programRunOptions
 }
 
 func prepareLintExecution(opts RunLinterOptions) (*lintExecution, error) {
@@ -43,8 +43,10 @@ func prepareLintExecution(opts RunLinterOptions) (*lintExecution, error) {
 			// immutable shared content, including when a caller reuses the plan.
 			task := plan
 			execution.programs[index] = &task
-			if opts.TypeCheck && plan.program.CanProvideProgramDiagnostics() {
-				execution.typeCheckPrograms = append(execution.typeCheckPrograms, plan.program)
+			if opts.TypeCheck {
+				if source := plan.program.DiagnosticSource(); source != nil {
+					execution.typeCheckSources = append(execution.typeCheckSources, source)
+				}
 			}
 		}
 	} else if opts.TypeCheck {
@@ -52,8 +54,8 @@ func prepareLintExecution(opts RunLinterOptions) (*lintExecution, error) {
 			return nil, err
 		}
 		for _, sourceProgram := range opts.TypeCheckOnlyPrograms {
-			if sourceProgram.CanProvideProgramDiagnostics() {
-				execution.typeCheckPrograms = append(execution.typeCheckPrograms, sourceProgram)
+			if source := sourceProgram.DiagnosticSource(); source != nil {
+				execution.typeCheckSources = append(execution.typeCheckSources, source)
 			}
 		}
 	}
@@ -72,8 +74,8 @@ func validateProgramsInPlan(plan *LintPlan) error {
 func (e *lintExecution) close() {
 	clear(e.programs)
 	e.programs = nil
-	clear(e.typeCheckPrograms)
-	e.typeCheckPrograms = nil
+	clear(e.typeCheckSources)
+	e.typeCheckSources = nil
 }
 
 func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
@@ -81,7 +83,7 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 	result := &LintResult{ExecutedRules: make(map[string]struct{})}
 	programResults := make([]programLintResult, len(e.programs))
 	if len(e.programs) > 0 {
-		work := newProgramLintWorkGroup(e.options.SingleThreaded, len(e.programs))
+		work := newProgramWorkGroup(e.options.SingleThreaded, len(e.programs))
 		for index := range e.programs {
 			task := e.programs[index]
 			e.programs[index] = nil
@@ -102,13 +104,13 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 		}
 	}
 
-	// Keep the native/type-check phase barrier. Only capable Programs retain
-	// this second borrow, and type-check consumes its own private input slots.
-	programs := e.typeCheckPrograms
-	e.typeCheckPrograms = nil
-	if len(programs) > 0 {
+	// Keep the native/type-check phase barrier. Diagnostic sources borrow the
+	// backend without retaining the lint facade or its owned derived caches.
+	sources := e.typeCheckSources
+	e.typeCheckSources = nil
+	if len(sources) > 0 {
 		runTypeCheckAcrossPrograms(typeCheckRequest{
-			Programs:       programs,
+			Sources:        sources,
 			SingleThreaded: e.options.SingleThreaded,
 			OnDiagnostic:   consumer.Report,
 		})
@@ -116,9 +118,8 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 	return result
 }
 
-// lintWorkGroup joins every admitted native borrower before re-raising an
-// abnormal worker exit. Nested checker shards use the same barrier, so a
-// project task cannot end while one of its file workers still uses it.
+// lintWorkGroup joins all scheduled borrowers before re-raising an abnormal
+// worker exit. Nested checker shards own their independent join barrier.
 type lintWorkGroup struct {
 	admission chan struct{}
 	work      core.WorkGroup
@@ -136,9 +137,10 @@ func newLintWorkGroup(singleThreaded bool) *lintWorkGroup {
 	return &lintWorkGroup{work: core.NewWorkGroup(singleThreaded)}
 }
 
-// newProgramLintWorkGroup bounds active projects to the execution CPU budget.
-// Each project retains its independent checker-shard scheduling.
-func newProgramLintWorkGroup(singleThreaded bool, programCount int) *lintWorkGroup {
+// newProgramWorkGroup bounds active projects to the execution CPU budget.
+// Native lint and type-check own separate groups, and each project retains
+// its independent checker-shard scheduling.
+func newProgramWorkGroup(singleThreaded bool, programCount int) *lintWorkGroup {
 	w := newLintWorkGroup(singleThreaded)
 	if !singleThreaded && programCount > 0 {
 		w.admission = make(chan struct{}, min(runtime.GOMAXPROCS(0), programCount))

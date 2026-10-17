@@ -58,9 +58,9 @@ type sourceBackend interface {
 // backend kind exposed to callers: the public facade simply cannot provide a
 // checker or program-wide type diagnostics for that source generation.
 type typeBackend interface {
+	diagnosticBackend
 	typeCheckerForFile(ctx context.Context, file *ast.SourceFile) (*checker.Checker, func())
 	typeCheckerForFileExclusive(ctx context.Context, file *ast.SourceFile) (*checker.Checker, func())
-	noEmitDiagnostics(ctx context.Context) []*ast.Diagnostic
 }
 
 type compilerBackend struct {
@@ -284,15 +284,6 @@ func (p *Program) TypeCheckerForFileExclusive(ctx context.Context, file *ast.Sou
 		return nil, func() {}
 	}
 	return p.types.typeCheckerForFileExclusive(ctx, file)
-}
-
-// NoEmitDiagnostics returns program-wide type diagnostics when this source
-// generation supports them. An unavailable capability produces no diagnostics.
-func (p *Program) NoEmitDiagnostics(ctx context.Context) []*ast.Diagnostic {
-	if !p.IsValid() || p.types == nil {
-		return nil
-	}
-	return p.types.noEmitDiagnostics(ctx)
 }
 
 // IsSourceFileDefaultLibrary answers against the source generation's compiler

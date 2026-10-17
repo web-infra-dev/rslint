@@ -3,9 +3,13 @@ package linter
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
@@ -18,8 +22,161 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+type typeCheckAdmissionFS struct {
+	vfs.FS
+	enabled atomic.Bool
+	active  atomic.Int32
+	maximum atomic.Int32
+	entered chan struct{}
+	release <-chan struct{}
+}
+
+func (f *typeCheckAdmissionFS) Realpath(path string) string {
+	if f.enabled.Load() {
+		active := f.active.Add(1)
+		defer f.active.Add(-1)
+		for maximum := f.maximum.Load(); active > maximum; maximum = f.maximum.Load() {
+			if f.maximum.CompareAndSwap(maximum, active) {
+				break
+			}
+		}
+		select {
+		case f.entered <- struct{}{}:
+		default:
+		}
+		<-f.release
+	}
+	return f.FS.Realpath(path)
+}
+
+func TestTypeCheck_ProjectAdmission(t *testing.T) {
+	previousProcs := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previousProcs) })
+	archive, err := txtarfs.Parse("type-check admission", []byte("-- entry.ts --\nconst = ;\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, singleThreaded := range []bool{false, true} {
+		name := "parallel"
+		limit := int32(2)
+		if singleThreaded {
+			name, limit = "singleThreaded", 1
+		}
+		t.Run(name, func(t *testing.T) {
+			const projectCount = 5
+			release := make(chan struct{})
+			fsys := &typeCheckAdmissionFS{
+				FS: osvfs.FS(), entered: make(chan struct{}, projectCount), release: release,
+			}
+			sources := make([]*lintprogram.DiagnosticSource, projectCount)
+			paths := make([]string, projectCount)
+			for index := range sources {
+				root := tspath.NormalizePath(archive.Materialize(t, ""))
+				paths[index] = tspath.ResolvePath(root, "entry.ts")
+				raw, err := utils.CreateProgramFromOptionsLenient(true,
+					&core.CompilerOptions{NoLib: core.TSTrue}, []string{paths[index]},
+					utils.CreateCompilerHost(root, fsys))
+				if err != nil {
+					t.Fatal(err)
+				}
+				sources[index] = lintprogram.NewOwnedFromCompilers([]*compiler.Program{raw})[0].DiagnosticSource()
+			}
+			fsys.enabled.Store(true)
+			var releaseOnce sync.Once
+			unblock := func() { releaseOnce.Do(func() { close(release) }) }
+			done := make(chan struct{})
+			t.Cleanup(func() {
+				unblock()
+				joinProgramAdmissionTestWorker(t, done)
+			})
+			var diagnostics []rule.RuleDiagnostic
+			go func() {
+				defer close(done)
+				runTypeCheckAcrossPrograms(typeCheckRequest{
+					Sources: sources, SingleThreaded: singleThreaded,
+					OnDiagnostic: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) },
+				})
+			}()
+			for range limit {
+				select {
+				case <-fsys.entered:
+				case <-time.After(5 * time.Second):
+					t.Fatal("type-check tasks did not reach diagnostic collection")
+				}
+			}
+			select {
+			case <-fsys.entered:
+				t.Fatal("type-check project bypassed the admission limit")
+			case <-time.After(200 * time.Millisecond):
+			}
+			unblock()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				t.Fatal("type-check tasks did not finish after admission was released")
+			}
+			if got := fsys.maximum.Load(); got > limit {
+				t.Fatalf("active type-check projects = %d, limit = %d", got, limit)
+			}
+			var lastPath string
+			var projectIndex int
+			for _, diagnostic := range diagnostics {
+				if diagnostic.FilePath == lastPath {
+					continue
+				}
+				if projectIndex >= len(paths) || diagnostic.FilePath != paths[projectIndex] {
+					t.Fatalf("diagnostics changed project order at %d: %q", projectIndex, diagnostic.FilePath)
+				}
+				lastPath = diagnostic.FilePath
+				projectIndex++
+			}
+			if projectIndex != projectCount {
+				t.Fatalf("reported diagnostics for %d projects, want %d", projectIndex, projectCount)
+			}
+		})
+	}
+}
+
+func TestTypeCheck_SharedGenerationAcrossConcurrentExecutions(t *testing.T) {
+	raw, _ := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const value: number = 'wrong';",
+	})
+	programs := lintprogram.NewOwnedFromCompilers([]*compiler.Program{raw, raw})
+	const requestCount = 4
+	results := make([][]rule.RuleDiagnostic, requestCount)
+	errors := make([]error, requestCount)
+	var workers sync.WaitGroup
+	for index := range results {
+		workers.Go(func() {
+			_, errors[index] = RunLinter(RunLinterOptions{
+				TypeCheckOnlyPrograms: programs,
+				TypeCheck:             true,
+				Consumer: rule.DiagnosticConsumer{
+					Report: func(d rule.RuleDiagnostic) { results[index] = append(results[index], d) },
+				},
+			})
+		})
+	}
+	workers.Wait()
+	for index, result := range results {
+		if errors[index] != nil {
+			t.Fatal(errors[index])
+		}
+		if len(result) != 1 || result[0].RuleName != "TypeScript(TS2322)" {
+			t.Fatalf("request %d lost or duplicated diagnostics: %+v", index, result)
+		}
+		if !reflect.DeepEqual(result, results[0]) {
+			t.Fatalf("request %d changed the shared generation's diagnostics", index)
+		}
+	}
+	if programs[0].GetSourceFile(results[0][0].FilePath) != results[0][0].SourceFile {
+		t.Fatal("type-check execution invalidated the borrowed generation")
+	}
+}
 
 // --- Type-check basic functionality ---
 
@@ -607,7 +764,7 @@ func TestTypeCheckDedupeKeyIncludesMessageChainAndRelatedInformation(t *testing.
 		"Source",
 		"Target",
 	))
-	if typeCheckDedupeKeyForDiagnostic(sourceProgram, withChainA) == typeCheckDedupeKeyForDiagnostic(sourceProgram, withChainB) {
+	if typeCheckDedupeKeyForDiagnostic(sourceProgram.DiagnosticSource(), withChainA) == typeCheckDedupeKeyForDiagnostic(sourceProgram.DiagnosticSource(), withChainB) {
 		t.Fatal("message-chain differences must remain distinct in the dedupe key")
 	}
 
@@ -625,7 +782,7 @@ func TestTypeCheckDedupeKeyIncludesMessageChainAndRelatedInformation(t *testing.
 		"second",
 		"Target",
 	))
-	if typeCheckDedupeKeyForDiagnostic(sourceProgram, withRelatedA) == typeCheckDedupeKeyForDiagnostic(sourceProgram, withRelatedB) {
+	if typeCheckDedupeKeyForDiagnostic(sourceProgram.DiagnosticSource(), withRelatedA) == typeCheckDedupeKeyForDiagnostic(sourceProgram.DiagnosticSource(), withRelatedB) {
 		t.Fatal("related-information differences must remain distinct in the dedupe key")
 	}
 }
@@ -653,7 +810,7 @@ func TestTypeCheckFilesystemPathIDIsStableAcrossSymlinkAliases(t *testing.T) {
 	if err := os.Symlink(realPath, aliasPath); err != nil {
 		t.Skipf("symlink unavailable: %v", err)
 	}
-	if typeCheckFilesystemPathID(sourceProgram, realPath) != typeCheckFilesystemPathID(sourceProgram, aliasPath) {
+	if typeCheckFilesystemPathID(sourceProgram.DiagnosticSource(), realPath) != typeCheckFilesystemPathID(sourceProgram.DiagnosticSource(), aliasPath) {
 		t.Fatalf("expected real and alias paths to share a typecheck identity: real=%q alias=%q", realPath, aliasPath)
 	}
 }
@@ -687,7 +844,7 @@ func TestTypeCheckFilesystemPathIDPreservesDistinctCanonicalCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
 	}
-	if typeCheckFilesystemPathID(lintprogram.NewFromCompiler(program), upper) == typeCheckFilesystemPathID(lintprogram.NewFromCompiler(program), lower) {
+	if typeCheckFilesystemPathID(lintprogram.NewFromCompiler(program).DiagnosticSource(), upper) == typeCheckFilesystemPathID(lintprogram.NewFromCompiler(program).DiagnosticSource(), lower) {
 		t.Fatalf("distinct canonical paths must retain exact identity: upper=%q lower=%q", upper, lower)
 	}
 }

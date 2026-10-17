@@ -14,14 +14,14 @@ import (
 
 // typeCheckRequest bundles the inputs for runTypeCheckAcrossPrograms.
 type typeCheckRequest struct {
-	Programs       []*program.Program
+	Sources        []*program.DiagnosticSource
 	SingleThreaded bool
 	OnDiagnostic   DiagnosticHandler
 }
 
 // runTypeCheckAcrossPrograms runs program-scoped semantic diagnostics
-// against every Program that exposes that capability. The source construction
-// strategy remains private; the linter schedules only the capability it needs.
+// through independent capabilities for complete source generations. Source
+// construction remains private; the linter schedules only the capability it needs.
 //
 // Aggregates diagnostics via collectNoEmitDiagnostics, which mirrors
 // compiler.GetDiagnosticsOfAnyProgram(file=nil) but enforces tsc --noEmit
@@ -36,21 +36,21 @@ type typeCheckRequest struct {
 // We dedupe on canonical (filePath, code, pos, end, final message), including
 // message chains and related information.
 //
-// req.Programs is a private slice transferred by lintExecution. Each slot is
-// consumed before dispatch; diagnostics, not Programs, survive the phase.
+// req.Sources is a private capability slice transferred by lintExecution.
+// Dispatch consumes each slot; completed tasks retain only diagnostics.
 // req.OnDiagnostic must be non-nil.
 func runTypeCheckAcrossPrograms(req typeCheckRequest) {
-	collected := make([][]collectedTypeCheckDiagnostic, len(req.Programs))
-	wg := newLintWorkGroup(req.SingleThreaded)
-	for i, prog := range req.Programs {
-		req.Programs[i] = nil
-		if !prog.CanProvideProgramDiagnostics() {
+	collected := make([][]collectedTypeCheckDiagnostic, len(req.Sources))
+	wg := newProgramWorkGroup(req.SingleThreaded, len(req.Sources))
+	for i, source := range req.Sources {
+		req.Sources[i] = nil
+		if source == nil {
 			continue
 		}
 		programIndex := i
-		program := prog
+		diagnosticSource := source
 		wg.Queue(func() {
-			collected[programIndex] = runTypeCheckForProgram(program)
+			collected[programIndex] = runTypeCheckForProgram(diagnosticSource)
 		})
 	}
 	wg.RunAndWait()
@@ -78,9 +78,9 @@ type collectedTypeCheckDiagnostic struct {
 	ruleDiagnostic rule.RuleDiagnostic
 }
 
-func runTypeCheckForProgram(prog *program.Program) []collectedTypeCheckDiagnostic {
+func runTypeCheckForProgram(source *program.DiagnosticSource) []collectedTypeCheckDiagnostic {
 	ctx := context.Background()
-	diags := prog.NoEmitDiagnostics(ctx)
+	diags := source.NoEmitDiagnostics(ctx)
 	collected := make([]collectedTypeCheckDiagnostic, 0, len(diags))
 
 	for _, d := range diags {
@@ -107,7 +107,7 @@ func runTypeCheckForProgram(prog *program.Program) []collectedTypeCheckDiagnosti
 
 		message := flattenDiagnosticMessage(d)
 		collected = append(collected, collectedTypeCheckDiagnostic{
-			key:            typeCheckDedupeKeyForDiagnostic(prog, d),
+			key:            typeCheckDedupeKeyForDiagnostic(source, d),
 			ruleDiagnostic: newTypeScriptDiagnostic(file, d, message),
 		})
 	}
@@ -122,24 +122,24 @@ type typeCheckDedupeKey struct {
 	message string
 }
 
-func typeCheckDedupeKeyForDiagnostic(prog *program.Program, d *ast.Diagnostic) typeCheckDedupeKey {
+func typeCheckDedupeKeyForDiagnostic(source *program.DiagnosticSource, d *ast.Diagnostic) typeCheckDedupeKey {
 	loc := d.Loc()
 	return typeCheckDedupeKey{
-		path:    typeCheckFilesystemPathID(prog, d.File().FileName()),
+		path:    typeCheckFilesystemPathID(source, d.File().FileName()),
 		code:    d.Code(),
 		pos:     loc.Pos(),
 		end:     loc.End(),
-		message: flattenDiagnosticMessageForIdentity(prog, d),
+		message: flattenDiagnosticMessageForIdentity(source, d),
 	}
 }
 
-func typeCheckFilesystemPathID(prog *program.Program, filePath string) string {
+func typeCheckFilesystemPathID(source *program.DiagnosticSource, filePath string) string {
 	filePath = tspath.NormalizePath(filePath)
-	if prog == nil {
+	if source == nil {
 		return filePath
 	}
-	filePath = tspath.GetNormalizedAbsolutePath(filePath, prog.CurrentDirectory())
-	fsys := prog.FS()
+	filePath = tspath.GetNormalizedAbsolutePath(filePath, source.CurrentDirectory())
+	fsys := source.FS()
 	if fsys != nil {
 		if realPath := fsys.Realpath(filePath); realPath != "" {
 			filePath = tspath.NormalizePath(realPath)
@@ -157,9 +157,9 @@ func flattenDiagnosticMessage(d *ast.Diagnostic) string {
 	})
 }
 
-func flattenDiagnosticMessageForIdentity(prog *program.Program, d *ast.Diagnostic) string {
+func flattenDiagnosticMessageForIdentity(source *program.DiagnosticSource, d *ast.Diagnostic) string {
 	return flattenDiagnosticMessageWithRelatedPath(d, func(file *ast.SourceFile) string {
-		return typeCheckFilesystemPathID(prog, file.FileName())
+		return typeCheckFilesystemPathID(source, file.FileName())
 	})
 }
 
