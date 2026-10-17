@@ -1708,12 +1708,12 @@ func TestProjectServiceFallbackUsesReferencedRuntimeConditions(t *testing.T) {
 			if selected == sessionProgram || !selected.Options().AllowNonTsExtensions.IsTrue() {
 				t.Fatal("fixture did not use the standalone source-reference Program")
 			}
-			if selected.Options().ConfigFilePath != tspath.ResolvePath(directory, "tsconfig.json") || len(selected.Options().CustomConditions) != 0 {
+			if lintProgramLexicalPathID(selected.Options().ConfigFilePath, fsys) != lintProgramLexicalPathID(tspath.ResolvePath(directory, "tsconfig.json"), fsys) || len(selected.Options().CustomConditions) != 0 {
 				t.Fatalf("unexpected fallback root options: %+v", selected.Options())
 			}
 			source := selected.GetSourceFile(fileName)
 			redirect := selected.GetRedirectForResolution(source)
-			if redirect == nil || redirect.ConfigName() != leafPath || !slices.Equal(redirect.CompilerOptions().CustomConditions, []string{test.condition}) {
+			if redirect == nil || lintProgramLexicalPathID(redirect.ConfigName(), fsys) != lintProgramLexicalPathID(leafPath, fsys) || !slices.Equal(redirect.CompilerOptions().CustomConditions, []string{test.condition}) {
 				t.Fatal("fixture lost the referenced source's distinct compiler options")
 			}
 			program := generation.Native.Programs[0]
@@ -1724,7 +1724,7 @@ func TestProjectServiceFallbackUsesReferencedRuntimeConditions(t *testing.T) {
 				specifier := statement.AsImportDeclaration().ModuleSpecifier
 				path, declaration, resolved := program.ResolveModule(source, modules.SourceFromSpecifier(specifier))
 				wantPath := tspath.ResolvePath(directory, "node_modules/"+specifier.Text()+"/types.d.ts")
-				if !resolved || declaration == nil || !declaration.IsDeclarationFile || fsys.Realpath(path) != fsys.Realpath(wantPath) {
+				if !resolved || declaration == nil || !declaration.IsDeclarationFile || lintProgramLexicalPathID(fsys.Realpath(path), fsys) != lintProgramLexicalPathID(fsys.Realpath(wantPath), fsys) {
 					t.Fatalf("declaration resolution for %q = %q, want %q", specifier.Text(), path, wantPath)
 				}
 			}
@@ -1738,6 +1738,242 @@ func TestProjectServiceFallbackUsesReferencedRuntimeConditions(t *testing.T) {
 				t.Fatalf("referenced condition %q: diagnostics=%+v, want only %s.member", test.condition, diagnostics, test.wantReceiver)
 			}
 		})
+	}
+}
+
+func newLintSessionServerForTest(t *testing.T, directory string, fsys vfs.FS) *Server {
+	t.Helper()
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = fsys
+	server.backgroundCtx = t.Context()
+	server.defaultLibraryPath = bundled.LibPath()
+	server.initializeParams = &lsproto.InitializeParams{}
+	server.outgoingQueue = make(chan *lsproto.Message, 100)
+	if err := server.handleInitialized(t.Context(), &lsproto.InitializedParams{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if server.lintTimer != nil {
+			server.lintTimer.Stop()
+		}
+		server.session.Close()
+	})
+	return server
+}
+
+func TestSessionRuntimeModuleFormatUsesUnsavedSymlinkImplementation(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/runtime_module_format.txtar")
+	const commonJS = "module.exports = {foo: 1};\n"
+	const esm = "export default {}; export const foo = 1;\n"
+	for _, storeMode := range []string{"enabled", "disabled", "watch-failure", "absent"} {
+		for _, included := range []bool{false, true} {
+			name := "outside-program"
+			if included {
+				name = "inside-program"
+			}
+			for _, test := range []struct {
+				name, initial, changed string
+				beforeWant, afterWant  int
+			}{
+				{name: "commonjs-to-esm", initial: commonJS, changed: esm, afterWant: 1},
+				{name: "esm-to-commonjs", initial: esm, changed: commonJS, beforeWant: 1},
+			} {
+				t.Run(storeMode+"/"+name+"/"+test.name, func(t *testing.T) {
+					fsys := bundled.WrapFS(osvfs.FS())
+					directory := tspath.NormalizePath(fsys.Realpath(archive.Materialize(t, "")))
+					consumerPath := tspath.ResolvePath(directory, "consumer.mts")
+					implementationPath := tspath.ResolvePath(directory, "node_modules/runtime-package/index.js")
+					aliasPath := tspath.ResolvePath(directory, "alias.js")
+					if err := os.Symlink(implementationPath, aliasPath); err != nil {
+						t.Skipf("symlink unavailable: %v", err)
+					}
+					if err := os.WriteFile(implementationPath, []byte(test.initial), 0o644); err != nil {
+						t.Fatal(err)
+					}
+					if included {
+						configText := `{"compilerOptions":{"noLib":true,"allowJs":true,"noEmit":true,"target":"esnext","module":"nodenext"},"files":["consumer.mts","node_modules/runtime-package/index.js"]}`
+						if err := os.WriteFile(tspath.ResolvePath(directory, "tsconfig.json"), []byte(configText), 0o644); err != nil {
+							t.Fatal(err)
+						}
+					}
+					server := newLintSessionServerForTest(t, directory, fsys)
+					server.lintPrograms = newLintProgramStore(server)
+					server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error {
+						if storeMode == "watch-failure" {
+							return errors.New("watch registration rejected")
+						}
+						return nil
+					}
+					if storeMode == "disabled" {
+						server.lintPrograms.coverage.disabled = true
+					}
+					if storeMode == "absent" {
+						server.lintPrograms = nil
+					}
+					entries := config.RslintConfig{{
+						Plugins:         []string{"import"},
+						LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
+						Rules:           config.Rules{"import/no-named-as-default-member": "error"},
+					}}
+					installJSConfigsForTest(server, map[string]config.RslintConfig{directory: entries})
+					open := func(path, content string, language lsproto.LanguageKind) {
+						t.Helper()
+						if err := server.handleDidOpen(t.Context(), &lsproto.DidOpenTextDocumentParams{TextDocument: &lsproto.TextDocumentItem{
+							Uri: documentURIFromPath(path), Version: 1, Text: content, LanguageId: language,
+						}}); err != nil {
+							t.Fatal(err)
+						}
+					}
+					consumer, ok := fsys.ReadFile(consumerPath)
+					if !ok {
+						t.Fatal("missing consumer fixture")
+					}
+					consumerURI := documentURIFromPath(consumerPath)
+					open(consumerPath, consumer, lsproto.LanguageKindTypeScript)
+					open(aliasPath, test.initial, lsproto.LanguageKindJavaScript)
+					lint := func(phase, wantText string, wantDiagnostics int, standalone bool) *compiler.Program {
+						t.Helper()
+						var selected *compiler.Program
+						provider := &documentGenerationProvider{
+							server: server, uri: consumerURI, snapshot: server.documentLintSnapshot(consumerURI),
+							buildGeneration: func(program *compiler.Program, filesystem vfs.FS, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
+								selected = program
+								if text, ok := filesystem.ReadFile(implementationPath); !ok || text != wantText {
+									t.Errorf("%s: implementation filesystem text = %q, want %q", phase, text, wantText)
+								}
+								return buildDocumentGeneration(program, filesystem, source, lintTarget, cwd, typed, snapshot)
+							},
+						}
+						result, err := linter.RunPipeline(t.Context(), linter.NewLintRequest(provider, linter.ObservationPolicy{
+							Demand: linter.ArtifactDemand{Native: rule.EditDemandAll},
+						}, nil))
+						if err != nil || selected == nil {
+							t.Fatalf("%s: lint error = %v, selected = %v", phase, err, selected != nil)
+						}
+						service, err := server.session.GetLanguageService(t.Context(), consumerURI)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if isStandalone := selected != service.GetProgram(); isStandalone != standalone {
+							t.Errorf("%s: standalone Program = %v, want %v", phase, isStandalone, standalone)
+						}
+						implementation := selected.GetSourceFile(implementationPath)
+						if actual := implementation != nil; actual != included {
+							t.Fatalf("%s: implementation in Program = %v, want %v", phase, actual, included)
+						}
+						if implementation != nil && implementation.Text() != wantText {
+							t.Errorf("%s: implementation AST text = %q, want overlay text %q", phase, implementation.Text(), wantText)
+						}
+						if diagnostics := result.Observation.Native.Diagnostics; len(diagnostics) != wantDiagnostics {
+							t.Errorf("%s: diagnostics = %d, want %d: %+v", phase, len(diagnostics), wantDiagnostics, diagnostics)
+						}
+						return selected
+					}
+					warm := lint("initial", test.initial, test.beforeWant, false)
+					if err := server.handleDidChange(t.Context(), makeDidChangeParams(documentURIFromPath(aliasPath), 2, test.changed)); err != nil {
+						t.Fatal(err)
+					}
+					updated := lint("unsaved alias", test.changed, test.afterWant, included)
+					if !included && updated != warm {
+						t.Error("an implementation outside the compiler graph stopped Session reuse")
+					}
+					if disk, ok := fsys.ReadFile(implementationPath); !ok || disk != test.initial {
+						t.Fatal("the alias edit changed the implementation on disk")
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestSessionRejectsStaleSourceAliases(t *testing.T) {
+	const initial = "export const foo = 1; export default {};"
+	const changed = "export const bar = 1; export default {};"
+	const consumer = "import './a.js'; import value from './b.js'; value.foo;"
+	for _, storeMode := range []string{"enabled", "absent"} {
+		for _, preserveSymlinks := range []string{"false", "true"} {
+			t.Run(storeMode+"/preserveSymlinks="+preserveSymlinks, func(t *testing.T) {
+				fsys := bundled.WrapFS(osvfs.FS())
+				directory := tspath.NormalizePath(fsys.Realpath(t.TempDir()))
+				for name, content := range map[string]string{
+					"tsconfig.json": `{"compilerOptions":{"noLib":true,"noEmit":true,"module":"nodenext","preserveSymlinks":` + preserveSymlinks + `},"files":["consumer.mts"]}`,
+					"package.json":  `{"type":"module"}`,
+					"consumer.mts":  consumer,
+					"real.ts":       initial,
+				} {
+					if err := os.WriteFile(tspath.ResolvePath(directory, name), []byte(content), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for _, name := range []string{"a.ts", "b.ts"} {
+					if err := os.Symlink(tspath.ResolvePath(directory, "real.ts"), tspath.ResolvePath(directory, name)); err != nil {
+						t.Skipf("symlink unavailable: %v", err)
+					}
+				}
+				server := newLintSessionServerForTest(t, directory, fsys)
+				server.lintPrograms = nil
+				if storeMode == "enabled" {
+					server.lintPrograms = newLintProgramStore(server)
+					server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+				}
+				installJSConfigsForTest(server, map[string]config.RslintConfig{directory: {{
+					Plugins:         []string{"import"},
+					LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
+					Rules:           config.Rules{"import/no-named-as-default-member": "error"},
+				}}})
+				open := func(name, content string) {
+					t.Helper()
+					if err := server.handleDidOpen(t.Context(), &lsproto.DidOpenTextDocumentParams{TextDocument: &lsproto.TextDocumentItem{
+						Uri: documentURIFromPath(tspath.ResolvePath(directory, name)), Version: 1, Text: content, LanguageId: lsproto.LanguageKindTypeScript,
+					}}); err != nil {
+						t.Fatal(err)
+					}
+				}
+				uri := documentURIFromPath(tspath.ResolvePath(directory, "consumer.mts"))
+				open("consumer.mts", consumer)
+				lint := func(phase, wantText string, wantDiagnostics int, standalone bool) {
+					t.Helper()
+					var selected *compiler.Program
+					provider := &documentGenerationProvider{
+						server: server, uri: uri, snapshot: server.documentLintSnapshot(uri),
+						buildGeneration: func(program *compiler.Program, filesystem vfs.FS, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
+							selected = program
+							for _, name := range []string{"a.ts", "b.ts"} {
+								path := tspath.ResolvePath(directory, name)
+								alias := program.GetSourceFile(path)
+								if alias == nil || alias.Text() != wantText {
+									t.Errorf("%s: %s AST does not match the editor content", phase, name)
+								}
+								if text, ok := filesystem.ReadFile(path); !ok || text != wantText {
+									t.Errorf("%s: %s filesystem text = %q, want %q", phase, name, text, wantText)
+								}
+							}
+							return buildDocumentGeneration(program, filesystem, source, lintTarget, cwd, typed, snapshot)
+						},
+					}
+					result, err := linter.RunPipeline(t.Context(), linter.NewLintRequest(provider, linter.ObservationPolicy{}, nil))
+					if err != nil || selected == nil {
+						t.Fatalf("%s: lint error = %v, selected = %v", phase, err, selected != nil)
+					}
+					service, err := server.session.GetLanguageService(t.Context(), uri)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if isStandalone := selected != service.GetProgram(); isStandalone != standalone {
+						t.Errorf("%s: standalone Program = %v, want %v", phase, isStandalone, standalone)
+					}
+					if diagnostics := result.Observation.Native.Diagnostics; len(diagnostics) != wantDiagnostics {
+						t.Errorf("%s: diagnostics = %d, want %d: %+v", phase, len(diagnostics), wantDiagnostics, diagnostics)
+					}
+				}
+				lint("initial", initial, 1, false)
+				// The Session updates a.ts but retains b.ts. Both spellings
+				// must agree with the same unsaved physical file before reuse.
+				open("a.ts", changed)
+				lint("unsaved alias", changed, 0, true)
+			})
+		}
 	}
 }
 

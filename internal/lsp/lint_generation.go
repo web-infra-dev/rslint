@@ -161,6 +161,9 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	} else if serviceEnabled {
 		request.fs = selectionFS
 	}
+	loaders.sessionProgramIsCurrent = func(program *compiler.Program) bool {
+		return lintProgramMatchesEditorOverlay(program, request.filesystem())
+	}
 
 	program, sourceFile, hasTypeInfo, err := selectLintProgram(
 		p.uri,

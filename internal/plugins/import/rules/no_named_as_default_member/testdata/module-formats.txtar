@@ -196,3 +196,49 @@ export const foo: number;
 module.exports = {foo: 1};
 -- node_modules/package.d.ts/index.d.ts --
 export const foo: number;
+-- tsconfig.no-interop.json --
+{"extends":"./tsconfig.json","compilerOptions":{"esModuleInterop":false}}
+-- node_modules/interop-marked/package.json --
+{"main":"./index.cjs","types":"./index.d.ts"}
+-- node_modules/interop-marked/index.cjs --
+Object.defineProperty(exports, "__esModule", {value: true});
+exports.foo = 1; exports.default = {};
+-- node_modules/interop-marked/index.d.ts --
+export const foo: number; declare const value: {}; export default value;
+-- node_modules/interop-assigned/package.json --
+{"main":"./index.cjs","types":"./index.d.ts"}
+-- node_modules/interop-assigned/index.cjs --
+module.exports = Object.assign({}, {__esModule: true, foo: 1, default: {}});
+-- node_modules/interop-assigned/index.d.ts --
+export const foo: number; declare const value: {}; export default value;
+-- node_modules/interop-plain/package.json --
+{"main":"./index.cjs","types":"./index.d.ts"}
+-- node_modules/interop-plain/index.cjs --
+Object.defineProperty(exports, "__esModule", {value: false});
+exports.foo = 1; exports.default = {};
+-- node_modules/interop-plain/index.d.ts --
+export const foo: number; declare const value: {}; export default value;
+-- node_modules/interop-reexport/package.json --
+{"main":"./index.cjs","types":"./index.d.ts"}
+-- node_modules/interop-reexport/index.cjs --
+module.exports = {__esModule: true, foo: 1, default: {}};
+-- node_modules/interop-reexport/index.d.ts --
+export const foo: number; export {default} from './default';
+-- node_modules/interop-reexport/default.d.ts --
+declare const value: {}; export default value;
+-- node_modules/interop-star-marker/package.json --
+{"main":"./index.cjs","types":"./index.d.ts"}
+-- node_modules/interop-star-marker/index.cjs --
+exports.__esModule = true; exports.foo = 1; exports.default = {};
+-- node_modules/interop-star-marker/index.d.ts --
+export const foo: number; export * from './marker';
+-- node_modules/interop-star-marker/marker.d.ts --
+export declare const __esModule: true;
+-- interop-source.cts --
+export const foo = 1; export default {};
+-- node_modules/interop-unknown-star/package.json --
+{"main":"./index.cjs","types":"./index.d.ts"}
+-- node_modules/interop-unknown-star/index.cjs --
+module.exports = {foo: 1};
+-- node_modules/interop-unknown-star/index.d.ts --
+export const foo: number; export * from 'fs';

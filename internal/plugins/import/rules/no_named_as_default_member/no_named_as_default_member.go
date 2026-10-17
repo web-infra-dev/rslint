@@ -32,7 +32,7 @@ var NoNamedAsDefaultMemberRule = rule.Rule{
 				continue
 			}
 			source := modules.SourceFromSpecifier(declaration.ModuleSpecifier)
-			if import_utils.IsCommonJSModule(ctx, source) {
+			if import_utils.HasCommonJSNamespaceDefault(ctx, source) {
 				continue
 			}
 			names := import_utils.GetLocalExportNames(ctx, source)

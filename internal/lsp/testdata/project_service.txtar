@@ -197,8 +197,6 @@ var globalValue = 1;
 {"exports":{"types":"./types.d.ts","development":"./development.cjs","default":"./default.mjs"}}
 -- runtime-reference-conditions/node_modules/cjs-development/types.d.ts --
 export declare const member: number;
-declare const value: { member: number };
-export default value;
 -- runtime-reference-conditions/node_modules/cjs-development/development.cjs --
 module.exports = { member: 1 };
 -- runtime-reference-conditions/node_modules/cjs-development/default.mjs --
@@ -208,8 +206,6 @@ export default { member };
 {"exports":{"types":"./types.d.ts","development":"./development.mjs","default":"./default.cjs"}}
 -- runtime-reference-conditions/node_modules/esm-development/types.d.ts --
 export declare const member: number;
-declare const value: { member: number };
-export default value;
 -- runtime-reference-conditions/node_modules/esm-development/development.mjs --
 export const member = 1;
 export default { member };
