@@ -49,7 +49,8 @@ type estreeProjector struct {
 	nodes            []nodeRecord
 	values, lists    []uint32
 	emptyList        uint32
-	strings          []byte
+	strings          []string
+	stringBytes      int
 	stringOffsets    map[string]uint32
 	numbers          []float64
 	tokenCovers      []tokenCover
@@ -64,7 +65,7 @@ type Options struct {
 
 // Builder reuses scratch for sequential projections. Build returns
 // independently owned bytes and clears every source-backed reference on return.
-// A Builder must not be used concurrently. Reset bounds retained numeric scratch
+// A Builder must not be used concurrently. Reset bounds retained scratch
 // before a caller returns the Builder to its own finite cache.
 type Builder struct {
 	p        estreeProjector
@@ -72,12 +73,12 @@ type Builder struct {
 	comments []projectedComment
 }
 
-// Reset drops the string index and retains at most 4 MiB of numeric buffers.
+// Reset drops the string index and retains at most 4 MiB of source-cleared buffers.
 // Returned frames never alias these buffers, so callers may reset immediately.
 func (b *Builder) Reset() {
 	b.p.clearSource()
 	b.p.stringOffsets = nil
-	scratchBytes := cap(b.p.nodes)*16 + (cap(b.p.values)+cap(b.p.lists))*4 + cap(b.p.strings) +
+	scratchBytes := cap(b.p.nodes)*16 + (cap(b.p.values)+cap(b.p.lists))*4 + cap(b.p.strings)*16 +
 		cap(b.p.numbers)*8 + (cap(b.tokens)+cap(b.comments))*12
 	scratchBytes += cap(b.p.tokenCovers) * 12
 	if scratchBytes > 4<<20 {
@@ -133,6 +134,7 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	p.lists = p.lists[:0]
 	p.emptyList = 0
 	p.strings = p.strings[:0]
+	p.stringBytes = 0
 	p.numbers = p.numbers[:0]
 	if p.stringOffsets == nil {
 		p.stringOffsets = make(map[string]uint32)
@@ -156,6 +158,8 @@ func (p *estreeProjector) clearSource() {
 	p.ctx = nil
 	p.offsets = utf16Offsets{}
 	clear(p.stringOffsets)
+	clear(p.strings)
+	p.strings = p.strings[:0]
 	p.tokenCovers = p.tokenCovers[:0]
 }
 
@@ -193,28 +197,43 @@ func (p *estreeProjector) stringValue(value string) uint32 {
 	if offset, ok := p.stringOffsets[value]; ok {
 		return taggedValue(tagString, offset)
 	}
-	offset := uint32(len(p.strings) / 4)
+	offset := uint32(p.stringBytes / 4)
 	p.stringOffsets[value] = offset
 	units := ecmascript.StringCodeUnitCount(value)
 	encodedSize := align4(4 + units*2)
 	p.reserve(encodedSize)
-	p.strings = slices.Grow(p.strings, encodedSize)
-	p.strings = binary.LittleEndian.AppendUint32(p.strings, uint32(units))
-	for index := 0; index < len(value); {
-		r, size := ecmascript.DecodeStringRune(value[index:])
-		if r > 0xFFFF {
-			high, low := utf16.EncodeRune(r)
-			p.strings = binary.LittleEndian.AppendUint16(p.strings, uint16(high))
-			p.strings = binary.LittleEndian.AppendUint16(p.strings, uint16(low))
-		} else {
-			p.strings = binary.LittleEndian.AppendUint16(p.strings, uint16(r))
-		}
-		index += size
-	}
-	for len(p.strings)%4 != 0 {
-		p.strings = append(p.strings, 0)
-	}
+	p.stringBytes += encodedSize
+	p.strings = append(p.strings, value)
 	return taggedValue(tagString, offset)
+}
+
+// Encode straight into the final frame instead of retaining a second UTF-16
+// byte column. clearSource releases all staged string references on return.
+func (p *estreeProjector) encodeStrings(out []byte) {
+	for _, value := range p.strings {
+		cursor := 4
+		for index := 0; index < len(value); {
+			p.check()
+			end := min(len(value), index+4096)
+			for index < end {
+				r, size := ecmascript.DecodeStringRune(value[index:])
+				if r > 0xFFFF {
+					high, low := utf16.EncodeRune(r)
+					binary.LittleEndian.PutUint16(out[cursor:], uint16(high))
+					binary.LittleEndian.PutUint16(out[cursor+2:], uint16(low))
+					cursor += 4
+				} else {
+					binary.LittleEndian.PutUint16(out[cursor:], uint16(r))
+					cursor += 2
+				}
+				index += size
+			}
+		}
+		binary.LittleEndian.PutUint32(out, uint32((cursor-4)/2))
+		end := align4(cursor)
+		clear(out[cursor:end])
+		out = out[end:]
+	}
 }
 
 func (p *estreeProjector) numberValue(value float64) uint32 {
@@ -430,7 +449,7 @@ func (b *Builder) encode(root uint32, hasBOM bool, allocate func(int) []byte) ([
 	values := valueStarts + n*4
 	lists := values + len(p.values)*4
 	stringsOffset := lists + len(p.lists)*4
-	numbers := stringsOffset + len(p.strings)
+	numbers := stringsOffset + p.stringBytes
 	tokenTypes := numbers + len(p.numbers)*8
 	tokenStarts := align4(tokenTypes + len(b.tokens))
 	tokenEnds := tokenStarts + len(b.tokens)*4
@@ -465,7 +484,7 @@ func (b *Builder) encode(root uint32, hasBOM bool, allocate func(int) []byte) ([
 	put(24, uint32(n))
 	put(28, uint32(len(p.values)))
 	put(32, uint32(len(p.lists)))
-	put(36, uint32(len(p.strings)))
+	put(36, uint32(p.stringBytes))
 	put(40, uint32(len(p.numbers)))
 	put(44, uint32(len(b.tokens)))
 	put(48, uint32(len(b.comments)))
@@ -490,7 +509,7 @@ func (b *Builder) encode(root uint32, hasBOM bool, allocate func(int) []byte) ([
 	for index, value := range p.lists {
 		put(lists+index*4, value)
 	}
-	copy(out[stringsOffset:], p.strings)
+	p.encodeStrings(out[stringsOffset:numbers])
 	for index, value := range p.numbers {
 		binary.LittleEndian.PutUint64(out[numbers+index*8:], math.Float64bits(value))
 	}

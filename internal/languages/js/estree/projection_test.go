@@ -11,6 +11,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -140,6 +141,7 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 			if builder.p.file != nil || builder.p.text != "" || builder.p.sourceType != "" || builder.p.offsets.positions != nil || len(builder.p.stringOffsets) != 0 {
 				t.Fatal("builder retained source graph")
 			}
+			assertClearedProjectionStrings(t, &builder)
 			builder.Reset()
 			if builder.p.stringOffsets != nil || len(builder.p.tokenCovers) != 0 {
 				t.Fatal("reset builder retained source indexes")
@@ -178,7 +180,39 @@ func TestProjectionCancellationAndFailure(t *testing.T) {
 		if data != nil || err == nil || calls != 1 {
 			t.Fatalf("incorrect allocator size %d = %v/%v, calls=%d", delta, data, err, calls)
 		}
+		assertClearedProjectionStrings(t, &builder)
 	}
+	for _, mode := range []string{"panic", "cancel"} {
+		t.Run("allocator "+mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			data, err := builder.BuildInto(ctx, source("/file.ts", "const text = 'staged string';"), Options{SourceType: "module"}, func(size int) []byte {
+				if mode == "panic" {
+					panic("output allocator failure")
+				}
+				cancel()
+				return make([]byte, size)
+			})
+			if data != nil || err == nil || (mode == "cancel" && !errors.Is(err, context.Canceled)) {
+				t.Fatalf("allocator %s = %v/%v", mode, data, err)
+			}
+			assertClearedProjectionStrings(t, &builder)
+		})
+	}
+	t.Run("cancel while encoding strings", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		probe := &cancelOnProjectionCheck{Context: ctx, cancel: cancel, remaining: 1 << 30}
+		text := "const text = '" + strings.Repeat("世界😀", 8192) + "';"
+		data, err := builder.BuildInto(probe, source("/file.ts", text), Options{SourceType: "module"}, func(size int) []byte {
+			probe.remaining = 8
+			return make([]byte, size)
+		})
+		if data != nil || !errors.Is(err, context.Canceled) {
+			t.Fatalf("string encoding cancellation = %v/%v", data, err)
+		}
+		assertClearedProjectionStrings(t, &builder)
+	})
 	file := source("/file.ts", "const x = 1")
 	file.Statements.Nodes[0].Kind = ast.KindUnknown
 	if data, err := builder.Build(context.Background(), file, Options{SourceType: "module"}); data != nil || err == nil {
@@ -199,6 +233,7 @@ func TestProjectionCancellationAndFailure(t *testing.T) {
 		if builder.p.file != nil || builder.p.ctx != nil || builder.p.text != "" || builder.p.offsets.positions != nil || len(builder.p.stringOffsets) != 0 || len(builder.p.tokenCovers) != 0 {
 			t.Fatal("canceled projection retained generation references")
 		}
+		assertClearedProjectionStrings(t, &builder)
 	}
 }
 
@@ -215,28 +250,36 @@ func TestProjectionStringEncoding(t *testing.T) {
 		{"\xed\xb0\x80", []uint16{0xdc00}},
 		{"\xed\xa0\x80\xed\xb0\x80", []uint16{0xd800, 0xdc00}},
 		{"\xff", []uint16{0xfffd}},
+		{strings.Repeat("a", 4095) + "😀\xed\xa0\x80世界", append(slices.Repeat([]uint16{'a'}, 4095), 0xd83d, 0xde00, 0xd800, 0x4e16, 0x754c)},
 	}
 	for _, test := range cases {
-		t.Run(fmt.Sprintf("%x", test.text), func(t *testing.T) {
-			p := estreeProjector{stringOffsets: make(map[string]uint32)}
+		t.Run(fmt.Sprintf("%x", test.text[:min(len(test.text), 32)]), func(t *testing.T) {
+			p := estreeProjector{ctx: context.Background(), stringOffsets: make(map[string]uint32)}
 			value := p.stringValue(test.text)
-			if value != taggedValue(tagString, 0) || int(binary.LittleEndian.Uint32(p.strings)) != len(test.units) {
+			data := bytes.Repeat([]byte{0xff}, p.stringBytes)
+			p.encodeStrings(data)
+			if value != taggedValue(tagString, 0) || int(binary.LittleEndian.Uint32(data)) != len(test.units) {
 				t.Fatal("encoded string length or tag changed")
 			}
 			for index, expected := range test.units {
-				if actual := binary.LittleEndian.Uint16(p.strings[4+index*2:]); actual != expected {
+				if actual := binary.LittleEndian.Uint16(data[4+index*2:]); actual != expected {
 					t.Fatalf("unit %d: got %x, want %x", index, actual, expected)
 				}
 			}
-			if len(p.strings)%4 != 0 || p.stringValue(test.text) != value {
+			if p.stringBytes%4 != 0 || p.stringValue(test.text) != value || len(p.strings) != 1 {
 				t.Fatal("string alignment or deduplication changed")
+			}
+			for _, padding := range data[4+len(test.units)*2:] {
+				if padding != 0 {
+					t.Fatal("string alignment retained previous output bytes")
+				}
 			}
 		})
 	}
 }
 
 func TestProjectionScratchResetDropsLargeBuffers(t *testing.T) {
-	text := "const text = '" + strings.Repeat("a", 1<<20) + "';"
+	text := strings.Repeat("const value = { key: 'text' };\n", 20_000)
 	var builder Builder
 	data, err := builder.Build(context.Background(), source("/large.ts", text), Options{SourceType: "module"})
 	if err != nil {
@@ -244,14 +287,29 @@ func TestProjectionScratchResetDropsLargeBuffers(t *testing.T) {
 	}
 	saved := bytes.Clone(data)
 	builder.Reset()
-	if builder.p.nodes != nil || builder.p.values != nil || builder.p.strings != nil || builder.tokens != nil {
-		t.Fatal("oversized scratch survived reset")
+	retained := uintptr(0)
+	for _, buffer := range []any{builder.p.nodes, builder.p.values, builder.p.lists, builder.p.strings, builder.p.numbers, builder.tokens, builder.comments, builder.p.tokenCovers} {
+		value := reflect.ValueOf(buffer)
+		retained += uintptr(value.Cap()) * value.Type().Elem().Size()
 	}
+	if retained > 4<<20 {
+		t.Fatalf("oversized scratch survived reset: %d bytes", retained)
+	}
+	assertClearedProjectionStrings(t, &builder)
 	if _, err := builder.Build(context.Background(), source("/next.ts", "next()"), Options{SourceType: "script"}); err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(data, saved) {
 		t.Fatal("reset changed an independently owned frame")
+	}
+}
+
+func assertClearedProjectionStrings(t *testing.T, builder *Builder) {
+	t.Helper()
+	for _, value := range builder.p.strings[:cap(builder.p.strings)] {
+		if value != "" {
+			t.Fatal("projection scratch retained a staged source string")
+		}
 	}
 }
 
