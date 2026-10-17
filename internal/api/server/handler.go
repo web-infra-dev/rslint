@@ -2,10 +2,8 @@ package server
 
 import (
 	"context"
-	"fmt"
 
 	api "github.com/web-infra-dev/rslint/internal/api"
-	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
@@ -23,22 +21,7 @@ func (h *Handler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
 func (h *Handler) HandleLintWithContext(ctx context.Context, req api.LintRequest, requester api.Requester) (*api.LintResponse, error) {
 	var dispatch linter.EslintPluginDispatcher
 	if requester != nil {
-		dispatch = func(reqCtx context.Context, pluginReq linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-			pluginReq, frames := pluginReq.WithFrameAttachments()
-			attachments := make([]ipc.Attachment, len(frames))
-			for index, frame := range frames {
-				attachments[index] = ipc.Bytes(frame)
-			}
-			msg, err := requester.SendRequest(reqCtx, api.KindPluginLint, pluginReq, attachments...)
-			if err != nil {
-				return nil, err
-			}
-			var result linter.EslintPluginLintResult
-			if err := msg.Decode(&result); err != nil {
-				return nil, fmt.Errorf("decode pluginLint result: %w", err)
-			}
-			return &result, nil
-		}
+		dispatch = NewPluginDispatcher(requester)
 	}
 	return h.handleLint(ctx, req, dispatch, requester)
 }

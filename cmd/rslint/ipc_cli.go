@@ -49,9 +49,9 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/api/server"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
-	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -410,22 +410,7 @@ func runCLI(args []string) int {
 	// Reverse dispatcher: send each plugin-lint batch back to the Node host
 	// over the IPC channel and decode its result. Runs concurrently with the
 	// native lint pass (handleLintCommand awaits it before output / --fix).
-	dispatch := func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-		wire, frames := req.WithFrameAttachments()
-		attachments := make([]ipc.Attachment, len(frames))
-		for i, frame := range frames {
-			attachments[i] = ipc.Bytes(frame)
-		}
-		msg, err := ch.SendRequest(ctx, kindPluginLint, wire, attachments...)
-		if err != nil {
-			return nil, err
-		}
-		var result linter.EslintPluginLintResult
-		if err := msg.Decode(&result); err != nil {
-			return nil, fmt.Errorf("decode pluginLint result: %w", err)
-		}
-		return &result, nil
-	}
+	dispatch := server.NewPluginDispatcher(ch)
 
 	// Hold the --timing table until Node confirms that its real stdout sink has
 	// completed every forwarded write. Draining the Go pipe alone is not a

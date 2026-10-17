@@ -1593,21 +1593,36 @@ are disabled or their targets do not match, the pipeline produces no ESTree
 frames or plugin attachments.
 The builder reads the acquired Program's concrete SourceFile without modifying
 its AST or invoking a second parser. Native Go rules continue to traverse the
-original ts-go AST. Each window exclusively borrows projection scratch and sends
-at most 32 files and 64 MiB of frame bytes. The scheduler supplies caller-owned
-output storage through `Builder.BuildInto`; the language encoder requests the
-exact final size and knows nothing about reuse or transport. Small frames share
-stable output blocks whose combined capacity is bounded; growth never copies
-completed frames or changes their views. Retained scratch and output capacity
-are each capped at 4 MiB per window (80 MiB combined with the usual ten dispatch slots).
-Frames that do not fit the remaining block capacity use independent storage.
-Before dispatch the scheduler drops frame references from result metadata,
-discards source references and oversized scratch buffers. The output blocks stay
-exclusively leased until the dispatcher returns, including error/cancellation,
-then enters the invocation-local cache. A dispatcher
-retaining bytes after return must copy them. The cache never owns Program
-references and cannot reuse an in-flight or lookahead frame. Already frozen LSP
-input frames retain independent ownership and never enter this output cache.
+original ts-go AST. Each window opens a dispatcher-owned output lease and sends
+at most 32 files and 64 MiB of frame bytes. `Builder.BuildInto` requests the exact
+final size through a plain allocation function; the language encoder knows
+nothing about storage, reuse or transport.
+
+For CLI/API shared transport, `internal/ipc.RequestOutput` reserves unpublished
+storage in the existing mapping. Projection writes its final frame directly
+there, with no intermediate Go-heap output frame or publication copy. Allocation
+order is preserved by the attachment ranges; a failed encoding rolls back its
+last allocation. Pre-frozen inputs are copied into that window's storage rather
+than extending a reservation into another window. If a frame would exceed the
+window byte limit, it remains an unconsumed input and is rebuilt in the next
+window before allocating output.
+
+Publication ends producer access to those bytes and transfers slot ownership to
+the existing exact reader-acknowledgement protocol. Failure before publication
+releases every reservation. Shutdown cannot unmap under an active encoder, but
+published outputs do not pin the Go mapping while Node executes rules. Full,
+fragmented or unavailable storage retains the existing owned/inline byte route;
+no parser fallback or old plugin protocol is involved. The Node side continues
+to read independent writable bytes and materialize ordinary mutable ASTs.
+
+Inline/LSP dispatch uses the owned-frame adapter. Small frames share stable
+output blocks whose combined retained capacity is bounded; growth never copies
+completed frames or changes their views. Retained scratch is capped at 4 MiB per
+window. Owned output adds at most 4 MiB per window; shared output does not allocate
+those Go output blocks. Before dispatch the scheduler drops frame references
+from result metadata and discards source references and oversized scratch.
+Scratch/output caches never own Program references or reuse an in-flight frame.
+Already frozen LSP inputs retain their independent ownership.
 Projection reuses the SourceFile's existing sparse position map. String text is
 staged while frame sizes are counted, then encoded directly into the final frame
 instead of a temporary UTF-16 byte column. Success, failure and cancellation clear every
@@ -1622,11 +1637,9 @@ Projection follows Espree's JS/JSX data contract and TypeScript ESTree's TS/TSX
 contract, selected by the SourceFile's script kind. This includes JSX entity
 values, token classifications, optional fields and template raw values; it
 does not change syntax admission, rule execution or diagnostic/fix policy.
-After the transport copies frames into shared storage or encodes inline fallback,
-oversized original buffers can be collected while Node executes rules. Shared slots still
-require the existing reader release acknowledgement before reuse. A single
-prepared lookahead frame may wait for the next window; no whole-group
-frame cache is retained. Private pipeline input slots transfer their syntax
+Shared publication carries ranges for the already encoded bytes; inline fallback
+serializes owned bytes. Shared slots require the existing reader release
+acknowledgement before reuse. No whole-group frame cache is retained. Private pipeline input slots transfer their syntax
 references to the bounded projection windows and are cleared as consumed.
 Diagnostic metadata shares the native source's independent text frame for
 read-only observations, preserving exact source identity without retaining

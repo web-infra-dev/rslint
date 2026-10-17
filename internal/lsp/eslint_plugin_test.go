@@ -127,14 +127,14 @@ func pluginRequestForProductionPassTest(
 		return linter.EslintPluginLintRequest{}, false
 	}
 	var request linter.EslintPluginLintRequest
-	outcome, err := run(context.Background(), func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	outcome, err := run(context.Background(), linter.EslintPluginDispatchFunc(func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		request = got
 		results := make([]linter.EslintPluginFileResult, len(got.Files))
 		for index, file := range got.Files {
 			results[index].FilePath = file.Path
 		}
 		return &linter.EslintPluginLintResult{Results: results}, nil
-	})
+	}))
 	if err != nil || outcome.DispatchError != nil {
 		t.Fatalf("run prepared plugin run: contract=%v dispatch=%v", err, outcome.DispatchError)
 	}
@@ -297,10 +297,10 @@ func TestMergePluginDiagnostics_MergesAndPublishes(t *testing.T) {
 func TestPluginDispatchForGeneration_StampsRequest(t *testing.T) {
 	s := newTestServer()
 	var received string
-	s.eslintPluginDispatch = func(_ context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(_ context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		received = req.Generation
 		return &linter.EslintPluginLintResult{}, nil
-	}
+	})
 
 	_, err := s.pluginDispatchForGeneration("config-12")(context.Background(), linter.EslintPluginLintRequest{})
 	if err != nil {
@@ -428,7 +428,7 @@ func TestPushDiagnosticsPublishesBaselineBeforePluginAndAdmitsEnrichment(t *test
 		}},
 	)
 	baselineAtDispatch := make(chan string, 1)
-	s.eslintPluginDispatch = func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		select {
 		case message := <-queue:
 			params, ok := message.AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
@@ -449,7 +449,7 @@ func TestPushDiagnosticsPublishesBaselineBeforePluginAndAdmitsEnrichment(t *test
 				EndPos:   5,
 			}},
 		}}}, nil
-	}
+	})
 
 	s.pushDiagnostics(uri)
 	select {
@@ -507,10 +507,10 @@ func TestPushDiagnosticsDoesNotSubmitIneligibleEnrichment(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			s, uri, queue := newPushDiagnosticsPluginFixture(t, test.source, test.entries)
 			dispatched := make(chan struct{}, 1)
-			s.eslintPluginDispatch = func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 				dispatched <- struct{}{}
 				return &linter.EslintPluginLintResult{}, nil
-			}
+			})
 			s.pushDiagnostics(uri)
 			select {
 			case <-queue:
@@ -916,7 +916,7 @@ func TestDeferredPluginRunRebuildsWithFixes(t *testing.T) {
 
 	// Mock the reverse dispatcher: one diagnostic with a fix, keyed by the
 	// resolved file path (applyEslintPluginResults matches result→input on it).
-	s.eslintPluginDispatch = func(_ context.Context, _ linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(_ context.Context, _ linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		return &linter.EslintPluginLintResult{
 			Results: []linter.EslintPluginFileResult{
 				{
@@ -933,7 +933,7 @@ func TestDeferredPluginRunRebuildsWithFixes(t *testing.T) {
 				},
 			},
 		}, nil
-	}
+	})
 
 	snapshot := s.documentLintSnapshot(uri)
 	work := preparedPluginRunForTest(t, s, uri, content, snapshot)
@@ -985,7 +985,7 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 	// Mocked plugin dispatcher: fix "bar" → "baz" wherever it appears in the
 	// content the worker was handed (req file text == the current pass content).
 	var pluginPasses int
-	s.eslintPluginDispatch = func(_ context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(_ context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		pluginPasses++
 		f := req.Files[0]
 		content := pluginFrameTextForTest(t, f.Frame)
@@ -1000,7 +1000,7 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 				Fixes: []linter.EslintPluginFix{{Range: [2]int{idx, idx + 3}, Text: "baz"}},
 			}},
 		}}}, nil
-	}
+	})
 
 	// Extend the production generation with one native test rule that fixes the
 	// first "1" → "2" and then converges.
@@ -1229,7 +1229,7 @@ func TestComputeFixAllContentSharesFrozenTargetWithNativeAndPlugin(t *testing.T)
 		return acquireSpeculativeGeneration(ctx, content, pluginSnapshot, environment)
 	}
 	pluginCalls := 0
-	s.eslintPluginDispatch = func(
+	s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(
 		_ context.Context,
 		req linter.EslintPluginLintRequest,
 	) (*linter.EslintPluginLintResult, error) {
@@ -1245,7 +1245,7 @@ func TestComputeFixAllContentSharesFrozenTargetWithNativeAndPlugin(t *testing.T)
 		return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
 			FilePath: req.Files[0].Path,
 		}}}, nil
-	}
+	})
 
 	if got := runSpeculativeFixAllForTest(t, s, context.Background(), uri, source, snapshot); got != source {
 		t.Fatalf("fixAll changed source without fixes: %q", got)
@@ -1279,11 +1279,11 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 
 	// Wedged dispatcher: never answers, blocks until the deadline cancels ctx.
 	var dispatchCalls int
-	s.eslintPluginDispatch = func(ctx context.Context, _ linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(ctx context.Context, _ linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		dispatchCalls++
 		<-ctx.Done()
 		return nil, ctx.Err()
-	}
+	})
 	// Extend each production generation with one native test fix.
 	var nativePasses int
 	s.speculativeGeneration = fixAllGenerationWithNativeFixForTest(t, &nativePasses, nil, func(content string) (core.TextRange, string, bool) {
@@ -1330,10 +1330,10 @@ func TestComputeFixAllContent_SyntaxErrorSkipsPluginPass(t *testing.T) {
 	s.documents[uri] = malformed
 
 	pluginCalls := 0
-	s.eslintPluginDispatch = func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		pluginCalls++
 		return &linter.EslintPluginLintResult{}, nil
-	}
+	})
 	got := runSpeculativeFixAllForTest(
 		t, s, context.Background(), uri, malformed, s.documentLintSnapshot(uri),
 	)
@@ -1360,10 +1360,10 @@ func TestDeferredPluginRunExpiredContextReturnsPromptly(t *testing.T) {
 	snapshot := s.documentLintSnapshot(uri)
 	work := preparedPluginRunForTest(t, s, uri, content, snapshot)
 
-	s.eslintPluginDispatch = func(ctx context.Context, _ linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(ctx context.Context, _ linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		<-ctx.Done()
 		return nil, ctx.Err()
-	}
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // already expired before the call
@@ -1539,11 +1539,11 @@ func TestDispatchPluginLintTimesOutWedgedClient(t *testing.T) {
 	defer log.SetOutput(os.Stderr)
 
 	released := make(chan error, 1)
-	s.eslintPluginDispatch = func(ctx context.Context, _ linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(ctx context.Context, _ linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		<-ctx.Done() // wedged client: only the deadline releases us
 		released <- ctx.Err()
 		return nil, ctx.Err()
-	}
+	})
 
 	s.startDiagnosticEnrichment(s.backgroundCtx, uri, 1, snapshot.pluginGeneration, work)
 
@@ -1614,13 +1614,13 @@ func TestDispatchPluginLintDeliversSuccessResultNotRacedAway(t *testing.T) {
 	s.eslintPluginConfigGeneration = "newer-live-generation"
 
 	dispatchedGeneration := make(chan string, 1)
-	s.eslintPluginDispatch = func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		dispatchedGeneration <- req.Generation
 		return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
 			FilePath:    req.Files[0].Path,
 			Diagnostics: []linter.EslintPluginDiagnostic{{RuleName: "tpok/no-bar", Message: "bad", StartPos: 6, EndPos: 9}},
 		}}}, nil
-	}
+	})
 
 	s.startDiagnosticEnrichment(s.backgroundCtx, uri, 7, snapshot.pluginGeneration, work)
 

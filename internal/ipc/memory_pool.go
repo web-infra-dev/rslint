@@ -13,6 +13,7 @@ type memorySlot struct {
 	generation uint32
 	length     uint32
 	busy       bool
+	reserved   bool
 }
 
 type memoryMapping struct {
@@ -22,11 +23,15 @@ type memoryMapping struct {
 }
 
 // memoryPool serializes reservation, copy, publication and close. Mapped
-// slices never escape the package. One request may occupy multiple slots.
+// writable views escape only through a pinned RequestOutput producer borrow.
+// One request may occupy multiple slots.
 type memoryPool struct {
-	mu      sync.Mutex
-	mapping memoryMapping
-	slots   [MemorySlotCount]memorySlot
+	mu       sync.Mutex
+	mapping  memoryMapping
+	slots    [MemorySlotCount]memorySlot
+	writers  int
+	closing  bool
+	closeErr error
 }
 
 func openMemoryPool(descriptor MemoryMapping) (*memoryPool, error) {
@@ -48,12 +53,12 @@ func openMemoryPool(descriptor MemoryMapping) (*memoryPool, error) {
 func (p *memoryPool) store(values []Attachment) ([]MemoryBatch, []*MemoryRange) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.mapping.data == nil {
+	if p.mapping.data == nil || p.closing {
 		return nil, nil
 	}
 	var free []int
 	for i, slot := range p.slots {
-		if !slot.busy && slot.generation != MemoryMaxGeneration {
+		if !slot.busy && !slot.reserved && slot.generation != MemoryMaxGeneration {
 			free = append(free, i)
 		}
 	}
@@ -143,7 +148,7 @@ func (p *memoryPool) release(batches []MemoryBatch) {
 		}
 		seen |= 1 << batch.Slot
 		slot := &p.slots[batch.Slot]
-		if !slot.busy || slot.generation != batch.Generation || slot.length != batch.Length {
+		if !slot.busy || slot.reserved || slot.generation != batch.Generation || slot.length != batch.Length {
 			return
 		}
 	}
@@ -155,13 +160,24 @@ func (p *memoryPool) release(batches []MemoryBatch) {
 func (p *memoryPool) close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.mapping.data == nil {
+	p.closing = true
+	return p.closeMapping()
+}
+
+// A producer may be writing outside the pool lock. Its last Close ends the
+// mapping borrow; channel shutdown cannot remove storage under an active encoder.
+func (p *memoryPool) closeMapping() error {
+	if p.writers != 0 {
 		return nil
+	}
+	if p.mapping.data == nil {
+		return p.closeErr
 	}
 	var err error
 	if p.mapping.unmap != nil {
 		err = p.mapping.unmap()
 	}
 	p.mapping = memoryMapping{}
-	return err
+	p.closeErr = err
+	return p.closeErr
 }

@@ -423,7 +423,7 @@ func TestHandleLint_FixProjectsOutputToRequestedAlias(t *testing.T) {
 	}
 
 	var calls atomic.Int32
-	dispatch := func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	dispatch := linter.EslintPluginDispatchFunc(func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		call := calls.Add(1)
 		if len(request.Files) != 1 || len(request.Files[0].Frame) < 64 {
 			t.Fatalf("plugin call %d has no source", call)
@@ -442,7 +442,7 @@ func TestHandleLint_FixProjectsOutputToRequestedAlias(t *testing.T) {
 		return &linter.EslintPluginLintResult{
 			Results: []linter.EslintPluginFileResult{result},
 		}, nil
-	}
+	})
 
 	response, err := (&Handler{}).handleLint(context.Background(), api.LintRequest{
 		Files:          []string{aliasPath},

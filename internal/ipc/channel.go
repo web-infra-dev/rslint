@@ -229,7 +229,10 @@ func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any
 	msg.ID = id
 	memory := c.memory
 	c.mu.Unlock()
-	batches := attach(msg, memory, attachments)
+	batches, err := attachOutput(msg, memory, attachments)
+	if err != nil {
+		return nil, err
+	}
 
 	// Encode before write admission. A local size/encoding failure has not
 	// exposed any batch to the peer, so its storage can be reused immediately

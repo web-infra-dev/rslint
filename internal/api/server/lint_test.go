@@ -156,7 +156,7 @@ func TestHandleLint_PluginWirePathUsesProgramIdentityWhileResultsUseRequestedAli
 				RuleNames: []string{"check"},
 			}},
 		},
-		func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		linter.EslintPluginDispatchFunc(func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 			if len(request.Files) != 1 {
 				return nil, fmt.Errorf("plugin files = %d, want 1", len(request.Files))
 			}
@@ -170,7 +170,7 @@ func TestHandleLint_PluginWirePathUsesProgramIdentityWhileResultsUseRequestedAli
 					EndPos:   5,
 				}},
 			}}}, nil
-		},
+		}),
 		nil,
 	)
 	if err != nil {
@@ -2835,4 +2835,11 @@ func TestHandleLint_ExplicitRootMembershipTracksConfigChanges(t *testing.T) {
 			t.Fatalf("roots=%s stale membership: %+v", roots, response)
 		}
 	}
+}
+
+func (f apiRequesterFunc) NewRequestOutput(ctx context.Context) (*ipc.RequestOutput, error) {
+	return ipc.NewRequestOutput(ctx), nil
+}
+func (f apiAttachmentRequesterFunc) NewRequestOutput(ctx context.Context) (*ipc.RequestOutput, error) {
+	return ipc.NewRequestOutput(ctx), nil
 }
