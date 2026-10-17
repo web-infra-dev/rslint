@@ -1,0 +1,10 @@
+-- tsconfig.json --
+{"compilerOptions":{"noLib":true,"allowJs":true,"noEmit":true,"target":"esnext","module":"nodenext"},"files":["consumer.mts"]}
+-- consumer.mts --
+import value from "runtime-package"; value.foo;
+-- node_modules/runtime-package/package.json --
+{"name":"runtime-package","main":"./index.js","types":"./index.d.ts"}
+-- node_modules/runtime-package/index.d.ts --
+export const foo: number;
+-- node_modules/runtime-package/index.js --
+module.exports = {foo: 1};

@@ -33,9 +33,10 @@ type lintProjectMetadataLoader func(
 ) (*lintProjectMetadata, bool, error)
 
 type lintProjectLoaders struct {
-	program  lintProgramLoader
-	metadata lintProjectMetadataLoader
-	fallback func() (*compiler.Program, *ast.SourceFile, error)
+	program                 lintProgramLoader
+	metadata                lintProjectMetadataLoader
+	fallback                func() (*compiler.Program, *ast.SourceFile, error)
+	sessionProgramIsCurrent func(*compiler.Program) bool
 }
 
 // lintProjectMetadata is the lightweight, immutable part of one configured
@@ -591,7 +592,8 @@ func selectLintProgram(
 			if err := loadSession(); err != nil {
 				return nil, nil, err
 			}
-			if loadedProject, ok := findLoadedProject(tsConfigPath); ok {
+			if loadedProject, ok := findLoadedProject(tsConfigPath); ok &&
+				(fallbackLoaders.sessionProgramIsCurrent == nil || fallbackLoaders.sessionProgramIsCurrent(loadedProject.program)) {
 				if serviceRootDirectory == "" ||
 					(lintSessionProgramMatchesConfig(loadedProject.program, metadata, fallbackLoaders.metadata, fs) &&
 						sessionRoots.canUseServiceProgram(tsConfigPath, loadedProject.program, fs)) {

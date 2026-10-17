@@ -1,0 +1,492 @@
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"nodenext","maxNodeModuleJsDepth":1},"include":["**/*"]}
+-- tsconfig.custom.json --
+{"extends":"./tsconfig.json","compilerOptions":{"customConditions":["development"]}}
+-- tsconfig.paths.json --
+{"extends":"./tsconfig.json","compilerOptions":{"paths":{"declaration-cjs":["./types/cjs.d.cts"],"declaration-unknown":["./types/unknown.d.ts"],"mapped-types-esm":["./types/mapped-types-esm.d.ts"]}}}
+-- tsconfig.suffixes.json --
+{"extends":"./tsconfig.json","compilerOptions":{"moduleSuffixes":[".native",""]}}
+-- tsconfig.roots.json --
+{"extends":"./tsconfig.json","compilerOptions":{"module":"esnext","moduleResolution":"bundler","rootDirs":["./src","./runtime"]}}
+-- package.json --
+{"name":"resolution-fixture","type":"module","imports":{"#explicit-ts-esm":{"types":"./types/unknown.d.ts","default":"./runtime/explicit-esm.ts"},"#explicit-ts-cjs":{"types":"./types/unknown.d.ts","default":"./runtime/explicit-cjs.ts"},"#declaration":"./types/mapped-types-esm.d.ts","#cjs":{"types":"./types/unknown.d.ts","default":"./runtime/index.cjs"}},"exports":{"types":"./types/unknown.d.ts","default":"./runtime/index.mjs"}}
+-- node_modules/nested/package.json --
+{"name":"nested","exports":{".":{"import":{"types":"./index.d.ts","default":"./index.cjs"},"require":{"types":"./index.d.ts","default":"./index.mjs"}},"./*":{"types":"./index.d.ts","default":"./*.js"}}}
+-- node_modules/nested/index.d.ts --
+export const foo: number;
+-- node_modules/nested/index.cjs --
+module.exports = {foo: 1};
+-- node_modules/nested/index.mjs --
+export default {}; export const foo = 1;
+-- node_modules/nested/cjs.js --
+module.exports = {foo: 1};
+-- node_modules/nested/esm.js --
+export default {}; export const foo = 1;
+-- node_modules/custom/package.json --
+{"name":"custom","exports":{"types":"./index.d.ts","development":"./index.cjs","default":"./index.mjs"}}
+-- node_modules/custom/index.d.ts --
+export const foo: number;
+-- node_modules/custom/index.cjs --
+module.exports = {foo: 1};
+-- node_modules/custom/index.mjs --
+export default {}; export const foo = 1;
+-- types/cjs.d.cts --
+export const foo: number;
+-- types/unknown.d.ts --
+export const foo: number;
+-- runtime/index.cjs --
+module.exports = {foo: 1};
+-- runtime/index.mjs --
+export default {}; export const foo = 1;
+-- runtime/package.json --
+{}
+-- src/cjs.d.ts --
+export const foo: number;
+-- runtime/cjs.js --
+module.exports = {foo: 1};
+-- src/esm.d.ts --
+export const foo: number;
+-- runtime/esm.js --
+export default {}; export const foo = 1;
+-- node_modules/nested-scope/package.json --
+{"name":"nested-scope","type":"commonjs"}
+-- node_modules/nested-scope/cjs/package.json --
+{"type":"commonjs"}
+-- node_modules/nested-scope/cjs/index.d.ts --
+export const foo: number;
+-- node_modules/nested-scope/cjs/index.js --
+module.exports = {foo: 1};
+-- node_modules/nested-scope/esm/package.json --
+{"type":"module"}
+-- node_modules/nested-scope/esm/index.d.ts --
+export const foo: number;
+-- node_modules/nested-scope/esm/index.js --
+export default {}; export const foo = 1;
+-- node_modules/versioned-cjs/package.json --
+{"name":"versioned-cjs","main":"./index.js","types":"./index.d.ts","typesVersions":{"*":{"*":["types/current.d.ts"]}}}
+-- node_modules/versioned-cjs/index.js --
+module.exports = {foo: 1};
+-- node_modules/versioned-cjs/index.d.ts --
+export const foo: number;
+-- node_modules/versioned-cjs/types/current.d.ts --
+export const foo: number;
+-- node_modules/versioned-esm/package.json --
+{"name":"versioned-esm","main":"./index.js","types":"./index.d.ts","typesVersions":{"*":{"*":["types/current.d.ts"]}}}
+-- node_modules/versioned-esm/index.js --
+export default {}; export const foo = 1;
+-- node_modules/versioned-esm/index.d.ts --
+export const foo: number;
+-- node_modules/versioned-esm/types/current.d.ts --
+export const foo: number;
+-- node_modules/suffix-cjs/package.json --
+{"name":"suffix-cjs","main":"./index.js","types":"./index.d.ts"}
+-- node_modules/suffix-cjs/index.js --
+export default {}; export const foo = 1;
+-- node_modules/suffix-cjs/index.native.js --
+module.exports = {foo: 1};
+-- node_modules/suffix-cjs/index.d.ts --
+export const foo: number;
+-- node_modules/suffix-cjs/index.native.d.ts --
+export const foo: number;
+-- node_modules/suffix-esm/package.json --
+{"name":"suffix-esm","main":"./index.js","types":"./index.d.ts"}
+-- node_modules/suffix-esm/index.js --
+module.exports = {foo: 1};
+-- node_modules/suffix-esm/index.native.js --
+export default {}; export const foo = 1;
+-- node_modules/suffix-esm/index.d.ts --
+export const foo: number;
+-- node_modules/suffix-esm/index.native.d.ts --
+export const foo: number;
+-- symlink/tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"nodenext","maxNodeModuleJsDepth":1},"include":["**/*"]}
+-- symlink/tsconfig.preserve.json --
+{"extends":"./tsconfig.json","compilerOptions":{"preserveSymlinks":true}}
+-- symlink/package.json --
+{"type":"commonjs"}
+-- symlink/packages/esm/package.json --
+{"name":"esm","type":"module","main":"./index.js","types":"./index.d.ts"}
+-- symlink/packages/esm/index.js --
+export default {}; export const foo = 1;
+-- symlink/packages/esm/index.d.ts --
+export const foo: number;
+-- symlink/packages/cjs/package.json --
+{"name":"cjs","type":"commonjs","main":"./index.js","types":"./index.d.ts"}
+-- symlink/packages/cjs/index.js --
+module.exports = {foo: 1};
+-- symlink/packages/cjs/index.d.ts --
+export const foo: number;
+-- node_modules/versioned-decoy/package.json --
+{"name":"versioned-decoy","main":"./index.mjs","types":"./index.d.ts","typesVersions":{"*":{"*":["types/current"]}}}
+-- node_modules/versioned-decoy/index.mjs --
+export default {}; export const foo = 1;
+-- node_modules/versioned-decoy/index.d.ts --
+export const foo: number;
+-- node_modules/versioned-decoy/types/current.d.ts --
+export const foo: number;
+-- node_modules/versioned-decoy/types/current.js --
+module.exports = {foo: 1};
+-- tsconfig.custom-types.json --
+{"extends":"./tsconfig.json","compilerOptions":{"customConditions":["types"]}}
+-- types/package.json --
+{"type":"commonjs"}
+-- types/mapped-types-esm.d.ts --
+export const foo: number;
+-- types/mapped-types-esm.js --
+module.exports = {foo: 1};
+-- node_modules/mapped-types-esm/package.json --
+{"name":"mapped-types-esm","main":"./index.mjs"}
+-- node_modules/mapped-types-esm/index.mjs --
+export default {}; export const foo = 1;
+-- node_modules/custom-types/package.json --
+{"name":"custom-types","exports":{"types":"./types.d.ts","default":"./main.mjs"}}
+-- node_modules/custom-types/types.d.ts --
+export const foo: number;
+-- node_modules/custom-types/types.js --
+module.exports = {foo: 1};
+-- node_modules/custom-types/main.mjs --
+export default {}; export const foo = 1;
+-- node_modules/default-first/package.json --
+{"name":"default-first","types":"./index.d.ts","exports":{"types":"./index.d.ts","default":"./index.cjs","development":"./index.mjs","import":"./index.mjs"}}
+-- node_modules/default-first/index.d.ts --
+export const foo: number;
+-- node_modules/default-first/index.cjs --
+module.exports = {foo: 1};
+-- node_modules/default-first/index.mjs --
+export default {}; export const foo = 1;
+-- node_modules/declaration-export-only/package.json --
+{"name":"declaration-export-only","exports":"./index.d.ts"}
+-- node_modules/declaration-export-only/index.d.ts --
+export const foo: number;
+-- node_modules/declaration-export-only/index.js --
+module.exports = {foo: 1};
+-- node_modules/declaration-main-only/package.json --
+{"name":"declaration-main-only","main":"./types.d.ts"}
+-- node_modules/declaration-main-only/types.d.ts --
+export const foo: number;
+-- node_modules/declaration-main-only/types.js --
+module.exports = {foo: 1};
+-- node_modules/declaration-main-only/index.js --
+module.exports = {foo: 1};
+-- tsconfig.versioned-types.json --
+{"extends":"./tsconfig.json","compilerOptions":{"customConditions":["types@>=5.0"]}}
+-- node_modules/custom-versioned-types/package.json --
+{"name":"custom-versioned-types","exports":{"types@>=5.0":"./types.d.ts","default":"./main.mjs"}}
+-- node_modules/custom-versioned-types/types.d.ts --
+export const foo: number;
+-- node_modules/custom-versioned-types/types.js --
+module.exports = {foo: 1};
+-- node_modules/custom-versioned-types/main.mjs --
+export default {}; export const foo = 1;
+-- node_modules/declaration-main-only/feature.d.ts --
+export const foo: number;
+-- node_modules/declaration-main-only/feature.js --
+module.exports = {foo: 1};
+-- node_modules/declaration-main-exports-override/package.json --
+{"name":"declaration-main-exports-override","main":"./types.d.ts","exports":{"types":"./types.d.ts","default":"./index.cjs"}}
+-- node_modules/declaration-main-exports-override/types.d.ts --
+export const foo: number;
+-- node_modules/declaration-main-exports-override/index.cjs --
+module.exports = {foo: 1};
+-- node_modules/declaration-export-array/package.json --
+{"name":"declaration-export-array","exports":["./types.d.ts","./index.cjs"]}
+-- node_modules/declaration-export-array/types.d.ts --
+export const foo: number;
+-- node_modules/declaration-export-array/index.cjs --
+module.exports = {foo: 1};
+-- node_modules/declaration-export-condition/package.json --
+{"name":"declaration-export-condition","exports":{"development":"./types.d.ts","default":"./index.cjs"}}
+-- node_modules/declaration-export-condition/types.d.ts --
+export const foo: number;
+-- node_modules/declaration-export-condition/index.cjs --
+module.exports = {foo: 1};
+-- tsconfig.node10.json --
+{"extends":"./tsconfig.json","compilerOptions":{"module":"commonjs","moduleResolution":"node10","esModuleInterop":true}}
+-- tsconfig.bundler.json --
+{"extends":"./tsconfig.json","compilerOptions":{"module":"esnext","moduleResolution":"bundler"}}
+-- tsconfig.preserve.json --
+{"extends":"./tsconfig.json","compilerOptions":{"preserveSymlinks":true}}
+-- tsconfig.suffixes-only.json --
+{"extends":"./tsconfig.json","compilerOptions":{"moduleSuffixes":[".native"]}}
+-- node_modules/declaration-main-suffix/package.json --
+{"name":"declaration-main-suffix","main":"./types.d.ts"}
+-- node_modules/declaration-main-suffix/types.d.ts --
+export const foo: number;
+-- node_modules/declaration-main-suffix/types.native.d.ts --
+export const foo: number;
+-- node_modules/declaration-main-suffix/types.native.js --
+module.exports = {foo: 1};
+-- node_modules/declaration-main-suffix/index.native.js --
+module.exports = {foo: 1};
+-- node_modules/declaration-main-native-only/package.json --
+{"name":"declaration-main-native-only","main":"./types.d.ts"}
+-- node_modules/declaration-main-native-only/types.native.d.ts --
+export const foo: number;
+-- node_modules/declaration-main-native-only/index.native.js --
+module.exports = {foo: 1};
+-- symlink/packages/declaration/package.json --
+{"name":"declaration","main":"./types.d.ts"}
+-- symlink/packages/declaration/types.d.ts --
+export const foo: number;
+-- symlink/packages/declaration/types.js --
+module.exports = {foo: 1};
+-- symlink/packages/declaration/index.js --
+module.exports = {foo: 1};
+-- node_modules/declaration-pattern/package.json --
+{"name":"declaration-pattern","exports":{"./*":"./*"}}
+-- node_modules/declaration-pattern/types.d.ts --
+export const foo: number;
+-- node_modules/declaration-pattern/types.js --
+module.exports = {foo: 1};
+-- tsconfig.json-runtime.json --
+{"extends":"./tsconfig.json","compilerOptions":{"resolveJsonModule":true}}
+-- node_modules/extensionless-json-main/package.json --
+{"name":"extensionless-json-main","main":"./data","types":"./index.d.ts"}
+-- node_modules/extensionless-json-main/index.d.ts --
+export const foo: number;
+-- node_modules/extensionless-json-main/data.json --
+{"foo":1}
+-- tsconfig.no-json.json --
+{"extends":"./tsconfig.json","compilerOptions":{"resolveJsonModule":false}}
+-- tsconfig.implementation-paths.json --
+{"extends":"./tsconfig.json","compilerOptions":{"paths":{"mapped-ts-esm":["./types/unknown.d.ts","./runtime/explicit-esm.ts"],"mapped-ts-cjs":["./types/unknown.d.ts","./runtime/explicit-cjs.ts"],"mapped-ts-source":["./types/unknown.d.ts","./runtime/source-only.js"]}}}
+-- runtime/explicit-esm.ts --
+export default {}; export const foo = 1;
+-- runtime/explicit-esm.js --
+module.exports = {foo: 1};
+-- runtime/explicit-cjs.ts --
+module.exports = {foo: 1};
+-- runtime/explicit-cjs.js --
+export default {}; export const foo = 1;
+-- runtime/source-only.ts --
+export default {}; export const foo = 1;
+-- node_modules/js-cjs-ts-decoy/package.json --
+{"name":"js-cjs-ts-decoy","exports":{"types":"./index.d.ts","default":"./index.js"}}
+-- node_modules/js-cjs-ts-decoy/index.d.ts --
+export const foo: number;
+-- node_modules/js-cjs-ts-decoy/index.js --
+module.exports = {foo: 1};
+-- node_modules/js-cjs-ts-decoy/index.ts --
+export default {}; export const foo = 1;
+-- node_modules/js-esm-ts-decoy/package.json --
+{"name":"js-esm-ts-decoy","exports":{"types":"./index.d.ts","default":"./index.js"}}
+-- node_modules/js-esm-ts-decoy/index.d.ts --
+export const foo: number;
+-- node_modules/js-esm-ts-decoy/index.js --
+export default {}; export const foo = 1;
+-- node_modules/js-esm-ts-decoy/index.ts --
+module.exports = {foo: 1};
+-- node_modules/query-cjs/package.json --
+{"name":"query-cjs","exports":{"types":"./index.d.ts","default":"./index.js?runtime"}}
+-- node_modules/query-cjs/index.d.ts --
+export const foo: number;
+-- node_modules/query-cjs/index.js --
+module.exports = {foo: 1};
+-- node_modules/fragment-cjs/package.json --
+{"name":"fragment-cjs","exports":{"types":"./index.d.ts","default":"./index.js#runtime"}}
+-- node_modules/fragment-cjs/index.d.ts --
+export const foo: number;
+-- node_modules/fragment-cjs/index.js --
+module.exports = {foo: 1};
+-- node_modules/encoded-cjs/package.json --
+{"name":"encoded-cjs","exports":{"types":"./index.d.ts","default":"./space%20file.js"}}
+-- node_modules/encoded-cjs/index.d.ts --
+export const foo: number;
+-- node_modules/encoded-cjs/space file.js --
+module.exports = {foo: 1};
+-- node_modules/query-array-esm/package.json --
+{"name":"query-array-esm","exports":{"types":"./index.d.ts","default":["./index.js?runtime","./unused.cjs"]}}
+-- node_modules/query-array-esm/index.d.ts --
+export const foo: number;
+-- node_modules/query-array-esm/index.js --
+export default {}; export const foo = 1;
+-- node_modules/query-array-esm/unused.cjs --
+module.exports = {foo: 1};
+-- node_modules/encoded-array-esm/package.json --
+{"name":"encoded-array-esm","exports":{"types":"./index.d.ts","default":["./space%20file.js","./unused.cjs"]}}
+-- node_modules/encoded-array-esm/index.d.ts --
+export const foo: number;
+-- node_modules/encoded-array-esm/space file.js --
+export default {}; export const foo = 1;
+-- node_modules/encoded-array-esm/unused.cjs --
+module.exports = {foo: 1};
+-- node_modules/suffix-export-cjs/package.json --
+{"name":"suffix-export-cjs","exports":{"types":"./index.d.ts","default":"./index.js"}}
+-- node_modules/suffix-export-cjs/index.d.ts --
+export const foo: number;
+-- node_modules/suffix-export-cjs/index.native.d.ts --
+export const foo: number;
+-- node_modules/suffix-export-cjs/index.js --
+export default {}; export const foo = 1;
+-- node_modules/suffix-export-cjs/index.native.js --
+module.exports = {foo: 1};
+-- node_modules/suffix-export-cjs/index.native.ts --
+export default {}; export const foo = 1;
+-- node_modules/main-before-index/package.json --
+{"name":"main-before-index","main":"./entry.js","types":"./index.d.ts"}
+-- node_modules/main-before-index/index.d.ts --
+export const foo: number;
+-- node_modules/main-before-index/index.native.d.ts --
+export const foo: number;
+-- node_modules/main-before-index/entry.js --
+module.exports = {foo: 1};
+-- node_modules/main-before-index/index.native.js --
+export default {}; export const foo = 1;
+-- node_modules/missing-main-index/package.json --
+{"name":"missing-main-index","main":"./missing.js","types":"./index.d.ts"}
+-- node_modules/missing-main-index/index.native.d.ts --
+export const foo: number;
+-- node_modules/missing-main-index/index.native.js --
+module.exports = {foo: 1};
+-- node_modules/missing-main-index/index.native.ts --
+export default {}; export const foo = 1;
+-- tsconfig.suffixes-empty-first.json --
+{"extends":"./tsconfig.json","compilerOptions":{"moduleSuffixes":["",".native"]}}
+-- node_modules/directory-main-cjs/package.json --
+{"name":"directory-main-cjs","main":"./lib","types":"./types.d.ts"}
+-- node_modules/directory-main-cjs/types.d.ts --
+export const foo: number;
+-- node_modules/directory-main-cjs/types.native.d.ts --
+export const foo: number;
+-- node_modules/directory-main-cjs/lib/index.js --
+module.exports = {foo: 1};
+-- node_modules/directory-main-cjs/lib/index.ts --
+export default {}; export const foo = 1;
+-- node_modules/directory-main-esm/package.json --
+{"name":"directory-main-esm","main":"./lib","types":"./types.d.ts"}
+-- node_modules/directory-main-esm/types.d.ts --
+export const foo: number;
+-- node_modules/directory-main-esm/types.native.d.ts --
+export const foo: number;
+-- node_modules/directory-main-esm/lib/index.js --
+export default {}; export const foo = 1;
+-- node_modules/directory-main-esm/lib/index.ts --
+module.exports = {foo: 1};
+-- node_modules/directory-main-suffix/package.json --
+{"name":"directory-main-suffix","main":"./lib","types":"./types.d.ts"}
+-- node_modules/directory-main-suffix/types.d.ts --
+export const foo: number;
+-- node_modules/directory-main-suffix/types.native.d.ts --
+export const foo: number;
+-- node_modules/directory-main-suffix/lib/index.js --
+export default {}; export const foo = 1;
+-- node_modules/directory-main-suffix/lib/index.native.js --
+module.exports = {foo: 1};
+-- node_modules/directory-main-suffix/lib/index.native.ts --
+export default {}; export const foo = 1;
+-- node_modules/directory-main-suffix/lib/index.native.native.js --
+export default {}; export const foo = 1;
+-- node_modules/directory-main-json/package.json --
+{"name":"directory-main-json","main":"./lib","types":"./types.d.ts"}
+-- node_modules/directory-main-json/types.d.ts --
+export const foo: number;
+-- node_modules/directory-main-json/types.native.d.ts --
+export const foo: number;
+-- node_modules/directory-main-json/lib/index.json --
+{"foo":1}
+-- node_modules/directory-main-json/lib/index.ts --
+export default {}; export const foo = 1;
+-- node_modules/directory-main-extension-order/package.json --
+{"name":"directory-main-extension-order","main":"./lib","types":"./types.d.ts"}
+-- node_modules/directory-main-extension-order/types.d.ts --
+export const foo: number;
+-- node_modules/directory-main-extension-order/types.native.d.ts --
+export const foo: number;
+-- node_modules/directory-main-extension-order/lib/index.js --
+export default {}; export const foo = 1;
+-- node_modules/directory-main-extension-order/lib/index.native.json --
+{"foo":1}
+-- node_modules/directory-main-trailing-slash/package.json --
+{"name":"directory-main-trailing-slash","main":"./lib/","types":"./types.d.ts"}
+-- node_modules/directory-main-trailing-slash/types.d.ts --
+export const foo: number;
+-- node_modules/directory-main-trailing-slash/types.native.d.ts --
+export const foo: number;
+-- node_modules/directory-main-trailing-slash/lib/index.js --
+module.exports = {foo: 1};
+-- node_modules/directory-main-trailing-slash/index.js --
+export default {}; export const foo = 1;
+-- node_modules/directory-main-nested-manifest/package.json --
+{"name":"directory-main-nested-manifest","main":"./lib","types":"./types.d.ts"}
+-- node_modules/directory-main-nested-manifest/types.d.ts --
+export const foo: number;
+-- node_modules/directory-main-nested-manifest/types.native.d.ts --
+export const foo: number;
+-- node_modules/directory-main-nested-manifest/lib/package.json --
+{"main":"./other.js"}
+-- node_modules/directory-main-nested-manifest/lib/index.js --
+module.exports = {foo: 1};
+-- node_modules/directory-main-nested-manifest/lib/other.js --
+export default {}; export const foo = 1;
+-- node_modules/fallback-index-extension-order/package.json --
+{"name":"fallback-index-extension-order","main":"./missing","types":"./types.d.ts"}
+-- node_modules/fallback-index-extension-order/types.d.ts --
+export const foo: number;
+-- node_modules/fallback-index-extension-order/types.native.d.ts --
+export const foo: number;
+-- node_modules/fallback-index-extension-order/index.js --
+export default {}; export const foo = 1;
+-- node_modules/fallback-index-extension-order/index.native.json --
+{"foo":1}
+-- node_modules/implicit-main-cjs/package.json --
+{"name":"implicit-main-cjs","types":"./types.d.ts"}
+-- node_modules/implicit-main-cjs/types.d.ts --
+export const foo: number;
+-- node_modules/implicit-main-cjs/index --
+export default {}; export const foo = 1;
+-- node_modules/implicit-main-cjs/index.js --
+module.exports = {foo: 1};
+-- node_modules/empty-main-cjs/package.json --
+{"name":"empty-main-cjs","types":"./types.d.ts","main":""}
+-- node_modules/empty-main-cjs/types.d.ts --
+export const foo: number;
+-- node_modules/empty-main-cjs/index --
+export default {}; export const foo = 1;
+-- node_modules/empty-main-cjs/index.js --
+module.exports = {foo: 1};
+-- node_modules/null-main-cjs/package.json --
+{"name":"null-main-cjs","types":"./types.d.ts","main":null}
+-- node_modules/null-main-cjs/types.d.ts --
+export const foo: number;
+-- node_modules/null-main-cjs/index --
+export default {}; export const foo = 1;
+-- node_modules/null-main-cjs/index.js --
+module.exports = {foo: 1};
+-- node_modules/explicit-main-extensionless/package.json --
+{"name":"explicit-main-extensionless","types":"./types.d.ts","main":"./index"}
+-- node_modules/explicit-main-extensionless/types.d.ts --
+export const foo: number;
+-- node_modules/explicit-main-extensionless/index --
+export default {}; export const foo = 1;
+-- node_modules/explicit-main-extensionless/index.js --
+module.exports = {foo: 1};
+-- node_modules/explicit-main-extensionless-cjs/package.json --
+{"name":"explicit-main-extensionless-cjs","types":"./types.d.ts","main":"./index"}
+-- node_modules/explicit-main-extensionless-cjs/types.d.ts --
+export const foo: number;
+-- node_modules/explicit-main-extensionless-cjs/index --
+module.exports = {foo: 1};
+-- node_modules/explicit-main-extensionless-cjs/index.js --
+export default {}; export const foo = 1;
+-- node_modules/implicit-main-suffix/package.json --
+{"name":"implicit-main-suffix","types":"./types.d.ts"}
+-- node_modules/implicit-main-suffix/types.d.ts --
+export const foo: number;
+-- node_modules/implicit-main-suffix/types.native.d.ts --
+export const foo: number;
+-- node_modules/implicit-main-suffix/index.native --
+export default {}; export const foo = 1;
+-- node_modules/implicit-main-suffix/index.native.js --
+module.exports = {foo: 1};
+-- node_modules/implicit-main-suffix/index.native.native.js --
+export default {}; export const foo = 1;
+-- node_modules/implicit-main-suffix/index.js --
+export default {}; export const foo = 1;
+-- node_modules/implicit-main-json/package.json --
+{"name":"implicit-main-json","types":"./types.d.ts"}
+-- node_modules/implicit-main-json/types.d.ts --
+export const foo: number;
+-- node_modules/implicit-main-json/index --
+export default {}; export const foo = 1;
+-- node_modules/implicit-main-json/index.json --
+{"foo":1}
