@@ -109,7 +109,7 @@ export function decodeFrame(
     invalid();
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const u32 = (offset: number): number => view.getUint32(offset, true);
-  if (u32(0) !== 0x31465445 || u32(4) !== 1 || u32(8) !== FRAME_SCHEMA_HASH) {
+  if (u32(0) !== 0x31465445 || u32(4) !== 2 || u32(8) !== FRAME_SCHEMA_HASH) {
     throw new Error('ESTree frame version or schema mismatch');
   }
   const flags = u32(12),
@@ -154,9 +154,7 @@ export function decodeFrame(
   };
   // One byte per wire word marks record boundaries without boxed Set entries.
   const listOffsets = new Uint8Array(listWords);
-  // Undefined marks a validated record that has not been decoded yet. Reuse
-  // this index for string caching instead of retaining a second offset table.
-  const stringCache = new Map<number, string | undefined>();
+
   for (let offset = 0, index = 0; offset < listWords; index++) {
     poll(index);
     listOffsets[offset] = 1;
@@ -168,13 +166,23 @@ export function decodeFrame(
     }
     offset += length + 1;
   }
-  for (let offset = 0, index = 0; offset < stringBytes; index++) {
-    poll(index);
-    stringCache.set(offset / 4, undefined);
+  let stringCount = 0;
+  for (let offset = 0; offset < stringBytes; stringCount++) {
+    poll(stringCount);
     const length = u32(strings + offset);
     const next = align4(offset + 4 + length * 2);
     if (next > stringBytes) invalid();
     offset = next;
+  }
+  // String references are sequential IDs. A compact offset column and an
+  // owned-string cache replace a per-file hash table of record boundaries.
+  const stringOffsets = new Uint32Array(stringCount);
+  const stringCache = new Array<string | undefined>(stringCount);
+  Object.setPrototypeOf(stringCache, null);
+  for (let offset = 0, index = 0; index < stringCount; index++) {
+    poll(index);
+    stringOffsets[index] = offset;
+    offset = align4(offset + 4 + u32(strings + offset) * 2);
   }
   const text = decoder.decode(bytes.subarray(source));
   if (text.length !== sourceLength) invalid();
@@ -189,7 +197,7 @@ export function decodeFrame(
     } else if (tag === 2) {
       if (listOffsets[payload] !== 1) invalid();
     } else if (tag === 3) {
-      if (!stringCache.has(payload)) invalid();
+      if (payload >= stringCount) invalid();
     } else if (tag === 6) {
       if (payload >= numberCount) invalid();
     } else if (payload !== 0) invalid();
@@ -231,10 +239,10 @@ export function decodeFrame(
     bytes.byteOffset + strings,
     stringBytes,
   );
-  const readString = (offset: number): string => {
-    const cached = stringCache.get(offset);
+  const readString = (id: number): string => {
+    const cached = stringCache[id];
     if (cached !== undefined) return cached;
-    const base = offset * 4,
+    const base = stringOffsets[id],
       length = u32(strings + base);
     let value = '';
     // Decode UTF-16 code units into owned JS strings, including unpaired
@@ -247,7 +255,7 @@ export function decodeFrame(
         base + 4 + Math.min(length, start + 4096) * 2,
       );
     }
-    stringCache.set(offset, value);
+    stringCache[id] = value;
     return value;
   };
   for (let id = 1; id <= count; id++) {

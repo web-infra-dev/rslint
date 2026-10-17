@@ -22,7 +22,7 @@ import (
 
 const (
 	frameMagic   uint32 = 0x31465445 // ETF1
-	frameVersion uint32 = 1
+	frameVersion uint32 = 2
 	headerSize          = 64
 	maxFrameSize        = 64 << 20
 	tagShift            = 29
@@ -51,7 +51,7 @@ type estreeProjector struct {
 	emptyList        uint32
 	strings          []string
 	stringBytes      int
-	stringOffsets    map[string]uint32
+	stringIDs        map[string]uint32
 	numbers          []float64
 	tokenCovers      []tokenCover
 	frameBytes       int
@@ -77,7 +77,7 @@ type Builder struct {
 // Returned frames never alias these buffers, so callers may reset immediately.
 func (b *Builder) Reset() {
 	b.p.clearSource()
-	b.p.stringOffsets = nil
+	b.p.stringIDs = nil
 	scratchBytes := cap(b.p.nodes)*16 + (cap(b.p.values)+cap(b.p.lists))*4 + cap(b.p.strings)*16 +
 		cap(b.p.numbers)*8 + (cap(b.tokens)+cap(b.comments))*12
 	scratchBytes += cap(b.p.tokenCovers) * 12
@@ -136,8 +136,8 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	p.strings = p.strings[:0]
 	p.stringBytes = 0
 	p.numbers = p.numbers[:0]
-	if p.stringOffsets == nil {
-		p.stringOffsets = make(map[string]uint32)
+	if p.stringIDs == nil {
+		p.stringIDs = make(map[string]uint32)
 	}
 	p.tokenCovers = p.tokenCovers[:0]
 	root := p.convert(file.AsNode(), false)
@@ -157,7 +157,7 @@ func (p *estreeProjector) clearSource() {
 	p.sourceType = ""
 	p.ctx = nil
 	p.offsets = utf16Offsets{}
-	clear(p.stringOffsets)
+	clear(p.stringIDs)
 	clear(p.strings)
 	p.strings = p.strings[:0]
 	p.tokenCovers = p.tokenCovers[:0]
@@ -194,17 +194,17 @@ func nullValue() uint32      { return taggedValue(tagNull, 0) }
 func undefinedValue() uint32 { return taggedValue(tagUndefined, 0) }
 
 func (p *estreeProjector) stringValue(value string) uint32 {
-	if offset, ok := p.stringOffsets[value]; ok {
-		return taggedValue(tagString, offset)
+	if id, ok := p.stringIDs[value]; ok {
+		return taggedValue(tagString, id)
 	}
-	offset := uint32(p.stringBytes / 4)
-	p.stringOffsets[value] = offset
+	id := uint32(len(p.strings))
+	p.stringIDs[value] = id
 	units := ecmascript.StringCodeUnitCount(value)
 	encodedSize := align4(4 + units*2)
 	p.reserve(encodedSize)
 	p.stringBytes += encodedSize
 	p.strings = append(p.strings, value)
-	return taggedValue(tagString, offset)
+	return taggedValue(tagString, id)
 }
 
 // Encode straight into the final frame instead of retaining a second UTF-16
