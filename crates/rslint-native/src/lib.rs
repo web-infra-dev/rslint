@@ -2,7 +2,7 @@
 mod memory_transport;
 #[cfg(feature = "test-worker-termination")]
 mod reader_worker_test;
-pub use memory_transport::read_bytes;
+pub use memory_transport::{read_bytes, read_bytes_into};
 #[cfg(feature = "test-worker-termination")]
 pub use reader_worker_test::{
     create_worker_termination_fixture, republish_worker_fixture, resume_worker_read,
