@@ -2,11 +2,10 @@
 //! publishes immutable batches before IPC registers a reader capability.
 //! One lease pins every batch of a request. Reuse is acknowledged only after
 //! revocation proves all native readers have returned.
-// cspell:words typedarray arraybuffer
 
 mod mapping;
 
-use napi::{Env, Error, JsValue, Result, Unknown};
+use napi::{Env, Error, Result, Unknown};
 use napi_derive::napi;
 #[cfg(test)]
 use std::borrow::Cow;
@@ -459,68 +458,6 @@ pub fn read_bytes(env: &Env, bytes: SharedBytes) -> NativeResult<Unknown<'_>> {
         // SAFETY: creation succeeded in this env. Returning the existing value
         // requires no further N-API calls; NativeResult preserves pending errors.
         Ok(unsafe { Unknown::from_raw_unchecked(env.raw(), value) })
-    })())
-}
-
-/// Copy into caller-owned, non-shared Node storage. The destination may be
-/// reused after its consumer finishes; it never aliases the published mapping.
-#[napi(catch_unwind, ts_return_type = "void")]
-pub fn read_bytes_into(
-    env: &Env,
-    bytes: SharedBytes,
-    destination: Unknown<'_>,
-) -> NativeResult<()> {
-    NativeResult((|| {
-        let lease = acquire(&bytes)?;
-        let range = lease.range(bytes.offset, bytes.length)?;
-        let raw = destination.raw();
-        let mut is_buffer = false;
-        napi::check_status!(unsafe { napi::sys::napi_is_buffer(env.raw(), raw, &mut is_buffer) })?;
-        if !is_buffer {
-            return Err(Error::from_reason("byte destination must be a Buffer"));
-        }
-        let mut backing = std::ptr::null_mut();
-        napi::check_status!(unsafe {
-            napi::sys::napi_get_typedarray_info(
-                env.raw(),
-                raw,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                &mut backing,
-                std::ptr::null_mut(),
-            )
-        })?;
-        let mut ordinary = false;
-        napi::check_status!(unsafe {
-            napi::sys::napi_is_arraybuffer(env.raw(), backing, &mut ordinary)
-        })?;
-        if !ordinary {
-            return Err(Error::from_reason(
-                "byte destination must not use shared storage",
-            ));
-        }
-        let mut data = std::ptr::null_mut();
-        let mut length = 0;
-        napi::check_status!(unsafe {
-            napi::sys::napi_get_buffer_info(env.raw(), raw, &mut data, &mut length)
-        })?;
-        if length < range.len() || (!range.is_empty() && data.is_null()) {
-            return Err(Error::from_reason("byte destination is too small"));
-        }
-        if !range.is_empty() {
-            // SAFETY: the Buffer is rooted in this synchronous callback and its
-            // backing is an ordinary ArrayBuffer, not concurrently shared JS
-            // memory. Capacity is checked before any write. No JS runs while
-            // this exclusive destination view is borrowed.
-            let output = unsafe { std::slice::from_raw_parts_mut(data.cast::<u8>(), range.len()) };
-            #[cfg(feature = "test-worker-termination")]
-            crate::reader_worker_test::before_read(bytes.lease);
-            lease.copy_into(range, output);
-            #[cfg(feature = "test-worker-termination")]
-            crate::reader_worker_test::after_read(bytes.lease, output);
-        }
-        Ok(())
     })())
 }
 

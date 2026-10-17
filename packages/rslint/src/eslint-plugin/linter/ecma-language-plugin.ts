@@ -24,9 +24,10 @@
  * as the result field for invalid frame input or abnormal worker failure.
  */
 
-import { decodePluginFrame } from '../native/frame-input.js';
+import { getNativeBinding } from '../../native/binding.js';
 import type { SharedBytes } from '../../native/types.js';
 import {
+  decodeFrame,
   FrameCancelled,
   checkFrameCancellation,
 } from '../../languages/js/frame.js';
@@ -189,10 +190,14 @@ export function lintFile(
     cancelled: false,
   };
 
-  let parsed: ReturnType<typeof decodePluginFrame>;
+  let parsed: ReturnType<typeof decodeFrame>;
   try {
     checkFrameCancellation(req.cancelFlag);
-    parsed = decodePluginFrame(req.frame, req.cancelFlag);
+    const bytes =
+      req.frame instanceof Uint8Array
+        ? req.frame
+        : getNativeBinding().readBytes(req.frame);
+    parsed = decodeFrame(bytes, req.cancelFlag);
   } catch (err) {
     if (err instanceof FrameCancelled) result.cancelled = true;
     else result.parseError = `frame: ${(err as Error)?.message ?? String(err)}`;

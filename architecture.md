@@ -1698,13 +1698,6 @@ published outputs do not pin the Go mapping while Node executes rules. Full,
 fragmented or unavailable storage retains the existing owned/inline byte route;
 no parser fallback or old plugin protocol is involved. The Node side continues
 to read independent writable bytes and materialize ordinary mutable ASTs.
-The SDK byte-input adapter owns a worker-local decoding buffer, bounded to
-4 MiB. Shared input is copied into this owned buffer and consumed synchronously;
-the returned language data contains no input view, so the next file may reuse
-the storage before any plugin runs. Reentrant decoding and inputs larger than
-the cache bound use independent owned buffers. Inline inputs already own their
-bytes and need no additional copy. This cache holds neither a capability nor
-an AST, and worker shutdown ends its lifetime.
 
 Inline/LSP dispatch uses the owned-frame adapter. Small frames share stable
 output blocks whose combined retained capacity is bounded; growth never copies
@@ -1860,10 +1853,7 @@ space using a lease, offset and length; offsets count actual published bytes,
 not slot capacity. A reader pins both views for every batch. The generic `readBytes` entry pins those views and copies all requested
 chunks directly into one independent, Node-owned Buffer. JavaScript writes
 cannot mutate a published snapshot, and Buffer lifetime does not delay slot
-reuse. `readBytesInto` uses the same pinned range copy with caller-owned Buffer
-storage instead of allocating another backing store. It validates the complete
-destination capacity before writing and rejects SharedArrayBuffer backing.
-Rust contains no parser, ESTree schema, filename, BOM or plugin policy.
+reuse. Rust contains no parser, ESTree schema, filename, BOM or plugin policy.
 
 JavaScript language data lives in `packages/rslint/src/languages/js`:
 ESTree types, the frame schema/decoder, source positions, visitor keys, token
@@ -1898,8 +1888,8 @@ validation and decoding share one index, and decoding uses one temporary byte
 view for the string table instead of a Buffer wrapper per string. Tagged words
 use signed reads to avoid boxed unsigned magnitudes while preserving their tag
 and payload bits; a byte per list word indexes validated record boundaries.
-No input view enters the returned language data; the SDK may immediately reuse
-its private byte scratch. BigInt and RegExp values are created in JavaScript. No
+No input view
+survives materialization. BigInt and RegExp values are created in JavaScript. No
 mapped Buffer, lazy AST proxy or capability escapes to plugin code; plugins may
 retain any AST node or SourceCode after lint returns. Existing scope, listener,
 SourceCode, report and fix execution consumes this final tree.

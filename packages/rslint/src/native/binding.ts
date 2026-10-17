@@ -35,7 +35,6 @@ const require = createRequire(import.meta.url);
 export interface NativeBinding {
   MemoryArena: new () => MemoryArena;
   readBytes(bytes: SharedBytes): Buffer;
-  readBytesInto(bytes: SharedBytes, destination: Buffer): void;
 }
 
 let binding: NativeBinding | undefined;
