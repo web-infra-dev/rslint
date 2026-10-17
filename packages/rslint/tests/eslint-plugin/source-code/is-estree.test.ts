@@ -12,7 +12,7 @@
 import { describe, test, expect } from 'rstack/test';
 
 import { createSourceCode } from '../../../src/eslint-plugin/source-code/source-code.js';
-import type { ESTreeNode } from '../../../src/eslint-plugin/source-code/source-code.js';
+import type { ESTreeNode } from '../../../src/languages/js/types.js';
 
 /** Minimal root node — only `type`/`range`/`loc` matter for `isESTree`. */
 function mkRoot(type: string, text: string): ESTreeNode {

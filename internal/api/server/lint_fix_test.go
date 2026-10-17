@@ -1,16 +1,20 @@
 package server
 
 import (
+	"bufio"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/api"
@@ -215,16 +219,16 @@ func TestHandleLint_FixVerifiesAfterTenRounds(t *testing.T) {
 	config := json.RawMessage(`[{"plugins":["community"],"rules":{"community/increment":"error"}}]`)
 
 	var calls atomic.Int32
-	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+	requester := apiAttachmentRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any, attachments ...ipc.Attachment) (*ipc.Message, error) {
 		if kind != api.KindPluginLint {
 			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
 		}
 		request := payload.(linter.EslintPluginLintRequest)
 		call := int(calls.Add(1))
-		if len(request.Files) != 1 || request.Files[0].Text == nil {
+		if len(request.Files) != 1 || request.Files[0].FrameAttachment == nil {
 			t.Fatalf("missing plugin source on call %d", call)
 		}
-		text := *request.Files[0].Text
+		text := attachmentFrameText(t, attachments)
 		value, err := strconv.Atoi(strings.TrimSpace(text))
 		if err != nil {
 			t.Fatalf("parse generation %q: %v", text, err)
@@ -288,16 +292,16 @@ func TestHandleLint_FixReportsOutputAfterNetRestoration(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "input.js")
 	var calls atomic.Int32
-	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+	requester := apiAttachmentRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any, attachments ...ipc.Attachment) (*ipc.Message, error) {
 		if kind != api.KindPluginLint {
 			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
 		}
 		request := payload.(linter.EslintPluginLintRequest)
 		call := calls.Add(1)
-		if len(request.Files) != 1 || request.Files[0].Text == nil {
+		if len(request.Files) != 1 || request.Files[0].FrameAttachment == nil {
 			t.Fatalf("plugin call %d has no source", call)
 		}
-		text := *request.Files[0].Text
+		text := attachmentFrameText(t, attachments)
 		replacement := "b"
 		if text == "b" {
 			replacement = "a"
@@ -347,16 +351,16 @@ func TestHandleLint_FixReportsEmptyOutput(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "input.js")
 	var calls atomic.Int32
-	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+	requester := apiAttachmentRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any, attachments ...ipc.Attachment) (*ipc.Message, error) {
 		if kind != api.KindPluginLint {
 			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
 		}
 		request := payload.(linter.EslintPluginLintRequest)
 		call := calls.Add(1)
-		if len(request.Files) != 1 || request.Files[0].Text == nil {
+		if len(request.Files) != 1 || request.Files[0].FrameAttachment == nil {
 			t.Fatalf("plugin call %d has no source", call)
 		}
-		text := *request.Files[0].Text
+		text := attachmentFrameText(t, attachments)
 		result := linter.EslintPluginFileResult{FilePath: request.Files[0].Path}
 		if text != "" {
 			result.Diagnostics = []linter.EslintPluginDiagnostic{{
@@ -419,12 +423,12 @@ func TestHandleLint_FixProjectsOutputToRequestedAlias(t *testing.T) {
 	}
 
 	var calls atomic.Int32
-	dispatch := func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	dispatch := linter.EslintPluginDispatchFunc(func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		call := calls.Add(1)
-		if len(request.Files) != 1 || request.Files[0].Text == nil {
+		if len(request.Files) != 1 || len(request.Files[0].Frame) < 64 {
 			t.Fatalf("plugin call %d has no source", call)
 		}
-		text := *request.Files[0].Text
+		text := string(request.Files[0].Frame[binary.LittleEndian.Uint32(request.Files[0].Frame[60:]):])
 		result := linter.EslintPluginFileResult{FilePath: request.Files[0].Path}
 		if strings.Contains(text, "bad") {
 			result.Diagnostics = []linter.EslintPluginDiagnostic{{
@@ -438,7 +442,7 @@ func TestHandleLint_FixProjectsOutputToRequestedAlias(t *testing.T) {
 		return &linter.EslintPluginLintResult{
 			Results: []linter.EslintPluginFileResult{result},
 		}, nil
-	}
+	})
 
 	response, err := (&Handler{}).handleLint(context.Background(), api.LintRequest{
 		Files:          []string{aliasPath},
@@ -490,13 +494,13 @@ func TestHandleLint_FixCancellationDuringFinalVerificationReturnsNoResponse(t *t
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var calls atomic.Int32
-	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+	requester := apiAttachmentRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any, attachments ...ipc.Attachment) (*ipc.Message, error) {
 		if kind != api.KindPluginLint {
 			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
 		}
 		request := payload.(linter.EslintPluginLintRequest)
 		call := calls.Add(1)
-		if len(request.Files) != 1 || request.Files[0].Text == nil {
+		if len(request.Files) != 1 || request.Files[0].FrameAttachment == nil {
 			t.Fatalf("plugin call %d has no source", call)
 		}
 		if call == 2 {
@@ -538,4 +542,38 @@ func TestHandleLint_FixCancellationDuringFinalVerificationReturnsNoResponse(t *t
 	if calls.Load() != 2 {
 		t.Fatalf("plugin calls = %d, want cancellation during final verification", calls.Load())
 	}
+}
+
+// Exercise the generic inline transport to inspect attachments in API mocks.
+// No production API or private transport fields are exposed for these tests.
+func attachmentFrameText(t *testing.T, attachments []ipc.Attachment) string {
+	t.Helper()
+	ar, aw := io.Pipe()
+	br, bw := io.Pipe()
+	defer ar.Close()
+	defer aw.Close()
+	defer br.Close()
+	defer bw.Close()
+	sender := ipc.NewChannel(bufio.NewReader(ar), bw)
+	receiver := ipc.NewChannel(bufio.NewReader(br), aw)
+	receiver.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) { return msg.Attachments, nil })
+	sender.Start()
+	receiver.Start()
+	defer sender.Close()
+	defer receiver.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	reply, err := sender.SendRequest(ctx, "inspect", nil, attachments...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var values []ipc.AttachmentData
+	if err := reply.Decode(&values); err != nil {
+		t.Fatal(err)
+	}
+	if len(values) != 1 || values[0].Bytes == nil || len(*values[0].Bytes) < 64 {
+		t.Fatal("missing ESTree attachment")
+	}
+	data := *values[0].Bytes
+	return string(data[binary.LittleEndian.Uint32(data[60:]):])
 }

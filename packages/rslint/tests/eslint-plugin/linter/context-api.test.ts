@@ -15,10 +15,160 @@
  * isolation.
  */
 import { describe, test, expect } from 'rstack/test';
+import { Linter } from 'eslint';
 
-import { lintFile } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
+import { lintFile } from '../project-frame.js';
 import type { LoadedPlugins } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
 import type { RuleContext } from '../../../src/eslint-plugin/linter/context.js';
+import { CONFORMANCE_CASES } from '../../languages/js/conformance-cases.js';
+import { referenceParser } from '../../languages/js/conformance-oracle.js';
+
+describe('systematic SourceCode, diagnostic and fix conformance', () => {
+  function probe(observations: unknown[]) {
+    return {
+      meta: { fixable: 'code' as const },
+      // The same rule object runs in both hosts; their context types differ.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      create(ctx: any) {
+        const sc = ctx.sourceCode;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const token = (value: any) =>
+          value == null
+            ? null
+            : {
+                type: value.type,
+                value: value.value,
+                range: value.range,
+                loc: value.loc,
+                regex: value.regex,
+              };
+        return {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          '*': (node: any) => {
+            const scope = sc.getScope(node);
+            observations.push({
+              type: node.type,
+              range: node.range,
+              loc: node.loc,
+              text: sc.getText(node),
+              first: token(sc.getFirstToken(node)),
+              last: token(sc.getLastToken(node)),
+              before: token(sc.getTokenBefore(node, { includeComments: true })),
+              after: token(sc.getTokenAfter(node, { includeComments: true })),
+              tokens:
+                node.type === 'Program'
+                  ? undefined
+                  : sc.getTokens(node, { includeComments: true }).map(token),
+              commentsBefore: sc.getCommentsBefore(node).map(token),
+              commentsInside: sc.getCommentsInside(node).map(token),
+              commentsAfter: sc.getCommentsAfter(node).map(token),
+              scope: {
+                type: scope.type,
+                variables: scope.variables
+                  .filter(
+                    (variable: { defs: unknown[] }) => variable.defs.length > 0,
+                  )
+                  .map(
+                    (variable: { name: string; defs: { type: string }[] }) => [
+                      variable.name,
+                      variable.defs.map((def) => def.type),
+                    ],
+                  ),
+              },
+            });
+            ctx.report({
+              node,
+              message: `probe ${observations.length - 1}`,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              fix: (fixer: any) => [
+                fixer.insertTextBefore(node, '/*probe*/'),
+                fixer.insertTextAfter(node, '/*end*/'),
+              ],
+            });
+          },
+        };
+      },
+    };
+  }
+
+  for (const fixture of CONFORMANCE_CASES) {
+    test(fixture.name, () => {
+      const actual: unknown[] = [],
+        expected: unknown[] = [];
+      const rule = probe(actual);
+      const result = lintFile(
+        {
+          filePath: fixture.filePath,
+          text: fixture.text,
+          languageOptions: {
+            sourceType: fixture.sourceType,
+            parserOptions: {
+              ecmaFeatures: { jsx: !fixture.filePath.endsWith('.ts') },
+            },
+          },
+          rules: { 'probe/conformance': { options: [] } },
+          collectFixes: true,
+          suggestionsMode: 'off',
+        },
+        { plugins: [], rules: new Map([['probe/conformance', rule]]) },
+      );
+      const linter = new Linter();
+      const diagnostics = linter.verify(
+        fixture.text,
+        [
+          {
+            files: ['**/*.{js,jsx,ts,tsx}'],
+            languageOptions: {
+              parser: referenceParser(fixture),
+              sourceType: fixture.sourceType,
+              ecmaVersion: 'latest',
+              parserOptions: {
+                ecmaFeatures: {
+                  jsx: !fixture.filePath.endsWith('.ts'),
+                },
+              },
+            },
+            plugins: { probe: { rules: { conformance: probe(expected) } } },
+            rules: { 'probe/conformance': 'error' },
+          },
+        ],
+        { filename: fixture.filePath },
+      );
+      expect(result.ruleErrors ?? []).toEqual([]);
+      expect(result.parseError).toBeUndefined();
+      expect(actual).toEqual(expected);
+      // ESLint sorts reports; the rslint wire buffer retains listener order
+      // until Go's diagnostic drain. Match reports by their unique probe ID.
+      expect(result.diagnostics.map((d) => d.message).sort()).toEqual(
+        diagnostics.map((d) => d.message).sort(),
+      );
+      const text = fixture.text.replace(/^\ufeff/, '');
+      const bytes = Buffer.from(text);
+      const toByte = (offset: number) =>
+        Buffer.byteLength(text.slice(0, offset));
+      const reports = new Map(result.diagnostics.map((d) => [d.message, d]));
+      for (const diagnostic of diagnostics) {
+        const fix = diagnostic.fix!;
+        const expectedRange = fix.range.map(toByte);
+        const observed = reports.get(diagnostic.message)!;
+        expect(observed.fixes).toEqual([
+          { range: expectedRange, text: fix.text },
+        ]);
+        expect(observed.startPos).toBe(expectedRange[0]);
+        expect(observed.endPos).toBe(expectedRange[1]);
+        const actualFix = observed.fixes![0];
+        const applied = Buffer.concat([
+          bytes.subarray(0, actualFix.range[0]),
+          Buffer.from(actualFix.text),
+          bytes.subarray(actualFix.range[1]),
+        ]).toString();
+        const expectedText =
+          text.slice(0, fix.range[0]) + fix.text + text.slice(fix.range[1]);
+        expect(applied).toBe(expectedText);
+      }
+    });
+  }
+});
 
 interface Observation<T = unknown> {
   value: T;

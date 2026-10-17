@@ -1,10 +1,7 @@
 import { describe, expect, test } from 'rstack/test';
 
 import { RSLintService } from '../src/service/service.js';
-import {
-  API_REVERSE_CONFIG_LOAD_CAPABILITY,
-  API_PLUGIN_LINT_ATTACHMENTS_CAPABILITY,
-} from '../src/service/protocol.js';
+import { API_REVERSE_CONFIG_LOAD_CAPABILITY } from '../src/service/protocol.js';
 import type { IpcAttachment } from '../src/ipc/protocol.js';
 import type {
   InboundRequestHandler,
@@ -30,7 +27,7 @@ class ReverseLintBackend implements RslintServiceInterface {
     if (kind === 'handshake') {
       this.handshakes.push([...(data.capabilities ?? [])]);
       return {
-        version: '3.1.0',
+        version: '4.0.0',
         ok: true,
         capabilities: ['reversePluginLint'],
       };
@@ -211,7 +208,7 @@ class ReverseConfigBackend extends ReverseLintBackend {
     if (kind === 'handshake') {
       this.handshakeCapabilities = [...(data.capabilities ?? [])];
       return {
-        version: '3.1.0',
+        version: '4.0.0',
         ok: true,
         capabilities: [API_REVERSE_CONFIG_LOAD_CAPABILITY],
       };
@@ -261,7 +258,6 @@ describe('RSLintService reverse lint request scoping', () => {
         service.lint(
           { files: ['a.ts'] },
           {
-            pluginLintAttachments: true,
             pluginLint: (request, attachments) => ({ request, attachments }),
           },
         ),
@@ -269,10 +265,7 @@ describe('RSLintService reverse lint request scoping', () => {
         request: { token: 'a.ts' },
         attachments: undefined,
       });
-      expect(backend.handshakes[0]).toEqual([
-        'reversePluginLint',
-        API_PLUGIN_LINT_ATTACHMENTS_CAPABILITY,
-      ]);
+      expect(backend.handshakes[0]).toEqual(['reversePluginLint']);
 
       const attachments = [
         'text',
@@ -283,14 +276,13 @@ describe('RSLintService reverse lint request scoping', () => {
       await service.lint(
         { files: ['b.ts'] },
         {
-          pluginLintAttachments: true,
           pluginLint: (_request, received) => {
             expect(received).toBe(attachments);
             return { diagnostics: [] };
           },
         },
       );
-      // Opt-in is request-scoped and cannot leak into a later legacy host.
+      // Attachment context is request-scoped and cannot leak into the next handler.
       backend.attachments = undefined;
       await service.lint(
         { files: ['c.ts'] },
@@ -354,7 +346,7 @@ describe('RSLintService reverse lint request scoping', () => {
     };
     const service = new RSLintService(backend);
     await expect(service.lint({ files: ['a.ts'] })).rejects.toThrow(
-      /protocol mismatch.*3\.1\.0.*1\.0\.0/,
+      /protocol mismatch.*4\.0\.0.*1\.0\.0/,
     );
     await service.close();
   });
@@ -363,7 +355,7 @@ describe('RSLintService reverse lint request scoping', () => {
     const backend = new ReverseLintBackend();
     backend.sendMessage = async (kind: string, data: any): Promise<any> => {
       if (kind === 'handshake') {
-        return { version: '3.1.0', ok: true, capabilities: [] };
+        return { version: '4.0.0', ok: true, capabilities: [] };
       }
       return ReverseLintBackend.prototype.sendMessage.call(backend, kind, data);
     };

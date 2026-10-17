@@ -16,24 +16,21 @@
  *     private diagnostic collector drained via `_drainDiagnostics()`
  *     after the AST visit.
  *
- * The heavier sub-modules live next door:
+ * The other plugin SDK modules own their respective APIs:
  *
- *   - `source-code.ts`        — `createSourceCode` + all SourceCode/Token
+ *   - `../source-code/source-code.ts` — `createSourceCode` + SourceCode
  *                                APIs (token/comment/scope/spacing).
  *   - `diagnostic-builder.ts` — `buildDiagnostic` + `normalizeReportArgs`
  *                                + diagnostic-related types.
  *
- * All public symbols those files expose are re-exported here so
- * downstream code (`import { ... } from './context.js'`) keeps
- * working unchanged.
+ * AST and JavaScript language data live in `languages/js`; SourceCode
+ * and diagnostics are imported directly from their owning modules.
  */
 
 import { makeFixer } from './fixer.js';
 import { applyOptionDefaults, type RuleSchema } from './options-defaults.js';
-import {
-  type ESTreeNode,
-  type SourceCode,
-} from '../source-code/source-code.js';
+import type { SourceCode } from '../source-code/source-code.js';
+import type { ESTreeNode, GlobalsConfig } from '../../languages/js/types.js';
 import {
   buildDiagnostic,
   normalizeReportArgs,
@@ -42,7 +39,6 @@ import {
   type ReportDescriptor,
   type SuggestionsMode,
 } from './diagnostic-builder.js';
-import type { GlobalsConfig } from '../types.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Public types
@@ -126,15 +122,15 @@ export interface CreateContextOptions {
   /** Source text (the wire-supplied byte source — not re-read from disk). */
   text: string;
   /**
-   * Per-file line-start-offsets cache (already built by `lintFile` for
-   * normalize). Forwarded into `buildDiagnostic` so the `descriptor.loc`
+   * Per-file line-start-offsets cache (already built by the frame decoder).
+   * Forwarded into `buildDiagnostic` so the `descriptor.loc`
    * report path doesn't rebuild lso per report — `no-unused-vars` paths
    * `loc:` into every descriptor, making this a 70+ms wall hit on
    * vscode/src without the cache.
    */
   lsoCache?: number[];
   /**
-   * The SourceCode for this file, built once by `lintFile` (carrying the native parser's
+   * The SourceCode for this file, built once by `lintFile` (carrying the Go-projected
    * token/comment streams) and shared across every rule + `applyDisableDirectives` so they
    * all hit the same lazy caches (tokens/comments/scopeManager). Required — per ESLint v10 a
    * RuleContext always has a SourceCode; there is no token-less mode.
@@ -203,31 +199,6 @@ export interface RuleContext {
 export type ListenerFn = (node: ESTreeNode) => void;
 
 // ─────────────────────────────────────────────────────────────────────
-// Re-exports — keep `./context.js` as a stable barrel for existing
-// callers (`import { ... } from './context.js'`).
-// ─────────────────────────────────────────────────────────────────────
-
-export {
-  createSourceCode,
-  type ESTreeNode,
-  type SourceCode,
-  type SourceCodeBuildInput,
-  type TokenCountOpts,
-  type TokenFilterOpts,
-  type TokenSkipOpts,
-} from '../source-code/source-code.js';
-export {
-  buildDiagnostic,
-  normalizeReportArgs,
-  type Diagnostic,
-  type MessagesMap,
-  type ReportDescriptor,
-  type SuggestionDescriptor,
-  type SuggestionInput,
-  type SuggestionsMode,
-} from './diagnostic-builder.js';
-
-// ─────────────────────────────────────────────────────────────────────
 // RuleContext factory
 // ─────────────────────────────────────────────────────────────────────
 
@@ -250,7 +221,7 @@ export function createRuleContext(opts: CreateContextOptions): RuleContext {
     opts.defaultOptions,
   );
 
-  // lintFile builds one SourceCode per file (carrying the native parser's token/comment
+  // lintFile builds one SourceCode per file (carrying the Go-projected token/comment
   // streams) and passes the same instance to every rule's createRuleContext, so the lazy
   // state (tokens/comments/scopeManager) primes once and is reused across rules. Per ESLint
   // v10 it is always supplied — there is no token-less RuleContext.

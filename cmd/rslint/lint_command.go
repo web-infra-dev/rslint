@@ -191,7 +191,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 
 	// Direct disk-backed callers may let their plugin host read the initial
 	// text. The production IPC CLI supplies FS and always sends exact snapshots.
-	pluginHostReadsInitialText := args.FS == nil
 	fs := args.FS
 	if fs == nil {
 		fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -479,7 +478,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				ConfigForFile: eslintPluginConfigResolver{
 					lintResolver: fileConfigResolver,
 				}.resolve,
-				HostReadsInitialText: pluginHostReadsInitialText,
 			}
 		}
 		return linter.Generation{

@@ -1,5 +1,5 @@
 /**
- * Differential token test (DESIGN §10): the native oxc token stream, rebuilt by
+ * Differential token test: the Go-projected token stream, rebuilt by
  * `token-builder` (the real path used by SourceCode), must match espree's `parse({tokens:true})`
  * tokens — the ESLint token contract rules consume — for `.js`/`.jsx`. This replaces the deleted
  * hand-written-tokenizer unit tests with a live oracle, so the contract is pinned against
@@ -9,10 +9,13 @@
  */
 import { describe, test, expect } from 'rstack/test';
 import * as espree from 'espree';
-import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
+import { parse as parseUpstream } from '@typescript-eslint/parser';
+import { projectSyntax } from '../../languages/js/project-frame.js';
 
-import { buildTokens } from '../../../src/eslint-plugin/source-code/token-builder.js';
-import { buildLineStartOffsets } from '../../../src/eslint-plugin/ast/normalize-ast.js';
+import { buildTokens } from '../../../src/languages/js/token-builder.js';
+import { buildLineStartOffsets } from '../../../src/languages/js/positions.js';
+import { CONFORMANCE_CASES } from '../../languages/js/conformance-cases.js';
+import { parseReference } from '../../languages/js/conformance-oracle.js';
 
 type Lang = 'js' | 'cjs' | 'jsx';
 
@@ -23,16 +26,20 @@ function fmt(t: {
   type: string;
   value: string;
   range: readonly [number, number];
+  loc: {
+    start: { line: number; column: number };
+    end: { line: number; column: number };
+  };
   regex?: { pattern: string; flags: string } | null;
 }): string {
-  const base = `${t.type}:${t.value}@${t.range[0]}-${t.range[1]}`;
+  const base = `${t.type}:${t.value}@${t.range[0]}-${t.range[1]}:${t.loc.start.line}:${t.loc.start.column}-${t.loc.end.line}:${t.loc.end.column}`;
   return t.regex ? `${base}|re(${t.regex.pattern}/${t.regex.flags})` : base;
 }
 
-function oxcTokens(src: string, lang: Lang): string[] {
+function projectedTokens(src: string, lang: Lang): string[] {
   const jsx = lang === 'jsx';
   const st = lang === 'cjs' ? 'script' : 'module';
-  const p = nativeParse(jsx ? 't.jsx' : 't.js', src, st, jsx);
+  const p = projectSyntax(jsx ? 't.jsx' : 't.js', src, st);
   return buildTokens(
     p.tokenTypes,
     p.tokenStarts,
@@ -50,6 +57,7 @@ function espreeTokens(src: string, lang: Lang): string[] {
     ecmaFeatures: { jsx: lang === 'jsx' },
     tokens: true,
     range: true,
+    loc: true,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any) as any;
   return ast.tokens.map(fmt);
@@ -57,6 +65,19 @@ function espreeTokens(src: string, lang: Lang): string[] {
 
 // [label, source, lang] — covers what the deleted lexer unit tests exercised.
 const JS_CASES: ReadonlyArray<readonly [string, string, Lang]> = [
+  ...['>', '>=', '>>', '>>>', '>>=', '>>>='].map(
+    (operator) =>
+      [
+        `greater-than operator ${operator}`,
+        `let left = 8; left ${operator} 1;`,
+        'js',
+      ] as const,
+  ),
+  [
+    'compound operators surrounded by trivia',
+    '// 😀\nlet left = 8; left /* > */ >>= /* > */ 1; left /* >= */ >>>= 1;',
+    'js',
+  ],
   // regex vs division (parser-driven disambiguation)
   ['regex after ctrl-paren', 'if (x) /re/.test(y)', 'js'],
   ['division after call', 'const a = f(x) / 2', 'js'],
@@ -138,6 +159,26 @@ const JS_CASES: ReadonlyArray<readonly [string, string, Lang]> = [
     'jsx',
   ],
   ['jsx namespaced name', 'const e = <a:b c:d="e" />', 'jsx'],
+  [
+    'jsx attribute ending in backslash',
+    String.raw`const e = <A value="\" />; next();`,
+    'jsx',
+  ],
+  [
+    'jsx single-quoted attribute ending in backslash',
+    String.raw`const e = <A value='\' />; next();`,
+    'jsx',
+  ],
+  [
+    'jsx multiline attribute',
+    'const e = <A value="first\nsecond" other="end" />; next();',
+    'jsx',
+  ],
+  [
+    'jsx multiline attribute with backslash and Unicode',
+    'const e = <A value="😀\\\r\n世界" />; next();',
+    'jsx',
+  ],
   ['jsx nested children', 'const e = <ul><li>a</li><li>b</li></ul>', 'jsx'],
   ['jsx entity text', 'const e = <p>a &amp; b &#169;</p>', 'jsx'],
   [
@@ -159,19 +200,84 @@ const JS_CASES: ReadonlyArray<readonly [string, string, Lang]> = [
   ['accented identifier', "const café = 'résumé'", 'js'],
 ];
 
-describe('token differential: oxc token stream == espree.parse tokens (.js/.jsx)', () => {
+describe('token differential: Go frame tokens == espree.parse tokens (.js/.jsx)', () => {
   for (const [label, src, lang] of JS_CASES) {
     test(label, () => {
-      expect(oxcTokens(src, lang)).toEqual(espreeTokens(src, lang));
+      expect(projectedTokens(src, lang)).toEqual(espreeTokens(src, lang));
+    });
+  }
+});
+
+describe('systematic token and comment conformance', () => {
+  for (const fixture of CONFORMANCE_CASES) {
+    test(fixture.name, () => {
+      const src = fixture.text.replace(/^\ufeff/, '');
+      const p = projectSyntax(
+        fixture.filePath,
+        fixture.text,
+        fixture.sourceType,
+      );
+      const actual = buildTokens(
+        p.tokenTypes,
+        p.tokenStarts,
+        p.tokenEnds,
+        src,
+        buildLineStartOffsets(src),
+      );
+      const expected = parseReference(fixture);
+      expect(actual.map(fmt)).toEqual(expected.tokens!.map(fmt));
+      expect(
+        p.comments.map((comment) => ({
+          type: comment.type,
+          value: comment.value,
+          range: [comment.start, comment.end],
+        })),
+      ).toEqual(
+        // The frame excludes shebang metadata; the SDK comparison below
+        // exercises SourceCode's synthesized Shebang entry.
+        expected
+          .comments!.filter((comment) => comment.type !== 'Hashbang')
+          .map((comment) => ({
+            type: comment.type,
+            value: comment.value,
+            range: comment.range,
+          })),
+      );
     });
   }
 });
 
 // .ts: espree can't parse TypeScript. Hand-pinned `type:value` expectations, verified against
 // @typescript-eslint/typescript-estree during the M3 spike (keyword split + this + as-const).
-describe('token differential: oxc token types for TypeScript (.ts)', () => {
+describe('token differential: Go frame token types for TypeScript (.ts)', () => {
+  for (const src of [
+    'let left = 8; left >= 1; left >> 1; left >>> 1; left >>= 1; left >>>= 1;',
+    'type T = A<B<C<D>>>; let value: A<B<C>>=input; const shifted=left>>right;',
+    'const result = f<A<B<C>>>(left >>> 1); const check = left >= right;',
+    'type T = A<B<C>>; const e = <A value="\\" />; const shifted = left >> right;',
+  ]) {
+    test(`contextual greater-than tokens: ${src}`, () => {
+      const filePath = src.includes('<A value=') ? 't.tsx' : 't.ts';
+      const p = projectSyntax(filePath, src);
+      const actual = buildTokens(
+        p.tokenTypes,
+        p.tokenStarts,
+        p.tokenEnds,
+        src,
+        buildLineStartOffsets(src),
+      );
+      const expected = parseUpstream(src, {
+        filePath,
+        range: true,
+        loc: true,
+        tokens: true,
+      });
+      expect(actual.map(fmt)).toEqual(expected.tokens!.map(fmt));
+    });
+  }
+
   function tsTokens(src: string): string[] {
-    const p = nativeParse('t.ts', src, 'module', false);
+    const p = projectSyntax('t.ts', src, 'module');
     return buildTokens(
       p.tokenTypes,
       p.tokenStarts,

@@ -71,10 +71,10 @@ func TestAutofixSyntaxGateStopsBeforeAfterNativePluginDispatch(t *testing.T) {
 			PluginFailure: PluginDiscardOnFailure,
 		},
 		AutofixPolicy{StopOnTargetSyntaxErrors: true},
-		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			dispatches++
 			return &EslintPluginLintResult{}, nil
-		},
+		}),
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -120,10 +120,10 @@ func TestAutofixSyntaxGateStopsConcurrentPluginBeforeDispatch(t *testing.T) {
 			Plugin: PluginConcurrentJoined,
 		},
 		autofixPolicyForTest(1, AutofixPolicy{StopOnTargetSyntaxErrors: true}),
-		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			dispatches++
 			return &EslintPluginLintResult{}, nil
-		},
+		}),
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -375,7 +375,7 @@ func TestAutofixReobserveFailurePreservesLastSuccessfulObservation(t *testing.T)
 			PluginFailure: PluginDiscardOnFailure,
 		},
 		autofixPolicyForTest(1, AutofixPolicy{VerifyAfterLastRound: true}),
-		func(dispatchCtx context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(dispatchCtx context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			if dispatches.Add(1) == 2 {
 				<-nativeFinished
 				cancel()
@@ -384,7 +384,7 @@ func TestAutofixReobserveFailurePreservesLastSuccessfulObservation(t *testing.T)
 			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
 				FilePath: request.Files[0].Path,
 			}}}, nil
-		},
+		}),
 	))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("pipeline error = %v, want context.Canceled", err)

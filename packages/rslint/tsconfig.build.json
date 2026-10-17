@@ -4,5 +4,12 @@
   "compilerOptions": {
     "types": ["node"],
     "tsBuildInfoFile": "${configDir}/node_modules/.cache/rslint-core-typecheck.tsbuildinfo"
-  }
+  },
+  "exclude": [
+    "${configDir}/src/**/*.spec.ts",
+    "${configDir}/src/**/*.test.ts",
+    "${configDir}/**/fixtures/**",
+    "${configDir}/src/eslint-plugin/**",
+    "${configDir}/src/languages/**"
+  ]
 }

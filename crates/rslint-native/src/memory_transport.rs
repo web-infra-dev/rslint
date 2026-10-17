@@ -7,6 +7,7 @@ mod mapping;
 
 use napi::{Env, Error, Result, Unknown};
 use napi_derive::napi;
+#[cfg(test)]
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
@@ -164,6 +165,7 @@ impl Lease {
         })
     }
 
+    #[cfg(test)]
     fn bytes(&self, offset: u32, length: u32) -> Result<Cow<'_, [u8]>> {
         let range = self.range(offset, length)?;
         let mut chunks = self.chunks(range);
@@ -411,6 +413,7 @@ fn acquire(bytes: &SharedBytes) -> Result<Arc<Lease>> {
 
 /// The lease remains pinned for the entire callback, including a cross-batch
 /// assembly. Borrowed slices cannot escape this scope or outlive revocation.
+#[cfg(test)]
 pub(crate) fn with_bytes<T>(
     bytes: SharedBytes,
     read: impl FnOnce(&[u8]) -> Result<T>,
@@ -446,7 +449,11 @@ pub fn read_bytes(env: &Env, bytes: SharedBytes) -> NativeResult<Unknown<'_>> {
             // no user code can observe a partially copied buffer or mutate it.
             let output =
                 unsafe { std::slice::from_raw_parts_mut(destination.cast::<u8>(), range.len()) };
+            #[cfg(feature = "test-worker-termination")]
+            crate::reader_worker_test::before_read(bytes.lease);
             lease.copy_into(range, output);
+            #[cfg(feature = "test-worker-termination")]
+            crate::reader_worker_test::after_read(bytes.lease, output);
         }
         // SAFETY: creation succeeded in this env. Returning the existing value
         // requires no further N-API calls; NativeResult preserves pending errors.

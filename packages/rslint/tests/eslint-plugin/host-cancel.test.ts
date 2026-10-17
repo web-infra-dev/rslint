@@ -1,3 +1,4 @@
+import { projectFrame } from '../languages/js/project-frame.js';
 import { describe, test, expect, rs } from 'rstack/test';
 
 import { createPluginLintHost } from '../../src/eslint-plugin/host.js';
@@ -21,7 +22,11 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
   () => {
     const req: EslintPluginLintRequest = {
       files: [
-        { path: 'a.ts', text: 'const x = null;', configKey: LOCAL_CONFIG_DIR },
+        {
+          path: 'a.ts',
+          frame: projectFrame('a.ts', 'const x = null;').toString('base64'),
+          configKey: LOCAL_CONFIG_DIR,
+        },
       ],
       rules: { 'local/no-null': { options: [] } },
       collectFixes: false,

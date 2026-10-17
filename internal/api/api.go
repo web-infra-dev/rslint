@@ -64,11 +64,10 @@ const (
 )
 
 // Version is the IPC protocol version.
-const Version = "3.1.0"
+const Version = "4.0.0"
 
 const CapabilityReversePluginLint = "reversePluginLint"
 const CapabilityReverseConfigLoad = "reverseConfigLoadV1"
-const CapabilityPluginLintAttachments = "pluginLintAttachments"
 
 // HandshakeRequest represents a handshake request
 type HandshakeRequest struct {
@@ -230,6 +229,7 @@ type Handler interface {
 // Requester is the reverse-RPC capability exposed to a bidirectional lint
 // handler. ipc.Channel implements it directly.
 type Requester interface {
+	NewRequestOutput(ctx context.Context) (*ipc.RequestOutput, error)
 	SendRequest(ctx context.Context, kind ipc.MessageKind, payload any, attachments ...ipc.Attachment) (*ipc.Message, error)
 }
 
@@ -345,7 +345,6 @@ func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, err
 			capabilities = []string{
 				CapabilityReversePluginLint,
 				CapabilityReverseConfigLoad,
-				CapabilityPluginLintAttachments,
 			}
 		}
 		return HandshakeResponse{

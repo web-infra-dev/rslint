@@ -29,10 +29,10 @@
 
 import { describe, test, expect } from 'rstack/test';
 
-import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
+import { projectSyntax } from '../../languages/js/project-frame.js';
 
 import { createSourceCode } from '../../../src/eslint-plugin/source-code/source-code.js';
-import type { ESTreeNode } from '../../../src/eslint-plugin/source-code/source-code.js';
+import type { ESTreeNode } from '../../../src/languages/js/types.js';
 
 // Build a SourceCode over real text so the native parser produces real tokens /
 // comments — mirrors `regression-coverage.test.ts`'s `mkSC`. Only a
@@ -51,7 +51,7 @@ function mkSC(text: string) {
   } as unknown as ESTreeNode;
   // Tokens/comments now come from the native parser (the JS tokenizer is gone) — parse the
   // real source and thread its columnar token stream into the SourceCode.
-  const parsed = nativeParse('test.js', text, 'module', false);
+  const parsed = projectSyntax('test.js', text, 'module');
   return createSourceCode({
     text,
     ast,

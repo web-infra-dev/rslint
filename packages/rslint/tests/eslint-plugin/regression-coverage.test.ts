@@ -17,22 +17,19 @@ import * as espree from 'espree';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import { createSourceCode } from '../../src/eslint-plugin/source-code/source-code.js';
-import { lintFile } from '../../src/eslint-plugin/linter/ecma-language-plugin.js';
+import { lintFile } from './project-frame.js';
 import type { LoadedPlugins } from '../../src/eslint-plugin/plugin/plugin-loader.js';
 import type { RuleContext } from '../../src/eslint-plugin/linter/context.js';
-import { parse as nativeParse } from '../../src/eslint-plugin/native/load-binding.js';
+import { projectSyntax } from '../languages/js/project-frame.js';
 
-import { buildTokens } from '../../src/eslint-plugin/source-code/token-builder.js';
-import {
-  normalizeAst,
-  buildLineStartOffsets,
-} from '../../src/eslint-plugin/ast/normalize-ast.js';
+import { buildTokens } from '../../src/languages/js/token-builder.js';
+import { buildLineStartOffsets } from '../../src/languages/js/positions.js';
 
 // Tokenize via the real path (native parser → columnar token stream → token-builder),
 // replacing the deleted hand-written JS tokenizer. `script` (sloppy) matches the sloppy-mode
 // token tests below and the espree oracle (`eTok`, which uses sourceType: 'script').
 function lexTokens(src: string) {
-  const parsed = nativeParse('test.js', src, 'script', false);
+  const parsed = projectSyntax('test.js', src, 'script');
   return buildTokens(
     parsed.tokenTypes,
     parsed.tokenStarts,
@@ -425,7 +422,7 @@ describe('getNodeByRangeIndex uses getVisitorKeys fallback', () => {
     // discovers children via the heuristic helper, and the walk
     // descends into the inner node. Without it, the walk stops at the
     // wrapper and returns the wrapper instead of the deeper node —
-    // mismatching listener-merge.ts / normalize-ast.ts behavior.
+    // mismatching listener traversal / decoded AST behavior.
     const inner = {
       type: 'InnerSynthetic',
       range: [5, 10] as [number, number],
@@ -1008,8 +1005,8 @@ describe('scope-factory TS path honors globalReturn / commonjs', () => {
 // ecma-language-plugin: .mts / .cts + ecmaFeatures.jsx promote to tsx
 // ────────────────────────────────────────────────────────────────────
 
-describe('.mts / .cts + ecmaFeatures.jsx parse as tsx', () => {
-  for (const ext of ['mts', 'cts'] as const) {
+describe('Program JSX syntax reaches the plugin frame', () => {
+  for (const ext of ['tsx', 'jsx'] as const) {
     test(`.${ext} with JSX content yields a real JSXElement node`, () => {
       let sawJsx = false;
       const loaded: LoadedPlugins = {
@@ -1046,11 +1043,7 @@ describe('.mts / .cts + ecmaFeatures.jsx parse as tsx', () => {
         loaded,
       );
 
-      // Pre-fix: .mts / .cts not promoted to 'tsx' → oxc parses as ts
-      // (no JSX) → JSXElement never appears in the AST → listener
-      // never fires → sawJsx stays false (rule-blind on JSX).
-      // Post-fix: promoted to tsx → AST has JSXElement → listener
-      // fires.
+      // The Program supplied JSX syntax; no Node parser promotion is involved.
       expect(sawJsx).toBe(true);
     });
   }
@@ -2839,7 +2832,7 @@ describe('SourceCode.getIndexFromLoc non-last-line bound (eslint@10)', () => {
   });
 });
 
-describe('normalize-ast: TemplateElement.range includes delimiters (espree@11)', () => {
+describe('Go-projected ESTree: TemplateElement.range includes delimiters (espree@11)', () => {
   function collectTplRanges(root: unknown): Array<[number, number]> {
     const out: Array<[number, number]> = [];
     (function f(n: unknown): void {
@@ -2866,9 +2859,9 @@ describe('normalize-ast: TemplateElement.range includes delimiters (espree@11)',
     src: string,
     ext: 'js' | 'ts' | 'tsx' = 'js',
   ): Array<[number, number]> {
-    const parsed = nativeParse(`t.${ext}`, src, 'module', ext === 'tsx');
-    const ast = JSON.parse(parsed.program);
-    normalizeAst(ast as never, buildLineStartOffsets(src), src);
+    const parsed = projectSyntax(`t.${ext}`, src, 'module');
+    const ast = parsed.ast;
+
     return collectTplRanges(ast);
   }
   function espreeTplRanges(src: string): Array<[number, number]> {

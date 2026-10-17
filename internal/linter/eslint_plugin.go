@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"golang.org/x/sync/errgroup"
@@ -32,8 +34,8 @@ type EslintPluginRuleConfig struct {
 
 type EslintPluginLintFile struct {
 	Path            string         `json:"path"`
-	Text            *string        `json:"text,omitempty"`
-	TextAttachment  *uint32        `json:"textAttachment,omitempty"`
+	Frame           []byte         `json:"frame,omitempty"`
+	FrameAttachment *uint32        `json:"frameAttachment,omitempty"`
 	ConfigKey       string         `json:"configKey"`
 	LanguageOptions map[string]any `json:"languageOptions,omitempty"`
 	Settings        map[string]any `json:"settings,omitempty"`
@@ -48,25 +50,21 @@ type EslintPluginLintRequest struct {
 	CollectTiming   bool                              `json:"collectTiming,omitempty"`
 }
 
-// WithTextAttachments projects complete snapshots into attachment indices for
-// hosts that support them. It preserves the logical request, file order and
-// metadata; storage and request scheduling remain outside this wire projection.
-// The original request and its immutable text strings are not modified.
-func (req EslintPluginLintRequest) WithTextAttachments() (EslintPluginLintRequest, []string) {
+// WithFrameAttachments moves the immutable binary frames into the existing IPC
+// attachment channel. LSP serializes the same frames inline as base64 instead.
+// It preserves the request and does not own storage or transport lifetimes.
+func (req EslintPluginLintRequest) WithFrameAttachments() (EslintPluginLintRequest, [][]byte) {
 	files := make([]EslintPluginLintFile, len(req.Files))
-	texts := make([]string, 0, len(req.Files))
+	frames := make([][]byte, 0, len(req.Files))
 	for i, file := range req.Files {
 		files[i] = file
-		if file.Text == nil {
-			continue
-		}
-		index := uint32(len(texts))
-		texts = append(texts, *file.Text)
-		files[i].Text = nil
-		files[i].TextAttachment = &index
+		index := uint32(len(frames))
+		frames = append(frames, file.Frame)
+		files[i].Frame = nil
+		files[i].FrameAttachment = &index
 	}
 	req.Files = files
-	return req, texts
+	return req, frames
 }
 
 // SuggestionsMode values for EslintPluginLintRequest.SuggestionsMode — the wire
@@ -118,26 +116,63 @@ type EslintPluginLintResult struct {
 	Results []EslintPluginFileResult `json:"results"`
 }
 
-// EslintPluginDispatcher sends one batch reverse-request to the Node host
+// EslintPluginDispatcher opens an output/dispatch scope for each request to the Node host
 // and returns its result. It must honor ctx and return after cancellation.
 // Concurrent pipeline work joins dispatch before ending its producer lease;
 // detached inputs need no generation borrow. The CLI uses the generic IPC
 // channel; the LSP server over an `rslint/pluginLint` request.
-type EslintPluginDispatcher func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error)
+// Dispatch borrows owned frames until return, or consumes allocator-owned frames
+// during publication. Callers do not inspect frames after entering Dispatch.
+// A dispatcher retaining owned bytes after return must copy them. Already frozen
+// input frames keep their independent ownership.
+type EslintPluginDispatcher interface {
+	OpenBatch(ctx context.Context) (*EslintPluginBatch, error)
+}
+
+// EslintPluginBatch owns the output borrow for one projection window. A nil
+// Allocate uses the scheduler's owned output cache (for inline/LSP transport).
+// Discard rolls back a failed encoding's last allocation. Release runs exactly
+// once on every path; a provider may end producer access earlier at publication.
+// Storage providers know bytes and requests, never native AST or ESTree schema.
+type EslintPluginBatch struct {
+	Allocate func(int) []byte
+	Discard  func([]byte)
+	Dispatch EslintPluginDispatchFunc
+	Release  func()
+}
+
+// EslintPluginDispatchFunc is the owned-frame adapter used by inline/LSP hosts.
+type EslintPluginDispatchFunc func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error)
+
+func (f EslintPluginDispatchFunc) OpenBatch(ctx context.Context) (*EslintPluginBatch, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if f == nil {
+		return nil, errors.New("plugin dispatcher is nil")
+	}
+	return &EslintPluginBatch{Dispatch: f}, nil
+}
+
+var errPluginWindowFull = errors.New("plugin ESTree window is full")
 
 // EslintPluginFileInput is the linter's generation-local representation of one
 // plugin-lint input before wire batching.
 type EslintPluginFileInput struct {
 	Path string
-	// Text is the complete generation source sent to the worker. Production
-	// IPC CLI and overlay hosts supply snapshots; only callers that explicitly
-	// enable HostReadsInitialText may omit it for the initial generation.
+	// Text is the complete generation snapshot, including its original BOM.
+	// It stays Go-local for projection validation and detached diagnostics.
 	Text *string
-	// SourceFile is the Go-local, decoded, BOM-stripped diagnostic frame; it is
-	// never sent on the wire. Concurrent pipeline work shares the native source's
-	// frame, keeping the original AST only until fix text validation completes.
-	// Detached inputs leave it nil and rebuild against inline Text.
-	SourceFile      ast.SourceFileLike
+	// SourceFile is the exact Program syntax root. Projection consumes this
+	// borrow before dispatch; detached work freezes Frame and drops it earlier.
+	SourceFile *ast.SourceFile
+	// DiagnosticSource carries the existing native/plugin diagnostic identity.
+	// Read-only observations use the source's independent text projection;
+	// fix planning keeps the original frame until text validation completes.
+	DiagnosticSource ast.SourceFileLike
+	// Frame owns detached syntax bytes; FrameError freezes a projection failure.
+	Frame           []byte
+	FrameError      string
 	ConfigKey       string
 	LanguageOptions map[string]any
 	Settings        map[string]any
@@ -148,7 +183,7 @@ type EslintPluginFileInput struct {
 
 // buildEslintPluginFileInput adds file-specific defaults and routing to an
 // already prepared plugin projection. It never selects or copies rules.
-func buildEslintPluginFileInput(filePath, configKey string, rules *preparedRuleSet, languageOptions, settings map[string]any, text *string, sourceFile ast.SourceFileLike) EslintPluginFileInput {
+func buildEslintPluginFileInput(filePath, configKey string, rules *preparedRuleSet, languageOptions, settings map[string]any, text *string, sourceFile *ast.SourceFile) EslintPluginFileInput {
 	_, _, normalizedLanguageOptions := rule.ResolveLanguageDefaults(filePath, rules.pluginLanguageOptions)
 	effectiveLanguageOptions := make(map[string]any, len(languageOptions)+2)
 	for name, value := range languageOptions {
@@ -216,14 +251,15 @@ func BuildEslintPluginFileInputs(
 	return inputs
 }
 
-// eslintPluginShutdownSentinel is the ONLY benign parseError the worker emits:
-// a graceful pool teardown (pool.shutdown()) racing an in-flight task. Every
-// other parseError means the file did NOT finish linting — the native parser
-// (oxc) recovers from syntax errors and returns a best-effort AST instead of a
-// parseError, so a parseError is never an ordinary syntax error but always an
-// abnormal worker failure (fs read, size guard, panic, normalize, crash,
-// configKey miss) that must surface.
+// eslintPluginShutdownSentinel is the sole benign worker failure during a
+// graceful pool teardown. Input/decoder failures are never syntax recovery and
+// must remain visible through the existing plugin failure policy.
 const eslintPluginShutdownSentinel = "shutdown"
+
+const (
+	pluginWindowFiles = 32
+	pluginWindowBytes = 64 << 20
+)
 
 // DispatchEslintPluginRules groups files by their rule-config signature and
 // dispatches each homogeneous batch to the Node host as an independent reverse
@@ -258,7 +294,7 @@ func DispatchEslintPluginRules(
 	_, err := dispatchEslintPluginRules(
 		ctx,
 		dispatch,
-		files,
+		slices.Clone(files),
 		collectFixes,
 		suggestionsMode,
 		timing,
@@ -276,17 +312,33 @@ func dispatchEslintPluginRules(
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
 ) ([]EslintPluginProtocolNotice, error) {
+	// Internal pipeline tasks transfer ownership of these private input slots.
+	// Exported dispatch helpers clone the caller's slice before entering here.
+	defer clear(files)
 	if len(files) == 0 || dispatch == nil {
 		return nil, nil
 	}
 
-	batches := groupEslintPluginFiles(files)
+	// Split only the lightweight input slices before entering the existing
+	// concurrency limit. A large homogeneous group must share that capacity,
+	// rather than serially alternating projection and worker execution.
+	var batches [][]EslintPluginFileInput
+	for _, group := range groupEslintPluginFiles(files) {
+		for start := 0; start < len(group); start += pluginWindowFiles {
+			batches = append(batches, group[start:min(start+pluginWindowFiles, len(group))])
+		}
+	}
+	clear(files)
 	batchDiags := make([][]rule.RuleDiagnostic, len(batches))
 	batchNotices := make([][]EslintPluginProtocolNotice, len(batches))
 	batchErrs := make([]error, len(batches))
 
 	var g errgroup.Group
-	g.SetLimit(dispatchConcurrency())
+	limit := dispatchConcurrency()
+	// This invocation owns a finite cache of projection and output buffers.
+	// A window keeps exclusive ownership until its dispatcher has returned.
+	builders := make(chan *pluginProjectionBuffers, limit)
+	g.SetLimit(limit)
 	for i, batch := range batches {
 		g.Go(func() error {
 			// Each batch writes only its own slot, so concurrent batches share
@@ -296,6 +348,7 @@ func dispatchEslintPluginRules(
 				ctx,
 				dispatch,
 				batch,
+				builders,
 				collectFixes,
 				suggestionsMode,
 				timing,
@@ -407,7 +460,7 @@ func DispatchEslintPluginRulesWithOutcome(
 	notices, err := dispatchEslintPluginRules(
 		ctx,
 		dispatch,
-		inputs,
+		slices.Clone(inputs),
 		collectFixes,
 		suggestionsMode,
 		timing,
@@ -436,6 +489,44 @@ func eslintPluginDispatchFailurePath(inputs []EslintPluginFileInput) string {
 	return ""
 }
 
+// The scheduler owns output reuse; the language encoder owns only scratch.
+// Both caches are bounded separately and contain no Program references.
+type pluginProjectionBuffers struct {
+	syntax         estree.Builder
+	output         [][]byte
+	outputCapacity int
+}
+
+func (b *pluginProjectionBuffers) reset() {
+	b.syntax.Reset()
+	for index := range b.output {
+		b.output[index] = b.output[index][:0]
+	}
+}
+
+// Pack frames in stable blocks with a bounded total capacity. Growing storage
+// never copies completed frames or invalidates their views. Overflow is owned.
+func (b *pluginProjectionBuffers) allocate(size int) []byte {
+	const limit = 4 << 20
+	previous := 0
+	for index, block := range b.output {
+		start := len(block)
+		if size <= cap(block)-start {
+			b.output[index] = block[:start+size]
+			return b.output[index][start : start+size : start+size]
+		}
+		previous = max(previous, cap(block))
+	}
+	if size > limit-b.outputCapacity {
+		return make([]byte, size)
+	}
+	capacity := min(limit-b.outputCapacity, max(size, 2*previous, 64<<10))
+	block := make([]byte, size, capacity)
+	b.output = append(b.output, block)
+	b.outputCapacity += capacity
+	return block[:size:size]
+}
+
 // dispatchOneBatch sends one batch's reverse request and rebuilds its
 // diagnostics through onDiagnostic. A panic is trapped and returned as an error
 // so a worker-side failure can't crash the driver process (each batch runs in
@@ -444,26 +535,189 @@ func dispatchOneBatch(
 	ctx context.Context,
 	dispatch EslintPluginDispatcher,
 	batch []EslintPluginFileInput,
+	builders chan *pluginProjectionBuffers,
 	collectFixes bool,
 	suggestionsMode string,
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
 	onNotice func(EslintPluginProtocolNotice),
 ) (err error) {
+	defer clear(batch)
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("eslint-plugin dispatch panicked: %v", r)
 		}
 	}()
-	req := buildEslintPluginRequest(batch, collectFixes, suggestionsMode, timing != nil)
-	res, dispatchErr := dispatch(ctx, req)
-	if dispatchErr != nil {
-		return dispatchErr
+	// Output buffers stay exclusive until dispatch returns, including errors
+	// and cancellation. No publication/reader lifetime enters the encoder.
+	var builder *pluginProjectionBuffers
+	releaseBuilder := func() {
+		if builder != nil {
+			builder.reset()
+			select {
+			case builders <- builder:
+			default:
+			}
+			builder = nil
+		}
 	}
-	if res == nil {
-		return nil
+	defer releaseBuilder()
+	var output *EslintPluginBatch
+	releaseOutput := func() {
+		current := output
+		output = nil
+		if current != nil && current.Release != nil {
+			current.Release()
+		}
 	}
-	return applyEslintPluginResults(batch, res, timing, onDiagnostic, onNotice)
+	defer releaseOutput()
+	for offset := 0; offset < len(batch); {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		var outputErr error
+		output, outputErr = dispatch.OpenBatch(ctx)
+		if outputErr != nil {
+			return outputErr
+		}
+		if output == nil || output.Dispatch == nil {
+			return errors.New("plugin dispatcher returned an invalid batch")
+		}
+		window := make([]EslintPluginFileInput, 0, min(pluginWindowFiles, len(batch)-offset))
+		bytes := 0
+		for offset < len(batch) && len(window) < pluginWindowFiles {
+			input := batch[offset]
+			if input.Frame != nil && len(window) > 0 && bytes+len(input.Frame) > pluginWindowBytes {
+				break
+			}
+			if input.Frame != nil && output.Allocate != nil {
+				data := output.Allocate(len(input.Frame))
+				copy(data, input.Frame)
+				input.Frame = data
+			}
+			if input.DiagnosticSource == nil && input.SourceFile != nil {
+				input.DiagnosticSource = input.SourceFile
+			}
+			if input.Frame == nil && input.FrameError == "" {
+				if builder == nil {
+					select {
+					case builder = <-builders:
+					default:
+						builder = new(pluginProjectionBuffers)
+					}
+				}
+				var allocated []byte
+				frame, projectErr := projectPluginFrame(ctx, &builder.syntax, input, func(size int) []byte {
+					if len(window) > 0 && bytes+size > pluginWindowBytes {
+						panic(errPluginWindowFull)
+					}
+					if output.Allocate != nil {
+						allocated = output.Allocate(size)
+						return allocated
+					}
+					return builder.allocate(size)
+				})
+				if projectErr != nil {
+					if allocated != nil && output.Discard != nil {
+						output.Discard(allocated)
+					}
+					// The frame was sized before allocation. Leave this input untouched
+					// and rebuild it in the next window; no transport lease crosses windows.
+					if errors.Is(projectErr, errPluginWindowFull) {
+						break
+					}
+					if ctx.Err() != nil {
+						return ctx.Err()
+					}
+					input.FrameError = projectErr.Error()
+				} else {
+					input.Frame = frame
+				}
+			}
+			// Projection has consumed the syntax borrow. Metadata keeps only its
+			// diagnostic frame; no original input slot pins completed ASTs.
+			input.SourceFile = nil
+			batch[offset] = EslintPluginFileInput{}
+			if input.FrameError != "" {
+				window = append(window, input)
+				offset++
+				continue
+			}
+			window = append(window, input)
+			bytes += len(input.Frame)
+			offset++
+		}
+		if len(window) == 0 {
+			releaseOutput()
+			continue
+		}
+		ready := make([]EslintPluginFileInput, 0, len(window))
+		failed := make([]EslintPluginFileInput, 0)
+		failures := &EslintPluginLintResult{}
+		for _, input := range window {
+			if input.FrameError != "" {
+				failed = append(failed, input)
+				failures.Results = append(failures.Results, EslintPluginFileResult{FilePath: input.Path, ParseError: input.FrameError})
+			} else {
+				ready = append(ready, input)
+			}
+		}
+		if len(ready) == 0 {
+			releaseOutput()
+			if err := applyEslintPluginResults(window, failures, timing, onDiagnostic, onNotice); err != nil {
+				return err
+			}
+			continue
+		}
+		req := buildEslintPluginRequest(ready, collectFixes, suggestionsMode, timing != nil)
+		// Inline base64 plus metadata must also fit the generic 256 MiB message
+		// ceiling. Include each file's base64 padding and the enclosing RPC envelope.
+		metadata := req
+		metadata.Files = append([]EslintPluginLintFile(nil), req.Files...)
+		for index := range metadata.Files {
+			metadata.Files[index].Frame = nil
+		}
+		encoded, encodeErr := json.Marshal(metadata)
+		if encodeErr != nil {
+			return encodeErr
+		}
+		inlineBytes := 0
+		for _, file := range req.Files {
+			inlineBytes += (len(file.Frame)+2)/3*4 + len(`,"frame":""`)
+		}
+		if len(encoded)+inlineBytes > 256<<20-4096 {
+			return errors.New("plugin frame batch exceeds IPC message limit")
+		}
+		// Results use source/rule metadata. Drop their frame references and
+		// oversized scratch buffers before dispatch. Owned output remains borrowed
+		// until return; shared publication consumes the producer's byte access.
+		for index := range window {
+			window[index].Frame = nil
+		}
+		for index := range ready {
+			ready[index].Frame = nil
+		}
+		if builder != nil {
+			builder.reset()
+		}
+		res, dispatchErr := output.Dispatch(ctx, req)
+		releaseOutput()
+		releaseBuilder()
+		if dispatchErr != nil || res == nil {
+			if err := applyEslintPluginResults(failed, failures, timing, onDiagnostic, onNotice); err != nil {
+				return err
+			}
+			if dispatchErr != nil {
+				return dispatchErr
+			}
+			continue
+		}
+		failures.Results = append(failures.Results, res.Results...)
+		if err := applyEslintPluginResults(window, failures, timing, onDiagnostic, onNotice); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // dispatchConcurrency bounds how many plugin-lint batches are dispatched
@@ -473,8 +727,8 @@ func dispatchOneBatch(
 // worker pick up the next batch's tasks from the shared queue without idling
 // during the Go↔Node round trip between batches. Capping it keeps a heavily
 // fragmented file set from dispatching every batch's reverse request at once —
-// note this bounds concurrent batches, NOT the tasks inside one batch (a single
-// huge batch still enqueues all its tasks together, bounded by the batch itself).
+// Each bounded file window is one batch. Byte-heavy windows may make smaller
+// sequential requests while retaining this same concurrency slot.
 func dispatchConcurrency() int {
 	const poolWorkers = 8 // mirrors the Node worker pool cap (worker-pool.ts)
 	const roundTripBuffer = 2
@@ -541,7 +795,7 @@ func buildEslintPluginRequest(batch []EslintPluginFileInput, collectFixes bool, 
 	for _, f := range batch {
 		wireFiles = append(wireFiles, EslintPluginLintFile{
 			Path:            f.Path,
-			Text:            f.Text,
+			Frame:           f.Frame[:len(f.Frame):len(f.Frame)],
 			ConfigKey:       f.ConfigKey,
 			LanguageOptions: f.LanguageOptions,
 			Settings:        f.Settings,
@@ -613,12 +867,9 @@ func applyEslintPluginResults(
 			return p
 		}
 
-		// Surface every worker failure. oxc recovers from syntax errors and
-		// returns a best-effort AST, so a parseError is never an ordinary
-		// syntax error — it is always an abnormal failure (fs read, size guard,
-		// panic, normalize, worker crash, configKey miss) that must affect the
-		// exit code and be visible. The sole benign value is the "shutdown"
-		// sentinel (graceful pool teardown racing a task).
+		// Program owns syntax errors. Projection/decoder and worker failures
+		// use this existing error field and must remain visible. The sole benign
+		// value is the "shutdown" sentinel (graceful pool teardown racing a task).
 		if fr.ParseError != "" {
 			if fr.ParseError != eslintPluginShutdownSentinel {
 				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf,
@@ -666,20 +917,12 @@ func applyEslintPluginResults(
 	return nil
 }
 
-// eslintPluginSourceFile returns the frame Go rebuilds plugin diagnostics
-// against, whose byte offsets must match the worker's wire offsets.
-//
-// Prefer the bound native source frame, whether an original AST or its
-// independent text projection. Detached work instead uses the exact inline
-// text supplied to the worker, minus a leading BOM: neither native nor plugin
-// byte offsets include that mark.
-//
-// Callers enabling HostReadsInitialText must ensure the host's disk decoding
-// agrees with the bound source frame. UTF-16 or malformed UTF-8 decoded
-// differently by the host can shift offsets; clamping only keeps them in bounds.
-//
-// ok=false only if the caller supplied neither (defensive).
+// Diagnostics use the same BOM-stripped source that was frozen in the frame.
+// Joined work can use its leased SourceFile; detached work owns only the text.
 func eslintPluginSourceFile(f EslintPluginFileInput) (ast.SourceFileLike, bool) {
+	if f.DiagnosticSource != nil {
+		return f.DiagnosticSource, true
+	}
 	if f.SourceFile != nil {
 		return f.SourceFile, true
 	}
@@ -746,4 +989,23 @@ func rebuildEslintPluginSuggestions(suggestions []EslintPluginSuggestion, clamp 
 		})
 	}
 	return &out
+}
+
+func projectPluginFrame(ctx context.Context, builder *estree.Builder, input EslintPluginFileInput, allocate func(int) []byte) ([]byte, error) {
+	if input.SourceFile == nil {
+		return nil, errors.New("plugin ESTree projection requires the Program SourceFile")
+	}
+	if input.Text == nil {
+		return nil, errors.New("plugin ESTree projection requires the source snapshot")
+	}
+	text := *input.Text
+	hasBOM := strings.HasPrefix(text, "\ufeff")
+	if strings.TrimPrefix(text, "\ufeff") != input.SourceFile.Text() {
+		return nil, errors.New("plugin source snapshot does not match Program syntax")
+	}
+	sourceType, _ := input.LanguageOptions["sourceType"].(string)
+	if sourceType == "" {
+		sourceType = "module"
+	}
+	return builder.BuildInto(ctx, input.SourceFile, estree.Options{SourceType: sourceType, HasBOM: hasBOM}, allocate)
 }

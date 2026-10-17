@@ -309,7 +309,7 @@ describe('WorkerPool shutdown state machine (no real Worker)', () => {
     const batch = pool.lintBatch([
       {
         filePath: 'queued.ts',
-        text: '',
+        frame: new Uint8Array([1]),
         rules: {},
         collectFixes: false,
         suggestionsMode: 'off',

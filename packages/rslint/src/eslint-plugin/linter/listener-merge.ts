@@ -27,8 +27,12 @@
 // below. @ts-expect-error keeps the implicit-any import from failing the build.
 // @ts-expect-error -- esquery has no published types
 import esqueryPkg from 'esquery';
-import type { ESTreeNode, ListenerFn } from './context.js';
-import { VISITOR_KEYS, getVisitorKeys } from '../ast/visitor-keys.js';
+import type { ESTreeNode } from '../../languages/js/types.js';
+import type { ListenerFn } from './context.js';
+import {
+  VISITOR_KEYS,
+  getVisitorKeys,
+} from '../../languages/js/visitor-keys.js';
 
 // esquery ships CJS; its default export is the matcher object with
 // `.parse`/`.matches`. Imported statically (not via createRequire) so rslib
@@ -615,17 +619,23 @@ function analyzeSpecificity(selector: EsqSelector): {
 function mergeByLinearMerge(
   byType: EsqEntry[] | undefined,
   wild: EsqEntry[],
-  fire: (e: EsqEntry) => void,
+  node: ESTreeNode,
+  ancestry: ESTreeNode[],
+  fire: (e: EsqEntry, node: ESTreeNode, ancestry: ESTreeNode[]) => void,
 ): void {
-  const bt = byType ?? [];
   let i = 0;
   let j = 0;
-  while (i < bt.length && j < wild.length) {
-    if (compareSpecificity(bt[i], wild[j]) <= 0) fire(bt[i++]);
-    else fire(wild[j++]);
+  if (!byType) {
+    while (j < wild.length) fire(wild[j++], node, ancestry);
+    return;
   }
-  while (i < bt.length) fire(bt[i++]);
-  while (j < wild.length) fire(wild[j++]);
+  const bt = byType;
+  while (i < bt.length && j < wild.length) {
+    if (compareSpecificity(bt[i], wild[j]) <= 0) fire(bt[i++], node, ancestry);
+    else fire(wild[j++], node, ancestry);
+  }
+  while (i < bt.length) fire(bt[i++], node, ancestry);
+  while (j < wild.length) fire(wild[j++], node, ancestry);
 }
 
 /**
@@ -683,12 +693,15 @@ export function visit(
   // running the same `'FunctionDeclaration > BlockStatement > ReturnStatement'`
   // selector through both engines.
   const ancestry: ESTreeNode[] = [];
+  // esquery consumes ancestry synchronously; rule listeners receive only node.
+  // This storage belongs to one visit, including when a listener nests visits.
+  const reversed: ESTreeNode[] = [];
   const reversedAncestry = (): ESTreeNode[] => {
+    reversed.length = ancestry.length;
     if (ancestry.length === 0) return ancestry;
-    const out = new Array<ESTreeNode>(ancestry.length);
     for (let i = 0; i < ancestry.length; i++)
-      out[i] = ancestry[ancestry.length - 1 - i];
-    return out;
+      reversed[i] = ancestry[ancestry.length - 1 - i];
+    return reversed;
   };
   const result: VisitResult = { cancelled: false, visitedNodes: 0 };
   const errH = opts.onListenerError;
@@ -710,117 +723,55 @@ export function visit(
     merged.esqueryByType.enterWildcard.length > 0 ||
     merged.esqueryByType.exitWildcard.length > 0;
 
-  // Inline helpers — closures over loop-stable state for hot path.
-  // Bare-type entries (`isSimple: true`, `selector: null`) skip the
-  // `esquery.matches` step entirely — the by-type bucket lookup
-  // already filtered to nodes whose type matches the selector.
+  // One dispatcher per visit keeps node-specific closures out of the hot path.
+  const fire = (
+    entry: EsqEntry,
+    node: ESTreeNode,
+    ancestors: ESTreeNode[],
+  ): void => {
+    if (!entry.isSimple) {
+      let matched: boolean;
+      try {
+        matched = esquery().matches(node, entry.selector!, ancestors);
+      } catch (err) {
+        // Attribute a bad selector to its first listener and keep dispatching.
+        errH?.({
+          ruleName: entry.listeners[0]?.ruleName,
+          selector: entry.raw,
+          node,
+          err,
+        });
+        return;
+      }
+      if (!matched) return;
+    }
+    for (const listener of entry.listeners) {
+      try {
+        listener.fn(node);
+      } catch (err) {
+        errH?.({
+          ruleName: listener.ruleName,
+          selector: entry.raw,
+          node,
+          err,
+        });
+      }
+    }
+  };
+
   const fireEnter = (node: ESTreeNode): void => {
-    const enterByType = merged.esqueryByType.enter.get(node.type);
-    const enterWild = merged.esqueryByType.enterWildcard;
-    if ((enterByType && enterByType.length > 0) || enterWild.length > 0) {
-      const esq = esquery();
-      const rev = reversedAncestry();
-      const fire = (e: EsqEntry): void => {
-        // Bare-type entries: by-type bucket guarantees a match, fire
-        // listeners directly.
-        if (e.isSimple) {
-          for (const tl of e.listeners) {
-            try {
-              tl.fn(node);
-            } catch (err) {
-              errH?.({ ruleName: tl.ruleName, selector: e.raw, node, err });
-            }
-          }
-          return;
-        }
-        // `esq.matches` itself can throw for poorly-formed selectors
-        // (e.g. unknown pseudo-class names). Without this outer
-        // try/catch the throw escapes `fire` → `fireEnter` → `dfs` →
-        // `visit` → `lintFile`, killing every diagnostic on the file
-        // for what is really a single bad selector. Surface it via
-        // `errH` (per-rule error channel) and skip the entry so the
-        // remaining selectors and listeners still run.
-        //
-        // `e.selector` is non-null on this branch — `isSimple` is the
-        // only flag that sets it to null and that case returned above.
-        let matched: boolean;
-        try {
-          matched = esq.matches(node, e.selector!, rev);
-        } catch (err) {
-          // Attribute the failure to the FIRST listener registered
-          // under the bad selector — every listener in `e.listeners`
-          // came in via the same selector, so any of them is a fair
-          // pointer back to the rule that registered it.
-          errH?.({
-            ruleName: e.listeners[0]?.ruleName,
-            selector: e.raw,
-            node,
-            err,
-          });
-          return;
-        }
-        if (matched) {
-          for (const tl of e.listeners) {
-            try {
-              tl.fn(node);
-            } catch (err) {
-              errH?.({ ruleName: tl.ruleName, selector: e.raw, node, err });
-            }
-          }
-        }
-      };
-      // Merge byType and wildcard buckets by specificity (both are
-      // already individually sorted at mergeListeners time). ESLint
-      // v10's NodeEventGenerator dispatches all matching selectors
-      // through ONE specificity-sorted list per node — pre-fix runner
-      // ran byType fully and then wildcard fully, inverting the
-      // observation order for any wildcard with lower specificity
-      // than a sibling by-type selector on the same node.
-      mergeByLinearMerge(enterByType, enterWild, fire);
+    const byType = merged.esqueryByType.enter.get(node.type);
+    const wild = merged.esqueryByType.enterWildcard;
+    if ((byType && byType.length > 0) || wild.length > 0) {
+      mergeByLinearMerge(byType, wild, node, reversedAncestry(), fire);
     }
   };
 
   const fireExit = (node: ESTreeNode): void => {
-    const exitByType = merged.esqueryByType.exit.get(node.type);
-    const exitWild = merged.esqueryByType.exitWildcard;
-    if ((exitByType && exitByType.length > 0) || exitWild.length > 0) {
-      const esq = esquery();
-      const rev = reversedAncestry();
-      const fire = (e: EsqEntry): void => {
-        if (e.isSimple) {
-          for (const tl of e.listeners) {
-            try {
-              tl.fn(node);
-            } catch (err) {
-              errH?.({ ruleName: tl.ruleName, selector: e.raw, node, err });
-            }
-          }
-          return;
-        }
-        // Same throw-isolation rationale as fireEnter — see comment above.
-        let matched: boolean;
-        try {
-          matched = esq.matches(node, e.selector!, rev);
-        } catch (err) {
-          errH?.({
-            ruleName: e.listeners[0]?.ruleName,
-            selector: e.raw,
-            node,
-            err,
-          });
-          return;
-        }
-        if (matched) {
-          for (const tl of e.listeners) {
-            try {
-              tl.fn(node);
-            } catch (err) {
-              errH?.({ ruleName: tl.ruleName, selector: e.raw, node, err });
-            }
-          }
-        }
-      };
-      mergeByLinearMerge(exitByType, exitWild, fire);
+    const byType = merged.esqueryByType.exit.get(node.type);
+    const wild = merged.esqueryByType.exitWildcard;
+    if ((byType && byType.length > 0) || wild.length > 0) {
+      mergeByLinearMerge(byType, wild, node, reversedAncestry(), fire);
     }
   };
 
@@ -881,5 +832,6 @@ export function visit(
   };
 
   dfs(root);
+  reversed.length = 0;
   return result;
 }

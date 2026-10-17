@@ -288,10 +288,9 @@ func TestService_BidirectionalLintKeepsReadLoopRunning(t *testing.T) {
 	if !handshakeResult.OK || handshakeResult.Version != Version {
 		t.Fatalf("unexpected handshake response: %+v", handshakeResult)
 	}
-	if len(handshakeResult.Capabilities) != 3 ||
+	if len(handshakeResult.Capabilities) != 2 ||
 		handshakeResult.Capabilities[0] != CapabilityReversePluginLint ||
-		handshakeResult.Capabilities[1] != CapabilityReverseConfigLoad ||
-		handshakeResult.Capabilities[2] != CapabilityPluginLintAttachments {
+		handshakeResult.Capabilities[1] != CapabilityReverseConfigLoad {
 		t.Fatalf("bidirectional handler did not advertise reverse capabilities: %+v", handshakeResult.Capabilities)
 	}
 

@@ -5,23 +5,7 @@
  * `src/ipc/protocol.ts` — the single source the CLI host consumes.
  */
 
-/**
- * ESLint-compatible access values carried to the plugin worker. This mirrors
- * the public config authoring type without coupling the worker build project to
- * the config-loader build project.
- */
-export type GlobalAccess =
-  | boolean
-  | null
-  | 'true'
-  | 'false'
-  | 'readonly'
-  | 'readable'
-  | 'writable'
-  | 'writeable'
-  | 'off';
-
-export type GlobalsConfig = Record<string, GlobalAccess>;
+export type { GlobalAccess, GlobalsConfig } from '../languages/js/types.js';
 
 /**
  * Per-config descriptor handed to the worker pool. Each worker imports

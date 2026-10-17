@@ -31,7 +31,7 @@ import {
   mergeListeners,
   visit,
 } from '../../../src/eslint-plugin/linter/listener-merge.js';
-import type { ESTreeNode } from '../../../src/eslint-plugin/linter/context.js';
+import type { ESTreeNode } from '../../../src/languages/js/types.js';
 
 const require = createRequire(import.meta.url);
 const esquery = require('esquery') as { parse: (s: string) => object };
@@ -110,6 +110,136 @@ describe('visit: esquery match throw is isolated, does not kill file', () => {
     expect(badErr).toBeDefined();
     expect(badErr?.ruleName).toBe('bad-rule');
   });
+});
+
+test('nested visits preserve outer ancestry for later enter and exit selectors', () => {
+  const outer = {
+    type: 'Program',
+    body: [
+      {
+        type: 'FunctionDeclaration',
+        id: { type: 'Identifier', name: 'outer' },
+        params: [],
+        body: {
+          type: 'BlockStatement',
+          body: [
+            {
+              type: 'ExpressionStatement',
+              expression: { type: 'Identifier', name: 'outerRef' },
+            },
+          ],
+        },
+      },
+    ],
+  } as unknown as ESTreeNode;
+  const inner = {
+    type: 'BlockStatement',
+    body: [
+      {
+        type: 'ExpressionStatement',
+        expression: { type: 'Identifier', name: 'innerRef' },
+      },
+    ],
+  } as unknown as ESTreeNode;
+  const events: string[] = [];
+  const innerListeners = mergeListeners([
+    {
+      listeners: {
+        'BlockStatement > ExpressionStatement > Identifier'() {
+          events.push('inner-enter');
+        },
+        'BlockStatement > ExpressionStatement > Identifier:exit'() {
+          events.push('inner-exit');
+        },
+      },
+    },
+  ]);
+  const nested = (phase: string, node: ESTreeNode): void => {
+    if (node.name !== 'outerRef') return;
+    events.push(phase);
+    expect(visit(inner, innerListeners).visitedNodes).toBe(3);
+  };
+  const outerListeners = mergeListeners([
+    {
+      listeners: {
+        Identifier: (node) => nested('outer-bare-enter', node),
+        'Identifier:exit': (node) => nested('outer-bare-exit', node),
+        'FunctionDeclaration > BlockStatement > ExpressionStatement > Identifier'() {
+          events.push('outer-enter');
+        },
+        'FunctionDeclaration > BlockStatement > ExpressionStatement > Identifier:exit'() {
+          events.push('outer-exit');
+        },
+      },
+    },
+  ]);
+  expect(visit(outer, outerListeners)).toEqual({
+    cancelled: false,
+    visitedNodes: 6,
+  });
+  expect(events).toEqual([
+    'outer-bare-enter',
+    'inner-enter',
+    'inner-exit',
+    'outer-enter',
+    'outer-bare-exit',
+    'inner-enter',
+    'inner-exit',
+    'outer-exit',
+  ]);
+});
+
+test('selector attribute getters can nest a visit without changing outer ancestry', () => {
+  const inner = {
+    type: 'Program',
+    body: [
+      {
+        type: 'ExpressionStatement',
+        expression: { type: 'Identifier', name: 'inner' },
+      },
+    ],
+  } as unknown as ESTreeNode;
+  let nestedMatches = 0;
+  const innerListeners = mergeListeners([
+    {
+      listeners: {
+        'Program > ExpressionStatement > Identifier[name="inner"]'() {
+          nestedMatches++;
+        },
+      },
+    },
+  ]);
+  const outer = {
+    type: 'Program',
+    body: [
+      {
+        type: 'ExpressionStatement',
+        expression: {
+          type: 'Identifier',
+          get name() {
+            visit(inner, innerListeners);
+            return 'outer';
+          },
+        },
+      },
+    ],
+  } as unknown as ESTreeNode;
+  const events: string[] = [];
+  const outerListeners = mergeListeners([
+    {
+      listeners: {
+        'Program > ExpressionStatement > Identifier[name="outer"]'() {
+          events.push('enter');
+        },
+        'Program > ExpressionStatement > Identifier[name="outer"]:exit'() {
+          events.push('exit');
+        },
+      },
+    },
+  ]);
+  expect(visit(outer, outerListeners).visitedNodes).toBe(3);
+  expect(events).toEqual(['enter', 'exit']);
+  expect(nestedMatches).toBeGreaterThanOrEqual(2);
 });
 
 /**

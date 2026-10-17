@@ -15,7 +15,7 @@
  *      WITHOUT triggering the full text tokenizer. Shebang lines are
  *      rewritten to type='Shebang'.
  *   3. `buildDiagnostic({ lsoCache, descriptor: { loc } })` reuses the
- *      supplied lso array. The expensive `buildLineStartOffsetsLocal`
+ *      supplied lso array. The expensive `buildLineStartOffsets`
  *      fallback path runs only when `lsoCache` is absent.
  *   4. `mergeListeners` returns an `esqueryByType` map keyed by
  *      statically-extracted anchor types, with non-typeable selectors
@@ -29,9 +29,10 @@ import { describe, test, expect } from 'rstack/test';
 import { createSourceCode } from '../../../src/eslint-plugin/source-code/source-code.js';
 import { createRuleContext } from '../../../src/eslint-plugin/linter/context.js';
 import { buildDiagnostic } from '../../../src/eslint-plugin/linter/diagnostic-builder.js';
-import { buildLineStartOffsets } from '../../../src/eslint-plugin/ast/normalize-ast.js';
+import { buildLineStartOffsets } from '../../../src/languages/js/positions.js';
 import { makeFixer } from '../../../src/eslint-plugin/linter/fixer.js';
-import type { ESTreeNode } from '../../../src/eslint-plugin/source-code/source-code.js';
+import { projectSyntax } from '../../languages/js/project-frame.js';
+import type { ESTreeNode } from '../../../src/languages/js/types.js';
 
 // Minimal node helper for synthesizing ASTs in these tests. We don't
 // need real oxc output — just a `type` + `range` is enough for the
@@ -45,6 +46,167 @@ function mkNode(type: string, start: number, end: number): ESTreeNode {
     end,
   };
 }
+
+describe('singular token queries share mutable objects with full streams', () => {
+  const makeSource = (text: string) => {
+    const parsed = projectSyntax('tokens.ts', text, 'module');
+    return createSourceCode({
+      text,
+      ast: parsed.ast,
+      scopeManagerFactory: () => ({}),
+      parsedTokens: {
+        types: parsed.tokenTypes,
+        starts: parsed.tokenStarts,
+        ends: parsed.tokenEnds,
+      },
+      parsedComments: parsed.comments,
+    });
+  };
+
+  test('lazy and full-stream queries agree at every offset and skip', () => {
+    const text = String.raw`const \u0061 = /ab/gi; /* gap */ const b = '😀';`;
+    const lazy = makeSource(text);
+    const eager = makeSource(text);
+    const program = mkNode('Program', 0, text.length);
+    eager.getTokens(program);
+    const methods = [
+      'getTokenBefore',
+      'getTokenAfter',
+      'getFirstToken',
+      'getLastToken',
+    ] as const;
+    for (let start = 0; start <= text.length; start++) {
+      for (let end = start; end <= text.length; end++) {
+        const node = mkNode('Probe', start, end);
+        for (const method of methods) {
+          for (const skip of [0, 1, 2, 100, 1.5, NaN]) {
+            expect(lazy[method](node, skip)).toEqual(eager[method](node, skip));
+          }
+        }
+      }
+    }
+  });
+
+  test('bounded token arrays match full streams with filters and comments', () => {
+    const text = 'const first = 1; /* gap */ const second = 2;';
+    const lazy = makeSource(text);
+    const eager = makeSource(text);
+    const program = mkNode('Program', 0, text.length);
+    eager.getTokens(program);
+    const methods = [
+      'getTokensBefore',
+      'getTokensAfter',
+      'getFirstTokens',
+      'getLastTokens',
+    ] as const;
+    for (let start = 0; start <= text.length; start++) {
+      for (let end = start; end <= text.length; end++) {
+        const node = mkNode('Probe', start, end);
+        for (const method of methods) {
+          for (const count of [0, 1, 2, 100, Infinity, NaN]) {
+            expect(lazy[method](node, count)).toEqual(
+              eager[method](node, count),
+            );
+            const options = {
+              count,
+              includeComments: true,
+              filter: (token: { type: string }) => token.type !== 'Punctuator',
+            };
+            expect(lazy[method](node, options)).toEqual(
+              eager[method](node, options),
+            );
+          }
+        }
+      }
+    }
+  });
+
+  test('range, value and location mutations survive full materialization', () => {
+    const sc = makeSource('let first = 1; let second = 2;');
+    const program = mkNode('Program', 0, sc.text.length);
+    const first = sc.getFirstToken(program)!;
+    expect(sc.getFirstToken(program)).toBe(first);
+    first.range[0] = 1;
+    first.range[1] = 2;
+    first.value = 'changed';
+    first.loc.start.column = 99;
+    const probe = mkNode('Probe', 0, 2);
+    expect(sc.getFirstToken(probe)).toBe(first);
+    expect(sc.getLastToken(probe)).toBe(first);
+    expect(sc.getTokenBefore(mkNode('Probe', 2, 2))).toBe(first);
+    expect(sc.getTokens(program)[0]).toBe(first);
+    expect(sc.getFirstToken(probe)).toBe(first);
+    expect(first.value).toBe('changed');
+    expect(first.loc.start.column).toBe(99);
+    // With no comments the public merged stream aliases the token array.
+    // Mutating that array must still affect later singular queries.
+    const stream = sc.tokensAndComments as unknown as Array<typeof first>;
+    stream.shift();
+    expect(sc.getFirstToken(program)).toBe(stream[0]);
+    expect(sc.getLastToken(program)).toBe(stream.at(-1));
+  });
+
+  test('filters and comment streams reuse tokens returned by singular queries', () => {
+    const sc = makeSource('const first = 1; /* gap */ const second = 2;');
+    const program = mkNode('Program', 0, sc.text.length);
+    const last = sc.getLastToken(program)!;
+    last.value = 'changed';
+    const comments = sc.getAllComments();
+    expect(
+      sc.getLastToken(program, (token) => {
+        expect(sc.getTokens(program).at(-1)).toBe(last);
+        return token === last;
+      }),
+    ).toBe(last);
+    const stream = sc.getTokens(program, { includeComments: true });
+    expect(stream.at(-1)).toBe(last);
+    expect(stream).toContain(comments[0]);
+    expect(sc.getLastToken(program, { includeComments: true })).toBe(last);
+  });
+
+  test('a filter returns its original candidate after mutating the public stream', () => {
+    const sc = makeSource('const first = 1; /* gap */ const second = 2;');
+    const program = mkNode('Program', 0, sc.text.length);
+    let selected: ReturnType<typeof sc.getFirstToken> = null;
+    const result = sc.getFirstToken(program, {
+      includeComments: true,
+      filter(token) {
+        selected = token;
+        const stream = sc.tokensAndComments as unknown as Array<typeof token>;
+        stream.shift();
+        return true;
+      },
+    });
+    expect(result).toBe(selected);
+    expect(result!.value).toBe('const');
+    expect(sc.getFirstToken(program, { includeComments: true })!.value).toBe(
+      'first',
+    );
+  });
+
+  test('comment mutations preserve the established merge order', () => {
+    const text = 'first(); /* gap */ second();';
+    const lazy = makeSource(text);
+    const eager = makeSource(text);
+    const program = mkNode('Program', 0, text.length);
+    const beforeSecond = mkNode('Probe', text.indexOf('second'), text.length);
+    const fromLazy = lazy.getTokenBefore(beforeSecond, {
+      includeComments: true,
+    })!;
+    const fromEager = eager.getTokenBefore(beforeSecond, {
+      includeComments: true,
+    })!;
+    expect(fromLazy.type).toBe('Block');
+    fromLazy.range[0] = 0;
+    fromEager.range[0] = 0;
+    fromLazy.value = 'changed';
+    fromEager.value = 'changed';
+    expect(lazy.getTokens(program, { includeComments: true })).toEqual(
+      eager.getTokens(program, { includeComments: true }),
+    );
+    expect(lazy.getAllComments()[0]).toBe(fromLazy);
+  });
+});
 
 // ────────────────────────────────────────────────────────────────────
 // 1. shared SourceCode across rule contexts
@@ -308,7 +470,7 @@ describe('buildDiagnostic reuses lsoCache for descriptor.loc path', () => {
     expect(diag!.startPos).toBe(103);
   });
 
-  test('falls back to buildLineStartOffsetsLocal when no lsoCache supplied', () => {
+  test('falls back to buildLineStartOffsets when no lsoCache supplied', () => {
     // No cache → reconstruct lso from text. Verify the descriptor.loc
     // path still works correctly (this is the legacy compatibility
     // path for unit tests / external API callers that don't have an

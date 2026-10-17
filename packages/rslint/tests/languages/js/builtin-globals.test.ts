@@ -10,18 +10,15 @@ import { fileURLToPath } from 'node:url';
 import {
   ECMASCRIPT_GLOBALS,
   LATEST_ECMASCRIPT_VERSION,
-} from '../../../src/eslint-plugin/ast/builtin-globals.js';
+} from '../../../src/languages/js/builtin-globals.js';
 import {
   makeScopeManagerFactory,
   seedEcmaGlobals,
   seedGlobals,
-} from '../../../src/eslint-plugin/ast/scope-factory.js';
-import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
-import {
-  buildLineStartOffsets,
-  normalizeAst,
-} from '../../../src/eslint-plugin/ast/normalize-ast.js';
-import type { ESTreeNode } from '../../../src/eslint-plugin/linter/context.js';
+} from '../../../src/languages/js/scope-factory.js';
+import { projectSyntax } from './project-frame.js';
+import { buildLineStartOffsets } from '../../../src/languages/js/positions.js';
+import type { ESTreeNode } from '../../../src/languages/js/types.js';
 
 interface ProbeVariable {
   name: string;
@@ -48,9 +45,9 @@ function analyzeTypeScriptSource(
   ecmaVersion: number | 'latest',
   globals?: Record<string, 'readonly' | 'writable' | 'off'>,
 ): ProbeScopeManager {
-  const parsed = nativeParse('probe.ts', source, 'script', false);
-  const ast = JSON.parse(parsed.program) as ESTreeNode;
-  normalizeAst(ast, buildLineStartOffsets(source), source);
+  const parsed = projectSyntax('probe.ts', source, 'script');
+  const ast = parsed.ast as ESTreeNode;
+
   const scopeManager = makeScopeManagerFactory(ast, {
     filePath: 'probe.ts',
     sourceType: 'script',

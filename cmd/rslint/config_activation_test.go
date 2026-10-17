@@ -108,7 +108,7 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 					}
 					return activationError
 				},
-			}, func(_ context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			}, linter.EslintPluginDispatchFunc(func(_ context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 				dispatches++
 				if calls != 1 {
 					t.Error("plugin dispatch did not await activation")
@@ -118,7 +118,7 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 					results[index].FilePath = file.Path
 				}
 				return &linter.EslintPluginLintResult{Results: results}, nil
-			})
+			}))
 			if calls != 1 {
 				t.Fatalf("activation joins = %d, want 1", calls)
 			}

@@ -6,43 +6,13 @@
  * wiring the public object.
  */
 
-import type {
-  ESTreeNode,
-  TokenCountOpts,
-  TokenSkipOpts,
-} from './source-code.js';
+import type { TokenCountOpts, TokenSkipOpts } from './source-code.js';
+import type { ESTreeNode } from '../../languages/js/types.js';
 import {
   spanIndexStartingAtOrAfter,
   spanIndexEndingAtOrBefore,
   type Token,
-} from './token-builder.js';
-
-// ─────────────────────────────────────────────────────────────────────
-// Line-start offset lookup — shared safe accessor for `lso[line - 1]`
-// ─────────────────────────────────────────────────────────────────────
-
-/**
- * Return the byte offset where `line1Based` starts. Clamps both ends so
- * out-of-range inputs (a rule reporting `loc.line` beyond EOF, line < 1)
- * resolve to a safe in-range offset instead of `undefined`.
- *
- *   line < 1                        → 0
- *   line > lso.length               → textLength
- *   otherwise                       → lso[line - 1]
- *
- * Centralising this avoids each call site re-deriving the clamp; a prior
- * inline `lso[Math.max(0, line - 1)]` only clamped the low end and let
- * NaN/undefined propagate into diagnostic ranges.
- */
-export function lineStartOffset(
-  lso: readonly number[],
-  line1Based: number,
-  textLength: number,
-): number {
-  if (line1Based <= 0) return 0;
-  if (line1Based - 1 >= lso.length) return textLength;
-  return lso[line1Based - 1];
-}
+} from '../../languages/js/token-builder.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Token-option normalizers — shape the polymorphic ESLint inputs

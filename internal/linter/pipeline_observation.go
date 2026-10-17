@@ -76,7 +76,7 @@ func prepareObservation(
 	targetSyntaxBlocked := stopOnTargetSyntaxErrors && plan != nil && plan.HasSyntacticDiagnostics()
 	pluginWork := pluginTask{failure: policy.PluginFailure}
 	if !targetSyntaxBlocked {
-		pluginWork, err = materializePluginTask(plan, generation, snapshot, policy, detachedPlugin, planChanges)
+		pluginWork, err = materializePluginTask(ctx, plan, generation, snapshot, policy, detachedPlugin, planChanges)
 		if err != nil {
 			return preparedObservation{}, err
 		}
@@ -88,10 +88,13 @@ func prepareObservation(
 	if err != nil {
 		return preparedObservation{}, err
 	}
-	if !planChanges {
-		for index := range pluginWork.inputs {
-			input := &pluginWork.inputs[index]
-			input.SourceFile = diagnosticTextSource(input.SourceFile)
+	for index := range pluginWork.inputs {
+		input := &pluginWork.inputs[index]
+		if input.SourceFile != nil {
+			input.DiagnosticSource = input.SourceFile
+			if !planChanges {
+				input.DiagnosticSource = diagnosticTextSource(input.SourceFile)
+			}
 		}
 	}
 	prepared := preparedObservation{

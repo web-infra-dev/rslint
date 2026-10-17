@@ -20,15 +20,15 @@
 
 import { describe, test, expect } from 'rstack/test';
 
-import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
+import { projectSyntax } from '../../languages/js/project-frame.js';
 
 import { createSourceCode } from '../../../src/eslint-plugin/source-code/source-code.js';
-import type { ESTreeNode } from '../../../src/eslint-plugin/source-code/source-code.js';
+import type { ESTreeNode } from '../../../src/languages/js/types.js';
 import {
   spanIndexEndingAtOrBefore,
   type Comment,
   type Token,
-} from '../../../src/eslint-plugin/source-code/token-builder.js';
+} from '../../../src/languages/js/token-builder.js';
 import { paddedTokenSlice } from '../../../src/eslint-plugin/source-code/source-code-helpers.js';
 
 // Same shape as `token-padding.test.ts`'s helper: a real native parse so
@@ -42,7 +42,7 @@ function mkSC(text: string) {
     range: [0, text.length] as [number, number],
     loc: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
   } as unknown as ESTreeNode;
-  const parsed = nativeParse('test.ts', text, 'module', false);
+  const parsed = projectSyntax('test.ts', text, 'module');
   return createSourceCode({
     text,
     ast,
