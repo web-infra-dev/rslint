@@ -1478,14 +1478,14 @@ func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
 				t,
 				dir,
 				args,
-				func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+				linter.EslintPluginDispatchFunc(func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 					request = got
 					results := make([]linter.EslintPluginFileResult, len(got.Files))
 					for index, file := range got.Files {
 						results[index].FilePath = file.Path
 					}
 					return &linter.EslintPluginLintResult{Results: results}, nil
-				},
+				}),
 			)
 			if code != 0 || len(request.Files) != 1 {
 				t.Fatalf("CLI plugin request failed: code=%d request=%+v stdout=%q stderr=%q", code, request, stdout, stderr)

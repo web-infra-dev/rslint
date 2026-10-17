@@ -1512,3 +1512,282 @@ func TestChannel_CloseDoesNotBlockOnReader(t *testing.T) {
 	default:
 	}
 }
+
+func TestChannelRequestOutputPublishesDirectStorage(t *testing.T) {
+	client, peer := newChannelPair(t)
+	pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+2*MemorySlotSize)}}
+	client.memory = pool
+	client.memoryInitialized = true
+	client.Start()
+	output, err := client.NewRequestOutput(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer output.Close()
+	first := output.Allocate(19)
+	copy(first, []byte("direct frame bytes!"))
+	discarded := output.Allocate(23)
+	output.Discard(discarded)
+	second := output.Allocate(MemorySlotSize + 7)
+	for i := range second {
+		second[i] = byte(i)
+	}
+	if &first[0] != &pool.mapping.data[MemoryHeaderSize] {
+		t.Fatal("output was not allocated in the transport mapping")
+	}
+	if !pool.slots[0].reserved || pool.slots[0].busy || pool.slots[0].generation != 0 {
+		t.Fatal("unpublished output acquired a reader generation")
+	}
+	values := []Attachment{output.Bytes(first), Text("inline value"), output.Bytes(second)}
+	expected := [][]byte{bytes.Clone(first), bytes.Clone(second)}
+	done := make(chan error, 1)
+	go func() {
+		request, err := ReadFrame(peer.reader)
+		if err != nil {
+			done <- err
+			return
+		}
+		if request.Transport == nil || len(request.Transport.Batches) != 2 {
+			done <- errors.New("missing direct output batches")
+			return
+		}
+		if request.Attachments[0].Range.Offset != 0 || request.Attachments[2].Range.Offset != uint32(len(first)) {
+			done <- errors.New("output ranges are not contiguous")
+			return
+		}
+		for i, index := range []int{0, 2} {
+			if got := readMemoryRange(t, pool, request.Transport.Batches, *request.Attachments[index].Range); !bytes.Equal(got, expected[i]) {
+				done <- errors.New("direct bytes changed during publication")
+				return
+			}
+		}
+		done <- peer.writeFrame(&Message{Kind: KindResponse, ID: request.ID, Transport: &TransportMetadata{Released: request.Transport.Batches}})
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, err := client.SendRequest(ctx, "output", nil, values...); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	for i, slot := range pool.slots {
+		if slot.busy || slot.reserved {
+			t.Fatalf("slot %d survived acknowledgement", i)
+		}
+	}
+	if !output.published || pool.writers != 0 {
+		t.Fatal("publication did not end the producer borrow")
+	}
+	if err := output.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.SendRequest(ctx, "stale", nil, values...); err == nil {
+		t.Fatal("closed output was published twice")
+	}
+}
+
+func TestChannelRequestOutputRollbackAndClose(t *testing.T) {
+	t.Run("fragmented blocks preserve logical attachment order", func(t *testing.T) {
+		client, _ := newChannelPair(t)
+		pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+3*MemorySlotSize)}}
+		client.memory = pool
+		pool.slots[1] = memorySlot{busy: true, generation: 1, length: 1}
+		out, err := client.NewRequestOutput(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer out.Close()
+		first := out.Allocate(MemorySlotSize - 3)
+		second := out.Allocate(8)
+		copy(first, "first")
+		copy(second, "second!!")
+		msg := &Message{}
+		batches, err := attachOutput(msg, pool, []Attachment{out.Bytes(first), Bytes([]byte("inline")), out.Bytes(second)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(batches) != 2 || batches[0].Slot != 0 || batches[1].Slot != 2 || msg.Attachments[1].Bytes == nil {
+			t.Fatalf("fragmented storage lost its physical or inline layout: %+v", msg)
+		}
+		if got := readMemoryRange(t, pool, batches, *msg.Attachments[2].Range); !bytes.Equal(got, []byte("second!!")) {
+			t.Fatalf("fragmented logical range read %q", got)
+		}
+		if msg.Attachments[2].Range.Offset != uint32(len(first)) {
+			t.Fatal("unused physical tail became a logical gap")
+		}
+		pool.release(batches)
+		if !pool.slots[1].busy || pool.slots[0].busy || pool.slots[2].busy {
+			t.Fatal("acknowledgement changed another request's slot")
+		}
+	})
+	t.Run("invalid publication is atomic", func(t *testing.T) {
+		for _, mode := range []string{"reordered", "duplicate", "unused", "different owners"} {
+			t.Run(mode, func(t *testing.T) {
+				client, _ := newChannelPair(t)
+				pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+2*MemorySlotSize)}}
+				client.memory = pool
+				out, err := client.NewRequestOutput(context.Background())
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer out.Close()
+				a, b := out.Bytes(out.Allocate(4)), out.Bytes(out.Allocate(5))
+				values := []Attachment{a, b}
+				switch mode {
+				case "reordered":
+					values = []Attachment{b, a}
+				case "duplicate":
+					values = []Attachment{a, a}
+				case "unused":
+					values = []Attachment{a}
+				case "different owners":
+					other, err := client.NewRequestOutput(context.Background())
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer other.Close()
+					values = append(values, other.Bytes(other.Allocate(4)))
+				}
+				if _, err := attachOutput(&Message{}, pool, values); err == nil {
+					t.Fatal("invalid publication succeeded")
+				}
+				for _, slot := range pool.slots {
+					if slot.busy || slot.generation != 0 {
+						t.Fatal("rejected publication exposed a partial batch")
+					}
+				}
+			})
+		}
+	})
+	t.Run("publication ends the producer borrow before acknowledgement", func(t *testing.T) {
+		client, _ := newChannelPair(t)
+		unmapped := false
+		pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+MemorySlotSize), unmap: func() error { unmapped = true; return nil }}}
+		client.memory = pool
+		out, err := client.NewRequestOutput(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer out.Close()
+		if _, err := attachOutput(&Message{}, pool, []Attachment{out.Bytes(out.Allocate(4))}); err != nil {
+			t.Fatal(err)
+		}
+		if !pool.slots[0].busy || pool.writers != 0 {
+			t.Fatal("reader ownership still pins a Go producer")
+		}
+		if err := client.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if !unmapped {
+			t.Fatal("published output kept the closed mapping alive")
+		}
+	})
+	t.Run("page commit failure leaves no reservation", func(t *testing.T) {
+		client, _ := newChannelPair(t)
+		pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+2*MemorySlotSize), commitSlot: func(slot int) error {
+			if slot == 1 {
+				return errors.New("page commit failed")
+			}
+			return nil
+		}}}
+		client.memory = pool
+		out, err := client.NewRequestOutput(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer out.Close()
+		data := out.Allocate(MemorySlotSize + 1)
+		if out.Bytes(data).output != nil {
+			t.Fatal("commit failure did not use owned output")
+		}
+		for _, slot := range pool.slots {
+			if slot.busy || slot.reserved || slot.generation != 0 {
+				t.Fatal("commit failure retained a partial reservation")
+			}
+		}
+	})
+	t.Run("rollback reuses unpublished bytes", func(t *testing.T) {
+		client, _ := newChannelPair(t)
+		pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+MemorySlotSize)}}
+		client.memory = pool
+		out, err := client.NewRequestOutput(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		a := out.Allocate(4)
+		out.Discard(a)
+		b := out.Allocate(4)
+		if &a[0] != &b[0] {
+			t.Fatal("failed output was not rolled back")
+		}
+		if err := out.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if pool.slots[0].reserved || pool.slots[0].busy || pool.slots[0].generation != 0 || pool.writers != 0 {
+			t.Fatal("unpublished output leaked a reservation")
+		}
+	})
+	t.Run("shutdown pins an active writer", func(t *testing.T) {
+		client, _ := newChannelPair(t)
+		unmapped := false
+		pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+MemorySlotSize), unmap: func() error { unmapped = true; return nil }}}
+		client.memory = pool
+		out, err := client.NewRequestOutput(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		data := out.Allocate(4)
+		if err := client.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if unmapped {
+			t.Fatal("channel unmapped an active encoder's output")
+		}
+		copy(data, "safe")
+		if err := out.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if !unmapped || pool.mapping.data != nil || pool.writers != 0 {
+			t.Fatal("last writer did not release the closed mapping")
+		}
+	})
+	t.Run("cancel before publication", func(t *testing.T) {
+		client, _ := newChannelPair(t)
+		pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+MemorySlotSize)}}
+		client.memory = pool
+		ctx, cancel := context.WithCancel(context.Background())
+		out, err := client.NewRequestOutput(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		value := out.Bytes(out.Allocate(8))
+		cancel()
+		if _, err := client.SendRequest(ctx, "cancel", nil, value); !errors.Is(err, context.Canceled) {
+			t.Fatal(err)
+		}
+		if err := out.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if pool.slots[0].reserved || pool.slots[0].busy || pool.slots[0].generation != 0 {
+			t.Fatal("cancellation published or retained storage")
+		}
+	})
+	t.Run("full mapping keeps owned inline bytes", func(t *testing.T) {
+		client, _ := newChannelPair(t)
+		pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+MemorySlotSize)}}
+		client.memory = pool
+		pool.slots[0].busy = true
+		out, err := client.NewRequestOutput(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer out.Close()
+		data := out.Allocate(5)
+		copy(data, "owned")
+		value := out.Bytes(data)
+		if value.output != nil || !bytes.Equal(value.bytes, []byte("owned")) {
+			t.Fatal("full mapping did not preserve owned output")
+		}
+	})
+}

@@ -116,14 +116,45 @@ type EslintPluginLintResult struct {
 	Results []EslintPluginFileResult `json:"results"`
 }
 
-// EslintPluginDispatcher sends one batch reverse-request to the Node host
+// EslintPluginDispatcher opens an output/dispatch scope for each request to the Node host
 // and returns its result. It must honor ctx and return after cancellation.
 // Concurrent pipeline work joins dispatch before ending its producer lease;
 // detached inputs need no generation borrow. The CLI uses the generic IPC
 // channel; the LSP server over an `rslint/pluginLint` request.
-// Frame bytes are immutable until return; a dispatcher retaining bytes beyond
-// that boundary must copy them. Already frozen input frames are never recycled.
-type EslintPluginDispatcher func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error)
+// Dispatch borrows owned frames until return, or consumes allocator-owned frames
+// during publication. Callers do not inspect frames after entering Dispatch.
+// A dispatcher retaining owned bytes after return must copy them. Already frozen
+// input frames keep their independent ownership.
+type EslintPluginDispatcher interface {
+	OpenBatch(ctx context.Context) (*EslintPluginBatch, error)
+}
+
+// EslintPluginBatch owns the output borrow for one projection window. A nil
+// Allocate uses the scheduler's owned output cache (for inline/LSP transport).
+// Discard rolls back a failed encoding's last allocation. Release runs exactly
+// once on every path; a provider may end producer access earlier at publication.
+// Storage providers know bytes and requests, never native AST or ESTree schema.
+type EslintPluginBatch struct {
+	Allocate func(int) []byte
+	Discard  func([]byte)
+	Dispatch EslintPluginDispatchFunc
+	Release  func()
+}
+
+// EslintPluginDispatchFunc is the owned-frame adapter used by inline/LSP hosts.
+type EslintPluginDispatchFunc func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error)
+
+func (f EslintPluginDispatchFunc) OpenBatch(ctx context.Context) (*EslintPluginBatch, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if f == nil {
+		return nil, errors.New("plugin dispatcher is nil")
+	}
+	return &EslintPluginBatch{Dispatch: f}, nil
+}
+
+var errPluginWindowFull = errors.New("plugin ESTree window is full")
 
 // EslintPluginFileInput is the linter's generation-local representation of one
 // plugin-lint input before wire batching.
@@ -531,18 +562,38 @@ func dispatchOneBatch(
 		}
 	}
 	defer releaseBuilder()
-	var pending *EslintPluginFileInput
+	var output *EslintPluginBatch
+	releaseOutput := func() {
+		current := output
+		output = nil
+		if current != nil && current.Release != nil {
+			current.Release()
+		}
+	}
+	defer releaseOutput()
 	for offset := 0; offset < len(batch); {
 		if err := ctx.Err(); err != nil {
 			return err
+		}
+		var outputErr error
+		output, outputErr = dispatch.OpenBatch(ctx)
+		if outputErr != nil {
+			return outputErr
+		}
+		if output == nil || output.Dispatch == nil {
+			return errors.New("plugin dispatcher returned an invalid batch")
 		}
 		window := make([]EslintPluginFileInput, 0, min(pluginWindowFiles, len(batch)-offset))
 		bytes := 0
 		for offset < len(batch) && len(window) < pluginWindowFiles {
 			input := batch[offset]
-			if pending != nil {
-				input = *pending
-				pending = nil
+			if input.Frame != nil && len(window) > 0 && bytes+len(input.Frame) > pluginWindowBytes {
+				break
+			}
+			if input.Frame != nil && output.Allocate != nil {
+				data := output.Allocate(len(input.Frame))
+				copy(data, input.Frame)
+				input.Frame = data
 			}
 			if input.DiagnosticSource == nil && input.SourceFile != nil {
 				input.DiagnosticSource = input.SourceFile
@@ -555,13 +606,26 @@ func dispatchOneBatch(
 						builder = new(pluginProjectionBuffers)
 					}
 				}
+				var allocated []byte
 				frame, projectErr := projectPluginFrame(ctx, &builder.syntax, input, func(size int) []byte {
 					if len(window) > 0 && bytes+size > pluginWindowBytes {
-						return make([]byte, size)
+						panic(errPluginWindowFull)
+					}
+					if output.Allocate != nil {
+						allocated = output.Allocate(size)
+						return allocated
 					}
 					return builder.allocate(size)
 				})
 				if projectErr != nil {
+					if allocated != nil && output.Discard != nil {
+						output.Discard(allocated)
+					}
+					// The frame was sized before allocation. Leave this input untouched
+					// and rebuild it in the next window; no transport lease crosses windows.
+					if errors.Is(projectErr, errPluginWindowFull) {
+						break
+					}
 					if ctx.Err() != nil {
 						return ctx.Err()
 					}
@@ -579,15 +643,12 @@ func dispatchOneBatch(
 				offset++
 				continue
 			}
-			if len(window) > 0 && bytes+len(input.Frame) > pluginWindowBytes {
-				pending = &input
-				break
-			}
 			window = append(window, input)
 			bytes += len(input.Frame)
 			offset++
 		}
 		if len(window) == 0 {
+			releaseOutput()
 			continue
 		}
 		ready := make([]EslintPluginFileInput, 0, len(window))
@@ -602,6 +663,7 @@ func dispatchOneBatch(
 			}
 		}
 		if len(ready) == 0 {
+			releaseOutput()
 			if err := applyEslintPluginResults(window, failures, timing, onDiagnostic, onNotice); err != nil {
 				return err
 			}
@@ -627,8 +689,8 @@ func dispatchOneBatch(
 			return errors.New("plugin frame batch exceeds IPC message limit")
 		}
 		// Results use source/rule metadata. Drop their frame references and
-		// oversized scratch buffers before dispatch. The bounded output blocks stay
-		// exclusively leased to this request until dispatch has finished.
+		// oversized scratch buffers before dispatch. Owned output remains borrowed
+		// until return; shared publication consumes the producer's byte access.
 		for index := range window {
 			window[index].Frame = nil
 		}
@@ -638,7 +700,8 @@ func dispatchOneBatch(
 		if builder != nil {
 			builder.reset()
 		}
-		res, dispatchErr := dispatch(ctx, req)
+		res, dispatchErr := output.Dispatch(ctx, req)
+		releaseOutput()
 		releaseBuilder()
 		if dispatchErr != nil || res == nil {
 			if err := applyEslintPluginResults(failed, failures, timing, onDiagnostic, onNotice); err != nil {

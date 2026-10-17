@@ -52,7 +52,7 @@ func deriveLSPRuleCatalog(
 //
 // Called from the main dispatch loop (pushDiagnostics) before spawning the
 // plugin goroutine, so the lazy assignment never races.
-func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatcher {
+func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatchFunc {
 	if s.eslintPluginDispatch == nil {
 		s.eslintPluginDispatch = func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 			raw, err := s.sendRequest(ctx, methodPluginLint, req)
@@ -245,7 +245,7 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 	}
 }
 
-func (s *Server) pluginDispatchForGeneration(generation string) linter.EslintPluginDispatcher {
+func (s *Server) pluginDispatchForGeneration(generation string) linter.EslintPluginDispatchFunc {
 	dispatch := s.installEslintPluginDispatch()
 	return func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		req.Generation = generation
@@ -260,7 +260,7 @@ func (s *Server) pluginDispatchForGeneration(generation string) linter.EslintPlu
 func (s *Server) pluginDispatchWithinBudget(
 	parent context.Context,
 	generation string,
-) (linter.EslintPluginDispatcher, context.CancelFunc) {
+) (linter.EslintPluginDispatchFunc, context.CancelFunc) {
 	timeout := s.pluginReverseTimeout
 	if timeout <= 0 {
 		timeout = defaultPluginReverseTimeout

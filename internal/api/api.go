@@ -232,6 +232,7 @@ type Handler interface {
 // Requester is the reverse-RPC capability exposed to a bidirectional lint
 // handler. ipc.Channel implements it directly.
 type Requester interface {
+	NewRequestOutput(ctx context.Context) (*ipc.RequestOutput, error)
 	SendRequest(ctx context.Context, kind ipc.MessageKind, payload any, attachments ...ipc.Attachment) (*ipc.Message, error)
 }
 

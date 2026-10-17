@@ -58,7 +58,7 @@ func TestPipelineConcurrentPluginStartsBeforeNativeAndPlansProjectedFix(t *testi
 			Plugin: PluginConcurrentJoined,
 		},
 		autofixPolicyForTest(1, AutofixPolicy{}),
-		func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			if request.Files[0].Path != fileName {
 				t.Fatalf("plugin wire path = %q, want Program source path %q", request.Files[0].Path, fileName)
 			}
@@ -74,7 +74,7 @@ func TestPipelineConcurrentPluginStartsBeforeNativeAndPlansProjectedFix(t *testi
 					Fixes:    []EslintPluginFix{{Range: [2]int{0, 1}, Text: "b"}},
 				}},
 			}}}, nil
-		},
+		}),
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -122,11 +122,11 @@ func TestPipelineJoinedModesPropagateCallerCancellation(t *testing.T) {
 					Plugin:        mode,
 					PluginFailure: PluginDiscardOnFailure,
 				},
-				func(dispatchCtx context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				EslintPluginDispatchFunc(func(dispatchCtx context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 					<-nativeFinished
 					cancel()
 					return nil, dispatchCtx.Err()
-				},
+				}),
 			))
 			if !errors.Is(err, context.Canceled) {
 				t.Fatalf("pipeline error = %v, want context.Canceled", err)
@@ -159,9 +159,9 @@ func TestPipelineDoesNotPromoteIndependentPluginBudgetFailure(t *testing.T) {
 			Plugin:        PluginAfterNativeJoined,
 			PluginFailure: PluginDiscardOnFailure,
 		},
-		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			return nil, context.DeadlineExceeded
-		},
+		}),
 	))
 	if err != nil {
 		t.Fatalf("pipeline promoted an independent plugin budget failure: %v", err)
@@ -304,7 +304,7 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 			Plugin: PluginConcurrentJoined,
 		},
 		autofixPolicyForTest(1, AutofixPolicy{VerifyAfterLastRound: true}),
-		func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			dispatches++
 			if len(request.Files) != 2 {
 				dispatchValidationErr = fmt.Errorf("plugin files = %+v", request.Files)
@@ -322,7 +322,7 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 				results[index].FilePath = file.Path
 			}
 			return &EslintPluginLintResult{Results: results}, nil
-		},
+		}),
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -357,9 +357,9 @@ func TestPipelineRejectsDuplicatePluginWirePath(t *testing.T) {
 	_, err := RunPipeline(context.Background(), NewLintRequest(
 		pipelineTestProvider(generation, nil),
 		ObservationPolicy{Plugin: PluginConcurrentJoined},
-		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			return &EslintPluginLintResult{}, nil
-		},
+		}),
 	))
 	if err == nil || !strings.Contains(err.Error(), "duplicate plugin wire path") {
 		t.Fatalf("duplicate wire path error = %v", err)
