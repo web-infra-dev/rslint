@@ -1692,9 +1692,11 @@ then enters the invocation-local cache. A dispatcher
 retaining bytes after return must copy them. The cache never owns Program
 references and cannot reuse an in-flight or lookahead frame. Already frozen LSP
 input frames retain independent ownership and never enter this output cache.
-Projection reuses the SourceFile's existing sparse position map and writes UTF-16
-strings without a temporary code-unit array. Empty wire lists share a single
-record, while each Node-side read still creates an independent mutable array.
+Projection reuses the SourceFile's existing sparse position map. String text is
+staged while frame sizes are counted, then encoded directly into the final frame
+instead of a temporary UTF-16 byte column. Success, failure and cancellation clear every
+staged string reference. Empty wire lists share a single record, while each
+Node-side read still creates an independent mutable array.
 Token coverage uses a private, source-ordered scalar buffer; the scanner walks
 it alongside tokens, preserving the last cover at repeated source positions.
 Parsed compound operators retain their full spans while TypeScript generic
