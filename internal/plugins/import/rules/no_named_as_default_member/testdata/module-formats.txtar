@@ -10,6 +10,8 @@
 {"extends":"./tsconfig.jsx.json","compilerOptions":{"jsx":"react-jsxdev"}}
 -- tsconfig.json-runtime.json --
 {"extends":"./tsconfig.json","compilerOptions":{"resolveJsonModule":true}}
+-- tsconfig.json-runtime-disabled.json --
+{"extends":"./tsconfig.json-runtime.json","compilerOptions":{"resolveJsonModule":false}}
 -- package.json --
 {"type":"module","imports":{"#esm":{"types":"./mapped/esm/index.d.ts","default":"./mapped/esm/index.js"}}}
 -- node_modules/mixed/package.json --
@@ -157,6 +159,36 @@ export const foo: number;
 -- node_modules/json-runtime/data.json --
 {"foo":1}
 -- node_modules/json-runtime/index.d.ts --
+export const foo: number;
+-- node_modules/json-exports/package.json --
+{"name":"json-exports","type":"module","exports":{"types":"./index.d.ts","default":"./data.json"}}
+-- node_modules/json-exports/data.json --
+{"foo":1}
+-- node_modules/json-exports/index.d.ts --
+export const foo: number;
+-- node_modules/json-main-dmts/package.json --
+{"name":"json-main-dmts","main":"./data.json","types":"./index.d.mts"}
+-- node_modules/json-main-dmts/data.json --
+{"foo":1}
+-- node_modules/json-main-dmts/index.d.mts --
+export const foo: number;
+-- node_modules/json-exports-dmts/package.json --
+{"name":"json-exports-dmts","type":"commonjs","exports":{"types":"./index.d.mts","default":"./data.json"}}
+-- node_modules/json-exports-dmts/data.json --
+{"foo":1}
+-- node_modules/json-exports-dmts/index.d.mts --
+export const foo: number;
+-- node_modules/json-main-dcts/package.json --
+{"name":"json-main-dcts","type":"module","main":"./data.json","types":"./index.d.cts"}
+-- node_modules/json-main-dcts/data.json --
+{"foo":1}
+-- node_modules/json-main-dcts/index.d.cts --
+export const foo: number;
+-- node_modules/json-exports-dcts/package.json --
+{"name":"json-exports-dcts","type":"module","exports":{"types":"./index.d.cts","default":"./data.json"}}
+-- node_modules/json-exports-dcts/data.json --
+{"foo":1}
+-- node_modules/json-exports-dcts/index.d.cts --
 export const foo: number;
 -- node_modules/package.d.ts/package.json --
 {"name":"package.d.ts","main":"./index.cjs","types":"./index.d.ts"}

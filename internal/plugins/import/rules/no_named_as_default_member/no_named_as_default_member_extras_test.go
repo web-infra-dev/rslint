@@ -186,10 +186,37 @@ func TestNoNamedAsDefaultMemberModuleFormats(t *testing.T) {
 	}
 	t.Run("json-runtime", func(t *testing.T) {
 		// A CommonJS consumer receives the JSON object itself as its default,
-		// even when declarations expose the object's keys as named exports.
-		rule_tester.RunRuleTester(defaultMemberRoot(t, "testdata/module-formats.txtar"), "tsconfig.json-runtime.json", t, &no_named_as_default_member.NoNamedAsDefaultMemberRule,
-			[]rule_tester.ValidTestCase{{Code: `import obj from 'json-runtime'; obj.foo; const {foo} = obj;`, FileName: "consumer.cts"}}, nil,
-		)
+		// even when declarations expose the object's keys as named exports or
+		// resolveJsonModule disables TypeScript's implicit JSON declarations.
+		for _, config := range []string{"tsconfig.json", "tsconfig.json-runtime.json", "tsconfig.json-runtime-disabled.json"} {
+			t.Run(config, func(t *testing.T) {
+				for _, tc := range []struct {
+					source string
+					warn   bool
+				}{
+					{"json-runtime", false},
+					{"json-exports", false},
+					{"json-main-dmts", false},
+					{"json-exports-dmts", false},
+					{"json-main-dcts", false},
+					{"json-exports-dcts", false},
+					{"dcts-esm", true},
+					{"dmts-cjs", false},
+				} {
+					t.Run(tc.source, func(t *testing.T) {
+						code := "import obj from '" + tc.source + "'; obj.foo; const {foo} = obj;"
+						var valid []rule_tester.ValidTestCase
+						var invalid []rule_tester.InvalidTestCase
+						if tc.warn {
+							invalid = []rule_tester.InvalidTestCase{{Code: code, FileName: "consumer.cts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamedAsDefaultMember"}, {MessageId: "noNamedAsDefaultMember"}}}}
+						} else {
+							valid = []rule_tester.ValidTestCase{{Code: code, FileName: "consumer.cts"}}
+						}
+						rule_tester.RunRuleTester(defaultMemberRoot(t, "testdata/module-formats.txtar"), config, t, &no_named_as_default_member.NoNamedAsDefaultMemberRule, valid, invalid)
+					})
+				}
+			})
+		}
 	})
 	// Both consumers resolve the same declaration file. The implementation
 	// cache must still distinguish the request's import and require conditions.

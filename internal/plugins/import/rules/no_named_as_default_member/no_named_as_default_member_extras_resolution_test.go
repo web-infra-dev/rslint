@@ -53,6 +53,9 @@ func TestNoNamedAsDefaultMemberResolutionFormats(t *testing.T) {
 		{"root-dirs-esm", "tsconfig.roots.json", "src/consumer.ts", "./esm.js", true},
 		{"nested-package-cjs", "tsconfig.json", "consumer.mts", "nested-scope/cjs/index.js", false},
 		{"nested-package-esm", "tsconfig.json", "consumer.mts", "nested-scope/esm/index.js", true},
+		// Known tsgo boundary: runtime lookup does not append .json to main.
+		// An unknown implementation retains the ordinary named-export checks.
+		{"known-boundary-extensionless-json-main", "tsconfig.json-runtime.json", "consumer.cts", "extensionless-json-main", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			code := "import obj from '" + tc.source + "'; obj.foo; const {foo} = obj;"

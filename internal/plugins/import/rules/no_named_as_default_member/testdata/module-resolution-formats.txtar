@@ -238,3 +238,11 @@ module.exports = {foo: 1};
 export const foo: number;
 -- node_modules/declaration-pattern/types.js --
 module.exports = {foo: 1};
+-- tsconfig.json-runtime.json --
+{"extends":"./tsconfig.json","compilerOptions":{"resolveJsonModule":true}}
+-- node_modules/extensionless-json-main/package.json --
+{"name":"extensionless-json-main","main":"./data","types":"./index.d.ts"}
+-- node_modules/extensionless-json-main/index.d.ts --
+export const foo: number;
+-- node_modules/extensionless-json-main/data.json --
+{"foo":1}

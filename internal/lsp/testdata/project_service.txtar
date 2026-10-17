@@ -181,3 +181,37 @@ export const value = payload;
 export declare const value: any;
 -- snapshot-references/lib/safe.d.ts --
 export declare const value: { member: number };
+-- runtime-reference-conditions/tsconfig.json --
+{"compilerOptions":{"noLib":true,"module":"esnext","moduleResolution":"bundler","disableReferencedProjectLoad":true,"allowJs":false},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}
+-- runtime-reference-conditions/leaf.json --
+{"compilerOptions":{"noLib":true,"module":"esnext","moduleResolution":"bundler","composite":true,"outDir":"dist","customConditions":["development"]},"files":["target.ts"]}
+-- runtime-reference-conditions/target.ts --
+/// <reference path="./globals.js" />
+import cjsDevelopment from 'cjs-development';
+import esmDevelopment from 'esm-development';
+cjsDevelopment.member;
+esmDevelopment.member;
+-- runtime-reference-conditions/globals.js --
+var globalValue = 1;
+-- runtime-reference-conditions/node_modules/cjs-development/package.json --
+{"exports":{"types":"./types.d.ts","development":"./development.cjs","default":"./default.mjs"}}
+-- runtime-reference-conditions/node_modules/cjs-development/types.d.ts --
+export declare const member: number;
+declare const value: { member: number };
+export default value;
+-- runtime-reference-conditions/node_modules/cjs-development/development.cjs --
+module.exports = { member: 1 };
+-- runtime-reference-conditions/node_modules/cjs-development/default.mjs --
+export const member = 1;
+export default { member };
+-- runtime-reference-conditions/node_modules/esm-development/package.json --
+{"exports":{"types":"./types.d.ts","development":"./development.mjs","default":"./default.cjs"}}
+-- runtime-reference-conditions/node_modules/esm-development/types.d.ts --
+export declare const member: number;
+declare const value: { member: number };
+export default value;
+-- runtime-reference-conditions/node_modules/esm-development/development.mjs --
+export const member = 1;
+export default { member };
+-- runtime-reference-conditions/node_modules/esm-development/default.cjs --
+module.exports = { member: 1 };

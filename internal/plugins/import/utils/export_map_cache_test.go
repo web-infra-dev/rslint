@@ -393,6 +393,69 @@ func TestCommonJSImplementationCacheGenerationIsolation(t *testing.T) {
 	}
 }
 
+func TestCommonJSImplementationCacheUsesReferencedOptions(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/commonjs-cache.txtar")
+	root := tspath.NormalizePath(osvfs.FS().Realpath(archive.Materialize(t, "reference-options")))
+	for _, options := range []string{"conditions", "paths", "suffixes"} {
+		for _, backend := range []string{"compiler", "filesystem"} {
+			for _, referenceFirst := range []bool{false, true} {
+				order := "root first"
+				if referenceFirst {
+					order = "reference first"
+				}
+				t.Run(options+"/"+backend+"/"+order, func(t *testing.T) {
+					fs := osvfs.FS()
+					raw, err := rslint_utils.CreateProgramUsingProjectReferenceSources(
+						true, fs, root, "tsconfig."+options+".json", rslint_utils.CreateCompilerHost(root, fs))
+					if err != nil {
+						t.Fatal(err)
+					}
+					p := lintprogram.NewFromCompiler(raw)
+					if backend == "filesystem" {
+						p = lintprogram.NewFromCompilerWithFileSystem(raw, fs)
+					}
+					entries := []string{"root.ts", "reference.ts"}
+					if referenceFirst {
+						entries[0], entries[1] = entries[1], entries[0]
+					}
+					// Both sources share one Program and runtime resolver cache.
+					// Reversing the first request catches either project's options
+					// being reused for the other after the resolver has been warmed.
+					for range 3 {
+						for _, entry := range entries {
+							ctx, source := commonJSCacheContext(t, p, entry)
+							redirect := raw.GetRedirectForResolution(ctx.SourceFile)
+							if entry == "reference.ts" {
+								if redirect == nil || redirect.ConfigName() != tspath.ResolvePath(root, "leaf."+options+".json") {
+									t.Fatal("fixture did not retain referenced-project options")
+								}
+							} else if redirect != nil {
+								t.Fatal("root source unexpectedly used referenced-project options")
+							}
+							declarationName := "node_modules/runtime/types.d.ts"
+							if options == "paths" {
+								declarationName = "mapped/esm.d.ts"
+								if entry == "reference.ts" {
+									declarationName = "mapped/cjs.d.ts"
+								}
+							} else if options == "suffixes" && entry == "reference.ts" {
+								declarationName = "node_modules/runtime/types.native.d.ts"
+							}
+							if path, declaration, resolved := p.ResolveModule(ctx.SourceFile, source); !resolved || declaration == nil ||
+								!declaration.IsDeclarationFile || path != tspath.ResolvePath(root, declarationName) {
+								t.Fatalf("%s declaration = %q, want %q", entry, path, declarationName)
+							}
+							if got, want := import_utils.IsCommonJSModule(ctx, source), entry == "reference.ts"; got != want {
+								t.Errorf("%s: IsCommonJSModule = %v, want %v", entry, got, want)
+							}
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestCommonJSImplementationCachePackageJSONBoundaries(t *testing.T) {
 	root := commonJSCacheRoot(t)
 	packagePath := tspath.ResolvePath(root, "node_modules/shared/package.json")
