@@ -332,8 +332,16 @@ and cannot observe which construction path supplied it.
 
    Import rules that resolve runtime implementations use the importing source's
    effective compiler options, including project-reference redirects. Runtime
-   resolvers are cached per options object within the lint generation so that
-   root and referenced projects retain their own conditions and path settings.
+   lookup results are cached per effective options, source file, request and
+   resolution mode within the lint generation. The shared runtime resolver
+   preserves source aliases and root directories while package entry targets
+   retain their authored extensions and URL semantics. Runtime syntax reads
+   compare current filesystem text before reusing a compiler AST, including
+   when an unsaved symlink alias changes a loaded implementation. Before reusing
+   a Session Program, editor generations compare loaded sources corresponding to
+   open overlays with their current text. A mismatch uses the existing standalone
+   loader so the selected ASTs and filesystem agree. Unopened sources are not
+   read for this check.
 
    Service construction clones the parsed command line and options before enabling `allowNonTsExtensions`, preserving config identity, complete roots and authored `allowJs`. This admits explicitly listed JS roots without changing config glob expansion or ordinary project options. Unmatched files retain source-only gap capabilities even if another selected Program imports them.
 

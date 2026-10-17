@@ -261,25 +261,27 @@ const nodeBuiltinTarget = "__rslint_node_builtin__.ts"
 
 type nodeResolutionFS struct {
 	vfs.FS
-	folder            string
-	base              string
-	options           Options
-	resolver          *nodeResolver
-	resourceSuffix    string
-	failure           Result
-	explicitExtension string
-	resolved          map[string]string
-	activeDirectories map[string]bool
-	unresolved        bool
-	request           string
-	noModuleSearch    bool
-	blockedDirectory  string
-	fullySpecified    bool
-	exportsFile       string
-	importsFile       string
-	importsMatched    bool
-	importsTarget     string
-	builtin           bool
+	compilerOptions     *core.CompilerOptions
+	implementationMains map[string]implementationMain
+	folder              string
+	base                string
+	options             Options
+	resolver            *nodeResolver
+	resourceSuffix      string
+	failure             Result
+	explicitExtension   string
+	resolved            map[string]string
+	activeDirectories   map[string]bool
+	unresolved          bool
+	request             string
+	noModuleSearch      bool
+	blockedDirectory    string
+	fullySpecified      bool
+	exportsFile         string
+	importsFile         string
+	importsMatched      bool
+	importsTarget       string
+	builtin             bool
 	// nodeTarget records that an exports or imports target was selected, and
 	// exportsKeys and importsKeys the keys that match a request without a
 	// pattern. NodeExports only.
@@ -290,6 +292,13 @@ type nodeResolutionFS struct {
 
 func (f *nodeResolutionFS) newResolver(cwd string) *module.Resolver {
 	host := compiler.NewCompilerHost(cwd, f, "", nil, nil, nil)
+	if f.compilerOptions != nil {
+		options := f.compilerOptions.Clone()
+		// Results still name the projected namespace. Realpath below restores
+		// the physical path and the caller's original symlink policy.
+		options.PreserveSymlinks = core.TSTrue
+		return module.NewResolver(host, options, "", "", nil)
+	}
 	return module.NewResolver(host, &core.CompilerOptions{
 		ModuleResolution: core.ModuleResolutionKindBundler,
 		NoDtsResolution:  core.TSTrue, ResolveJsonModule: core.TSTrue,
@@ -384,7 +393,8 @@ func (f *nodeResolutionFS) probeFile(name string) string {
 }
 
 func (f *nodeResolutionFS) FileExists(name string) bool {
-	physical := f.physical(name)
+	normalized := f.implementationMarker(name)
+	physical := f.physical(normalized)
 	var resolved string
 	switch {
 	case strings.HasPrefix(f.request, "#") && tspath.GetBaseFileName(physical) == nodeBuiltinTarget:
@@ -411,6 +421,7 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 			return false
 		}
 		target := strings.TrimSuffix(strings.TrimSuffix(physical, nodeTargetSuffix), nodeExportSuffix)
+		main := f.implementationMains[target]
 		// Relative imports maps honor extension aliases; package main and
 		// exports targets retain their explicitly selected extensions.
 		applyAlias := strings.HasPrefix(f.request, "#") && f.importsTarget == ""
@@ -418,29 +429,47 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 		exactTarget := f.options.NodeExports && strings.HasSuffix(physical, nodeExportSuffix)
 		if exactTarget {
 			if path, suffix, ok := f.nodeTargetPath(target); ok {
-				resolved = f.probeFile(path)
+				resolved = f.probeImplementationTarget(path, true, false)
 				if resolved != "" {
 					f.resourceSuffix = suffix
 				}
 			}
 			f.nodeTarget = f.nodeTarget || resolved != ""
+		} else if main.indexOnly {
+			// An absent or empty main only probes index.js/json/node. An
+			// explicitly authored main: "./index" may load an extensionless file.
+			resolved = f.probeImplementationIndex(main.directory)
 		} else {
-			resolved = f.probe(target, applyAlias)
+			resolved = f.probeImplementationTarget(target, false, applyAlias)
 		}
-		if resolved == "" && !exactTarget && !f.options.NoDirectory && !f.fullySpecified && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
-			// enhanced-resolve permits directory exports. Ask tsgo to resolve
-			// their main/index using its regular relative-directory traversal.
-			// Guard package main cycles before creating a nested resolver.
-			if f.activeDirectories == nil {
-				f.activeDirectories = map[string]bool{}
+		if resolved == "" && !exactTarget && !main.indexOnly && !f.options.NoDirectory && !f.fullySpecified &&
+			(f.compilerOptions != nil || !strings.HasSuffix(target, "/")) && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
+			if f.compilerOptions != nil {
+				resolved = f.probeImplementationIndex(target)
+			} else {
+				// enhanced-resolve permits directory exports. Ask tsgo to resolve
+				// their main/index using its regular relative-directory traversal.
+				// Guard package main cycles before creating a nested resolver.
+				if f.activeDirectories == nil {
+					f.activeDirectories = map[string]bool{}
+				}
+				f.activeDirectories[target] = true
+				logicalTarget := strings.TrimSuffix(strings.TrimSuffix(normalized, nodeTargetSuffix), nodeExportSuffix)
+				directory := tspath.GetDirectoryPath(logicalTarget)
+				result, _ := f.newResolver(directory).ResolveModuleName("./"+tspath.GetBaseFileName(logicalTarget), tspath.ResolvePath(directory, "__import__.js"), core.ResolutionModeCommonJS, nil)
+				delete(f.activeDirectories, target)
+				if result != nil && result.IsResolved() {
+					resolved = f.Realpath(result.ResolvedFileName)
+				}
 			}
-			f.activeDirectories[target] = true
-			logicalTarget := strings.TrimSuffix(strings.TrimSuffix(name, nodeTargetSuffix), nodeExportSuffix)
-			directory := tspath.GetDirectoryPath(logicalTarget)
-			result, _ := f.newResolver(directory).ResolveModuleName("./"+tspath.GetBaseFileName(logicalTarget), tspath.ResolvePath(directory, "__import__.js"), core.ResolutionModeCommonJS, nil)
-			delete(f.activeDirectories, target)
-			if result != nil && result.IsResolved() {
-				resolved = f.Realpath(result.ResolvedFileName)
+		}
+		if f.compilerOptions != nil && resolved == "" && strings.HasSuffix(physical, nodeTargetSuffix) {
+			if main.directory != "" && !main.indexOnly {
+				resolved = f.probeImplementationIndex(main.directory)
+			}
+			if resolved == "" {
+				f.unresolved = true
+				return true
 			}
 		}
 		if resolved == "" && strings.HasSuffix(physical, nodeExportSuffix) {
@@ -461,6 +490,12 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 			if resolved = f.probe(tspath.ResolvePath(tspath.GetDirectoryPath(physical), entry), false); resolved != "" {
 				break
 			}
+		}
+	case f.compilerOptions != nil:
+		// These are original compiler probes, outside marked package fields.
+		// Preserve paths/rootDirs/source substitution without admitting types.
+		if !tspath.IsDeclarationFileName(physical) && f.FS.FileExists(physical) {
+			resolved = physical
 		}
 	case f.explicitExtension != "" && strings.HasSuffix(physical, f.explicitExtension):
 		resolved = f.probe(physical, true)
@@ -642,6 +677,7 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 		return text, true
 	}
 	if object, ok := value.Value.(*hujson.Object); ok {
+		f.prepareImplementationMain(object, tspath.GetDirectoryPath(f.physical(name)))
 		if f.options.IgnoreExports {
 			object.Members = slices.DeleteFunc(object.Members, func(member hujson.ObjectMember) bool {
 				key := nodePackageMemberName(member)
@@ -692,6 +728,9 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 					}
 				}
 				suffix := nodeTargetSuffix
+				if key == "main" && f.compilerOptions != nil {
+					suffix = implementationMainSuffix
+				}
 				if key == "exports" {
 					suffix = nodeExportSuffix
 				}

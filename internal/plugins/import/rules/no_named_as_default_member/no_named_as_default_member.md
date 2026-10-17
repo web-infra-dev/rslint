@@ -55,10 +55,20 @@ This rule has no options. It does not provide automatic fixes or suggestions.
   `.mts` implementations remain ES modules even inside a `type: 'commonjs'`
   package. If the implementation is unavailable, a generic `.d.ts` file alone
   does not suppress warnings; an explicit `.d.cts` extension identifies CommonJS.
-- **Runtime entry lookup follows TypeScript's resolver.** Node's extensionless
-  JSON fallback is not supported. For example, a package with `"main": "./data"`,
-  `data.json` and `index.d.ts` retains named-member warnings because the runtime
-  entry cannot be identified. An explicit `"main": "./data.json"` is supported.
+  Package entry targets keep their authored extension: an adjacent `index.ts`
+  cannot replace `"main": "./index.js"`. Runtime package lookup also supports
+  exports URL paths and Node's extensionless JSON main fallback.
+- **CommonJS defaults follow the importing file's interop mode.** Native Node
+  ESM imports receive the CommonJS object as their default. Other imports retain
+  named-member warnings when the declaration explicitly exports `default` or
+  `__esModule`, including through re-exports. For example, a package declaring
+  both `export default value` and `export const foo` is checked for `value.foo`
+  in a CommonJS consumer: transpilers may unwrap its default through
+  `__esModule`. As with upstream's ESM checks, a warning does not prove that the
+  property is absent at runtime. Arbitrary CommonJS code is not executed to
+  infer the default object's properties. CommonJS emit with
+  `esModuleInterop: false` also retains the checks because it accesses
+  `require('package').default` directly.
 - **Checking imports requires access to the imported files.** If you disable both
   `languageOptions.parserOptions.project` and `projectService`, include imported
   files in the lint targets too. For example, checking `app.ts` alone will not

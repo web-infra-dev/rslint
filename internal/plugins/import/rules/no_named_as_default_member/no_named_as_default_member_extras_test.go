@@ -56,8 +56,8 @@ func TestNoNamedAsDefaultMemberExtras(t *testing.T) {
 			// Default properties are excluded
 			{Code: `import obj from './base.js'; obj.default; const {default: value} = obj;`},
 			// CommonJS modules like fs-extra do not generate invalid named import suggestions
-			{Code: `import fse from 'fs-extra'; fse.outputFileSync('a', 'text'); fse.remove('a'); fse.readdir('.'); const {outputFileSync} = fse;`},
-			{Code: `import cjs from 'cjs-package'; cjs.foo; const {foo} = cjs;`},
+			{Code: `import fse from 'fs-extra'; fse.outputFileSync('a', 'text'); fse.remove('a'); fse.readdir('.'); const {outputFileSync} = fse;`, FileName: "interop/consumer.ts", TSConfig: "interop/tsconfig.json"},
+			{Code: `import cjs from 'cjs-package'; cjs.foo; const {foo} = cjs;`, FileName: "interop/consumer.ts", TSConfig: "interop/tsconfig.json"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// rslint follows TypeScript's implicit interop default for NodeNext;
@@ -224,4 +224,35 @@ func TestNoNamedAsDefaultMemberModuleFormats(t *testing.T) {
 		[]rule_tester.ValidTestCase{{Code: `import obj from 'conditional'; obj.foo;`, FileName: "consumer.cts"}},
 		[]rule_tester.InvalidTestCase{{Code: `import obj from 'conditional'; obj.foo;`, FileName: "consumer.mts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamedAsDefaultMember"}}}},
 	)
+}
+
+func TestNoNamedAsDefaultMemberDefaultInterop(t *testing.T) {
+	root := defaultMemberRoot(t, "testdata/module-formats.txtar")
+	for _, config := range []string{"tsconfig.json", "tsconfig.no-interop.json", "tsconfig.bundler.json"} {
+		for _, source := range []string{"interop-marked", "interop-assigned", "interop-plain", "interop-reexport", "interop-star-marker", "./interop-source.cjs", "generic-cjs", "interop-unknown-star"} {
+			for _, file := range []string{"consumer.cts", "consumer.mts"} {
+				t.Run(config+"/"+source+"/"+file, func(t *testing.T) {
+					// Native Node ESM receives the whole CommonJS object. A
+					// transpiler can unwrap default through __esModule instead.
+					// As upstream does for ESM, an authored default is checked
+					// even if it happens to have the same member at runtime.
+					// Unknown star exports, such as fs-extra's export from fs,
+					// do not prove that an __esModule marker is present.
+					warn := source != "generic-cjs" && source != "interop-unknown-star" || config == "tsconfig.no-interop.json"
+					if file == "consumer.mts" && config != "tsconfig.bundler.json" {
+						warn = false
+					}
+					code := "import value from '" + source + "'; value.foo; const {foo} = value;"
+					var valid []rule_tester.ValidTestCase
+					var invalid []rule_tester.InvalidTestCase
+					if warn {
+						invalid = []rule_tester.InvalidTestCase{{Code: code, FileName: file, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamedAsDefaultMember"}, {MessageId: "noNamedAsDefaultMember"}}}}
+					} else {
+						valid = []rule_tester.ValidTestCase{{Code: code, FileName: file}}
+					}
+					rule_tester.RunRuleTester(root, config, t, &no_named_as_default_member.NoNamedAsDefaultMemberRule, valid, invalid)
+				})
+			}
+		}
+	}
 }
