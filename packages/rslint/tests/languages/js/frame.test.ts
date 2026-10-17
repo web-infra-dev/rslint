@@ -456,44 +456,40 @@ describe('systematic AST conformance', () => {
       FRAME_SCHEMAS.map(([type]) => type).filter((type) => !types.has(type)),
     ).toEqual([]);
   });
-  for (const fixture of CONFORMANCE_CASES) {
-    test(fixture.name, () => {
-      const actual = projectSyntax(
-        fixture.filePath,
-        fixture.text,
-        fixture.sourceType,
-      ).ast;
-      const expected = parseReference(fixture);
-      expect(canonical(actual)).toEqual(canonical(expected));
-      const visit = (node: ESTreeNode, reference: ESTreeNode): void => {
-        expect(node.type).toBe(reference.type);
-        expect(node.loc).toEqual(reference.loc);
-        const keys = upstreamVisitorKeys[reference.type];
-        if (!keys)
-          throw new Error(`missing upstream visitor keys: ${reference.type}`);
-        expect([...VISITOR_KEYS[node.type]].sort()).toEqual([...keys].sort());
-        for (const key of keys) {
-          const children = node[key];
-          const expectedChildren = reference[key];
-          if (Array.isArray(expectedChildren)) {
-            expect(Array.isArray(children)).toBe(true);
-            expect((children as unknown[]).length).toBe(
-              expectedChildren.length,
-            );
-            for (const [index, child] of expectedChildren.entries()) {
-              if (child == null) continue;
-              expect((children as ESTreeNode[])[index].parent).toBe(node);
-              visit((children as ESTreeNode[])[index], child as ESTreeNode);
-            }
-          } else if (expectedChildren != null) {
-            expect((children as ESTreeNode).parent).toBe(node);
-            visit(children as ESTreeNode, expectedChildren as ESTreeNode);
+  test.each(CONFORMANCE_CASES)('$name', (fixture) => {
+    const actual = projectSyntax(
+      fixture.filePath,
+      fixture.text,
+      fixture.sourceType,
+    ).ast;
+    const expected = parseReference(fixture);
+    expect(canonical(actual)).toEqual(canonical(expected));
+    const visit = (node: ESTreeNode, reference: ESTreeNode): void => {
+      expect(node.type).toBe(reference.type);
+      expect(node.loc).toEqual(reference.loc);
+      const keys = upstreamVisitorKeys[reference.type];
+      if (!keys)
+        throw new Error(`missing upstream visitor keys: ${reference.type}`);
+      expect([...VISITOR_KEYS[node.type]].sort()).toEqual([...keys].sort());
+      for (const key of keys) {
+        const children = node[key];
+        const expectedChildren = reference[key];
+        if (Array.isArray(expectedChildren)) {
+          expect(Array.isArray(children)).toBe(true);
+          expect((children as unknown[]).length).toBe(expectedChildren.length);
+          for (const [index, child] of expectedChildren.entries()) {
+            if (child == null) continue;
+            expect((children as ESTreeNode[])[index].parent).toBe(node);
+            visit((children as ESTreeNode[])[index], child as ESTreeNode);
           }
+        } else if (expectedChildren != null) {
+          expect((children as ESTreeNode).parent).toBe(node);
+          visit(children as ESTreeNode, expectedChildren as ESTreeNode);
         }
-      };
-      visit(actual, expected as unknown as ESTreeNode);
-    });
-  }
+      }
+    };
+    visit(actual, expected as unknown as ESTreeNode);
+  });
 });
 
 describe('projected ranges used by plugin diagnostics and fixes', () => {
@@ -535,73 +531,71 @@ describe('projected ranges used by plugin diagnostics and fixes', () => {
       expected: 'const valid = left > right;',
     },
   ];
-  for (const fixture of cases) {
-    test(fixture.text, async () => {
-      const { lintFile } = await import('../../eslint-plugin/project-frame.js');
-      const result = lintFile(
-        {
-          filePath: 'ranges.ts',
-          text: fixture.text,
-          rules: { 'probe/range': { options: [] } },
-          collectFixes: true,
-          suggestionsMode: 'off',
-        },
-        {
-          plugins: [],
-          rules: new Map([
-            [
-              'probe/range',
-              {
-                meta: { fixable: 'code' },
-                create(ctx: RuleContext) {
-                  return {
-                    [fixture.selector](candidate: ESTreeNode) {
-                      const node =
-                        candidate.type === 'MethodDefinition'
-                          ? (candidate.key as ESTreeNode)
-                          : candidate.type === 'BinaryExpression'
-                            ? (ctx.sourceCode.getFirstTokenBetween(
-                                candidate.left as ESTreeNode,
-                                candidate.right as ESTreeNode,
-                              )! as unknown as ESTreeNode)
-                            : candidate;
-                      expect(ctx.sourceCode.getText(node)).toBe(fixture.target);
-                      ctx.report({
-                        node,
-                        message: 'selected range',
-                        fix: (fixer) =>
-                          fixer.replaceText(node, fixture.replacement),
-                      });
-                    },
-                  };
-                },
+  test.each(cases)('$text', async (fixture) => {
+    const { lintFile } = await import('../../eslint-plugin/project-frame.js');
+    const result = lintFile(
+      {
+        filePath: 'ranges.ts',
+        text: fixture.text,
+        rules: { 'probe/range': { options: [] } },
+        collectFixes: true,
+        suggestionsMode: 'off',
+      },
+      {
+        plugins: [],
+        rules: new Map([
+          [
+            'probe/range',
+            {
+              meta: { fixable: 'code' },
+              create(ctx: RuleContext) {
+                return {
+                  [fixture.selector](candidate: ESTreeNode) {
+                    const node =
+                      candidate.type === 'MethodDefinition'
+                        ? (candidate.key as ESTreeNode)
+                        : candidate.type === 'BinaryExpression'
+                          ? (ctx.sourceCode.getFirstTokenBetween(
+                              candidate.left as ESTreeNode,
+                              candidate.right as ESTreeNode,
+                            )! as unknown as ESTreeNode)
+                          : candidate;
+                    expect(ctx.sourceCode.getText(node)).toBe(fixture.target);
+                    ctx.report({
+                      node,
+                      message: 'selected range',
+                      fix: (fixer) =>
+                        fixer.replaceText(node, fixture.replacement),
+                    });
+                  },
+                };
               },
-            ],
-          ]),
-        },
-      );
-      expect(result.diagnostics).toHaveLength(1);
-      const start = Buffer.byteLength(
-        fixture.text.slice(0, fixture.text.lastIndexOf(fixture.target)),
-      );
-      const end = start + Buffer.byteLength(fixture.target);
-      expect(result.diagnostics[0].startPos).toBe(start);
-      expect(result.diagnostics[0].endPos).toBe(end);
-      expect(result.fixes).toEqual([
-        { range: [start, end], text: fixture.replacement },
-      ]);
-      const bytes = Buffer.from(fixture.text);
-      const applied = Buffer.concat([
-        bytes.subarray(0, start),
-        Buffer.from(result.fixes[0].text),
-        bytes.subarray(end),
-      ]).toString();
-      expect(applied).toBe(fixture.expected);
-      expect(() =>
-        parseUpstream(applied, { filePath: 'ranges.ts' }),
-      ).not.toThrow();
-    });
-  }
+            },
+          ],
+        ]),
+      },
+    );
+    expect(result.diagnostics).toHaveLength(1);
+    const start = Buffer.byteLength(
+      fixture.text.slice(0, fixture.text.lastIndexOf(fixture.target)),
+    );
+    const end = start + Buffer.byteLength(fixture.target);
+    expect(result.diagnostics[0].startPos).toBe(start);
+    expect(result.diagnostics[0].endPos).toBe(end);
+    expect(result.fixes).toEqual([
+      { range: [start, end], text: fixture.replacement },
+    ]);
+    const bytes = Buffer.from(fixture.text);
+    const applied = Buffer.concat([
+      bytes.subarray(0, start),
+      Buffer.from(result.fixes[0].text),
+      bytes.subarray(end),
+    ]).toString();
+    expect(applied).toBe(fixture.expected);
+    expect(() =>
+      parseUpstream(applied, { filePath: 'ranges.ts' }),
+    ).not.toThrow();
+  });
 
   test('JSX attribute boundaries preserve subsequent tokens and comments', async () => {
     const { lintFile } = await import('../../eslint-plugin/project-frame.js');
@@ -903,6 +897,59 @@ describe('hostile frames and ownership', () => {
       expect(() => decodeFrame(bytes)).toThrow();
     },
   );
+
+  test('string IDs reject out-of-range references and prior frame versions', () => {
+    const original = projectFrame(
+      'file.ts',
+      "const value = 'long dictionary value';",
+    );
+    const oldVersion = Buffer.from(original);
+    oldVersion.writeUInt32LE(1, 4);
+    expect(() => decodeFrame(oldVersion)).toThrow('version or schema mismatch');
+    const count = original.readUInt32LE(24);
+    const starts = Math.ceil((64 + count * 2) / 4) * 4;
+    const values = starts + count * 12;
+    const strings =
+      values + (original.readUInt32LE(28) + original.readUInt32LE(32)) * 4;
+    const stringBytes = original.readUInt32LE(36);
+    let stringCount = 0;
+    for (let offset = 0; offset < stringBytes; stringCount++) {
+      offset =
+        Math.ceil(
+          (offset + 4 + original.readUInt32LE(strings + offset) * 2) / 4,
+        ) * 4;
+    }
+    const index = Array.from(
+      { length: original.readUInt32LE(28) },
+      (_, i) => i,
+    ).find((i) => original.readUInt32LE(values + i * 4) >>> 29 === 3);
+    expect(index).toBeDefined();
+    for (const id of [stringCount, 0x1fffffff]) {
+      const bad = Buffer.from(original);
+      bad.writeUInt32LE(0x60000000 | id, values + (index as number) * 4);
+      expect(() => decodeFrame(bad)).toThrow('invalid ESTree frame');
+    }
+  });
+
+  test('private string IDs do not read inherited array entries', () => {
+    const bytes = projectFrame('file.ts', 'const value = 1;');
+    const old = Object.getOwnPropertyDescriptor(Array.prototype, '0');
+    Object.defineProperty(Array.prototype, '0', {
+      configurable: true,
+      writable: true,
+      value: 'inherited string',
+    });
+    try {
+      const { ast } = decodeFrame(bytes);
+      const program = ast as ESTreeNode & {
+        body: Array<{ declarations: Array<{ id: { name: string } }> }>;
+      };
+      expect(program.body[0].declarations[0].id.name).toBe('value');
+    } finally {
+      if (old) Object.defineProperty(Array.prototype, '0', old);
+      else Reflect.deleteProperty(Array.prototype, '0');
+    }
+  });
 
   test('rejects truncated frames, bad UTF-8 and cyclic or shared children', () => {
     const original = projectFrame('file.ts', 'a(); b();');

@@ -1626,7 +1626,10 @@ Already frozen LSP inputs retain their independent ownership.
 Projection reuses the SourceFile's existing sparse position map. String text is
 staged while frame sizes are counted, then encoded directly into the final frame
 instead of a temporary UTF-16 byte column. Success, failure and cancellation clear every
-staged string reference. Empty wire lists share a single record, while each
+staged string reference. Frame version 2 references strings by sequential IDs.
+The Node decoder validates their bounds, indexes record offsets in a compact
+column and caches owned strings in a private array; it builds no per-file string
+hash table. Matching Go/Node frame versions are required. Empty wire lists share a single record, while each
 Node-side read still creates an independent mutable array.
 Token coverage uses a private, source-ordered scalar buffer; the scanner walks
 it alongside tokens, preserving the last cover at repeated source positions.

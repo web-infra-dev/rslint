@@ -138,12 +138,12 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 				t.Fatal("projection changed native source syntax")
 			}
 			saved := bytes.Clone(data)
-			if builder.p.file != nil || builder.p.text != "" || builder.p.sourceType != "" || builder.p.offsets.positions != nil || len(builder.p.stringOffsets) != 0 {
+			if builder.p.file != nil || builder.p.text != "" || builder.p.sourceType != "" || builder.p.offsets.positions != nil || len(builder.p.stringIDs) != 0 {
 				t.Fatal("builder retained source graph")
 			}
 			assertClearedProjectionStrings(t, &builder)
 			builder.Reset()
-			if builder.p.stringOffsets != nil || len(builder.p.tokenCovers) != 0 {
+			if builder.p.stringIDs != nil || len(builder.p.tokenCovers) != 0 {
 				t.Fatal("reset builder retained source indexes")
 			}
 			next, err := builder.Build(context.Background(), source("/next.js", "next()"), Options{SourceType: "script"})
@@ -230,7 +230,7 @@ func TestProjectionCancellationAndFailure(t *testing.T) {
 		if data != nil || !errors.Is(err, context.Canceled) {
 			t.Fatalf("mid-projection cancellation at %d = %v/%v", after, data, err)
 		}
-		if builder.p.file != nil || builder.p.ctx != nil || builder.p.text != "" || builder.p.offsets.positions != nil || len(builder.p.stringOffsets) != 0 || len(builder.p.tokenCovers) != 0 {
+		if builder.p.file != nil || builder.p.ctx != nil || builder.p.text != "" || builder.p.offsets.positions != nil || len(builder.p.stringIDs) != 0 || len(builder.p.tokenCovers) != 0 {
 			t.Fatal("canceled projection retained generation references")
 		}
 		assertClearedProjectionStrings(t, &builder)
@@ -254,7 +254,7 @@ func TestProjectionStringEncoding(t *testing.T) {
 	}
 	for _, test := range cases {
 		t.Run(fmt.Sprintf("%x", test.text[:min(len(test.text), 32)]), func(t *testing.T) {
-			p := estreeProjector{ctx: context.Background(), stringOffsets: make(map[string]uint32)}
+			p := estreeProjector{ctx: context.Background(), stringIDs: make(map[string]uint32)}
 			value := p.stringValue(test.text)
 			data := bytes.Repeat([]byte{0xff}, p.stringBytes)
 			p.encodeStrings(data)
@@ -273,6 +273,9 @@ func TestProjectionStringEncoding(t *testing.T) {
 				if padding != 0 {
 					t.Fatal("string alignment retained previous output bytes")
 				}
+			}
+			if next := p.stringValue("next:" + test.text); next != taggedValue(tagString, 1) || p.stringValue(test.text) != value {
+				t.Fatal("string references must be sequential IDs independent of record byte size")
 			}
 		})
 	}
