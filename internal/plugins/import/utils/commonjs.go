@@ -42,10 +42,14 @@ func IsCommonJSModule(ctx rule.RuleContext, source modules.Source) bool {
 		}
 		// Reuse the compiler's paths, custom conditions and request mode, but
 		// omit declaration lookup and the implicit "types" export condition.
+		// Referenced sources can use different options within the same Program.
 		// The cached resolver owns only options and a filesystem host, never p.
-		resolver := program.Cached(p, implementationResolverKey{}, func() *module.Resolver {
-			options := p.Options().Clone()
+		sourceOptions := p.OptionsForFile(ctx.SourceFile)
+		resolver := program.Cached(p, implementationResolverKey{options: sourceOptions}, func() *module.Resolver {
+			options := sourceOptions.Clone()
 			options.NoDtsResolution = core.TSTrue
+			// JSON is a runtime entry even when its inferred TypeScript types are disabled.
+			options.ResolveJsonModule = core.TSTrue
 			options.CustomConditions = slices.DeleteFunc(slices.Clone(options.CustomConditions), func(condition string) bool {
 				return condition == "types" || strings.HasPrefix(condition, "types@")
 			})
@@ -63,7 +67,7 @@ func IsCommonJSModule(ctx rule.RuleContext, source modules.Source) bool {
 		mode := p.GetModeForUsageLocation(ctx.SourceFile, source.Specifier())
 		resolved, _ := resolver.ResolveModuleName(source.Specifier().Text(), ctx.SourceFile.FileName(), mode, nil)
 		if resolved.IsResolved() && !tspath.IsDeclarationFileName(resolved.ResolvedFileName) {
-			if _, declarationMain := declarationMainSource(resolved.ResolvedFileName, p.Options().ModuleSuffixes); !declarationMain {
+			if _, declarationMain := declarationMainSource(resolved.ResolvedFileName, sourceOptions.ModuleSuffixes); !declarationMain {
 				return isCommonJSImplementation(p, resolved.ResolvedFileName)
 			}
 		}
@@ -82,7 +86,9 @@ func IsCommonJSModule(ctx rule.RuleContext, source modules.Source) bool {
 	return link.Target != nil && p.SourceFileMetadata(link.Target).PackageJsonType == "commonjs"
 }
 
-type implementationResolverKey struct{}
+type implementationResolverKey struct {
+	options *core.CompilerOptions
+}
 type commonJSImplementationKey string
 
 // NoDtsResolution omits implicit declarations, but explicit paths and

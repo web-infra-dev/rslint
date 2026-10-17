@@ -27,6 +27,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 func lintProjectMetadataForTest(
@@ -1376,9 +1377,9 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 							var selectedProgram *compiler.Program
 							provider := &documentGenerationProvider{
 								server: server, uri: uri, snapshot: snapshot,
-								buildGeneration: func(program *compiler.Program, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
+								buildGeneration: func(program *compiler.Program, filesystem vfs.FS, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
 									selectedProgram = program
-									return buildDocumentGeneration(program, source, lintTarget, cwd, typed, snapshot)
+									return buildDocumentGeneration(program, filesystem, source, lintTarget, cwd, typed, snapshot)
 								},
 							}
 							result, err = linter.RunPipeline(context.Background(), linter.NewLintRequest(
@@ -1629,6 +1630,112 @@ func TestProjectServiceLSPUsesReferencedEditorSources(t *testing.T) {
 				} else if program.GetSourceFile(tspath.ResolvePath(directory, "lib/dist/value.d.ts")) != nil {
 					t.Fatalf("speculative=%v: used stale declaration output", speculative)
 				}
+			}
+		})
+	}
+}
+
+func TestProjectServiceFallbackUsesReferencedRuntimeConditions(t *testing.T) {
+	// Child discovery is disabled, so selection keeps the root config while
+	// source construction redirects target.ts to the reference's options.
+	// Its explicit JS reference also forces the standalone service fallback.
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, test := range []struct {
+		condition, wantReceiver string
+	}{
+		{condition: "development", wantReceiver: "esmDevelopment"},
+		{condition: "production", wantReceiver: "cjsDevelopment"},
+	} {
+		t.Run(test.condition, func(t *testing.T) {
+			directory := tspath.NormalizePath(archive.Materialize(t, "runtime-reference-conditions"))
+			fileName := tspath.ResolvePath(directory, "target.ts")
+			leafPath := tspath.ResolvePath(directory, "leaf.json")
+			fsys := bundled.WrapFS(osvfs.FS())
+			leafConfig, ok := fsys.ReadFile(leafPath)
+			if !ok {
+				t.Fatal("missing referenced project config")
+			}
+			if err := os.WriteFile(leafPath, []byte(strings.ReplaceAll(leafConfig, "development", test.condition)), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			content, ok := fsys.ReadFile(fileName)
+			if !ok {
+				t.Fatal("missing target fixture")
+			}
+			server := newTestServer()
+			server.cwd = directory
+			server.fs = fsys
+			server.lintSessionRoots = newLintSessionProjectRootCache()
+			server.backgroundCtx = context.Background()
+			server.defaultLibraryPath = bundled.LibPath()
+			server.initializeParams = &lsproto.InitializeParams{}
+			if err := server.handleInitialized(t.Context(), &lsproto.InitializedParams{}); err != nil {
+				t.Fatal(err)
+			}
+			defer server.session.Close()
+			uri := documentURIFromPath(fileName)
+			server.documents[uri] = content
+			server.session.DidOpenFile(t.Context(), uri, 1, content, lsproto.LanguageKindTypeScript)
+			service, err := server.session.GetLanguageService(t.Context(), uri)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sessionProgram := service.GetProgram()
+			if lintSessionProgramSupportsService(sessionProgram) {
+				t.Fatal("fixture did not require a standalone project-service fallback")
+			}
+			entries := config.RslintConfig{{
+				Plugins:         []string{"import"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
+				Rules:           config.Rules{"import/no-named-as-default-member": "error"},
+			}}
+			var selected *compiler.Program
+			provider := &documentGenerationProvider{
+				server: server, uri: uri,
+				snapshot: documentLintSnapshotForTest(server, uri, entries, directory, false, nil),
+				buildGeneration: func(program *compiler.Program, filesystem vfs.FS, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
+					selected = program
+					return buildDocumentGeneration(program, filesystem, source, lintTarget, cwd, typed, snapshot)
+				},
+			}
+			generation, release, err := provider.AcquireGeneration(t.Context(), linter.SourceSnapshot{})
+			if release != nil {
+				defer release()
+			}
+			if err != nil || selected == nil || len(generation.Native.Programs) != 1 {
+				t.Fatalf("fallback generation: selected=%v error=%v", selected != nil, err)
+			}
+			if selected == sessionProgram || !selected.Options().AllowNonTsExtensions.IsTrue() {
+				t.Fatal("fixture did not use the standalone source-reference Program")
+			}
+			if selected.Options().ConfigFilePath != tspath.ResolvePath(directory, "tsconfig.json") || len(selected.Options().CustomConditions) != 0 {
+				t.Fatalf("unexpected fallback root options: %+v", selected.Options())
+			}
+			source := selected.GetSourceFile(fileName)
+			redirect := selected.GetRedirectForResolution(source)
+			if redirect == nil || redirect.ConfigName() != leafPath || !slices.Equal(redirect.CompilerOptions().CustomConditions, []string{test.condition}) {
+				t.Fatal("fixture lost the referenced source's distinct compiler options")
+			}
+			program := generation.Native.Programs[0]
+			for _, statement := range source.Statements.Nodes {
+				if !ast.IsImportDeclaration(statement) {
+					continue
+				}
+				specifier := statement.AsImportDeclaration().ModuleSpecifier
+				path, declaration, resolved := program.ResolveModule(source, modules.SourceFromSpecifier(specifier))
+				wantPath := tspath.ResolvePath(directory, "node_modules/"+specifier.Text()+"/types.d.ts")
+				if !resolved || declaration == nil || !declaration.IsDeclarationFile || fsys.Realpath(path) != fsys.Realpath(wantPath) {
+					t.Fatalf("declaration resolution for %q = %q, want %q", specifier.Text(), path, wantPath)
+				}
+			}
+			result, err := runLSPGenerationForTest(t.Context(), generation, nil, linter.ArtifactDemand{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			diagnostics := result.Observation.Native.Diagnostics
+			if len(diagnostics) != 1 || diagnostics[0].RuleName != "import/no-named-as-default-member" ||
+				!strings.Contains(diagnostics[0].Message.Description, "`"+test.wantReceiver+"`") {
+				t.Fatalf("referenced condition %q: diagnostics=%+v, want only %s.member", test.condition, diagnostics, test.wantReceiver)
 			}
 		})
 	}

@@ -49,10 +49,16 @@ This rule has no options. It does not provide automatic fixes or suggestions.
 - **CommonJS declarations are checked against their implementation.** For
   example, `fsExtra.outputFileSync()` is allowed even though `@types/fs-extra`
   declares `outputFileSync` as a named export. The check follows the importing
-  file's resolution settings and runtime export conditions. Explicit `.mjs` and
+  file's resolution settings and runtime export conditions, including settings
+  inherited from a referenced project. JSON runtime entries are treated as
+  default objects even when `resolveJsonModule` is disabled. Explicit `.mjs` and
   `.mts` implementations remain ES modules even inside a `type: 'commonjs'`
   package. If the implementation is unavailable, a generic `.d.ts` file alone
   does not suppress warnings; an explicit `.d.cts` extension identifies CommonJS.
+- **Runtime entry lookup follows TypeScript's resolver.** Node's extensionless
+  JSON fallback is not supported. For example, a package with `"main": "./data"`,
+  `data.json` and `index.d.ts` retains named-member warnings because the runtime
+  entry cannot be identified. An explicit `"main": "./data.json"` is supported.
 - **Checking imports requires access to the imported files.** If you disable both
   `languageOptions.parserOptions.project` and `projectService`, include imported
   files in the lint targets too. For example, checking `app.ts` alone will not

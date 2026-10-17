@@ -22,3 +22,53 @@ module.exports = {foo: 1};
 export const foo: number;
 -- node_modules/shared/types/current.js --
 module.exports = {foo: 1};
+-- reference-options/shared.json --
+{"compilerOptions":{"noLib":true,"module":"esnext","moduleResolution":"bundler"}}
+-- reference-options/tsconfig.conditions.json --
+{"extends":"./shared.json","files":["root.ts","reference.ts"],"references":[{"path":"./leaf.conditions.json"}]}
+-- reference-options/leaf.conditions.json --
+{"extends":"./shared.json","compilerOptions":{"composite":true,"outDir":"dist","customConditions":["development"]},"files":["reference.ts"]}
+-- reference-options/tsconfig.paths.json --
+{"extends":"./shared.json","compilerOptions":{"paths":{"runtime":["./mapped/esm"]}},"files":["root.ts","reference.ts"],"references":[{"path":"./leaf.paths.json"}]}
+-- reference-options/leaf.paths.json --
+{"extends":"./shared.json","compilerOptions":{"composite":true,"outDir":"dist","paths":{"runtime":["./mapped/cjs"]}},"files":["reference.ts"]}
+-- reference-options/tsconfig.suffixes.json --
+{"extends":"./shared.json","files":["root.ts","reference.ts"],"references":[{"path":"./leaf.suffixes.json"}]}
+-- reference-options/leaf.suffixes.json --
+{"extends":"./shared.json","compilerOptions":{"composite":true,"outDir":"dist","moduleSuffixes":[".native",""]},"files":["reference.ts"]}
+-- reference-options/root.ts --
+import value from 'runtime';
+value.member;
+-- reference-options/reference.ts --
+import value from 'runtime';
+value.member;
+-- reference-options/node_modules/runtime/package.json --
+{"exports":{"types":"./types.d.ts","development":"./cjs.js","default":"./esm.js"}}
+-- reference-options/node_modules/runtime/types.d.ts --
+export declare const member: number;
+declare const value: { member: number };
+export default value;
+-- reference-options/node_modules/runtime/types.native.d.ts --
+export declare const member: number;
+declare const value: { member: number };
+export default value;
+-- reference-options/node_modules/runtime/cjs.js --
+module.exports = { member: 1 };
+-- reference-options/node_modules/runtime/esm.js --
+export const member = 1;
+export default { member };
+-- reference-options/node_modules/runtime/esm.native.js --
+module.exports = { member: 1 };
+-- reference-options/mapped/esm.d.ts --
+export declare const member: number;
+declare const value: { member: number };
+export default value;
+-- reference-options/mapped/esm.js --
+export const member = 1;
+export default { member };
+-- reference-options/mapped/cjs.d.ts --
+export declare const member: number;
+declare const value: { member: number };
+export default value;
+-- reference-options/mapped/cjs.js --
+module.exports = { member: 1 };
