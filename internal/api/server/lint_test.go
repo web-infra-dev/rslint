@@ -966,28 +966,48 @@ func TestHandleLint_LowLevelExternalConfigSeparatesAuthoredAndScanRoots(t *testi
 }
 
 func TestHandleLint_OverlayGitignoreIsApplied(t *testing.T) {
-	dir := t.TempDir()
-	target := filepath.Join(dir, "source.js")
-	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
-		t.Fatalf("write target: %v", err)
-	}
-
-	response, err := (&Handler{}).HandleLint(api.LintRequest{
-		Config: json.RawMessage(`[
-			{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
-		]`),
-		ConfigDirectory:  dir,
-		WorkingDirectory: dir,
-		Files:            []string{target},
-		FileContents: map[string]string{
-			filepath.Join(dir, ".gitignore"): "source.js\n",
-		},
-	})
-	if err != nil {
-		t.Fatalf("HandleLint returned error: %v", err)
-	}
-	if response.FileCount != 0 || len(response.LintedFiles) != 0 || len(response.Diagnostics) != 0 {
-		t.Fatalf("overlay .gitignore was not applied: %+v", response)
+	for _, mode := range []string{"direct", "directory alias", "directory alias with external config"} {
+		t.Run(mode, func(t *testing.T) {
+			root := t.TempDir()
+			physical := filepath.Join(root, "workspace")
+			if err := os.Mkdir(physical, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			workingDirectory := physical
+			if mode != "direct" {
+				workingDirectory = filepath.Join(root, "alias")
+				if err := os.Symlink(physical, workingDirectory); err != nil {
+					t.Skipf("directory symlink unavailable: %v", err)
+				}
+			}
+			configDirectory := workingDirectory
+			if mode == "directory alias with external config" {
+				configDirectory = filepath.Join(root, "external-config")
+				if err := os.Mkdir(configDirectory, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			target := tspath.NormalizePath(filepath.Join(workingDirectory, "source.js"))
+			if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			request := api.LintRequest{
+				Config: json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`), ConfigDirectory: configDirectory,
+				WorkingDirectory: workingDirectory, Files: []string{target},
+			}
+			response, err := (&Handler{}).HandleLint(request)
+			if err != nil || response.FileCount != 1 || len(response.Diagnostics) != 1 {
+				t.Fatalf("target without overlay: response=%+v error=%v", response, err)
+			}
+			request.FileContents = map[string]string{filepath.Join(workingDirectory, ".gitignore"): "source.js\n"}
+			response, err = (&Handler{}).HandleLint(request)
+			if err != nil {
+				t.Fatalf("HandleLint returned error: %v", err)
+			}
+			if response.FileCount != 0 || len(response.LintedFiles) != 0 || len(response.Diagnostics) != 0 {
+				t.Fatalf("overlay .gitignore was not applied: %+v", response)
+			}
+		})
 	}
 }
 
@@ -1031,7 +1051,7 @@ func TestHandleLint_GitignoredParentBlocksNestedNegation(t *testing.T) {
 	}
 }
 
-func TestHandleLint_ParentGitignoreDoesNotSuppressConfigRoot(t *testing.T) {
+func TestHandleLint_ParentGitignoreAppliesAcrossConfigRoot(t *testing.T) {
 	dir := t.TempDir()
 	appDir := filepath.Join(dir, "packages", "app")
 	target := filepath.Join(appDir, "src", "file.js")
@@ -1061,14 +1081,8 @@ func TestHandleLint_ParentGitignoreDoesNotSuppressConfigRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
-	if response.FileCount != 1 {
-		t.Fatalf("parent .gitignore must not suppress a config-owned file, got FileCount=%d", response.FileCount)
-	}
-	if len(response.LintedFiles) != 1 {
-		t.Fatalf("config-owned file must be in LintedFiles, got %v", response.LintedFiles)
-	}
-	if len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("expected no-debugger for config-owned file, got %+v", response.Diagnostics)
+	if response.FileCount != 0 || len(response.LintedFiles) != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("ancestor Git policy must suppress the target: %+v", response)
 	}
 }
 
@@ -1102,18 +1116,12 @@ func TestHandleLint_IntermediateParentGitignoreIsNotRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
-	if response.FileCount != 1 {
-		t.Fatalf("parent .gitignore files must not suppress a config-owned file, got FileCount=%d", response.FileCount)
-	}
-	if len(response.LintedFiles) != 1 {
-		t.Fatalf("config-owned file must be in LintedFiles, got %v", response.LintedFiles)
-	}
-	if len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("expected no-debugger for config-owned file, got %+v", response.Diagnostics)
+	if response.FileCount != 0 || len(response.LintedFiles) != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("ancestor Git policy must suppress the target: %+v", response)
 	}
 }
 
-func TestHandleLint_ParentWildcardDoesNotReadIntermediateGitignore(t *testing.T) {
+func TestHandleLint_ParentWildcardReadsReachableIntermediateGitignore(t *testing.T) {
 	dir := t.TempDir()
 	appDir := filepath.Join(dir, "packages", "app")
 	target := filepath.Join(appDir, "src", "generated", "file.js")
@@ -1143,14 +1151,8 @@ func TestHandleLint_ParentWildcardDoesNotReadIntermediateGitignore(t *testing.T)
 	if err != nil {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
-	if response.FileCount != 1 {
-		t.Fatalf("parent intermediate .gitignore must not skip generated explicit file, got FileCount=%d", response.FileCount)
-	}
-	if len(response.LintedFiles) != 1 {
-		t.Fatalf("config-owned generated file must be in LintedFiles, got %v", response.LintedFiles)
-	}
-	if len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("expected no-debugger for config-owned generated file, got %+v", response.Diagnostics)
+	if response.FileCount != 0 || len(response.LintedFiles) != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("ancestor Git policy must suppress the target: %+v", response)
 	}
 }
 
@@ -2209,7 +2211,7 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(
 	}
 }
 
-func TestHandleLint_ExplicitConfigUsesOnlyWorkingDirectoryGitignore(t *testing.T) {
+func TestHandleLint_ExplicitConfigUsesEachTargetGitignore(t *testing.T) {
 	workingDirectory := t.TempDir()
 	targetDirectory := t.TempDir()
 	configPath := filepath.Join(workingDirectory, "custom.config.mjs")
@@ -2261,11 +2263,8 @@ func TestHandleLint_ExplicitConfigUsesOnlyWorkingDirectoryGitignore(t *testing.T
 	if err != nil {
 		t.Fatalf("HandleLintWithContext: %v", err)
 	}
-	if response.FileCount != 1 ||
-		len(response.Diagnostics) != 1 ||
-		response.Diagnostics[0].RuleName != "no-debugger" ||
-		filepath.Base(response.Diagnostics[0].FilePath) != "outside.js" {
-		t.Fatalf("explicit config Git projection crossed its working-directory boundary: %+v", response)
+	if response.FileCount != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("explicit config must apply the target tree's Git policy even outside cwd: %+v", response)
 	}
 }
 
@@ -2842,5 +2841,109 @@ func TestHandleLint_ExplicitRootMembershipTracksConfigChanges(t *testing.T) {
 		if response.FileCount != 1 || len(response.Diagnostics) != want {
 			t.Fatalf("roots=%s stale membership: %+v", roots, response)
 		}
+	}
+}
+
+func TestHandleLint_ConfigGitignoreIndependentOfWorkingDirectory(t *testing.T) {
+	root := t.TempDir()
+	writeProgramTestFiles(t, root, map[string]string{
+		".gitignore":                 "dist/\n",
+		"rslint.config.mjs":          "export default [];\n",
+		"packages/app/.gitignore":    "local.js\n",
+		"packages/app/dist/index.js": "debugger;\n",
+		"packages/app/src/index.js":  "debugger;\n",
+	})
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	entries := mustAPIConfig(t, `[{"files":["**/*.js"],"rules":{"no-debugger":"error"}}]`)
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		switch kind {
+		case api.KindLoadConfigs:
+			request := payload.(discovery.ConfigLoadBatchRequest)
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			for _, candidate := range request.Candidates {
+				response.Results = append(response.Results, discovery.ConfigLoadResult{ID: candidate.ID, Status: "loaded", Entries: entries})
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, response)
+		case api.KindActivateConfigs:
+			request := payload.(discovery.ConfigActivationRequest)
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{TransactionID: request.TransactionID})
+		default:
+			return nil, fmt.Errorf("unexpected reverse kind %q", kind)
+		}
+	})
+	for _, explicit := range []bool{false, true} {
+		for _, cwd := range []string{root, filepath.Join(root, "packages/app")} {
+			t.Run(fmt.Sprintf("explicit=%t/cwd=%s", explicit, filepath.Base(cwd)), func(t *testing.T) {
+				selection := &api.ConfigDiscoveryRequest{}
+				if explicit {
+					selection.ExplicitConfigPath = filepath.Join(root, "rslint.config.mjs")
+				}
+				visible := filepath.Join(root, "packages/app/src/index.js")
+				response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+					WorkingDirectory: cwd,
+					Files:            []string{filepath.Join(root, "packages/app/dist/index.js"), visible, visible},
+					ConfigDiscovery:  selection,
+				}, requester)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if response.FileCount != 1 || len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
+					t.Fatalf("target Git policy changed with cwd/config mode or repeated inputs: %+v", response)
+				}
+			})
+		}
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryPreservesExactOverlayTargets(t *testing.T) {
+	for _, test := range []struct {
+		name            string
+		explicit, empty bool
+	}{
+		{name: "omitted files"}, {name: "explicit config", explicit: true}, {name: "empty exact list", empty: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeProgramTestFiles(t, root, map[string]string{"unrelated.js": "debugger;\n"})
+			selection := &api.ConfigDiscoveryRequest{OverrideConfig: json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`)}
+			requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+				switch kind {
+				case api.KindLoadConfigs:
+					request := payload.(discovery.ConfigLoadBatchRequest)
+					response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+					for _, candidate := range request.Candidates {
+						response.Results = append(response.Results, discovery.ConfigLoadResult{ID: candidate.ID, Status: "loaded", Entries: mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`)})
+					}
+					return ipc.NewMessage(ipc.KindResponse, 1, response)
+				case api.KindActivateConfigs:
+					request := payload.(discovery.ConfigActivationRequest)
+					return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{TransactionID: request.TransactionID})
+				default:
+					return nil, fmt.Errorf("unexpected reverse request %s", kind)
+				}
+			})
+			if test.explicit {
+				selection.ExplicitConfigPath = filepath.Join(root, "custom.config.mjs")
+				writeProgramTestFiles(t, root, map[string]string{"custom.config.mjs": "export default [];\n"})
+			}
+			request := api.LintRequest{WorkingDirectory: root, ConfigDiscovery: selection, FileContents: map[string]string{filepath.Join(root, "overlay.js"): "debugger;\n"}}
+			want := 1
+			if test.empty {
+				request.Files = []string{}
+				want = 0
+			}
+			response, err := (&Handler{}).HandleLintWithContext(context.Background(), request, requester)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response.FileCount != want || len(response.Diagnostics) != want {
+				t.Fatalf("exact overlay targets widened or disappeared: %+v", response)
+			}
+			if want > 0 && response.Diagnostics[0].FilePath != "overlay.js" {
+				t.Fatalf("disk target outside the requested set was linted: %+v", response)
+			}
+		})
 	}
 }

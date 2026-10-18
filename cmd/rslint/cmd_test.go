@@ -91,6 +91,7 @@ func runLintCommandWithDispatcherForTest(
 	t.Helper()
 
 	t.Chdir(cwd)
+	prepareCommandCatalogForTest(cwd, &args)
 
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
@@ -888,8 +889,10 @@ func TestHandleLintCommandTypeCheckProjectConstructionOrder(t *testing.T) {
 				if code != 1 || !strings.Contains(stderr, "missing.json") {
 					t.Fatalf("declared project error: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
 				}
-				if got, want := fsys.callCount(targetPath) > 0, !typeCheckOnly || selection.options != nil; got != want {
-					t.Fatalf("target identity resolved before project error = %t, want %t", got, want)
+				// Input identity is frozen before discovery, including requests
+				// whose explicit projects fail before target planning begins.
+				if fsys.callCount(targetPath) == 0 {
+					t.Fatal("requested target identity was not frozen before the project error")
 				}
 			})
 		}
@@ -1250,14 +1253,7 @@ func TestHandleLintCommandDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *testi
 		}
 	}
 	spy := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
-	entries := rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
-		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
-		dir,
-		dir,
-		spy,
-		nil,
-		[]string{tspath.NormalizePath(selectedDir)},
-	)
+	entries := rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}}
 
 	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		ConfigCatalog:  explicitConfigCatalogForTest(dir, entries),
@@ -1278,7 +1274,7 @@ func TestHandleLintCommandDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *testi
 	}
 }
 
-func TestHandleLintCommandExplicitConfigDirectoryTargetUsesInvocationCWD(t *testing.T) {
+func TestHandleLintCommandExplicitConfigDirectoryTargetInheritsAncestorGitignore(t *testing.T) {
 	repositoryRoot := t.TempDir()
 	cwd := filepath.Join(repositoryRoot, "packages", "app")
 	selectedDir := filepath.Join(cwd, "selected")
@@ -1300,15 +1296,11 @@ func TestHandleLintCommandExplicitConfigDirectoryTargetUsesInvocationCWD(t *test
 			t.Fatalf("write %s: %v", path, err)
 		}
 	}
+	if err := os.Mkdir(filepath.Join(repositoryRoot, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	spy := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
-	entries := rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
-		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
-		repositoryRoot,
-		cwd,
-		spy,
-		nil,
-		[]string{tspath.NormalizePath(selectedDir)},
-	)
+	entries := rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}}
 
 	code, stdout, stderr := runLintCommandForTest(t, cwd, lintArgs{
 		ConfigCatalog:  explicitConfigCatalogForTest(repositoryRoot, entries),
@@ -1318,15 +1310,14 @@ func TestHandleLintCommandExplicitConfigDirectoryTargetUsesInvocationCWD(t *test
 		NoColor:        true,
 		SingleThreaded: true,
 	})
-	if code != 1 || !strings.Contains(stdout, "no-debugger") {
-		t.Fatalf("selected directory was not linted from invocation cwd: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	if code != 0 || strings.Contains(stdout, "no-debugger") {
+		t.Fatalf("ancestor Git rule failed to suppress selected file: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	wantGitignoreReads := []string{
-		tspath.NormalizePath(filepath.Join(cwd, ".gitignore")),
-		tspath.NormalizePath(filepath.Join(selectedDir, ".gitignore")),
-	}
-	if !slices.Equal(spy.gitignoreReads, wantGitignoreReads) {
-		t.Fatalf("explicit config CWD-rooted Git reads = %v, want %v", spy.gitignoreReads, wantGitignoreReads)
+	for _, source := range []string{filepath.Join(repositoryRoot, ".gitignore"), filepath.Join(cwd, ".gitignore"), filepath.Join(selectedDir, ".gitignore")} {
+		physical := tspath.CombinePaths(osvfs.FS().Realpath(filepath.Dir(source)), ".gitignore")
+		if !slices.Contains(spy.gitignoreReads, physical) {
+			t.Fatalf("ancestor/target source %s not observed: %v", physical, spy.gitignoreReads)
+		}
 	}
 	unrelatedDir = tspath.NormalizePath(unrelatedDir)
 	for _, accessed := range spy.accessedDirs {
@@ -1362,14 +1353,7 @@ func TestHandleLintCommandExplicitConfigKeepsDirectoryGitScopesIndependent(t *te
 	}
 
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	entries := rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
-		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
-		configDir,
-		invocationDir,
-		fsys,
-		nil,
-		[]string{tspath.NormalizePath(firstDir), tspath.NormalizePath(secondDir)},
-	)
+	entries := rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}}
 	code, stdout, stderr := runLintCommandForTest(t, invocationDir, lintArgs{
 		ConfigCatalog:  explicitConfigCatalogForTest(configDir, entries),
 		FS:             fsys,
@@ -1658,7 +1642,7 @@ func explicitFileWarningsForTest(
 ) []allowFileWarning {
 	t.Helper()
 	request.SingleThreaded = true
-	plan, err := target.Resolve(request)
+	plan, err := target.Resolve(withGitPolicyForTest(request))
 	if err != nil {
 		t.Fatalf("target.Resolve: %v", err)
 	}
@@ -1673,8 +1657,7 @@ func TestCollectAllowFileWarnings_NoWarningForFilesScopeMiss(t *testing.T) {
 	configDir := tspath.GetDirectoryPath(tspath.GetDirectoryPath(targetPath))
 
 	warnings := explicitFileWarningsForTest(t, target.Request{
-		Files: []string{targetPath},
-		Config: rslintconfig.RslintConfig{
+		Files: rslintconfig.ResolveFileIdentities([]string{targetPath}, osvfs.FS()), Config: rslintconfig.RslintConfig{
 			{Files: []string{"**/*.js"}, Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		ConfigDirectory: configDir,
@@ -1694,8 +1677,7 @@ func TestCollectAllowFileWarnings_NoWarningForExistingFile(t *testing.T) {
 	targetPath = tspath.NormalizePath(targetPath)
 
 	warnings := explicitFileWarningsForTest(t, target.Request{
-		Files: []string{targetPath},
-		Config: rslintconfig.RslintConfig{
+		Files: rslintconfig.ResolveFileIdentities([]string{targetPath}, osvfs.FS()), Config: rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		ConfigDirectory: tspath.GetDirectoryPath(targetPath),
@@ -1710,8 +1692,7 @@ func TestCollectAllowFileWarnings_NoWarningForExistingFile(t *testing.T) {
 func TestCollectAllowFileWarnings_MissingFileWarns(t *testing.T) {
 	targetPath := tspath.NormalizePath(filepath.Join(t.TempDir(), "missing.ts"))
 	warnings := explicitFileWarningsForTest(t, target.Request{
-		Files: []string{targetPath},
-		Config: rslintconfig.RslintConfig{
+		Files: rslintconfig.ResolveFileIdentities([]string{targetPath}, osvfs.FS()), Config: rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		ConfigDirectory: tspath.GetDirectoryPath(targetPath),
@@ -1734,8 +1715,7 @@ func TestCollectAllowFileWarnings_GlobalIgnoreStillWarns(t *testing.T) {
 	configDir := tspath.GetDirectoryPath(tspath.GetDirectoryPath(targetPath))
 
 	warnings := explicitFileWarningsForTest(t, target.Request{
-		Files: []string{targetPath},
-		Config: rslintconfig.RslintConfig{
+		Files: rslintconfig.ResolveFileIdentities([]string{targetPath}, osvfs.FS()), Config: rslintconfig.RslintConfig{
 			{Ignores: []string{"src/**"}},
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
@@ -1762,8 +1742,7 @@ func TestCollectAllowFileWarnings_DefaultExcludedFileWarns(t *testing.T) {
 	}
 
 	warnings := explicitFileWarningsForTest(t, target.Request{
-		Files: []string{targetPath},
-		Config: rslintconfig.RslintConfig{
+		Files: rslintconfig.ResolveFileIdentities([]string{targetPath}, osvfs.FS()), Config: rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		ConfigDirectory: tspath.NormalizePath(dir),
@@ -1798,8 +1777,7 @@ func TestCollectAllowFileWarningsUsesScanRootBeforeConfigProjection(t *testing.T
 	aliasTarget := tspath.CombinePaths(aliasDir, "index.ts")
 
 	warnings := explicitFileWarningsForTest(t, target.Request{
-		Files:           []string{aliasTarget},
-		Config:          rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-console": "error"}}},
+		Files: rslintconfig.ResolveFileIdentities([]string{aliasTarget}, osvfs.FS()), Config: rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-console": "error"}}},
 		ConfigDirectory: configDir,
 		ScanRoot:        scanRoot,
 		FS:              osvfs.FS(),
@@ -1834,18 +1812,13 @@ func TestCollectAllowFileWarningsPreservesGitignoreTargetIdentity(t *testing.T) 
 	); err != nil {
 		t.Fatal(err)
 	}
-	effective := rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
-		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-console": "error"}}},
-		configDir,
-		scanRoot,
-		osvfs.FS(),
-		[]string{aliasTarget},
-		nil,
-	)
+	effective := rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-console": "error"}}}
+	if err := os.WriteFile(filepath.Join(physicalSourceDir, ".gitignore"), []byte("ignored.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	warnings := explicitFileWarningsForTest(t, target.Request{
-		Files:           []string{aliasTarget},
-		Config:          effective,
+		Files: rslintconfig.ResolveFileIdentities([]string{aliasTarget}, osvfs.FS()), Config: effective,
 		ConfigDirectory: configDir,
 		ScanRoot:        scanRoot,
 		FS:              osvfs.FS(),
@@ -1880,8 +1853,7 @@ func TestCollectAllowFileWarnings_KeepsLexicalConfigOwnersSeparate(t *testing.T)
 	targetB := tspath.ResolvePath(ownerB, "link/index.ts")
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	warnings := explicitFileWarningsForTest(t, target.Request{
-		Files: []string{targetA, targetB},
-		ConfigMap: map[string]rslintconfig.RslintConfig{
+		Files: rslintconfig.ResolveFileIdentities([]string{targetA, targetB}, fsys), ConfigMap: map[string]rslintconfig.RslintConfig{
 			ownerA: {{Ignores: []string{"link/**"}}},
 			ownerB: {{}},
 		},
@@ -1926,14 +1898,14 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildProject: %v", err)
 	}
-	targetPlan, err := target.Resolve(target.Request{
+	targetPlan, err := target.Resolve(withGitPolicyForTest(target.Request{
 		Config:          targetConfig,
 		ConfigDirectory: dir,
 		ScanRoot:        dir,
 		FS:              fs,
-		Directories:     []string{tspath.NormalizePath(dir)},
+		Directories:     rslintconfig.ResolveDirectoryIdentities([]string{tspath.NormalizePath(dir)}, fs),
 		SingleThreaded:  true,
-	})
+	}))
 	if err != nil {
 		t.Fatalf("target.Resolve: %v", err)
 	}
@@ -1957,6 +1929,7 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		TargetsBySourcePath:                 binding.LintTargetBySourcePath,
 		SourceMappingsIncludeCanonicalPaths: true,
 		PathSpaces:                          targetPlan.PathSpaces(),
+		GitPolicy:                           targetPlan.GitPolicy(),
 		FS:                                  fs,
 	})
 	var diagnostics []rule.RuleDiagnostic

@@ -39,13 +39,13 @@ func TestPathSpaceSnapshotRequiresEveryAuthoredBase(t *testing.T) {
 		"/repo/invocation",
 	)
 
-	if _, err := NewTargetMatcherWithPathSpaces(config, configDirectory, nil, nil); err == nil ||
+	if _, err := NewTargetMatcherWithPathSpaces(config, configDirectory, nil, nil, nil); err == nil ||
 		!strings.Contains(err.Error(), "path-space snapshot is required") {
 		t.Fatalf("nil snapshot error = %v", err)
 	}
 
 	emptySnapshot := NewPathSpaceSnapshot(nil, nil)
-	if _, err := NewTargetMatcherWithPathSpaces(nil, configDirectory, nil, emptySnapshot); err == nil ||
+	if _, err := NewTargetMatcherWithPathSpaces(nil, configDirectory, nil, emptySnapshot, nil); err == nil ||
 		!strings.Contains(err.Error(), configDirectory) {
 		t.Fatalf("missing owner base error = %v", err)
 	}
@@ -54,7 +54,7 @@ func TestPathSpaceSnapshotRequiresEveryAuthoredBase(t *testing.T) {
 		map[string]RslintConfig{configDirectory: nil},
 		nil,
 	)
-	if _, err := NewTargetMatcherWithPathSpaces(config, configDirectory, nil, ownerOnlySnapshot); err == nil ||
+	if _, err := NewTargetMatcherWithPathSpaces(config, configDirectory, nil, ownerOnlySnapshot, nil); err == nil ||
 		!strings.Contains(err.Error(), "/repo/invocation") {
 		t.Fatalf("missing authored entry base error = %v", err)
 	}
@@ -63,7 +63,7 @@ func TestPathSpaceSnapshotRequiresEveryAuthoredBase(t *testing.T) {
 		map[string]RslintConfig{configDirectory: config},
 		nil,
 	)
-	if _, err := NewTargetMatcherWithPathSpaces(config, configDirectory, nil, completeSnapshot); err != nil {
+	if _, err := NewTargetMatcherWithPathSpaces(config, configDirectory, nil, completeSnapshot, nil); err != nil {
 		t.Fatalf("complete snapshot rejected: %v", err)
 	}
 }
@@ -74,7 +74,7 @@ func TestPathSpaceSnapshotAllowsEmptyConfigAtFrozenOwner(t *testing.T) {
 		map[string]RslintConfig{configDirectory: nil},
 		nil,
 	)
-	matcher, err := NewTargetMatcherWithPathSpaces(nil, configDirectory, nil, snapshot)
+	matcher, err := NewTargetMatcherWithPathSpaces(nil, configDirectory, nil, snapshot, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

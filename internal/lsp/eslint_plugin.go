@@ -214,6 +214,19 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 		return // document closed between dispatch and result
 	}
 
+	// Filesystem aliases can change without a document/config generation bump.
+	// Recheck admission before committing asynchronous results to the editor.
+	snapshot := s.documentLintSnapshot(r.uri)
+	if snapshot.unavailable || snapshot.resolvedConfig.GloballyIgnored {
+		delete(s.diagnostics, r.uri)
+		if err := s.PublishDiagnostics(s.backgroundCtx, &lsproto.PublishDiagnosticsParams{
+			Uri: r.uri, Diagnostics: []*lsproto.Diagnostic{},
+		}); err != nil {
+			log.Printf("[rslint] Error clearing plugin diagnostics for excluded target: %v", err)
+		}
+		return
+	}
+
 	// Append plugin diagnostics to the native ones already stored for this
 	// generation. handleCodeAction reads s.diagnostics[uri], so plugin
 	// quick fixes / suggestions become available too.

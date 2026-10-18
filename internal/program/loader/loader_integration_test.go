@@ -76,10 +76,10 @@ func TestBuildProjectsOwnsCacheAndPreservesItAcrossBindings(t *testing.T) {
 					}},
 				}}
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-				plan, err := target.Resolve(target.Request{
+				plan, err := target.Resolve(withGitPolicyForTest(target.Request{
 					Config: config, ConfigDirectory: dir, FS: fsys,
-					Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts")},
-				})
+					Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts")}, fsys),
+				}))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -173,7 +173,7 @@ func TestBuildProjectsSeparatesProjectPolicies(t *testing.T) {
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	session := NewSession(fsys)
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{dir + "/a/src/file.ts", dir + "/a/src/disabled.ts", dir + "/b/src/file.ts"}})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{dir + "/a/src/file.ts", dir + "/a/src/disabled.ts", dir + "/b/src/file.ts"}, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +229,7 @@ func TestBuildProjectsKeepsServiceGapsSourceOnly(t *testing.T) {
 			t.Run(strconv.Itoa(int(scope))+"/"+mode, func(t *testing.T) {
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 				session := NewSession(fsys)
-				plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: files})
+				plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities(files, fsys)}))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -304,7 +304,7 @@ func TestBuildProjectsKeepsProgramModesSeparate(t *testing.T) {
 						})
 					}
 					fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-					plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: files})
+					plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities(files, fsys)}))
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -392,7 +392,7 @@ func TestBuildProjectsValidatesServiceSourcesBeforePublishing(t *testing.T) {
 					ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)},
 				}}}
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-				plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{file}})
+				plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{file}, fsys)}))
 				if err != nil || len(plan.Files) != 1 {
 					t.Fatalf("target selection: files=%v, error=%v", plan.Files, err)
 				}
@@ -436,7 +436,7 @@ func TestBuildProjectsScopesInactiveOwners(t *testing.T) {
 		dir + "/b": {{Ignores: []string{"**"}}, {LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"custom.json"}}}}},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	plan, err := target.Resolve(target.Request{ConfigMap: configs, ConfigDirectory: dir, FS: fsys, Files: []string{dir + "/a/src/file.ts"}})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{ConfigMap: configs, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{dir + "/a/src/file.ts"}, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,16 +480,16 @@ func TestBuildProjectsSkipsOwnersWithoutTargets(t *testing.T) {
 				config = append(config, rslintconfig.ConfigWithAuthoredPathBase(override, otherOwner)...)
 				configs := map[string]rslintconfig.RslintConfig{projectOwner: config}
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-				request := target.Request{ConfigMap: configs, ConfigDirectory: dir, FS: fsys, Directories: []string{projectOwner}}
+				request := target.Request{ConfigMap: configs, ConfigDirectory: dir, FS: fsys, Directories: rslintconfig.ResolveDirectoryIdentities([]string{projectOwner}, fsys)}
 				wantPrograms := 0
 				if withActiveOwner {
 					configs[otherOwner] = rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
 						ProjectService: rslintconfig.BoolPtr(true),
 					}}}}
-					request.Files = []string{tspath.ResolvePath(otherOwner, "src/file.ts")}
+					request.Files = rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(otherOwner, "src/file.ts")}, fsys)
 					wantPrograms++
 				}
-				plan, err := target.Resolve(request)
+				plan, err := target.Resolve(withGitPolicyForTest(request))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -523,7 +523,7 @@ func TestBuildProjectsKeepsEffectiveCandidatesSeparateFromTypeCheckScope(t *test
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	files := []string{dir + "/a/src/file.ts", dir + "/b/src/file.ts"}
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: files})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities(files, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -570,10 +570,10 @@ func TestBuildProjectsDeduplicatesExplicitProjectsAcrossOwners(t *testing.T) {
 		tspath.ResolvePath(dir, "service"): {{Files: []string{"**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}}},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	plan, err := target.Resolve(target.Request{
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{
 		ConfigMap: configs, ConfigDirectory: dir, FS: fsys,
-		Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts"), tspath.ResolvePath(dir, "service/file.ts")},
-	})
+		Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts"), tspath.ResolvePath(dir, "service/file.ts")}, fsys),
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -605,15 +605,16 @@ func TestBuildProjectPlanReusesCandidatesAcrossRuleConfigs(t *testing.T) {
 				})
 			}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			plan, err := target.Resolve(target.Request{
+			plan, err := target.Resolve(withGitPolicyForTest(target.Request{
 				Config: config, ConfigDirectory: dir, FS: fsys,
-				Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "a/src/disabled.ts")},
-			})
+				Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "a/src/disabled.ts")}, fsys),
+			}))
 			if err != nil {
 				t.Fatal(err)
 			}
 			resolver := configLint.NewResolver(configLint.ResolverOptions{
-				Config: config, ConfigDirectory: dir, FS: fsys, PathSpaces: plan.PathSpaces(), Catalog: rule.NewCatalog(),
+				Config: config, ConfigDirectory: dir, FS: fsys, PathSpaces: plan.PathSpaces(),
+				GitPolicy: plan.GitPolicy(), Catalog: rule.NewCatalog(),
 			})
 			policies, err := resolver.ProjectPolicies(plan.Files, false)
 			if err != nil {
@@ -714,7 +715,7 @@ func TestBuildProjectsPreservesRawDeclarationsAfterEmptyArray(t *testing.T) {
 		{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{}}}},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{tspath.ResolvePath(dir, "a/src/file.ts")}})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a/src/file.ts")}, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -786,7 +787,7 @@ func TestBuildProjectsPreservesProjectDeclarationOrder(t *testing.T) {
 				wantConfig = "tsconfig.safe.json"
 			}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{file}})
+			plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{file}, fsys)}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -839,7 +840,7 @@ func TestBuildProjectsPreservesRawProjectBases(t *testing.T) {
 			dir := tspath.ResolvePath(archive.Materialize(t, "legacy-policy"), "pkg[1]")
 			config := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(false), Project: rslintconfig.ProjectPaths{pattern}}}}}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{tspath.ResolvePath(dir, "target.ts")}})
+			plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "target.ts")}, fsys)}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -857,7 +858,7 @@ func TestBuildProjectsPreservesRawProjectBases(t *testing.T) {
 		}
 		config = rslintconfig.ConfigWithResolvedBasePaths(config, dir)
 		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-		plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts")}})
+		plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts")}, fsys)}))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -895,7 +896,7 @@ func TestBuildProjectsRootContextsShareExecution(t *testing.T) {
 				}
 				files := []string{tspath.ResolvePath(owner, "x.ts"), tspath.ResolvePath(owner, "y.ts")}
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-				plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: files})
+				plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: rslintconfig.ResolveFileIdentities(files, fsys)}))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -954,7 +955,7 @@ func TestBuildProjectsWithoutEffectiveProjectsKeepTargetsUnbound(t *testing.T) {
 				config := rslintconfig.RslintConfig{{Files: []string{"**/disabled.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &disabled}}}
 				files := []string{tspath.ResolvePath(dir, "src/file.ts"), tspath.ResolvePath(dir, "src/disabled.ts")}
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-				plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: files})
+				plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities(files, fsys)}))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1003,7 +1004,7 @@ func TestBuildProjectsAllDeclaredKeepsRootForServiceAndClear(t *testing.T) {
 				config = append(config, rslintconfig.ConfigEntry{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: resetOptions}})
 			}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: []string{tspath.ResolvePath(owner, "x.ts")}})
+			plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(owner, "x.ts")}, fsys)}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1041,7 +1042,7 @@ func TestBuildProjectsAllDeclaredWithoutTargets(t *testing.T) {
 			}
 			config := rslintconfig.RslintConfig{{Ignores: []string{"**"}}, {LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &parsed}}}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Directories: []string{dir}})
+			plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Directories: rslintconfig.ResolveDirectoryIdentities([]string{dir}, fsys)}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1072,7 +1073,7 @@ func TestBuildProjectsRootContextsDeduplicateSharedPath(t *testing.T) {
 		config = append(config, rslintconfig.ConfigEntry{Files: []string{name}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{TsconfigRootDir: &roots[index]}}})
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: []string{tspath.ResolvePath(owner, "x.ts"), tspath.ResolvePath(owner, "y.ts")}})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(owner, "x.ts"), tspath.ResolvePath(owner, "y.ts")}, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1098,7 +1099,7 @@ func TestLoadProgramsSingleCandidateRequiresRootMembership(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service_modes.txtar").Materialize(t, ""))
 	config := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}}}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	requestPlan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{tspath.ResolvePath(dir, "a.ts")}})
+	requestPlan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a.ts")}, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3263,7 +3264,7 @@ func TestBuildProjectsRejectsCaseFoldedServiceSourceWithDifferentCanonicalIdenti
 	config := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{
 		ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)},
 	}}}
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: configDir, FS: fsys, Files: []string{lower}})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: configDir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{lower}, fsys)}))
 	if err != nil || len(plan.Files) != 1 || plan.Files[0].CanonicalPath != lower {
 		t.Fatalf("fixture must retain the distinct physical target: files=%v error=%v", plan.Files, err)
 	}

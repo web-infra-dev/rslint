@@ -81,12 +81,21 @@ func installJSConfigsForTest(s *Server, configs map[string]config.RslintConfig) 
 			s.fs,
 			s.jsConfigOwnerIndex.PathSpaces(),
 			s.currentRuleCatalog(),
+			s.gitPolicy,
 		)
 		if err != nil {
 			panic(err)
 		}
 		s.jsFileConfigResolvers[configDirectory] = resolver
 	}
+}
+
+func gitPolicyForLSPTest(s *Server) *config.GitPolicy {
+	directories := []string{s.cwd}
+	for directory := range s.jsConfigs {
+		directories = append(directories, directory)
+	}
+	return config.CollectGitPolicy(nil, s.cwd, s.fs, nil, config.ResolveDirectoryIdentities(directories, s.fs))
 }
 
 func installRuleCatalogForTest(s *Server, configs ...config.RslintConfig) {
@@ -157,6 +166,10 @@ func documentLintSnapshotForTest(
 		ruleCatalog = s.currentRuleCatalog()
 	}
 	target := lspConfigTarget(uriToPath(uri), configDirectory, s.fs)
+	gitPolicy := s.gitPolicy
+	if gitPolicy == nil {
+		gitPolicy = config.CollectGitPolicy(entries, configDirectory, s.fs, []config.PathIdentity{target.Identity()}, nil)
+	}
 	snapshot := documentLintSnapshot{
 		target: target,
 		config: entries,
@@ -165,6 +178,7 @@ func documentLintSnapshotForTest(
 			s.fs,
 		),
 		ruleCatalog:      ruleCatalog,
+		gitPolicy:        gitPolicy,
 		pluginGeneration: s.eslintPluginConfigGeneration,
 	}
 	if usesConfigCatalog {
@@ -2508,23 +2522,16 @@ func TestConfiguredLintExternalConfigPreservesGitignoreTargetIdentity(t *testing
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(
-		filepath.Join(workspace, ".gitignore"),
-		[]byte("linked-src/ignored.ts\n"),
+		filepath.Join(configDir, ".gitignore"),
+		[]byte("src/ignored.ts\n"),
 		0o644,
 	); err != nil {
 		t.Fatal(err)
 	}
-	effective := config.ConfigWithGitignoreForTargetsFromRoot(
-		config.RslintConfig{{
-			Files: []string{"src/**/*.ts"},
-			Rules: config.Rules{"no-debugger": "error"},
-		}},
-		configDir,
-		workspace,
-		osvfs.FS(),
-		[]string{aliasFile},
-		nil,
-	)
+	effective := config.RslintConfig{{
+		Files: []string{"src/**/*.ts"},
+		Rules: config.Rules{"no-debugger": "error"},
+	}}
 
 	s := newTestServer()
 	s.cwd = workspace
@@ -2821,7 +2828,7 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			},
 		},
 		{
-			name:      "parent ignore does not affect nested config",
+			name:      "parent ignore applies through nested config",
 			configDir: "packages/app",
 			relative:  "ignored/keep.ts",
 			config:    config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
@@ -2829,7 +2836,6 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 				".gitignore":                      "/packages/app/ignored/\n",
 				"packages/app/ignored/.gitignore": "!keep.ts\n",
 			},
-			wantLinted: true,
 		},
 		{
 			name:     "excluded parent keeps nested source unreachable",
@@ -2848,19 +2854,19 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			wantLinted: true,
 		},
 		{
-			name:       "directory symlink obeys lexical root gitignore",
+			name:       "directory symlink uses physical Git chain",
 			relative:   "link/source.ts",
 			config:     config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
 			gitignores: map[string]string{".gitignore": "link/source.ts\n"},
 			symlinkDir: true,
+			wantLinted: true,
 		},
 		{
-			name:         "directory symlink skips target gitignore source",
+			name:         "directory symlink reads physical target Git source",
 			relative:     "link/source.ts",
 			config:       config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
 			symlinkDir:   true,
 			targetIgnore: "source.ts\n",
-			wantLinted:   true,
 		},
 	}
 

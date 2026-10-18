@@ -151,8 +151,19 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		configTargetScopes     map[string]target.OwnerScope
 		catalogPlugins         []rslintconfig.EslintPluginEntry
 		pluginConfigKeyByOwner map[string]string
-		configGitignoreFrozen  bool
+		gitPolicy              *rslintconfig.GitPolicy
 	)
+	var targetFiles []rslintconfig.PathIdentity
+	targetFileByPath := make(map[string]rslintconfig.PathIdentity, len(allowedFiles))
+	if allowedFiles != nil {
+		targetFiles = make([]rslintconfig.PathIdentity, 0, len(allowedFiles))
+		for _, path := range allowedFiles {
+			identity := rslintconfig.FreezeFileIdentity(path, fs)
+			targetFiles = append(targetFiles, identity)
+			targetFileByPath[rslintconfig.ExactPathID(path)] = identity
+		}
+	}
+	var targetDirectories []rslintconfig.DirectoryIdentity
 	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
 			return nil, errors.New("configDiscovery requires a bidirectional API host")
@@ -174,26 +185,30 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			CWD:                       currentDirectory,
 			Fresh:                     true,
 			LimitDirectoryWalkToFiles: len(configDiscovery.Directories) > 0,
-			ImplicitCWD:               len(req.Files) == 0 && len(configDiscovery.Directories) == 0,
+			ImplicitCWD:               allowedFiles == nil && len(configDiscovery.Directories) == 0,
 			SingleThreaded:            false,
 		}
-		for _, directory := range configDiscovery.Directories {
-			discoveryRequest.Directories = append(discoveryRequest.Directories, resolveRequestPath(directory))
+		if targetFiles != nil {
+			discoveryRequest.Files = make([]discovery.DiscoveryFile, 0, len(targetFiles))
 		}
-		for index, filePath := range req.Files {
+		for _, directory := range configDiscovery.Directories {
+			discoveryRequest.Directories = append(discoveryRequest.Directories, rslintconfig.ResolveDirectoryIdentities([]string{resolveRequestPath(directory)}, fs)...)
+		}
+		for index, path := range req.Files {
 			explicit := true
 			if len(configDiscovery.ExplicitFiles) > 0 {
 				explicit = configDiscovery.ExplicitFiles[index]
 			}
-			canonicalPath := ""
-			if len(req.CanonicalFiles) > 0 {
-				canonicalPath = resolveRequestPath(req.CanonicalFiles[index])
-			}
 			discoveryRequest.Files = append(discoveryRequest.Files, discovery.DiscoveryFile{
-				Path:          resolveRequestPath(filePath),
-				CanonicalPath: canonicalPath,
-				Explicit:      explicit,
+				PathIdentity: targetFileByPath[rslintconfig.ExactPathID(resolveRequestPath(path))],
+				Explicit:     explicit,
 			})
+		}
+
+		if req.Files == nil {
+			for _, identity := range targetFiles {
+				discoveryRequest.Files = append(discoveryRequest.Files, discovery.DiscoveryFile{PathIdentity: identity, Explicit: true})
+			}
 		}
 
 		loader := &apiConfigModuleLoader{
@@ -203,14 +218,11 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		var configCatalog *discovery.ConfigCatalog
 		var err error
 		if configDiscovery.ExplicitConfigPath != "" {
-			var targetFiles []discovery.DiscoveryFile
-			if allowedFiles != nil {
-				targetFiles = make([]discovery.DiscoveryFile, 0, len(allowedFiles))
-				for _, filePath := range allowedFiles {
-					targetFiles = append(targetFiles, discovery.DiscoveryFile{
-						Path:          filePath,
-						CanonicalPath: canonicalPaths[rslintconfig.ExactPathID(filePath)],
-					})
+			var gitFiles []discovery.DiscoveryFile
+			if targetFiles != nil {
+				gitFiles = make([]discovery.DiscoveryFile, len(targetFiles))
+				for index, file := range targetFiles {
+					gitFiles[index] = discovery.DiscoveryFile{PathIdentity: file}
 				}
 			}
 			configCatalog, err = discovery.LoadExplicitConfig(
@@ -218,11 +230,10 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				fs,
 				loader,
 				discovery.ExplicitConfigRequest{
-					CWD:               currentDirectory,
-					ConfigPath:        resolveRequestPath(configDiscovery.ExplicitConfigPath),
-					TargetFiles:       targetFiles,
-					TargetDirectories: append([]string(nil), discoveryRequest.Directories...),
-					Fresh:             true,
+					CWD:         currentDirectory,
+					ConfigPath:  resolveRequestPath(configDiscovery.ExplicitConfigPath),
+					TargetFiles: gitFiles,
+					Fresh:       true,
 				},
 			)
 		} else {
@@ -230,6 +241,14 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 		if err != nil {
 			return nil, fmt.Errorf("discover config catalog: %w", err)
+		}
+		if failure := configCatalog.AllConfigsFailedError(); failure != nil {
+			return nil, fmt.Errorf("discover config catalog: %w", failure)
+		}
+		gitPolicy = configCatalog.GitPolicy
+		targetFiles = configCatalog.TargetFiles
+		if targetFiles == nil {
+			targetDirectories = configCatalog.TargetDirectories
 		}
 		if len(configCatalog.Failures) > 0 {
 			printConfigDiscoveryFailures(configCatalog.Failures)
@@ -252,7 +271,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				defaultRootDirectory = configDirectory
 				rslintConfig = append(rslintconfig.RslintConfig(nil), configCatalog.Configs[configDirectory]...)
 				pluginConfigKeyByOwner = map[string]string{configDirectory: configDirectory}
-				configGitignoreFrozen = true
 			} else {
 				configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
 				pluginConfigKeyByOwner = make(map[string]string, len(configCatalog.Configs))
@@ -279,15 +297,11 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		catalogPlugins = configCatalog.EslintPlugins
 	}
 
-	if configMap == nil && !configGitignoreFrozen {
-		rslintConfig = rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
-			rslintConfig,
-			configDirectory,
-			currentDirectory,
-			fs,
-			allowedFiles,
-			nil,
-		)
+	if gitPolicy == nil {
+		if targetFiles == nil {
+			targetDirectories = rslintconfig.ResolveDirectoryIdentities([]string{currentDirectory}, fs)
+		}
+		gitPolicy = rslintconfig.CollectGitPolicy(rslintConfig, configDirectory, fs, targetFiles, targetDirectories)
 	}
 	pluginEntries := append([]rslintconfig.EslintPluginEntry(nil), catalogPlugins...)
 	for _, plugin := range req.EslintPlugins {
@@ -335,7 +349,9 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		ScanRoot:        currentDirectory,
 		OwnerScopes:     configTargetScopes,
 		FS:              fs,
-		Files:           allowedFiles,
+		Files:           targetFiles,
+		Directories:     targetDirectories,
+		GitPolicy:       gitPolicy,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("resolve lint targets: %w", err)
@@ -347,6 +363,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		DefaultRootDirectory: defaultRootDirectory,
 		Catalog:              ruleCatalog,
 		PathSpaces:           targetPlan.PathSpaces(),
+		GitPolicy:            targetPlan.GitPolicy(),
 		FS:                   fs,
 	})
 	projectPolicies, err := configResolver.ProjectPolicies(targetPlan.Files, false)

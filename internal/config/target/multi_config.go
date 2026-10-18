@@ -12,11 +12,12 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 	configMap map[string]rslintconfig.RslintConfig,
 	scopes map[string]OwnerScope,
 	fsys vfs.FS,
-	allowFiles []string,
-	allowDirs []string,
+	allowFiles []rslintconfig.PathIdentity,
+	allowDirs []rslintconfig.DirectoryIdentity,
 	singleThreaded bool,
 	ownerIndex *OwnerIndex,
 	explicitSet *explicitLintTargetSet,
+	gitPolicy *rslintconfig.GitPolicy,
 ) []File {
 	if len(configMap) == 0 {
 		return nil
@@ -60,13 +61,10 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 		}
 	}
 	if explicitSet == nil {
-		explicitSet = newExplicitLintTargetSet([]string{}, fsys)
-	}
-	for _, scope := range scopes {
-		explicitSet.add(scope.ExplicitFiles, false, fsys)
+		explicitSet = newExplicitLintTargetSet([]rslintconfig.PathIdentity{}, fsys)
 	}
 	filesByConfig := make(map[string][]*explicitLintTarget)
-	for _, explicitFile := range explicitSet.targetsForPaths(allowFiles) {
+	for _, explicitFile := range explicitSet.targetsForIdentities(allowFiles) {
 		pathID := tspath.ToPath(explicitFile.target.Path, "", true)
 		if _, assigned := assignedExplicitOwners[pathID]; assigned {
 			continue
@@ -115,7 +113,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 		}
 		configAllowDirs := allowDirs
 		if scopes[configDir].ExplicitOnly {
-			configAllowDirs = []string{}
+			configAllowDirs = []rslintconfig.DirectoryIdentity{}
 		}
 		targets := discoverLintTargetsForConfigInMap(
 			configMap,
@@ -127,6 +125,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 			configAllowDirs,
 			singleThreaded,
 			ownerIndex.PathSpaces(),
+			gitPolicy,
 		)
 		for _, target := range targets {
 			pathID := tspath.ToPath(tspath.NormalizePath(target.Path), "", true)
@@ -165,9 +164,10 @@ func discoverLintTargetsForConfigInMap(
 	configDir string,
 	fsys vfs.FS,
 	explicitFiles []*explicitLintTarget,
-	allowDirs []string,
+	allowDirs []rslintconfig.DirectoryIdentity,
 	singleThreaded bool,
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
+	gitPolicy *rslintconfig.GitPolicy,
 ) []File {
 	cfg, ok := configMap[configDir]
 	if !ok {
@@ -185,6 +185,7 @@ func discoverLintTargetsForConfigInMap(
 		stopDirs,
 		singleThreaded,
 		pathSpaces,
+		gitPolicy,
 	)
 	if len(targets) == 0 {
 		return targets

@@ -109,6 +109,9 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	}
 	server := p.server
 	snapshot := p.snapshot
+	if snapshot.unavailable {
+		return emptyLintGeneration(server.cwd), nil, nil
+	}
 	if !snapshot.configResolved {
 		snapshot = resolveDocumentLintSnapshotConfig(snapshot, server.fs)
 	}

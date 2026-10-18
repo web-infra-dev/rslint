@@ -25,3 +25,12 @@ func LookupSourceTarget(
 	lintTarget, ok := targetsBySourcePath[canonicalID]
 	return lintTarget, ok
 }
+
+func canonicalPathOrSelf(path string, fsys vfs.FS) string {
+	if fsys != nil {
+		if physical := fsys.Realpath(path); physical != "" {
+			return tspath.NormalizePath(physical)
+		}
+	}
+	return tspath.NormalizePath(path)
+}

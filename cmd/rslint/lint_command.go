@@ -369,8 +369,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			ScanRoot:        workingDirectory,
 			OwnerScopes:     configTargetScopes,
 			FS:              fs,
-			Files:           allowFiles,
-			Directories:     allowDirs,
+			Files:           configCatalog.TargetFiles,
+			Directories:     configCatalog.TargetDirectories,
+			GitPolicy:       configCatalog.GitPolicy,
 			SingleThreaded:  singleThreaded,
 		})
 		if err != nil {
@@ -383,6 +384,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			DefaultRootDirectory: currentDirectory,
 			Catalog:              ruleCatalog,
 			PathSpaces:           targetPlan.PathSpaces(),
+			GitPolicy:            targetPlan.GitPolicy(),
 			FS:                   fs,
 		})
 		projectPolicies, err = configResolver.ProjectPolicies(targetPlan.Files, singleThreaded)

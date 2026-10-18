@@ -184,13 +184,13 @@ type Server struct {
 	// and ignore patterns on every edit.
 	jsFileConfigResolvers map[string]*config.FileConfigResolver
 	// fallbackConfigOwnerIndex freezes the workspace fallback's authored path
-	// space. The fallback is an empty config plus the committed .gitignore view
-	// for files outside every discovered config boundary.
+	// space. Its empty authored config shares the committed Git policy with
+	// every discovered config owner.
 	fallbackConfigOwnerIndex   *target.OwnerIndex
 	fallbackFileConfigResolver *config.FileConfigResolver
 	// configDiscoveryActive becomes true after the first structurally valid
 	// configRefresh request. It lets Go's supplemental strict-ancestor JS and
-	// config-scoped .gitignore watchers trigger a fresh transaction without
+	// Git-policy watchers trigger a fresh transaction without
 	// sending reverse requests before the client installs its handlers. The
 	// extension remains the sole refresh owner for workspace/descendant config
 	// changes.
@@ -206,11 +206,15 @@ type Server struct {
 	// unavailable boundaries used to keep LSP alive when every JS config is
 	// broken. Refresh failures preserve only the usable JS catalog as last-good.
 	configDiscoveryHasLastGood bool
-	// configSnapshotIncludesGitignore means the current catalog and workspace
-	// fallback already contain the .gitignore view captured during their
-	// transaction. Before the first committed snapshot, fallback evaluation uses
-	// the live policy.
-	configSnapshotIncludesGitignore bool
+	// gitPolicy is committed atomically with the configuration and resolvers.
+	// A nil value means discovery has not committed yet; bootstrap operations
+	// collect one exact target with a request-local reader.
+	gitPolicy                    *config.GitPolicy
+	gitPolicyWatcherID           project.WatcherID
+	retiredGitPolicyWatcherID    project.WatcherID
+	gitPolicyWatcherGeneration   uint64
+	gitPolicyWatcherKey          string
+	committedGitWatchDirectories []string
 	// jsUnavailableConfigs contains absolute config-directory paths for failed
 	// JS/TS config boundaries. They participate in ownership but suppress lint.
 	jsUnavailableConfigs map[string]struct{}

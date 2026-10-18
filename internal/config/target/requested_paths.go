@@ -4,7 +4,6 @@ import (
 	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
@@ -62,11 +61,9 @@ func filterInitialWalkRoots(
 		if isDefaultExcluded != nil && isDefaultExcluded(root) {
 			continue
 		}
-		if root != "." {
-			if isStoppedWalkPath(root, stopWalkDirs, useCaseSensitive) ||
-				(canPrune != nil && canPrune(root)) {
-				continue
-			}
+		if (root != "." && isStoppedWalkPath(root, stopWalkDirs, useCaseSensitive)) ||
+			(canPrune != nil && canPrune(root)) {
+			continue
 		}
 		filtered = append(filtered, root)
 	}
@@ -95,10 +92,6 @@ type resolvedAllowedDirectory = rslintconfig.DirectoryIdentity
 type requestedPathProjection struct {
 	Path          string
 	CanonicalPath string
-}
-
-func resolveAllowedDirectories(allowDirs []string, fsys vfs.FS) []resolvedAllowedDirectory {
-	return rslintconfig.ResolveDirectoryIdentities(allowDirs, fsys)
 }
 
 // projectPathThroughRequestedDirectories returns every caller-visible spelling
@@ -184,87 +177,50 @@ func projectPathThroughRequestedDirectories(
 	return projections
 }
 
-func discoverWalkRoots(configDir string, allowDirs []string, fsys vfs.FS) []string {
+// frozenWalkRoot uses request identities first and frozen authored bases for
+// owner handoffs. Target planning never resolves a requested root again.
+func frozenWalkRoot(path string, directories []rslintconfig.DirectoryIdentity, spaces *rslintconfig.PathSpaceSnapshot) rslintconfig.DirectoryIdentity {
+	for _, directory := range directories {
+		if rslintconfig.ExactPathID(directory.LexicalPath) == rslintconfig.ExactPathID(path) {
+			return directory
+		}
+	}
+	physical, ok := spaces.PhysicalDirectory(path)
+	if !ok {
+		physical = path
+	}
+	return rslintconfig.DirectoryIdentity{LexicalPath: path, CanonicalPath: physical}
+}
+
+func discoverWalkRoots(root rslintconfig.DirectoryIdentity, allowDirs []rslintconfig.DirectoryIdentity) []string {
 	if allowDirs == nil {
 		return []string{"."}
 	}
-	if len(allowDirs) == 0 {
-		return nil
-	}
-
-	configDir = tspath.NormalizePath(configDir)
-	canonicalConfigDir := configDir
-	if fsys != nil {
-		if realPath := fsys.Realpath(configDir); realPath != "" {
-			canonicalConfigDir = tspath.NormalizePath(realPath)
-		}
-	}
 	seen := make(map[string]struct{}, len(allowDirs))
-	roots := make([]string, 0, len(allowDirs))
-	addRoot := func(root string) {
-		if root == "" {
-			root = "."
+	var roots []string
+	add := func(relative string) {
+		if relative == "" {
+			relative = "."
 		}
-		root = tspath.NormalizePath(root)
-		if root == "." {
-			roots = []string{"."}
-			seen = map[string]struct{}{".": {}}
-			return
-		}
-		for _, existing := range roots {
-			if existing == "." {
-				return
-			}
-			if pathsEqual(existing, root, true) ||
-				tspath.StartsWithDirectory(root, existing, true) {
-				return
-			}
-		}
-		filtered := roots[:0]
-		seen = make(map[string]struct{}, len(allowDirs))
-		for _, existing := range roots {
-			if pathsEqual(existing, root, true) ||
-				tspath.StartsWithDirectory(existing, root, true) {
-				continue
-			}
-			seen[existing] = struct{}{}
-			filtered = append(filtered, existing)
-		}
-		roots = filtered
-		if _, ok := seen[root]; ok {
-			return
-		}
-		seen[root] = struct{}{}
-		roots = append(roots, root)
-	}
-
-	for _, rawDir := range allowDirs {
-		dir := tspath.NormalizePath(rawDir)
-		if pathsEqual(dir, configDir, true) ||
-			tspath.StartsWithDirectory(configDir, dir, true) {
-			return []string{"."}
-		}
-		if relative, within := rslintconfig.RelativePathWithinConfigRoot(dir, configDir, true); within {
-			addRoot(relative)
-			continue
-		}
-		if fsys == nil {
-			continue
-		}
-		realDir := fsys.Realpath(dir)
-		if realDir == "" {
-			continue
-		}
-		canonicalDir := tspath.NormalizePath(realDir)
-		if pathsEqual(canonicalDir, canonicalConfigDir, true) ||
-			tspath.StartsWithDirectory(canonicalConfigDir, canonicalDir, true) {
-			return []string{"."}
-		}
-		if relative, within := rslintconfig.RelativePathWithinConfigRoot(canonicalDir, canonicalConfigDir, true); within {
-			addRoot(relative)
+		key := rslintconfig.ExactPathID(relative)
+		if _, exists := seen[key]; !exists {
+			seen[key] = struct{}{}
+			roots = append(roots, relative)
 		}
 	}
-
+	for _, directory := range allowDirs {
+		if _, contains := rslintconfig.RelativePathWithinConfigRoot(root.LexicalPath, directory.LexicalPath, true); contains {
+			add(".")
+		} else if relative, within := rslintconfig.RelativePathWithinConfigRoot(directory.LexicalPath, root.LexicalPath, true); within {
+			add(relative)
+		} else if _, contains := rslintconfig.RelativePathWithinConfigRoot(root.CanonicalPath, directory.CanonicalPath, true); contains {
+			add(".")
+		} else if relative, within := rslintconfig.RelativePathWithinConfigRoot(directory.CanonicalPath, root.CanonicalPath, true); within {
+			add(relative)
+		}
+	}
+	// Each explicit directory remains an independent entry: its ancestors may
+	// be pruned even though this directory begins a different Git repository.
 	sort.Strings(roots)
 	return roots
 }

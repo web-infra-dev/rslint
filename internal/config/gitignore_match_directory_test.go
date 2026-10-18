@@ -3,6 +3,10 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"runtime"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -13,7 +17,8 @@ import (
 
 type gitignoreReadSpyFS struct {
 	vfs.FS
-	reads []string
+	reads       []string
+	directories []string
 }
 
 func (fsys *gitignoreReadSpyFS) ReadFile(path string) (string, bool) {
@@ -21,554 +26,417 @@ func (fsys *gitignoreReadSpyFS) ReadFile(path string) (string, bool) {
 	return fsys.FS.ReadFile(path)
 }
 
-func TestCollectedGitignoreUsesItsOwnMatchDirectory(t *testing.T) {
-	config := ConfigWithCollectedGitignore(
-		RslintConfig{
-			{Ignores: []string{"../workspace/config-ignored.ts"}},
-			{Rules: Rules{"rule": "error"}},
-		},
-		[]gitignore.Pattern{{
-			Glob:           "git-ignored.ts",
-			NodeGlob:       "git-ignored.ts",
-			MatchDirectory: "/repo/workspace",
-		}},
-		false,
-	)
+func (fsys *gitignoreReadSpyFS) GetAccessibleEntries(path string) vfs.Entries {
+	fsys.directories = append(fsys.directories, tspath.NormalizePath(path))
+	return fsys.FS.GetAccessibleEntries(path)
+}
 
+func gitPolicyFixture(t *testing.T, files map[string]string) string {
+	t.Helper()
+	root := t.TempDir()
+	for name, content := range files {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return tspath.NormalizePath(osvfs.FS().Realpath(root))
+}
+
+func gitPolicyMatcher(t *testing.T, entries RslintConfig, owner string, fsys vfs.FS, policy *GitPolicy) TargetMatcher {
+	t.Helper()
+	spaces := NewPathSpaceSnapshot(map[string]RslintConfig{owner: entries}, fsys)
+	matcher, err := NewTargetMatcherWithPathSpaces(entries, owner, fsys, spaces, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return matcher
+}
+
+func TestGitPolicyTargetChainUsesNearestRepository(t *testing.T) {
+	for _, marker := range []string{"directory", "file", "none"} {
+		t.Run(marker, func(t *testing.T) {
+			root := gitPolicyFixture(t, map[string]string{
+				".gitignore":                 "dist/\n",
+				"repo/.gitignore":            "*.generated.ts\n",
+				"repo/pkg/.gitignore":        "!keep.generated.ts\n",
+				"repo/pkg/dist/app.ts":       "",
+				"repo/pkg/drop.generated.ts": "",
+				"repo/pkg/keep.generated.ts": "",
+			})
+			repo := tspath.CombinePaths(root, "repo")
+			if marker == "directory" {
+				if err := os.Mkdir(filepath.Join(repo, ".git"), 0755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if marker == "file" {
+				if err := os.WriteFile(filepath.Join(repo, ".git"), []byte("gitdir: elsewhere\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			entries := RslintConfig{{Files: []string{"**/*.ts"}}}
+			// The config's unrelated directory does not select a Git upper bound.
+			owner := tspath.CombinePaths(root, "external-config")
+			paths := []string{"pkg/dist/app.ts", "pkg/drop.generated.ts", "pkg/keep.generated.ts"}
+			identities := make([]PathIdentity, len(paths))
+			for index, path := range paths {
+				identities[index] = FreezeFileIdentity(tspath.CombinePaths(repo, path), osvfs.FS())
+			}
+			policy := CollectGitPolicy(entries, owner, osvfs.FS(), identities, nil)
+			matcher := gitPolicyMatcher(t, entries, owner, osvfs.FS(), policy)
+			for index, want := range []bool{marker == "none", true, false} {
+				if got := matcher.MatchFile(identities[index]).GloballyIgnored(); got != want {
+					t.Errorf("%s ignored=%v want=%v", paths[index], got, want)
+				}
+			}
+			if !policy.CoversDirectory(tspath.CombinePaths(repo, "pkg")) {
+				t.Fatal("exact target directory is not covered")
+			}
+			if policy.CoversDirectory(tspath.CombinePaths(repo, "unvisited")) {
+				t.Fatal("root presence covered an unvisited directory")
+			}
+		})
+	}
+}
+
+func TestGitPolicyNestedEmptyRepositoryCutsAncestorRules(t *testing.T) {
+	root := gitPolicyFixture(t, map[string]string{
+		".git": "", ".gitignore": "vendor/\n",
+		"vendor/inner/.git":      "gitdir: elsewhere\n",
+		"vendor/inner/source.ts": "",
+	})
+	inner := tspath.CombinePaths(root, "vendor/inner")
+	entries := RslintConfig{{Files: []string{"**/*.ts"}}}
+	dirs := ResolveDirectoryIdentities([]string{root, inner}, osvfs.FS())
+	policy := CollectGitPolicy(entries, root, osvfs.FS(), nil, dirs)
+	matcher := gitPolicyMatcher(t, entries, root, osvfs.FS(), policy)
+	target := FreezeFileIdentity(tspath.CombinePaths(inner, "source.ts"), osvfs.FS())
+	if matcher.MatchFile(target).GloballyIgnored() {
+		t.Fatal("empty inner Git root borrowed outer ignore rules")
+	}
+	if !policy.CoversDirectory(inner) {
+		t.Fatal("explicit inner root was lost under pruned ancestor")
+	}
+	// Merely knowing an explicit inner root never opens sibling traversal.
+	if policy.CoversDirectory(tspath.CombinePaths(root, "vendor/sibling")) {
+		t.Fatal("explicit inner target reopened unrelated siblings")
+	}
+}
+
+func TestGitPolicyCombinesSourceStateBeforeAuthoredNegations(t *testing.T) {
+	root := gitPolicyFixture(t, map[string]string{
+		".git": "", ".gitignore": "a-dir/\ndist/\n",
+		"foo/.gitignore":    "!a-dir/keep.ts\n",
+		"foo/a-dir/keep.ts": "", "dist/.gitignore": "source.ts\n", "dist/source.ts": "",
+	})
+	source := FreezeFileIdentity(tspath.CombinePaths(root, "foo/a-dir/keep.ts"), osvfs.FS())
+	entries := RslintConfig{{Files: []string{"**/*.ts"}}}
+	policy := CollectGitPolicy(entries, root, osvfs.FS(), []PathIdentity{source}, nil)
+	if !gitPolicyMatcher(t, entries, root, osvfs.FS(), policy).MatchFile(source).GloballyIgnored() {
+		t.Fatal("child source negation restored an excluded parent")
+	}
+	entries = append(RslintConfig{{Ignores: []string{"!dist/**"}}}, entries...)
+	spy := &gitignoreReadSpyFS{FS: osvfs.FS()}
+	policy = CollectGitPolicy(entries, root, spy, nil, ResolveDirectoryIdentities([]string{root}, spy))
+	matcher := gitPolicyMatcher(t, entries, root, spy, policy)
+	dist := FreezeFileIdentity(tspath.CombinePaths(root, "dist/source.ts"), spy)
+	if matcher.MatchFile(dist).GloballyIgnored() {
+		t.Fatal("authored negation did not override Git decision")
+	}
+	for _, path := range spy.reads {
+		if path == tspath.CombinePaths(root, "dist/.gitignore") {
+			t.Fatal("authored negation made raw Git source reachable")
+		}
+	}
+	if !policy.CoversDirectory(tspath.CombinePaths(root, "dist")) {
+		t.Fatal("proven raw block was not covered")
+	}
+	if matcher.CanPruneDirectory(DirectoryIdentity{LexicalPath: tspath.CombinePaths(root, "dist"), CanonicalPath: tspath.CombinePaths(root, "dist")}) {
+		t.Fatal("authored negation lost directory reach")
+	}
+}
+
+func TestGitPolicyDirectoryPruningUsesGitAndAuthoredNegationReach(t *testing.T) {
+	root := gitPolicyFixture(t, map[string]string{".git": "", ".gitignore": "build/\n", "build/keep.ts": "", "build/drop.ts": ""})
 	for _, test := range []struct {
-		name    string
+		ignore []string
+		prune  bool
+	}{
+		{nil, true}, {[]string{"!build/keep.ts"}, false}, {[]string{"!other/keep.ts"}, true}, {[]string{"build/**", "!build/keep.ts"}, true},
+	} {
+		entries := RslintConfig{{Ignores: test.ignore}, {Files: []string{"**/*.ts"}}}
+		policy := CollectGitPolicy(entries, root, osvfs.FS(), []PathIdentity{FreezeFileIdentity(tspath.CombinePaths(root, "build/keep.ts"), osvfs.FS())}, nil)
+		matcher := gitPolicyMatcher(t, entries, root, osvfs.FS(), policy)
+		path := tspath.CombinePaths(root, "build")
+		if got := matcher.CanPruneDirectory(DirectoryIdentity{LexicalPath: path, CanonicalPath: path}); got != test.prune {
+			t.Errorf("%v prune=%v want=%v", test.ignore, got, test.prune)
+		}
+	}
+}
+
+func TestGitPolicyUsesPhysicalParentAndOriginalLeafName(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink privileges differ")
+	}
+	root := gitPolicyFixture(t, map[string]string{
+		"repo-a/.git": "", "repo-a/.gitignore": "src/alias.ts\n",
+		"repo-a/src/source.ts": "", "repo-b/.git": "", "repo-b/source.ts": "",
+	})
+	a := tspath.CombinePaths(root, "repo-a")
+	b := tspath.CombinePaths(root, "repo-b")
+	alias := tspath.CombinePaths(root, "directory-alias")
+	if err := os.Symlink(filepath.Join(a, "src"), alias); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(b, "source.ts"), filepath.Join(a, "src/alias.ts")); err != nil {
+		t.Fatal(err)
+	}
+	identity := FreezeFileIdentity(tspath.CombinePaths(alias, "alias.ts"), osvfs.FS())
+	if want := tspath.CombinePaths(a, "src/alias.ts"); GitPath(identity) != want {
+		t.Fatalf("Git path=%s want=%s", GitPath(identity), want)
+	}
+	entries := RslintConfig{{Files: []string{"**/*.ts"}}}
+	policy := CollectGitPolicy(entries, b, osvfs.FS(), []PathIdentity{identity}, nil)
+	if !gitPolicyMatcher(t, entries, b, osvfs.FS(), policy).MatchFile(identity).GloballyIgnored() {
+		t.Fatal("leaf symlink borrowed destination repository rules")
+	}
+}
+
+func TestGitPolicySnapshotAndInputConfigurationAreImmutable(t *testing.T) {
+	root := gitPolicyFixture(t, map[string]string{".git": "", ".gitignore": "dist/\n", "dist/file.ts": "", "src/file.ts": ""})
+	reader := gitignore.NewReader(osvfs.FS())
+	reader.Observe(reader.Ancestors(root), root)
+	snapshot := reader.Snapshot()
+	policy := NewGitPolicy(snapshot)
+	for index := range snapshot.Sources {
+		for p := range snapshot.Sources[index].Patterns {
+			snapshot.Sources[index].Patterns[p].NodeGlob = "does-not-match"
+		}
+	}
+	snapshot.Roots[0] = "/elsewhere"
+	reader.Observe(reader.Ancestors(tspath.CombinePaths(root, "src")), tspath.CombinePaths(root, "src"))
+	if policy.CoversDirectory(tspath.CombinePaths(root, "src")) {
+		t.Fatal("new observation mutated prior generation")
+	}
+	entries := RslintConfig{{Files: []string{"**/*.ts"}}}
+	before := append(RslintConfig(nil), entries...)
+	target := FreezeFileIdentity(tspath.CombinePaths(root, "dist/file.ts"), osvfs.FS())
+	if !gitPolicyMatcher(t, entries, root, osvfs.FS(), policy).MatchFile(target).GloballyIgnored() {
+		t.Fatal("snapshot mutation changed compiled Git rules")
+	}
+	if !reflect.DeepEqual(entries, before) || entries.IsFileIgnored(target.Path, root) {
+		t.Fatal("Git collection leaked into authored configuration")
+	}
+}
+
+func TestTargetMatchRequiresSameGitPolicyGeneration(t *testing.T) {
+	root := gitPolicyFixture(t, map[string]string{".git": "", ".gitignore": "dist/\n", "dist/file.ts": ""})
+	entries := RslintConfig{{Files: []string{"**/*.ts"}}}
+	identity := FreezeFileIdentity(tspath.CombinePaths(root, "dist/file.ts"), osvfs.FS())
+	first := CollectGitPolicy(entries, root, osvfs.FS(), []PathIdentity{identity}, nil)
+	second := CollectGitPolicy(entries, root, osvfs.FS(), []PathIdentity{identity}, nil)
+	spaces := NewPathSpaceSnapshot(map[string]RslintConfig{root: entries}, osvfs.FS())
+	matcher, err := NewTargetMatcherWithPathSpaces(entries, root, osvfs.FS(), spaces, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	match := matcher.MatchFile(identity)
+	for _, test := range []struct {
+		policy *GitPolicy
+		reuse  bool
+	}{{first, true}, {second, false}, {nil, false}} {
+		resolver, err := NewFileConfigResolverWithPathSpaces(entries, root, osvfs.FS(), spaces, baseRuleCatalog(), test.policy)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, reuse := resolver.reuseTargetMatch(identity, &match); reuse != test.reuse {
+			t.Errorf("reuse=%v want=%v", reuse, test.reuse)
+		}
+	}
+}
+
+func TestExplicitDirectoryIdentitiesKeepPrunedNestedRoots(t *testing.T) {
+	fsys := osvfs.FS()
+	root := tspath.NormalizePath(t.TempDir())
+	child := tspath.CombinePaths(root, "ignored/inner")
+	identities := ResolveDirectoryIdentities([]string{root, child}, fsys)
+	if len(identities) != 2 || !strings.HasSuffix(identities[1].LexicalPath, "/ignored/inner") {
+		t.Fatalf("explicit roots=%v", identities)
+	}
+}
+
+func TestGitPolicyAuthoredLeafNegationFindsVisitedNestedRepository(t *testing.T) {
+	root := gitPolicyFixture(t, map[string]string{
+		".git": "", ".gitignore": "dist/\n", "dist/.gitignore": "*.ts\n",
+		"dist/inner/.git": "", "dist/inner/.gitignore": "*.generated.ts\n",
+		"dist/inner/source.ts": "", "dist/inner/output.generated.ts": "",
+		"dist/unrelated/.gitignore": "*.ts\n", "dist/unrelated/source.ts": "",
+	})
+	entries := RslintConfig{{Ignores: []string{"!dist/inner/source.ts"}}, {Files: []string{"**/*.ts"}}}
+	spy := &gitignoreReadSpyFS{FS: osvfs.FS()}
+	policy := CollectGitPolicy(entries, root, spy, nil, ResolveDirectoryIdentities([]string{root}, spy))
+	matcher := gitPolicyMatcher(t, entries, root, spy, policy)
+	if !policy.CoversDirectory(tspath.CombinePaths(root, "dist/inner")) {
+		t.Fatal("target-visible nested repository was not observed")
+	}
+	for _, test := range []struct {
 		path    string
 		ignored bool
-	}{
-		{name: "Git pattern uses invocation root", path: "/repo/workspace/git-ignored.ts", ignored: true},
-		{name: "authored ignore uses config directory", path: "/repo/workspace/config-ignored.ts", ignored: true},
-		{name: "same basename outside Git-ignore root", path: "/repo/config/git-ignored.ts", ignored: false},
-		{name: "visible target", path: "/repo/workspace/visible.ts", ignored: false},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			if got := config.IsFileIgnored(test.path, "/repo/config"); got != test.ignored {
-				t.Fatalf("IsFileIgnored(%q) = %t, want %t", test.path, got, test.ignored)
-			}
-		})
-	}
-}
-
-func TestCollectedGitignoreUsesConfigMatchSpaceBeforeLexicalFallback(t *testing.T) {
-	config := ConfigWithCollectedGitignore(
-		RslintConfig{{Rules: Rules{"rule": "error"}}},
-		[]gitignore.Pattern{{
-			Glob:                  "ignored.js",
-			NodeGlob:              "ignored.js",
-			MatchDirectory:        "/physical/workspace",
-			LexicalMatchDirectory: "/repo/workspace",
-		}},
-		false,
-	)
-
-	if !config.IsFileIgnored("/physical/workspace/ignored.js", "/physical/config") {
-		t.Fatal("Git pattern did not match the config-space projection")
-	}
-	if !config.IsFileIgnored("/repo/workspace/ignored.js", "/repo/config-link") {
-		t.Fatal("Git pattern lost its lexical compatibility fallback")
-	}
-	if config.IsFileIgnored("/physical/config/ignored.js", "/physical/config") {
-		t.Fatal("Git pattern escaped its projected invocation root")
-	}
-}
-
-func TestCollectedGitignoreMatchDirectoryIsCaseInsensitiveOnWindows(t *testing.T) {
-	config := ConfigWithCollectedGitignore(
-		RslintConfig{{Rules: Rules{"rule": "error"}}},
-		[]gitignore.Pattern{{
-			Glob:           "src/generated.ts",
-			NodeGlob:       "src/generated.ts",
-			MatchDirectory: "C:/Repo/Workspace",
-		}},
-		true,
-	)
-
-	if !config.IsFileIgnored("c:/repo/workspace/SRC/GENERATED.TS", "D:/Config") {
-		t.Fatal("case-insensitive Git pattern did not match the Windows path alias")
-	}
-	if config.IsFileIgnored("D:/Config/src/generated.ts", "D:/Config") {
-		t.Fatal("Git pattern escaped its Windows drive/root")
-	}
-}
-
-func TestCollectedGitignoreMatchDirectoryControlsDirectoryPruning(t *testing.T) {
-	config := ConfigWithCollectedGitignore(
-		RslintConfig{{Rules: Rules{"rule": "error"}}},
-		[]gitignore.Pattern{{
-			Glob:           "generated/**/*",
-			NodeGlob:       "generated",
-			DirectoryOnly:  true,
-			MatchDirectory: "/repo/workspace",
-		}},
-		false,
-	)
-	resolver := newConfigTargetResolver(config, "/repo/config", nil)
-	if !resolver.canPruneDirectory("/repo/workspace/generated", "") {
-		t.Fatal("Git-ignore-rooted directory was not pruned")
-	}
-	if resolver.canPruneDirectory("/repo/config/generated", "") {
-		t.Fatal("same relative directory outside the Git-ignore root was pruned")
-	}
-}
-
-func TestCollectedGitignoreChoosesOneAuthoritativeScope(t *testing.T) {
-	root := t.TempDir()
-	physicalRoot := tspath.NormalizePath(filepath.Join(root, "physical"))
-	physicalChild := tspath.CombinePaths(physicalRoot, "child")
-	aliasRoot := tspath.NormalizePath(filepath.Join(root, "alias-root"))
-	aliasChild := tspath.NormalizePath(filepath.Join(root, "alias-child"))
-	for _, directory := range []string{physicalChild, tspath.CombinePaths(physicalChild, "nested")} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			t.Fatal(err)
+	}{{"dist/inner/source.ts", false}, {"dist/inner/output.generated.ts", true}, {"dist/unrelated/source.ts", true}} {
+		target := FreezeFileIdentity(tspath.CombinePaths(root, test.path), spy)
+		if got := matcher.MatchFile(target).GloballyIgnored(); got != test.ignored {
+			t.Errorf("%s ignored=%v want=%v", test.path, got, test.ignored)
 		}
 	}
-	target := tspath.CombinePaths(physicalChild, "ignored.ts")
-	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(physicalRoot, aliasRoot); err != nil {
-		t.Skipf("symlinks are unavailable: %v", err)
-	}
-	if err := os.Symlink(physicalChild, aliasChild); err != nil {
-		t.Skipf("symlinks are unavailable: %v", err)
-	}
-
-	first := CollectedGitignorePatternsForRoot([]gitignore.Pattern{{
-		Glob:     "child/ignored.ts",
-		NodeGlob: "child/ignored.ts",
-	}}, "/config", aliasRoot, osvfs.FS())
-	second := CollectedGitignorePatternsForRoot([]gitignore.Pattern{{
-		Glob:     "ignored.ts",
-		NodeGlob: "ignored.ts",
-		Negated:  true,
-	}}, "/config", aliasChild, osvfs.FS())
-	effective := ConfigWithCollectedGitignoreScopes(
-		RslintConfig{{Rules: Rules{"rule": "error"}}},
-		append(first, second...),
-		[]string{aliasRoot, aliasChild},
-		"/config",
-		osvfs.FS(),
-		false,
-	)
-
-	// The physical spelling falls under both physical roots. Stable scope order
-	// assigns it to aliasRoot, so aliasChild's negation cannot override it.
-	resolver := newConfigTargetResolver(effective, "/config", osvfs.FS())
-	if !resolver.resolve(target, osvfs.FS().Realpath(target)).globallyIgnored {
-		t.Fatal("physical target borrowed patterns from more than one Git scope")
+	for _, path := range spy.reads {
+		if path == tspath.CombinePaths(root, "dist/.gitignore") || path == tspath.CombinePaths(root, "dist/unrelated/.gitignore") {
+			t.Fatalf("hidden source read: %s", path)
+		}
 	}
 }
 
-func TestConfigWithGitignoreForTargetsKeepsEmptyAliasScopeAuthoritative(t *testing.T) {
-	root := t.TempDir()
-	invocationRoot := tspath.NormalizePath(filepath.Join(root, "invocation"))
-	physicalRoot := tspath.NormalizePath(filepath.Join(root, "physical"))
-	aliasDirectory := tspath.CombinePaths(invocationRoot, "link")
-	configDirectory := tspath.NormalizePath(filepath.Join(root, "config"))
-	for _, directory := range []string{invocationRoot, physicalRoot, configDirectory} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.Symlink(physicalRoot, aliasDirectory); err != nil {
-		t.Skipf("symlinks are unavailable: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(physicalRoot, ".gitignore"), []byte("ignored.ts\nblocked/\nreopen/*\n!reopen/keep/\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	for _, path := range []string{
-		tspath.CombinePaths(physicalRoot, "ignored.ts"),
-		tspath.CombinePaths(physicalRoot, "blocked", "file.ts"),
-		tspath.CombinePaths(physicalRoot, "reopen", "keep", "file.ts"),
-	} {
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte("debugger;\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	effective := ConfigWithGitignoreForTargetsFromRoot(
-		RslintConfig{{Rules: Rules{"rule": "error"}}},
-		configDirectory,
-		invocationRoot,
-		osvfs.FS(),
-		nil,
-		[]string{invocationRoot, physicalRoot},
-	)
-	resolver := newConfigTargetResolver(effective, configDirectory, osvfs.FS())
-	physicalIgnored := tspath.CombinePaths(physicalRoot, "ignored.ts")
-	aliasIgnored := tspath.CombinePaths(aliasDirectory, "ignored.ts")
-	if !resolver.resolve(physicalIgnored, physicalIgnored).globallyIgnored {
-		t.Fatal("physical scope did not apply its own .gitignore")
-	}
-	if resolver.resolve(aliasIgnored, physicalIgnored).globallyIgnored {
-		t.Fatal("empty lexical scope borrowed an aliased physical scope's .gitignore")
-	}
-
-	physicalBlocked := tspath.CombinePaths(physicalRoot, "blocked")
-	aliasBlocked := tspath.CombinePaths(aliasDirectory, "blocked")
-	if !resolver.canPruneDirectory(physicalBlocked, physicalBlocked) {
-		t.Fatal("physical scope did not prune its ignored directory")
-	}
-	if resolver.canPruneDirectory(aliasBlocked, physicalBlocked) {
-		t.Fatal("directory pruning crossed from the physical scope into the empty alias scope")
-	}
-	physicalKeep := tspath.CombinePaths(physicalRoot, "reopen", "keep")
-	aliasKeep := tspath.CombinePaths(aliasDirectory, "reopen", "keep")
-	if !resolver.reopensDirectory(physicalKeep, physicalKeep) {
-		t.Fatal("physical scope did not apply its own Git negation")
-	}
-	if resolver.reopensDirectory(aliasKeep, physicalKeep) {
-		t.Fatal("directory reopening crossed from the physical scope into the empty alias scope")
-	}
-}
-
-func TestGitignoreCollectionPruningUsesEachConfigEntryAuthoredBase(t *testing.T) {
-	root := t.TempDir()
-	configDirectory := tspath.NormalizePath(filepath.Join(root, "config"))
-	invocationRoot := tspath.NormalizePath(filepath.Join(root, "workspace"))
-	blockedDirectory := tspath.CombinePaths(invocationRoot, "blocked")
-	for _, directory := range []string{configDirectory, blockedDirectory} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	blockedGitignore := tspath.CombinePaths(blockedDirectory, ".gitignore")
-	if err := os.WriteFile(blockedGitignore, []byte("ignored.ts\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(tspath.CombinePaths(blockedDirectory, "ignored.ts"), []byte("debugger;\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	inlineOverride := ConfigWithAuthoredPathBase(
-		RslintConfig{{Ignores: []string{"blocked/**"}}},
-		invocationRoot,
-	)
-	entries := append(
-		RslintConfig{{Rules: Rules{"no-debugger": "error"}}},
-		inlineOverride...,
-	)
+func TestGitPolicyAuthoredBasesPruneSourcesAndRespectAbsoluteBlocks(t *testing.T) {
+	root := gitPolicyFixture(t, map[string]string{
+		".git": "", ".gitignore": "*.generated.ts\n",
+		"packages/blocked/.gitignore": "*.ts\n", "packages/blocked/file.ts": "",
+		"packages/visible/.gitignore": "*.log\n", "packages/visible/file.ts": "",
+		"node_modules/.gitignore": "*.ts\n", "node_modules/file.ts": "",
+	})
+	entries := append(ConfigWithAuthoredPathBase(RslintConfig{{Ignores: []string{"blocked/**", "!blocked/file.ts"}}}, tspath.CombinePaths(root, "packages")), ConfigEntry{Files: []string{"**/*.ts"}})
 	spy := &gitignoreReadSpyFS{FS: osvfs.FS()}
-	_ = ConfigWithGitignoreForTargetsFromRoot(
-		entries,
-		configDirectory,
-		invocationRoot,
-		spy,
-		nil,
-		[]string{invocationRoot},
-	)
-	for _, read := range spy.reads {
-		if read == blockedGitignore {
-			t.Fatal("collection rebased an invocation-authored ignore to the external config directory")
+	policy := CollectGitPolicy(entries, root, spy, nil, ResolveDirectoryIdentities([]string{root}, spy))
+	for _, path := range spy.reads {
+		if path == tspath.CombinePaths(root, "packages/blocked/.gitignore") || path == tspath.CombinePaths(root, "node_modules/.gitignore") {
+			t.Fatalf("pruned source read: %s", path)
+		}
+	}
+	if !slices.Contains(spy.reads, tspath.CombinePaths(root, "packages/visible/.gitignore")) {
+		t.Fatal("sibling source was pruned")
+	}
+	target := FreezeFileIdentity(tspath.CombinePaths(root, "packages/blocked/file.ts"), spy)
+	if !gitPolicyMatcher(t, entries, root, spy, policy).MatchFile(target).GloballyIgnored() {
+		t.Fatal("Git/author negation overrode authored absolute directory block")
+	}
+}
+
+func TestGitPolicyGitNegationCannotOverrideAuthoredIgnore(t *testing.T) {
+	root := gitPolicyFixture(t, map[string]string{".git": "", ".gitignore": "*.ts\n!keep.ts\n", "keep.ts": ""})
+	entries := RslintConfig{{Ignores: []string{"keep.ts"}}, {Files: []string{"**/*.ts"}}}
+	identity := FreezeFileIdentity(tspath.CombinePaths(root, "keep.ts"), osvfs.FS())
+	for _, policy := range []*GitPolicy{
+		CollectGitPolicy(entries, root, osvfs.FS(), []PathIdentity{identity}, nil),
+		CollectGitPolicy(entries, root, osvfs.FS(), nil, ResolveDirectoryIdentities([]string{root}, osvfs.FS())),
+	} {
+		if !gitPolicyMatcher(t, entries, root, osvfs.FS(), policy).MatchFile(identity).GloballyIgnored() {
+			t.Fatal("Git negation overrode authored ignore")
 		}
 	}
 }
 
-func TestCollectedGitignoreScopesStayIndependentOnWindowsAndUNCPaths(t *testing.T) {
-	for _, test := range []struct {
-		name          string
-		firstRoot     string
-		secondRoot    string
-		firstTarget   string
-		secondTarget  string
-		caseSensitive bool
-	}{
-		{
-			name:         "Windows drive and case",
-			firstRoot:    "C:/Repo/One",
-			secondRoot:   "D:/Repo/Two",
-			firstTarget:  "c:/repo/one/SHARED.TS",
-			secondTarget: "d:/repo/two/SHARED.TS",
-		},
-		{
-			name:          "UNC shares",
-			firstRoot:     "//server/share-one/repo",
-			secondRoot:    "//server/share-two/repo",
-			firstTarget:   "//server/share-one/repo/shared.ts",
-			secondTarget:  "//server/share-two/repo/shared.ts",
-			caseSensitive: true,
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			patterns := []gitignore.Pattern{
-				{Glob: "shared.ts", NodeGlob: "shared.ts", MatchDirectory: test.firstRoot},
-				{Glob: "shared.ts", NodeGlob: "shared.ts", Negated: true, MatchDirectory: test.secondRoot},
+func TestGitPolicyRecursiveCollectionDoesNotFollowDirectorySymlinks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink privileges differ")
+	}
+	root := gitPolicyFixture(t, map[string]string{".git": "", "src/.gitignore": "*.generated.ts\n", "src/source.ts": "", "outside/.gitignore": "*.ts\n"})
+	if err := os.Symlink(filepath.Join(root, "src"), filepath.Join(root, "src/cycle")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "outside"), filepath.Join(root, "src/external")); err != nil {
+		t.Fatal(err)
+	}
+	spy := &gitignoreReadSpyFS{FS: osvfs.FS()}
+	policy := CollectGitPolicy(nil, root, spy, nil, ResolveDirectoryIdentities([]string{tspath.CombinePaths(root, "src")}, spy))
+	if !policy.CoversDirectory(tspath.CombinePaths(root, "src")) {
+		t.Fatal("explicit directory root not covered")
+	}
+	for _, path := range spy.reads {
+		if strings.Contains(path, "/cycle/") || strings.Contains(path, "/external/") || path == tspath.CombinePaths(root, "outside/.gitignore") {
+			t.Fatalf("followed descendant symlink: %s", path)
+		}
+	}
+}
+
+func TestGitPolicyOnlyWalksSuppliedDirectoryRootsAndExactChains(t *testing.T) {
+	root := gitPolicyFixture(t, map[string]string{
+		".git": "", ".gitignore": "*.generated.ts\n",
+		"target/deep/.gitignore": "local.ts\n", "target/deep/local.ts": "",
+		"exact/deep/.gitignore": "*.ts\n", "exact/deep/file.ts": "",
+		"unrequested/.gitignore": "*.ts\n", "unrequested/file.ts": "",
+	})
+	spy := &gitignoreReadSpyFS{FS: osvfs.FS()}
+	files := ResolveFileIdentities([]string{tspath.CombinePaths(root, "exact/deep/file.ts")}, spy)
+	directories := ResolveDirectoryIdentities([]string{tspath.CombinePaths(root, "target")}, spy)
+	CollectGitPolicy(nil, root, spy, files, directories)
+	for _, path := range spy.directories {
+		if _, within := RelativePathWithinConfigRoot(path, tspath.CombinePaths(root, "target"), true); !within {
+			t.Fatalf("walked outside the supplied recursive root: %s", path)
+		}
+	}
+	if !slices.Contains(spy.reads, tspath.CombinePaths(root, "exact/deep/.gitignore")) {
+		t.Fatal("exact target ancestor source was not observed")
+	}
+	if slices.Contains(spy.reads, tspath.CombinePaths(root, "unrequested/.gitignore")) {
+		t.Fatal("read an unrelated subtree")
+	}
+}
+
+type gitPolicyNoRealpathFS struct{ vfs.FS }
+
+func (fsys gitPolicyNoRealpathFS) Realpath(string) string { return "" }
+func (fsys gitPolicyNoRealpathFS) GetAccessibleEntries(path string) vfs.Entries {
+	entries := fsys.FS.GetAccessibleEntries(path)
+	entries.Symlinks = nil
+	return entries
+}
+
+func TestGitPolicyVFSWithoutRealpathUsesLexicalDirectoryIdentity(t *testing.T) {
+	root := gitPolicyFixture(t, map[string]string{".git": "", "pkg/.gitignore": "*.ts\n", "pkg/file.ts": ""})
+	fsys := gitPolicyNoRealpathFS{FS: osvfs.FS()}
+	entries := RslintConfig{{Files: []string{"**/*.ts"}}}
+	policy := CollectGitPolicy(entries, root, fsys, nil, ResolveDirectoryIdentities([]string{root}, fsys))
+	target := FreezeFileIdentity(tspath.CombinePaths(root, "pkg/file.ts"), fsys)
+	if !gitPolicyMatcher(t, entries, root, fsys, policy).MatchFile(target).GloballyIgnored() {
+		t.Fatal("unknown realpath was treated as a directory symlink")
+	}
+}
+
+type gitPolicyVolumeRootFS struct {
+	vfs.FS
+	root string
+}
+
+func (fsys gitPolicyVolumeRootFS) UseCaseSensitiveFileNames() bool { return false }
+func (fsys gitPolicyVolumeRootFS) DirectoryExists(string) bool     { return false }
+func (fsys gitPolicyVolumeRootFS) FileExists(string) bool          { return false }
+func (fsys gitPolicyVolumeRootFS) Realpath(path string) string     { return path }
+func (fsys gitPolicyVolumeRootFS) ReadFile(path string) (string, bool) {
+	if path == tspath.CombinePaths(fsys.root, ".gitignore") {
+		return "dist/\n", true
+	}
+	return "", false
+}
+func TestGitPolicyVolumeRootRulesApplyToFilesAndDirectories(t *testing.T) {
+	for _, root := range []string{"C:/", "//server/share/", "//server/share"} {
+		t.Run(root, func(t *testing.T) {
+			fsys := gitPolicyVolumeRootFS{root: root}
+			file := tspath.CombinePaths(root, "pkg/dist/input.ts")
+			identity := PathIdentity{Path: file, CanonicalPath: file, CanonicalParentPath: tspath.GetDirectoryPath(file)}
+			entries := RslintConfig{{Files: []string{"**/*.ts"}}}
+			policy := CollectGitPolicy(entries, "/config", fsys, []PathIdentity{identity}, nil)
+			matcher := gitPolicyMatcher(t, entries, "/config", fsys, policy)
+			if !matcher.MatchFile(identity).GloballyIgnored() {
+				t.Fatalf("volume-root .gitignore was lost for %s", file)
 			}
-			effective := ConfigWithCollectedGitignoreScopes(
-				RslintConfig{{Rules: Rules{"rule": "error"}}},
-				patterns,
-				[]string{test.firstRoot, test.secondRoot},
-				"C:/config",
-				nil,
-				!test.caseSensitive,
-			)
-			if !effective.IsFileIgnored(test.firstTarget, "C:/config") {
-				t.Fatal("first scope lost its positive pattern")
+			if !matcher.CanPruneDirectory(DirectoryIdentity{LexicalPath: identity.CanonicalParentPath, CanonicalPath: identity.CanonicalParentPath}) {
+				t.Fatal("volume-root directory ignore was lost")
 			}
-			if effective.IsFileIgnored(test.secondTarget, "C:/config") {
-				t.Fatal("a positive pattern crossed into the second scope")
+			if !policy.CoversDirectory(identity.CanonicalParentPath) {
+				t.Fatal("exact directory coverage was lost")
 			}
 		})
-	}
-}
-
-func TestConfigWithGitignoreForTargetsUsesExternalScanRoot(t *testing.T) {
-	root := t.TempDir()
-	configDir := tspath.NormalizePath(filepath.Join(root, "config"))
-	scanRoot := tspath.NormalizePath(filepath.Join(root, "workspace"))
-	for _, directory := range []string{configDir, scanRoot} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	visible := tspath.CombinePaths(scanRoot, "visible.js")
-	ignored := tspath.CombinePaths(scanRoot, "ignored.js")
-	for _, filePath := range []string{visible, ignored} {
-		if err := os.WriteFile(filePath, []byte("debugger;\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(scanRoot, ".gitignore"), []byte("ignored.js\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	entries := ConfigWithGitignoreForTargetsFromRoot(
-		RslintConfig{{
-			Files: []string{"../workspace/*.js"},
-			Rules: Rules{"no-debugger": "error"},
-		}},
-		configDir,
-		scanRoot,
-		osvfs.FS(),
-		[]string{visible, ignored},
-		nil,
-	)
-	resolver := newConfigTargetResolver(entries, configDir, osvfs.FS())
-	if decision := resolver.resolve(ignored, ""); !decision.globallyIgnored {
-		t.Fatalf("external scan-root Git ignore did not exclude %q: %+v", ignored, decision)
-	}
-	if decision := resolver.resolve(visible, ""); decision.globallyIgnored || !decision.selected {
-		t.Fatalf("external scan-root visible target was not selected: %+v", decision)
-	}
-}
-
-func TestConfigWithGitignoreForTargetsMatchesPhysicalAndLexicalScanRoots(t *testing.T) {
-	configDir := tspath.NormalizePath(t.TempDir())
-	physicalScanRoot := tspath.NormalizePath(t.TempDir())
-	aliasScanRoot := tspath.CombinePaths(tspath.NormalizePath(t.TempDir()), "workspace-alias")
-	if err := os.Symlink(physicalScanRoot, aliasScanRoot); err != nil {
-		t.Skipf("directory symlink unavailable: %v", err)
-	}
-	physicalIgnored := tspath.CombinePaths(physicalScanRoot, "ignored.js")
-	aliasIgnored := tspath.CombinePaths(aliasScanRoot, "ignored.js")
-	configVisible := tspath.CombinePaths(configDir, "ignored.js")
-	for _, filePath := range []string{physicalIgnored, configVisible} {
-		if err := os.WriteFile(filePath, []byte("debugger;\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(aliasScanRoot, ".gitignore"), []byte("ignored.js\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	physicalIgnored = tspath.NormalizePath(osvfs.FS().Realpath(physicalIgnored))
-
-	entries := ConfigWithGitignoreForTargetsFromRoot(
-		RslintConfig{{Rules: Rules{"no-debugger": "error"}}},
-		configDir,
-		aliasScanRoot,
-		osvfs.FS(),
-		[]string{physicalIgnored},
-		nil,
-	)
-	resolver := newConfigTargetResolver(entries, configDir, osvfs.FS())
-	for _, filePath := range []string{physicalIgnored, aliasIgnored} {
-		if decision := resolver.resolve(filePath, ""); !decision.globallyIgnored {
-			t.Fatalf("Git ignore did not cover scan-root identity %q: %+v", filePath, decision)
-		}
-	}
-	if decision := resolver.resolve(configVisible, ""); decision.globallyIgnored {
-		t.Fatalf("Git ignore escaped the scan root onto %q: %+v", configVisible, decision)
-	}
-}
-
-func TestConfigWithGitignoreForTargetsRequestedPhysicalAncestorStartsIndependentScope(t *testing.T) {
-	physicalParent := tspath.NormalizePath(t.TempDir())
-	physicalWorkspace := tspath.CombinePaths(physicalParent, "workspace")
-	if err := os.MkdirAll(physicalWorkspace, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	aliasWorkspace := tspath.CombinePaths(tspath.NormalizePath(t.TempDir()), "workspace-alias")
-	if err := os.Symlink(physicalWorkspace, aliasWorkspace); err != nil {
-		t.Skipf("directory symlink unavailable: %v", err)
-	}
-	sibling := tspath.CombinePaths(physicalParent, "sibling.ts")
-	if err := os.WriteFile(sibling, []byte("debugger;\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		tspath.CombinePaths(physicalParent, ".gitignore"),
-		[]byte("sibling.ts\n"),
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
-
-	effective := ConfigWithGitignoreForTargetsFromRoot(
-		RslintConfig{{Rules: Rules{"no-debugger": "error"}}},
-		aliasWorkspace,
-		aliasWorkspace,
-		osvfs.FS(),
-		nil,
-		[]string{physicalParent},
-	)
-	resolver := newConfigTargetResolver(effective, aliasWorkspace, osvfs.FS())
-	if decision := resolver.resolve(sibling, tspath.NormalizePath(osvfs.FS().Realpath(sibling))); !decision.globallyIgnored {
-		t.Fatalf("requested physical ancestor lost its own Git scope: %+v", decision)
-	}
-}
-
-func TestExternalConfigGitignoreMatchesRawLexicalTargetBeforeOwnerProjection(t *testing.T) {
-	root := tspath.NormalizePath(t.TempDir())
-	scanRoot := tspath.CombinePaths(root, "workspace")
-	configDir := tspath.CombinePaths(root, "physical", "package")
-	physicalTargetDir := tspath.CombinePaths(configDir, "src")
-	aliasTargetDir := tspath.CombinePaths(scanRoot, "linked-src")
-	for _, directory := range []string{scanRoot, physicalTargetDir} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.Symlink(physicalTargetDir, aliasTargetDir); err != nil {
-		t.Skipf("directory symlink unavailable: %v", err)
-	}
-	physicalTarget := tspath.CombinePaths(physicalTargetDir, "ignored.js")
-	aliasTarget := tspath.CombinePaths(aliasTargetDir, "ignored.js")
-	physicalGeneratedDir := tspath.CombinePaths(physicalTargetDir, "generated")
-	aliasGeneratedDir := tspath.CombinePaths(aliasTargetDir, "generated")
-	physicalReopenedDir := tspath.CombinePaths(physicalTargetDir, "reopened")
-	aliasReopenedDir := tspath.CombinePaths(aliasTargetDir, "reopened")
-	for _, directory := range []string{physicalGeneratedDir, physicalReopenedDir} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.WriteFile(physicalTarget, []byte("debugger;\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(scanRoot, ".gitignore"),
-		[]byte("linked-src/ignored.js\nlinked-src/generated/\n!linked-src/reopened/\n"),
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
-
-	entries := ConfigWithGitignoreForTargetsFromRoot(
-		RslintConfig{{
-			Files: []string{"src/**/*.js"},
-			Rules: Rules{"no-debugger": "error"},
-		}},
-		configDir,
-		scanRoot,
-		osvfs.FS(),
-		[]string{aliasTarget},
-		[]string{aliasTargetDir},
-	)
-	resolver := newConfigTargetResolver(entries, configDir, osvfs.FS())
-	canonicalTarget := tspath.NormalizePath(osvfs.FS().Realpath(aliasTarget))
-	if decision := resolver.resolve(aliasTarget, canonicalTarget); !decision.globallyIgnored {
-		t.Fatalf("Git ignore lost the caller-visible symlink path: %+v", decision)
-	}
-	if decision := resolver.resolve(physicalTarget, physicalTarget); decision.globallyIgnored {
-		t.Fatalf("lexical Git pattern leaked onto the physical target spelling: %+v", decision)
-	}
-	canonicalGeneratedDir := tspath.NormalizePath(osvfs.FS().Realpath(aliasGeneratedDir))
-	if !resolver.canPruneDirectory(aliasGeneratedDir, canonicalGeneratedDir) {
-		t.Fatal("Git directory pattern lost the caller-visible symlink path while pruning")
-	}
-	if resolver.canPruneDirectory(physicalGeneratedDir, physicalGeneratedDir) {
-		t.Fatal("lexical Git directory pattern leaked onto the physical directory spelling")
-	}
-	canonicalReopenedDir := tspath.NormalizePath(osvfs.FS().Realpath(aliasReopenedDir))
-	if !resolver.reopensDirectory(aliasReopenedDir, canonicalReopenedDir) {
-		t.Fatal("Git negation lost the caller-visible symlink path while reopening")
-	}
-	if resolver.reopensDirectory(physicalReopenedDir, physicalReopenedDir) {
-		t.Fatal("lexical Git negation leaked onto the physical directory spelling")
-	}
-}
-
-func TestExternalGitignoreDistinguishesFileAndDirectorySymlinks(t *testing.T) {
-	root := tspath.NormalizePath(t.TempDir())
-	gitRoot := tspath.CombinePaths(root, "workspace")
-	configDir := tspath.CombinePaths(root, "config")
-	outsideDir := tspath.CombinePaths(root, "outside")
-	physicalDirectoryTarget := tspath.CombinePaths(gitRoot, "generated")
-	for _, directory := range []string{gitRoot, configDir, outsideDir, physicalDirectoryTarget} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	physicalFileTarget := tspath.CombinePaths(gitRoot, "ignored.js")
-	visibleTarget := tspath.CombinePaths(gitRoot, "visible.js")
-	physicalDirectoryFile := tspath.CombinePaths(physicalDirectoryTarget, "nested.js")
-	for _, filePath := range []string{physicalFileTarget, visibleTarget, physicalDirectoryFile} {
-		if err := os.WriteFile(filePath, []byte("debugger;\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.WriteFile(
-		filepath.Join(gitRoot, ".gitignore"),
-		[]byte("ignored.js\ngenerated/\n"),
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
-	fileAlias := tspath.CombinePaths(outsideDir, "file-alias.js")
-	directoryAlias := tspath.CombinePaths(outsideDir, "directory-alias")
-	if err := os.Symlink(physicalFileTarget, fileAlias); err != nil {
-		t.Skipf("file symlink unavailable: %v", err)
-	}
-	if err := os.Symlink(physicalDirectoryTarget, directoryAlias); err != nil {
-		t.Skipf("directory symlink unavailable: %v", err)
-	}
-	directoryAliasFile := tspath.CombinePaths(directoryAlias, "nested.js")
-
-	entries := ConfigWithGitignoreForTargetsFromRoot(
-		RslintConfig{{Rules: Rules{"no-debugger": "error"}}},
-		configDir,
-		gitRoot,
-		osvfs.FS(),
-		[]string{visibleTarget, fileAlias, directoryAliasFile},
-		nil,
-	)
-	resolver := newConfigTargetResolver(entries, configDir, osvfs.FS())
-	if decision := resolver.resolve(physicalFileTarget, physicalFileTarget); !decision.globallyIgnored {
-		t.Fatalf("Git rule did not ignore its physical in-root target: %+v", decision)
-	}
-	if decision := resolver.resolve(
-		fileAlias,
-		tspath.NormalizePath(osvfs.FS().Realpath(fileAlias)),
-	); decision.globallyIgnored {
-		t.Fatalf("Git rule escaped its root through an external file symlink: %+v", decision)
-	}
-	if decision := resolver.resolve(
-		directoryAliasFile,
-		tspath.NormalizePath(osvfs.FS().Realpath(directoryAliasFile)),
-	); !decision.globallyIgnored {
-		t.Fatalf("Git rule lost a verified directory-alias target: %+v", decision)
-	}
-	if !resolver.canPruneDirectory(
-		directoryAlias,
-		tspath.NormalizePath(osvfs.FS().Realpath(directoryAlias)),
-	) {
-		t.Fatal("Git rule did not prune a verified directory alias into its root")
 	}
 }

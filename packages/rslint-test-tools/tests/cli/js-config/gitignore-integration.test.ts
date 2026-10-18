@@ -327,7 +327,7 @@ describe('Gitignore: interaction with config ignores', () => {
 });
 
 describe('Gitignore: monorepo scenarios', () => {
-  test('package configs do not inherit root .gitignore', async () => {
+  test('package configs inherit root .gitignore within the repository', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'dist/\ncoverage/\n',
       'rslint.config.mjs': `export default [{ files: ["**/*.ts"], rules: { "no-debugger": "error" } }];`,
@@ -345,12 +345,12 @@ describe('Gitignore: monorepo scenarios', () => {
       expect(
         diagsAt(diagnostics, 'packages/lib/src/utils.ts').length,
       ).toBeGreaterThan(0);
-      expect(
-        diagsAt(diagnostics, 'packages/app/dist/bundle.ts').length,
-      ).toBeGreaterThan(0);
-      expect(
-        diagsAt(diagnostics, 'packages/lib/coverage/lcov.ts').length,
-      ).toBeGreaterThan(0);
+      expect(diagsAt(diagnostics, 'packages/app/dist/bundle.ts').length).toBe(
+        0,
+      );
+      expect(diagsAt(diagnostics, 'packages/lib/coverage/lcov.ts').length).toBe(
+        0,
+      );
     } finally {
       await cleanup();
     }
@@ -784,7 +784,7 @@ describe('Gitignore: monorepo gap file interaction', () => {
     }
   });
 
-  test('root .gitignore does not prune child config discovery', async () => {
+  test('root .gitignore applies after child config discovery', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'build/\n',
       'rslint.config.mjs': `export default [{ files: ["*.ts"], rules: { "no-console": "error" } }];`,
@@ -796,9 +796,9 @@ describe('Gitignore: monorepo gap file interaction', () => {
       expect(
         diagsAt(diagnostics, 'packages/app/src/index.ts').length,
       ).toBeGreaterThan(0);
-      expect(
-        diagsAt(diagnostics, 'packages/app/build/output.ts').length,
-      ).toBeGreaterThan(0);
+      expect(diagsAt(diagnostics, 'packages/app/build/output.ts').length).toBe(
+        0,
+      );
     } finally {
       await cleanup();
     }

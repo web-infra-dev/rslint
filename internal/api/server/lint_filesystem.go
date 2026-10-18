@@ -66,6 +66,11 @@ func addEquivalentFileContentPaths(fileContents map[string]string, configDirecto
 
 	realConfigDirectory := fs.Realpath(configDirectory)
 	for _, entry := range entries {
+		// A new overlay file has no realpath yet, but its containing
+		// directory may already have a physical identity.
+		if realParent := fs.Realpath(tspath.GetDirectoryPath(entry.path)); realParent != "" {
+			addAlias(tspath.CombinePaths(realParent, tspath.GetBaseFileName(entry.path)), entry.content)
+		}
 		if realPath := fs.Realpath(entry.path); realPath != "" && realPath != entry.path {
 			addAlias(realPath, entry.content)
 		}

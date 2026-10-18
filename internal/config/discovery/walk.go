@@ -15,9 +15,8 @@ type discoveryWalkNode struct {
 	canonicalDirectory string
 	ownerDir           string
 	ownerPath          string
-	gitDirectory       string
+	configReachable    bool
 	gitCursor          gitignore.Cursor
-	gitActive          bool
 	targets            *discoveryTargetTrie
 }
 type suspendedDiscoveryNode struct {
@@ -26,13 +25,12 @@ type suspendedDiscoveryNode struct {
 }
 
 type discoveryWalkResult struct {
-	children             []discoveryWalkNode
-	pending              *suspendedDiscoveryNode
-	candidateToAdopt     *configLoadState
-	gitignoreObservation *gitignoreObservation
-	directoriesVisited   int
-	directoriesPruned    int
-	err                  error
+	children           []discoveryWalkNode
+	pending            *suspendedDiscoveryNode
+	candidateToAdopt   *configLoadState
+	directoriesVisited int
+	directoriesPruned  int
+	err                error
 }
 type discoveryWalkStats struct {
 	directoriesVisited int
@@ -64,9 +62,6 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 					return err
 				}
 			}
-			if result.gitignoreObservation != nil {
-				coordinator.git.recordObservation(*result.gitignoreObservation)
-			}
 			next = append(next, result.children...)
 			if result.pending != nil {
 				suspended = append(suspended, *result.pending)
@@ -85,12 +80,6 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 					}
 					item.node.ownerDir = state.candidate.directory
 					item.node.ownerPath = state.candidate.path
-					item.node.gitCursor = gitignore.NewCursor(
-						state.candidate.directory,
-						coordinator.fs.UseCaseSensitiveFileNames(),
-					)
-					item.node.gitDirectory = state.candidate.directory
-					item.node.gitActive = true
 				}
 				next = append(next, item.node)
 			}
@@ -151,7 +140,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 	}
 	result := discoveryWalkResult{}
 
-	if coordinator.explicitConfigPath == "" {
+	if coordinator.explicitConfigPath == "" && node.configReachable {
 		if candidate, found := coordinator.findCandidateForOwner(
 			node.directory,
 			node.ownerPath,
@@ -166,25 +155,17 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 				result.candidateToAdopt = state
 				node.ownerDir = state.candidate.directory
 				node.ownerPath = state.candidate.path
-				node.gitCursor = gitignore.NewCursor(
-					state.candidate.directory,
-					coordinator.fs.UseCaseSensitiveFileNames(),
-				)
-				node.gitDirectory = state.candidate.directory
-				node.gitActive = true
 			}
 		}
 	}
 	result.directoriesVisited = 1
-	if node.gitActive {
-		nextCursor, observation := coordinator.git.readSource(
-			node.ownerDir,
-			node.directory,
-			node.gitDirectory,
-			node.gitCursor,
-		)
-		node.gitCursor = nextCursor
-		result.gitignoreObservation = observation
+	node.gitCursor = coordinator.git.Observe(node.gitCursor, node.canonicalDirectory)
+	// A supplied directory may select its own config while remaining a raw Git
+	// traversal boundary. That ownership exception does not authorize searching
+	// its hidden children for another repository.
+	if !node.gitCursor.SourceReachable() && !coordinator.mayReopenGitDescendants(node.ownerPath, node.directory, node.canonicalDirectory) {
+		result.directoriesPruned = 1
+		return result
 	}
 	walkTargets := node.targets
 	if walkTargets != nil && walkTargets.recursive {
@@ -199,7 +180,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 	sort.Strings(directories)
 	parentRealPath := ""
 	if entries.Symlinks == nil && len(directories) > 0 {
-		parentRealPath = coordinator.fs.Realpath(node.directory)
+		parentRealPath = node.canonicalDirectory
 	}
 	children := make([]discoveryWalkNode, 0, len(directories))
 	for _, name := range directories {
@@ -225,31 +206,20 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 			result.directoriesPruned++
 			continue
 		}
-		childGitDirectory := ""
-		childGitCursor := gitignore.Cursor{}
-		childGitActive := false
-		if node.gitActive {
-			childGitDirectory = tspath.CombinePaths(node.gitDirectory, name)
-			nextCursor, gitBlocked := node.gitCursor.Enter(childGitDirectory)
-			if gitBlocked && !coordinator.reopensGitignoredDirectory(
-				node.ownerPath,
-				child,
-				canonicalChild,
-			) {
-				result.directoriesPruned++
-				continue
-			}
-			childGitCursor = nextCursor
-			childGitActive = true
+		nextCursor, _ := coordinator.git.Enter(node.gitCursor, canonicalChild)
+		gitBlocked := !nextCursor.SourceReachable()
+		childConfigReachable := !gitBlocked || coordinator.reopensGitignoredDirectory(node.ownerPath, child, canonicalChild)
+		if gitBlocked && !coordinator.mayReopenGitDescendants(node.ownerPath, child, canonicalChild) {
+			result.directoriesPruned++
+			continue
 		}
 		children = append(children, discoveryWalkNode{
 			directory:          child,
 			canonicalDirectory: canonicalChild,
 			ownerDir:           node.ownerDir,
 			ownerPath:          node.ownerPath,
-			gitDirectory:       childGitDirectory,
-			gitCursor:          childGitCursor,
-			gitActive:          childGitActive,
+			configReachable:    childConfigReachable,
+			gitCursor:          nextCursor,
 			targets:            childTargets,
 		})
 	}
@@ -270,4 +240,11 @@ func (coordinator *discoveryCoordinator) reopensGitignoredDirectory(ownerPath st
 func (coordinator *discoveryCoordinator) isGloballyIgnoredCandidate(ownerPath string, candidatePath string, canonicalPath string) bool {
 	matcher, ok := coordinator.modules.globalIgnoreMatcher(ownerPath)
 	return ok && matcher.IgnoresPath(candidatePath, canonicalPath)
+}
+
+// A file-level authored negation may require traversal to reach a nested
+// repository without authorizing execution of the enclosing config module.
+func (coordinator *discoveryCoordinator) mayReopenGitDescendants(ownerPath string, directory string, canonicalDirectory string) bool {
+	matcher, ok := coordinator.modules.globalIgnoreMatcher(ownerPath)
+	return ok && matcher.MayReopenGitDescendants(directory, canonicalDirectory)
 }

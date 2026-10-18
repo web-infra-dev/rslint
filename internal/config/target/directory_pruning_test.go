@@ -8,7 +8,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
-	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"gotest.tools/v3/assert"
 )
@@ -98,7 +97,7 @@ func setupDiscoveryTxtarFixture(t *testing.T, name string) (string, map[string]s
 	if err != nil {
 		t.Fatal(err)
 	}
-	configDir := tspath.NormalizePath(archive.Materialize(t, name))
+	configDir := osvfs.FS().Realpath(tspath.NormalizePath(archive.Materialize(t, name)))
 	paths := make(map[string]string, len(names))
 	for _, relativeName := range names {
 		paths[relativeName] = tspath.ResolvePath(configDir, relativeName)
@@ -203,16 +202,9 @@ func TestDiscoverFilesOutsidePrograms_UnrootedNegationConservative(t *testing.T)
 // macOS/Windows walks enter every ignored directory in large repositories.
 func TestDiscoverFilesOutsidePrograms_CaseInsensitiveAnchoredNegationPrunesUnrelatedDir(t *testing.T) {
 	configDir, paths := setupDiscoveryTxtarFixture(t, "case-insensitive")
-	config := rslintconfig.ConfigWithCollectedGitignore(rslintconfig.RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
-	}, []gitignore.Pattern{
-		{Glob: "**/target/**/*", NodeGlob: "**/target", DirectoryOnly: true},
-		// scripts/* ignores each immediate child node without excluding the
-		// scripts parent, so Git permits the later Debug negation to reopen the
-		// matching child.
-		{Glob: "scripts/*", NodeGlob: "scripts/*"},
-		{Glob: "!Scripts/**/Debug/**/*", NodeGlob: "Scripts/**/Debug", Negated: true, DirectoryOnly: true},
-	}, true)
+	}
 
 	spy := &caseInsensitiveSpyFS{spyFS: &spyFS{FS: osvfs.FS()}}
 	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, true)
@@ -274,7 +266,6 @@ func TestDiscoverFilesOutsidePrograms_GitignoreTargetPrunedE2E(t *testing.T) {
 	config := rslintconfig.RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
-	config = rslintconfig.ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	spy := &spyFS{FS: osvfs.FS()}
 	gapFiles := discoverFilesOutsideProgramsForTest(config, dir, spy, map[string]struct{}{}, nil, nil, false)
@@ -285,7 +276,7 @@ func TestDiscoverFilesOutsidePrograms_GitignoreTargetPrunedE2E(t *testing.T) {
 	assert.Equal(t, len(gapFiles), 1, "got %v", gapFiles)
 	assert.Assert(t, toSet(gapFiles)[tspath.NormalizePath(dir+"/src/index.ts")])
 	// Linter consistency: target files return nil.
-	assert.Assert(t, config.GetConfigForFile(tspath.NormalizePath(dir+"/target/a.ts"), dir) == nil)
+	assert.Assert(t, configWithGitForFileForTest(config, tspath.NormalizePath(dir+"/target/a.ts"), dir) == nil)
 }
 
 // Nested .gitignore negation: root ignores build/, a sub/.gitignore re-includes
@@ -297,7 +288,6 @@ func TestDiscoverFilesOutsidePrograms_NestedGitignoreNegationE2E(t *testing.T) {
 	config := rslintconfig.RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
-	config = rslintconfig.ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	spy := &spyFS{FS: osvfs.FS()}
 	gapFiles := discoverFilesOutsideProgramsForTest(config, dir, spy, map[string]struct{}{}, nil, nil, false)
@@ -308,7 +298,7 @@ func TestDiscoverFilesOutsidePrograms_NestedGitignoreNegationE2E(t *testing.T) {
 	assert.Assert(t, dirAccessed(spy.snapshotAccessedDirs(), "build"), "sub/build must be walked")
 	if !gapSet[tspath.NormalizePath(dir+"/sub/build/keep.ts")] {
 		// Consistency cross-check: linter must agree it is lintable.
-		mc := config.GetConfigForFile(tspath.NormalizePath(dir+"/sub/build/keep.ts"), dir)
+		mc := configWithGitForFileForTest(config, tspath.NormalizePath(dir+"/sub/build/keep.ts"), dir)
 		t.Errorf("sub/build/keep.ts should be a gap file; GetConfigForFile=%v", mc != nil)
 	}
 	// Top-level build/top.ts stays ignored.
@@ -358,7 +348,7 @@ func TestDiscoverFilesOutsidePrograms_PruningPreservesGapFiles(t *testing.T) {
 			// this set regardless of directory pruning.
 			var oracle []string
 			for _, abs := range paths {
-				if config.GetConfigForFile(abs, configDir) != nil {
+				if configWithGitForFileForTest(config, abs, configDir) != nil {
 					oracle = append(oracle, abs)
 				}
 			}
@@ -393,7 +383,7 @@ func TestDiscoverFilesOutsidePrograms_PerEntryNegationDoesNotResurrect(t *testin
 	assert.Assert(t, !gapSet[paths["target/x.ts"]])
 	assert.Assert(t, !gapSet[paths["target/keep/k.ts"]], "per-entry ! must not resurrect a global ignore")
 	// Linter authority agrees, and target/ is pruned (consistent).
-	assert.Assert(t, config.GetConfigForFile(paths["target/keep/k.ts"], configDir) == nil)
+	assert.Assert(t, configWithGitForFileForTest(config, paths["target/keep/k.ts"], configDir) == nil)
 	assert.Assert(t, !dirAccessed(spy.snapshotAccessedDirs(), "target"), "target pruned; per-entry ! does not protect")
 }
 

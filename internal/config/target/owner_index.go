@@ -95,12 +95,14 @@ func mustTargetMatcher(
 	configDirectory string,
 	fsys vfs.FS,
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
+	gitPolicy *rslintconfig.GitPolicy,
 ) rslintconfig.TargetMatcher {
 	matcher, err := rslintconfig.NewTargetMatcherWithPathSpaces(
 		config,
 		configDirectory,
 		fsys,
 		pathSpaces,
+		gitPolicy,
 	)
 	if err != nil {
 		panic(err)

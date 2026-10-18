@@ -38,7 +38,7 @@ func readLintDirectory(fsys vfs.FS, directory string) []lintDirectoryEntry {
 			}
 			realPath := fsys.Realpath(directoryPath)
 			expectedRealPath := tspath.CombinePaths(parentRealPath, name)
-			isSymlink = !rslintconfig.PathsEqual(realPath, expectedRealPath, fsys.UseCaseSensitiveFileNames())
+			isSymlink = parentRealPath != "" && realPath != "" && !rslintconfig.PathsEqual(realPath, expectedRealPath, fsys.UseCaseSensitiveFileNames())
 		}
 		if !isSymlink {
 			entries = append(entries, lintDirectoryEntry{name: name, directory: true})

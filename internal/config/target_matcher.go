@@ -38,6 +38,7 @@ type targetMatchSource struct {
 	config           RslintConfig
 	configDirectory  string
 	pathSpaces       *PathSpaceSnapshot
+	gitPolicy        *GitPolicy
 	useCaseSensitive bool
 	hasFS            bool
 }
@@ -50,6 +51,7 @@ func NewTargetMatcherWithPathSpaces(
 	configDirectory string,
 	fsys vfs.FS,
 	pathSpaces *PathSpaceSnapshot,
+	gitPolicy *GitPolicy,
 ) (TargetMatcher, error) {
 	if pathSpaces == nil {
 		return TargetMatcher{}, errors.New("path-space snapshot is required")
@@ -68,13 +70,14 @@ func NewTargetMatcherWithPathSpaces(
 			}
 		}
 	}
-	resolver := newConfigTargetResolverWithBases(config, configDirectory, fsys, pathSpaces.bases)
+	resolver := newConfigTargetResolverWithBases(config, configDirectory, fsys, pathSpaces.bases, gitPolicy)
 	return TargetMatcher{
 		resolver: resolver,
 		source: &targetMatchSource{
 			config:           config,
 			configDirectory:  normalizeAuthoredBase(configDirectory),
 			pathSpaces:       pathSpaces,
+			gitPolicy:        gitPolicy,
 			useCaseSensitive: resolver.useCaseSensitive,
 			hasFS:            fsys != nil,
 		},

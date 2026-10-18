@@ -8,24 +8,13 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
-// configSnapshotFS gives one config-discovery transaction a stable view of
-// every .gitignore file it observes. cachedvfs deliberately does not cache
-// ReadFile, while snapshot preparation may visit one source for multiple
-// ownership scopes. Caching those bytes keeps all scopes in the candidate
-// catalog consistent; the resulting config entries contain materialized ignore
-// patterns and do not retain this filesystem after commit.
+// configSnapshotFS freezes path bases for one discovery transaction. Git source
+// and marker observations are cached by the request-local Git reader instead.
 type configSnapshotFS struct {
 	vfs.FS
-
-	mu                sync.Mutex
-	gitignoreSnapshot map[string]configSnapshotFile
-	realpathSnapshot  map[string]string
-	caseSensitive     bool
-}
-
-type configSnapshotFile struct {
-	content string
-	exists  bool
+	mu               sync.Mutex
+	realpathSnapshot map[string]string
+	caseSensitive    bool
 }
 
 func newConfigSnapshotFS(fsys vfs.FS) *configSnapshotFS {
@@ -34,10 +23,9 @@ func newConfigSnapshotFS(fsys vfs.FS) *configSnapshotFS {
 		caseSensitive = fsys.UseCaseSensitiveFileNames()
 	}
 	return &configSnapshotFS{
-		FS:                fsys,
-		gitignoreSnapshot: make(map[string]configSnapshotFile),
-		realpathSnapshot:  make(map[string]string),
-		caseSensitive:     caseSensitive,
+		FS:               fsys,
+		realpathSnapshot: make(map[string]string),
+		caseSensitive:    caseSensitive,
 	}
 }
 
@@ -61,26 +49,6 @@ func (fsys *configSnapshotFS) Realpath(filePath string) string {
 	realPath := fsys.FS.Realpath(filePath)
 	fsys.realpathSnapshot[key] = realPath
 	return realPath
-}
-
-func (fsys *configSnapshotFS) ReadFile(filePath string) (string, bool) {
-	if fsys == nil || fsys.FS == nil {
-		return "", false
-	}
-	filePath = tspath.NormalizePath(filePath)
-	if tspath.GetBaseFileName(filePath) != ".gitignore" {
-		return fsys.FS.ReadFile(filePath)
-	}
-
-	key := fsys.snapshotKey(filePath)
-	fsys.mu.Lock()
-	defer fsys.mu.Unlock()
-	if file, ok := fsys.gitignoreSnapshot[key]; ok {
-		return file.content, file.exists
-	}
-	content, exists := fsys.FS.ReadFile(filePath)
-	fsys.gitignoreSnapshot[key] = configSnapshotFile{content: content, exists: exists}
-	return content, exists
 }
 
 func (fsys *configSnapshotFS) snapshotKey(filePath string) string {

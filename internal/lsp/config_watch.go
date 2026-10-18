@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/url"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
@@ -21,23 +22,123 @@ import (
 const gitignoreWatcherID project.WatcherID = "rslint-gitignore-policy"
 const ancestorJSConfigWatcherID project.WatcherID = "rslint-ancestor-js-config"
 
-func gitignoreFileWatchers(cwd string, relativePatternSupport bool) []*lsproto.FileSystemWatcher {
-	workspaceRoot := filepath.Clean(cwd)
-	watchers := []*lsproto.FileSystemWatcher{
-		fileSystemWatcher(workspaceRoot, "**/.gitignore", relativePatternSupport),
-	}
-	// Automatic discovery may select a config above the workspace. Exact
-	// watchers on the strict lexical ancestors cover every possible source from
-	// that config directory down to cwd without recursively watching siblings.
-	for current := filepath.Dir(workspaceRoot); current != workspaceRoot; {
-		watchers = append(watchers, fileSystemWatcher(current, ".gitignore", relativePatternSupport))
-		parent := filepath.Dir(current)
-		if parent == current {
-			break
+// gitPolicyWatchDirectories includes the physical directory chains used by
+// collection, plus the lexical workspace ancestry used by config discovery.
+// Watching missing markers is necessary: creating .git changes the boundary.
+func gitPolicyWatchDirectories(directories []config.DirectoryIdentity, files []config.PathIdentity) []string {
+	seen := make(map[string]struct{})
+	addAncestors := func(directory string) {
+		for directory != "" {
+			directory = tspath.NormalizePath(directory)
+			seen[directory] = struct{}{}
+			if strings.HasPrefix(directory, "//") && strings.Count(strings.Trim(directory, "/"), "/") <= 1 {
+				break
+			}
+			parent := tspath.GetDirectoryPath(directory)
+			if parent == directory {
+				break
+			}
+			directory = parent
 		}
-		current = parent
+	}
+	for _, directory := range directories {
+		addAncestors(directory.LexicalPath)
+		addAncestors(directory.CanonicalPath)
+	}
+	for _, file := range files {
+		addAncestors(lspGitDirectory(file))
+	}
+	result := make([]string, 0, len(seen))
+	for directory := range seen {
+		result = append(result, directory)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func gitPolicyFileWatchers(directories []config.DirectoryIdentity, sourceDirectories []string, relativePatterns bool) []*lsproto.FileSystemWatcher {
+	seen := make(map[string]struct{})
+	var watchers []*lsproto.FileSystemWatcher
+	add := func(directory, pattern string) {
+		key := directory + "/" + pattern
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		watchers = append(watchers, fileSystemWatcher(directory, pattern, relativePatterns))
+	}
+	for _, directory := range directories {
+		for _, path := range []string{directory.LexicalPath, directory.CanonicalPath} {
+			add(path, "**/.gitignore")
+			add(path, "**/.git")
+		}
+	}
+	for _, directory := range sourceDirectories {
+		add(directory, ".gitignore")
+		add(directory, ".git")
 	}
 	return watchers
+}
+
+func (s *Server) updateGitPolicyWatchers(ctx context.Context, roots []config.DirectoryIdentity, current []string) error {
+	if !s.watchEnabled || s.outgoingQueue == nil {
+		return nil
+	}
+	// A failed handoff retains at most one superseded or uncertain registration.
+	// Finish its cleanup before installing another generation.
+	if s.retiredGitPolicyWatcherID != "" {
+		if err := s.UnwatchFiles(ctx, s.retiredGitPolicyWatcherID); err != nil {
+			return err
+		}
+		s.retiredGitPolicyWatcherID = ""
+	}
+	directorySet := make(map[string]struct{}, len(current)+len(s.committedGitWatchDirectories))
+	for _, directory := range append(append([]string(nil), current...), s.committedGitWatchDirectories...) {
+		directorySet[directory] = struct{}{}
+	}
+	directories := make([]string, 0, len(directorySet))
+	for directory := range directorySet {
+		directories = append(directories, directory)
+	}
+	sort.Strings(directories)
+	// Exact source chains and recursive roots are different subscriptions. An
+	// alias can move between already observed directories without changing the
+	// exact-directory union, while its recursive watch must still be replaced.
+	scopeKeys := make([]string, 0, len(directories)+2*len(roots))
+	for _, directory := range directories {
+		scopeKeys = append(scopeKeys, "exact:"+directory)
+	}
+	for _, root := range roots {
+		scopeKeys = append(scopeKeys, "recursive:"+root.LexicalPath, "recursive:"+root.CanonicalPath)
+	}
+	sort.Strings(scopeKeys)
+	key := strings.Join(scopeKeys, "\x00")
+	if key == s.gitPolicyWatcherKey {
+		return nil
+	}
+	relativePatterns := false
+	if s.initializeParams != nil && s.initializeParams.Capabilities != nil && s.initializeParams.Capabilities.Workspace != nil && s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles != nil {
+		relativePatterns = ptrIsTrue(s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles.RelativePatternSupport)
+	}
+	s.gitPolicyWatcherGeneration++
+	id := project.WatcherID(fmt.Sprintf("%s-%d", gitignoreWatcherID, s.gitPolicyWatcherGeneration))
+	if err := s.WatchFiles(ctx, id, gitPolicyFileWatchers(roots, directories, relativePatterns)); err != nil {
+		// The client may have installed this ID before cancellation or a lost
+		// response. Track the attempt so the next refresh unregisters it first.
+		s.watchers.Add(id)
+		s.retiredGitPolicyWatcherID = id
+		return err
+	}
+	previous := s.gitPolicyWatcherID
+	s.gitPolicyWatcherID, s.gitPolicyWatcherKey = id, key
+	if previous != "" {
+		s.retiredGitPolicyWatcherID = previous
+		if err := s.UnwatchFiles(ctx, previous); err != nil {
+			return err
+		}
+		s.retiredGitPolicyWatcherID = ""
+	}
+	return nil
 }
 
 // ancestorJSConfigFileWatchers covers the strict lexical ancestors that Go's
@@ -138,7 +239,7 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		if isTsConfigURI(uri) {
 			needsTypeInfoRebuild = true
 		}
-		if isGitignoreURI(uri) {
+		if isGitignoreURI(uri) || isGitMarkerURI(uri) {
 			needsIgnoreRefresh = true
 		}
 		if isStrictAncestorAutoJSConfigPath(uriToPath(change.Uri), s.cwd, s.fs) {
@@ -189,6 +290,11 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 func isGitignoreURI(uri string) bool {
 	idx := strings.LastIndex(uri, "/")
 	return idx >= 0 && strings.EqualFold(uri[idx+1:], ".gitignore")
+}
+
+func isGitMarkerURI(uri string) bool {
+	idx := strings.LastIndex(uri, "/")
+	return idx >= 0 && strings.EqualFold(uri[idx+1:], ".git")
 }
 
 func isStrictAncestorAutoJSConfigPath(filePath string, cwd string, fsys vfs.FS) bool {

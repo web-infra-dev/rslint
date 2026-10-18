@@ -38,32 +38,10 @@ type ConfigEntry struct {
 	Plugins  []string `json:"plugins,omitempty"`
 	Settings Settings `json:"settings,omitempty"`
 
-	// collectedGitignore marks the process-local synthetic entry prepended by
-	// ConfigWithGitignore and retains its once-compiled directory-node
-	// matchers. Keeping the uncommon metadata behind one pointer preserves the
-	// original ConfigEntry footprint for every ordinary authored config entry.
-	collectedGitignore *collectedGitignoreMetadata
 	// authoredPathBase stores the entry's effective path origin when it differs
 	// from the owning config's default path semantics. API composition and
 	// config loading populate it before downstream config consumers run.
 	authoredPathBase *configEntryPathBase
-}
-
-type collectedGitignoreMetadata struct {
-	ignores []IgnorePattern
-	scopes  []collectedGitignoreScope
-}
-
-// collectedGitignoreScope is one authoritative Git collection boundary. The
-// slice order is semantic: target resolution first chooses the earliest scope
-// containing the caller's lexical path and only then falls back, in the same
-// order, to canonical-to-physical containment. Patterns from every other
-// scope are inapplicable to that target.
-type collectedGitignoreScope struct {
-	matchDirectory    string
-	physicalDirectory string
-	lexicalDirectory  string
-	caseInsensitive   bool
 }
 
 type configEntryPathBase struct {
@@ -149,7 +127,7 @@ func ConfigWithResolvedBasePaths(
 
 func configNeedsTargetResolver(config RslintConfig) bool {
 	for _, entry := range config {
-		if entry.BasePath != nil || entry.authoredPathBase != nil || entry.collectedGitignore != nil {
+		if entry.BasePath != nil || entry.authoredPathBase != nil {
 			return true
 		}
 	}
@@ -793,42 +771,9 @@ func normalizePattern(pattern string) string {
 // aligns with ESLint v10: `dir/**` blocks directory traversal entirely, and
 // `!` negation cannot undo it.
 func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string) bool {
-	if hasPatternMatchDirectory(patterns) {
-		for _, pattern := range patterns {
-			if pattern.Negated || pattern.Kind != dirAbsoluteBlock {
-				continue
-			}
-			dirPath, ok := ignoreDirectoryPathForPattern(filePath, cwd, pattern)
-			if ok && directoryPatternAbsolutelyBlocks(pattern, dirPath) {
-				return true
-			}
-		}
-		return false
-	}
+
 	dirPath, ok := ignoreDirectoryPath(filePath, cwd)
 	return ok && isDirAbsolutelyBlocked(dirPath, patterns)
-}
-
-func ignoreDirectoryPathForPattern(filePath string, defaultDirectory string, pattern IgnorePattern) (string, bool) {
-	matchDirectories := patternMatchDirectories(pattern, defaultDirectory)
-	for index, directory := range matchDirectories {
-		if directory == "" || repeatedMatchDirectory(matchDirectories, index) {
-			continue
-		}
-		dirPath, ok := ignoreDirectoryPath(filePath, directory)
-		if !ok {
-			continue
-		}
-		if pathEscapesCwd(dirPath) && pattern.CaseInsensitive {
-			parent := tspath.GetDirectoryPath(filePath)
-			dirPath = normalizePathWithCaseSensitivity(parent, directory, false)
-			dirPath = strings.TrimSuffix(strings.ReplaceAll(dirPath, "\\", "/"), "/")
-		}
-		if !pathEscapesCwd(dirPath) {
-			return dirPath, true
-		}
-	}
-	return "", false
 }
 
 func ignoreDirectoryPath(filePath string, cwd string) (string, bool) {
@@ -929,12 +874,7 @@ func extractConfigIgnores(config RslintConfig) []IgnorePattern {
 		if !isGlobalIgnoreEntry(entry) {
 			continue
 		}
-		var entryIgnores []IgnorePattern
-		if entry.collectedGitignore != nil {
-			entryIgnores = entry.collectedGitignore.ignores
-		} else {
-			entryIgnores = ParseIgnorePatterns(entry.Ignores)
-		}
+		entryIgnores := ParseIgnorePatterns(entry.Ignores)
 		if len(entryIgnores) == 0 {
 			continue
 		}

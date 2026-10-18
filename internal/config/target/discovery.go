@@ -17,10 +17,11 @@ func discoverLintTargetsWithPreparedFiles(
 	scanRoot string,
 	fsys vfs.FS,
 	explicitFiles []*explicitLintTarget,
-	allowDirs []string,
+	allowDirs []rslintconfig.DirectoryIdentity,
 	stopDirs []string,
 	singleThreaded bool,
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
+	gitPolicy *rslintconfig.GitPolicy,
 ) []File {
 	configDir = tspath.NormalizePath(configDir)
 	scanRoot = tspath.NormalizePath(scanRoot)
@@ -29,14 +30,14 @@ func discoverLintTargetsWithPreparedFiles(
 	}
 	if allowDirs == nil {
 		return discoverLintTargetsWithinRoot(
-			config, configDir, scanRoot, fsys, explicitFiles, nil, stopDirs, singleThreaded, pathSpaces,
+			config, configDir, scanRoot, fsys, explicitFiles, nil, stopDirs, singleThreaded, pathSpaces, gitPolicy,
 		)
 	}
 
 	targets := []File{}
 	if explicitFiles != nil {
 		targets = discoverLintTargetsWithinRoot(
-			config, configDir, scanRoot, fsys, explicitFiles, nil, stopDirs, singleThreaded, pathSpaces,
+			config, configDir, scanRoot, fsys, explicitFiles, nil, stopDirs, singleThreaded, pathSpaces, gitPolicy,
 		)
 	}
 	if len(allowDirs) == 0 {
@@ -44,18 +45,10 @@ func discoverLintTargetsWithPreparedFiles(
 	}
 
 	useCaseSensitive := fsys == nil || fsys.UseCaseSensitiveFileNames()
-	targetMatcher := mustTargetMatcher(config, configDir, fsys, pathSpaces)
-	scanRootCanonical := scanRoot
-	if fsys != nil {
-		if realPath := fsys.Realpath(scanRoot); realPath != "" {
-			scanRootCanonical = tspath.NormalizePath(realPath)
-		}
-	}
-	for _, root := range rslintconfig.CoalesceDirectoryIdentities(allowDirs, fsys) {
-		isDefaultRoot := pathsEqual(root.LexicalPath, scanRoot, true) ||
-			pathsEqual(root.CanonicalPath, scanRootCanonical, true)
-		if !isDefaultRoot && (rslintconfig.IsDefaultExcludedPath(root.LexicalPath, scanRoot, useCaseSensitive) ||
-			targetMatcher.CanPruneDirectory(root)) {
+	targetMatcher := mustTargetMatcher(config, configDir, fsys, pathSpaces, gitPolicy)
+	for _, root := range allowDirs {
+		if rslintconfig.IsDefaultExcludedPath(root.LexicalPath, scanRoot, useCaseSensitive) ||
+			targetMatcher.CanPruneDirectory(root) {
 			continue
 		}
 		targets = append(targets, discoverLintTargetsWithinRoot(
@@ -64,10 +57,11 @@ func discoverLintTargetsWithPreparedFiles(
 			root.LexicalPath,
 			fsys,
 			nil,
-			[]string{root.LexicalPath},
+			[]rslintconfig.DirectoryIdentity{root},
 			stopDirs,
 			singleThreaded,
 			pathSpaces,
+			gitPolicy,
 		)...)
 	}
 
@@ -93,10 +87,11 @@ func discoverLintTargetsWithinRoot(
 	scanRoot string,
 	fsys vfs.FS,
 	explicitFiles []*explicitLintTarget,
-	allowDirs []string,
+	allowDirs []rslintconfig.DirectoryIdentity,
 	stopDirs []string,
 	singleThreaded bool,
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
+	gitPolicy *rslintconfig.GitPolicy,
 ) []File {
 	useCaseSensitive := true
 	if fsys != nil {
@@ -121,11 +116,8 @@ func discoverLintTargetsWithinRoot(
 		}
 		return matchPath
 	}
-	resolvedAllowDirs := resolveAllowedDirectories(allowDirs, fsys)
-	directWalkRoot := resolvedAllowedDirectory{
-		LexicalPath:   scanRoot,
-		CanonicalPath: scanRoot,
-	}
+	resolvedAllowDirs := allowDirs
+	directWalkRoot := frozenWalkRoot(scanRoot, allowDirs, pathSpaces)
 	directWalkProjection := allowDirs == nil
 	if len(resolvedAllowDirs) == 1 &&
 		rslintconfig.ExactPathID(resolvedAllowDirs[0].LexicalPath) == rslintconfig.ExactPathID(scanRoot) {
@@ -152,7 +144,7 @@ func discoverLintTargetsWithinRoot(
 		return projection, true
 	}
 
-	targetMatcher := mustTargetMatcher(config, configDir, fsys, pathSpaces)
+	targetMatcher := mustTargetMatcher(config, configDir, fsys, pathSpaces, gitPolicy)
 
 	var allowFileSet map[string]*explicitLintTarget
 	if explicitFiles != nil {
@@ -285,11 +277,9 @@ func discoverLintTargetsWithinRoot(
 			projections = []requestedPathProjection{{Path: fullPath}}
 		}
 		resolvedCanonicalPath := ""
-		resolvedCanonicalParentPath := ""
 		if needsRealpath && fsys != nil {
-			identity := FreezeFileIdentity(fullPath, fsys)
-			resolvedCanonicalPath = identity.CanonicalPath
-			resolvedCanonicalParentPath = identity.CanonicalParentPath
+			physicalPath := tspath.CombinePaths(directWalkRoot.CanonicalPath, walkPath)
+			resolvedCanonicalPath = fsys.Realpath(physicalPath)
 		}
 		for _, projection := range projections {
 			canonicalPath := projection.CanonicalPath
@@ -299,9 +289,11 @@ func discoverLintTargetsWithinRoot(
 			if canonicalPath == "" {
 				canonicalPath = fullPath
 			}
-			canonicalParentPath := resolvedCanonicalParentPath
-			if canonicalParentPath == "" {
-				canonicalParentPath = tspath.GetDirectoryPath(canonicalPath)
+			// Preserve the containing directory even when the leaf is a symlink
+			// to a file in a different repository.
+			canonicalParentPath := tspath.GetDirectoryPath(projection.CanonicalPath)
+			if projection.CanonicalPath == "" {
+				canonicalParentPath = tspath.GetDirectoryPath(fullPath)
 			}
 			if rslintconfig.IsDefaultExcludedPath(projection.Path, scanRoot, useCaseSensitive) {
 				continue
@@ -331,11 +323,11 @@ func discoverLintTargetsWithinRoot(
 	}
 
 	work := func(walkPath string) []string {
-		directory := normalizedScanRoot
+		physicalDirectory := directWalkRoot.CanonicalPath
 		if walkPath != "." {
-			directory = tspath.CombinePaths(normalizedScanRoot, walkPath)
+			physicalDirectory = tspath.CombinePaths(physicalDirectory, walkPath)
 		}
-		entries := readLintDirectory(fsys, directory)
+		entries := readLintDirectory(fsys, physicalDirectory)
 
 		var childDirs []string
 		for _, e := range entries {
@@ -378,7 +370,7 @@ func discoverLintTargetsWithinRoot(
 	}
 
 	pool := newWalkPool(workers)
-	walkRoots := discoverWalkRoots(normalizedScanRoot, allowDirs, fsys)
+	walkRoots := discoverWalkRoots(directWalkRoot, allowDirs)
 	walkRoots = filterInitialWalkRoots(
 		walkRoots,
 		func(walkPath string) bool {

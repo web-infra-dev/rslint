@@ -79,10 +79,6 @@ func (coordinator *moduleLoadCoordinator) state(candidatePath string) *configLoa
 	return coordinator.statesByPath[candidatePath]
 }
 
-func (coordinator *moduleLoadCoordinator) hasCandidateResults() bool {
-	return len(coordinator.statesByPath) > 0
-}
-
 func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configCandidate) error {
 	type candidateGroup struct {
 		candidate configCandidate
@@ -278,8 +274,7 @@ func (coordinator *moduleLoadCoordinator) failures() []ConfigFailure {
 	return failures
 }
 
-func (coordinator *moduleLoadCoordinator) allConfigsFailedError() error {
-	failures := coordinator.failures()
+func allConfigsFailedError(failures []ConfigFailure) error {
 	if len(failures) == 0 {
 		return ErrAllConfigsFailed
 	}
@@ -296,7 +291,7 @@ func (coordinator *moduleLoadCoordinator) allConfigsFailedError() error {
 }
 
 func (coordinator *moduleLoadCoordinator) activateEffectiveConfigs(effectiveConfigIDs []string) ([]rslintconfig.EslintPluginEntry, error) {
-	if !coordinator.hasCandidateResults() {
+	if len(effectiveConfigIDs) == 0 {
 		return nil, nil
 	}
 	response, err := coordinator.loader.ActivateConfigs(coordinator.ctx, ConfigActivationRequest{

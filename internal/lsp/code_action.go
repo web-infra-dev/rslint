@@ -39,6 +39,11 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 		return s.handleFixAllCodeAction(ctx, uri)
 	}
 
+	snapshot := s.documentLintSnapshot(uri)
+	if snapshot.unavailable || snapshot.resolvedConfig.GloballyIgnored {
+		return lsproto.CodeActionResponse{CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{}}, nil
+	}
+
 	// Get stored diagnostics for this document
 	ruleDiagnostics, exists := s.diagnostics[uri]
 	if !exists {

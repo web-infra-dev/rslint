@@ -410,7 +410,7 @@ func newPushDiagnosticsPluginFixture(
 		t.Fatal(err)
 	}
 	s.lintPrograms = fixture.store
-	s.configSnapshotIncludesGitignore = true
+	s.gitPolicy = gitPolicyForLSPTest(s)
 	configDirectory := filepath.Dir(fixture.configPath)
 	installJSConfigsForTest(s, map[string]config.RslintConfig{configDirectory: entries})
 	s.eslintPluginConfigGeneration = "push-generation"
@@ -667,24 +667,17 @@ func TestPreparedPluginInputExternalConfigPreservesGitignoreTargetIdentity(t *te
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(
-		filepath.Join(workspace, ".gitignore"),
-		[]byte("linked-src/ignored.ts\n"),
+		filepath.Join(configDir, ".gitignore"),
+		[]byte("src/ignored.ts\n"),
 		0o644,
 	); err != nil {
 		t.Fatal(err)
 	}
-	effective := config.ConfigWithGitignoreForTargetsFromRoot(
-		config.RslintConfig{{
-			Files:   []string{"src/**/*.ts"},
-			Plugins: []string{"tpexternalgit"},
-			Rules:   config.Rules{"tpexternalgit/no-foo": "error"},
-		}},
-		configDir,
-		workspace,
-		osvfs.FS(),
-		[]string{aliasFile},
-		nil,
-	)
+	effective := config.RslintConfig{{
+		Files:   []string{"src/**/*.ts"},
+		Plugins: []string{"tpexternalgit"},
+		Rules:   config.Rules{"tpexternalgit/no-foo": "error"},
+	}}
 
 	s := newTestServer()
 	installRuleCatalogForTest(s, effective)
@@ -781,7 +774,7 @@ func TestDocumentLintSnapshotKeepsPluginRulesInsideDeclaredOwner(t *testing.T) {
 	s := newTestServer()
 	s.cwd = root
 	s.fs = osvfs.FS()
-	s.configSnapshotIncludesGitignore = true
+	s.gitPolicy = gitPolicyForLSPTest(s)
 	rootOwnerDirectory := tspath.NormalizePath(root)
 	nestedOwnerDirectory := tspath.NormalizePath(nested)
 	rootConfig := config.RslintConfig{{Rules: config.Rules{
@@ -1121,7 +1114,7 @@ func TestNativeFixPassUsesFrozenTargetOverlay(t *testing.T) {
 	s := newTestServer()
 	s.cwd = "/alias"
 	s.fs = fsys
-	s.configSnapshotIncludesGitignore = true
+	s.gitPolicy = gitPolicyForLSPTest(s)
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/alias": {{Rules: config.Rules{"no-debugger": "error"}}},
 	})
@@ -1179,7 +1172,7 @@ func TestComputeFixAllContentSharesFrozenTargetWithNativeAndPlugin(t *testing.T)
 	s := newTestServer()
 	s.cwd = "/alias"
 	s.fs = fsys
-	s.configSnapshotIncludesGitignore = true
+	s.gitPolicy = gitPolicyForLSPTest(s)
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/owner-a": {{
 			Files:   []string{"**/*.ts"},
@@ -1838,5 +1831,66 @@ func TestHandleDidClose_CancelsInflightDispatch(t *testing.T) {
 	s.inflightPluginDispatchMu.Unlock()
 	if stillThere {
 		t.Error("in-flight dispatch entry should be removed after close")
+	}
+}
+
+func TestMergePluginDiagnosticsRetargetedAliasRejectsInvalidPolicy(t *testing.T) {
+	for _, covered := range []bool{false, true} {
+		t.Run(fmt.Sprintf("covered=%t", covered), func(t *testing.T) {
+			s, outgoing, root := newConfigRefreshTestServer(t)
+			for name, content := range map[string]string{
+				".gitignore": "b/source.ts\n", "a/source.ts": "debugger;", "b/source.ts": "debugger;",
+			} {
+				path := tspath.ResolvePath(root, name)
+				if err := os.MkdirAll(tspath.GetDirectoryPath(path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			alias := tspath.ResolvePath(root, "alias")
+			if err := os.Symlink(tspath.ResolvePath(root, "a"), alias); err != nil {
+				t.Skip(err)
+			}
+			uri := documentURIFromPath(tspath.ResolvePath(alias, "source.ts"))
+			if covered {
+				s.gitPolicy = config.CollectGitPolicy(nil, root, s.fs, nil, config.ResolveDirectoryIdentities([]string{root}, s.fs))
+			} else {
+				identity := config.FreezeFileIdentity(uriToPath(uri), s.fs)
+				s.gitPolicy = config.CollectGitPolicy(nil, root, s.fs, []config.PathIdentity{identity}, nil)
+			}
+			installJSConfigsForTest(s, map[string]config.RslintConfig{root: {{Rules: config.Rules{"no-debugger": "error"}}}})
+			s.documents[uri] = "debugger;"
+			s.docGeneration[uri] = 1
+			if snapshot := s.documentLintSnapshot(uri); snapshot.unavailable || snapshot.resolvedConfig.GloballyIgnored {
+				t.Fatalf("original alias was excluded: %+v", snapshot)
+			}
+			// Native results may already be displayed when the plugin completes.
+			s.diagnostics[uri] = []rule.RuleDiagnostic{pluginDiag("debugger;", "no-debugger", "old native result", 0, 8)}
+			if err := os.Remove(alias); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(tspath.ResolvePath(root, "b"), alias); err != nil {
+				t.Fatal(err)
+			}
+			snapshot := s.documentLintSnapshot(uri)
+			if covered && (snapshot.unavailable || !snapshot.resolvedConfig.GloballyIgnored) || !covered && !snapshot.unavailable {
+				t.Fatalf("invalid test destination: %+v", snapshot)
+			}
+			s.mergePluginDiagnostics(pluginLintResult{uri: uri, generation: 1, diags: []rule.RuleDiagnostic{pluginDiag("debugger;", "plug/rule", "old alias result", 0, 8)}})
+			if _, cached := s.diagnostics[uri]; cached {
+				t.Fatal("retargeted alias retained stale diagnostics")
+			}
+			select {
+			case message := <-outgoing:
+				params, ok := message.AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+				if !ok || params.Uri != uri || len(params.Diagnostics) != 0 {
+					t.Fatalf("retargeted alias did not clear old display: %+v", message)
+				}
+			default:
+				t.Fatal("retargeted alias left old diagnostics displayed")
+			}
+		})
 	}
 }

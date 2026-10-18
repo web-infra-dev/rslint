@@ -1,3 +1,5 @@
+// cspell:ignore gitdir
+
 package target
 
 import (
@@ -84,16 +86,16 @@ func TestTargetPlanAppliesExecutionConfigOverFrozenPathSpaces(t *testing.T) {
 	if err := os.WriteFile(filePath, []byte("export {};\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	plan, err := Resolve(Request{
+	plan, err := Resolve(withTestGitPolicy(Request{
 		Config: rslintconfig.RslintConfig{{
 			Settings: rslintconfig.Settings{"generation": "discovery"},
 		}},
 		ConfigDirectory: directory,
 		ScanRoot:        directory,
 		FS:              osvfs.FS(),
-		Files:           []string{filePath},
+		Files:           freezeFilePathsForTest([]string{filePath}, osvfs.FS()),
 		SingleThreaded:  true,
-	})
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,6 +111,7 @@ func TestTargetPlanAppliesExecutionConfigOverFrozenPathSpaces(t *testing.T) {
 		osvfs.FS(),
 		plan.PathSpaces(),
 		rules.All(),
+		plan.GitPolicy(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -130,16 +133,16 @@ func TestTargetPlanFreezesExplicitOwnerAndWarningOutcome(t *testing.T) {
 		targetPath:       targetPath,
 		targetParentPath: tspath.GetDirectoryPath(targetPath),
 	}
-	plan, err := Resolve(Request{
+	plan, err := Resolve(withTestGitPolicy(Request{
 		ConfigMap: map[string]rslintconfig.RslintConfig{
 			"/repo/Project": {{}},
 		},
 		ConfigDirectory: "/repo",
 		ScanRoot:        "/repo",
 		FS:              fsys,
-		Files:           []string{targetPath},
+		Files:           freezeFilePathsForTest([]string{targetPath}, fsys),
 		SingleThreaded:  true,
-	})
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,14 +162,14 @@ func TestTargetPlanFreezesExplicitOwnerAndWarningOutcome(t *testing.T) {
 func TestTargetPlanPreservesIgnoredBeforeMissingWarningPriority(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	target := tspath.CombinePaths(root, "node_modules/pkg/missing.ts")
-	plan, err := Resolve(Request{
+	plan, err := Resolve(withTestGitPolicy(Request{
 		Config:          rslintconfig.RslintConfig{{}},
 		ConfigDirectory: root,
 		ScanRoot:        root,
 		FS:              osvfs.FS(),
-		Files:           []string{target},
+		Files:           freezeFilePathsForTest([]string{target}, osvfs.FS()),
 		SingleThreaded:  true,
-	})
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,14 +211,14 @@ func TestTargetResolveSeparatesConfigDirectoryFromScanRoot(t *testing.T) {
 		Files: []string{"../workspace/src/*.ts"},
 		Rules: rslintconfig.Rules{"no-debugger": "error"},
 	}}
-	plan, err := Resolve(Request{
+	plan, err := Resolve(withTestGitPolicy(Request{
 		Config:          entries,
 		ConfigDirectory: configDirectory,
 		ScanRoot:        scanRoot,
 		FS:              osvfs.FS(),
-		Directories:     []string{scanRoot},
+		Directories:     rslintconfig.ResolveDirectoryIdentities([]string{scanRoot}, osvfs.FS()),
 		SingleThreaded:  true,
-	})
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,13 +270,13 @@ func TestTargetResolveRejectsPhysicalAliasesWithDifferentOwners(t *testing.T) {
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
-	_, err := Resolve(Request{
+	_, err := Resolve(withTestGitPolicy(Request{
 		ConfigMap:       configs,
 		ConfigDirectory: tspath.NormalizePath(ownersRoot),
 		FS:              fsys,
-		Files:           []string{targetA, targetB},
+		Files:           freezeFilePathsForTest([]string{targetA, targetB}, fsys),
 		SingleThreaded:  true,
-	})
+	}))
 	if err == nil || !strings.Contains(err.Error(), "governed by different configs") {
 		t.Fatalf("ownership conflict error = %v", err)
 	}
@@ -306,13 +309,13 @@ func TestTargetResolveRejectsSamePhysicalConfigAliasesAsDifferentOwners(t *testi
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
-	_, err := Resolve(Request{
+	_, err := Resolve(withTestGitPolicy(Request{
 		ConfigMap:       configs,
 		ConfigDirectory: tspath.NormalizePath(aliasesRoot),
 		FS:              fsys,
-		Files:           []string{targetA, targetB},
+		Files:           freezeFilePathsForTest([]string{targetA, targetB}, fsys),
 		SingleThreaded:  true,
-	})
+	}))
 	if err == nil || !strings.Contains(err.Error(), "governed by different configs") {
 		t.Fatalf("ownership conflict error = %v", err)
 	}
@@ -384,10 +387,11 @@ func TestTargetPlanCarriesDiscoveryMatches(t *testing.T) {
 		root:  {{Rules: rslintconfig.Rules{"no-console": "error"}}},
 		child: {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
 	}
-	plan, err := Resolve(Request{
+	plan, err := Resolve(withTestGitPolicy(Request{
 		ConfigMap: configs, ConfigDirectory: root, FS: osvfs.FS(),
-		Files: []string{paths["pkg/explicit.ts"]}, Directories: []string{root},
-	})
+		Files:       freezeFilePathsForTest([]string{paths["pkg/explicit.ts"]}, osvfs.FS()),
+		Directories: rslintconfig.ResolveDirectoryIdentities([]string{root}, osvfs.FS()),
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +403,7 @@ func TestTargetPlanCarriesDiscoveryMatches(t *testing.T) {
 		if match == nil || !match.Selected() || match.GloballyIgnored() {
 			t.Fatalf("%s lost its discovery match", file.Path)
 		}
-		resolver, err := rslintconfig.NewFileConfigResolverWithPathSpaces(configs[file.ConfigDirectory], file.ConfigDirectory, osvfs.FS(), plan.PathSpaces(), rules.All())
+		resolver, err := rslintconfig.NewFileConfigResolverWithPathSpaces(configs[file.ConfigDirectory], file.ConfigDirectory, osvfs.FS(), plan.PathSpaces(), rules.All(), plan.GitPolicy())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -410,6 +414,113 @@ func TestTargetPlanCarriesDiscoveryMatches(t *testing.T) {
 		}
 		if len(resolved.EnabledRules) != 1 || resolved.EnabledRules[0].Name != name {
 			t.Fatalf("%s received another owner's rules", file.Path)
+		}
+	}
+}
+
+func TestTargetPlanRetainsNestedRepositoryEntryUnderIgnoredAncestor(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	nested := tspath.ResolvePath(root, "vendor/nested")
+	for path, content := range map[string]string{
+		".gitignore":             "vendor/\n",
+		"root.ts":                "export {};\n",
+		"vendor/nested/.git":     "gitdir: /unused/worktree\n",
+		"vendor/nested/index.ts": "export {};\n",
+	} {
+		fullPath := tspath.ResolvePath(root, path)
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Mkdir(tspath.ResolvePath(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, roots := range [][]string{{root, nested}, {nested, root}, {root, nested, nested}} {
+		plan, err := Resolve(withTestGitPolicy(Request{
+			Config:          rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+			ConfigDirectory: root, ScanRoot: root, FS: osvfs.FS(),
+			Directories:    rslintconfig.ResolveDirectoryIdentities(roots, osvfs.FS()),
+			SingleThreaded: true,
+		}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(plan.Files) != 2 {
+			t.Fatalf("roots %v lost or duplicated nested entry: %+v", roots, plan.Files)
+		}
+		if plan.GitPolicy() == nil {
+			t.Fatal("plan lost Git policy")
+		}
+	}
+}
+
+type frozenDirectoryRequestFS struct {
+	vfs.FS
+	root   string
+	frozen bool
+}
+
+func (fsys *frozenDirectoryRequestFS) Realpath(path string) string {
+	if fsys.frozen && tspath.NormalizePath(path) == fsys.root {
+		panic("requested root resolved after freezing")
+	}
+	return fsys.FS.Realpath(path)
+}
+
+func TestTargetPlanDoesNotResolveFrozenDirectoryAgain(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	physical := tspath.ResolvePath(root, "physical")
+	alias := tspath.ResolvePath(root, "alias")
+	configDir := tspath.ResolvePath(root, "config")
+	for _, directory := range []string{physical, configDir} {
+		if err := os.Mkdir(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(tspath.ResolvePath(physical, "input.ts"), []byte("export {};\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(physical, alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	fsys := &frozenDirectoryRequestFS{FS: osvfs.FS(), root: alias}
+	directories := rslintconfig.ResolveDirectoryIdentities([]string{alias}, fsys)
+	fsys.frozen = true
+	plan, err := Resolve(withTestGitPolicy(Request{Config: rslintconfig.RslintConfig{{}}, ConfigDirectory: configDir, ScanRoot: configDir, FS: fsys, Directories: directories, SingleThreaded: true}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Files) != 1 || plan.Files[0].CanonicalParentPath != directories[0].CanonicalPath {
+		t.Fatalf("frozen root was not retained: %+v", plan.Files)
+	}
+}
+
+func TestTargetPlanIgnoredDirectoryDoesNotDependOnScanRoot(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	ignored := tspath.ResolvePath(root, "ignored")
+	for path, content := range map[string]string{".gitignore": "ignored/\n", "ignored/nested/.git": "gitdir: /unused\n", "ignored/nested/index.ts": "export {};\n"} {
+		full := tspath.ResolvePath(root, path)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Mkdir(tspath.ResolvePath(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, cwd := range []string{root, ignored} {
+		request := withTestGitPolicy(Request{Config: rslintconfig.RslintConfig{{}}, ConfigDirectory: root, ScanRoot: cwd, FS: osvfs.FS(), Directories: rslintconfig.ResolveDirectoryIdentities([]string{ignored}, osvfs.FS()), SingleThreaded: true})
+		plan, err := Resolve(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(plan.Files) != 0 {
+			t.Fatalf("ignored root reopened when ScanRoot=%s: %+v", cwd, plan.Files)
 		}
 	}
 }

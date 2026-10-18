@@ -67,29 +67,37 @@ func addDiscoveryTarget(
 	return true
 }
 
-func (coordinator *discoveryCoordinator) normalizedDirectoryRoots() []string {
+func (coordinator *discoveryCoordinator) normalizedDirectoryRoots() []rslintconfig.DirectoryIdentity {
 	raw := coordinator.request.Directories
 	if len(raw) == 0 && len(coordinator.request.Files) == 0 && coordinator.request.ImplicitCWD {
-		raw = []string{coordinator.request.CWD}
+		raw = rslintconfig.ResolveDirectoryIdentities([]string{coordinator.request.CWD}, coordinator.fs)
 	}
 	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
-	byIdentity := make(map[tspath.Path]string, len(raw))
+	byIdentity := make(map[tspath.Path]rslintconfig.DirectoryIdentity, len(raw))
 	for _, directory := range raw {
-		directory = normalizeDiscoveryPath(directory, coordinator.request.CWD)
-		identity := tspath.ToPath(directory, "", useCaseSensitive)
-		if current, exists := byIdentity[identity]; !exists || directory < current {
+		directory.LexicalPath = normalizeDiscoveryPath(directory.LexicalPath, coordinator.request.CWD)
+		if directory.CanonicalPath == "" {
+			directory.CanonicalPath = directory.LexicalPath
+		} else {
+			directory.CanonicalPath = normalizeDiscoveryPath(directory.CanonicalPath, coordinator.request.CWD)
+		}
+		identity := tspath.ToPath(directory.LexicalPath, "", useCaseSensitive)
+		if current, exists := byIdentity[identity]; !exists || directory.LexicalPath < current.LexicalPath {
 			byIdentity[identity] = directory
 		}
 	}
-	roots := make([]string, 0, len(byIdentity))
+	roots := make([]rslintconfig.DirectoryIdentity, 0, len(byIdentity))
 	for _, directory := range byIdentity {
 		roots = append(roots, directory)
 	}
-	sort.Strings(roots)
+	sort.Slice(roots, func(i, j int) bool { return roots[i].LexicalPath < roots[j].LexicalPath })
 	return roots
 }
 
 func (coordinator *discoveryCoordinator) normalizedFiles() []DiscoveryFile {
+	if coordinator.request.Files == nil {
+		return nil
+	}
 	files := make([]DiscoveryFile, 0, len(coordinator.request.Files))
 	indexByPath := make(map[string]int, len(coordinator.request.Files))
 	for _, file := range coordinator.request.Files {
@@ -97,10 +105,16 @@ func (coordinator *discoveryCoordinator) normalizedFiles() []DiscoveryFile {
 		if file.CanonicalPath != "" {
 			file.CanonicalPath = normalizeDiscoveryPath(file.CanonicalPath, coordinator.request.CWD)
 		}
+		if file.CanonicalParentPath != "" {
+			file.CanonicalParentPath = normalizeDiscoveryPath(file.CanonicalParentPath, coordinator.request.CWD)
+		}
 		if index, exists := indexByPath[file.Path]; exists {
 			files[index].Explicit = files[index].Explicit || file.Explicit
 			if files[index].CanonicalPath == "" {
 				files[index].CanonicalPath = file.CanonicalPath
+			}
+			if files[index].CanonicalParentPath == "" {
+				files[index].CanonicalParentPath = file.CanonicalParentPath
 			}
 			continue
 		}
@@ -117,13 +131,14 @@ func (coordinator *discoveryCoordinator) normalizedFiles() []DiscoveryFile {
 // must not be evaluated. Directory-only CLI/LSP requests have no files and keep
 // the existing unbounded walk by leaving the returned map empty.
 func (coordinator *discoveryCoordinator) targetAncestorTries(
-	roots []string,
+	roots []rslintconfig.DirectoryIdentity,
 	files []DiscoveryFile,
 ) map[string]*discoveryTargetTrie {
 	tries := make(map[string]*discoveryTargetTrie, len(roots))
 	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
 	for _, file := range files {
-		for _, root := range roots {
+		for _, directory := range roots {
+			root := directory.LexicalPath
 			trie := tries[root]
 			if trie == nil {
 				trie = &discoveryTargetTrie{}

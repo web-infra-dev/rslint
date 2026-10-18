@@ -47,6 +47,7 @@ type ResolverOptions struct {
 	// already supplied both lexical and canonical source keys, so normalization
 	// needs no filesystem IO.
 	SourceMappingsIncludeCanonicalPaths bool
+	GitPolicy                           *config.GitPolicy
 	PathSpaces                          *config.PathSpaceSnapshot
 	FS                                  vfs.FS
 }
@@ -78,6 +79,7 @@ func NewResolver(options ResolverOptions) *Resolver {
 			options.FS,
 			options.PathSpaces,
 			options.Catalog,
+			options.GitPolicy,
 		)
 		if err != nil {
 			panic(err)
