@@ -2971,6 +2971,7 @@ func TestRunConfiguredLintForContent_VirtualProjectDirectoryAliases(t *testing.T
 					dependencyPath := tspath.ResolvePath(alias("dependency"), "virtual/dependency.ts")
 					filePath := tspath.ResolvePath(documentRoot, "virtual/deep/new.ts")
 					uri := documentURIFromPath(filePath)
+					editorPath := uriToPath(uri)
 					const content = "import { value } from '../dependency'; var result = value as number; debugger;\n"
 					const dependency = "export declare const value: number;\n"
 					s := newTestServer()
@@ -2993,8 +2994,8 @@ func TestRunConfiguredLintForContent_VirtualProjectDirectoryAliases(t *testing.T
 						t.Fatalf("virtual project aliases lost target or dependency type information: %+v", result.Observation.Native.Diagnostics)
 					}
 					for _, diagnostic := range result.Observation.Native.Diagnostics {
-						if diagnostic.FilePath != filePath {
-							t.Fatalf("diagnostic path = %q, want editor path %q", diagnostic.FilePath, filePath)
+						if diagnostic.FilePath != editorPath {
+							t.Fatalf("diagnostic path = %q, want editor path %q", diagnostic.FilePath, editorPath)
 						}
 					}
 					fixed := runSpeculativeFixAllForTest(t, s, context.Background(), uri, content, documentLintSnapshotForTest(s, uri, entries, owner, false, projects))
