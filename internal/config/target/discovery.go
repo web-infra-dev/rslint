@@ -208,6 +208,24 @@ func discoverLintTargetsWithinRoot(
 	}
 
 	normalizedScanRoot := normalizeWalkPath(scanRoot)
+	physicalWalkPath := func(walkPath string) string {
+		fullPath := tspath.NormalizePath(tspath.CombinePaths(normalizedScanRoot, walkPath))
+		for current := fullPath; current != ""; current = tspath.GetDirectoryPath(current) {
+			if rslintconfig.ExactPathID(current) == rslintconfig.ExactPathID(directWalkRoot.LexicalPath) {
+				break
+			}
+			if physical, frozen := pathSpaces.PhysicalDirectory(current); frozen {
+				relative, within := rslintconfig.RelativePathWithinConfigRoot(fullPath, current, true)
+				if within {
+					return tspath.ResolvePath(physical, relative)
+				}
+			}
+			if parent := tspath.GetDirectoryPath(current); parent == current {
+				break
+			}
+		}
+		return tspath.ResolvePath(directWalkRoot.CanonicalPath, walkPath)
+	}
 
 	var (
 		targetMu  sync.Mutex
@@ -278,7 +296,7 @@ func discoverLintTargetsWithinRoot(
 		}
 		resolvedCanonicalPath := ""
 		if needsRealpath && fsys != nil {
-			physicalPath := tspath.CombinePaths(directWalkRoot.CanonicalPath, walkPath)
+			physicalPath := physicalWalkPath(walkPath)
 			resolvedCanonicalPath = fsys.Realpath(physicalPath)
 		}
 		for _, projection := range projections {
@@ -323,10 +341,7 @@ func discoverLintTargetsWithinRoot(
 	}
 
 	work := func(walkPath string) []string {
-		physicalDirectory := directWalkRoot.CanonicalPath
-		if walkPath != "." {
-			physicalDirectory = tspath.CombinePaths(physicalDirectory, walkPath)
-		}
+		physicalDirectory := physicalWalkPath(walkPath)
 		entries := readLintDirectory(fsys, physicalDirectory)
 
 		var childDirs []string

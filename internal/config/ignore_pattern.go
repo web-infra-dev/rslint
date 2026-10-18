@@ -22,6 +22,13 @@ func NewGlobalIgnoreMatcher(config RslintConfig, configDir string, fsys vfs.FS) 
 	}
 }
 
+// NewGlobalIgnoreMatcherWithPathSpaces reuses authored bases already frozen by
+// the config discovery transaction.
+func NewGlobalIgnoreMatcherWithPathSpaces(config RslintConfig, configDir string, fsys vfs.FS, spaces *PathSpaceSnapshot) (GlobalIgnoreMatcher, error) {
+	matcher, err := NewTargetMatcherWithPathSpaces(config, configDir, fsys, spaces, nil)
+	return GlobalIgnoreMatcher{resolver: matcher.resolver}, err
+}
+
 // BlocksDirectory reports whether global ignores form an absolute traversal
 // boundary at directory.
 func (matcher GlobalIgnoreMatcher) BlocksDirectory(directory string, canonicalDirectory string) bool {
@@ -87,12 +94,12 @@ func (matcher GlobalIgnoreMatcher) MayReopenGitDescendants(directory string, can
 	return false
 }
 
-// IgnoresPath reports whether global ignores exclude a config candidate.
-func (matcher GlobalIgnoreMatcher) IgnoresPath(filePath string, canonicalPath string) bool {
+// IgnoresFile reports whether global ignores exclude a frozen config candidate.
+func (matcher GlobalIgnoreMatcher) IgnoresFile(file PathIdentity) bool {
 	if matcher.resolver == nil {
 		return false
 	}
-	target, matches := matcher.resolver.resolvePathSpaces(filePath, canonicalPath, false)
+	target, matches := matcher.resolver.resolvePathSpacesWithCanonicalParent(file.Path, file.CanonicalPath, file.CanonicalParentPath, false)
 	return matcher.resolver.globallyIgnores(target, matches)
 }
 
@@ -354,6 +361,7 @@ type gitIgnorePathState struct {
 	path                   string
 	lowerPath              string
 	fileDepth              int
+	minimumDepth           int
 	unresolved             int
 	resolvedDepths         uint64
 	resolvedDepthsOverflow []bool
@@ -522,6 +530,11 @@ func (state *gitIgnorePathState) applyRootBasename(pattern *IgnorePattern, path 
 }
 
 func (state *gitIgnorePathState) applyDepth(depth int, negated bool) bool {
+	// A source can decide descendants, never its containing directory or
+	// ancestors. Both the basename fast path and general matcher share this gate.
+	if depth < state.minimumDepth {
+		return false
+	}
 	state.matched = true
 	if !negated {
 		return true

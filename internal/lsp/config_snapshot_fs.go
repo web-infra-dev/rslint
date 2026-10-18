@@ -32,10 +32,9 @@ func newConfigSnapshotFS(fsys vfs.FS) *configSnapshotFS {
 // Realpath freezes normalized path lookups for this config evaluation. Cache
 // identity follows the filesystem's case sensitivity so alternate casing
 // cannot observe two physical generations on a case-insensitive filesystem.
-// It is intentionally scoped outside target capture: FreezeFileIdentity
-// must observe its parent-before/file/parent-after sequence directly, while
-// owner selection, Git projection, and authored-base matching that follow it
-// must agree with one another.
+// Target capture anchors leaf resolution in one physical parent. Owner
+// selection, Git projection, and authored-base matching that follow it must
+// agree on the config directory's identity throughout this transaction.
 func (fsys *configSnapshotFS) Realpath(filePath string) string {
 	if fsys == nil || fsys.FS == nil {
 		return ""

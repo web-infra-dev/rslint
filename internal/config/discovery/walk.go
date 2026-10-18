@@ -44,6 +44,11 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 			return err
 		}
 		sort.Slice(queue, func(i, j int) bool { return queue[i].directory < queue[j].directory })
+		for _, node := range queue {
+			if _, exists := coordinator.physicalDirectories[node.directory]; !exists {
+				coordinator.physicalDirectories[node.directory] = node.canonicalDirectory
+			}
+		}
 		var next []discoveryWalkNode
 		var suspended []suspendedDiscoveryNode
 		var candidates []configCandidate
@@ -175,7 +180,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 		return result
 	}
 
-	entries := coordinator.fs.GetAccessibleEntries(node.directory)
+	entries := coordinator.fs.GetAccessibleEntries(node.canonicalDirectory)
 	directories := append([]string(nil), entries.Directories...)
 	sort.Strings(directories)
 	parentRealPath := ""
@@ -194,7 +199,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 		if rslintconfig.IsDefaultExcludedPath(name, "", coordinator.fs.UseCaseSensitiveFileNames()) {
 			continue
 		}
-		if isSymlinkDirectoryChild(coordinator.fs, node.directory, parentRealPath, name, entries) {
+		if isSymlinkDirectoryChild(coordinator.fs, node.canonicalDirectory, parentRealPath, name, entries) {
 			continue
 		}
 		child := tspath.CombinePaths(node.directory, name)
@@ -237,9 +242,9 @@ func (coordinator *discoveryCoordinator) reopensGitignoredDirectory(ownerPath st
 	return ok && matcher.ReopensDirectoryNode(directory, canonicalDirectory)
 }
 
-func (coordinator *discoveryCoordinator) isGloballyIgnoredCandidate(ownerPath string, candidatePath string, canonicalPath string) bool {
+func (coordinator *discoveryCoordinator) isGloballyIgnoredCandidate(ownerPath string, candidate rslintconfig.PathIdentity) bool {
 	matcher, ok := coordinator.modules.globalIgnoreMatcher(ownerPath)
-	return ok && matcher.IgnoresPath(candidatePath, canonicalPath)
+	return ok && matcher.IgnoresFile(candidate)
 }
 
 // A file-level authored negation may require traversal to reach a nested

@@ -117,69 +117,76 @@ func TestHandleLint_RejectsMismatchedCanonicalFiles(t *testing.T) {
 }
 
 func TestHandleLint_PluginWirePathUsesProgramIdentityWhileResultsUseRequestedAlias(t *testing.T) {
-	root := t.TempDir()
-	realPath := filepath.Join(root, "real.ts")
-	aliasPath := filepath.Join(root, "alias.ts")
-	if err := os.WriteFile(realPath, []byte("const value = 1;\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(root, "tsconfig.json"),
-		[]byte(`{"compilerOptions":{"noLib":true},"files":["real.ts"]}`),
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(realPath, aliasPath); err != nil {
-		t.Skipf("symlink unavailable: %v", err)
-	}
-	var wirePath string
-	response, err := (&Handler{}).handleLint(
-		context.Background(),
-		api.LintRequest{
-			Files:          []string{aliasPath},
-			CanonicalFiles: []string{realPath},
-			Config: json.RawMessage(`[{
-				"files":["**/*.ts"],
-				"plugins":["community"],
-				"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}},
-				"rules":{"community/check":"error"}
-			}]`),
-			ConfigDirectory:  root,
-			WorkingDirectory: root,
-			EslintPlugins: []api.EslintPluginEntry{{
-				Prefix:    "community",
-				RuleNames: []string{"check"},
-			}},
-		},
-		func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-			if len(request.Files) != 1 {
-				return nil, fmt.Errorf("plugin files = %d, want 1", len(request.Files))
+	for _, symlink := range []bool{false, true} {
+		t.Run(fmt.Sprintf("symlink=%t", symlink), func(t *testing.T) {
+			root := t.TempDir()
+			realPath := filepath.Join(root, "real.ts")
+			aliasPath := filepath.Join(root, "alias.ts")
+			if err := os.WriteFile(realPath, []byte("const value = 1;\n"), 0o644); err != nil {
+				t.Fatal(err)
 			}
-			wirePath = request.Files[0].Path
-			return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
-				FilePath: wirePath,
-				Diagnostics: []linter.EslintPluginDiagnostic{{
-					RuleName: "community/check",
-					Message:  "reported",
-					StartPos: 0,
-					EndPos:   5,
-				}},
-			}}}, nil
-		},
-		nil,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if wirePath != tspath.NormalizePath(realPath) {
-		t.Fatalf("plugin wire path = %q, want Program identity %q", wirePath, tspath.NormalizePath(realPath))
-	}
-	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "alias.ts" {
-		t.Fatalf("projected diagnostics = %+v, want requested alias", response.Diagnostics)
-	}
-	if !reflect.DeepEqual(response.LintedFiles, []string{"alias.ts"}) {
-		t.Fatalf("linted files = %v, want requested alias", response.LintedFiles)
+			if err := os.WriteFile(
+				filepath.Join(root, "tsconfig.json"),
+				[]byte(`{"compilerOptions":{"noLib":true},"files":["real.ts"]}`),
+				0o644,
+			); err != nil {
+				t.Fatal(err)
+			}
+			if symlink {
+				if err := os.Symlink(realPath, aliasPath); err != nil {
+					t.Skipf("symlink unavailable: %v", err)
+				}
+			}
+			var wirePath string
+			response, err := (&Handler{}).handleLint(
+				context.Background(),
+				api.LintRequest{
+					Files:          []string{aliasPath},
+					CanonicalFiles: []string{realPath},
+					FileContents:   map[string]string{aliasPath: "const value = 1;\n"},
+					Config: json.RawMessage(`[{
+						"files":["**/*.ts"],
+						"plugins":["community"],
+						"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}},
+						"rules":{"community/check":"error"}
+					}]`),
+					ConfigDirectory:  root,
+					WorkingDirectory: root,
+					EslintPlugins: []api.EslintPluginEntry{{
+						Prefix:    "community",
+						RuleNames: []string{"check"},
+					}},
+				},
+				func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+					if len(request.Files) != 1 {
+						return nil, fmt.Errorf("plugin files = %d, want 1", len(request.Files))
+					}
+					wirePath = request.Files[0].Path
+					return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
+						FilePath: wirePath,
+						Diagnostics: []linter.EslintPluginDiagnostic{{
+							RuleName: "community/check",
+							Message:  "reported",
+							StartPos: 0,
+							EndPos:   5,
+						}},
+					}}}, nil
+				},
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if wirePath != tspath.NormalizePath(realPath) {
+				t.Fatalf("plugin wire path = %q, want Program identity %q", wirePath, tspath.NormalizePath(realPath))
+			}
+			if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "alias.ts" {
+				t.Fatalf("projected diagnostics = %+v, want requested alias", response.Diagnostics)
+			}
+			if !reflect.DeepEqual(response.LintedFiles, []string{"alias.ts"}) {
+				t.Fatalf("linted files = %v, want requested alias", response.LintedFiles)
+			}
+		})
 	}
 }
 
@@ -1284,6 +1291,75 @@ func TestHandleLint_FileContentsKeepTypeInfoWhenProgramUsesSymlinkSource(t *test
 	}
 }
 
+func TestHandleLint_FileContentsPreferRequestedAliasAcrossGenerations(t *testing.T) {
+	for _, project := range []bool{false, true} {
+		for _, symlink := range []bool{false, true} {
+			for _, fix := range []bool{false, true} {
+				t.Run(fmt.Sprintf("project=%v/symlink=%v/fix=%v", project, symlink, fix), func(t *testing.T) {
+					dir := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+					canonical := tspath.ResolvePath(dir, "real.ts")
+					alias := tspath.ResolvePath(dir, "alias.ts")
+					dependency := tspath.ResolvePath(dir, "dependency.ts")
+					const diskSource = "export const diskValue = 0;\n"
+					const buffer = "\uFEFFvar value = 1; debugger;\n"
+					writeProgramTestFiles(t, dir, map[string]string{
+						"real.ts":       diskSource,
+						"tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["alias.ts"]}`,
+					})
+					if symlink {
+						if err := os.Symlink(canonical, alias); err != nil {
+							t.Skipf("file symlink unavailable: %v", err)
+						}
+					}
+					config := json.RawMessage(`[{"rules":{"no-var":"error","no-debugger":"error"}}]`)
+					if project {
+						config = json.RawMessage(`[{"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}},"rules":{"no-var":"error","no-debugger":"error"}}]`)
+					}
+					response, err := (&Handler{}).HandleLint(api.LintRequest{
+						Config: config, ConfigDirectory: dir, WorkingDirectory: dir,
+						Files: []string{alias}, CanonicalFiles: []string{canonical},
+						FileContents: map[string]string{
+							alias:      buffer,
+							canonical:  "export const canonicalBuffer = 2;\n",
+							dependency: "debugger;\n",
+						},
+						Fix: fix, IncludeEncodedSourceFiles: true,
+					})
+					if err != nil {
+						t.Fatal(err)
+					}
+					wantDiagnostics := 2
+					if fix {
+						wantDiagnostics = 1
+						if got := response.Output["alias.ts"]; got != strings.Replace(buffer, "var value", "let value", 1) || len(response.Output) != 1 {
+							t.Fatalf("fix generation lost requested buffer/BOM: %v", response.Output)
+						}
+					} else if len(response.Output) != 0 {
+						t.Fatalf("lint returned fix output: %v", response.Output)
+					}
+					if response.FileCount != 1 || !reflect.DeepEqual(response.LintedFiles, []string{"alias.ts"}) || len(response.Diagnostics) != wantDiagnostics {
+						t.Fatalf("requested buffer was replaced or dependency became a target: %+v", response)
+					}
+					for _, diagnostic := range response.Diagnostics {
+						if diagnostic.FilePath != "alias.ts" || (fix && diagnostic.RuleName != "no-debugger") {
+							t.Errorf("unexpected requested-buffer diagnostic: %+v", diagnostic)
+						}
+					}
+					if _, ok := response.EncodedSourceFiles["alias.ts"]; !ok || len(response.EncodedSourceFiles) != 1 {
+						t.Fatalf("encoded sources lost caller path: %v", response.EncodedSourceFiles)
+					}
+					if got, err := os.ReadFile(canonical); err != nil || string(got) != diskSource {
+						t.Fatalf("API modified disk source: text=%q error=%v", got, err)
+					}
+					if _, err := os.Stat(dependency); !os.IsNotExist(err) {
+						t.Fatalf("API persisted overlay dependency: %v", err)
+					}
+				})
+			}
+		}
+	}
+}
+
 // An in-memory target outside every tsconfig Program must still run
 // non-type-aware rules through the fallback Program.
 func TestHandleLint_GapFile_NonTypeAwareRuleRuns(t *testing.T) {
@@ -1711,12 +1787,12 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 					Status: "loaded",
 				}
 				switch filepath.Clean(candidate.ConfigPath) {
-				case filepath.Clean(rootConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(rootConfigPath)):
 					if filepath.Clean(candidate.ConfigDirectory) != filepath.Clean(root) {
 						return nil, fmt.Errorf("root configDirectory = %q, want %q", candidate.ConfigDirectory, root)
 					}
 					result.Entries = rootEntries
-				case filepath.Clean(nestedConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)):
 					if filepath.Clean(candidate.ConfigDirectory) != filepath.Clean(nestedDir) {
 						return nil, fmt.Errorf("nested configDirectory = %q, want %q", candidate.ConfigDirectory, nestedDir)
 					}
@@ -1935,10 +2011,10 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
 				requestedPaths = append(requestedPaths, filepath.Clean(candidate.ConfigPath))
-				if filepath.Clean(candidate.ConfigPath) == filepath.Clean(unrelatedConfigPath) {
+				if filepath.Clean(candidate.ConfigPath) == filepath.Clean(osvfs.FS().Realpath(unrelatedConfigPath)) {
 					return nil, fmt.Errorf("unrelated config was evaluated: %q", candidate.ConfigPath)
 				}
-				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(rootConfigPath) {
+				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(osvfs.FS().Realpath(rootConfigPath)) {
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
 				response.Results = append(response.Results, discovery.ConfigLoadResult{
@@ -1972,7 +2048,7 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 	if err != nil {
 		t.Fatalf("HandleLintWithContext: %v", err)
 	}
-	if !reflect.DeepEqual(requestedPaths, []string{filepath.Clean(rootConfigPath)}) {
+	if !reflect.DeepEqual(requestedPaths, []string{filepath.Clean(osvfs.FS().Realpath(rootConfigPath))}) {
 		t.Fatalf("requested config paths = %v, want only root", requestedPaths)
 	}
 	if response.FileCount != 1 || len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
@@ -1998,7 +2074,7 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 			request := payload.(discovery.ConfigLoadBatchRequest)
 			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
-				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(configPath) {
+				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(osvfs.FS().Realpath(configPath)) {
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
 				response.Results = append(response.Results, discovery.ConfigLoadResult{
@@ -2073,9 +2149,9 @@ func TestHandleLint_ConfigDiscoveryOverrideNegationReopensGitHiddenConfig(t *tes
 					Status: "loaded",
 				}
 				switch filepath.Clean(candidate.ConfigPath) {
-				case filepath.Clean(rootConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(rootConfigPath)):
 					result.Entries = rootEntries
-				case filepath.Clean(nestedConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)):
 					result.Entries = nestedEntries
 				default:
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
@@ -2106,8 +2182,8 @@ func TestHandleLint_ConfigDiscoveryOverrideNegationReopensGitHiddenConfig(t *tes
 		t.Fatalf("HandleLintWithContext: %v", err)
 	}
 	wantRequestedPaths := []string{
-		filepath.Clean(rootConfigPath),
-		filepath.Clean(nestedConfigPath),
+		filepath.Clean(osvfs.FS().Realpath(rootConfigPath)),
+		filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)),
 	}
 	if !reflect.DeepEqual(requestedPaths, wantRequestedPaths) {
 		t.Fatalf("requested config paths = %v, want %v", requestedPaths, wantRequestedPaths)
@@ -2154,9 +2230,9 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(
 					Status: "loaded",
 				}
 				switch filepath.Clean(candidate.ConfigPath) {
-				case filepath.Clean(rootConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(rootConfigPath)):
 					result.Entries = rootEntries
-				case filepath.Clean(nestedConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)):
 					result.Entries = nestedEntries
 				default:
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
@@ -2233,7 +2309,7 @@ func TestHandleLint_ExplicitConfigUsesEachTargetGitignore(t *testing.T) {
 		switch kind {
 		case api.KindLoadConfigs:
 			request := payload.(discovery.ConfigLoadBatchRequest)
-			if len(request.Candidates) != 1 || filepath.Clean(request.Candidates[0].ConfigPath) != filepath.Clean(configPath) {
+			if len(request.Candidates) != 1 || filepath.Clean(request.Candidates[0].ConfigPath) != filepath.Clean(osvfs.FS().Realpath(configPath)) {
 				return nil, fmt.Errorf("unexpected explicit candidates: %+v", request.Candidates)
 			}
 			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigLoadBatchResponse{

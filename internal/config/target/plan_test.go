@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type retargetingExplicitOwnerFS struct {
@@ -27,12 +28,12 @@ type retargetingExplicitOwnerFS struct {
 
 func (fsys *retargetingExplicitOwnerFS) UseCaseSensitiveFileNames() bool { return false }
 func (fsys *retargetingExplicitOwnerFS) FileExists(filePath string) bool {
-	return tspath.NormalizePath(filePath) == fsys.targetPath
+	return tspath.NormalizePath(filePath) == "/repo/shared.ts"
 }
 func (fsys *retargetingExplicitOwnerFS) Realpath(filePath string) string {
 	filePath = tspath.NormalizePath(filePath)
 	switch filePath {
-	case fsys.targetPath:
+	case tspath.CombinePaths("/repo/Project", tspath.GetBaseFileName(fsys.targetPath)):
 		return "/repo/shared.ts"
 	case fsys.targetParentPath:
 		fsys.parentCalls++
@@ -154,8 +155,111 @@ func TestTargetPlanFreezesExplicitOwnerAndWarningOutcome(t *testing.T) {
 		!plan.ExplicitFileOutcomes[0].Exists {
 		t.Fatalf("explicit outcome = %+v", plan.ExplicitFileOutcomes)
 	}
-	if fsys.parentCalls != 2 {
-		t.Fatalf("target parent Realpath calls = %d, want only the two identity reads", fsys.parentCalls)
+	if fsys.parentCalls != 1 {
+		t.Fatalf("target parent Realpath calls = %d, want one frozen observation", fsys.parentCalls)
+	}
+}
+
+func TestTargetPlanExplicitFileExistenceUsesFrozenIdentity(t *testing.T) {
+	for _, aliasKind := range []string{"directory", "file"} {
+		for _, exists := range []bool{true, false} {
+			name := "captured missing"
+			if exists {
+				name = "captured present"
+			}
+			t.Run(aliasKind+"/"+name, func(t *testing.T) {
+				fsys := osvfs.FS()
+				root := tspath.NormalizePath(fsys.Realpath(t.TempDir()))
+				first, replacement := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "replacement")
+				for _, directory := range []string{first, replacement} {
+					if err := os.Mkdir(directory, 0o755); err != nil {
+						t.Fatal(err)
+					}
+				}
+				firstFile, replacementFile := tspath.ResolvePath(first, "source.ts"), tspath.ResolvePath(replacement, "source.ts")
+				// A leaf symlink must initially resolve so its physical target can
+				// be captured. The missing case removes that target after capture.
+				if exists || aliasKind == "file" {
+					if err := os.WriteFile(firstFile, []byte("export {};\n"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if !exists {
+					if err := os.WriteFile(replacementFile, []byte("export {};\n"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				alias, destination, replacementDestination := tspath.ResolvePath(root, "alias"), first, replacement
+				path := tspath.ResolvePath(alias, "source.ts")
+				if aliasKind == "file" {
+					alias, destination, replacementDestination = tspath.ResolvePath(root, "alias.ts"), firstFile, replacementFile
+					path = alias
+				}
+				if err := os.Symlink(destination, alias); err != nil {
+					t.Skipf("%s symlink unavailable: %v", aliasKind, err)
+				}
+				identity := rslintconfig.FreezeFileIdentity(path, fsys)
+				if identity.CanonicalPath != firstFile {
+					t.Fatalf("captured file = %q, want %q", identity.CanonicalPath, firstFile)
+				}
+				request := withTestGitPolicy(Request{
+					Config:          rslintconfig.RslintConfig{{}},
+					ConfigDirectory: root,
+					ScanRoot:        root,
+					FS:              fsys,
+					Files:           []rslintconfig.PathIdentity{identity},
+					SingleThreaded:  true,
+				})
+				if err := os.Remove(alias); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(replacementDestination, alias); err != nil {
+					t.Fatal(err)
+				}
+				if !exists && aliasKind == "file" {
+					if err := os.Remove(firstFile); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if fsys.FileExists(path) == exists || fsys.FileExists(firstFile) != exists {
+					t.Fatal("alias and captured file must have opposite existence")
+				}
+				plan, err := Resolve(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(plan.ExplicitFileOutcomes) != 1 || plan.ExplicitFileOutcomes[0].Path != path ||
+					plan.ExplicitFileOutcomes[0].Exists != exists || plan.ExplicitFileOutcomes[0].Ignored {
+					t.Fatalf("outcome crossed captured identity: %+v", plan.ExplicitFileOutcomes)
+				}
+				if (len(plan.Files) == 1) != exists || len(plan.Files) > 1 {
+					t.Fatalf("selection crossed captured identity: %+v", plan.Files)
+				}
+				if exists && plan.Files[0].Identity() != identity {
+					t.Fatalf("selected identity = %+v, want %+v", plan.Files[0].Identity(), identity)
+				}
+			})
+		}
+	}
+}
+
+func TestExplicitLintTargetSetPreservesVirtualAndLexicalFallback(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	path, canonical := tspath.ResolvePath(root, "source.ts"), tspath.ResolvePath(root, "physical/source.txt")
+	for _, identity := range []rslintconfig.PathIdentity{
+		{Path: path},
+		{Path: path, CanonicalPath: canonical},
+	} {
+		key := identity.CanonicalPath
+		if key == "" {
+			key = path
+		}
+		fsys := utils.NewOverlayVFS(osvfs.FS(), map[string]string{key: "export {};\n"})
+		set := newExplicitLintTargetSet([]rslintconfig.PathIdentity{identity}, fsys)
+		selected := set.targetsForIdentities([]rslintconfig.PathIdentity{identity})
+		if len(selected) != 1 || !selected[0].selectedBy(root, root, true, nil) {
+			t.Fatalf("virtual explicit target was lost: identity=%+v outcomes=%+v", identity, set.outcomes())
+		}
 	}
 }
 

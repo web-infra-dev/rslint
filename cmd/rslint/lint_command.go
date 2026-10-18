@@ -189,21 +189,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return 1
 	}
 
-	// Direct disk-backed callers may let their plugin host read the initial
-	// text. The production IPC CLI supplies FS and always sends exact snapshots.
-	pluginHostReadsInitialText := args.FS == nil
 	fs := args.FS
 	if fs == nil {
 		fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	}
-	sourceFS := fs
-
-	// The run-scoped loader owns source snapshots, compiler metadata, Program
-	// construction, target binding, and fix-generation rebuilds. Integrations
-	// consume only its unified Program results.
-	programSession := loader.NewSession(fs)
-	fs = programSession.FS()
-
 	eslintPlugins := configCatalog.EslintPlugins
 	ruleCatalog, shadowedPluginRules := rules.All().ForESLintPlugins(eslintPlugins)
 	reportShadowedPluginRules(shadowedPluginRules)
@@ -343,16 +332,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		Scope:          projectScope,
 		SingleThreaded: singleThreaded,
 	}
-	// Type-check-only needs no lint targets for plain explicit declarations.
-	// Combined lint/type-check keeps the full declaration range, but resolves
-	// target policies first so lint binding cannot borrow unrelated projects.
-	buildBeforeTargets := typeCheckOnly && !hasProjectOptions
-	var projectSet loader.ProjectSet
-	if buildBeforeTargets {
-		projectSet, err = programSession.BuildProjects(projectRequest)
-		if err != nil {
-			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
-		}
+	pathSpaces := configCatalog.PathSpaces
+	if pathSpaces != nil {
+		pathSpaces = pathSpaces.WithConfigBases(projectConfigs, fs)
 	}
 
 	// Plain explicit-project type-check-only remains program-wide and skips
@@ -372,6 +354,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			Files:           configCatalog.TargetFiles,
 			Directories:     configCatalog.TargetDirectories,
 			GitPolicy:       configCatalog.GitPolicy,
+			PathSpaces:      pathSpaces,
 			SingleThreaded:  singleThreaded,
 		})
 		if err != nil {
@@ -391,14 +374,20 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		if err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
+		pathSpaces = targetPlan.PathSpaces()
 	}
 	projectRequest.Targets = targetPlan
 	projectRequest.Policies = projectPolicies
-	if !buildBeforeTargets {
-		projectSet, err = programSession.BuildProjects(projectRequest)
-		if err != nil {
-			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
-		}
+	// Freeze IO before constructing source/metadata caches. Program names stay
+	// lexical, while every generation reads the same planned physical inputs.
+	sourceFS, err := loader.WithFrozenIO(fs, pathSpaces, targetPlan.Files)
+	if err != nil {
+		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+	}
+	programSession := loader.NewSession(sourceFS)
+	projectSet, err := programSession.BuildProjects(projectRequest)
+	if err != nil {
+		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 	}
 	programs := projectSet.Programs()
 	var loadedPrograms loader.LoadResult
@@ -481,7 +470,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				ConfigForFile: eslintPluginConfigResolver{
 					lintResolver: fileConfigResolver,
 				}.resolve,
-				HostReadsInitialText: pluginHostReadsInitialText,
 			}
 		}
 		return linter.Generation{
@@ -550,7 +538,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	if fix {
 		pipelineRequest = linter.NewAutofixRequestWithCommitter(
 			provider,
-			cliFinalChangeCommitter{},
+			newCLIFinalChangeCommitter(targetPlan.Files),
 			observationPolicy,
 			linter.AutofixPolicy{
 				VerifyAfterLastRound: true,

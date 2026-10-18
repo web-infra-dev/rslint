@@ -84,13 +84,19 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 	for _, directory := range directoryRoots {
 		coordinator.physicalDirectories[directory.LexicalPath] = directory.CanonicalPath
 	}
+	anchors := make([]rslintconfig.DirectoryIdentity, 0, len(coordinator.physicalDirectories))
+	for lexical, physical := range coordinator.physicalDirectories {
+		anchors = append(anchors, rslintconfig.DirectoryIdentity{LexicalPath: lexical, CanonicalPath: physical})
+	}
+	coordinator.modules.pathSpaces = coordinator.modules.pathSpaces.WithConfigBases(nil, coordinator.fs, anchors...)
 
 	if coordinator.explicitConfigPath != "" {
 		configPath := normalizeDiscoveryPath(coordinator.explicitConfigPath, cwd)
 		candidate := configCandidate{
-			path:            configPath,
-			directory:       tspath.GetDirectoryPath(configPath),
-			configArrayBase: cwd,
+			path:              configPath,
+			directory:         tspath.GetDirectoryPath(configPath),
+			physicalDirectory: coordinator.physicalDirectory(tspath.GetDirectoryPath(configPath)),
+			configArrayBase:   cwd,
 		}
 		if err := coordinator.modules.loadCandidates([]configCandidate{candidate}); err != nil {
 			return nil, err
@@ -248,6 +254,7 @@ func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
 	return &ConfigCatalog{
 		TransactionID:      coordinator.transactionID,
 		GitPolicy:          rslintconfig.NewGitPolicy(coordinator.git.Snapshot()),
+		PathSpaces:         coordinator.modules.pathSpaces,
 		TargetFiles:        coordinator.targetFiles,
 		TargetDirectories:  coordinator.targetDirectories,
 		Configs:            configs,

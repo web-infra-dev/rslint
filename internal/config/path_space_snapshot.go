@@ -19,13 +19,74 @@ type PathSpaceSnapshot struct {
 
 // NewPathSpaceSnapshot freezes owning config directories and any distinct
 // authored bases carried by composed entries.
-func NewPathSpaceSnapshot(configMap map[string]RslintConfig, fsys vfs.FS) *PathSpaceSnapshot {
-	bases := make(map[string]configTargetBase, len(configMap))
+func NewPathSpaceSnapshot(configMap map[string]RslintConfig, fsys vfs.FS, directories ...DirectoryIdentity) *PathSpaceSnapshot {
+	return (*PathSpaceSnapshot)(nil).WithConfigBases(configMap, fsys, directories...)
+}
+
+// WithConfigBases extends a snapshot without re-observing an existing base.
+// The supplied directory identities anchor newly loaded config owners and the
+// request roots through which their authored bases were reached. These are
+// directory identities; individual file hints never establish directory bases.
+func (snapshot *PathSpaceSnapshot) WithConfigBases(configMap map[string]RslintConfig, fsys vfs.FS, directories ...DirectoryIdentity) *PathSpaceSnapshot {
+	capacity := len(configMap) + len(directories)
+	if snapshot != nil {
+		capacity += len(snapshot.bases)
+	}
+	bases := make(map[string]configTargetBase, capacity)
+	if snapshot != nil {
+		for id, base := range snapshot.bases {
+			bases[id] = base
+		}
+	}
+	var seeded []string
+	for _, identity := range directories {
+		directory := normalizeAuthoredBase(identity.LexicalPath)
+		id := authoredBaseID(directory)
+		if _, exists := bases[id]; exists {
+			continue
+		}
+		physical := identity.CanonicalPath
+		if physical == "" {
+			physical = directory
+		}
+		bases[id] = configTargetBase{directory: directory, physicalDirectory: normalizeAuthoredBase(physical)}
+		seeded = append(seeded, directory)
+	}
+	physicalDirectory := func(directory string) string {
+		directory = normalizeAuthoredBase(directory)
+		for current := directory; current != ""; {
+			if base, exists := bases[authoredBaseID(current)]; exists {
+				if current == directory {
+					return base.physicalDirectory
+				}
+				relative, within := RelativePathWithinConfigRoot(directory, current, true)
+				if within {
+					return canonicalDirectoryPathOrSelf(tspath.ResolvePath(base.physicalDirectory, relative), fsys)
+				}
+			}
+			parent := tspath.GetDirectoryPath(current)
+			if parent == current {
+				break
+			}
+			current = parent
+		}
+		return canonicalDirectoryPathOrSelf(directory, fsys)
+	}
+	freezeAncestors := func(directory string) {
+		id := authoredBaseID(directory)
+		base := bases[id]
+		base.physicalAliasAncestors = verifiedConfigAliasAncestorsWithLookup(directory, base.physicalDirectory, fsys, physicalDirectory)
+		bases[id] = base
+	}
+	for _, directory := range seeded {
+		freezeAncestors(directory)
+	}
 	freezeBase := func(directory string) {
 		directory = normalizeAuthoredBase(directory)
 		baseID := authoredBaseID(directory)
 		if _, exists := bases[baseID]; !exists {
-			bases[baseID] = freezeConfigTargetBase(directory, fsys)
+			bases[baseID] = configTargetBase{directory: directory, physicalDirectory: physicalDirectory(directory)}
+			freezeAncestors(directory)
 		}
 	}
 	for configDir, entries := range configMap {
@@ -79,6 +140,19 @@ func (snapshot *PathSpaceSnapshot) PhysicalDirectory(directory string) (string, 
 		return "", false
 	}
 	return base.physicalDirectory, true
+}
+
+// DirectoryIdentities returns copies of the frozen lexical and physical
+// directory values without exposing matching or alias metadata.
+func (snapshot *PathSpaceSnapshot) DirectoryIdentities() []DirectoryIdentity {
+	if snapshot == nil {
+		return nil
+	}
+	directories := make([]DirectoryIdentity, 0, len(snapshot.bases))
+	for _, base := range snapshot.bases {
+		directories = append(directories, DirectoryIdentity{LexicalPath: base.directory, CanonicalPath: base.physicalDirectory})
+	}
+	return directories
 }
 
 // SameDirectory reports whether two owner spellings are the same frozen

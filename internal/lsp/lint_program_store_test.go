@@ -1239,7 +1239,7 @@ func TestLintProgramStoreReusesFrozenTargetForResidentAndRebuild(t *testing.T) {
 	}
 	retargetingFS := &retargetingLintProgramFS{
 		FS:         fixture.server.fs,
-		targetPath: fixture.sourcePath,
+		targetPath: canonicalPath,
 		firstPath:  canonicalPath,
 		laterPath:  laterPath,
 	}

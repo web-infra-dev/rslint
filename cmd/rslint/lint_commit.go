@@ -7,16 +7,36 @@ import (
 	"os"
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // cliFinalChangeCommitter performs the CLI's one terminal disk projection.
 // All fix rounds happen in linter-owned memory before this adapter is called.
-type cliFinalChangeCommitter struct{}
+type cliFinalChangeCommitter struct {
+	// Only the low-level zero value permits identity writes. A constructed
+	// committer accepts the selected target set, including when it is empty.
+	canonicalByPath map[string]string
+}
 
-func (cliFinalChangeCommitter) CommitFinalChanges(
+func newCLIFinalChangeCommitter(files []target.File) cliFinalChangeCommitter {
+	paths := make(map[string]string, len(files))
+	for _, file := range files {
+		physical := file.CanonicalPath
+		if physical == "" {
+			// Filesystems without a physical identity retain their lexical path.
+			physical = file.Path
+		}
+		paths[rslintconfig.ExactPathID(file.Path)] = tspath.NormalizePath(physical)
+	}
+	return cliFinalChangeCommitter{canonicalByPath: paths}
+}
+
+func (committer cliFinalChangeCommitter) CommitFinalChanges(
 	ctx context.Context,
 	changes []linter.FileChange,
 ) (linter.CommitResult, error) {
@@ -29,12 +49,23 @@ func (cliFinalChangeCommitter) CommitFinalChanges(
 	// replacement cannot be globally atomic, but stale input must not create an
 	// avoidable partial commit.
 	var preflightErrors []error
-	for _, change := range changes {
+	destinations := make([]string, len(changes))
+	for index, change := range changes {
 		if err := ctx.Err(); err != nil {
 			preflightErrors = append(preflightErrors, err)
 			break
 		}
-		current, ok := readPhysicalFileText(change.Path)
+		physical := change.Path
+		if committer.canonicalByPath != nil {
+			var selected bool
+			physical, selected = committer.canonicalByPath[rslintconfig.ExactPathID(change.Path)]
+			if !selected {
+				preflightErrors = append(preflightErrors, fmt.Errorf("fix target %q is not a selected lint target", change.Path))
+				continue
+			}
+		}
+		destinations[index] = physical
+		current, ok := readPhysicalFileText(physical)
 		if !ok {
 			preflightErrors = append(preflightErrors, fmt.Errorf("read fix target %q", change.Path))
 			continue
@@ -48,12 +79,12 @@ func (cliFinalChangeCommitter) CommitFinalChanges(
 	}
 
 	var writeErrors []error
-	for _, change := range changes {
+	for index, change := range changes {
 		if err := ctx.Err(); err != nil {
 			writeErrors = append(writeErrors, err)
 			break
 		}
-		if err := os.WriteFile(change.Path, []byte(change.After), 0o644); err != nil {
+		if err := os.WriteFile(destinations[index], []byte(change.After), 0o644); err != nil {
 			writeErrors = append(writeErrors, fmt.Errorf("write fixed file %q: %w", change.Path, err))
 			continue
 		}

@@ -3,6 +3,7 @@ package loader
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -3250,9 +3251,9 @@ func TestLoadProgramsRejectsCaseFoldedSourceWithDifferentCanonicalIdentity(t *te
 }
 
 func TestBuildProjectsRejectsCaseFoldedServiceSourceWithDifferentCanonicalIdentity(t *testing.T) {
-	const configDir = "/repo"
-	const upper = "/repo/Source.ts"
-	const lower = "/repo/source.ts"
+	configDir := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	upper := tspath.ResolvePath(configDir, "Source.ts")
+	lower := tspath.ResolvePath(configDir, "source.ts")
 	fsys := &exactCaseProgramFS{
 		FS: osvfs.FS(),
 		files: map[string]string{
@@ -3307,5 +3308,364 @@ func TestLoadProgramsSplitsCompatibilityProgramsForCaseFoldedPathCollisions(t *t
 	slices.Sort(want)
 	if !slices.Equal(bound, want) {
 		t.Fatalf("compatibility Programs must preserve both exact source identities: got %v want %v", bound, want)
+	}
+}
+
+func TestProgramInputsKeepFrozenDirectoryAcrossGenerations(t *testing.T) {
+	for _, mode := range []string{"explicit", "service", "root override", "source only API", "source only CLI", "type-check-only"} {
+		t.Run(mode, func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			first, replacement := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "replacement")
+			const firstSource = "export const fromFirst: string = 1; debugger;\n"
+			const replacementSource = "export const fromReplacement = 2;\n"
+			for directory, content := range map[string]string{first: firstSource, replacement: replacementSource} {
+				writeProgramTestFiles(t, directory, map[string]string{
+					"tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["source.ts"]}`,
+					"source.ts":     content,
+				})
+			}
+			alias := tspath.ResolvePath(root, "alias")
+			if err := os.Symlink(first, alias); err != nil {
+				t.Skipf("directory symlink unavailable: %v", err)
+			}
+			entry := rslintconfig.ConfigEntry{Rules: rslintconfig.Rules{"no-debugger": "error"}}
+			if !strings.HasPrefix(mode, "source only") {
+				options := &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"tsconfig.json"}}
+				if mode == "service" {
+					options.Project = nil
+					options.ProjectService = rslintconfig.BoolPtr(true)
+				}
+				if mode == "root override" {
+					options.TsconfigRootDir = &alias
+				}
+				entry.LanguageOptions = &rslintconfig.LanguageOptions{ParserOptions: options}
+			}
+			entries := rslintconfig.RslintConfig{entry}
+			configs := map[string]rslintconfig.RslintConfig{alias: entries}
+			fsys := bundled.WrapFS(osvfs.FS())
+			input := rslintconfig.FreezeFileIdentity(tspath.ResolvePath(alias, "source.ts"), fsys)
+			spaces := rslintconfig.NewPathSpaceSnapshot(configs, fsys, rslintconfig.ResolveDirectoryIdentities([]string{alias}, fsys)...)
+			policy := rslintconfig.CollectGitPolicy(entries, alias, fsys, []rslintconfig.PathIdentity{input}, nil)
+			plan, err := target.Resolve(target.Request{ConfigMap: configs, FS: fsys, Files: []rslintconfig.PathIdentity{input}, GitPolicy: policy, PathSpaces: spaces})
+			if err != nil || len(plan.Files) != 1 {
+				t.Fatalf("resolve frozen target: files=%v error=%v", plan.Files, err)
+			}
+			resolver := configLint.NewResolver(configLint.ResolverOptions{ConfigsByOwner: configs, FS: fsys, PathSpaces: plan.PathSpaces(), GitPolicy: plan.GitPolicy(), Catalog: rules.All()})
+			policies, err := resolver.ProjectPolicies(plan.Files, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := ProjectBuildRequest{Configs: configs, Targets: plan, Policies: policies, Scope: Targeted, SingleThreaded: true}
+			frozenFiles := plan.Files
+			if mode == "type-check-only" {
+				request.Scope = AllDeclared
+				request.Targets = target.Plan{}
+				request.Policies = nil
+				frozenFiles = nil
+			}
+			if err := os.Remove(alias); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(replacement, alias); err != nil {
+				t.Fatal(err)
+			}
+			frozen, err := WithFrozenIO(fsys, spaces, frozenFiles)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertGeneration := func(generationFS vfs.FS, want string) {
+				t.Helper()
+				session := NewSession(generationFS)
+				projects, err := session.BuildProjects(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				programs := projects.Programs()
+				if mode != "type-check-only" {
+					var binding LoadResult
+					if mode == "source only CLI" {
+						binding, err = session.LoadCLI(projects, plan, alias, true)
+					} else {
+						binding, err = session.LoadAPI(projects, plan, alias, true)
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+					programs = binding.Programs
+				}
+				found := false
+				for _, program := range programs {
+					for _, source := range program.SourceFiles() {
+						if tspath.GetBaseFileName(source.FileName()) != "source.ts" {
+							continue
+						}
+						found = true
+						if source.Text() != want || source.FileName() != input.Path {
+							t.Errorf("generation crossed frozen input: source=%q text=%q; want source=%q text=%q", source.FileName(), source.Text(), input.Path, want)
+						}
+					}
+				}
+				if !found {
+					t.Fatal("captured source absent from every Program")
+				}
+			}
+			assertGeneration(frozen, firstSource)
+			for _, text := range []string{utils.BOM + "export const round = 1;\n", "export const round = 2;\n"} {
+				overlay := utils.NewOverlayVFS(frozen, map[string]string{input.Path: text, input.CanonicalPath: text})
+				assertGeneration(overlay, strings.TrimPrefix(text, utils.BOM))
+				for _, path := range []string{input.Path, input.CanonicalPath} {
+					if utils.SourceHasBOM(overlay, path) != strings.HasPrefix(text, utils.BOM) {
+						t.Errorf("generation lost BOM for %q", path)
+					}
+				}
+			}
+			if got, _ := fsys.ReadFile(tspath.ResolvePath(replacement, "source.ts")); got != replacementSource {
+				t.Fatalf("memory generations changed replacement disk source: %q", got)
+			}
+		})
+	}
+}
+
+func TestProgramInputsKeepFrozenLeafAndAuthoredLanguage(t *testing.T) {
+	for _, mode := range []string{"source only API", "source only CLI", "physical project root"} {
+		t.Run(mode, func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			owner, original, replacement := tspath.ResolvePath(root, "owner"), tspath.ResolvePath(root, "original"), tspath.ResolvePath(root, "replacement")
+			const text = "export const value: number = 1;\n"
+			writeProgramTestFiles(t, owner, map[string]string{"tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["source.ts"]}`})
+			writeProgramTestFiles(t, original, map[string]string{"source.txt": text, "sibling.ts": "original sibling"})
+			writeProgramTestFiles(t, replacement, map[string]string{"source.txt": "replacement source", "sibling.ts": "replacement sibling"})
+			alias := tspath.ResolvePath(root, "alias")
+			if err := os.Symlink(owner, alias); err != nil {
+				t.Skipf("directory symlink unavailable: %v", err)
+			}
+			leaf := tspath.ResolvePath(owner, "source.ts")
+			if err := os.Symlink(tspath.ResolvePath(original, "source.txt"), leaf); err != nil {
+				t.Skipf("file symlink unavailable: %v", err)
+			}
+			entries := rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}}
+			if mode == "physical project root" {
+				entries[0].LanguageOptions = &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+					Project: rslintconfig.ProjectPaths{tspath.ResolvePath(owner, "tsconfig.json")},
+				}}
+			}
+			configs := map[string]rslintconfig.RslintConfig{alias: entries}
+			fsys := bundled.WrapFS(osvfs.FS())
+			input := rslintconfig.FreezeFileIdentity(tspath.ResolvePath(alias, "source.ts"), fsys)
+			spaces := rslintconfig.NewPathSpaceSnapshot(configs, fsys)
+			plan, err := target.Resolve(target.Request{ConfigMap: configs, FS: fsys, Files: []rslintconfig.PathIdentity{input}, PathSpaces: spaces,
+				GitPolicy: rslintconfig.CollectGitPolicy(entries, alias, fsys, []rslintconfig.PathIdentity{input}, nil)})
+			if err != nil || len(plan.Files) != 1 {
+				t.Fatalf("resolve frozen target: files=%v error=%v", plan.Files, err)
+			}
+			if err := os.Remove(leaf); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(tspath.ResolvePath(replacement, "source.txt"), leaf); err != nil {
+				t.Fatal(err)
+			}
+			frozen, err := WithFrozenIO(fsys, spaces, plan.Files)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, path := range []string{input.Path, leaf, input.CanonicalPath} {
+				if got, ok := frozen.ReadFile(path); !ok || got != text || frozen.Realpath(path) != input.CanonicalPath {
+					t.Errorf("frozen leaf IO for %q = %q, %v, %q", path, got, ok, frozen.Realpath(path))
+				}
+			}
+			if got, _ := frozen.ReadFile(tspath.ResolvePath(replacement, "sibling.ts")); got != "replacement sibling" {
+				t.Fatalf("canonical file identity leaked into unrelated directory mapping: %q", got)
+			}
+			assertGeneration := func(generationFS vfs.FS, want string) {
+				t.Helper()
+				session := NewSession(generationFS)
+				projects, err := session.buildProjectsWithOptionsForTest(t, configs, plan, Targeted, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var binding LoadResult
+				if mode == "source only CLI" {
+					binding, err = session.LoadCLI(projects, plan, alias, true)
+				} else {
+					binding, err = session.LoadAPI(projects, plan, alias, true)
+				}
+				if err != nil || len(binding.Programs) != 1 {
+					t.Fatalf("bind frozen leaf: programs=%d error=%v", len(binding.Programs), err)
+				}
+				wantName := input.Path
+				if mode == "physical project root" {
+					wantName = leaf
+				}
+				source := binding.Programs[0].GetSourceFile(wantName)
+				if source == nil || source.Text() != strings.TrimPrefix(want, utils.BOM) || source.FileName() != wantName {
+					t.Fatalf("authored .ts root lost its source/name: %v", source)
+				}
+				if diagnostics := binding.Programs[0].SyntacticDiagnostics(context.Background(), source); len(diagnostics) != 0 {
+					t.Fatalf("authored .ts root was parsed using canonical .txt language: %v", diagnostics)
+				}
+				for _, path := range []string{input.Path, leaf, input.CanonicalPath} {
+					if got, ok := session.FS().ReadFile(path); !ok || got != source.Text() || utils.SourceHasBOM(session.FS(), path) != strings.HasPrefix(want, utils.BOM) {
+						t.Errorf("generation lost frozen leaf text/BOM at %q: text=%q readable=%v", path, got, ok)
+					}
+				}
+			}
+			assertGeneration(frozen, text)
+			for _, fixed := range []string{utils.BOM + "export const value: number = 2;\n", "export const value: number = 3;\n"} {
+				// The physical project root uses the third, Git-coordinate spelling.
+				// Its overlay lookup must follow the frozen realpath to these keys.
+				assertGeneration(utils.NewOverlayVFS(frozen, map[string]string{input.Path: fixed, input.CanonicalPath: fixed}), fixed)
+			}
+		})
+	}
+}
+
+func TestProgramInputsPreserveLexicalTsconfigExtendsSibling(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	physical := tspath.ResolvePath(root, "physical/project")
+	lexical := tspath.ResolvePath(root, "lexical/project")
+	writeProgramTestFiles(t, physical, map[string]string{
+		"tsconfig.json": `{"extends":"../outside/base.json","files":["source.ts"]}`,
+		"source.ts":     "export const value = 1;\n",
+	})
+	writeProgramTestFiles(t, tspath.ResolvePath(root, "physical/outside"), map[string]string{"base.json": `{"compilerOptions":{"strict":false,"noLib":true}}`})
+	writeProgramTestFiles(t, tspath.ResolvePath(root, "lexical/outside"), map[string]string{"base.json": `{"compilerOptions":{"strict":true,"noLib":true}}`})
+	if err := os.Symlink(physical, lexical); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	fsys := bundled.WrapFS(osvfs.FS())
+	configs := map[string]rslintconfig.RslintConfig{lexical: projectConfig("tsconfig.json")}
+	frozen, err := WithFrozenIO(fsys, rslintconfig.NewPathSpaceSnapshot(configs, fsys), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects, err := NewSession(frozen).BuildProjects(ProjectBuildRequest{Configs: configs, Scope: AllDeclared, SingleThreaded: true})
+	if err != nil || len(projects.Programs()) != 1 {
+		t.Fatalf("build aliased config: programs=%d error=%v", projects.Len(), err)
+	}
+	program := projects.Programs()[0]
+	if program.Options().Strict != core.TSTrue || program.Options().ConfigFilePath != tspath.ResolvePath(lexical, "tsconfig.json") {
+		t.Fatalf("extends used physical sibling or flattened config name: strict=%v config=%q", program.Options().Strict, program.Options().ConfigFilePath)
+	}
+}
+
+func TestProgramInputsKeepFrozenNativeCaseAliases(t *testing.T) {
+	fsys := bundled.WrapFS(osvfs.FS())
+	if fsys.UseCaseSensitiveFileNames() {
+		t.Skip("filesystem is case-sensitive")
+	}
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	first, second := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "second")
+	writeProgramTestFiles(t, first, map[string]string{"tsconfig.json": "FIRST", "only-first.ts": ""})
+	writeProgramTestFiles(t, second, map[string]string{"tsconfig.json": "SECOND", "source.ts": "SECOND SOURCE", "only-second.ts": ""})
+	original := tspath.ResolvePath(root, "original.txt")
+	if err := os.WriteFile(original, []byte("FIRST SOURCE"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	leaf := tspath.ResolvePath(first, "source.ts")
+	if err := os.Symlink(original, leaf); err != nil {
+		t.Skipf("file symlink unavailable: %v", err)
+	}
+	alias, alternate := tspath.ResolvePath(root, "Alias"), tspath.ResolvePath(root, "alias")
+	if err := os.Symlink(first, alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	if got, ok := fsys.ReadFile(tspath.ResolvePath(alias, "tsconfig.json")); !ok || got != "FIRST" {
+		t.Fatalf("initial alias does not read the first directory: %q, %v", got, ok)
+	}
+	if got, ok := fsys.ReadFile(tspath.ResolvePath(alternate, "tsconfig.json")); !ok || got != "FIRST" {
+		t.Skip("filesystem does not resolve the two alias spellings equivalently")
+	}
+	spaces := rslintconfig.NewPathSpaceSnapshot(map[string]rslintconfig.RslintConfig{alias: {{}}}, fsys)
+	input := rslintconfig.FreezeFileIdentity(tspath.ResolvePath(alias, "source.ts"), fsys)
+	withoutTargets, err := WithFrozenIO(fsys, spaces, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withTargets, err := WithFrozenIO(fsys, spaces, []target.File{{PathIdentity: input, ConfigDirectory: alias}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(alias); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(second, alias); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(leaf); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(tspath.ResolvePath(second, "source.ts"), leaf); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{alias, alternate} {
+		if got := tspath.NormalizePath(fsys.Realpath(path)); got != second {
+			t.Fatalf("alias did not move to the second directory: %q", got)
+		}
+		if got, ok := fsys.ReadFile(tspath.ResolvePath(path, "tsconfig.json")); !ok || got != "SECOND" {
+			t.Fatalf("unfrozen control did not read the replacement: %q, %v", got, ok)
+		}
+		for _, frozen := range []vfs.FS{withoutTargets, withTargets} {
+			if got, ok := frozen.ReadFile(tspath.ResolvePath(path, "tsconfig.json")); !ok || got != "FIRST" {
+				t.Errorf("case spelling escaped frozen directory: %q = %q, %v", path, got, ok)
+			}
+			entries := frozen.GetAccessibleEntries(path)
+			if !slices.Contains(entries.Files, "only-first.ts") || slices.Contains(entries.Files, "only-second.ts") || frozen.Realpath(path) != first {
+				t.Errorf("case spelling escaped frozen directory metadata: %q entries=%v realpath=%q", path, entries.Files, frozen.Realpath(path))
+			}
+		}
+	}
+	mixedSource := tspath.ResolvePath(alternate, "SOURCE.ts")
+	if got, ok := withTargets.ReadFile(mixedSource); !ok || got != "FIRST SOURCE" || withTargets.Realpath(mixedSource) != input.CanonicalPath {
+		t.Fatalf("case spelling escaped frozen leaf identity: text=%q readable=%v realpath=%q", got, ok, withTargets.Realpath(mixedSource))
+	}
+}
+
+type frozenCaseFlagFS struct {
+	vfs.FS
+	caseSensitive bool
+}
+
+func (fs *frozenCaseFlagFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
+
+func TestProgramInputsOnlyFoldUnambiguousNativeCaseIdentities(t *testing.T) {
+	for _, caseSensitive := range []bool{true, false} {
+		for _, conflicting := range []bool{false, true} {
+			t.Run(fmt.Sprintf("caseSensitive=%v/conflicting=%v", caseSensitive, conflicting), func(t *testing.T) {
+				directories := []rslintconfig.DirectoryIdentity{{LexicalPath: "/input/Anchor", CanonicalPath: "/captured/first"}}
+				files := []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: "/input/File.ts", CanonicalPath: "/captured/first.ts"}}}
+				if conflicting {
+					directories = append(directories, rslintconfig.DirectoryIdentity{LexicalPath: "/input/anchor", CanonicalPath: "/captured/second"})
+					files = append(files, target.File{PathIdentity: rslintconfig.PathIdentity{Path: "/input/file.ts", CanonicalPath: "/captured/second.ts"}})
+				}
+				spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, directories...)
+				values := spaces.DirectoryIdentities()
+				values[0].CanonicalPath = "/unrelated"
+				frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, files)
+				if err != nil {
+					t.Fatal(err)
+				}
+				view := frozen.(*frozenFileSystem)
+				for _, directory := range directories {
+					if got := view.ioPath(directory.LexicalPath + "/source.ts"); got != directory.CanonicalPath+"/source.ts" {
+						t.Errorf("exact directory identity changed: %q", got)
+					}
+				}
+				for _, file := range files {
+					if got := view.ioPath(file.Path); got != file.CanonicalPath {
+						t.Errorf("exact file identity changed: %q", got)
+					}
+				}
+				wantDirectory, wantFile := "/input/aNcHoR/source.ts", "/input/fIlE.ts"
+				if !caseSensitive && !conflicting {
+					wantDirectory, wantFile = "/captured/first/source.ts", "/captured/first.ts"
+				}
+				if got := view.ioPath("/input/aNcHoR/source.ts"); got != wantDirectory {
+					t.Errorf("directory case fallback = %q, want %q", got, wantDirectory)
+				}
+				if got := view.ioPath("/input/fIlE.ts"); got != wantFile {
+					t.Errorf("file case fallback = %q, want %q", got, wantFile)
+				}
+			})
+		}
 	}
 }

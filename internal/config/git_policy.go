@@ -91,6 +91,9 @@ func (policy *GitPolicy) ignored(physicalPath string) bool {
 		return false
 	}
 	state := newGitIgnorePathState(relative)
+	// The containing source starts at the file node. Each parent source can
+	// decide one more ancestor node, while never deciding its own directory.
+	state.minimumDepth = state.fileDepth
 	rootID := policy.pathID(root)
 	for current := directory; current != ""; current = gitignore.ParentDirectory(current) {
 		id := policy.pathID(current)
@@ -100,6 +103,7 @@ func (policy *GitPolicy) ignored(physicalPath string) bool {
 		if id == rootID {
 			break
 		}
+		state.minimumDepth--
 	}
 	return false
 }
@@ -113,6 +117,7 @@ func (policy *GitPolicy) directoryCoverage(physicalDir string) (covered, negatio
 	if !within || relative == "" {
 		return false, false
 	}
+	minimumDepth := 1 + strings.Count(relative, "/")
 	rootID := policy.pathID(root)
 	for current := directory; current != ""; current = gitignore.ParentDirectory(current) {
 		id := policy.pathID(current)
@@ -121,14 +126,22 @@ func (policy *GitPolicy) directoryCoverage(physicalDir string) (covered, negatio
 		if !covered {
 			for _, pattern := range source.patterns {
 				if !pattern.Negated && pattern.Kind == dirFileLevelCover && ignorePatternMatches(pattern, relative+"/x") {
-					covered = true
-					break
+					// The projection also matches a directory-only wildcard's
+					// synthetic leaf. Verify actual directory nodes before treating
+					// that as coverage of every file in the directory.
+					state := newGitIgnorePathState(relative + "/x")
+					state.minimumDepth = minimumDepth
+					if state.apply(&pattern) {
+						covered = true
+						break
+					}
 				}
 			}
 		}
 		if id == rootID {
 			break
 		}
+		minimumDepth--
 	}
 	return covered, negationCanReach
 }

@@ -89,6 +89,71 @@ func setupDiscoveryFixture(t *testing.T, files []string) (string, map[string]str
 	return tspath.NormalizePath(tmpDir), paths
 }
 
+func TestTargetWalkPreservesFilesBesideDirectoryOnlyGitWildcards(t *testing.T) {
+	for _, sourceDirectory := range []string{"", "nested"} {
+		for _, test := range []struct {
+			name       string
+			pattern    string
+			reopenLeaf bool
+			ancestor   bool
+			want       []string
+		}{
+			{"all directories", "**/\n", false, false, []string{"keep.js"}},
+			{"direct directories", "*/\n", false, false, []string{"keep.js"}},
+			{"anchored contents with file negation", "/**\n!keep.js\n", false, false, []string{"keep.js"}},
+			{"anchored contents with blanket negation", "/**\n!**\n", false, false, []string{"bundle.js/drop.js", "keep.js", "sub/drop.js"}},
+			{"anchored directories with blanket negation", "/**/\n!**\n", false, false, []string{"bundle.js/drop.js", "keep.js", "sub/drop.js"}},
+			{"files and directories", "*\n", false, false, nil},
+			{"file name as directory pattern", "keep.js/\n", false, false, []string{"bundle.js/drop.js", "keep.js", "sub/drop.js"}},
+			{"directory with file extension", "bundle.js/\n", false, false, []string{"keep.js", "sub/drop.js"}},
+			{"Git directory negation", "**/\n!sub/\n", false, false, []string{"keep.js", "sub/drop.js"}},
+			{"authored leaf negation", "**/\n", true, false, []string{"keep.js", "sub/drop.js"}},
+			{"ancestor directory cover", "*/\n", false, true, nil},
+		} {
+			if test.ancestor && sourceDirectory == "" {
+				continue
+			}
+			t.Run(sourceDirectory+"/"+test.name, func(t *testing.T) {
+				files := map[string]string{
+					".git": "",
+					tspath.CombinePaths(sourceDirectory, ".gitignore"):        test.pattern,
+					tspath.CombinePaths(sourceDirectory, "keep.js"):           "debugger;\n",
+					tspath.CombinePaths(sourceDirectory, "sub/drop.js"):       "debugger;\n",
+					tspath.CombinePaths(sourceDirectory, "bundle.js/drop.js"): "debugger;\n",
+				}
+				if test.ancestor {
+					files[".gitignore"] = sourceDirectory + "/\n"
+				}
+				root := setupDiscoveryContentFixture(t, files)
+				source := tspath.ResolvePath(root, sourceDirectory)
+				config := rslintconfig.RslintConfig{{Files: []string{"**/*.js"}}}
+				if test.reopenLeaf {
+					config = append(rslintconfig.RslintConfig{{Ignores: []string{"!" + tspath.CombinePaths(sourceDirectory, "sub/drop.js")}}}, config...)
+				}
+				for _, walkRoot := range []string{root, source} {
+					directories := rslintconfig.ResolveDirectoryIdentities([]string{walkRoot}, osvfs.FS())
+					policy := rslintconfig.CollectGitPolicy(config, root, osvfs.FS(), nil, directories)
+					plan, err := Resolve(Request{
+						Config: config, ConfigDirectory: root, ScanRoot: walkRoot, FS: osvfs.FS(),
+						Directories: directories, GitPolicy: policy, SingleThreaded: true,
+					})
+					if err != nil {
+						t.Fatal(err)
+					}
+					var got []string
+					for _, file := range plan.Files {
+						got = append(got, tspath.GetRelativePathFromDirectory(source, file.Path, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}))
+					}
+					sort.Strings(got)
+					if strings.Join(got, ",") != strings.Join(test.want, ",") {
+						t.Fatalf("walk %s: files=%v want=%v", walkRoot, got, test.want)
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestDiscoverFilesOutsidePrograms_Basic(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",

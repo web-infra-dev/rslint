@@ -3,6 +3,8 @@ package config
 import (
 	"strings"
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 func TestExactPathIDWindowsDrive(t *testing.T) {
@@ -29,6 +31,38 @@ func TestExactPathIDWindowsDrive(t *testing.T) {
 				t.Fatalf("identity equality = %v, want %v", equal, test.equal)
 			}
 		})
+	}
+}
+
+func TestPathSpaceSnapshotExtensionRetainsFrozenAnchors(t *testing.T) {
+	fsys := &pathIdentityHookFS{FS: &pathSpaceTestFS{}}
+	fsys.realpath = func(path string) string {
+		if strings.HasPrefix(path, "/alias") {
+			t.Fatalf("re-resolved a frozen lexical alias: %s", path)
+		}
+		if path == "/outside" {
+			return "/independent/outside"
+		}
+		return path
+	}
+	original := NewPathSpaceSnapshot(nil, fsys, DirectoryIdentity{LexicalPath: "/alias", CanonicalPath: "/physical"})
+	inside, outside := "src", "../outside"
+	entries := RslintConfig{{BasePath: &inside}, {BasePath: &outside}}
+	extended := original.WithConfigBases(map[string]RslintConfig{"/alias": entries}, fsys)
+	for lexical, physical := range map[string]string{
+		"/alias": "/physical", "/alias/src": "/physical/src", "/outside": "/independent/outside",
+	} {
+		if got, exists := extended.PhysicalDirectory(lexical); !exists || got != physical {
+			t.Fatalf("base %s = %s, %t; want %s", lexical, got, exists, physical)
+		}
+	}
+	if _, exists := original.PhysicalDirectory("/alias/src"); exists {
+		t.Fatal("extending a snapshot changed the original")
+	}
+	owner := tspath.CombinePaths("/alias", "pkg")
+	nested := extended.WithConfigBases(map[string]RslintConfig{owner: nil}, fsys)
+	if got, _ := nested.PhysicalDirectory(owner); got != "/physical/pkg" {
+		t.Fatalf("nested owner escaped its original anchor: %s", got)
 	}
 }
 

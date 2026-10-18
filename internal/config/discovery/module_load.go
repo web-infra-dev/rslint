@@ -17,14 +17,20 @@ import (
 type configCandidate struct {
 	path      string
 	directory string
+	// physicalDirectory anchors module IO while path and directory preserve
+	// the caller's lexical candidate and config-owner identities.
+	physicalDirectory string
 	// configArrayBase is set only when ConfigArray A differs from the config
 	// module directory, as for an explicit config. Empty means directory.
 	configArrayBase string
 }
 
-// configLoadState binds one candidate to the raw config and authored-ignore
-// matcher returned by Node. The effective catalog always clones these entries
-// before adding Git-derived config.
+func (candidate configCandidate) modulePath() string {
+	return tspath.CombinePaths(candidate.physicalDirectory, tspath.GetBaseFileName(candidate.path))
+}
+
+// configLoadState binds one candidate to immutable authored entries and their
+// ignore matcher. Git policy remains independent from these entries.
 type configLoadState struct {
 	id            string
 	candidate     configCandidate
@@ -43,6 +49,7 @@ type moduleLoadCoordinator struct {
 	transactionID  string
 	fresh          bool
 	singleThreaded bool
+	pathSpaces     *rslintconfig.PathSpaceSnapshot
 
 	statesByPath     map[string]*configLoadState
 	stateByIdentity  map[tspath.Path]*configLoadState
@@ -88,6 +95,12 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 	for _, candidate := range rawCandidates {
 		candidate.path = tspath.NormalizePath(candidate.path)
 		candidate.directory = tspath.NormalizePath(candidate.directory)
+		if candidate.physicalDirectory == "" {
+			candidate.physicalDirectory = candidate.directory
+			if physical := coordinator.fs.Realpath(candidate.directory); physical != "" {
+				candidate.physicalDirectory = tspath.NormalizePath(physical)
+			}
+		}
 		identity := tspath.ToPath(candidate.path, "", coordinator.fs.UseCaseSensitiveFileNames())
 		if state := coordinator.stateByIdentity[identity]; state != nil {
 			if err := coordinator.validateNativeCaseAlias(state.candidate, candidate); err != nil {
@@ -142,8 +155,11 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 		candidate := groupByPath[path].candidate
 		// Competing filenames in one directory must share an original owner
 		// spelling before Node receives its opaque routing key.
-		ownerID := rslintconfig.ExactPathID(candidate.directory)
+		ownerID := rslintconfig.ExactPathID(candidate.physicalDirectory)
 		if owner, exists := coordinator.ownerByIdentity[ownerID]; exists {
+			if owner != candidate.directory && (coordinator.fs.UseCaseSensitiveFileNames() || !strings.EqualFold(owner, candidate.directory)) {
+				return fmt.Errorf("Config directories %q and %q resolve to the same filesystem location %q", owner, candidate.directory, candidate.physicalDirectory) //nolint:staticcheck // Preserve the config-directory ambiguity contract.
+			}
 			candidate.directory = owner
 		} else {
 			coordinator.ownerByIdentity[ownerID] = candidate.directory
@@ -153,7 +169,7 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 		id := fmt.Sprintf("config-%06d", coordinator.nextCandidateID)
 		request.Candidates = append(request.Candidates, ConfigLoadCandidate{
 			ID:              id,
-			ConfigPath:      candidate.path,
+			ConfigPath:      candidate.modulePath(),
 			ConfigDirectory: candidate.directory,
 		})
 	}
@@ -167,14 +183,22 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 		return err
 	}
 
-	for _, wireCandidate := range request.Candidates {
-		group := groupByPath[wireCandidate.ConfigPath]
+	configsForBases := make(map[string]rslintconfig.RslintConfig, len(request.Candidates))
+	directoryIdentities := make([]rslintconfig.DirectoryIdentity, 0, len(request.Candidates))
+	loadedStates := make([]*configLoadState, 0, len(request.Candidates))
+	for index, wireCandidate := range request.Candidates {
+		group := groupByPath[paths[index]]
 		candidate := group.candidate
 		result := results[wireCandidate.ID]
 		state := &configLoadState{
 			id:        wireCandidate.ID,
 			candidate: candidate,
 		}
+		// Failed candidates remain known owner boundaries for transactional LSP
+		// fallback, so their directory identity is frozen as well.
+		directoryIdentities = append(directoryIdentities, rslintconfig.DirectoryIdentity{
+			LexicalPath: candidate.directory, CanonicalPath: candidate.physicalDirectory,
+		})
 		if result.Status == "failed" {
 			failure := *result.Error
 			state.failure = &failure
@@ -190,11 +214,8 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 				entries,
 				configArrayBase,
 			)
-			state.ignoreMatcher = rslintconfig.NewGlobalIgnoreMatcher(
-				state.entries,
-				candidate.directory,
-				coordinator.fs,
-			)
+			configsForBases[candidate.directory] = append(configsForBases[candidate.directory], state.entries...)
+			loadedStates = append(loadedStates, state)
 			coordinator.configsLoaded++
 		}
 		identity := tspath.ToPath(candidate.path, "", coordinator.fs.UseCaseSensitiveFileNames())
@@ -211,6 +232,14 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 			}
 		}
 	}
+	coordinator.pathSpaces = coordinator.pathSpaces.WithConfigBases(configsForBases, coordinator.fs, directoryIdentities...)
+	for _, state := range loadedStates {
+		matcher, err := rslintconfig.NewGlobalIgnoreMatcherWithPathSpaces(state.entries, state.candidate.directory, coordinator.fs, coordinator.pathSpaces)
+		if err != nil {
+			return err
+		}
+		state.ignoreMatcher = matcher
+	}
 	return nil
 }
 
@@ -218,6 +247,9 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 // physical-directory invariant used by the final catalog.
 func (coordinator *moduleLoadCoordinator) validateNativeCaseAlias(left configCandidate, right configCandidate) error {
 	if left.path == right.path {
+		if rslintconfig.ExactPathID(left.physicalDirectory) != rslintconfig.ExactPathID(right.physicalDirectory) {
+			return fmt.Errorf("config candidate %q changed physical directory from %q to %q", left.path, left.physicalDirectory, right.physicalDirectory)
+		}
 		return nil
 	}
 	if coordinator.fs.UseCaseSensitiveFileNames() || !strings.EqualFold(left.path, right.path) {
@@ -239,10 +271,10 @@ func (coordinator *moduleLoadCoordinator) validateNativeCaseAlias(left configCan
 		leftInfo, rightInfo := coordinator.fs.Stat(leftPath), coordinator.fs.Stat(rightPath)
 		return leftInfo != nil && rightInfo != nil && os.SameFile(leftInfo, rightInfo)
 	}
-	leftPhysicalDirectory := physicalPath(left.directory)
-	rightPhysicalDirectory := physicalPath(right.directory)
-	leftPhysicalPath := physicalPath(left.path)
-	rightPhysicalPath := physicalPath(right.path)
+	leftPhysicalDirectory := left.physicalDirectory
+	rightPhysicalDirectory := right.physicalDirectory
+	leftPhysicalPath := physicalPath(left.modulePath())
+	rightPhysicalPath := physicalPath(right.modulePath())
 	if !samePhysicalPath(leftPhysicalDirectory, rightPhysicalDirectory) ||
 		!samePhysicalPath(leftPhysicalPath, rightPhysicalPath) {
 		return fmt.Errorf(

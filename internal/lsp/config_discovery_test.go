@@ -478,8 +478,9 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	if completed := awaitConfigRefreshResult(t, initial); completed.err != nil {
 		t.Fatalf("explicit initial refresh failed: %v", completed.err)
 	}
-	if len(loadRequest.Candidates) != 1 || loadRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
-		t.Fatalf("explicit candidates = %+v, want only %q", loadRequest.Candidates, configPath)
+	wantModulePath := tspath.NormalizePath(osvfs.FS().Realpath(configPath))
+	if len(loadRequest.Candidates) != 1 || loadRequest.Candidates[0].ConfigPath != wantModulePath {
+		t.Fatalf("explicit candidates = %+v, want only %q", loadRequest.Candidates, wantModulePath)
 	}
 	configDir := tspath.NormalizePath(externalRoot)
 	if loadRequest.Candidates[0].ConfigDirectory != configDir {
@@ -507,7 +508,7 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	if completed := awaitConfigRefreshResult(t, reload); completed.err != nil {
 		t.Fatalf("same-path refresh failed: %v", completed.err)
 	}
-	if len(reloadRequest.Candidates) != 1 || reloadRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+	if len(reloadRequest.Candidates) != 1 || reloadRequest.Candidates[0].ConfigPath != wantModulePath {
 		t.Fatalf("same-path candidates = %+v", reloadRequest.Candidates)
 	}
 
@@ -530,7 +531,7 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	if err := <-watchResult; err != nil {
 		t.Fatalf("explicit .gitignore refresh failed: %v", err)
 	}
-	if len(watchRequest.Candidates) != 1 || watchRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+	if len(watchRequest.Candidates) != 1 || watchRequest.Candidates[0].ConfigPath != wantModulePath {
 		t.Fatalf("explicit watcher candidates = %+v", watchRequest.Candidates)
 	}
 
@@ -2128,7 +2129,7 @@ func TestHandleDidOpenVirtualDirectoryAliasInheritsPhysicalGitPolicy(t *testing.
 	}
 	snapshot := s.documentLintSnapshot(uri)
 	wantParent := tspath.ResolvePath(tspath.NormalizePath(osvfs.FS().Realpath(physical)), "generated/deep")
-	if snapshot.unavailable || !snapshot.configResolved || !snapshot.resolvedConfig.GloballyIgnored || snapshot.target.Path != file || snapshot.target.CanonicalParentPath != wantParent {
+	if snapshot.unavailable || !snapshot.configResolved || !snapshot.resolvedConfig.GloballyIgnored || snapshot.target.Path != uriToPath(uri) || snapshot.target.CanonicalParentPath != wantParent {
 		t.Fatalf("virtual alias lost its physical Git chain: %+v", snapshot)
 	}
 	if _, err := os.Stat(tspath.GetDirectoryPath(file)); !os.IsNotExist(err) {

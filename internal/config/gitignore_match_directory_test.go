@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -175,6 +176,116 @@ func TestGitPolicyDirectoryPruningUsesGitAndAuthoredNegationReach(t *testing.T) 
 		if got := matcher.CanPruneDirectory(DirectoryIdentity{LexicalPath: path, CanonicalPath: path}); got != test.prune {
 			t.Errorf("%v prune=%v want=%v", test.ignore, got, test.prune)
 		}
+	}
+}
+
+func TestGitPolicyDirectoryOnlyWildcardsDoNotCoverSourceFiles(t *testing.T) {
+	for _, sourceDirectory := range []string{"", "nested"} {
+		for _, test := range []struct {
+			pattern       string
+			fileIgnored   bool
+			sourceCovered bool
+			childCovered  bool
+		}{
+			{"**/\n", false, false, true},
+			{"*/\n", false, false, true},
+			{"*\n", true, true, true},
+			{"keep.js/\n", false, false, false},
+			{"**/\n!sub/\n", false, false, false},
+		} {
+			t.Run(sourceDirectory+"/"+strings.TrimSpace(test.pattern), func(t *testing.T) {
+				root := gitPolicyFixture(t, map[string]string{
+					".git": "",
+					tspath.CombinePaths(sourceDirectory, ".gitignore"):  test.pattern,
+					tspath.CombinePaths(sourceDirectory, "keep.js"):     "",
+					tspath.CombinePaths(sourceDirectory, "sub/drop.js"): "",
+				})
+				fsys := osvfs.FS()
+				entries := RslintConfig{{Files: []string{"**/*.js"}}}
+				policy := CollectGitPolicy(entries, root, fsys, nil, ResolveDirectoryIdentities([]string{root}, fsys))
+				matcher := gitPolicyMatcher(t, entries, root, fsys, policy)
+				source := tspath.ResolvePath(root, sourceDirectory)
+				file := FreezeFileIdentity(tspath.CombinePaths(source, "keep.js"), fsys)
+				if got := matcher.MatchFile(file).GloballyIgnored(); got != test.fileIgnored {
+					t.Fatalf("source file ignored=%v want=%v", got, test.fileIgnored)
+				}
+				// Repository roots are always visited; all other coverage decisions
+				// must distinguish direct files from descendant directory nodes.
+				wantSourceCovered := sourceDirectory != "" && test.sourceCovered
+				if got := matcher.CanPruneDirectory(DirectoryIdentity{LexicalPath: source, CanonicalPath: source}); got != wantSourceCovered {
+					t.Fatalf("source directory pruned=%v want=%v", got, wantSourceCovered)
+				}
+				child := tspath.CombinePaths(source, "sub")
+				if got := matcher.CanPruneDirectory(DirectoryIdentity{LexicalPath: child, CanonicalPath: child}); got != test.childCovered {
+					t.Fatalf("child directory pruned=%v want=%v", got, test.childCovered)
+				}
+			})
+		}
+	}
+}
+
+func TestGitPolicySourceCannotIgnoreItsOwnDirectory(t *testing.T) {
+	for _, sourceDirectory := range []string{"a", "a/b", strings.Repeat("a/", 65) + "b"} {
+		for _, test := range []struct {
+			pattern      string
+			otherIgnored bool
+		}{
+			{"/**\n!keep.js\n", true},
+			{"/**\n!**\n", false},
+			{"/**/\n!**\n", false},
+			{"*\n!**\n", false},
+			{"**\n!**\n", false},
+		} {
+			t.Run(sourceDirectory+"/"+strings.TrimSpace(test.pattern), func(t *testing.T) {
+				root := gitPolicyFixture(t, map[string]string{
+					".git": "",
+					tspath.CombinePaths(sourceDirectory, ".gitignore"):  test.pattern,
+					tspath.CombinePaths(sourceDirectory, "keep.js"):     "",
+					tspath.CombinePaths(sourceDirectory, "sub/drop.js"): "",
+				})
+				fsys := osvfs.FS()
+				entries := RslintConfig{{Files: []string{"**/*.js"}}}
+				files := ResolveFileIdentities([]string{
+					tspath.ResolvePath(root, sourceDirectory+"/keep.js"),
+					tspath.ResolvePath(root, sourceDirectory+"/sub/drop.js"),
+				}, fsys)
+				policy := CollectGitPolicy(entries, root, fsys, files, nil)
+				matcher := gitPolicyMatcher(t, entries, root, fsys, policy)
+				for index, want := range []bool{false, test.otherIgnored} {
+					if got := matcher.MatchFile(files[index]).GloballyIgnored(); got != want {
+						t.Fatalf("%s ignored=%v want=%v", files[index].Path, got, want)
+					}
+				}
+				source := tspath.ResolvePath(root, sourceDirectory)
+				if matcher.CanPruneDirectory(DirectoryIdentity{LexicalPath: source, CanonicalPath: source}) {
+					t.Fatal("source directory containing a visible file was pruned")
+				}
+			})
+		}
+	}
+}
+
+func TestGitPolicySourceNegationCannotReopenAnIgnoredAncestor(t *testing.T) {
+	root := gitPolicyFixture(t, map[string]string{
+		".git": "", "a/.gitignore": "b/\n", "a/b/.gitignore": "/**\n!**\n", "a/b/keep.js": "",
+	})
+	for _, authoredReopen := range []bool{false, true} {
+		t.Run(strconv.FormatBool(authoredReopen), func(t *testing.T) {
+			fsys := &gitignoreReadSpyFS{FS: osvfs.FS()}
+			entries := RslintConfig{{Files: []string{"**/*.js"}}}
+			if authoredReopen {
+				entries = append(RslintConfig{{Ignores: []string{"!a/b/keep.js"}}}, entries...)
+			}
+			file := FreezeFileIdentity(tspath.ResolvePath(root, "a/b/keep.js"), fsys)
+			policy := CollectGitPolicy(entries, root, fsys, []PathIdentity{file}, nil)
+			matcher := gitPolicyMatcher(t, entries, root, fsys, policy)
+			if got := matcher.MatchFile(file).GloballyIgnored(); got != !authoredReopen {
+				t.Fatalf("ancestor ignored=%v authoredReopen=%v", got, authoredReopen)
+			}
+			if slices.Contains(fsys.reads, tspath.ResolvePath(root, "a/b/.gitignore")) {
+				t.Fatal("negation made the hidden source reachable")
+			}
+		})
 	}
 }
 
@@ -408,6 +519,8 @@ type gitPolicyVolumeRootFS struct {
 	vfs.FS
 	root string
 }
+
+func (gitPolicyVolumeRootFS) Stat(string) vfs.FileInfo { return nil }
 
 func (fsys gitPolicyVolumeRootFS) UseCaseSensitiveFileNames() bool { return false }
 func (fsys gitPolicyVolumeRootFS) DirectoryExists(string) bool     { return false }

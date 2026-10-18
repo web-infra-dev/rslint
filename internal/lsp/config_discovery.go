@@ -608,6 +608,10 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		usableLastGood: len(configCatalog.Configs) > 0,
 		gitPolicy:      configCatalog.GitPolicy,
 	}
+	pathSpaces := configCatalog.PathSpaces
+	if pathSpaces == nil {
+		pathSpaces = config.NewPathSpaceSnapshot(configCatalog.Configs, fsys)
+	}
 	seenConfigDirs := make(map[string]string, len(configCatalog.Configs))
 	for _, configDir := range configCatalog.ConfigDirectories() {
 		entries := configCatalog.Configs[configDir]
@@ -619,7 +623,8 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 			return nil, err
 		}
 		entries = normalizedEntries
-		configID := lspFilesystemPathID(configDir, fsys)
+		physical, _ := pathSpaces.PhysicalDirectory(configDir)
+		configID := lspLexicalPathID(physical, fsys == nil || fsys.UseCaseSensitiveFileNames())
 		if previous, exists := seenConfigDirs[configID]; exists {
 			return nil, fmt.Errorf(
 				"discovered config contains duplicate directories %q and %q",
@@ -649,7 +654,12 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 	// the target package retains only routing and frozen path-space state.
 	// Authored entries and unavailable boundaries remain separate from the Git
 	// policy frozen by the same discovery generation.
-	snapshot.ownerIndex = target.NewOwnerIndex(snapshot.configs, fsys)
+	pathSpaces = pathSpaces.WithConfigBases(snapshot.configs, fsys)
+	ownerIndex, err := target.NewOwnerIndexWithPathSpaces(snapshot.configs, fsys, pathSpaces)
+	if err != nil {
+		return nil, err
+	}
+	snapshot.ownerIndex = ownerIndex
 	if configCatalog.Explicit {
 		// An explicit config is invocation-wide and owns every editor target, so
 		// no workspace fallback participates in this mode.
@@ -660,10 +670,11 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 	// to discovered configs and to documents without a config owner.
 	fallbackCWD := tspath.NormalizePath(s.cwd)
 	snapshot.fallbackConfig = config.RslintConfig{}
-	snapshot.fallbackConfigOwnerIndex = target.NewOwnerIndex(
-		map[string]config.RslintConfig{fallbackCWD: snapshot.fallbackConfig},
-		fsys,
-	)
+	fallbackConfigs := map[string]config.RslintConfig{fallbackCWD: snapshot.fallbackConfig}
+	snapshot.fallbackConfigOwnerIndex, err = target.NewOwnerIndexWithPathSpaces(fallbackConfigs, fsys, pathSpaces.WithConfigBases(fallbackConfigs, fsys))
+	if err != nil {
+		return nil, err
+	}
 	snapshot.fallbackConfigDirectory = fallbackCWD
 	return snapshot, nil
 }

@@ -81,7 +81,11 @@ func newExplicitLintTargetSet(
 		}
 		exists := true
 		if fsys != nil {
-			exists = fsys.FileExists(filePath)
+			physicalPath := identity.CanonicalPath
+			if physicalPath == "" {
+				physicalPath = filePath
+			}
+			exists = fsys.FileExists(tspath.NormalizePath(physicalPath))
 		}
 		set.byPath[pathID] = &explicitLintTarget{
 			target:    File{PathIdentity: identity},

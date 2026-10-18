@@ -203,7 +203,8 @@ func (loader *fakeConfigModuleLoader) LoadConfigs(_ context.Context, request Con
 	response := ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 	for _, candidate := range request.Candidates {
 		path := tspath.NormalizePath(candidate.ConfigPath)
-		if failure, failed := loader.failures[path]; failed {
+		lexicalPath := tspath.CombinePaths(candidate.ConfigDirectory, tspath.GetBaseFileName(path))
+		if failure, failed := configFixtureAtPath(loader.failures, path, lexicalPath); failed {
 			failure := failure
 			response.Results = append(response.Results, ConfigLoadResult{
 				ID:     candidate.ID,
@@ -212,8 +213,10 @@ func (loader *fakeConfigModuleLoader) LoadConfigs(_ context.Context, request Con
 			})
 			continue
 		}
-		entries := append(rslintconfig.RslintConfig(nil), loader.configs[path]...)
-		plugins := cloneEslintPluginEntries(loader.plugins[path])
+		config, _ := configFixtureAtPath(loader.configs, path, lexicalPath)
+		entries := append(rslintconfig.RslintConfig(nil), config...)
+		pluginEntries, _ := configFixtureAtPath(loader.plugins, path, lexicalPath)
+		plugins := cloneEslintPluginEntries(pluginEntries)
 		loader.pluginsByID[candidate.ID] = plugins
 		response.Results = append(response.Results, ConfigLoadResult{
 			ID:      candidate.ID,
@@ -225,6 +228,21 @@ func (loader *fakeConfigModuleLoader) LoadConfigs(_ context.Context, request Con
 		response = loader.mutate(request, response)
 	}
 	return response, nil
+}
+
+func configFixtureAtPath[T any](values map[string]T, physical, lexical string) (T, bool) {
+	for _, path := range []string{physical, lexical} {
+		if value, exists := values[path]; exists {
+			return value, true
+		}
+		for key, value := range values {
+			if rslintconfig.ExactPathID(key) == rslintconfig.ExactPathID(path) {
+				return value, true
+			}
+		}
+	}
+	var empty T
+	return empty, false
 }
 
 func (loader *fakeConfigModuleLoader) ActivateConfigs(_ context.Context, request ConfigActivationRequest) (ConfigActivationResponse, error) {
@@ -840,7 +858,7 @@ func TestConfigDiscoveryDirectorySymlinkRootUsesPhysicalGitTree(t *testing.T) {
 		if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{root}) {
 			t.Fatalf("owners = %v", got)
 		}
-		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig, childConfig}) {
+		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig, tspath.CombinePaths(external, "child/rslint.config.js")}) {
 			t.Fatalf("config requests = %v", got)
 		}
 		if !slices.Contains(spy.gitignorePaths, physicalSource) {
@@ -1052,7 +1070,7 @@ func TestConfigDiscoveryAutomaticCandidateWinsSameDirectoryLiteralConflict(t *te
 				var wantIDs []string
 				for _, batch := range loader.batches {
 					for _, candidate := range batch.Candidates {
-						if candidate.ConfigPath == rootConfig {
+						if rslintconfig.ExactPathID(candidate.ConfigPath) == rslintconfig.ExactPathID(rootConfig) {
 							if test.includesRoot {
 								wantIDs = append(wantIDs, candidate.ID)
 							}
@@ -2384,8 +2402,8 @@ func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *tes
 			t.Fatalf("Build: %v", err)
 		}
 		physicalRoot = tspath.NormalizePath(physicalRoot)
-		if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{physicalRoot}) {
-			t.Fatalf("directory canonical fallback = %v, want %q", got, physicalRoot)
+		if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{lexicalRoot}) {
+			t.Fatalf("directory physical IO changed lexical owner = %v, want %q", got, lexicalRoot)
 		}
 		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{configPath}) {
 			t.Fatalf("directory canonical candidates = %v", got)
@@ -2429,7 +2447,7 @@ func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *tes
 			t.Fatalf("DiscoverAutomatic: %v", err)
 		}
 		physicalRoot = tspath.NormalizePath(physicalRoot)
-		effective := catalogTestConfig(t, catalog, physicalRoot)
+		effective := catalogTestConfig(t, catalog, lexicalRoot)
 		if effective.IsFileIgnored(
 			tspath.CombinePaths(physicalRoot, "lexical-hidden/index.ts"),
 			physicalRoot,
@@ -2474,8 +2492,8 @@ func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *tes
 		if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{aliasRoot}) {
 			t.Fatalf("symlink directory lost lexical owner: %v", got)
 		}
-		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{lexicalConfig}) {
-			t.Fatalf("symlink directory did not stay lexical-first: %v", got)
+		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{tspath.CombinePaths(physicalRoot, "rslint.config.js")}) {
+			t.Fatalf("symlink directory did not load its physical module: %v", got)
 		}
 	})
 }
@@ -3641,5 +3659,91 @@ func TestConfigDiscoveryIgnoredDirectoryRootDoesNotDependOnCWD(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+type movingDiscoveryDirectoryFS struct {
+	vfs.FS
+	t                    *testing.T
+	alias, first, second string
+	once                 sync.Once
+}
+
+func (fsys *movingDiscoveryDirectoryFS) GetAccessibleEntries(directory string) vfs.Entries {
+	if directory == fsys.first || directory == fsys.alias {
+		fsys.once.Do(func() {
+			if err := os.Remove(fsys.alias); err != nil {
+				fsys.t.Fatal(err)
+			}
+			if err := os.Symlink(fsys.second, fsys.alias); err != nil {
+				fsys.t.Fatal(err)
+			}
+		})
+	}
+	return fsys.FS.GetAccessibleEntries(directory)
+}
+
+func TestConfigDiscoveryMovedDirectoryRetainsPhysicalTreeAndLexicalOwner(t *testing.T) {
+	for _, hasOwnConfig := range []bool{false, true} {
+		t.Run(strconv.FormatBool(hasOwnConfig), func(t *testing.T) {
+			root := discoveryTempDir(t)
+			first, second := tspath.CombinePaths(root, "first"), tspath.CombinePaths(root, "second")
+			rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+			source := writeDiscoveryFixture(t, first, "scope/from-first.js", "debugger;\n")
+			writeDiscoveryFixture(t, second, "scope/from-second.js", "debugger;\n")
+			secondConfig := writeConfigCandidate(t, second, "scope/rslint.config.js")
+			alias := tspath.CombinePaths(root, "alias")
+			if err := os.Symlink(first, alias); err != nil {
+				t.Skipf("directory symlink unavailable: %v", err)
+			}
+			loader := newFixtureConfigLoader()
+			loader.configs[rootConfig] = namedConfig("outer")
+			loader.configs[secondConfig] = namedConfig("wrong-second")
+			firstConfig := tspath.CombinePaths(first, "scope/rslint.config.js")
+			if hasOwnConfig {
+				writeConfigCandidate(t, first, "scope/rslint.config.js")
+				loader.configs[firstConfig] = namedConfig("first")
+			}
+			fsys := &movingDiscoveryDirectoryFS{FS: discoveryTestFS(), t: t, alias: alias, first: first, second: second}
+			directories := rslintconfig.ResolveDirectoryIdentities([]string{alias}, fsys)
+			catalog, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{CWD: root, Directories: directories, SingleThreaded: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			owner := tspath.CombinePaths(alias, "scope")
+			if entries, exists := catalog.Configs[owner]; exists != hasOwnConfig || exists && namedConfigEntry(entries).Name != "first" {
+				t.Fatalf("moved alias changed owner contents: %v", catalog.Configs)
+			}
+			for _, batch := range loader.batches {
+				for _, candidate := range batch.Candidates {
+					if candidate.ConfigPath == secondConfig || candidate.ConfigPath == tspath.CombinePaths(owner, "rslint.config.js") {
+						t.Fatalf("module loader received moving alias or other tree: %+v", candidate)
+					}
+					if candidate.ConfigPath == firstConfig && candidate.ConfigDirectory != owner {
+						t.Fatalf("physical module lost lexical routing: %+v", candidate)
+					}
+				}
+			}
+			plan, err := target.Resolve(target.Request{ConfigMap: catalog.Configs, OwnerScopes: catalog.Scopes, FS: fsys, Directories: catalog.TargetDirectories, Files: catalog.TargetFiles, GitPolicy: catalog.GitPolicy, PathSpaces: catalog.PathSpaces, SingleThreaded: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, file := range plan.Files {
+				if !strings.HasPrefix(file.CanonicalPath, first+"/") || !strings.HasPrefix(file.Path, alias+"/") {
+					t.Fatalf("mixed requested and physical tree: %+v", file)
+				}
+				found = found || file.CanonicalPath == source
+			}
+			if !found {
+				t.Fatalf("original input disappeared: %+v", plan.Files)
+			}
+			if moved := tspath.NormalizePath(osvfs.FS().Realpath(alias)); moved != second {
+				t.Fatalf("attack did not move the directory alias: %s", moved)
+			}
+			if physical, _ := plan.PathSpaces().PhysicalDirectory(alias); physical != first {
+				t.Fatalf("target stage re-resolved the owner: %s", physical)
+			}
+		})
 	}
 }

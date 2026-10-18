@@ -12,11 +12,23 @@ import (
 // Request roots and file parents have already populated this map.
 func (coordinator *discoveryCoordinator) physicalDirectory(directory string) string {
 	directory = tspath.NormalizePath(directory)
+	if coordinator.physicalDirectories == nil {
+		coordinator.physicalDirectories = make(map[string]string)
+	}
 	if physical, exists := coordinator.physicalDirectories[directory]; exists {
 		return physical
 	}
 	physical := directory
-	if realPath := coordinator.fs.Realpath(directory); realPath != "" {
+	for ancestor := configDiscoveryParent(directory); ancestor != ""; ancestor = configDiscoveryParent(ancestor) {
+		if parentPhysical, exists := coordinator.physicalDirectories[ancestor]; exists {
+			relative, within := rslintconfig.RelativePathWithinConfigRoot(directory, ancestor, true)
+			if within {
+				physical = tspath.ResolvePath(parentPhysical, relative)
+				break
+			}
+		}
+	}
+	if realPath := coordinator.fs.Realpath(physical); realPath != "" {
 		physical = tspath.NormalizePath(realPath)
 	}
 	coordinator.physicalDirectories[directory] = physical

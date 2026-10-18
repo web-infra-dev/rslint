@@ -37,6 +37,7 @@ type Request struct {
 	Files           []rslintconfig.PathIdentity
 	Directories     []rslintconfig.DirectoryIdentity
 	GitPolicy       *rslintconfig.GitPolicy
+	PathSpaces      *rslintconfig.PathSpaceSnapshot
 	SingleThreaded  bool
 }
 
@@ -56,7 +57,11 @@ func Resolve(request Request) (Plan, error) {
 	explicitFiles := newExplicitLintTargetSet(request.Files, request.FS)
 	var discoveredFiles []File
 	if request.ConfigMap != nil {
-		ownerIndex := NewOwnerIndex(request.ConfigMap, request.FS)
+		spaces := request.PathSpaces
+		if spaces == nil {
+			spaces = rslintconfig.NewPathSpaceSnapshot(request.ConfigMap, request.FS, request.Directories...)
+		}
+		ownerIndex := mustOwnerIndexWithPathSpaces(request.ConfigMap, request.FS, spaces)
 		plan.pathSpaces = ownerIndex.PathSpaces()
 		discoveredFiles = discoverLintTargetsMultiConfigWithPreparedFiles(
 			request.ConfigMap,
@@ -71,7 +76,10 @@ func Resolve(request Request) (Plan, error) {
 		)
 	} else {
 		configMap := map[string]rslintconfig.RslintConfig{configDirectory: request.Config}
-		plan.pathSpaces = rslintconfig.NewPathSpaceSnapshot(configMap, request.FS)
+		plan.pathSpaces = request.PathSpaces
+		if plan.pathSpaces == nil {
+			plan.pathSpaces = rslintconfig.NewPathSpaceSnapshot(configMap, request.FS, request.Directories...)
+		}
 		discoveredFiles = discoverLintTargetsWithPreparedFiles(
 			request.Config,
 			configDirectory,

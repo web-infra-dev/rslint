@@ -102,6 +102,7 @@ type ConfigDiscoveryStats struct {
 type ConfigCatalog struct {
 	TransactionID      string
 	GitPolicy          *rslintconfig.GitPolicy
+	PathSpaces         *rslintconfig.PathSpaceSnapshot
 	TargetFiles        []rslintconfig.PathIdentity
 	TargetDirectories  []rslintconfig.DirectoryIdentity
 	Configs            map[string]rslintconfig.RslintConfig

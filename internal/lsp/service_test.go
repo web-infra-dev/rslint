@@ -7,7 +7,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2193,7 +2195,7 @@ func TestRunConfiguredLintForContent_OverlaysLexicalTargetIntoDefaultExcludedRea
 			name = "Windows drive aliases"
 		}
 		t.Run(name, func(t *testing.T) {
-			root := tspath.NormalizePath(t.TempDir())
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 			if portableWindows {
 				root = "C:/Repo"
 			}
@@ -2936,5 +2938,195 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 				t.Fatalf("linted=%v, want %v: diagnostics=%+v", gotLinted, test.wantLinted, result.Observation.Native.Diagnostics)
 			}
 		})
+	}
+}
+
+func TestRunConfiguredLintForContent_VirtualProjectDirectoryAliases(t *testing.T) {
+	for _, selector := range []string{`"files":["virtual/deep/new.ts"]`, `"include":["virtual/**/*.ts"]`} {
+		for _, ownerAlias := range []bool{false, true} {
+			for _, documentAlias := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/ownerAlias=%v/documentAlias=%v", selector, ownerAlias, documentAlias), func(t *testing.T) {
+					root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+					physical := tspath.ResolvePath(root, "real")
+					if err := os.MkdirAll(tspath.ResolvePath(physical, ".git"), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(tspath.ResolvePath(physical, "tsconfig.json"), []byte(`{"compilerOptions":{"noLib":true},`+selector+`}`), 0o644); err != nil {
+						t.Fatal(err)
+					}
+					alias := func(name string) string {
+						path := tspath.ResolvePath(root, name)
+						if err := os.Symlink(physical, path); err != nil {
+							t.Skipf("directory symlink unavailable: %v", err)
+						}
+						return path
+					}
+					owner, documentRoot := physical, physical
+					if ownerAlias {
+						owner = alias("owner")
+					}
+					if documentAlias {
+						documentRoot = alias("document")
+					}
+					dependencyPath := tspath.ResolvePath(alias("dependency"), "virtual/dependency.ts")
+					filePath := tspath.ResolvePath(documentRoot, "virtual/deep/new.ts")
+					uri := documentURIFromPath(filePath)
+					const content = "import { value } from '../dependency'; var result = value as number; debugger;\n"
+					const dependency = "export declare const value: number;\n"
+					s := newTestServer()
+					s.cwd, s.fs = owner, bundled.WrapFS(osvfs.FS())
+					s.documents[uri] = content
+					s.documents[documentURIFromPath(dependencyPath)] = dependency
+					entries := config.RslintConfig{{
+						Plugins: []string{"@typescript-eslint"},
+						Rules: config.Rules{
+							"no-debugger": "error", "no-var": "error",
+							"@typescript-eslint/no-unnecessary-type-assertion": "error",
+						},
+					}}
+					projects := []string{tspath.ResolvePath(owner, "tsconfig.json")}
+					result, err := configuredSpeculativePipelineResultForTest(s, uri, context.Background(), content, entries, owner, false, projects)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(result.Observation.Native.Diagnostics) != 3 {
+						t.Fatalf("virtual project aliases lost target or dependency type information: %+v", result.Observation.Native.Diagnostics)
+					}
+					for _, diagnostic := range result.Observation.Native.Diagnostics {
+						if diagnostic.FilePath != filePath {
+							t.Fatalf("diagnostic path = %q, want editor path %q", diagnostic.FilePath, filePath)
+						}
+					}
+					fixed := runSpeculativeFixAllForTest(t, s, context.Background(), uri, content, documentLintSnapshotForTest(s, uri, entries, owner, false, projects))
+					if strings.Contains(fixed, "var ") || strings.Contains(fixed, " as number") {
+						t.Fatalf("virtual project aliases lost typed fixes: %q", fixed)
+					}
+					if s.documents[uri] != content || s.documents[documentURIFromPath(dependencyPath)] != dependency {
+						t.Fatal("speculative fixes changed the editor buffers")
+					}
+					if _, err := os.Stat(tspath.ResolvePath(physical, "virtual")); !os.IsNotExist(err) {
+						t.Fatalf("virtual directory was materialized: %v", err)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestEditorOverlayKeepsMovedTargetAndIndependentAliases(t *testing.T) {
+	for _, replacementExists := range []bool{false, true} {
+		t.Run(fmt.Sprintf("replacementExists=%v", replacementExists), func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			first, replacement := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "replacement")
+			for _, directory := range []string{first, tspath.ResolvePath(replacement, "virtual/deep")} {
+				if err := os.MkdirAll(directory, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for name, content := range map[string]string{"first/first-only.ts": "first disk", "replacement/replacement-only.ts": "replacement disk", "replacement/virtual/deep/other.ts": "other disk"} {
+				if err := os.WriteFile(tspath.ResolvePath(root, name), []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if replacementExists {
+				if err := os.WriteFile(tspath.ResolvePath(replacement, "virtual/deep/new.ts"), []byte("replacement target disk"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			alias := func(name, destination string) string {
+				path := tspath.ResolvePath(root, name)
+				if err := os.Symlink(destination, path); err != nil {
+					t.Skipf("directory symlink unavailable: %v", err)
+				}
+				return path
+			}
+			moved, owner := alias("moved", first), alias("owner", first)
+			dependency, alternate := alias("dependency", replacement), alias("alternate", replacement)
+			s := newTestServer()
+			s.cwd, s.fs = first, bundled.WrapFS(osvfs.FS())
+			path := tspath.ResolvePath(moved, "virtual/deep/new.ts")
+			uri := documentURIFromPath(path)
+			const content = utils.BOM + "selected editor buffer"
+			const dependencyContent = utils.BOM + "dependency editor buffer"
+			s.documents[uri] = content
+			s.documents[documentURIFromPath(tspath.ResolvePath(dependency, "virtual/deep/dependency.ts"))] = dependencyContent
+			target := lspConfigTarget(path, first, s.fs)
+			overlay := s.currentEditorOverlayFSForTarget(uri, target)
+			if err := os.Remove(moved); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(replacement, moved); err != nil {
+				t.Fatal(err)
+			}
+			for _, file := range []string{path, target.CanonicalPath, tspath.ResolvePath(owner, "virtual/deep/new.ts")} {
+				if text, ok := overlay.ReadFile(file); !ok || text != strings.TrimPrefix(content, utils.BOM) {
+					t.Fatalf("selected alias read %q = %q, %v", file, text, ok)
+				}
+				if !overlay.FileExists(file) || overlay.Stat(file) == nil || overlay.Stat(file).Size() != int64(len(strings.TrimPrefix(content, utils.BOM))) || !utils.SourceHasBOM(overlay, file) || overlay.Realpath(file) != target.CanonicalPath {
+					t.Fatalf("selected alias metadata changed after retargeting: %q", file)
+				}
+				if !overlay.DirectoryExists(tspath.GetDirectoryPath(file)) || !slices.Contains(overlay.GetAccessibleEntries(tspath.GetDirectoryPath(file)).Files, "new.ts") {
+					t.Fatalf("selected buffer disappeared from alias directory: %q", file)
+				}
+			}
+			dependencyPath := tspath.ResolvePath(alternate, "virtual/deep/dependency.ts")
+			if text, ok := overlay.ReadFile(dependencyPath); !ok || text != strings.TrimPrefix(dependencyContent, utils.BOM) || !overlay.FileExists(dependencyPath) || overlay.Stat(dependencyPath) == nil || !utils.SourceHasBOM(overlay, dependencyPath) || overlay.Realpath(dependencyPath) != tspath.ResolvePath(replacement, "virtual/deep/dependency.ts") {
+				t.Fatalf("independent dependency alias lost its own ancestry: %q, %v", text, ok)
+			}
+			if text, ok := overlay.ReadFile(tspath.ResolvePath(moved, "virtual/deep/other.ts")); !ok || text != "other disk" {
+				t.Fatalf("other disk file was redirected to the selected target's old root: %q, %v", text, ok)
+			}
+			entries := overlay.GetAccessibleEntries(moved)
+			if slices.Contains(entries.Files, "first-only.ts") || !slices.Contains(entries.Files, "replacement-only.ts") || !slices.Contains(entries.Directories, "virtual") {
+				t.Fatalf("directory projection mixed disk roots or lost the frozen buffer: %+v", entries)
+			}
+		})
+	}
+}
+
+type sharedEditorEntriesFS struct {
+	vfs.FS
+	entries vfs.Entries
+}
+
+func (fs *sharedEditorEntriesFS) GetAccessibleEntries(string) vfs.Entries { return fs.entries }
+
+func TestEditorOverlayAliasEntriesDoNotMutateSharedBacking(t *testing.T) {
+	files, directories := make([]string, 16), make([]string, 16)
+	for index := range files {
+		files[index], directories[index] = "untouched", "untouched"
+	}
+	files[0], directories[0] = "z.ts", "z-directory"
+	base := &configBoundaryIdentityFS{
+		FS: &sharedEditorEntriesFS{FS: &mockFS{}, entries: vfs.Entries{
+			Files: files[:1], Directories: directories[:1], Symlinks: map[string]struct{}{},
+		}},
+		caseSensitive: true,
+		realPaths:     map[string]string{"/alias": "/physical"},
+	}
+	overlay := newFrozenLintTargetOverlayFS(base, map[string]string{
+		"/document/a.ts": "editor", "/physical/a.ts": "editor", "/physical/extra/dependency.ts": "dependency",
+	}, target.File{PathIdentity: config.PathIdentity{Path: "/document/a.ts", CanonicalPath: "/physical/a.ts", CanonicalParentPath: "/physical"}})
+	var workers sync.WaitGroup
+	for range 8 {
+		workers.Go(func() {
+			for range 32 {
+				entries := overlay.GetAccessibleEntries("/alias")
+				if strings.Join(entries.Files, ",") != "a.ts,z.ts" || strings.Join(entries.Directories, ",") != "extra,z-directory" {
+					t.Errorf("alias entries are incomplete or unsorted: %+v", entries)
+					return
+				}
+			}
+		})
+	}
+	workers.Wait()
+	for index := range files {
+		wantFile, wantDirectory := "untouched", "untouched"
+		if index == 0 {
+			wantFile, wantDirectory = "z.ts", "z-directory"
+		}
+		if files[index] != wantFile || directories[index] != wantDirectory {
+			t.Fatalf("shared backing changed at %d: files=%v directories=%v", index, files, directories)
+		}
 	}
 }

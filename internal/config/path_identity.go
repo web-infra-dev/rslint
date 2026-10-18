@@ -62,9 +62,9 @@ func ResolveDirectoryIdentities(directories []string, fsys vfs.FS) []DirectoryId
 }
 
 // FreezeFileIdentity observes the caller-visible file and its physical parent
-// once at the input boundary. A second parent observation retries a concurrent
-// directory-alias move instead of combining two known generations. Missing
-// parent directories retain the physical identity of their existing ancestor.
+// once at the input boundary. Resolve the leaf from the captured physical
+// parent so a moving directory alias cannot mix two parent generations.
+// Missing parents retain the physical identity of their existing ancestor.
 func FreezeFileIdentity(filePath string, fsys vfs.FS) PathIdentity {
 	filePath = tspath.NormalizePath(filePath)
 	parent := tspath.GetDirectoryPath(filePath)
@@ -72,21 +72,15 @@ func FreezeFileIdentity(filePath string, fsys vfs.FS) PathIdentity {
 	if fsys == nil {
 		return identity
 	}
-	for range 2 {
-		before := canonicalDirectoryPathOrSelf(parent, fsys)
-		identity.CanonicalPath = canonicalPathOrSelf(filePath, fsys)
-		identity.CanonicalParentPath = canonicalDirectoryPathOrSelf(parent, fsys)
-		if before == identity.CanonicalParentPath {
-			break
-		}
-	}
-	if identity.CanonicalPath == filePath && identity.CanonicalParentPath != parent {
-		identity.CanonicalPath = tspath.CombinePaths(identity.CanonicalParentPath, tspath.GetBaseFileName(filePath))
-	}
+	identity.CanonicalParentPath = canonicalDirectoryPathOrSelf(parent, fsys)
+	identity.CanonicalPath = canonicalPathOrSelf(tspath.CombinePaths(identity.CanonicalParentPath, tspath.GetBaseFileName(filePath)), fsys)
 	return identity
 }
 
 func canonicalDirectoryPathOrSelf(directory string, fsys vfs.FS) string {
+	if fsys == nil {
+		return tspath.NormalizePath(directory)
+	}
 	canonical := canonicalPathOrSelf(directory, fsys)
 	// Overlay directories can satisfy DirectoryExists without a disk entry.
 	if canonical != directory || fsys.Stat(directory) != nil {

@@ -850,7 +850,7 @@ func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
 }
 
 func TestHandleLintCommandTypeCheckProjectConstructionOrder(t *testing.T) {
-	directory := tspath.NormalizePath(t.TempDir())
+	directory := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	targetPath := tspath.ResolvePath(directory, "target.ts")
 	if err := os.WriteFile(targetPath, []byte("export const value = 1;\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -893,8 +893,7 @@ func TestHandleLintCommandTypeCheckProjectConstructionOrder(t *testing.T) {
 				if code != 1 || !strings.Contains(stderr, "missing.json") {
 					t.Fatalf("declared project error: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
 				}
-				// Input identity is frozen before discovery, including requests
-				// whose explicit projects fail before target planning begins.
+				// A declared-project failure must not bypass input identity capture.
 				if fsys.callCount(targetPath) == 0 {
 					t.Fatal("requested target identity was not frozen before the project error")
 				}
@@ -1146,7 +1145,7 @@ func TestHandleLintCommandConfigCatalogSelection(t *testing.T) {
 }
 
 func TestHandleLintCommandBuildsOnlySelectedProjects(t *testing.T) {
-	parent := tspath.NormalizePath(t.TempDir())
+	parent := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	dir := tspath.ResolvePath(parent, "pkg")
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -1461,15 +1460,13 @@ func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
 		SingleThreaded: true,
 	}
 	for _, test := range []struct {
-		name       string
-		fs         vfs.FS
-		wantInline bool
+		name string
+		fs   vfs.FS
 	}{
 		{name: "production disk host"},
 		{
-			name:       "injected filesystem",
-			fs:         bundled.WrapFS(cachedvfs.From(osvfs.FS())),
-			wantInline: true,
+			name: "injected filesystem",
+			fs:   bundled.WrapFS(cachedvfs.From(osvfs.FS())),
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -1493,12 +1490,8 @@ func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
 				t.Fatalf("CLI plugin request failed: code=%d request=%+v stdout=%q stderr=%q", code, request, stdout, stderr)
 			}
 			text := request.Files[0].Text
-			if test.wantInline {
-				if text == nil || *text != content {
-					t.Fatalf("injected filesystem text = %v, want %q", text, content)
-				}
-			} else if text != nil {
-				t.Fatalf("production disk host unexpectedly received inline text %q", *text)
+			if text == nil || *text != content {
+				t.Fatalf("frozen generation text = %v, want %q", text, content)
 			}
 		})
 	}
@@ -2403,7 +2396,12 @@ func TestCLIFinalChangeCommitterCommitsCompleteFinalDelta(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	committer := cliFinalChangeCommitter{}
+	// Low-level targets without a realpath retain their lexical disk paths.
+	files := make([]target.File, len(paths))
+	for index, path := range paths {
+		files[index] = target.File{PathIdentity: rslintconfig.PathIdentity{Path: path}}
+	}
+	committer := newCLIFinalChangeCommitter(files)
 	changes := make([]linter.FileChange, len(paths))
 	for index, path := range paths {
 		changes[index] = linter.FileChange{Path: path, Before: "before", After: fmt.Sprintf("after-%d", index)}
@@ -2419,6 +2417,135 @@ func TestCLIFinalChangeCommitterCommitsCompleteFinalDelta(t *testing.T) {
 		content, readErr := os.ReadFile(path)
 		if readErr != nil || string(content) != fmt.Sprintf("after-%d", index) {
 			t.Fatalf("committed file %q: content=%q error=%v", path, content, readErr)
+		}
+	}
+}
+
+func TestCLIFinalChangeCommitterKeepsFrozenAliasTarget(t *testing.T) {
+	const before = utils.BOM + "var value = 1;\n"
+	const after = utils.BOM + "let value = 1;\n"
+	for _, leaf := range []bool{false, true} {
+		for _, sameContent := range []bool{false, true} {
+			t.Run(fmt.Sprintf("leaf=%t/same-content=%t", leaf, sameContent), func(t *testing.T) {
+				root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+				first, second := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "second")
+				for _, directory := range []string{first, second} {
+					if err := os.Mkdir(directory, 0o755); err != nil {
+						t.Fatal(err)
+					}
+				}
+				firstFile, secondFile := tspath.ResolvePath(first, "entry.js"), tspath.ResolvePath(second, "entry.js")
+				secondText := "const untouched = true;\n"
+				if sameContent {
+					secondText = before
+				}
+				if err := os.WriteFile(firstFile, []byte(before), 0o750); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(secondFile, []byte(secondText), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				originalInfo, err := os.Stat(firstFile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				alias := tspath.ResolvePath(root, "alias")
+				firstDestination, secondDestination := first, second
+				filePath := tspath.ResolvePath(alias, "entry.js")
+				if leaf {
+					alias = tspath.ResolvePath(root, "entry.ts")
+					firstDestination, secondDestination = firstFile, secondFile
+					filePath = alias
+				}
+				if err := os.Symlink(firstDestination, alias); err != nil {
+					t.Skipf("symlink unavailable: %v", err)
+				}
+				identity := rslintconfig.FreezeFileIdentity(filePath, osvfs.FS())
+				committer := newCLIFinalChangeCommitter([]target.File{{PathIdentity: identity}})
+				if err := os.Remove(alias); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(secondDestination, alias); err != nil {
+					t.Fatal(err)
+				}
+				callerPath := filepath.FromSlash(filePath)
+				result, err := committer.CommitFinalChanges(context.Background(), []linter.FileChange{{Path: callerPath, Before: before, After: after}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !slices.Equal(result.ConfirmedPaths, []string{callerPath}) {
+					t.Fatalf("commit changed caller identity: %+v", result)
+				}
+				for path, want := range map[string]string{firstFile: after, secondFile: secondText} {
+					if content, err := os.ReadFile(path); err != nil || string(content) != want {
+						t.Fatalf("commit wrote the wrong frozen file %s: text=%q err=%v", path, content, err)
+					}
+				}
+				if info, err := os.Stat(firstFile); err != nil || info.Mode().Perm() != originalInfo.Mode().Perm() {
+					t.Fatalf("fix changed existing file mode: info=%v err=%v", info, err)
+				}
+				if info, err := os.Lstat(alias); err != nil || info.Mode()&os.ModeSymlink == 0 {
+					t.Fatalf("fix replaced the caller's alias: info=%v err=%v", info, err)
+				}
+			})
+		}
+	}
+}
+
+func TestCLIFinalChangeCommitterRejectsStaleCanonicalTarget(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	first, second, alias := tspath.ResolvePath(root, "first.ts"), tspath.ResolvePath(root, "second.ts"), tspath.ResolvePath(root, "alias.ts")
+	for _, file := range []string{first, second} {
+		if err := os.WriteFile(file, []byte("before"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(first, alias); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	committer := newCLIFinalChangeCommitter([]target.File{{PathIdentity: rslintconfig.FreezeFileIdentity(alias, osvfs.FS())}})
+	if err := os.Remove(alias); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(second, alias); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(first, []byte("externally changed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result, err := committer.CommitFinalChanges(context.Background(), []linter.FileChange{{Path: alias, Before: "before", After: "fixed"}})
+	if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("%q", alias)) || !strings.Contains(err.Error(), "changed after lint generation") || len(result.ConfirmedPaths) != 0 {
+		t.Fatalf("stale canonical target admitted a commit: result=%+v err=%v", result, err)
+	}
+	for path, want := range map[string]string{first: "externally changed", second: "before"} {
+		if content, err := os.ReadFile(path); err != nil || string(content) != want {
+			t.Fatalf("stale preflight mutated %s: text=%q err=%v", path, content, err)
+		}
+	}
+}
+
+func TestCLIFinalChangeCommitterRejectsUnselectedPathBeforeAnyWrite(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	first, second, alias := tspath.ResolvePath(root, "first.ts"), tspath.ResolvePath(root, "second.ts"), tspath.ResolvePath(root, "unselected.ts")
+	for _, file := range []string{first, second} {
+		if err := os.WriteFile(file, []byte("before"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(second, alias); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	committer := newCLIFinalChangeCommitter([]target.File{{PathIdentity: rslintconfig.FreezeFileIdentity(first, osvfs.FS())}})
+	result, err := committer.CommitFinalChanges(context.Background(), []linter.FileChange{
+		{Path: first, Before: "before", After: "fixed"},
+		{Path: alias, Before: "before", After: "fixed"},
+	})
+	if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("%q", alias)) || !strings.Contains(err.Error(), "not a selected lint target") || len(result.ConfirmedPaths) != 0 {
+		t.Fatalf("unselected target admitted a commit: result=%+v err=%v", result, err)
+	}
+	for _, file := range []string{first, second} {
+		if content, err := os.ReadFile(file); err != nil || string(content) != "before" {
+			t.Fatalf("unselected target caused partial write at %s: text=%q err=%v", file, content, err)
 		}
 	}
 }

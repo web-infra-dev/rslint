@@ -974,6 +974,10 @@ Automatic discovery uses these rules:
    matching ordered results. `configDirectory` is an opaque Go-owned routing
    identity and must round-trip byte-for-byte; Node may native-normalize only
    `configPath`, which it uses for local file I/O and module import.
+   Directory enumeration and module requests use the captured physical
+   directory; the lexical directory remains the owner and selector coordinate.
+   The catalog passes its frozen authored path spaces to target planning and
+   LSP activation, so neither reconstructs them through a moved directory alias.
    Before sending a batch, Go coalesces verified native case aliases to one
    stable candidate ID and representative directory across all frontiers. The
    check requires both lexical case equivalence and matching resolved file and
@@ -1251,6 +1255,9 @@ proof of the target's complete ancestor chain. If parent directories have not
 been created, identity capture resolves the nearest existing ancestor and
 appends the missing suffix; an existing leaf symlink retains its own resolved
 file identity and its containing directory's separate Git coordinate.
+Leaf resolution starts in the captured physical parent, so a directory alias
+cannot switch the file into another parent generation. API canonical-file hints
+override only the file identity at the request boundary.
 Native-case owner aliases may be verified once while the target's owner is
 selected. LSP then freezes one
 document lint snapshot containing the same complete target plus its selected
@@ -1259,6 +1266,10 @@ diagnostics, resident Programs, and every fix pass consume that snapshot. No
 later stage resolves the target file or selects its owner again. Staged CLI,
 native API, and transactional LSP paths therefore reuse the same Go ownership
 rules instead of independently reconstructing hierarchy on the Node side.
+Editor overlays use the same ancestor identity for source reads, directory
+entries and metadata reached through another directory alias. Open virtual
+dependencies share their physical keys, preserving the document's type
+information in configured Programs and speculative fixes.
 
 Configuration meaning and invocation scope are separate inputs. For one
 invocation-wide config, `ConfigDirectory` is the config file's directory and is
@@ -1283,6 +1294,15 @@ overrides are layered after target selection and config resolvers evaluate them
 in those same frozen path spaces.
 `internal/program/loader` consumes the plan but cannot add targets, change
 ownership, or reinterpret config-relative paths.
+Its request-scoped `WithFrozenIO` view projects filesystem operations through
+the recorded directory and file identities before source and metadata caches
+are created. Program filenames retain their authored spelling and extension;
+relative config paths are normalized in that path space before projection.
+Canonical-file hints map individual files and never establish directory roots.
+API request buffers and every fix generation place their memory overlay above
+this same physical view, preserving exact caller-buffer precedence.
+Program IO follows the filesystem's case policy while prioritizing exact frozen
+identities; ambiguous case-equivalent anchors never collapse distinct roots.
 
 After Program binding, `internal/config/lint` maps each Program source path
 through its `Resolver` back to that immutable selected target and resolves rules
@@ -1433,7 +1453,7 @@ and mutation sequencing do not.
 7. **Core Request**: CLI/API/LSP choose a sealed `RunPipeline` request kind and provide semantic adapters. They do not call `PrepareLintPlan`, `RunLinter`, plugin dispatch, or fix application as separate stages.
 8. **Rule Plan Preparation**: for each acquired generation, the core calls `PrepareLintPlan()` with one ordered Program sequence, its exact parallel target projection, and the generation's rule resolver. Planning never discovers, excludes, or scans for fallback targets; a target absent from its bound Program is an invariant error. The immutable result owns that Program sequence, freezes rare syntax diagnostics in a sparse plan-level projection, and keeps each hot per-file execution unit limited to its source, a shared prepared rule set, and checker capability. Prepared sets own eligibility, ordered native/plugin projections and rule-derived environments; execution consumes these views without filtering rules again. Syntax-error and zero-rule files remain selected, and the same non-empty file/rule projection feeds third-party plugin dispatch. Worker results are joined in stable Program/file order; cancellation cannot publish a partial plan, and callback panics return through the caller so the enclosing generation lifecycle remains exact-once.
 9. **Rule Execution**: the core invokes `RunLinter()` only with the prepared plan plus scheduling, diagnostic, timing, and optional program-wide type-check concerns. A nil plan explicitly skips lint for `--type-check-only`. Execution never recollects files, re-resolves rules, or accepts a second Program authority alongside a plan. Plans bind exact Program pointers, so every autofix re-observation constructs a fresh Program and plan over the current in-memory snapshot. When `--type-check` is enabled, Phase 2 schedules only Programs that expose complete program diagnostics.
-10. **Fix Rounds and Aggregation**: `RunPipeline` joins native/plugin results, projects stable target paths, computes whole-file changes, applies them to private memory, and reacquires a generation until stable or bounded. A file may move between Program generations when its import graph changes, but the target plan remains stable. Once memory differs from the initial generation, every plugin target is frozen inline from that generation even when the initial CLI host could read disk. CLI independently supplies a terminal committer and therefore touches disk only once after the last successful observation; API and LSP consume the returned memory delta without a committer. Integrations retain only presentation policy for structured plugin notices, path conversion, and output/protocol mapping.
+10. **Fix Rounds and Aggregation**: `RunPipeline` joins native/plugin results, projects stable target paths, computes whole-file changes, applies them to private memory, and reacquires a generation until stable or bounded. A file may move between Program generations when its import graph changes, but the target plan remains stable. CLI/API plugin inputs carry the exact generation text inline. CLI independently supplies a terminal committer and therefore touches disk only once after the last successful observation; API and LSP consume the returned memory delta without a committer. The CLI committer accepts only selected caller paths and uses their frozen canonical destinations for both fresh stale-content preflight and writes. Errors and confirmed paths retain caller spelling. Integrations retain only presentation policy for structured plugin notices, path conversion, and output/protocol mapping.
 11. **Report Assembly**: the CLI's concrete, side-effect-free report projection validates final post-fix diagnostics and converts them from rule-domain values to output-owned values. It computes error/warning/type-error counts and one outcome from the same snapshot plus `--max-warnings`; the completed `Report` supplies that outcome to both status rendering and exit policy. Only the default format requests a `Summary` and immutable source snapshots for code frames. Before `RunPipeline`, the loader freezes roots from the actual type-capable Programs selected for the run, combines their identities with already-frozen lint-target identities, and immediately reduces them to the canonical-union file count consumed after execution. Machine formats consume projected positions, do not request root identities, and do not construct fake zero-valued summaries. `--quiet` filters rendering only.
 12. **Output Formatting**: after config/rule preflight and before Program/target work, the CLI asks `internal/output` to emit a default-format start line. A complete report ends with a mode-specific success/error status, while a post-start runtime failure uses a separate incomplete-run status. The package consumes only the completed presentation report and owns its text, format dispatch, and ANSI spans; the command owns lifecycle ordering and report/outcome assembly. JSON line, GitHub workflow command, and GitLab Code Quality formats remain diagnostics-only and never emit lifecycle text or ANSI styling.
 13. **Output Synchronization**: in the default IPC CLI, Go sends the rendered lifecycle start as an acknowledged `output` request; Node responds only after the real-stdout write callback completes, so post-start work cannot emit inherited stderr ahead of the start line. Remaining stdout text uses ordered, bounded `output` notifications for large diagnostic sets. Go then sends its terminal `shutdown` request. Node seals forwarding and waits for every remaining real-stdout write callback before acknowledging; only after Go receives that acknowledgement does it emit deferred stderr (currently the `--timing` table), so merged `2>&1` output cannot place the table before or inside the report.

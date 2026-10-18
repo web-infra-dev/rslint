@@ -1,11 +1,13 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/rules"
 )
@@ -38,8 +40,7 @@ func TestFreezeFileIdentityAncestorFallback(t *testing.T) {
 	}{
 		{"one missing directory", "/alias/src/new.ts", "/physical/pkg/src/new.ts", "/physical/pkg/src", map[string]string{"/alias": "/physical/pkg"}},
 		{"multiple missing directories", "/alias/src/deep/new.ts", "/physical/pkg/src/deep/new.ts", "/physical/pkg/src/deep", map[string]string{"/alias": "/physical/pkg"}},
-		{"independent file hint", "/alias/generated/new.ts", "/other/renamed.ts", "/physical/pkg/generated", map[string]string{"/alias": "/physical/pkg", "/alias/generated/new.ts": "/other/renamed.ts"}},
-		{"file symlink", "/alias/link.ts", "/other/source.ts", "/physical/pkg", map[string]string{"/alias": "/physical/pkg", "/alias/link.ts": "/other/source.ts"}},
+		{"file symlink", "/alias/link.ts", "/other/source.ts", "/physical/pkg", map[string]string{"/alias": "/physical/pkg", "/physical/pkg/link.ts": "/other/source.ts"}},
 		{"drive root", "C:/missing/new.ts", "C:/missing/new.ts", "C:/missing", map[string]string{"C:": "/must-not-resolve"}},
 		{"UNC share root", "//server/share/missing/new.ts", "//server/share/missing/new.ts", "//server/share/missing", map[string]string{"//server/": "/must-not-resolve"}},
 	} {
@@ -70,38 +71,76 @@ type pathIdentityHookFS struct {
 
 func (fsys *pathIdentityHookFS) Realpath(path string) string { return fsys.realpath(path) }
 
-func TestFreezeFileIdentityRetriesMovedMissingAncestor(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
-	first, second := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "second")
-	for _, directory := range []string{first, second} {
-		if err := os.Mkdir(directory, 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	alias := tspath.ResolvePath(root, "alias")
-	if err := os.Symlink(first, alias); err != nil {
-		t.Skipf("directory symlink unavailable: %v", err)
-	}
-	file := tspath.ResolvePath(alias, "missing/deep/new.ts")
-	fileReads := 0
-	fsys := &pathIdentityHookFS{FS: osvfs.FS()}
-	fsys.realpath = func(path string) string {
-		if path == file {
-			fileReads++
-			if fileReads == 1 {
-				if err := os.Remove(alias); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.Symlink(second, alias); err != nil {
-					t.Fatal(err)
-				}
+func TestFreezeFileIdentityAnchorsLeafInPhysicalParent(t *testing.T) {
+	for _, cached := range []bool{false, true} {
+		for _, suffix := range []string{"", "missing/deep"} {
+			for _, leafSymlink := range []bool{false, true} {
+				t.Run(fmt.Sprintf("cached=%t/suffix=%s/leafSymlink=%t", cached, suffix, leafSymlink), func(t *testing.T) {
+					root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+					first, second := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "second")
+					for _, directory := range []string{first, second} {
+						if err := os.Mkdir(directory, 0o755); err != nil {
+							t.Fatal(err)
+						}
+						if err := os.Mkdir(tspath.ResolvePath(directory, ".git"), 0o755); err != nil {
+							t.Fatal(err)
+						}
+					}
+					if err := os.WriteFile(tspath.ResolvePath(first, ".gitignore"), []byte("new.ts\n"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+					alias := tspath.ResolvePath(root, "alias")
+					if err := os.Symlink(first, alias); err != nil {
+						t.Skipf("directory symlink unavailable: %v", err)
+					}
+					parent := tspath.ResolvePath(first, suffix)
+					physicalFile := tspath.ResolvePath(parent, "new.ts")
+					wantCanonical := physicalFile
+					if leafSymlink {
+						if err := os.MkdirAll(parent, 0o755); err != nil {
+							t.Fatal(err)
+						}
+						wantCanonical = tspath.ResolvePath(second, "source.ts")
+						if err := os.WriteFile(wantCanonical, []byte("debugger;"), 0o644); err != nil {
+							t.Fatal(err)
+						}
+						if err := os.Symlink(wantCanonical, physicalFile); err != nil {
+							t.Skipf("file symlink unavailable: %v", err)
+						}
+					}
+					file := tspath.ResolvePath(alias, suffix, "new.ts")
+					moved := false
+					hooks := &pathIdentityHookFS{FS: osvfs.FS()}
+					hooks.realpath = func(path string) string {
+						if path == file {
+							t.Fatal("leaf resolution revisited the moving directory alias")
+						}
+						if path == physicalFile && !moved {
+							moved = true
+							if err := os.Remove(alias); err != nil {
+								t.Fatal(err)
+							}
+							if err := os.Symlink(second, alias); err != nil {
+								t.Fatal(err)
+							}
+						}
+						return hooks.FS.Realpath(path)
+					}
+					var fsys vfs.FS = hooks
+					if cached {
+						fsys = cachedvfs.From(hooks)
+					}
+					identity := FreezeFileIdentity(file, fsys)
+					if !moved || identity.Path != file || identity.CanonicalPath != wantCanonical || identity.CanonicalParentPath != parent {
+						t.Fatalf("mixed directory generations after alias moved: %+v", identity)
+					}
+					policy := CollectGitPolicy(nil, root, fsys, []PathIdentity{identity}, nil)
+					if !policy.ignored(GitPath(identity)) {
+						t.Fatal("frozen target lost its containing repository's Git policy")
+					}
+				})
 			}
 		}
-		return fsys.FS.Realpath(path)
-	}
-	identity := FreezeFileIdentity(file, fsys)
-	if fileReads != 2 || identity.CanonicalParentPath != tspath.ResolvePath(second, "missing/deep") || identity.CanonicalPath != tspath.ResolvePath(second, "missing/deep/new.ts") {
-		t.Fatalf("mixed ancestor generations after %d file reads: %+v", fileReads, identity)
 	}
 }
 

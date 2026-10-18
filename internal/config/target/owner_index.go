@@ -50,16 +50,16 @@ func NewOwnerIndex(
 	fsys vfs.FS,
 ) *OwnerIndex {
 	pathSpaces := rslintconfig.NewPathSpaceSnapshot(configMap, fsys)
-	index, err := newOwnerIndexWithPathSpaces(configMap, fsys, pathSpaces)
+	index, err := NewOwnerIndexWithPathSpaces(configMap, fsys, pathSpaces)
 	if err != nil {
 		panic(err)
 	}
 	return index
 }
 
-// newOwnerIndexWithPathSpaces binds ownership to an existing frozen
+// NewOwnerIndexWithPathSpaces binds ownership to an existing frozen
 // generation. Missing owner bases are invariant errors.
-func newOwnerIndexWithPathSpaces(
+func NewOwnerIndexWithPathSpaces(
 	configMap map[string]rslintconfig.RslintConfig,
 	fsys vfs.FS,
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
@@ -83,7 +83,7 @@ func mustOwnerIndexWithPathSpaces(
 	fsys vfs.FS,
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
 ) *OwnerIndex {
-	index, err := newOwnerIndexWithPathSpaces(configMap, fsys, pathSpaces)
+	index, err := NewOwnerIndexWithPathSpaces(configMap, fsys, pathSpaces)
 	if err != nil {
 		panic(err)
 	}

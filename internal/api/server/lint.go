@@ -46,6 +46,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 
 	// Create filesystem
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	programBaseFS := fs
 	var allowedFiles []string
 	seenAllowedFiles := make(map[string]struct{})
 
@@ -133,32 +134,31 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		)
 	}
 	if len(fileContents) > 0 {
-		addEquivalentFileContentPaths(fileContents, configDirectory, currentDirectory, fs)
+		addEquivalentFileContentPaths(fileContents, configDirectory, currentDirectory, fs, canonicalPaths)
 		fs = utils.NewOverlayVFS(fs, fileContents)
 	}
+	identityFS := fs
 	if len(canonicalPaths) > 0 {
 		fs = &canonicalPathVFS{FS: fs, canonicalPaths: canonicalPaths}
 	}
-	sourceFS := fs
-	// The Program context must wrap the fully composed request VFS so metadata
-	// snapshots observe overlay contents and canonical aliases exactly as the
-	// rest of this request does. A new context is created for every API call.
-	programSession := loader.NewSession(fs)
-	fs = programSession.FS()
-
 	var (
 		configMap              map[string]rslintconfig.RslintConfig
 		configTargetScopes     map[string]target.OwnerScope
 		catalogPlugins         []rslintconfig.EslintPluginEntry
 		pluginConfigKeyByOwner map[string]string
 		gitPolicy              *rslintconfig.GitPolicy
+		pathSpaces             *rslintconfig.PathSpaceSnapshot
 	)
 	var targetFiles []rslintconfig.PathIdentity
 	targetFileByPath := make(map[string]rslintconfig.PathIdentity, len(allowedFiles))
 	if allowedFiles != nil {
 		targetFiles = make([]rslintconfig.PathIdentity, 0, len(allowedFiles))
 		for _, path := range allowedFiles {
-			identity := rslintconfig.FreezeFileIdentity(path, fs)
+			identity := rslintconfig.FreezeFileIdentity(path, identityFS)
+			if canonicalPath := canonicalPaths[rslintconfig.ExactPathID(path)]; canonicalPath != "" {
+				// The host's file hint is independent of the containing directory.
+				identity.CanonicalPath = canonicalPath
+			}
 			targetFiles = append(targetFiles, identity)
 			targetFileByPath[rslintconfig.ExactPathID(path)] = identity
 		}
@@ -246,6 +246,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			return nil, fmt.Errorf("discover config catalog: %w", failure)
 		}
 		gitPolicy = configCatalog.GitPolicy
+		pathSpaces = configCatalog.PathSpaces
 		targetFiles = configCatalog.TargetFiles
 		if targetFiles == nil {
 			targetDirectories = configCatalog.TargetDirectories
@@ -342,6 +343,13 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// invocation-wide single-config paths.
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
+	if pathSpaces != nil {
+		configsForBases := configMap
+		if configsForBases == nil {
+			configsForBases = map[string]rslintconfig.RslintConfig{configDirectory: rslintConfig}
+		}
+		pathSpaces = pathSpaces.WithConfigBases(configsForBases, fs)
+	}
 	targetPlan, err := target.Resolve(target.Request{
 		ConfigMap:       configMap,
 		Config:          rslintConfig,
@@ -352,6 +360,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		Files:           targetFiles,
 		Directories:     targetDirectories,
 		GitPolicy:       gitPolicy,
+		PathSpaces:      pathSpaces,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("resolve lint targets: %w", err)
@@ -380,6 +389,20 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		Policies: projectPolicies,
 		Scope:    loader.Targeted,
 	}
+	// Keep exact request buffers above physical IO projection, including when
+	// callers supply different contents under two spellings of the same file.
+	// Discovery uses its composed view; Program caches see this final view.
+	sourceFS, err := loader.WithFrozenIO(programBaseFS, targetPlan.PathSpaces(), targetPlan.Files)
+	if err != nil {
+		return nil, err
+	}
+	if len(canonicalPaths) > 0 {
+		sourceFS = &canonicalPathVFS{FS: sourceFS, canonicalPaths: canonicalPaths}
+	}
+	if len(fileContents) > 0 {
+		sourceFS = utils.NewOverlayVFS(sourceFS, fileContents)
+	}
+	programSession := loader.NewSession(sourceFS)
 	// A plain API lint only needs type information when at least one target is
 	// selected. The stable target/config plan is reused while each source
 	// snapshot gets a fresh request-local Program generation.
@@ -460,7 +483,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			for _, file := range files {
 				overrides[tspath.NormalizePath(file.Path)] = file.Text
 			}
-			addEquivalentFileContentPaths(overrides, configDirectory, currentDirectory, sourceFS)
+			addEquivalentFileContentPaths(overrides, configDirectory, currentDirectory, sourceFS, canonicalPaths)
 			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides))
 			roundBinding, rebuildErr := buildBinding(roundSession)
 			if rebuildErr != nil {

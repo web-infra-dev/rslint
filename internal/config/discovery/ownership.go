@@ -289,20 +289,22 @@ func (coordinator *discoveryCoordinator) findCandidateForOwner(
 	ownerPath string,
 	canonicalDirectory string,
 ) (configCandidate, bool) {
+	if canonicalDirectory == "" {
+		canonicalDirectory = coordinator.physicalDirectory(directory)
+	}
 	for _, name := range AutoJSConfigFileNames {
 		candidatePath := tspath.CombinePaths(directory, name)
+		canonicalCandidate := tspath.CombinePaths(canonicalDirectory, name)
 		if isDefaultDiscoveryExcluded(candidatePath, coordinator.request.CWD, coordinator.fs.UseCaseSensitiveFileNames()) ||
-			!coordinator.fs.FileExists(candidatePath) {
+			!coordinator.fs.FileExists(canonicalCandidate) {
 			continue
 		}
-		canonicalCandidate := ""
-		if canonicalDirectory != "" {
-			canonicalCandidate = tspath.CombinePaths(canonicalDirectory, name)
-		}
-		if coordinator.isGloballyIgnoredCandidate(ownerPath, candidatePath, canonicalCandidate) {
+		if coordinator.isGloballyIgnoredCandidate(ownerPath, rslintconfig.PathIdentity{
+			Path: candidatePath, CanonicalPath: canonicalCandidate, CanonicalParentPath: canonicalDirectory,
+		}) {
 			continue
 		}
-		return configCandidate{path: tspath.NormalizePath(candidatePath), directory: directory}, true
+		return configCandidate{path: tspath.NormalizePath(candidatePath), directory: directory, physicalDirectory: canonicalDirectory}, true
 	}
 	return configCandidate{}, false
 }
