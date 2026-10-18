@@ -1377,47 +1377,50 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles lets a literal target bypass Git-hidden config discovery but prunes a glob target', async () => {
-    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-gitignore-'));
-    try {
-      await writeFile(
-        path.join(tmp, 'rslint.config.mjs'),
-        "export default [{ rules: { 'no-debugger': 'error' } }];\n",
+  test.each([false, true])(
+    'lintFiles applies ancestor Git ignores and reachable child config negations (negation: %s)',
+    async (negation) => {
+      const tmp = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-api-gitignore-'),
       );
-      await writeFile(path.join(tmp, '.gitignore'), 'ignored/\n');
-      await mkdir(path.join(tmp, 'ignored'));
-      await writeFile(
-        path.join(tmp, 'ignored', 'rslint.config.mjs'),
-        "export default [{ rules: { 'no-debugger': 'error' } }];\n",
-      );
-      await writeFile(path.join(tmp, 'ignored', 'index.ts'), 'debugger;\n');
-      await writeFile(path.join(tmp, 'visible.ts'), 'debugger;\n');
-
-      const rslint = new Rslint({ cwd: tmp });
       try {
-        const explicit = await rslint.lintFiles('ignored/index.ts');
-        expect(explicit).toHaveLength(1);
-        expect(path.relative(tmp, explicit[0].filePath)).toBe(
-          path.join('ignored', 'index.ts'),
+        await writeFile(
+          path.join(tmp, 'rslint.config.mjs'),
+          "export default [{ rules: { 'no-debugger': 'error' } }];\n",
         );
-
-        const rootedGlob = await rslint.lintFiles('ignored/**/*.ts');
-        expect(rootedGlob).toHaveLength(1);
-        expect(path.relative(tmp, rootedGlob[0].filePath)).toBe(
-          path.join('ignored', 'index.ts'),
+        await writeFile(path.join(tmp, '.gitignore'), 'ignored/\n');
+        await mkdir(path.join(tmp, 'ignored'));
+        await writeFile(
+          path.join(tmp, 'ignored', 'rslint.config.mjs'),
+          `export default [${negation ? "{ ignores: ['!index.ts'] }," : ''} { rules: { 'no-debugger': 'error' } }];\n`,
         );
+        await writeFile(path.join(tmp, 'ignored', 'index.ts'), 'debugger;\n');
+        await writeFile(path.join(tmp, 'visible.ts'), 'debugger;\n');
 
-        const results = await rslint.lintFiles('**/*.ts');
-        expect(
-          results.map((result) => path.relative(tmp, result.filePath)).sort(),
-        ).toEqual(['visible.ts']);
+        const rslint = new Rslint({ cwd: tmp });
+        try {
+          const explicit = await rslint.lintFiles('ignored/index.ts');
+          expect(
+            explicit.map((result) => path.relative(tmp, result.filePath)),
+          ).toEqual(negation ? [path.join('ignored', 'index.ts')] : []);
+
+          const rootedGlob = await rslint.lintFiles('ignored/**/*.ts');
+          expect(
+            rootedGlob.map((result) => path.relative(tmp, result.filePath)),
+          ).toEqual(negation ? [path.join('ignored', 'index.ts')] : []);
+
+          const results = await rslint.lintFiles('**/*.ts');
+          expect(
+            results.map((result) => path.relative(tmp, result.filePath)).sort(),
+          ).toEqual(['visible.ts']);
+        } finally {
+          await rslint.close();
+        }
       } finally {
-        await rslint.close();
+        await cleanupTempDir(tmp);
       }
-    } finally {
-      await cleanupTempDir(tmp);
-    }
-  });
+    },
+  );
 
   test('lintFiles includes dotfiles but skips default excluded directories', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-dotfiles-'));

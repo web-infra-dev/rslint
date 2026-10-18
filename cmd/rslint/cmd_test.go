@@ -803,7 +803,7 @@ func TestValidateTypeCheckOnlyFlags_FixTakesPriority(t *testing.T) {
 }
 
 func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
-	directory := t.TempDir()
+	directory := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	write := func(name string, content string) string {
 		t.Helper()
 		filePath := filepath.Join(directory, name)
@@ -827,16 +827,20 @@ func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
 		},
 	}}
 
-	fsys := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
-	code, stdout, stderr := runLintCommandForTest(t, directory, lintArgs{
+	args := lintArgs{
 		ConfigCatalog:  explicitConfigCatalogForTest(directory, configEntries),
-		FS:             fsys,
+		FS:             bundled.WrapFS(cachedvfs.From(osvfs.FS())),
 		TypeCheck:      true,
 		TypeCheckOnly:  true,
 		Format:         "jsonline",
 		NoColor:        true,
 		SingleThreaded: true,
-	})
+	}
+	// Catalog preparation belongs to discovery; monitor only command execution.
+	prepareCommandCatalogForTest(directory, &args)
+	fsys := &directoryAccessSpyFS{FS: args.FS}
+	args.FS = fsys
+	code, stdout, stderr := runLintCommandForTest(t, directory, args)
 	if code != 0 {
 		t.Fatalf("type-check-only exit = %d, stdout=%q stderr=%q", code, stdout, stderr)
 	}

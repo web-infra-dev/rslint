@@ -3226,7 +3226,11 @@ type discoveredTestConfig struct {
 
 func catalogTestConfig(t *testing.T, catalog *ConfigCatalog, directory string) discoveredTestConfig {
 	t.Helper()
-	return boundTestConfig(t, catalog.Configs[directory], directory, discoveryTestFS(), catalog.GitPolicy)
+	entries, exists := catalog.Configs[directory]
+	if !exists {
+		t.Fatalf("config owner %q not found in %v", directory, catalog.ConfigDirectories())
+	}
+	return boundTestConfig(t, entries, directory, discoveryTestFS(), catalog.GitPolicy)
 }
 
 func boundTestConfig(t *testing.T, entries rslintconfig.RslintConfig, directory string, fsys vfs.FS, policy *rslintconfig.GitPolicy) discoveredTestConfig {
@@ -3274,7 +3278,7 @@ func discoveryTempDir(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return physical
+	return tspath.NormalizePath(physical)
 }
 
 func TestConfigDiscoveryExplicitConfigGitBoundaryIndependentOfCWD(t *testing.T) {
