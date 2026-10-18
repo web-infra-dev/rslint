@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/bits"
 	"slices"
 	"strings"
 	"unicode/utf16"
@@ -85,7 +86,7 @@ func (b *Builder) Reset() {
 	// every other reusable buffer and force the next file to rebuild them all.
 	sizes := [...]int{cap(b.p.nodes) * 16, cap(b.p.values) * 4, cap(b.p.lists) * 4,
 		cap(b.p.strings) * 16, cap(b.p.numbers) * 8, cap(b.tokens) * 12,
-		cap(b.comments) * 12, cap(b.p.tokenCovers) * 12, cap(b.p.offsets.entries) * 8}
+		cap(b.comments) * 12, cap(b.p.tokenCovers) * 12, cap(b.p.offsets.entries) * int(unsafe.Sizeof(utf16Offset{}))}
 	total := 0
 	for _, size := range sizes {
 		total += size
@@ -505,12 +506,22 @@ func parseNumberLiteral(text string) float64 {
 
 // The plugin projection owns this reusable sparse index. Do not populate the
 // SourceFile's native PositionMap cache: it outlives the projected frame.
-// Frame/source bounds fit uint32; entries contain no text or AST references.
-type utf16Offset struct{ end, delta uint32 }
-type utf16Offsets struct{ entries []utf16Offset }
+// Each sparse 64-byte block records rune ends whose byte/UTF-16 difference
+// increases by one (two-byte UTF-8) or two (three/four-byte UTF-8). Prefix
+// deltas and population counts preserve queries inside a rune without keeping
+// an entry per character in large Unicode strings. No source is retained.
+type utf16Offset struct {
+	block, delta uint32
+	one, two     uint64
+}
+type utf16Offsets struct {
+	entries []utf16Offset
+	delta   uint32
+}
 
 func (o *utf16Offsets) reset(ctx context.Context, text string) {
 	o.entries = o.entries[:0]
+	o.delta = 0
 	delta, checkAt := 0, 0
 	for index := 0; index < len(text); {
 		if index >= checkAt {
@@ -528,17 +539,38 @@ func (o *utf16Offsets) reset(ctx context.Context, text string) {
 		if r >= 0x10000 {
 			units = 2
 		}
-		delta += size - units
 		index += size
-		o.entries = append(o.entries, utf16Offset{uint32(index), uint32(delta)})
+		step := size - units
+		if step == 0 {
+			continue
+		}
+		block := uint32(index) &^ 63
+		if len(o.entries) == 0 || o.entries[len(o.entries)-1].block != block {
+			o.entries = append(o.entries, utf16Offset{block: block, delta: uint32(delta)})
+		}
+		entry := &o.entries[len(o.entries)-1]
+		if step == 1 {
+			entry.one |= uint64(1) << (uint32(index) & 63)
+		} else {
+			entry.two |= uint64(1) << (uint32(index) & 63)
+		}
+		delta += step
 	}
+	o.delta = uint32(delta)
 }
 
 func (o utf16Offsets) At(offset int) uint32 {
+	if len(o.entries) == 0 {
+		return uint32(offset)
+	}
+	return o.nonASCIIAt(offset)
+}
+
+func (o utf16Offsets) nonASCIIAt(offset int) uint32 {
 	lo, hi := 0, len(o.entries)
 	for lo < hi {
 		mid := lo + (hi-lo)/2
-		if int(o.entries[mid].end) <= offset {
+		if int(o.entries[mid].block) <= offset {
 			lo = mid + 1
 		} else {
 			hi = mid
@@ -547,7 +579,20 @@ func (o utf16Offsets) At(offset int) uint32 {
 	if lo == 0 {
 		return uint32(offset)
 	}
-	return uint32(offset) - o.entries[lo-1].delta
+	entry := o.entries[lo-1]
+	within := offset - int(entry.block)
+	if within >= 63 {
+		// Between populated blocks, the next prefix is the complete delta for
+		// this block. The final block uses the total, avoiding bit counts in
+		// long ASCII gaps without adding a field to every entry.
+		if lo < len(o.entries) {
+			return uint32(offset) - o.entries[lo].delta
+		}
+		return uint32(offset) - o.delta
+	}
+	mask := ^uint64(0) >> (63 - within)
+	delta := entry.delta + uint32(bits.OnesCount64(entry.one&mask)+2*bits.OnesCount64(entry.two&mask))
+	return uint32(offset) - delta
 }
 func align4(n int) int { return (n + 3) &^ 3 }
 

@@ -287,7 +287,18 @@ func TestProjectionStringEncoding(t *testing.T) {
 
 func TestProjectionOwnsUTF16Offsets(t *testing.T) {
 	var offsets utf16Offsets
-	for _, text := range []string{"", "ASCII", "aé世界😀z", "a\xed\xa0\x80b\xff", strings.Repeat("世界😀", 1000), "ASCII again"} {
+	texts := []string{"", "ASCII", "aé世界😀z", "a\xed\xa0\x80b\xff", strings.Repeat("é", 1000), strings.Repeat("世界😀", 1000), "ASCII again"}
+	allBytes := make([]byte, 256)
+	for index := range allBytes {
+		allBytes[index] = byte(index)
+	}
+	texts = append(texts, string(allBytes))
+	// Exercise scalar ends at and around every block boundary, including WTF-8
+	// and invalid bytes, with ASCII gaps that must preserve the prefix delta.
+	for padding := range 130 {
+		texts = append(texts, strings.Repeat("a", padding)+"é世😀\xed\xa0\x80\xff"+strings.Repeat("z", 130)+"é😀")
+	}
+	for _, text := range texts {
 		offsets.reset(context.Background(), text)
 		native := ast.ComputePositionMap(text)
 		for index := -1; index <= len(text)+1; index++ {
@@ -310,6 +321,14 @@ func TestProjectionOwnsUTF16Offsets(t *testing.T) {
 	}
 	if len(builder.p.offsets.entries) != 0 {
 		t.Fatal("finished projection retained active offsets")
+	}
+
+	text := strings.Repeat("世界😀", 1<<18)
+	offsets.reset(context.Background(), text)
+	// A tiny syntax tree containing a large Unicode literal must not require
+	// several times the source size just for its private offset index.
+	if bytes := uintptr(cap(offsets.entries)) * reflect.TypeFor[utf16Offset]().Size(); bytes > uintptr(len(text)) {
+		t.Fatalf("dense Unicode index exceeds source size: %d > %d", bytes, len(text))
 	}
 }
 
@@ -450,9 +469,10 @@ func TestProjectionCallerOwnedOutput(t *testing.T) {
 
 func BenchmarkProjectionWindow(b *testing.B) {
 	cases := map[string]string{
-		"ASCII":      strings.Repeat("function f(a) { return { value: a + 2, text: 'abc' }; }\n", 1000),
-		"Unicode":    strings.Repeat("const café = { 字段: '\\uD800', text: '😃' };\n", 1000),
-		"LongString": "const text = '" + strings.Repeat("a", 1<<20) + "';",
+		"ASCII":       strings.Repeat("function f(a) { return { value: a + 2, text: 'abc' }; }\n", 1000),
+		"Unicode":     strings.Repeat("const café = { 字段: '\\uD800', text: '😃' };\n", 1000),
+		"LongString":  "const text = '" + strings.Repeat("a", 1<<20) + "';",
+		"LongUnicode": "const text = '" + strings.Repeat("世界😀", (1<<20)/10) + "';",
 	}
 	for name, text := range cases {
 		file := source("/input.ts", text)

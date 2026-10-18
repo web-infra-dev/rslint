@@ -1715,8 +1715,11 @@ return.
 Already frozen LSP inputs retain their independent ownership.
 Projection owns a reusable sparse UTF-16 offset column. It does not populate
 the native SourceFile's position-map cache; the column is cleared after each
-file and participates in the same 4 MiB scratch budget. String text is
-staged while frame sizes are counted, then encoded directly into the final frame
+file and participates in the same 4 MiB scratch budget.
+The offset index stores sparse 64-byte blocks with prefix deltas and rune-end
+bitmaps. Population counts answer byte-offset queries, including offsets inside
+a UTF-8 scalar, without a record per Unicode character or a retained source view.
+String text is staged while frame sizes are counted, then encoded directly into the final frame
 instead of a temporary UTF-16 byte column. Success, failure and cancellation clear every
 staged string reference. Frame version 3 references strings by sequential IDs.
 An immutable source-backed string may use a checked UTF-8 source range instead
