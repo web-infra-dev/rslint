@@ -19,6 +19,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
@@ -108,7 +109,7 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 			{start: 0, end: 5, kind: ast.KindIdentifier, typeCode: tokenIdentifier},
 			{start: 7, end: 13, kind: ast.KindIdentifier, typeCode: tokenKeyword},
 		}
-		tokens, _ := scanTokensAndCommentsInto(context.Background(), file, utf16Offsets{file.GetPositionMap()}, covers, nil, nil, maxFrameSize)
+		tokens, _ := scanTokensAndCommentsInto(context.Background(), scanner.NewScanner(), file, utf16Offsets{file.GetPositionMap()}, covers, nil, nil, maxFrameSize)
 		if len(tokens) != 4 || tokens[0].typeCode != tokenIdentifier || tokens[2].typeCode != tokenKeyword {
 			t.Fatalf("token cover precedence changed: %v", tokens)
 		}
@@ -143,7 +144,7 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 			}
 			assertClearedProjectionStrings(t, &builder)
 			builder.Reset()
-			if builder.p.stringIDs != nil || len(builder.p.tokenCovers) != 0 {
+			if len(builder.p.stringIDs) != 0 || len(builder.p.tokenCovers) != 0 || builder.p.scan.Text() != "" {
 				t.Fatal("reset builder retained source indexes")
 			}
 			next, err := builder.Build(context.Background(), source("/next.js", "next()"), Options{SourceType: "script"})
@@ -282,6 +283,44 @@ func TestProjectionStringEncoding(t *testing.T) {
 }
 
 func TestProjectionScratchResetDropsLargeBuffers(t *testing.T) {
+	t.Run("evicts large columns without discarding small ones", func(t *testing.T) {
+		builder := Builder{p: estreeProjector{
+			nodes:  make([]nodeRecord, 0, 1<<19),
+			values: make([]uint32, 0, 128),
+			lists:  make([]uint32, 0, 64),
+		}}
+		builder.Reset()
+		if cap(builder.p.nodes) != 0 || cap(builder.p.values) != 128 || cap(builder.p.lists) != 64 {
+			t.Fatal("one oversized column discarded unrelated small scratch")
+		}
+	})
+	t.Run("clears scanner state and bounds dictionary reuse", func(t *testing.T) {
+		var builder Builder
+		if _, err := builder.Build(context.Background(), source("/small.ts", "// @ts-ignore\nconst value = 0xabcdef;"), Options{SourceType: "module"}); err != nil {
+			t.Fatal(err)
+		}
+		index := builder.p.stringIDs
+		builder.Reset()
+		if builder.p.scan.Text() != "" || builder.p.scan.TokenValue() != "" || len(builder.p.scan.CommentDirectives()) != 0 || len(index) != 0 {
+			t.Fatal("scratch retained scanner or dictionary source references")
+		}
+		builder.p.stringIDs["reuse probe"] = 1
+		if _, ok := index["reuse probe"]; !ok {
+			t.Fatal("small cleared dictionary was not reused")
+		}
+		delete(builder.p.stringIDs, "reuse probe")
+		var text strings.Builder
+		for index := range 4100 {
+			fmt.Fprintf(&text, "name%d;", index)
+		}
+		if _, err := builder.Build(context.Background(), source("/dictionary.ts", text.String()), Options{SourceType: "module"}); err != nil {
+			t.Fatal(err)
+		}
+		builder.Reset()
+		if builder.p.stringIDs != nil || len(index) != 0 {
+			t.Fatal("oversized dictionary survived reset")
+		}
+	})
 	text := strings.Repeat("const value = { key: 'text' };\n", 20_000)
 	var builder Builder
 	data, err := builder.Build(context.Background(), source("/large.ts", text), Options{SourceType: "module"})

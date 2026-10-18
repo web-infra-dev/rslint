@@ -1655,6 +1655,15 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    is a private CLI/API asset, not a new package export; `build:js` emits it in a
    separate library block to keep the worker independent of shared chunks.
 
+The worker pool keeps FIFO admission within a 1 MiB window of in-flight encoded
+frame bytes. An individual larger frame runs alone; smaller frames retain the
+existing worker-count parallelism. Queued waits remain outside per-task
+execution deadlines. The pool uses owned byte lengths or shared-range metadata,
+without decoding syntax or inspecting plugins. Completion, timeout and worker
+exit release admission through the existing in-flight task records; there is
+no separate byte lease or counter lifetime. Cancellation and shutdown retain
+their existing result and failure policies.
+
 `internal/ipc.Channel` is the common Go/Node data transport. Its request API
 accepts an application payload plus optional `Text` or `Bytes` attachments.
 Text has JSON-compatible Unicode semantics; bytes preserve arbitrary binary
@@ -1706,6 +1715,12 @@ window. Owned output adds at most 4 MiB per window; shared output does not alloc
 those Go output blocks. Before dispatch the scheduler drops frame references
 from result metadata and discards source references and oversized scratch.
 Scratch/output caches never own Program references or reuse an in-flight frame.
+Reset evicts the largest scratch columns until their combined capacity is at
+most 4 MiB, preserving smaller reusable columns. A cleared string dictionary
+is reused only while it has at most 4,096 entries; larger dictionaries are
+cleared and dropped after the file. Projection reuses one scanner value and
+zeros its complete state, including source-backed numeric caches, on every
+return.
 Already frozen LSP inputs retain their independent ownership.
 Projection reuses the SourceFile's existing sparse position map. String text is
 staged while frame sizes are counted, then encoded directly into the final frame

@@ -33,6 +33,7 @@ func (p *estreeProjector) recordTokenCover(node *ast.Node) {
 
 func scanTokensAndCommentsInto(
 	ctx context.Context,
+	scan *scanner.Scanner,
 	file *ast.SourceFile,
 	offsets utf16Offsets,
 	covers []tokenCover,
@@ -47,7 +48,6 @@ func scanTokensAndCommentsInto(
 	})
 	coverIndex := 0
 	isTypeScript := file.ScriptKind == core.ScriptKindTS || file.ScriptKind == core.ScriptKindTSX
-	scan := scanner.NewScanner()
 	scan.SetText(file.Text())
 	scan.SetLanguageVariant(file.LanguageVariant)
 	scan.SetSkipTrivia(false)

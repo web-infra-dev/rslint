@@ -120,6 +120,217 @@ async function controlledPool(options: Partial<WorkerPoolOptions> = {}) {
 describe('WorkerPool demand-driven capacity', () => {
   afterEach(() => rs.restoreAllMocks());
 
+  test.each(['owned', 'shared'] as const)(
+    'admits an oversized %s frame alone and preserves FIFO',
+    async (kind) => {
+      const h = await controlledPool();
+      const input = (name: string, size: number): LintTask => ({
+        ...task(name, ''),
+        frame:
+          kind === 'owned'
+            ? new Uint8Array(size)
+            : { lease: 1, offset: 0, length: size },
+      });
+      try {
+        const batch = h.pool.lintBatch([
+          input('large-a.ts', 3 << 20),
+          input('large-b.ts', 3 << 20),
+          input('small.ts', 64 << 10),
+        ]);
+        expect(h.starts.map((s) => s.worker.posted.length)).toEqual([1, 0]);
+        h.finish(0);
+        expect(h.starts.map((s) => s.worker.posted.length)).toEqual([2, 0]);
+        h.finish(0);
+        expect(h.starts.map((s) => s.worker.posted.length)).toEqual([3, 0]);
+        h.finish(0);
+        expect((await batch).map((r) => r.filePath)).toEqual([
+          'large-a.ts',
+          'large-b.ts',
+          'small.ts',
+        ]);
+        expect(h.starts).toHaveLength(2);
+      } finally {
+        await h.close();
+      }
+    },
+  );
+
+  test('releases byte admission after completion and skips a cancelled queued input', async () => {
+    const h = await controlledPool();
+    const input = (name: string, size: number): LintTask => ({
+      ...task(name, ''),
+      frame: new Uint8Array(size),
+    });
+    try {
+      const ids: number[] = [];
+      const batch = h.pool.lintBatch(
+        [
+          input('medium.ts', 768 << 10),
+          input('cancel.ts', 3 << 20),
+          input('small.ts', 256 << 10),
+        ],
+        (id) => ids.push(id),
+      );
+      expect(h.starts.map((s) => s.worker.posted.length)).toEqual([1, 0]);
+      expect(h.pool.cancelTask(ids[1])).toBe(true);
+      h.state.kickQueue();
+      expect(h.starts.map((s) => s.worker.posted.length)).toEqual([1, 1]);
+      h.finish(0);
+      h.finish(1);
+      const results = await batch;
+      expect(results[1].cancelled).toBe(true);
+      expect(results[0].parseError).toBeUndefined();
+      expect(results[2].parseError).toBeUndefined();
+    } finally {
+      await h.close();
+    }
+  });
+
+  test('a crashed large input releases admission for an already-idle healthy worker', async () => {
+    const h = await controlledPool();
+    try {
+      const batch = h.pool.lintBatch([
+        { ...task('large.ts', ''), frame: new Uint8Array(3 << 20) },
+        task('small.ts', ''),
+      ]);
+      expect(h.starts.map((s) => s.worker.posted.length)).toEqual([1, 0]);
+      h.starts[0].worker.emit('exit', 42);
+      expect(h.starts[1].worker.posted).toHaveLength(1);
+      h.finish(1);
+      const results = await batch;
+      expect(results[0].parseError).toMatch(/^worker_crashed:/);
+      expect(results[1].parseError).toBeUndefined();
+    } finally {
+      await h.close();
+    }
+  });
+
+  test('byte admission does not evaluate caller-provided payload getters', async () => {
+    const h = await controlledPool();
+    let reads = 0;
+    const frame = {
+      lease: 1,
+      offset: 0,
+      get length() {
+        reads++;
+        return 3 << 20;
+      },
+    };
+    try {
+      const batch = h.pool.lintBatch([
+        { ...task('accessor.ts', ''), frame },
+        task('small.ts', ''),
+      ]);
+      expect(reads).toBe(0);
+      h.finish(0);
+      h.finish(1);
+      await batch;
+      expect(reads).toBe(0);
+    } finally {
+      await h.close();
+    }
+  });
+
+  test('a timed-out large input releases admission before its worker exits', async () => {
+    const h = await controlledPool({ taskTimeoutMs: 42_000 });
+    const originalTimeout = globalThis.setTimeout;
+    const deadlines: Array<() => void> = [];
+    const timerSpy = rs.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      callback: (...args: unknown[]) => void,
+      delay?: number,
+      ...args: unknown[]
+    ) => {
+      const timer = originalTimeout(callback, delay, ...args);
+      if (delay === 42_000)
+        deadlines.push(() => {
+          clearTimeout(timer);
+          callback(...args);
+        });
+      return timer;
+    }) as typeof setTimeout);
+    try {
+      const batch = h.pool.lintBatch([
+        { ...task('large.ts', ''), frame: new Uint8Array(3 << 20) },
+        task('small.ts', ''),
+      ]);
+      expect(h.starts.map((s) => s.worker.posted.length)).toEqual([1, 0]);
+      deadlines[0]();
+      expect(h.starts[1].worker.posted).toHaveLength(1);
+      h.finish(1);
+      const results = await batch;
+      expect(results[0].parseError).toBe('task_timeout');
+      expect(results[1].parseError).toBeUndefined();
+    } finally {
+      timerSpy.mockRestore();
+      await h.close();
+    }
+  });
+
+  test('a failed postMessage releases admission for the next input', async () => {
+    const h = await controlledPool();
+    const worker = h.starts[0].worker;
+    const post = worker.postMessage.bind(worker);
+    let fail = true;
+    worker.postMessage = (message) => {
+      if (fail && (message as { kind?: string }).kind === 'task') {
+        fail = false;
+        const error = new Error('injected clone failure');
+        error.name = 'DataCloneError';
+        throw error;
+      }
+      post(message);
+    };
+    try {
+      const batch = h.pool.lintBatch([
+        { ...task('large.ts', ''), frame: new Uint8Array(3 << 20) },
+        task('small.ts', ''),
+      ]);
+      const running = h.starts.findIndex((s) =>
+        s.worker.posted.some(
+          (message) => (message as { kind?: string }).kind === 'task',
+        ),
+      );
+      expect(running).toBeGreaterThanOrEqual(0);
+      h.finish(running);
+      const results = await batch;
+      expect(results[0].parseError).toMatch(/^postMessage_failed:/);
+      expect(results[1].parseError).toBeUndefined();
+    } finally {
+      await h.close();
+    }
+  });
+
+  test('reentrant input submission during cloning cannot bypass byte admission', async () => {
+    const h = await controlledPool({ warmupWorkerCount: 4 });
+    const worker = h.starts[0].worker;
+    const post = worker.postMessage.bind(worker);
+    const input = (name: string, size: number): LintTask => ({
+      ...task(name, ''),
+      frame: new Uint8Array(size),
+    });
+    let nested: ReturnType<WorkerPool['lintBatch']> | undefined;
+    // Structured clone can synchronously invoke a caller-provided getter.
+    worker.postMessage = (message) => {
+      if (!nested && (message as { kind?: string }).kind === 'task')
+        nested = h.pool.lintBatch([input('nested.ts', 768 << 10)]);
+      post(message);
+    };
+    try {
+      const outer = h.pool.lintBatch([
+        input('first.ts', 64 << 10),
+        input('second.ts', 768 << 10),
+      ]);
+      expect(h.starts.map((s) => s.worker.posted.length)).toEqual([1, 1, 0, 0]);
+      h.finish(0);
+      h.finish(1);
+      h.finish(0);
+      expect((await outer).every((r) => !r.parseError)).toBe(true);
+      expect((await nested)?.[0].parseError).toBeUndefined();
+    } finally {
+      await h.close();
+    }
+  });
+
   test.each([
     [1, 1],
     [2, 2],

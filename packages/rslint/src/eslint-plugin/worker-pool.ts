@@ -37,6 +37,7 @@ import { Worker, type WorkerOptions } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 import { StringDecoder } from 'node:string_decoder';
 import os from 'node:os';
+import { isProxy } from 'node:util/types';
 
 import { CancelFlagPool } from './cancel-flag.js';
 import type {
@@ -81,6 +82,38 @@ export interface WorkerPoolOptions {
 /** A single task as the pool sees it; equivalent to LintFileRequest minus cancelFlag (pool injects). */
 export type LintTask = Omit<LintFileRequest, 'cancelFlag'>;
 
+// Bound the inputs being decoded concurrently, independently of worker count.
+// One larger input can always run alone; this is not an input-size limit.
+const MAX_INFLIGHT_FRAME_BYTES = 1 << 20;
+const typedArrayByteLength = Object.getOwnPropertyDescriptor(
+  Object.getPrototypeOf(Uint8Array.prototype),
+  'byteLength',
+)?.get;
+
+function frameInputBytes(task: LintTask): number {
+  try {
+    if (isProxy(task)) return 0;
+    const frame: unknown = Object.getOwnPropertyDescriptor(
+      task,
+      'frame',
+    )?.value;
+    if (!frame || typeof frame !== 'object' || isProxy(frame)) return 0;
+    // A scheduling hint must not run caller-provided getters. Serialization
+    // and frame validation retain their existing ownership of invalid input.
+    const length: unknown =
+      ArrayBuffer.isView(frame) && typedArrayByteLength
+        ? Reflect.apply(typedArrayByteLength, frame, [])
+        : Object.getOwnPropertyDescriptor(frame, 'length')?.value;
+    return typeof length === 'number' &&
+      Number.isSafeInteger(length) &&
+      length > 0
+      ? length
+      : 0;
+  } catch {
+    return 0;
+  }
+}
+
 // ─── Internal types ────────────────────────────────────────────────────
 
 interface WorkerSlot {
@@ -113,6 +146,7 @@ interface WorkerSlot {
 
 interface PendingTask {
   taskId: number;
+  inputBytes: number;
   cancelSlot: number;
   resolve: (r: LintFileResult) => void;
   /**
@@ -214,6 +248,7 @@ async function terminateWorker(worker: Worker): Promise<number> {
  */
 interface QueuedTask {
   task: LintTask;
+  inputBytes: number;
   taskId: number;
   cancelSlot: number;
   resolve: (r: LintFileResult) => void;
@@ -412,6 +447,7 @@ export class WorkerPool {
           const cancelSlot = this.cancelPool.acquire();
           const q: QueuedTask = {
             task,
+            inputBytes: frameInputBytes(task),
             taskId,
             cancelSlot,
             resolve,
@@ -475,16 +511,33 @@ export class WorkerPool {
    * Pre-cancelled entries (set by `cancelTask` while still queued)
    * are resolved here without ever being posted to a worker.
    */
+  private inputBytesInFlight(): number {
+    let inputBytes = 0;
+    for (const slot of this.workers) {
+      for (const pending of slot.inflight.values())
+        inputBytes += pending.inputBytes;
+    }
+    return inputBytes;
+  }
+
   private kickQueue(): void {
     if (this.closed) return;
     if (this.pendingQueue.length === 0) return;
+    let inputBytes = this.inputBytesInFlight();
     for (const slot of this.workers) {
       if (this.pendingQueue.length === 0) return;
       if (!slot.ready) continue;
       if (slot.inflight.size > 0) continue;
       // Skip any cancelled-while-queued entries to find the next real task.
       while (this.pendingQueue.length > 0) {
-        const q = this.pendingQueue.shift()!;
+        const q = this.pendingQueue[0];
+        if (
+          !q.cancelled &&
+          inputBytes > 0 &&
+          inputBytes + q.inputBytes > MAX_INFLIGHT_FRAME_BYTES
+        )
+          return;
+        this.pendingQueue.shift();
         if (q.cancelled) {
           this.cancelPool.release(q.cancelSlot);
           q.resolve({
@@ -497,6 +550,8 @@ export class WorkerPool {
           continue;
         }
         this.dispatchToWorker(slot, q);
+        // Structured cloning can invoke caller getters and reenter the pool.
+        inputBytes = this.inputBytesInFlight();
         break;
       }
     }
@@ -1068,6 +1123,9 @@ export class WorkerPool {
         // pending task.
         this.drainQueueIfAllSlotsDegraded();
       }
+      // A byte-limited queue may have healthy idle workers when this slot
+      // exits. Its released admission must not wait for a respawn or result.
+      this.kickQueue();
     });
   }
 
@@ -1174,10 +1232,12 @@ export class WorkerPool {
       });
       // Force termination — exit handler respawns.
       void terminateWorker(slot.worker);
+      this.kickQueue();
     }, this.opts.taskTimeoutMs);
 
     const pending: PendingTask = {
       taskId,
+      inputBytes: q.inputBytes,
       cancelSlot,
       resolve: resolveOk,
       reject: (err, kind = 'crash') => {

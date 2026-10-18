@@ -55,6 +55,7 @@ type estreeProjector struct {
 	numbers          []float64
 	tokenCovers      []tokenCover
 	frameBytes       int
+	scan             scanner.Scanner
 }
 
 // Options are syntax metadata already resolved by the linter.
@@ -73,16 +74,47 @@ type Builder struct {
 	comments []projectedComment
 }
 
-// Reset drops the string index and retains at most 4 MiB of source-cleared buffers.
+// Reset retains at most 4 MiB of source-cleared columns and a small cleared
+// string index. Large dictionaries never enter the caller's finite cache.
 // Returned frames never alias these buffers, so callers may reset immediately.
 func (b *Builder) Reset() {
 	b.p.clearSource()
-	b.p.stringIDs = nil
-	scratchBytes := cap(b.p.nodes)*16 + (cap(b.p.values)+cap(b.p.lists))*4 + cap(b.p.strings)*16 +
-		cap(b.p.numbers)*8 + (cap(b.tokens)+cap(b.comments))*12
-	scratchBytes += cap(b.p.tokenCovers) * 12
-	if scratchBytes > 4<<20 {
-		*b = Builder{}
+	// Evict the largest columns first. One oversized column must not discard
+	// every other reusable buffer and force the next file to rebuild them all.
+	sizes := [...]int{cap(b.p.nodes) * 16, cap(b.p.values) * 4, cap(b.p.lists) * 4,
+		cap(b.p.strings) * 16, cap(b.p.numbers) * 8, cap(b.tokens) * 12,
+		cap(b.comments) * 12, cap(b.p.tokenCovers) * 12}
+	total := 0
+	for _, size := range sizes {
+		total += size
+	}
+	for total > 4<<20 {
+		largest := 0
+		for index, size := range sizes {
+			if size > sizes[largest] {
+				largest = index
+			}
+		}
+		total -= sizes[largest]
+		sizes[largest] = 0
+		switch largest {
+		case 0:
+			b.p.nodes = nil
+		case 1:
+			b.p.values = nil
+		case 2:
+			b.p.lists = nil
+		case 3:
+			b.p.strings = nil
+		case 4:
+			b.p.numbers = nil
+		case 5:
+			b.tokens = nil
+		case 6:
+			b.comments = nil
+		case 7:
+			b.p.tokenCovers = nil
+		}
 	}
 }
 
@@ -141,7 +173,7 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	}
 	p.tokenCovers = p.tokenCovers[:0]
 	root := p.convert(file.AsNode(), false)
-	b.tokens, b.comments = scanTokensAndCommentsInto(ctx, file, p.offsets, p.tokenCovers, b.tokens[:0], b.comments[:0], maxFrameSize-p.frameBytes)
+	b.tokens, b.comments = scanTokensAndCommentsInto(ctx, &p.scan, file, p.offsets, p.tokenCovers, b.tokens[:0], b.comments[:0], maxFrameSize-p.frameBytes)
 	return b.encode(root, options.HasBOM, allocate)
 }
 
@@ -157,10 +189,17 @@ func (p *estreeProjector) clearSource() {
 	p.sourceType = ""
 	p.ctx = nil
 	p.offsets = utf16Offsets{}
+	indexSize := len(p.stringIDs)
 	clear(p.stringIDs)
+	if indexSize > 4096 {
+		p.stringIDs = nil
+	}
 	clear(p.strings)
 	p.strings = p.strings[:0]
 	p.tokenCovers = p.tokenCovers[:0]
+	// Numeric caches and token state may contain source-backed strings.
+	// Reuse the scanner's storage, never state from a previous file.
+	p.scan = scanner.Scanner{}
 }
 
 func (p *estreeProjector) reserve(bytes int) {
@@ -390,7 +429,7 @@ func (p *estreeProjector) typeParameters(list *ast.NodeList, declaration bool) u
 	}
 	start := p.offsets.At(max(0, list.Pos()-1))
 	endPos := list.End()
-	scan := scanner.NewScanner()
+	scan := &p.scan
 	scan.SetText(p.text)
 	scan.SetSkipTrivia(true)
 	scan.ResetTokenState(endPos)
