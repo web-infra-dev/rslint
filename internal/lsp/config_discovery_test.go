@@ -2084,6 +2084,58 @@ func TestHandleDidOpenCollectsIgnoredDirectoryWithoutLoadingItsConfig(t *testing
 	}
 }
 
+func TestHandleDidOpenVirtualDirectoryAliasInheritsPhysicalGitPolicy(t *testing.T) {
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	physical := tspath.ResolvePath(root, "packages/app")
+	if err := os.MkdirAll(physical, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tspath.ResolvePath(root, ".gitignore"), []byte("generated/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	alias := tspath.ResolvePath(tspath.NormalizePath(t.TempDir()), "alias")
+	if err := os.Symlink(physical, alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	entries := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	initial := startConfigRefreshForTest(s, "initial")
+	load := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, response := loadedConfigResponse(t, load, entries)
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if result := awaitConfigRefreshResult(t, initial); result.err != nil {
+		t.Fatal(result.err)
+	}
+	file := tspath.ResolvePath(alias, "generated/deep/new.ts")
+	uri := documentURIFromPath(file)
+	if !s.documentLintSnapshot(uri).unavailable {
+		t.Fatal("unobserved virtual parent was treated as covered")
+	}
+	opened := make(chan error, 1)
+	go func() {
+		opened <- s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{TextDocument: &lsproto.TextDocumentItem{Uri: uri, Text: "debugger;", Version: 1, LanguageId: "typescript"}})
+	}()
+	load = nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	request, response := loadedConfigResponse(t, load, entries)
+	if len(request.Candidates) != 1 || request.Candidates[0].ConfigDirectory != root {
+		t.Fatalf("virtual document became a config discovery seed: %+v", request.Candidates)
+	}
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if err := awaitConfigWatchEvent(t, opened); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := s.documentLintSnapshot(uri)
+	wantParent := tspath.ResolvePath(tspath.NormalizePath(osvfs.FS().Realpath(physical)), "generated/deep")
+	if snapshot.unavailable || !snapshot.configResolved || !snapshot.resolvedConfig.GloballyIgnored || snapshot.target.Path != file || snapshot.target.CanonicalParentPath != wantParent {
+		t.Fatalf("virtual alias lost its physical Git chain: %+v", snapshot)
+	}
+	if _, err := os.Stat(tspath.GetDirectoryPath(file)); !os.IsNotExist(err) {
+		t.Fatalf("virtual parent must remain absent: %v", err)
+	}
+}
+
 func TestDocumentSnapshotDoesNotBootstrapAfterHandshakeWithoutCommit(t *testing.T) {
 	s := newTestServer()
 	fsys := &gitObservationGuardFS{FS: &mockFS{files: map[string]bool{}}, reject: true}

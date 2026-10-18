@@ -321,7 +321,7 @@ describe('Rslint class', () => {
     }
   });
 
-  test('lintText resolves config from the canonical ancestor of a virtual file', async () => {
+  test('lintText resolves virtual directory aliases and physical ancestor Git ignores', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-virtual-symlink-'),
     );
@@ -329,6 +329,8 @@ describe('Rslint class', () => {
     const realPackage = path.join(realRoot, 'packages', 'app');
     const aliasPackage = path.join(tmp, 'alias-app');
     await mkdir(realPackage, { recursive: true });
+    await mkdir(path.join(realRoot, '.git'));
+    await writeFile(path.join(realRoot, '.gitignore'), 'generated/\n');
     await writeFile(
       path.join(realRoot, 'rslint.config.mjs'),
       [
@@ -348,17 +350,27 @@ describe('Rslint class', () => {
         return;
       }
 
-      const virtualFile = path.join(aliasPackage, 'src', 'virtual.ts');
       const rslint = new Rslint({ cwd: tmp });
       try {
-        const [result] = await rslint.lintText(
-          'let values: Array<string> = [];\n',
-          { filePath: virtualFile },
-        );
-        expect(result.filePath).toBe(path.normalize(virtualFile));
-        expect(result.messages.map((message) => message.ruleId)).toEqual([
-          '@typescript-eslint/array-type',
-        ]);
+        for (const suffix of ['virtual.ts', 'deep/nested/virtual.ts']) {
+          const virtualFile = path.join(aliasPackage, 'src', suffix);
+          const [result] = await rslint.lintText(
+            'let values: Array<string> = [];\n',
+            { filePath: virtualFile },
+          );
+          expect(result.filePath).toBe(path.normalize(virtualFile));
+          expect(result.messages.map((message) => message.ruleId)).toEqual([
+            '@typescript-eslint/array-type',
+          ]);
+          const ignoredFile = path.join(aliasPackage, 'generated', suffix);
+          const [ignored] = await rslint.lintText(
+            'let values: Array<string> = [];\n',
+            { filePath: ignoredFile },
+          );
+          expect(ignored.filePath).toBe(path.normalize(ignoredFile));
+          expect(ignored.messages).toEqual([]);
+          expect(ignored.output).toBeUndefined();
+        }
       } finally {
         await rslint.close();
       }

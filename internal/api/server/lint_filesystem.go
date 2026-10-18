@@ -66,14 +66,11 @@ func addEquivalentFileContentPaths(fileContents map[string]string, configDirecto
 
 	realConfigDirectory := fs.Realpath(configDirectory)
 	for _, entry := range entries {
-		// A new overlay file has no realpath yet, but its containing
-		// directory may already have a physical identity.
-		if realParent := fs.Realpath(tspath.GetDirectoryPath(entry.path)); realParent != "" {
-			addAlias(tspath.CombinePaths(realParent, tspath.GetBaseFileName(entry.path)), entry.content)
-		}
-		if realPath := fs.Realpath(entry.path); realPath != "" && realPath != entry.path {
-			addAlias(realPath, entry.content)
-		}
+		// Overlay sources and lint targets share physical ancestry even when
+		// several parent directories have not been created.
+		identity := rslintconfig.FreezeFileIdentity(entry.path, fs)
+		addAlias(tspath.CombinePaths(identity.CanonicalParentPath, tspath.GetBaseFileName(entry.path)), entry.content)
+		addAlias(identity.CanonicalPath, entry.content)
 		if realConfigDirectory != "" && tspath.ComparePaths(configDirectory, realConfigDirectory, comparePathOptions) != 0 {
 			addDirectoryAlias(configDirectory, realConfigDirectory, entry.path, entry.content)
 			addDirectoryAlias(realConfigDirectory, configDirectory, entry.path, entry.content)

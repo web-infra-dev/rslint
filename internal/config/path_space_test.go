@@ -1,9 +1,12 @@
 package config
 
 import (
+	"os"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
@@ -19,6 +22,87 @@ func (fs *pathSpaceTestFS) Realpath(filePath string) string {
 		return realPath
 	}
 	return filePath
+}
+
+func (fs *pathSpaceTestFS) Stat(path string) vfs.FileInfo {
+	if fs.FS != nil {
+		return fs.FS.Stat(path)
+	}
+	return nil
+}
+
+func TestFreezeFileIdentityAncestorFallback(t *testing.T) {
+	for _, test := range []struct {
+		name, file, canonical, parent string
+		realPaths                     map[string]string
+	}{
+		{"one missing directory", "/alias/src/new.ts", "/physical/pkg/src/new.ts", "/physical/pkg/src", map[string]string{"/alias": "/physical/pkg"}},
+		{"multiple missing directories", "/alias/src/deep/new.ts", "/physical/pkg/src/deep/new.ts", "/physical/pkg/src/deep", map[string]string{"/alias": "/physical/pkg"}},
+		{"independent file hint", "/alias/generated/new.ts", "/other/renamed.ts", "/physical/pkg/generated", map[string]string{"/alias": "/physical/pkg", "/alias/generated/new.ts": "/other/renamed.ts"}},
+		{"file symlink", "/alias/link.ts", "/other/source.ts", "/physical/pkg", map[string]string{"/alias": "/physical/pkg", "/alias/link.ts": "/other/source.ts"}},
+		{"drive root", "C:/missing/new.ts", "C:/missing/new.ts", "C:/missing", map[string]string{"C:": "/must-not-resolve"}},
+		{"UNC share root", "//server/share/missing/new.ts", "//server/share/missing/new.ts", "//server/share/missing", map[string]string{"//server/": "/must-not-resolve"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			identity := FreezeFileIdentity(test.file, &pathSpaceTestFS{realPaths: test.realPaths})
+			if identity.Path != test.file || identity.CanonicalPath != test.canonical || identity.CanonicalParentPath != test.parent {
+				t.Fatalf("identity = %+v, want file %s and parent %s", identity, test.canonical, test.parent)
+			}
+			if path := GitPath(identity); path != tspath.CombinePaths(test.parent, tspath.GetBaseFileName(test.file)) {
+				t.Fatalf("Git coordinate followed the leaf target: %s", path)
+			}
+		})
+	}
+	t.Run("existing directory stops ancestor lookup", func(t *testing.T) {
+		directory := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+		file := tspath.ResolvePath(directory, "new.ts")
+		fsys := &pathSpaceTestFS{FS: osvfs.FS(), realPaths: map[string]string{tspath.GetDirectoryPath(directory): "/must-not-resolve"}}
+		if identity := FreezeFileIdentity(file, fsys); identity.CanonicalParentPath != directory || identity.CanonicalPath != file {
+			t.Fatalf("existing directory was replaced by an ancestor: %+v", identity)
+		}
+	})
+}
+
+type pathIdentityHookFS struct {
+	vfs.FS
+	realpath func(string) string
+}
+
+func (fsys *pathIdentityHookFS) Realpath(path string) string { return fsys.realpath(path) }
+
+func TestFreezeFileIdentityRetriesMovedMissingAncestor(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	first, second := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "second")
+	for _, directory := range []string{first, second} {
+		if err := os.Mkdir(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	alias := tspath.ResolvePath(root, "alias")
+	if err := os.Symlink(first, alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	file := tspath.ResolvePath(alias, "missing/deep/new.ts")
+	fileReads := 0
+	fsys := &pathIdentityHookFS{FS: osvfs.FS()}
+	fsys.realpath = func(path string) string {
+		if path == file {
+			fileReads++
+			if fileReads == 1 {
+				if err := os.Remove(alias); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(second, alias); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		return fsys.FS.Realpath(path)
+	}
+	identity := FreezeFileIdentity(file, fsys)
+	if fileReads != 2 || identity.CanonicalParentPath != tspath.ResolvePath(second, "missing/deep") || identity.CanonicalPath != tspath.ResolvePath(second, "missing/deep/new.ts") {
+		t.Fatalf("mixed ancestor generations after %d file reads: %+v", fileReads, identity)
+	}
 }
 
 func TestResolveConfigFilePathSpace(t *testing.T) {

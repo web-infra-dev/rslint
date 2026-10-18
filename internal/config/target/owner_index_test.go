@@ -47,6 +47,7 @@ func (fs *retargetingConfigDirectoryFS) Realpath(filePath string) string {
 func (fs *configPathSpaceFS) DirectoryExists(string) bool    { return false }
 func (fs *configPathSpaceFS) FileExists(string) bool         { return false }
 func (fs *configPathSpaceFS) ReadFile(string) (string, bool) { return "", false }
+func (fs *configPathSpaceFS) Stat(string) vfs.FileInfo       { return nil }
 func (fs *configPathSpaceFS) GetAccessibleEntries(string) vfs.Entries {
 	return vfs.Entries{Symlinks: map[string]struct{}{}}
 }

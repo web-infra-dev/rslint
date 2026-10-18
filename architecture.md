@@ -1247,8 +1247,12 @@ through Program binding. Each target records four separate facts: the caller's
 lexical `Path`, the file's `CanonicalPath`, the lexical parent's physical
 `CanonicalParentPath`, and the governing `ConfigDirectory`. The parent identity
 distinguishes a leaf file symlink from a directory alias; it is not treated as
-proof of the target's complete ancestor chain. Native-case owner aliases may be
-verified once while the target's owner is selected. LSP then freezes one
+proof of the target's complete ancestor chain. If parent directories have not
+been created, identity capture resolves the nearest existing ancestor and
+appends the missing suffix; an existing leaf symlink retains its own resolved
+file identity and its containing directory's separate Git coordinate.
+Native-case owner aliases may be verified once while the target's owner is
+selected. LSP then freezes one
 document lint snapshot containing the same complete target plus its selected
 owner, resolved config, matching rule catalog, and project paths; Go rules, plugin rules,
 diagnostics, resident Programs, and every fix pass consume that snapshot. No

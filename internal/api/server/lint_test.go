@@ -2897,6 +2897,163 @@ func TestHandleLint_ConfigGitignoreIndependentOfWorkingDirectory(t *testing.T) {
 	}
 }
 
+func TestHandleLint_VirtualDirectoryAliasesInheritAncestorGitignore(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	repo := tspath.ResolvePath(root, "repo")
+	physical := tspath.ResolvePath(repo, "packages/app")
+	writeProgramTestFiles(t, repo, map[string]string{
+		".gitignore":           "generated/\n",
+		"packages/app/keep.js": "",
+	})
+	if err := os.Mkdir(tspath.ResolvePath(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alias := tspath.ResolvePath(root, "alias")
+	if err := os.Symlink(physical, alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	for _, test := range []struct {
+		path    string
+		ignored bool
+	}{
+		{"generated/new.js", true},
+		{"generated/deep/nested/new.js", true},
+		{"src/new.js", false},
+		{"src/deep/nested/new.js", false},
+	} {
+		for _, spelling := range []string{physical, alias} {
+			for _, canonicalHint := range []bool{false, true} {
+				for _, fix := range []bool{false, true} {
+					t.Run(fmt.Sprintf("%s/%s/canonical=%t/fix=%t", test.path, filepath.Base(spelling), canonicalHint, fix), func(t *testing.T) {
+						file := tspath.ResolvePath(spelling, test.path)
+						request := api.LintRequest{
+							Config:           json.RawMessage(`[{"rules":{"no-debugger":"error","no-var":"error"}}]`),
+							ConfigDirectory:  repo,
+							WorkingDirectory: repo,
+							Files:            []string{file},
+							FileContents:     map[string]string{file: "var value = 1; debugger;\n"},
+							Fix:              fix,
+						}
+						if canonicalHint {
+							request.CanonicalFiles = []string{tspath.ResolvePath(physical, test.path)}
+						}
+						response, err := (&Handler{}).HandleLint(request)
+						if err != nil {
+							t.Fatal(err)
+						}
+						wantFiles, wantDiagnostics, wantOutput := 0, 0, 0
+						if !test.ignored {
+							wantFiles, wantDiagnostics = 1, 2
+							if fix {
+								wantDiagnostics, wantOutput = 1, 1
+							}
+						}
+						if response.FileCount != wantFiles || len(response.LintedFiles) != wantFiles || len(response.Diagnostics) != wantDiagnostics || len(response.Output) != wantOutput {
+							t.Fatalf("virtual target ignored=%t: %+v", test.ignored, response)
+						}
+						if wantFiles > 0 {
+							wantPath := tspath.GetRelativePathFromDirectory(repo, file, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+							if response.LintedFiles[0] != wantPath {
+								t.Fatalf("lost caller path %s: %v", wantPath, response.LintedFiles)
+							}
+							for _, diagnostic := range response.Diagnostics {
+								if diagnostic.FilePath != wantPath {
+									t.Fatalf("diagnostic changed caller path: %+v", diagnostic)
+								}
+							}
+							if wantOutput > 0 && response.Output[wantPath] == "" {
+								t.Fatalf("fix output changed caller path: %v", response.Output)
+							}
+						}
+						if _, err := os.Stat(tspath.GetDirectoryPath(file)); !os.IsNotExist(err) {
+							t.Fatalf("virtual parent must remain absent: %v", err)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
+func TestHandleLint_VirtualDirectoryAliasOverlayGitignore(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	physical := tspath.ResolvePath(root, "repo/packages/app")
+	if err := os.MkdirAll(physical, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alias := tspath.ResolvePath(root, "alias")
+	if err := os.Symlink(physical, alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	for _, spelling := range []string{physical, alias} {
+		t.Run(filepath.Base(spelling), func(t *testing.T) {
+			file := tspath.ResolvePath(spelling, "virtual/deep/new.js")
+			request := api.LintRequest{
+				Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
+				ConfigDirectory:  tspath.ResolvePath(root, "repo"),
+				WorkingDirectory: tspath.ResolvePath(root, "repo"),
+				Files:            []string{file},
+				FileContents: map[string]string{
+					file: "debugger;\n",
+					tspath.ResolvePath(spelling, "virtual/.gitignore"): "deep/\n",
+				},
+			}
+			response, err := (&Handler{}).HandleLint(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response.FileCount != 0 || len(response.Diagnostics) != 0 {
+				t.Fatalf("overlay Git source lost its physical alias: %+v", response)
+			}
+		})
+	}
+}
+
+func TestHandleLint_FileSymlinkKeepsContainingRepositoryGitPolicy(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	repo, external := tspath.ResolvePath(root, "repo"), tspath.ResolvePath(root, "external")
+	writeProgramTestFiles(t, repo, map[string]string{".gitignore": "ignored-link.js\n", "packages/app/keep.js": ""})
+	writeProgramTestFiles(t, external, map[string]string{".gitignore": "ignored.js\n", "ignored.js": "", "visible.js": ""})
+	for _, directory := range []string{repo, external} {
+		if err := os.Mkdir(tspath.ResolvePath(directory, ".git"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, test := range []struct {
+		name, destination string
+		ignored           bool
+	}{
+		{"ignored-link.js", "visible.js", true},
+		{"visible-link.js", "ignored.js", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			file := tspath.ResolvePath(repo, "packages/app/"+test.name)
+			destination := tspath.ResolvePath(external, test.destination)
+			if err := os.Symlink(destination, file); err != nil {
+				t.Skipf("file symlink unavailable: %v", err)
+			}
+			response, err := (&Handler{}).HandleLint(api.LintRequest{
+				Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
+				ConfigDirectory:  repo,
+				WorkingDirectory: repo,
+				Files:            []string{file},
+				CanonicalFiles:   []string{destination},
+				FileContents:     map[string]string{file: "debugger;\n"},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := 1
+			if test.ignored {
+				want = 0
+			}
+			if response.FileCount != want || len(response.Diagnostics) != want {
+				t.Fatalf("file symlink used its destination's Git policy: %+v", response)
+			}
+		})
+	}
+}
+
 func TestHandleLint_ConfigDiscoveryPreservesExactOverlayTargets(t *testing.T) {
 	for _, test := range []struct {
 		name            string
