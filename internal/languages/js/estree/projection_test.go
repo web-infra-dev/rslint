@@ -110,7 +110,9 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 			{start: 0, end: 5, kind: ast.KindIdentifier, typeCode: tokenIdentifier},
 			{start: 7, end: 13, kind: ast.KindIdentifier, typeCode: tokenKeyword},
 		}
-		tokens, _ := scanTokensAndCommentsInto(context.Background(), scanner.NewScanner(), file, utf16Offsets{file.GetPositionMap()}, covers, nil, nil, maxFrameSize)
+		var offsets utf16Offsets
+		offsets.reset(context.Background(), file.Text())
+		tokens, _ := scanTokensAndCommentsInto(context.Background(), scanner.NewScanner(), file, offsets, covers, nil, nil, maxFrameSize)
 		if len(tokens) != 4 || tokens[0].typeCode != tokenIdentifier || tokens[2].typeCode != tokenKeyword {
 			t.Fatalf("token cover precedence changed: %v", tokens)
 		}
@@ -140,7 +142,7 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 				t.Fatal("projection changed native source syntax")
 			}
 			saved := bytes.Clone(data)
-			if builder.p.file != nil || builder.p.text != "" || builder.p.sourceType != "" || builder.p.offsets.positions != nil || len(builder.p.stringIDs) != 0 {
+			if builder.p.file != nil || builder.p.text != "" || builder.p.sourceType != "" || len(builder.p.offsets.entries) != 0 || len(builder.p.stringIDs) != 0 {
 				t.Fatal("builder retained source graph")
 			}
 			assertClearedProjectionStrings(t, &builder)
@@ -232,7 +234,7 @@ func TestProjectionCancellationAndFailure(t *testing.T) {
 		if data != nil || !errors.Is(err, context.Canceled) {
 			t.Fatalf("mid-projection cancellation at %d = %v/%v", after, data, err)
 		}
-		if builder.p.file != nil || builder.p.ctx != nil || builder.p.text != "" || builder.p.offsets.positions != nil || len(builder.p.stringIDs) != 0 || len(builder.p.tokenCovers) != 0 {
+		if builder.p.file != nil || builder.p.ctx != nil || builder.p.text != "" || len(builder.p.offsets.entries) != 0 || len(builder.p.stringIDs) != 0 || len(builder.p.tokenCovers) != 0 {
 			t.Fatal("canceled projection retained generation references")
 		}
 		assertClearedProjectionStrings(t, &builder)
@@ -280,6 +282,34 @@ func TestProjectionStringEncoding(t *testing.T) {
 				t.Fatal("string references must be sequential IDs independent of record byte size")
 			}
 		})
+	}
+}
+
+func TestProjectionOwnsUTF16Offsets(t *testing.T) {
+	var offsets utf16Offsets
+	for _, text := range []string{"", "ASCII", "aé世界😀z", "a\xed\xa0\x80b\xff", strings.Repeat("世界😀", 1000), "ASCII again"} {
+		offsets.reset(context.Background(), text)
+		native := ast.ComputePositionMap(text)
+		for index := -1; index <= len(text)+1; index++ {
+			if got, want := offsets.At(index), uint32(native.UTF8ToUTF16(index)); got != want {
+				t.Fatalf("offset %d = %d, want %d", index, got, want)
+			}
+		}
+	}
+	file := source("/offsets.ts", "const 世界 = '😀';")
+	cache := reflect.ValueOf(file).Elem().FieldByName("positionMap")
+	if !cache.IsNil() {
+		t.Fatal("fixture already populated the native position cache")
+	}
+	var builder Builder
+	if _, err := builder.Build(context.Background(), file, Options{SourceType: "module"}); err != nil {
+		t.Fatal(err)
+	}
+	if !cache.IsNil() {
+		t.Fatal("plugin projection populated the native position cache")
+	}
+	if len(builder.p.offsets.entries) != 0 {
+		t.Fatal("finished projection retained active offsets")
 	}
 }
 
@@ -367,7 +397,7 @@ func TestProjectionScratchResetDropsLargeBuffers(t *testing.T) {
 	saved := bytes.Clone(data)
 	builder.Reset()
 	retained := uintptr(0)
-	for _, buffer := range []any{builder.p.nodes, builder.p.values, builder.p.lists, builder.p.strings, builder.p.numbers, builder.tokens, builder.comments, builder.p.tokenCovers} {
+	for _, buffer := range []any{builder.p.nodes, builder.p.values, builder.p.lists, builder.p.strings, builder.p.numbers, builder.tokens, builder.comments, builder.p.tokenCovers, builder.p.offsets.entries} {
 		value := reflect.ValueOf(buffer)
 		retained += uintptr(value.Cap()) * value.Type().Elem().Size()
 	}

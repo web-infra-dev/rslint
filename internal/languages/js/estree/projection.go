@@ -85,7 +85,7 @@ func (b *Builder) Reset() {
 	// every other reusable buffer and force the next file to rebuild them all.
 	sizes := [...]int{cap(b.p.nodes) * 16, cap(b.p.values) * 4, cap(b.p.lists) * 4,
 		cap(b.p.strings) * 16, cap(b.p.numbers) * 8, cap(b.tokens) * 12,
-		cap(b.comments) * 12, cap(b.p.tokenCovers) * 12}
+		cap(b.comments) * 12, cap(b.p.tokenCovers) * 12, cap(b.p.offsets.entries) * 8}
 	total := 0
 	for _, size := range sizes {
 		total += size
@@ -116,6 +116,8 @@ func (b *Builder) Reset() {
 			b.comments = nil
 		case 7:
 			b.p.tokenCovers = nil
+		case 8:
+			b.p.offsets.entries = nil
 		}
 	}
 }
@@ -160,7 +162,7 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	}
 	// Reserve the maximum padding between columns before growing scratch.
 	p.frameBytes = headerSize + len(p.text) + 6
-	p.offsets = utf16Offsets{file.GetPositionMap()}
+	p.offsets.reset(ctx, p.text)
 	// The native node count is a sizing hint, not a limit on projected syntax.
 	// Reserve once per file instead of copying growing columns at every append.
 	p.nodes = slices.Grow(p.nodes[:0], min(file.NodeCount, maxFrameSize/14))
@@ -190,7 +192,7 @@ func (p *estreeProjector) clearSource() {
 	p.text = ""
 	p.sourceType = ""
 	p.ctx = nil
-	p.offsets = utf16Offsets{}
+	p.offsets.entries = p.offsets.entries[:0]
 	indexSize := len(p.stringIDs)
 	clear(p.stringIDs)
 	if indexSize > 4096 {
@@ -501,10 +503,51 @@ func parseNumberLiteral(text string) float64 {
 	return value
 }
 
-type utf16Offsets struct{ positions *ast.PositionMap }
+// The plugin projection owns this reusable sparse index. Do not populate the
+// SourceFile's native PositionMap cache: it outlives the projected frame.
+// Frame/source bounds fit uint32; entries contain no text or AST references.
+type utf16Offset struct{ end, delta uint32 }
+type utf16Offsets struct{ entries []utf16Offset }
+
+func (o *utf16Offsets) reset(ctx context.Context, text string) {
+	o.entries = o.entries[:0]
+	delta, checkAt := 0, 0
+	for index := 0; index < len(text); {
+		if index >= checkAt {
+			if err := ctx.Err(); err != nil {
+				panic(err)
+			}
+			checkAt = index + 4096
+		}
+		if text[index] < utf8.RuneSelf {
+			index++
+			continue
+		}
+		r, size := ecmascript.DecodeStringRune(text[index:])
+		units := 1
+		if r >= 0x10000 {
+			units = 2
+		}
+		delta += size - units
+		index += size
+		o.entries = append(o.entries, utf16Offset{uint32(index), uint32(delta)})
+	}
+}
 
 func (o utf16Offsets) At(offset int) uint32 {
-	return uint32(o.positions.UTF8ToUTF16(offset))
+	lo, hi := 0, len(o.entries)
+	for lo < hi {
+		mid := lo + (hi-lo)/2
+		if int(o.entries[mid].end) <= offset {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	if lo == 0 {
+		return uint32(offset)
+	}
+	return uint32(offset) - o.entries[lo-1].delta
 }
 func align4(n int) int { return (n + 3) &^ 3 }
 

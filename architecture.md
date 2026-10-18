@@ -1713,7 +1713,9 @@ cleared and dropped after the file. Projection reuses one scanner value and
 zeros its complete state, including source-backed numeric caches, on every
 return.
 Already frozen LSP inputs retain their independent ownership.
-Projection reuses the SourceFile's existing sparse position map. String text is
+Projection owns a reusable sparse UTF-16 offset column. It does not populate
+the native SourceFile's position-map cache; the column is cleared after each
+file and participates in the same 4 MiB scratch budget. String text is
 staged while frame sizes are counted, then encoded directly into the final frame
 instead of a temporary UTF-16 byte column. Success, failure and cancellation clear every
 staged string reference. Frame version 3 references strings by sequential IDs.
