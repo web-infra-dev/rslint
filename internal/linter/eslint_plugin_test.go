@@ -1181,7 +1181,7 @@ func TestDispatchEslintPluginRulesWithOutcomeSkipsEmptyInput(t *testing.T) {
 }
 
 func TestDispatchEslintPluginReleasesProjectedFrameAfterTransfer(t *testing.T) {
-	text := "const value = '" + strings.Repeat("x", 1<<20) + "';"
+	text := "const value = '" + strings.Repeat("x", 5<<20) + "';"
 	input := EslintPluginFileInput{
 		Path:       "/repo/file.ts",
 		Text:       &text,
@@ -1190,7 +1190,7 @@ func TestDispatchEslintPluginReleasesProjectedFrameAfterTransfer(t *testing.T) {
 	}
 	outcome := DispatchEslintPluginRulesWithOutcome(context.Background(),
 		EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
-			if len(request.Files) != 1 || len(request.Files[0].Frame) < 1<<20 {
+			if len(request.Files) != 1 || len(request.Files[0].Frame) <= 4<<20 {
 				return nil, errors.New("expected a large projected frame")
 			}
 			wire, frames := request.WithFrameAttachments()

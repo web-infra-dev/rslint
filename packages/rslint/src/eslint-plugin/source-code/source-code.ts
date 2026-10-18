@@ -535,15 +535,19 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
   const mergedIndices = (): number[] => {
     if (_mergedIndices) return _mergedIndices;
     const comments = ensureComments();
-    const indices: number[] = [];
+    const indices = new Array<number>(tokenCount() + comments.length);
+    let count = 0;
     let i = 0,
       j = 0;
     while (i < tokenCount() && j < comments.length) {
-      if (tokenStart(i) <= comments[j].range[0]) indices.push(i++);
-      else indices.push(-++j);
+      if (tokenStart(i) <= comments[j].range[0]) indices[count++] = i++;
+      else indices[count++] = -++j;
     }
-    while (i < tokenCount()) indices.push(i++);
-    while (j < comments.length) indices.push(-++j);
+    while (i < tokenCount()) indices[count++] = i++;
+    while (j < comments.length) indices[count++] = -++j;
+    // Range getters can change a public stream during the merge.
+    // The initial length is a capacity hint; retain the actual merged size.
+    indices.length = count;
     return (_mergedIndices = indices);
   };
   const streamCount = (include: boolean): number =>

@@ -1655,15 +1655,6 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    is a private CLI/API asset, not a new package export; `build:js` emits it in a
    separate library block to keep the worker independent of shared chunks.
 
-The worker pool keeps FIFO admission within a 1 MiB window of in-flight encoded
-frame bytes. An individual larger frame runs alone; smaller frames retain the
-existing worker-count parallelism. Queued waits remain outside per-task
-execution deadlines. The pool uses owned byte lengths or shared-range metadata,
-without decoding syntax or inspecting plugins. Completion, timeout and worker
-exit release admission through the existing in-flight task records; there is
-no separate byte lease or counter lifetime. Cancellation and shutdown retain
-their existing result and failure policies.
-
 `internal/ipc.Channel` is the common Go/Node data transport. Its request API
 accepts an application payload plus optional `Text` or `Bytes` attachments.
 Text has JSON-compatible Unicode semantics; bytes preserve arbitrary binary
@@ -1725,10 +1716,13 @@ Already frozen LSP inputs retain their independent ownership.
 Projection reuses the SourceFile's existing sparse position map. String text is
 staged while frame sizes are counted, then encoded directly into the final frame
 instead of a temporary UTF-16 byte column. Success, failure and cancellation clear every
-staged string reference. Frame version 2 references strings by sequential IDs.
-The Node decoder validates their bounds, indexes record offsets in a compact
-column and caches owned strings in a private array; it builds no per-file string
-hash table. Matching Go/Node frame versions are required. Empty wire lists share a single record, while each
+staged string reference. Frame version 3 references strings by sequential IDs.
+An immutable source-backed string may use a checked UTF-8 source range instead
+of a duplicate UTF-16 record. Other strings, including unpaired surrogates,
+retain UTF-16 encoding. The Node decoder validates record and source boundaries,
+indexes offsets in a compact column and caches independently decoded strings in
+a private array; it builds no per-file string hash table and retains no source
+substring or transport view. Matching Go/Node frame versions are required. Empty wire lists share a single record, while each
 Node-side read still creates an independent mutable array.
 Token coverage uses a private, source-ordered scalar buffer; the scanner walks
 it alongside tokens, preserving the last cover at repeated source positions.
@@ -1897,8 +1891,13 @@ The worker checks cancellation before capability reads, validates the complete
 frame layout and references before allocating AST objects, then eagerly
 materializes ordinary ESTree objects, ranges, loc, canonical parent links and
 owned token columns. Schema-local constructors allocate each node's own present
-fields together; they retain schema constants only and preserve the ordinary
-Object prototype, mutable data properties and absent optional fields. String
+fields together, including reachable nodes' final parent slots. Structural
+reachability is validated first; parents are still assigned after all fields
+are complete, in the existing traversal order. Constructors are cached by
+present-field shape, with at most eight variants per schema and a generic
+constructor for additional shapes. They retain schema constants only and
+preserve the ordinary Object prototype, mutable data properties, absent
+optional fields and inherited setter behavior. String
 validation and decoding share one index, and decoding uses one temporary byte
 view for the string table instead of a Buffer wrapper per string. Tagged words
 use signed reads to avoid boxed unsigned magnitudes while preserving their tag
@@ -1908,10 +1907,17 @@ survives materialization. BigInt and RegExp values are created in JavaScript. No
 mapped Buffer, lazy AST proxy or capability escapes to plugin code; plugins may
 retain any AST node or SourceCode after lint returns. Existing scope, listener,
 SourceCode, report and fix execution consumes this final tree.
+SourceCode's private comment-aware token index reserves the known stream size
+and keeps the actual merge length, avoiding repeated backing-array growth.
+Token objects, identity, public arrays, range mutations and filter callbacks
+retain their existing behavior.
 Listener dispatch uses one callback and a private reversed-ancestor buffer per
 traversal. The synchronous selector matcher borrows that buffer; rule callbacks
 receive only the ordinary AST node. Nested traversals have independent buffers,
 and no AST or traversal buffer enters the worker's selector compilation cache.
+The SDK's private native-copy read and decode call ends before SourceCode
+construction and rule execution, so its temporary Buffer is no longer a stack
+root during rule callbacks. Caller-owned inline frames keep their ownership.
 Lazy scope resources capture language metadata and the owned AST, never the
 transport request. Retaining SourceCode therefore does not retain an inline
 frame Buffer or a shared-memory capability after decoding.

@@ -174,6 +174,19 @@ export interface LintFileResult {
   ruleTimes?: Record<string, number>;
 }
 
+// End the private native-copy stack frame before rule execution starts. A
+// block-local Buffer in lintFile can remain a stack root throughout the visit.
+// Caller-owned inline frames retain their existing ownership.
+function readFrame(req: LintFileRequest): ReturnType<typeof decodeFrame> {
+  checkFrameCancellation(req.cancelFlag);
+  return decodeFrame(
+    req.frame instanceof Uint8Array
+      ? req.frame
+      : getNativeBinding().readBytes(req.frame),
+    req.cancelFlag,
+  );
+}
+
 /**
  * Lint a single file. Stateless — `loadedPlugins` is owned by the
  * Worker; this function does not mutate it.
@@ -192,12 +205,7 @@ export function lintFile(
 
   let parsed: ReturnType<typeof decodeFrame>;
   try {
-    checkFrameCancellation(req.cancelFlag);
-    const bytes =
-      req.frame instanceof Uint8Array
-        ? req.frame
-        : getNativeBinding().readBytes(req.frame);
-    parsed = decodeFrame(bytes, req.cancelFlag);
+    parsed = readFrame(req);
   } catch (err) {
     if (err instanceof FrameCancelled) result.cancelled = true;
     else result.parseError = `frame: ${(err as Error)?.message ?? String(err)}`;

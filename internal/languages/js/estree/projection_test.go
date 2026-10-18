@@ -21,6 +21,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func source(path, text string) *ast.SourceFile {
@@ -204,7 +205,7 @@ func TestProjectionCancellationAndFailure(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		probe := &cancelOnProjectionCheck{Context: ctx, cancel: cancel, remaining: 1 << 30}
-		text := "const text = '" + strings.Repeat("世界😀", 8192) + "';"
+		text := "const text = '" + strings.Repeat(`\u4e16\u754c\uD83D\uDE00`, 8192) + "';"
 		data, err := builder.BuildInto(probe, source("/file.ts", text), Options{SourceType: "module"}, func(size int) []byte {
 			probe.remaining = 8
 			return make([]byte, size)
@@ -279,6 +280,42 @@ func TestProjectionStringEncoding(t *testing.T) {
 				t.Fatal("string references must be sequential IDs independent of record byte size")
 			}
 		})
+	}
+}
+
+func TestProjectionSourceStringEncoding(t *testing.T) {
+	text := strings.Repeat("prefix", 3) + "世界😀source text" + strings.Repeat("suffix", 3)
+	value := text[18 : len(text)-18]
+	for _, aliased := range []bool{true, false} {
+		t.Run(strconv.FormatBool(aliased), func(t *testing.T) {
+			input := value
+			if !aliased {
+				input = strings.Clone(value)
+			}
+			p := estreeProjector{ctx: context.Background(), text: text, stringIDs: make(map[string]uint32)}
+			id := p.stringValue(input)
+			data := make([]byte, p.stringBytes)
+			p.encodeStrings(data)
+			encoded := binary.LittleEndian.Uint32(data)
+			if aliased {
+				if len(data) != 8 || encoded != ^uint32(len(value)) || binary.LittleEndian.Uint32(data[4:]) != 18 {
+					t.Fatalf("source span changed: %x", data)
+				}
+			} else if encoded>>31 != 0 || encoded != uint32(ecmascript.StringCodeUnitCount(value)) {
+				t.Fatal("independent values must retain UTF-16 encoding")
+			}
+			if id != p.stringValue(strings.Clone(value)) || len(p.strings) != 1 {
+				t.Fatal("representation changed string deduplication")
+			}
+			p.clearSource()
+			if p.text != "" || len(p.strings) != 0 || len(p.stringIDs) != 0 {
+				t.Fatal("source spans retained source references")
+			}
+		})
+	}
+	p := estreeProjector{text: text}
+	if _, ok := p.sourceStringOffset(text[19:22]); ok {
+		t.Fatal("partial UTF-8 scalars cannot use source spans")
 	}
 }
 

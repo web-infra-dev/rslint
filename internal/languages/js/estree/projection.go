@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
+	"unsafe"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -22,7 +24,7 @@ import (
 
 const (
 	frameMagic   uint32 = 0x31465445 // ETF1
-	frameVersion uint32 = 2
+	frameVersion uint32 = 3
 	headerSize          = 64
 	maxFrameSize        = 64 << 20
 	tagShift            = 29
@@ -238,18 +240,46 @@ func (p *estreeProjector) stringValue(value string) uint32 {
 	}
 	id := uint32(len(p.strings))
 	p.stringIDs[value] = id
-	units := ecmascript.StringCodeUnitCount(value)
-	encodedSize := align4(4 + units*2)
+	encodedSize := 8
+	if _, ok := p.sourceStringOffset(value); !ok {
+		encodedSize = align4(4 + ecmascript.StringCodeUnitCount(value)*2)
+	}
 	p.reserve(encodedSize)
 	p.stringBytes += encodedSize
 	p.strings = append(p.strings, value)
 	return taggedValue(tagString, id)
 }
 
+// sourceStringOffset recognizes immutable slices of this file's source. The
+// addresses are only a sizing hint: bounds, equality and UTF-8 validity guard
+// the representation. No pointer or source-backed view enters the frame.
+func (p *estreeProjector) sourceStringOffset(value string) (int, bool) {
+	if len(value) < 3 || len(value) > len(p.text) {
+		return 0, false
+	}
+	base := uintptr(unsafe.Pointer(unsafe.StringData(p.text)))
+	address := uintptr(unsafe.Pointer(unsafe.StringData(value)))
+	if address < base || address-base > uintptr(len(p.text)-len(value)) {
+		return 0, false
+	}
+	offset := int(address - base)
+	if p.text[offset:offset+len(value)] != value || !utf8.ValidString(value) {
+		return 0, false
+	}
+	return offset, true
+}
+
 // Encode straight into the final frame instead of retaining a second UTF-16
 // byte column. clearSource releases all staged string references on return.
 func (p *estreeProjector) encodeStrings(out []byte) {
 	for _, value := range p.strings {
+		if offset, ok := p.sourceStringOffset(value); ok {
+			p.check()
+			binary.LittleEndian.PutUint32(out, ^uint32(len(value)))
+			binary.LittleEndian.PutUint32(out[4:], uint32(offset))
+			out = out[8:]
+			continue
+		}
 		cursor := 4
 		for index := 0; index < len(value); {
 			p.check()
