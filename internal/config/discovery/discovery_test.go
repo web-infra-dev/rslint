@@ -2401,7 +2401,6 @@ func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *tes
 		if err != nil {
 			t.Fatalf("Build: %v", err)
 		}
-		physicalRoot = tspath.NormalizePath(physicalRoot)
 		if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{lexicalRoot}) {
 			t.Fatalf("directory physical IO changed lexical owner = %v, want %q", got, lexicalRoot)
 		}
