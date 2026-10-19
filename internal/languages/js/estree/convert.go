@@ -255,8 +255,9 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 		return p.addNode("TSSatisfiesExpression", node,
 			nodeValue(p.convert(n.Expression, false)), nodeValue(p.convert(n.Type, false)))
 	case ast.KindNonNullExpression:
-		id := p.addNode("TSNonNullExpression", node, nodeValue(p.convertChainOperand(node.AsNonNullExpression().Expression)))
-		return p.wrapOptionalChain(node, id)
+		expression, chain := p.convertChainOperand(node.AsNonNullExpression().Expression)
+		id := p.addNode("TSNonNullExpression", node, nodeValue(expression))
+		return p.wrapOptionalChain(node, id, chain)
 	case ast.KindTypeAssertionExpression:
 		n := node.AsTypeAssertion()
 		return p.addNode("TSTypeAssertion", node,
@@ -272,18 +273,18 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 
 	case ast.KindPropertyAccessExpression:
 		n := node.AsPropertyAccessExpression()
-		object := p.convertChainOperand(n.Expression)
+		object, chain := p.convertChainOperand(n.Expression)
 		id := p.addNode("MemberExpression", node,
 			nodeValue(object), nodeValue(p.convert(n.Name(), false)),
 			boolValue(false), boolValue(n.QuestionDotToken != nil))
-		return p.wrapOptionalChain(node, id)
+		return p.wrapOptionalChain(node, id, chain)
 	case ast.KindElementAccessExpression:
 		n := node.AsElementAccessExpression()
-		object := p.convertChainOperand(n.Expression)
+		object, chain := p.convertChainOperand(n.Expression)
 		id := p.addNode("MemberExpression", node,
 			nodeValue(object), nodeValue(p.convert(n.ArgumentExpression, false)),
 			boolValue(true), boolValue(n.QuestionDotToken != nil))
-		return p.wrapOptionalChain(node, id)
+		return p.wrapOptionalChain(node, id, chain)
 	case ast.KindCallExpression:
 		return p.convertCall(node)
 	case ast.KindNewExpression:
@@ -770,8 +771,8 @@ func (p *estreeProjector) unwrapChain(id uint32) uint32 {
 	return id
 }
 
-func (p *estreeProjector) wrapOptionalChain(node *ast.Node, id uint32) uint32 {
-	if node.Flags&ast.NodeFlagsOptionalChain == 0 {
+func (p *estreeProjector) wrapOptionalChain(node *ast.Node, id uint32, chain bool) uint32 {
+	if !chain && node.Flags&ast.NodeFlagsOptionalChain == 0 {
 		return id
 	}
 	return p.addNode("ChainExpression", node, nodeValue(id))
@@ -992,11 +993,11 @@ func (p *estreeProjector) convertCall(node *ast.Node) uint32 {
 		}
 		return p.addNode("ImportExpression", node, nodeValue(source), nodeValue(options))
 	}
-	callee := p.convertChainOperand(n.Expression)
+	callee, chain := p.convertChainOperand(n.Expression)
 	id := p.addNode("CallExpression", node,
 		nodeValue(callee), p.convertList(arguments, false), boolValue(n.QuestionDotToken != nil),
 		p.typeParameters(n.TypeArguments, false))
-	return p.wrapOptionalChain(node, id)
+	return p.wrapOptionalChain(node, id, chain)
 }
 
 func (p *estreeProjector) convertNoSubstitutionTemplate(node *ast.Node) uint32 {
@@ -1596,12 +1597,16 @@ func (p *estreeProjector) convertJsxExpression(node *ast.Node) uint32 {
 	return p.addNode("JSXExpressionContainer", node, nodeValue(expression))
 }
 
-func (p *estreeProjector) convertChainOperand(node *ast.Node) uint32 {
+func (p *estreeProjector) convertChainOperand(node *ast.Node) (uint32, bool) {
 	id := p.convert(node, false)
 	if node != nil && node.Kind == ast.KindParenthesizedExpression {
-		return id
+		return id, false
 	}
-	return p.unwrapChain(id)
+	// A terminal non-null assertion may lack tsgo's optional-chain flag.
+	// Preserve the converted operand's chain until the outer expression wraps
+	// it; parentheses remain an explicit boundary for short-circuiting.
+	expression := p.unwrapChain(id)
+	return expression, expression != id
 }
 func (p *estreeProjector) templateCooked(node *ast.Node) uint32 {
 	if node.TemplateLiteralLikeData().TemplateFlags&ast.TokenFlagsContainsInvalidEscape != 0 {
