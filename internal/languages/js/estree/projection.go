@@ -27,7 +27,6 @@ const (
 	frameMagic   uint32 = 0x31465445 // ETF1
 	frameVersion uint32 = 3
 	headerSize          = 64
-	maxFrameSize        = 64 << 20
 	tagShift            = 29
 	payloadMask         = 1<<tagShift - 1
 	tagNull      uint32 = 0
@@ -38,6 +37,13 @@ const (
 	tagTrue      uint32 = 5
 	tagNumber    uint32 = 6
 	tagUndefined uint32 = 7
+)
+
+const (
+	// Frame lengths and offsets are uint32; slice lengths must also fit int.
+	maxWireFrameSize = min(math.MaxUint32, math.MaxInt)
+	// Bound speculative reservations, not the size of accepted frames.
+	maxInitialFrameBytes = 64 << 20
 )
 
 type nodeRecord struct {
@@ -57,7 +63,7 @@ type estreeProjector struct {
 	stringIDs        map[string]uint32
 	numbers          []float64
 	tokenCovers      []tokenCover
-	frameBytes       int
+	frameBytes       uint64
 	scan             scanner.Scanner
 }
 
@@ -158,16 +164,16 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	if options.SourceType == "commonjs" {
 		p.sourceType = "script"
 	}
-	if len(p.text) > maxFrameSize-headerSize-6 {
-		return nil, errors.New("ESTree source exceeds frame size limit")
+	if len(p.text) > maxWireFrameSize-headerSize-6 {
+		return nil, errors.New("ESTree source does not fit frame encoding")
 	}
 	// Reserve the maximum padding between columns before growing scratch.
-	p.frameBytes = headerSize + len(p.text) + 6
+	p.frameBytes = headerSize + uint64(len(p.text)) + 6
 	p.offsets.reset(ctx, p.text)
 	// The native node count is a sizing hint, not a limit on projected syntax.
 	// Reserve once per file instead of copying growing columns at every append.
-	p.nodes = slices.Grow(p.nodes[:0], min(file.NodeCount, maxFrameSize/14))
-	p.values = slices.Grow(p.values[:0], min(file.NodeCount*4, maxFrameSize/4))
+	p.nodes = slices.Grow(p.nodes[:0], min(file.NodeCount, maxInitialFrameBytes/14))
+	p.values = slices.Grow(p.values[:0], min(file.NodeCount*4, maxInitialFrameBytes/4))
 	p.lists = p.lists[:0]
 	p.emptyList = 0
 	p.strings = p.strings[:0]
@@ -178,7 +184,9 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	}
 	p.tokenCovers = p.tokenCovers[:0]
 	root := p.convert(file.AsNode(), false)
-	b.tokens, b.comments = scanTokensAndCommentsInto(ctx, &p.scan, file, p.offsets, p.tokenCovers, b.tokens[:0], b.comments[:0], maxFrameSize-p.frameBytes)
+	initialTokenBytes := maxInitialFrameBytes - int(min(p.frameBytes, maxInitialFrameBytes))
+	b.tokens = slices.Grow(b.tokens[:0], min(max(16, file.NodeCount*2), initialTokenBytes/9))
+	b.tokens, b.comments = scanTokensAndCommentsInto(ctx, &p.scan, file, p.offsets, p.tokenCovers, b.tokens[:0], b.comments[:0], maxWireFrameSize-int(p.frameBytes))
 	return b.encode(root, options.HasBOM, allocate)
 }
 
@@ -207,9 +215,9 @@ func (p *estreeProjector) clearSource() {
 	p.scan = scanner.Scanner{}
 }
 
-func (p *estreeProjector) reserve(bytes int) {
-	if bytes > maxFrameSize-p.frameBytes {
-		panic(errors.New("ESTree frame exceeds size limit"))
+func (p *estreeProjector) reserve(bytes uint64) {
+	if bytes > uint64(maxWireFrameSize)-p.frameBytes {
+		panic(errors.New("ESTree frame size does not fit its encoding"))
 	}
 	p.frameBytes += bytes
 }
@@ -243,12 +251,12 @@ func (p *estreeProjector) stringValue(value string) uint32 {
 	}
 	id := uint32(len(p.strings))
 	p.stringIDs[value] = id
-	encodedSize := 8
+	encodedSize := uint64(8)
 	if _, ok := p.sourceStringOffset(value); !ok {
-		encodedSize = align4(4 + ecmascript.StringCodeUnitCount(value)*2)
+		encodedSize = (4 + uint64(ecmascript.StringCodeUnitCount(value))*2 + 3) &^ 3
 	}
 	p.reserve(encodedSize)
-	p.stringBytes += encodedSize
+	p.stringBytes += int(encodedSize)
 	p.strings = append(p.strings, value)
 	return taggedValue(tagString, id)
 }
@@ -256,8 +264,9 @@ func (p *estreeProjector) stringValue(value string) uint32 {
 // sourceStringOffset recognizes immutable slices of this file's source. The
 // addresses are only a sizing hint: bounds, equality and UTF-8 validity guard
 // the representation. No pointer or source-backed view enters the frame.
+// Source-span lengths reserve their high bit to distinguish UTF-16 records.
 func (p *estreeProjector) sourceStringOffset(value string) (int, bool) {
-	if len(value) < 3 || len(value) > len(p.text) {
+	if len(value) < 3 || len(value) > math.MaxInt32 || len(value) > len(p.text) {
 		return 0, false
 	}
 	base := uintptr(unsafe.Pointer(unsafe.StringData(p.text)))
@@ -319,7 +328,7 @@ func (p *estreeProjector) listValue(ids []uint32) uint32 {
 	if len(ids) == 0 && p.emptyList != 0 {
 		return p.emptyList
 	}
-	p.reserve((len(ids) + 1) * 4)
+	p.reserve((uint64(len(ids)) + 1) * 4)
 	offset := uint32(len(p.lists))
 	p.lists = append(p.lists, uint32(len(ids)))
 	p.lists = append(p.lists, ids...)
@@ -374,7 +383,7 @@ func (p *estreeProjector) add(typeName string, start, end uint32, values ...uint
 			}
 		}
 	}
-	p.reserve(14 + len(values)*4)
+	p.reserve(14 + uint64(len(values))*4)
 	id := uint32(len(p.nodes) + 1)
 	p.nodes = append(p.nodes, nodeRecord{
 		typeID:     typeID,
@@ -613,8 +622,8 @@ func (b *Builder) encode(root uint32, hasBOM bool, allocate func(int) []byte) ([
 	comments := tokenEnds + len(b.tokens)*4
 	source := comments + len(b.comments)*12
 	size := source + len(p.text)
-	if size > 64<<20 {
-		return nil, errors.New("ESTree frame exceeds 64 MiB")
+	if size > maxWireFrameSize {
+		return nil, errors.New("ESTree frame size does not fit its encoding")
 	}
 	var out []byte
 	if allocate == nil {

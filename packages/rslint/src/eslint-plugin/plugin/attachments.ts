@@ -44,7 +44,6 @@ export function resolvePluginAttachments(
       if (
         typeof frame !== 'string' ||
         frame.length === 0 ||
-        frame.length > Math.ceil((64 * 1024 * 1024) / 3) * 4 ||
         frame.length % 4 !== 0 ||
         !/^[A-Za-z0-9+/]*={0,2}$/.test(frame)
       )

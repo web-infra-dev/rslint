@@ -1677,8 +1677,9 @@ are disabled or their targets do not match, the pipeline produces no ESTree
 frames or plugin attachments.
 The builder reads the acquired Program's concrete SourceFile without modifying
 its AST or invoking a second parser. Native Go rules continue to traverse the
-original ts-go AST. Each window opens a dispatcher-owned output lease and sends
-at most 32 files and 64 MiB of frame bytes. `Builder.BuildInto` requests the exact
+original ts-go AST. Each window opens a dispatcher-owned output lease and holds
+at most 32 files, targeting 64 MiB of frame bytes. A larger individual frame uses
+its own window within the transport's capacity. `Builder.BuildInto` requests the exact
 final size through a plain allocation function; the language encoder knows
 nothing about storage, reuse or transport.
 
@@ -1687,8 +1688,8 @@ storage in the existing mapping. Projection writes its final frame directly
 there, with no intermediate Go-heap output frame or publication copy. Allocation
 order is preserved by the attachment ranges; a failed encoding rolls back its
 last allocation. Pre-frozen inputs are copied into that window's storage rather
-than extending a reservation into another window. If a frame would exceed the
-window byte limit, it remains an unconsumed input and is rebuilt in the next
+than extending a reservation into another window. If an additional frame would
+exceed the window byte target, it remains an unconsumed input and is rebuilt in the next
 window before allocating output.
 
 Publication ends producer access to those bytes and transfers slot ownership to
@@ -1738,6 +1739,8 @@ Projection follows Espree's JS/JSX data contract and TypeScript ESTree's TS/TSX
 contract, selected by the SourceFile's script kind. This includes JSX entity
 values, token classifications, optional fields and template raw values; it
 does not change syntax admission, rule execution or diagnostic/fix policy.
+Unparenthesized comma chains produce one final expression list, without
+encoding intermediate prefixes. Parentheses retain nested sequences.
 Shared publication carries ranges for the already encoded bytes; inline fallback
 serializes owned bytes. Shared slots require the existing reader release
 acknowledgement before reuse. No whole-group frame cache is retained. Private pipeline input slots transfer their syntax
@@ -1748,10 +1751,12 @@ syntax. Fix planning retains the original diagnostic source until its existing
 text validation completes. Public dispatch helpers preserve caller-owned input
 slices. The Node host applies `--singleThreaded` to its worker count; reverse
 requests keep the existing bounded scheduler.
-Projection checks cancellation and a 64 MiB per-frame limit while generating
-nodes, strings, lists and tokens. Unsupported syntax fails explicitly rather
+Projection checks cancellation and the encoding's integer representation while
+generating nodes, strings, lists and tokens; it imposes no separate file-size
+quota. Initial capacity estimates limit speculative reservations, while columns
+can grow for larger frames. Unsupported syntax fails explicitly rather
 than producing a generic node or an empty successful lint.
-The temporary token-cover index stores 32-bit byte offsets within this limit.
+The temporary token-cover index stores 32-bit byte offsets within that encoding.
 It contains no AST pointers and is discarded when the builder resets.
 
 The frame contains the final ESTree schema, UTF-16 node/token/comment offsets,

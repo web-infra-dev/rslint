@@ -142,6 +142,28 @@ async function lint(
 }
 
 describe('CLI community plugins (object-form) end-to-end', () => {
+  test('--fix runs plugins on a long comma expression', async () => {
+    const text = 'a,'.repeat(5999) + '[1].filter(Boolean);\n';
+    const { dir, exitCode, diags } = await lint(
+      {
+        'local-plugin.mjs': LOCAL_PLUGIN,
+        'rslint.config.mjs': PLUGIN_CONFIG,
+        'tsconfig.json': TSCONFIG,
+        'sequence.ts': text,
+      },
+      ['--fix'],
+    );
+    try {
+      expect(exitCode).toBe(0);
+      expect(diags).toEqual([]);
+      expect(await fs.readFile(path.join(dir, 'sequence.ts'), 'utf8')).toBe(
+        text.replace('.filter(', '.some('),
+      );
+    } finally {
+      await cleanupTempDir(dir);
+    }
+  });
+
   test.each([
     ['no plugin', ''],
     [

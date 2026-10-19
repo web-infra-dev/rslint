@@ -112,7 +112,7 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 		}
 		var offsets utf16Offsets
 		offsets.reset(context.Background(), file.Text())
-		tokens, _ := scanTokensAndCommentsInto(context.Background(), scanner.NewScanner(), file, offsets, covers, nil, nil, maxFrameSize)
+		tokens, _ := scanTokensAndCommentsInto(context.Background(), scanner.NewScanner(), file, offsets, covers, nil, nil, maxWireFrameSize)
 		if len(tokens) != 4 || tokens[0].typeCode != tokenIdentifier || tokens[2].typeCode != tokenKeyword {
 			t.Fatalf("token cover precedence changed: %v", tokens)
 		}
@@ -163,6 +163,26 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProjectionLongCommaSequence(t *testing.T) {
+	const count = 6000
+	text := strings.Repeat("a,", count-1) + "a;"
+	var builder Builder
+	data, err := builder.Build(context.Background(), source("/sequence.js", text), Options{SourceType: "module"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sequences := 0
+	for _, node := range builder.p.nodes {
+		if node.typeID == typeIDs["SequenceExpression"] {
+			sequences++
+		}
+	}
+	if sequences != 1 || len(builder.p.lists) > count+8 {
+		t.Fatalf("sequence retained intermediate records: nodes=%d, list words=%d", sequences, len(builder.p.lists))
+	}
+	t.Logf("source=%d bytes, frame=%d bytes, nodes=%d, list words=%d", len(text), len(data), len(builder.p.nodes), len(builder.p.lists))
 }
 
 func TestProjectionCancellationAndFailure(t *testing.T) {

@@ -929,14 +929,23 @@ func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 	p.recordTokenCover(n.OperatorToken)
 	operator := scanner.TokenToString(n.OperatorToken.Kind)
 	if n.OperatorToken.Kind == ast.KindCommaToken {
-		left := p.convert(n.Left, false)
-		items := []uint32{left}
-		// Only an unparenthesized comma continues the same sequence. Its
-		// projected child may also be a sequence after removing parentheses.
-		if n.Left.Kind == ast.KindBinaryExpression && n.Left.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
-			items = p.sequenceItems(left)
+		// Collect the native left spine before projecting it. Encoding every
+		// prefix would retain quadratic lists and detached sequence nodes.
+		rights := []*ast.Node{n.Right}
+		left := n.Left
+		for left.Kind == ast.KindBinaryExpression && left.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
+			p.check()
+			nested := left.AsBinaryExpression()
+			rights = append(rights, nested.Right)
+			left = nested.Left
 		}
-		items = append(items, p.convert(n.Right, false))
+		// Parenthesized operands stay separate sequences. Convert in source
+		// order, just as for other expression lists.
+		items := make([]uint32, len(rights)+1)
+		items[0] = p.convert(left, false)
+		for index := len(rights) - 1; index >= 0; index-- {
+			items[len(rights)-index] = p.convert(rights[index], false)
+		}
 		return p.addNode("SequenceExpression", node, p.listValue(items))
 	}
 	typeName := "BinaryExpression"
@@ -955,23 +964,6 @@ func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 	return p.addNode(typeName, node,
 		nodeValue(p.convert(n.Left, typeName == "AssignmentExpression")),
 		p.stringValue(operator), nodeValue(p.convert(n.Right, false)))
-}
-
-func (p *estreeProjector) sequenceItems(id uint32) []uint32 {
-	if id == 0 || int(id) > len(p.nodes) {
-		return []uint32{id}
-	}
-	record := p.nodes[id-1]
-	if schemas[record.typeID].name != "SequenceExpression" {
-		return []uint32{id}
-	}
-	encoded := p.values[record.valueStart]
-	if encoded>>tagShift != tagList {
-		return []uint32{id}
-	}
-	offset := encoded & payloadMask
-	length := p.lists[offset]
-	return append([]uint32(nil), p.lists[offset+1:offset+1+length]...)
 }
 
 func (p *estreeProjector) convertCall(node *ast.Node) uint32 {

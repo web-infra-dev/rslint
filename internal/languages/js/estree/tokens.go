@@ -16,8 +16,8 @@ type projectedToken struct {
 }
 type projectedComment struct{ kind, start, end uint32 }
 
-// Projection bounds the source to 64 MiB before visiting syntax. These byte
-// offsets fit in uint32; keep this temporary index compact and pointer-free.
+// Frame source offsets use uint32. Keep this temporary index compact and
+// pointer-free, within the encoding's range checked before visiting syntax.
 type tokenCover struct {
 	typeCode   uint8
 	kind       ast.Kind
@@ -51,13 +51,12 @@ func scanTokensAndCommentsInto(
 	scan.SetText(file.Text())
 	scan.SetLanguageVariant(file.LanguageVariant)
 	scan.SetSkipTrivia(false)
-	tokens = slices.Grow(tokens, min(max(16, file.NodeCount*2), budget/9))
 	if comments == nil {
 		comments = make([]projectedComment, 0, 8)
 	}
 	for kind := scan.Scan(); kind != ast.KindEndOfFile; kind = scan.Scan() {
-		if len(tokens)*9+len(comments)*12+18 > budget {
-			panic(errors.New("ESTree token columns exceed frame size limit"))
+		if uint64(len(tokens))*9+uint64(len(comments))*12+18 > uint64(budget) {
+			panic(errors.New("ESTree token columns do not fit frame encoding"))
 		}
 		if err := ctx.Err(); err != nil {
 			panic(err)

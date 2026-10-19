@@ -172,8 +172,7 @@ export function decodeFrame(
   if (
     !(bytes instanceof Uint8Array) ||
     bytes.buffer instanceof SharedArrayBuffer ||
-    bytes.length < HEADER ||
-    bytes.length > 64 * 1024 * 1024
+    bytes.length < HEADER
   )
     invalid();
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
