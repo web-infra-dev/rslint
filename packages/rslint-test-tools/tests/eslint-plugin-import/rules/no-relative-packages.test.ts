@@ -3,6 +3,7 @@
 // intentionally preserves diagnostics/ranges without those automatic edits.
 import fs from 'node:fs';
 import path from 'node:path';
+import type { LanguageOptions } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
 
 import { RuleTester } from '../rule-tester.js';
@@ -160,7 +161,7 @@ const invalid = [
 ];
 for (const item of [...valid, ...invalid])
   item.filename = path.join(root, item.filename);
-const languageOptions = {
+const languageOptions: LanguageOptions = {
   parserOptions: { project: false, projectService: false },
 };
 
