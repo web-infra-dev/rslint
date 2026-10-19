@@ -83,7 +83,6 @@ func acquireSpeculativeGeneration(
 		}
 		return newLintGeneration(
 			program,
-			overlayFS,
 			sourceFile,
 			target,
 			environment.processCwd,

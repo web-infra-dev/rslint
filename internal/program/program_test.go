@@ -86,39 +86,6 @@ func TestOwnedCompilerProgramsShareCacheOnlyWithinBatch(t *testing.T) {
 	}
 }
 
-func TestCompilerExternalFileSystem(t *testing.T) {
-	const implementation = "/specifier-cache-fixture/runtime/index.js"
-	const oldText = "module.exports = {value: 1};"
-	const newText = "export const value = 1; export default {};"
-	files := specifierCacheFiles(false)
-	files[implementation] = oldText
-	raw, fsys := specifierCacheProgram(t, files)
-	source := specifierCacheFile(t, raw)
-	shared := lintprogram.NewFromCompiler(raw)
-	overlay := utils.NewOverlayVFS(fsys, map[string]string{implementation: newText})
-	current := lintprogram.NewFromCompilerWithExternalFileSystem(raw, overlay)
-	if current.GetSourceFile(source.FileName()) != source || !current.CanProvideTypeChecker(source) || current.FS() != shared.FS() {
-		t.Fatal("external reads changed the compiler's source services")
-	}
-	type key struct{}
-	build := func() *int { return new(int) }
-	if lintprogram.Cached(current, key{}, build) != lintprogram.Cached(shared, key{}, build) {
-		t.Fatal("external reads replaced the compiler's shared cache")
-	}
-	if text, _ := current.FS().ReadFile(implementation); text != oldText {
-		t.Fatalf("compiler filesystem changed to %q", text)
-	}
-	if text, _ := current.ExternalFileSystem().ReadFile(implementation); text != newText {
-		t.Fatalf("external filesystem returned %q", text)
-	}
-	if text, _ := shared.ExternalFileSystem().ReadFile(implementation); text != oldText {
-		t.Fatalf("external overlay leaked to another facade: %q", text)
-	}
-	if lintprogram.NewFromCompilerWithExternalFileSystem(nil, fsys) != nil || lintprogram.NewFromCompilerWithExternalFileSystem(raw, nil) != nil {
-		t.Fatal("missing compiler or filesystem created a generation")
-	}
-}
-
 func TestOwnedCompilerCacheReleasesWhileRawGenerationLives(t *testing.T) {
 	raw, _ := specifierCacheProgram(t, specifierCacheFiles(false))
 	type key int
@@ -215,9 +182,6 @@ func TestSourceOnlyProgramOwnsBoundUniverseWithoutCheckerCapability(t *testing.T
 		if !file.IsBound() || !sourceProgram.OwnsSourceFile(file) || sourceProgram.GetSourceFile(file.FileName()) != file {
 			t.Fatalf("source Program lost exact source identity for %q", file.FileName())
 		}
-		if sourceProgram.OptionsForFile(file) != sourceProgram.Options() {
-			t.Fatalf("source Program lost its compiler options for %q", file.FileName())
-		}
 	}
 	if diagnostics := sourceProgram.SyntacticDiagnostics(context.Background(), sourceProgram.SourceFiles()[0]); len(diagnostics) != 0 {
 		t.Fatalf("unexpected syntactic diagnostics: %+v", diagnostics)
@@ -232,7 +196,6 @@ func TestSourceOnlyProgramOwnsBoundUniverseWithoutCheckerCapability(t *testing.T
 		t.Fatal("owned source lost its cached module resolution")
 	}
 	if sourceProgram.OwnsSourceFile(foreign) ||
-		sourceProgram.OptionsForFile(foreign) != nil ||
 		sourceProgram.SourceFileMetadata(foreign) != (ast.SourceFileMetaData{}) ||
 		sourceProgram.SyntacticDiagnostics(context.Background(), foreign) != nil ||
 		sourceProgram.GetResolvedModule(foreign, importSpecifier.Text(), mode) != nil {

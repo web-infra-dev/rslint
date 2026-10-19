@@ -26,10 +26,6 @@ type Program struct {
 	source sourceBackend
 	types  typeBackend
 	cache  *derivedCache
-
-	// externalFileSystem is an optional per-lint view for files behind declarations.
-	// It does not replace the compiler source universe or its derived cache.
-	externalFileSystem vfs.FS
 }
 
 // sourceBackend is the private Adapter side of the facade. It intentionally
@@ -41,7 +37,6 @@ type sourceBackend interface {
 	rootFileNames() []string
 	ownsSourceFile(file *ast.SourceFile) bool
 	compilerOptions() *core.CompilerOptions
-	compilerOptionsForFile(file *ast.SourceFile) *core.CompilerOptions
 	fileSystem() vfs.FS
 	workingDirectory() string
 	defaultLibraryPath() string
@@ -88,32 +83,6 @@ func NewFromCompiler(raw *compiler.Program) *Program {
 	}
 	backend := &compilerBackend{raw: raw}
 	return &Program{source: backend, types: backend, cache: cacheForCompiler(raw)}
-}
-
-// NewFromCompilerWithExternalFileSystem supplies current external-file contents
-// to a lint pass that reuses a compiler generation. Source ASTs, the compiler
-// filesystem, resolution and derived caches retain their original identity.
-func NewFromCompilerWithExternalFileSystem(raw *compiler.Program, fs vfs.FS) *Program {
-	if raw == nil || isNilInterface(fs) {
-		return nil
-	}
-	p := NewFromCompiler(raw)
-	p.externalFileSystem = fs
-	return p
-}
-
-// ExternalFileSystem supplies files inspected behind declarations, which may
-// be absent from the compiler graph. Such reads must not use the source cache:
-// an editor can change these files while reusing the same compiler generation.
-// Ordinary CLI and parser-backed Programs use their existing filesystem.
-func (p *Program) ExternalFileSystem() vfs.FS {
-	if !p.IsValid() {
-		return nil
-	}
-	if p.externalFileSystem != nil {
-		return p.externalFileSystem
-	}
-	return p.FS()
 }
 
 // NewFromCompilers adapts programs in stable input order.
@@ -193,15 +162,6 @@ func (p *Program) Options() *core.CompilerOptions {
 		return nil
 	}
 	return p.source.compilerOptions()
-}
-
-// OptionsForFile returns the read-only options used to resolve imports from an
-// owned source file, including options from a redirected project reference.
-func (p *Program) OptionsForFile(file *ast.SourceFile) *core.CompilerOptions {
-	if !p.OwnsSourceFile(file) {
-		return nil
-	}
-	return p.source.compilerOptionsForFile(file)
 }
 
 func (p *Program) FS() vfs.FS {
@@ -431,15 +391,9 @@ func (b *compilerBackend) ownsSourceFile(file *ast.SourceFile) bool {
 	return b.raw.GetSourceFile(file.FileName()) == file
 }
 func (b *compilerBackend) compilerOptions() *core.CompilerOptions { return b.raw.Options() }
-func (b *compilerBackend) compilerOptionsForFile(file *ast.SourceFile) *core.CompilerOptions {
-	if redirect := b.raw.GetRedirectForResolution(file); redirect != nil {
-		return module.GetCompilerOptionsWithRedirect(b.raw.Options(), redirect)
-	}
-	return b.raw.Options()
-}
-func (b *compilerBackend) fileSystem() vfs.FS         { return b.raw.Host().FS() }
-func (b *compilerBackend) workingDirectory() string   { return b.raw.Host().GetCurrentDirectory() }
-func (b *compilerBackend) defaultLibraryPath() string { return b.raw.Host().DefaultLibraryPath() }
+func (b *compilerBackend) fileSystem() vfs.FS                     { return b.raw.Host().FS() }
+func (b *compilerBackend) workingDirectory() string               { return b.raw.Host().GetCurrentDirectory() }
+func (b *compilerBackend) defaultLibraryPath() string             { return b.raw.Host().DefaultLibraryPath() }
 func (b *compilerBackend) nearestPackageJSONDirectory(directory string) string {
 	return b.raw.GetNearestAncestorDirectoryWithPackageJson(directory)
 }
@@ -453,7 +407,6 @@ func (b *compilerBackend) resolvedModule(file ast.HasFileName, name string, mode
 func (b *compilerBackend) resolveModuleName(name string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule {
 	return b.raw.ResolveModuleName(name, containingFile, mode)
 }
-
 func (b *compilerBackend) sourceFileForResolvedModule(fileName string) *ast.SourceFile {
 	return b.raw.GetSourceFileForResolvedModule(fileName)
 }
@@ -501,12 +454,9 @@ func (s *parsedBackend) ownsSourceFile(file *ast.SourceFile) bool {
 	return s.sourcesByPath[file.Path()] == file
 }
 func (s *parsedBackend) compilerOptions() *core.CompilerOptions { return s.options }
-func (s *parsedBackend) compilerOptionsForFile(*ast.SourceFile) *core.CompilerOptions {
-	return s.options
-}
-func (s *parsedBackend) fileSystem() vfs.FS         { return s.fs }
-func (s *parsedBackend) workingDirectory() string   { return s.currentDirectory }
-func (s *parsedBackend) defaultLibraryPath() string { return s.host.DefaultLibraryPath() }
+func (s *parsedBackend) fileSystem() vfs.FS                     { return s.fs }
+func (s *parsedBackend) workingDirectory() string               { return s.currentDirectory }
+func (s *parsedBackend) defaultLibraryPath() string             { return s.host.DefaultLibraryPath() }
 func (s *parsedBackend) nearestPackageJSONDirectory(directory string) string {
 	scope := s.resolver.GetPackageScopeForPath(directory)
 	if scope.Exists() {

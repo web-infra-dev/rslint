@@ -427,16 +427,7 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 		} else {
 			resolved = f.probe(target, applyAlias)
 		}
-		if resolved == "" && !exactTarget && f.options.NodeExports && !f.options.NoDirectory && !f.fullySpecified && f.FS.DirectoryExists(target) {
-			// Node's package main directory loads an index file; it does not
-			// follow another package.json main inside that directory.
-			for _, extension := range f.options.Extensions {
-				if resolved = f.probeFile(tspath.ResolvePath(target, "index"+extension)); resolved != "" {
-					break
-				}
-			}
-		}
-		if resolved == "" && !exactTarget && !f.options.NodeExports && !f.options.NoDirectory && !f.fullySpecified && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
+		if resolved == "" && !exactTarget && !f.options.NoDirectory && !f.fullySpecified && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
 			// enhanced-resolve permits directory exports. Ask tsgo to resolve
 			// their main/index using its regular relative-directory traversal.
 			// Guard package main cycles before creating a nested resolver.
@@ -467,13 +458,7 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 			if strings.Contains(entry, `\`) && tspath.GetRootLength(physical) == 1 && !tspath.IsRootedDiskPath(entry) {
 				continue
 			}
-			candidate := tspath.ResolvePath(tspath.GetDirectoryPath(physical), entry)
-			if f.options.NodeExports && path.Ext(entry) != "" {
-				resolved = f.probeFile(candidate)
-			} else {
-				resolved = f.probe(candidate, false)
-			}
-			if resolved != "" {
+			if resolved = f.probe(tspath.ResolvePath(tspath.GetDirectoryPath(physical), entry), false); resolved != "" {
 				break
 			}
 		}

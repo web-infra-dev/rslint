@@ -54,8 +54,6 @@ type lintProgramRequest struct {
 	sourceReferences  bool
 	usedKey           lintProgramKey
 	usedState         *lintProgramState
-	generationTracker *lintTrackingFS
-	generationCwd     string
 	projectMetadata   map[string]*lintProjectMetadata
 	transientMetadata map[string]struct{}
 }
@@ -428,33 +426,8 @@ func (r *lintProgramRequest) cover(state *lintProgramState) (added bool, safe bo
 	return added, true
 }
 
-// fileSystemForGeneration tracks external dependency reads on this request's
-// editor overlay. Session Programs can retain an older filesystem snapshot for
-// implementations behind declarations; their source view stays unchanged.
-func (r *lintProgramRequest) fileSystemForGeneration(program *compiler.Program) vfs.FS {
-	r.prepareOverlay()
-	if r.usedState != nil && r.usedState.program == program {
-		return r.usedState.tracker
-	}
-	r.generationTracker = newLintTrackingFS(r.overlayFS)
-	r.generationCwd = program.GetCurrentDirectory()
-	return r.generationTracker
-}
-
 func (r *lintProgramRequest) finalize() {
-	if !r.store.Usable() {
-		return
-	}
-	if r.generationTracker != nil {
-		lookups := r.generationTracker.drain()
-		_, safe, err := r.store.coverage.ensure(r.ctx, lookups.seenFiles, r.generationCwd)
-		if err != nil || !safe {
-			r.store.coverage.disabled = true
-			r.store.Invalidate()
-			return
-		}
-	}
-	if r.usedState == nil {
+	if !r.store.Usable() || r.usedState == nil {
 		return
 	}
 	added, safe := r.cover(r.usedState)

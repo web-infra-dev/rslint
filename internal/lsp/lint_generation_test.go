@@ -13,7 +13,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -55,7 +54,6 @@ func TestLSPGenerationReleaseLifecycle(t *testing.T) {
 		ruleRan := false
 		generation := newLintGeneration(
 			program,
-			fsys,
 			sourceFile,
 			lspConfigTarget(file, directory, fsys),
 			directory,
@@ -92,7 +90,6 @@ func TestLSPGenerationReleaseLifecycle(t *testing.T) {
 		ruleRan := false
 		generation := newLintGeneration(
 			program,
-			fsys,
 			sourceFile,
 			lspConfigTarget(file, directory, fsys),
 			directory,
@@ -125,7 +122,6 @@ func TestLSPGenerationReleaseLifecycle(t *testing.T) {
 		releases := 0
 		generation := newLintGeneration(
 			program,
-			fsys,
 			sourceFile,
 			lspConfigTarget(file, directory, fsys),
 			directory,
@@ -214,7 +210,6 @@ func TestDocumentGenerationProviderFinalizesBeforePublication(t *testing.T) {
 		},
 		buildGeneration: func(
 			*compiler.Program,
-			vfs.FS,
 			*ast.SourceFile,
 			target.File,
 			string,

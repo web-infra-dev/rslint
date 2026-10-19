@@ -2032,12 +2032,12 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 				},
 			}, nil
 		},
-		buildGeneration: func(selected *compiler.Program, filesystem vfs.FS, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
+		buildGeneration: func(selected *compiler.Program, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
 			serviceProgram = selected
 			if !typed {
 				t.Fatal("direct service root lost type information")
 			}
-			return buildDocumentGeneration(selected, filesystem, source, lintTarget, cwd, typed, snapshot)
+			return buildDocumentGeneration(selected, source, lintTarget, cwd, typed, snapshot)
 		},
 	}
 	_, release, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{})

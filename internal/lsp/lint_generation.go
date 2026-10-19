@@ -67,7 +67,6 @@ type documentProgramRequest func(
 
 type documentGenerationBuilder func(
 	program *compiler.Program,
-	filesystem vfs.FS,
 	sourceFile *ast.SourceFile,
 	target target.File,
 	processCwd string,
@@ -77,7 +76,6 @@ type documentGenerationBuilder func(
 
 func buildDocumentGeneration(
 	program *compiler.Program,
-	filesystem vfs.FS,
 	sourceFile *ast.SourceFile,
 	target target.File,
 	processCwd string,
@@ -86,7 +84,6 @@ func buildDocumentGeneration(
 ) linter.Generation {
 	return newLintGeneration(
 		program,
-		filesystem,
 		sourceFile,
 		target,
 		processCwd,
@@ -136,7 +133,6 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	}
 	release := linter.ReleaseFunc(nil)
 	releasePending := false
-	var resident *lintProgramRequest
 	defer func() {
 		if releasePending && release != nil {
 			release()
@@ -145,12 +141,11 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	if p.requestPrograms != nil {
 		loaders, release = p.requestPrograms(ctx, p.uri, snapshot.target)
 	} else if server.lintPrograms.Usable() {
-		resident = server.lintPrograms.request(ctx, p.uri, snapshot.target, serviceEnabled)
+		resident := server.lintPrograms.request(ctx, p.uri, snapshot.target, serviceEnabled)
 		loaders = lintProjectLoaders{program: resident.load, metadata: resident.loadMetadata}
 		release = resident.finalize
-		resident.prepareOverlay()
-		request.fs = resident.overlayFS
 		if serviceEnabled {
+			resident.prepareOverlay()
 			selectionFS = resident.overlayFS
 		}
 	}
@@ -184,13 +179,8 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	if buildGeneration == nil {
 		buildGeneration = buildDocumentGeneration
 	}
-	filesystem := request.filesystem()
-	if resident != nil {
-		filesystem = resident.fileSystemForGeneration(program)
-	}
 	generation := buildGeneration(
 		program,
-		filesystem,
 		sourceFile,
 		snapshot.target,
 		server.cwd,
@@ -205,7 +195,6 @@ func (p *documentGenerationProvider) AcquireGeneration(
 
 func newLintGeneration(
 	program *compiler.Program,
-	filesystem vfs.FS,
 	sourceFile *ast.SourceFile,
 	target target.File,
 	processCwd string,
@@ -214,7 +203,7 @@ func newLintGeneration(
 	pluginConfig *linter.EslintPluginFileConfig,
 	readText func(targetPath string, source ast.SourceFileLike) (string, error),
 ) linter.Generation {
-	sourceProgram := lintprogram.NewFromCompilerWithExternalFileSystem(program, filesystem)
+	sourceProgram := lintprogram.NewFromCompiler(program)
 	sourcePath := sourceFile.FileName()
 	servedRules := rulesServedToEditors(enabledRules)
 	if !hasTypeInfo {

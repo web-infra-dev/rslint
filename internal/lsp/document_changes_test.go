@@ -365,7 +365,7 @@ func TestUnicodeBomIsNotServedToEditors(t *testing.T) {
 
 			target := lspConfigTarget(file, dir, fs)
 			generation := newLintGeneration(
-				program, fs, sourceFile, target, dir, true,
+				program, sourceFile, target, dir, true,
 				resolver.ResolveTarget(target.Identity()).EnabledRules,
 				nil, nil,
 			)
@@ -421,7 +421,7 @@ func TestOtherRulesStillRunInTheEditor(t *testing.T) {
 
 	target := lspConfigTarget(file, dir, fs)
 	generation := newLintGeneration(
-		program, fs, sourceFile, target, dir, true,
+		program, sourceFile, target, dir, true,
 		resolver.ResolveTarget(target.Identity()).EnabledRules,
 		nil, nil,
 	)

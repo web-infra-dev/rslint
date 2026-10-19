@@ -95,10 +95,6 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 		{"custom", moduleresolver.Options{Extensions: []string{".custom"}}, "/node-runtime/node_modules/custom/index.custom"},
 		{"conditional", moduleresolver.Options{}, "/node-runtime/node_modules/conditional/import.js"},
 		{"conditional", moduleresolver.Options{Conditions: []string{"types"}}, "/node-runtime/node_modules/conditional/index.d.ts"},
-		{"directory-main", moduleresolver.Options{}, "/node-runtime/node_modules/directory-main/lib/other.js"},
-		{"directory-main", moduleresolver.Options{NodeExports: true}, "/node-runtime/node_modules/directory-main/lib/index.js"},
-		{"directory-main/trailing", moduleresolver.Options{NodeExports: true}, "/node-runtime/node_modules/directory-main/trailing/lib/index.js"},
-		{"exact-index", moduleresolver.Options{NodeExports: true, MainFiles: []string{"index.js", "index.json", "index.node"}}, "/node-runtime/node_modules/exact-index/index.json"},
 	} {
 		if got := moduleresolver.ResolveModule(p, test.name, "/node-runtime/input.js", test.options); got != test.want {
 			t.Errorf("moduleresolver.ResolveModule(%s, %#v) = %q, want %q", test.name, test.options, got, test.want)

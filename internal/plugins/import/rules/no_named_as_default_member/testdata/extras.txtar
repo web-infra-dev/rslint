@@ -84,3 +84,63 @@ export const foo: number;
 export default function esmPackage(): void;
 export const foo: number;
 
+-- formats/tsconfig.json --
+{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","allowJs":true,"maxNodeModuleJsDepth":1,"noEmit":true,"types":[]},"include":["**/*"]}
+-- formats-node/tsconfig.json --
+{"compilerOptions":{"module":"nodenext","allowJs":true,"maxNodeModuleJsDepth":1,"noEmit":true,"types":[]},"include":["**/*"]}
+-- node_modules/esm-in-cjs/package.json --
+{"name":"esm-in-cjs","type":"commonjs","main":"./index.mjs","types":"./index.d.mts"}
+-- node_modules/esm-in-cjs/index.mjs --
+export default {}; export const foo = 1;
+-- node_modules/esm-in-cjs/index.d.mts --
+declare const obj: {}; export default obj; export const foo: number;
+-- node_modules/esm-in-cjs/direct.mjs --
+export default {}; export const foo = 1;
+-- node_modules/esm-in-cjs/source.mts --
+export default {}; export const foo = 1;
+-- node_modules/esm-with-types/package.json --
+{"name":"esm-with-types","main":"./index.mjs","types":"./index.d.ts"}
+-- node_modules/esm-with-types/index.mjs --
+export default {}; export const foo = 1;
+-- node_modules/esm-with-types/index.d.ts --
+declare const obj: {}; export default obj; export const foo: number;
+-- node_modules/default-alias/package.json --
+{"name":"default-alias","types":"./index.d.ts"}
+-- node_modules/default-alias/index.d.ts --
+declare const obj: {}; export { obj as default }; export const foo: number;
+-- node_modules/default-reexport/package.json --
+{"name":"default-reexport","types":"./index.d.ts"}
+-- node_modules/default-reexport/index.d.ts --
+export { default } from './value.js'; export const foo: number;
+-- node_modules/default-reexport/value.d.ts --
+declare const obj: {}; export default obj;
+-- node_modules/default-namespace/package.json --
+{"name":"default-namespace","types":"./index.d.ts"}
+-- node_modules/default-namespace/index.d.ts --
+export * as default from './value.js'; export const foo: number;
+-- node_modules/default-namespace/value.d.ts --
+export const other: number;
+-- node_modules/cjs-default/package.json --
+{"name":"cjs-default","type":"commonjs","main":"./index.js","types":"./index.d.ts"}
+-- node_modules/cjs-default/index.js --
+exports.__esModule = true; exports.default = {}; exports.foo = 1;
+-- node_modules/cjs-default/index.d.ts --
+declare const obj: {}; export default obj; export const foo: number;
+-- node_modules/cjs-default-no-type/package.json --
+{"name":"cjs-default-no-type","main":"./index.js","types":"./index.d.ts"}
+-- node_modules/cjs-default-no-type/index.js --
+exports.__esModule = true; exports.default = {}; exports.foo = 1;
+-- node_modules/cjs-default-no-type/index.d.ts --
+declare const obj: {}; export default obj; export const foo: number;
+-- node_modules/cjs-unknown-star/package.json --
+{"name":"cjs-unknown-star","types":"./index.d.ts"}
+-- node_modules/cjs-unknown-star/index.d.ts --
+export * from 'unavailable'; export const foo: number;
+-- node_modules/cjs-export-equals/package.json --
+{"name":"cjs-export-equals","main":"./index.js","types":"./index.d.ts"}
+-- node_modules/cjs-export-equals/index.js --
+module.exports = { foo: 1, __esModule: false };
+-- node_modules/cjs-export-equals/index.d.ts --
+declare namespace Lib { const foo: number; const __esModule: false; }
+export = Lib;
+

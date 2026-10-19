@@ -56,8 +56,8 @@ func TestNoNamedAsDefaultMemberExtras(t *testing.T) {
 			// Default properties are excluded
 			{Code: `import obj from './base.js'; obj.default; const {default: value} = obj;`},
 			// CommonJS modules like fs-extra do not generate invalid named import suggestions
-			{Code: `import fse from 'fs-extra'; fse.outputFileSync('a', 'text'); fse.remove('a'); fse.readdir('.'); const {outputFileSync} = fse;`, FileName: "interop/consumer.ts", TSConfig: "interop/tsconfig.json"},
-			{Code: `import cjs from 'cjs-package'; cjs.foo; const {foo} = cjs;`, FileName: "interop/consumer.ts", TSConfig: "interop/tsconfig.json"},
+			{Code: `import fse from 'fs-extra'; fse.outputFileSync('a', 'text'); fse.remove('a'); fse.readdir('.'); const {outputFileSync} = fse;`},
+			{Code: `import cjs from 'cjs-package'; cjs.foo; const {foo} = cjs;`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// rslint follows TypeScript's implicit interop default for NodeNext;
@@ -134,125 +134,42 @@ func TestNoNamedAsDefaultMemberExtras(t *testing.T) {
 }
 
 func TestNoNamedAsDefaultMemberModuleFormats(t *testing.T) {
-	for _, config := range []string{"tsconfig.json", "tsconfig.bundler.json", "tsconfig.force.json", "tsconfig.jsx.json", "tsconfig.jsx-dev.json"} {
-		t.Run(config, func(t *testing.T) {
-			root := defaultMemberRoot(t, "testdata/module-formats.txtar")
-			for _, tc := range []struct {
-				source string
-				warn   bool
-			}{
-				{"mixed/mjs.mjs", true},
-				{"mixed/mts.mjs", true},
-				{"mixed/dmts.mjs", true},
-				{"generic-esm", true},
-				{"generic-esm-commonjs-scope", true},
-				{"generic-esm-syntax", true},
-				{"generic-esm-import-meta", true},
-				{"generic-esm-named-only", true},
-				{"dcts-esm", true},
-				{"typed-esm", true},
-				{"conditional", true},
-				{"conditional/feature", true},
-				{"custom-condition", true},
-				{"mapped/esm", true},
-				{"#esm", true},
-				{"declarations-only", true},
-				{"./only-cjs.cjs", false},
-				{"./only-esm.mjs", true},
-				{"generic-cjs", false},
-				{"package.d.ts", false},
-				{"null-exports-cjs", false},
-				{"generic-cjs-dynamic-import", false},
-				{"generic-cjs-jsx-opening", false},
-				{"generic-cjs-jsx-self-closing", false},
-				{"generic-cjs-jsx-fragment", false},
-				{"dmts-cjs", false},
-				{"typed-cjs", false},
-				{"esm-scope-cjs", false},
-			} {
-				t.Run(tc.source, func(t *testing.T) {
-					code := "import obj from '" + tc.source + "'; obj.foo; const {foo} = obj;"
-					var valid []rule_tester.ValidTestCase
-					var invalid []rule_tester.InvalidTestCase
-					if tc.warn {
-						invalid = []rule_tester.InvalidTestCase{{Code: code, FileName: "consumer.mts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamedAsDefaultMember"}, {MessageId: "noNamedAsDefaultMember"}}}}
-					} else {
-						valid = []rule_tester.ValidTestCase{{Code: code, FileName: "consumer.mts"}}
-					}
-					rule_tester.RunRuleTester(root, config, t, &no_named_as_default_member.NoNamedAsDefaultMemberRule, valid, invalid)
-				})
-			}
+	var invalid []rule_tester.InvalidTestCase
+	for _, source := range []string{
+		"esm-in-cjs", "esm-in-cjs/direct.mjs", "esm-in-cjs/source.mts",
+		"esm-with-types", "default-alias", "default-reexport", "default-namespace",
+		"cjs-default", "cjs-default-no-type",
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:     "import obj from '" + source + "';\nobj.foo;\nconst { foo } = obj;",
+			FileName: "formats/consumer.ts", TSConfig: "formats/tsconfig.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				defaultMemberError("obj", "foo", source, 2, 1, 2, 8),
+				defaultMemberError("obj", "foo", source, 3, 9, 3, 12),
+			},
 		})
 	}
-	t.Run("json-runtime", func(t *testing.T) {
-		// A CommonJS consumer receives the JSON object itself as its default,
-		// even when declarations expose the object's keys as named exports or
-		// resolveJsonModule disables TypeScript's implicit JSON declarations.
-		for _, config := range []string{"tsconfig.json", "tsconfig.json-runtime.json", "tsconfig.json-runtime-disabled.json"} {
-			t.Run(config, func(t *testing.T) {
-				for _, tc := range []struct {
-					source string
-					warn   bool
-				}{
-					{"json-runtime", false},
-					{"json-exports", false},
-					{"json-main-dmts", false},
-					{"json-exports-dmts", false},
-					{"json-main-dcts", false},
-					{"json-exports-dcts", false},
-					{"dcts-esm", true},
-					{"dmts-cjs", false},
-				} {
-					t.Run(tc.source, func(t *testing.T) {
-						code := "import obj from '" + tc.source + "'; obj.foo; const {foo} = obj;"
-						var valid []rule_tester.ValidTestCase
-						var invalid []rule_tester.InvalidTestCase
-						if tc.warn {
-							invalid = []rule_tester.InvalidTestCase{{Code: code, FileName: "consumer.cts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamedAsDefaultMember"}, {MessageId: "noNamedAsDefaultMember"}}}}
-						} else {
-							valid = []rule_tester.ValidTestCase{{Code: code, FileName: "consumer.cts"}}
-						}
-						rule_tester.RunRuleTester(defaultMemberRoot(t, "testdata/module-formats.txtar"), config, t, &no_named_as_default_member.NoNamedAsDefaultMemberRule, valid, invalid)
-					})
-				}
-			})
-		}
-	})
-	// Both consumers resolve the same declaration file. The implementation
-	// cache must still distinguish the request's import and require conditions.
-	rule_tester.RunRuleTester(defaultMemberRoot(t, "testdata/module-formats.txtar"), "tsconfig.json", t, &no_named_as_default_member.NoNamedAsDefaultMemberRule,
-		[]rule_tester.ValidTestCase{{Code: `import obj from 'conditional'; obj.foo;`, FileName: "consumer.cts"}},
-		[]rule_tester.InvalidTestCase{{Code: `import obj from 'conditional'; obj.foo;`, FileName: "consumer.mts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamedAsDefaultMember"}}}},
-	)
-}
-
-func TestNoNamedAsDefaultMemberDefaultInterop(t *testing.T) {
-	root := defaultMemberRoot(t, "testdata/module-formats.txtar")
-	for _, config := range []string{"tsconfig.json", "tsconfig.no-interop.json", "tsconfig.bundler.json"} {
-		for _, source := range []string{"interop-marked", "interop-assigned", "interop-plain", "interop-reexport", "interop-star-marker", "./interop-source.cjs", "generic-cjs", "interop-unknown-star"} {
-			for _, file := range []string{"consumer.cts", "consumer.mts"} {
-				t.Run(config+"/"+source+"/"+file, func(t *testing.T) {
-					// Native Node ESM receives the whole CommonJS object. A
-					// transpiler can unwrap default through __esModule instead.
-					// As upstream does for ESM, an authored default is checked
-					// even if it happens to have the same member at runtime.
-					// Unknown star exports, such as fs-extra's export from fs,
-					// do not prove that an __esModule marker is present.
-					warn := source != "generic-cjs" && source != "interop-unknown-star" || config == "tsconfig.no-interop.json"
-					if file == "consumer.mts" && config != "tsconfig.bundler.json" {
-						warn = false
-					}
-					code := "import value from '" + source + "'; value.foo; const {foo} = value;"
-					var valid []rule_tester.ValidTestCase
-					var invalid []rule_tester.InvalidTestCase
-					if warn {
-						invalid = []rule_tester.InvalidTestCase{{Code: code, FileName: file, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamedAsDefaultMember"}, {MessageId: "noNamedAsDefaultMember"}}}}
-					} else {
-						valid = []rule_tester.ValidTestCase{{Code: code, FileName: file}}
-					}
-					rule_tester.RunRuleTester(root, config, t, &no_named_as_default_member.NoNamedAsDefaultMemberRule, valid, invalid)
-				})
-			}
-		}
+	// Explicit ESM formats also win over package metadata in native Node imports.
+	for _, source := range []string{"esm-in-cjs", "esm-in-cjs/direct.mjs", "esm-in-cjs/source.mts"} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:     "import obj from '" + source + "';\nobj.foo;",
+			FileName: "formats-node/consumer.mts", TSConfig: "formats-node/tsconfig.json",
+			Errors: []rule_tester.InvalidTestCaseError{defaultMemberError("obj", "foo", source, 2, 1, 2, 8)},
+		})
 	}
+	rule_tester.RunRuleTester(defaultMemberRoot(t, "testdata/extras.txtar"), "tsconfig.json", t, &no_named_as_default_member.NoNamedAsDefaultMemberRule,
+		[]rule_tester.ValidTestCase{
+			// Unknown star exports are not evidence of an authored default.
+			{Code: `import obj from 'cjs-unknown-star'; obj.foo; const {foo} = obj;`, FileName: "formats/consumer.ts", TSConfig: "formats/tsconfig.json"},
+			// A marker name alone does not identify a separate default object.
+			{Code: `import obj from 'cjs-export-equals'; obj.foo; const {foo} = obj;`, FileName: "interop/consumer.ts", TSConfig: "interop/tsconfig.json"},
+			// Native Node ESM defaults contain the CommonJS namespace, even when
+			// that namespace also exposes its own default and __esModule members.
+			{Code: `import obj from 'cjs-default'; obj.foo; const {foo} = obj;`, FileName: "formats-node/consumer.mts", TSConfig: "formats-node/tsconfig.json"},
+			{Code: `import obj from 'cjs-default-no-type'; obj.foo; const {foo} = obj;`, FileName: "formats-node/consumer.mts", TSConfig: "formats-node/tsconfig.json"},
+			// The existing NodeNext declaration view can be CommonJS even when
+			// the hidden implementation is ESM. This rule does not inspect it.
+			{Code: `import obj from 'esm-with-types'; obj.foo; const {foo} = obj;`, FileName: "formats-node/consumer.mts", TSConfig: "formats-node/tsconfig.json"},
+		}, invalid,
+	)
 }

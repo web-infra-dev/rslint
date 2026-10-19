@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"slices"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -11,6 +12,51 @@ import (
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
+
+// HasCommonJSNamespaceDefault recognizes CommonJS namespace defaults from the
+// resolved module. An authored default in a generic declaration does not imply
+// that the module's named exports are properties of that default.
+func HasCommonJSNamespaceDefault(ctx rule.RuleContext, source modules.Source) bool {
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
+		return false
+	}
+	index := IndexFor(ctx)
+	link := resolveExportLinkForLookup(ctx.Program(), ctx.SourceFile, index.settings, source)
+	if !link.Resolved {
+		return false
+	}
+	if strings.HasSuffix(link.Path, ".mjs") || strings.HasSuffix(link.Path, ".mts") {
+		return false
+	}
+	if link.NodeDefault {
+		return true
+	}
+	if strings.HasSuffix(link.Path, ".cjs") || strings.HasSuffix(link.Path, ".cts") || strings.HasSuffix(link.Path, ".d.cts") {
+		return true
+	}
+	if link.Target == nil {
+		return false
+	}
+	if link.Target.IsDeclarationFile {
+		exports, available := GetExportMap(ctx, source)
+		if available && exports.Get(defaultExportName) != nil {
+			return false
+		}
+	}
+	meta := ctx.Program().SourceFileMetadata(link.Target)
+	if meta.PackageJsonType == "commonjs" {
+		return true
+	}
+	if (strings.Contains(link.Path, "/node_modules/") || strings.Contains(link.Path, "\\node_modules\\")) && meta.PackageJsonType != "module" {
+		if link.Target.IsDeclarationFile {
+			return isCommonJSDeclaration(ctx.Program(), link.Target)
+		}
+		if link.Target.ExternalModuleIndicator == nil || !ast.IsExternalModuleIndicator(link.Target.ExternalModuleIndicator) {
+			return true
+		}
+	}
+	return false
+}
 
 // GetLocalExportNames returns names declared by the resolved module itself,
 // including local export lists and namespace aliases, but not named or star

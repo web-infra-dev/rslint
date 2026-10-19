@@ -373,11 +373,7 @@ func compilerOptionsESModuleInterop(sourceProgram *program.Program) bool {
 	if !sourceProgram.IsValid() || sourceProgram.Options() == nil {
 		return false
 	}
-	return compilerOptionsESModuleInteropForOptions(sourceProgram.Options())
-}
-
-//nolint:staticcheck // Preserve explicit legacy interop options for import rules.
-func compilerOptionsESModuleInteropForOptions(options *core.CompilerOptions) bool {
+	options := sourceProgram.Options()
 	if options.ESModuleInterop != core.TSUnknown {
 		return options.ESModuleInterop == core.TSTrue
 	}
