@@ -4,13 +4,13 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
@@ -18,7 +18,8 @@ import (
 // IsCommonJSModule identifies the implementation's format independently of a
 // generic declaration file, which may describe ESM or live in @types.
 func IsCommonJSModule(ctx rule.RuleContext, source modules.Source) bool {
-	return isCommonJSImplementation(ctx.Program(), implementationPath(ctx, source))
+	p, path := commonJSImplementation(ctx, source)
+	return isCommonJSImplementation(p, path)
 }
 
 // HasCommonJSNamespaceDefault exempts native Node defaults and declarations
@@ -27,8 +28,8 @@ func IsCommonJSModule(ctx rule.RuleContext, source modules.Source) bool {
 // that from arbitrary CommonJS assignments would require executing the module.
 func HasCommonJSNamespaceDefault(ctx rule.RuleContext, source modules.Source) bool {
 	p := ctx.Program()
-	path := implementationPath(ctx, source)
-	if !isCommonJSImplementation(p, path) {
+	runtime, path := commonJSImplementation(ctx, source)
+	if !isCommonJSImplementation(runtime, path) {
 		return false
 	}
 	options := p.OptionsForFile(ctx.SourceFile)
@@ -56,42 +57,60 @@ func HasCommonJSNamespaceDefault(ctx rule.RuleContext, source modules.Source) bo
 	return available && exports.Get(defaultExportName) == nil && exports.Get("__esModule") == nil
 }
 
-func implementationPath(ctx rule.RuleContext, source modules.Source) string {
+// Only a declaration-backed import needs external runtime evidence. Ordinary
+// source imports retain the compiler's AST, module graph and export semantics.
+func commonJSImplementation(ctx rule.RuleContext, source modules.Source) (*program.Program, string) {
 	p := ctx.Program()
 	if !p.IsValid() || !p.OwnsSourceFile(ctx.SourceFile) {
-		return ""
+		return p, ""
 	}
 	link := resolveExportLinkForLookup(p, ctx.SourceFile, IndexFor(ctx).settings, source)
 	if !link.Resolved {
-		return ""
+		return p, ""
 	}
 	if link.Target != nil && link.Target.IsDeclarationFile {
 		request := source.Specifier().Text()
 		_, subpath := module.ParsePackageName(request)
 		if tspath.IsDeclarationFileName(request) && (tspath.IsExternalModuleNameRelative(request) || strings.HasPrefix(request, "#") || subpath != "") {
-			return link.Path
+			return p, link.Path
 		}
-		if path := moduleresolver.ResolveImplementation(p, ctx.SourceFile, source); path != "" && !tspath.IsDeclarationFileName(path) {
-			return path
+		runtime := commonJSRuntimeView(ctx)
+		mode := p.GetModeForUsageLocation(ctx.SourceFile, source.Specifier())
+		if path := resolveRuntimeImplementation(runtime, request, ctx.SourceFile.FileName(), mode); path != "" && !tspath.IsDeclarationFileName(path) {
+			return runtime, path
 		}
 	}
-	return link.Path
+	return p, link.Path
+}
+
+type commonJSRuntimeViewKey struct{}
+
+// The existing rootless Program provides package lookup, resolution and caches
+// without copying compiler ASTs or constructing another type-checking graph.
+// Its lifetime is one file's lint pass, so a reused editor Program cannot retain
+// old implementation text, negative lookups or package metadata.
+func commonJSRuntimeView(ctx rule.RuleContext) *program.Program {
+	return rule.CachedByFile(ctx, commonJSRuntimeViewKey{}, func() *program.Program {
+		p := ctx.Program()
+		host := compiler.NewCompilerHost(p.CurrentDirectory(), p.ExternalFileSystem(), p.DefaultLibraryPath(), nil, nil, nil)
+		runtime, _ := program.NewFromRoots(program.RootOptions{
+			Host: host, CompilerOptions: p.OptionsForFile(ctx.SourceFile), SingleThreaded: true,
+		})
+		return runtime
+	})
 }
 
 type commonJSImplementationKey string
 type implementationSourceKey string
 
-// Runtime inspection reads the generation's filesystem even when the compiler
-// already loaded this path. An editor can retain the old dependency AST while
-// a symlink alias supplies newer, unsaved text in the generation's overlay.
 func implementationSource(p *program.Program, path string) *ast.SourceFile {
+	if file := p.GetSourceFile(path); file != nil {
+		return file
+	}
 	return program.Cached(p, implementationSourceKey(path), func() *ast.SourceFile {
 		text, ok := p.FS().ReadFile(path)
 		if !ok {
 			return nil
-		}
-		if file := p.GetSourceFile(path); file != nil && file.Text() == text {
-			return file
 		}
 		kind := core.GetScriptKindFromFileName(path)
 		if kind == core.ScriptKindUnknown {

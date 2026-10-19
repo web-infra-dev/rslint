@@ -428,9 +428,9 @@ func (r *lintProgramRequest) cover(state *lintProgramState) (added bool, safe bo
 	return added, true
 }
 
-// fileSystemForGeneration keeps rule reads on this request's editor overlay.
-// Session Programs can retain an older filesystem snapshot for implementation
-// files outside their TypeScript graph, so their compiler host is not suitable.
+// fileSystemForGeneration tracks external dependency reads on this request's
+// editor overlay. Session Programs can retain an older filesystem snapshot for
+// implementations behind declarations; their source view stays unchanged.
 func (r *lintProgramRequest) fileSystemForGeneration(program *compiler.Program) vfs.FS {
 	r.prepareOverlay()
 	if r.usedState != nil && r.usedState.program == program {

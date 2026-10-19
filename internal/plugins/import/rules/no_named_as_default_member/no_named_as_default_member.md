@@ -56,8 +56,9 @@ This rule has no options. It does not provide automatic fixes or suggestions.
   package. If the implementation is unavailable, a generic `.d.ts` file alone
   does not suppress warnings; an explicit `.d.cts` extension identifies CommonJS.
   Package entry targets keep their authored extension: an adjacent `index.ts`
-  cannot replace `"main": "./index.js"`. Runtime package lookup also supports
-  exports URL paths and Node's extensionless JSON main fallback.
+  cannot replace `"main": "./index.js"`, and `moduleSuffixes` cannot select a
+  different runtime entry. Runtime package lookup also supports exports URL
+  paths and Node's extensionless JSON main fallback.
 - **CommonJS defaults follow the importing file's interop mode.** Native Node
   ESM imports receive the CommonJS object as their default. Other imports retain
   named-member warnings when the declaration explicitly exports `default` or

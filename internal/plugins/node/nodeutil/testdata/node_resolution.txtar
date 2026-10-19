@@ -41,6 +41,24 @@ export default 1;
 export default 1;
 -- node_modules/_http_agent/index.js --
 export default 1;
+-- node_modules/directory-main/package.json --
+{"main":"./lib"}
+-- node_modules/directory-main/lib/package.json --
+{"main":"./other.js"}
+-- node_modules/directory-main/lib/index.js --
+module.exports = 1;
+-- node_modules/directory-main/lib/other.js --
+export default 1;
+-- node_modules/directory-main/trailing/package.json --
+{"main":"./lib/"}
+-- node_modules/directory-main/trailing/lib/index.js --
+module.exports = 1;
+-- node_modules/exact-index/package.json --
+{}
+-- node_modules/exact-index/index.js.js --
+export default 1;
+-- node_modules/exact-index/index.json --
+{"foo":1}
 -- alias-context/input.mts --
 import type { Value } from 'alias' with { "resolution-mode": "import" };
 import type { Value } from 'alias' with { "resolution-mode": "require" };

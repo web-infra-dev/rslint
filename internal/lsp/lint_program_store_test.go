@@ -334,7 +334,7 @@ func TestLintProgramStoreProjectServiceFinalizesSelectedProject(t *testing.T) {
 		t.Fatalf("built a Program beyond the metadata-selected project: selected=%s Programs=%v", selected.configPath, store.programs)
 	}
 	// Emulate a checker's lazy dependency read outside the existing coverage.
-	request.fileSystemForGeneration(selected.program).FileExists(tspath.NormalizePath(filepath.Join(t.TempDir(), "lazy.d.ts")))
+	selected.program.Host().FS().FileExists(tspath.NormalizePath(filepath.Join(t.TempDir(), "lazy.d.ts")))
 	request.finalize()
 	if store.programs[selectedKey] != nil {
 		t.Fatal("selected fallback retained lazy reads predating watcher coverage")

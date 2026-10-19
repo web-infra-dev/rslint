@@ -307,6 +307,18 @@ func commonJSCacheContext(t *testing.T, p *lintprogram.Program, fileName string)
 	return (rule.RuleContext{SourceFile: file}).WithProgram(p), modules.SourceFromSpecifier(firstImportSpecifier(t, file))
 }
 
+// Each file pass is serial; the counter observes runtime cache reuse without
+// sharing a FileCache between concurrent workers.
+type commonJSReadCountingFS struct {
+	vfs.FS
+	reads int
+}
+
+func (fs *commonJSReadCountingFS) ReadFile(path string) (string, bool) {
+	fs.reads++
+	return fs.FS.ReadFile(path)
+}
+
 func TestCommonJSImplementationCacheAcrossRequestsAndBackends(t *testing.T) {
 	root := commonJSCacheRoot(t)
 	for _, config := range []string{"tsconfig.json", "tsconfig.forced.json"} {
@@ -391,6 +403,52 @@ func TestCommonJSImplementationCacheGenerationIsolation(t *testing.T) {
 			}
 		})
 	}
+	t.Run("reused compiler with separate file passes", func(t *testing.T) {
+		raw := commonJSCacheCompiler(t, root, "tsconfig.json", osvfs.FS())
+		for _, change := range []struct {
+			name string
+			path string
+			text string
+		}{
+			{"implementation syntax", "node_modules/shared/cjs/index.js", `export default {}; export const foo = 1;`},
+			{"new package boundary", "node_modules/shared/cjs/package.json", `{"type":"module"}`},
+			{"package entry", "node_modules/shared/package.json", `{"exports":{"./commonjs":{"types":"./index.d.ts","default":"./esm/index.js"}}}`},
+		} {
+			t.Run(change.name, func(t *testing.T) {
+				beforeFS := &commonJSReadCountingFS{FS: osvfs.FS()}
+				afterFS := &commonJSReadCountingFS{FS: rslint_utils.NewOverlayVFS(osvfs.FS(), map[string]string{
+					tspath.ResolvePath(root, change.path): change.text,
+				})}
+				before := lintprogram.NewFromCompilerWithExternalFileSystem(raw, beforeFS)
+				after := lintprogram.NewFromCompilerWithExternalFileSystem(raw, afterFS)
+				beforeContext, beforeSource := commonJSCacheContext(t, before, "second-consumer.mts")
+				afterContext, afterSource := commonJSCacheContext(t, after, "second-consumer.mts")
+				beforeContext = beforeContext.WithFileCache(rule.NewFileCache())
+				afterContext = afterContext.WithFileCache(rule.NewFileCache())
+				if beforeContext.SourceFile != afterContext.SourceFile || before.FS() != after.FS() {
+					t.Fatal("file passes must reuse the same compiler source generation")
+				}
+				if !import_utils.IsCommonJSModule(beforeContext, beforeSource) {
+					t.Fatal("initial file pass lost its CommonJS implementation")
+				}
+				if import_utils.IsCommonJSModule(afterContext, afterSource) {
+					t.Fatal("new file pass reused the previous runtime evidence")
+				}
+				beforeReads, afterReads := beforeFS.reads, afterFS.reads
+				if beforeReads == 0 || afterReads == 0 {
+					t.Fatal("file passes did not inspect their external filesystems")
+				}
+				for range 3 {
+					if !import_utils.IsCommonJSModule(beforeContext, beforeSource) || import_utils.IsCommonJSModule(afterContext, afterSource) {
+						t.Fatal("independent file-pass caches changed each other's result")
+					}
+				}
+				if beforeFS.reads != beforeReads || afterFS.reads != afterReads {
+					t.Fatalf("warm file passes repeated external reads: before %d -> %d; after %d -> %d", beforeReads, beforeFS.reads, afterReads, afterFS.reads)
+				}
+			})
+		}
+	})
 }
 
 func TestCommonJSImplementationCacheUsesReferencedOptions(t *testing.T) {
@@ -412,15 +470,14 @@ func TestCommonJSImplementationCacheUsesReferencedOptions(t *testing.T) {
 					}
 					p := lintprogram.NewFromCompiler(raw)
 					if backend == "filesystem" {
-						p = lintprogram.NewFromCompilerWithFileSystem(raw, fs)
+						p = lintprogram.NewFromCompilerWithExternalFileSystem(raw, fs)
 					}
 					entries := []string{"root.ts", "reference.ts"}
 					if referenceFirst {
 						entries[0], entries[1] = entries[1], entries[0]
 					}
-					// Both sources share one Program and runtime resolver cache.
-					// Reversing the first request catches either project's options
-					// being reused for the other after the resolver has been warmed.
+					// Both sources share one compiler Program. Runtime reads must
+					// still use the importing source's referenced project options.
 					for range 3 {
 						for _, entry := range entries {
 							ctx, source := commonJSCacheContext(t, p, entry)
@@ -445,7 +502,7 @@ func TestCommonJSImplementationCacheUsesReferencedOptions(t *testing.T) {
 								!declaration.IsDeclarationFile || path != tspath.ResolvePath(root, declarationName) {
 								t.Fatalf("%s declaration = %q, want %q", entry, path, declarationName)
 							}
-							if got, want := import_utils.IsCommonJSModule(ctx, source), entry == "reference.ts"; got != want {
+							if got, want := import_utils.IsCommonJSModule(ctx, source), entry == "reference.ts" && options != "suffixes"; got != want {
 								t.Errorf("%s: IsCommonJSModule = %v, want %v", entry, got, want)
 							}
 						}

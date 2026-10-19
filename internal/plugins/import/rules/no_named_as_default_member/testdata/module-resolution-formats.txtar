@@ -249,7 +249,37 @@ export const foo: number;
 -- tsconfig.no-json.json --
 {"extends":"./tsconfig.json","compilerOptions":{"resolveJsonModule":false}}
 -- tsconfig.implementation-paths.json --
-{"extends":"./tsconfig.json","compilerOptions":{"paths":{"mapped-ts-esm":["./types/unknown.d.ts","./runtime/explicit-esm.ts"],"mapped-ts-cjs":["./types/unknown.d.ts","./runtime/explicit-cjs.ts"],"mapped-ts-source":["./types/unknown.d.ts","./runtime/source-only.js"]}}}
+{"extends":"./tsconfig.json","compilerOptions":{"paths":{"mapped-ts-esm":["./types/unknown.d.ts","./runtime/explicit-esm.ts"],"mapped-ts-cjs":["./types/unknown.d.ts","./runtime/explicit-cjs.ts"],"mapped-ts-source":["./types/unknown.d.ts","./runtime/source-only.js"],"mapped-fallback":["./types/unknown.d.ts","./missing.ts"],"mapped-wild/*":["./types/unknown.d.ts","./runtime/mapped/*.js"],"mapped-wild/pre*":["./types/unknown.d.ts","./runtime/explicit-esm.ts"],"mapped-declaration/*":["./types/unknown.d.ts","./types/*.ts"],"mapped-suffixed":["./types/unknown.d.ts","./runtime/suffixed.js"],"mapped-js-cjs":["./types/unknown.d.ts","./runtime/explicit-esm.js"],"mapped-js-esm":["./types/unknown.d.ts","./runtime/explicit-cjs.js"],"mapped-extension-from-name/*":["./types/unknown.d.ts","./runtime/*"]}}}
+-- tsconfig.implementation-suffixes.json --
+{"extends":"./tsconfig.implementation-paths.json","compilerOptions":{"moduleSuffixes":[".native",""]}}
+-- node_modules/mapped-ts-esm/package.json --
+{"main":"./index.cjs"}
+-- node_modules/mapped-ts-esm/index.cjs --
+module.exports = {foo: 1};
+-- node_modules/mapped-ts-cjs/package.json --
+{"main":"./index.mjs"}
+-- node_modules/mapped-ts-cjs/index.mjs --
+export default {}; export const foo = 1;
+-- node_modules/mapped-fallback/package.json --
+{"main":"./index.js"}
+-- node_modules/mapped-fallback/index.js --
+module.exports = {foo: 1};
+-- node_modules/mapped-fallback/index.ts --
+export default {}; export const foo = 1;
+-- runtime/mapped/cjs.js --
+module.exports = {foo: 1};
+-- runtime/mapped/prefix.js --
+module.exports = {foo: 1};
+-- types/foo.d.ts --
+export const foo: number;
+-- types/foo.js --
+module.exports = {foo: 1};
+-- runtime/suffixed.js --
+export default {}; export const foo = 1;
+-- runtime/suffixed.native.js --
+module.exports = {foo: 1};
+-- runtime/suffixed.native.ts --
+export default {}; export const foo = 1;
 -- runtime/explicit-esm.ts --
 export default {}; export const foo = 1;
 -- runtime/explicit-esm.js --
@@ -489,4 +519,12 @@ export const foo: number;
 -- node_modules/implicit-main-json/index --
 export default {}; export const foo = 1;
 -- node_modules/implicit-main-json/index.json --
+{"foo":1}
+-- node_modules/exact-index-json/package.json --
+{"types":"./types.d.ts"}
+-- node_modules/exact-index-json/types.d.ts --
+export const foo: number;
+-- node_modules/exact-index-json/index.js.js --
+export default {}; export const foo = 1;
+-- node_modules/exact-index-json/index.json --
 {"foo":1}

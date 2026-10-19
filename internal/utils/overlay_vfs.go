@@ -33,20 +33,10 @@ func (vfs *OverlayVFS) FileExists(path string) bool {
 }
 
 func (vfs *OverlayVFS) ReadFile(path string) (contents string, ok bool) {
-	if src, ok := vfs.ReadOverlayFile(path); ok {
-		return src, true
+	if src, ok := vfs.virtualFile(path); ok {
+		return strings.TrimPrefix(src, BOM), ok
 	}
 	return vfs.fs.ReadFile(path)
-}
-
-// ReadOverlayFile returns parser-ready text only when this overlay supplies it.
-// It uses the same path identity and BOM handling as ReadFile, without reading
-// file contents from the underlying filesystem.
-func (vfs *OverlayVFS) ReadOverlayFile(path string) (string, bool) {
-	if src, ok := vfs.virtualFile(path); ok {
-		return strings.TrimPrefix(src, BOM), true
-	}
-	return "", false
 }
 
 // SourceHasBOM answers for content this overlay supplies; anything else is the

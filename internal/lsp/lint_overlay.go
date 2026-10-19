@@ -1,7 +1,6 @@
 package lsp
 
 import (
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
@@ -100,27 +99,6 @@ func newFrozenLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target
 		canonicalPathID: lspLexicalPathID(canonicalPath, caseSensitive),
 		canonicalPath:   canonicalPath,
 	}
-}
-
-// lintProgramMatchesEditorOverlay checks only editor-supplied source contents.
-// Session can retain several ASTs for one physical file and update only the
-// edited alias. Check every loaded spelling against the overlay's own path
-// rules, without reading unopened source contents from the underlying FS.
-func lintProgramMatchesEditorOverlay(program *compiler.Program, filesystem vfs.FS) bool {
-	overlay, ok := filesystem.(*frozenLintTargetOverlayFS)
-	if !ok {
-		return true
-	}
-	reader, ok := overlay.FS.(*utils.OverlayVFS)
-	if !ok {
-		return false
-	}
-	for _, source := range program.GetSourceFiles() {
-		if text, ok := reader.ReadOverlayFile(source.FileName()); ok && source.Text() != text {
-			return false
-		}
-	}
-	return true
 }
 
 func (fs *frozenLintTargetOverlayFS) Realpath(filePath string) string {

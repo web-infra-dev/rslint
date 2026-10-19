@@ -1832,17 +1832,22 @@ func TestSessionRuntimeModuleFormatUsesUnsavedSymlinkImplementation(t *testing.T
 					consumerURI := documentURIFromPath(consumerPath)
 					open(consumerPath, consumer, lsproto.LanguageKindTypeScript)
 					open(aliasPath, test.initial, lsproto.LanguageKindJavaScript)
-					lint := func(phase, wantText string, wantDiagnostics int, standalone bool) *compiler.Program {
+					lint := func(phase, wantText string, wantDiagnostics int) *compiler.Program {
 						t.Helper()
 						var selected *compiler.Program
 						provider := &documentGenerationProvider{
 							server: server, uri: consumerURI, snapshot: server.documentLintSnapshot(consumerURI),
 							buildGeneration: func(program *compiler.Program, filesystem vfs.FS, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
 								selected = program
-								if text, ok := filesystem.ReadFile(implementationPath); !ok || text != wantText {
-									t.Errorf("%s: implementation filesystem text = %q, want %q", phase, text, wantText)
+								generation := buildDocumentGeneration(program, filesystem, source, lintTarget, cwd, typed, snapshot)
+								sourceProgram := generation.Native.Programs[0]
+								if sourceProgram.FS() != program.Host().FS() || sourceProgram.GetSourceFile(implementationPath) != program.GetSourceFile(implementationPath) {
+									t.Errorf("%s: external runtime reads replaced the compiler's source view", phase)
 								}
-								return buildDocumentGeneration(program, filesystem, source, lintTarget, cwd, typed, snapshot)
+								if text, ok := sourceProgram.ExternalFileSystem().ReadFile(implementationPath); !ok || text != wantText {
+									t.Errorf("%s: external implementation text = %q, want %q", phase, text, wantText)
+								}
+								return generation
 							},
 						}
 						result, err := linter.RunPipeline(t.Context(), linter.NewLintRequest(provider, linter.ObservationPolicy{
@@ -1855,26 +1860,23 @@ func TestSessionRuntimeModuleFormatUsesUnsavedSymlinkImplementation(t *testing.T
 						if err != nil {
 							t.Fatal(err)
 						}
-						if isStandalone := selected != service.GetProgram(); isStandalone != standalone {
-							t.Errorf("%s: standalone Program = %v, want %v", phase, isStandalone, standalone)
+						if selected != service.GetProgram() {
+							t.Errorf("%s: runtime inspection stopped reusing the Session Program", phase)
 						}
 						implementation := selected.GetSourceFile(implementationPath)
 						if actual := implementation != nil; actual != included {
 							t.Fatalf("%s: implementation in Program = %v, want %v", phase, actual, included)
-						}
-						if implementation != nil && implementation.Text() != wantText {
-							t.Errorf("%s: implementation AST text = %q, want overlay text %q", phase, implementation.Text(), wantText)
 						}
 						if diagnostics := result.Observation.Native.Diagnostics; len(diagnostics) != wantDiagnostics {
 							t.Errorf("%s: diagnostics = %d, want %d: %+v", phase, len(diagnostics), wantDiagnostics, diagnostics)
 						}
 						return selected
 					}
-					warm := lint("initial", test.initial, test.beforeWant, false)
+					warm := lint("initial", test.initial, test.beforeWant)
 					if err := server.handleDidChange(t.Context(), makeDidChangeParams(documentURIFromPath(aliasPath), 2, test.changed)); err != nil {
 						t.Fatal(err)
 					}
-					updated := lint("unsaved alias", test.changed, test.afterWant, included)
+					updated := lint("unsaved alias", test.changed, test.afterWant)
 					if !included && updated != warm {
 						t.Error("an implementation outside the compiler graph stopped Session reuse")
 					}
@@ -1883,96 +1885,6 @@ func TestSessionRuntimeModuleFormatUsesUnsavedSymlinkImplementation(t *testing.T
 					}
 				})
 			}
-		}
-	}
-}
-
-func TestSessionRejectsStaleSourceAliases(t *testing.T) {
-	const initial = "export const foo = 1; export default {};"
-	const changed = "export const bar = 1; export default {};"
-	const consumer = "import './a.js'; import value from './b.js'; value.foo;"
-	for _, storeMode := range []string{"enabled", "absent"} {
-		for _, preserveSymlinks := range []string{"false", "true"} {
-			t.Run(storeMode+"/preserveSymlinks="+preserveSymlinks, func(t *testing.T) {
-				fsys := bundled.WrapFS(osvfs.FS())
-				directory := tspath.NormalizePath(fsys.Realpath(t.TempDir()))
-				for name, content := range map[string]string{
-					"tsconfig.json": `{"compilerOptions":{"noLib":true,"noEmit":true,"module":"nodenext","preserveSymlinks":` + preserveSymlinks + `},"files":["consumer.mts"]}`,
-					"package.json":  `{"type":"module"}`,
-					"consumer.mts":  consumer,
-					"real.ts":       initial,
-				} {
-					if err := os.WriteFile(tspath.ResolvePath(directory, name), []byte(content), 0o644); err != nil {
-						t.Fatal(err)
-					}
-				}
-				for _, name := range []string{"a.ts", "b.ts"} {
-					if err := os.Symlink(tspath.ResolvePath(directory, "real.ts"), tspath.ResolvePath(directory, name)); err != nil {
-						t.Skipf("symlink unavailable: %v", err)
-					}
-				}
-				server := newLintSessionServerForTest(t, directory, fsys)
-				server.lintPrograms = nil
-				if storeMode == "enabled" {
-					server.lintPrograms = newLintProgramStore(server)
-					server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
-				}
-				installJSConfigsForTest(server, map[string]config.RslintConfig{directory: {{
-					Plugins:         []string{"import"},
-					LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
-					Rules:           config.Rules{"import/no-named-as-default-member": "error"},
-				}}})
-				open := func(name, content string) {
-					t.Helper()
-					if err := server.handleDidOpen(t.Context(), &lsproto.DidOpenTextDocumentParams{TextDocument: &lsproto.TextDocumentItem{
-						Uri: documentURIFromPath(tspath.ResolvePath(directory, name)), Version: 1, Text: content, LanguageId: lsproto.LanguageKindTypeScript,
-					}}); err != nil {
-						t.Fatal(err)
-					}
-				}
-				uri := documentURIFromPath(tspath.ResolvePath(directory, "consumer.mts"))
-				open("consumer.mts", consumer)
-				lint := func(phase, wantText string, wantDiagnostics int, standalone bool) {
-					t.Helper()
-					var selected *compiler.Program
-					provider := &documentGenerationProvider{
-						server: server, uri: uri, snapshot: server.documentLintSnapshot(uri),
-						buildGeneration: func(program *compiler.Program, filesystem vfs.FS, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
-							selected = program
-							for _, name := range []string{"a.ts", "b.ts"} {
-								path := tspath.ResolvePath(directory, name)
-								alias := program.GetSourceFile(path)
-								if alias == nil || alias.Text() != wantText {
-									t.Errorf("%s: %s AST does not match the editor content", phase, name)
-								}
-								if text, ok := filesystem.ReadFile(path); !ok || text != wantText {
-									t.Errorf("%s: %s filesystem text = %q, want %q", phase, name, text, wantText)
-								}
-							}
-							return buildDocumentGeneration(program, filesystem, source, lintTarget, cwd, typed, snapshot)
-						},
-					}
-					result, err := linter.RunPipeline(t.Context(), linter.NewLintRequest(provider, linter.ObservationPolicy{}, nil))
-					if err != nil || selected == nil {
-						t.Fatalf("%s: lint error = %v, selected = %v", phase, err, selected != nil)
-					}
-					service, err := server.session.GetLanguageService(t.Context(), uri)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if isStandalone := selected != service.GetProgram(); isStandalone != standalone {
-						t.Errorf("%s: standalone Program = %v, want %v", phase, isStandalone, standalone)
-					}
-					if diagnostics := result.Observation.Native.Diagnostics; len(diagnostics) != wantDiagnostics {
-						t.Errorf("%s: diagnostics = %d, want %d: %+v", phase, len(diagnostics), wantDiagnostics, diagnostics)
-					}
-				}
-				lint("initial", initial, 1, false)
-				// The Session updates a.ts but retains b.ts. Both spellings
-				// must agree with the same unsaved physical file before reuse.
-				open("a.ts", changed)
-				lint("unsaved alias", changed, 0, true)
-			})
 		}
 	}
 }

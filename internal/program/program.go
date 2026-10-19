@@ -26,6 +26,10 @@ type Program struct {
 	source sourceBackend
 	types  typeBackend
 	cache  *derivedCache
+
+	// externalFileSystem is an optional per-lint view for files behind declarations.
+	// It does not replace the compiler source universe or its derived cache.
+	externalFileSystem vfs.FS
 }
 
 // sourceBackend is the private Adapter side of the facade. It intentionally
@@ -68,14 +72,6 @@ type compilerBackend struct {
 	raw *compiler.Program
 }
 
-// compilerFileSystemBackend retains the compiler's source and type services,
-// while extra reads belong to the integration's current filesystem view.
-type compilerFileSystemBackend struct {
-	*compilerBackend
-	fs       vfs.FS
-	resolver *module.Resolver
-}
-
 // IsValid reports whether Program was created by this package. The zero value
 // is invalid and is rejected at linter boundaries before callbacks run.
 func (p *Program) IsValid() bool {
@@ -94,25 +90,30 @@ func NewFromCompiler(raw *compiler.Program) *Program {
 	return &Program{source: backend, types: backend, cache: cacheForCompiler(raw)}
 }
 
-// NewFromCompilerWithFileSystem gives one lint generation its own filesystem
-// view and derived cache while retaining the compiler's unchanged ASTs and type
-// services. Editors can reuse a compiler Program when only an implementation
-// behind a declaration changes; its frozen host and shared cache are then too
-// old for rules that inspect files outside the compiler's source universe.
-// The caller must keep loaded source files consistent with raw and provide a
-// stable filesystem view for the lifetime of this lint generation.
-func NewFromCompilerWithFileSystem(raw *compiler.Program, fs vfs.FS) *Program {
+// NewFromCompilerWithExternalFileSystem supplies current external-file contents
+// to a lint pass that reuses a compiler generation. Source ASTs, the compiler
+// filesystem, resolution and derived caches retain their original identity.
+func NewFromCompilerWithExternalFileSystem(raw *compiler.Program, fs vfs.FS) *Program {
 	if raw == nil || isNilInterface(fs) {
 		return nil
 	}
-	compilerSource := &compilerBackend{raw: raw}
-	host := compiler.NewCompilerHost(raw.Host().GetCurrentDirectory(), fs, raw.Host().DefaultLibraryPath(), nil, nil, nil)
-	backend := &compilerFileSystemBackend{
-		compilerBackend: compilerSource,
-		fs:              fs,
-		resolver:        module.NewResolver(host, raw.Options(), "", "", nil),
+	p := NewFromCompiler(raw)
+	p.externalFileSystem = fs
+	return p
+}
+
+// ExternalFileSystem supplies files inspected behind declarations, which may
+// be absent from the compiler graph. Such reads must not use the source cache:
+// an editor can change these files while reusing the same compiler generation.
+// Ordinary CLI and parser-backed Programs use their existing filesystem.
+func (p *Program) ExternalFileSystem() vfs.FS {
+	if !p.IsValid() {
+		return nil
 	}
-	return &Program{source: backend, types: compilerSource, cache: &derivedCache{}}
+	if p.externalFileSystem != nil {
+		return p.externalFileSystem
+	}
+	return p.FS()
 }
 
 // NewFromCompilers adapts programs in stable input order.
@@ -451,28 +452,6 @@ func (b *compilerBackend) resolvedModule(file ast.HasFileName, name string, mode
 }
 func (b *compilerBackend) resolveModuleName(name string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule {
 	return b.raw.ResolveModuleName(name, containingFile, mode)
-}
-
-func (b *compilerFileSystemBackend) fileSystem() vfs.FS { return b.fs }
-func (b *compilerFileSystemBackend) fileExists(path string) bool {
-	return b.fs.FileExists(path)
-}
-func (b *compilerFileSystemBackend) nearestPackageJSONDirectory(directory string) string {
-	scope := b.resolver.GetPackageScopeForPath(directory)
-	if scope.Exists() {
-		return scope.PackageDirectory
-	}
-	return ""
-}
-func (b *compilerFileSystemBackend) resolveModuleName(name string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule {
-	var redirect module.ResolvedProjectReference
-	if source := b.raw.GetSourceFile(containingFile); source != nil {
-		if config := b.raw.GetRedirectForResolution(source); config != nil {
-			redirect = config
-		}
-	}
-	resolved, _ := b.resolver.ResolveModuleName(name, containingFile, mode, redirect)
-	return resolved
 }
 
 func (b *compilerBackend) sourceFileForResolvedModule(fileName string) *ast.SourceFile {

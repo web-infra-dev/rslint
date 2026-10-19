@@ -86,72 +86,35 @@ func TestOwnedCompilerProgramsShareCacheOnlyWithinBatch(t *testing.T) {
 	}
 }
 
-func TestCompilerFileSystemGenerations(t *testing.T) {
-	const directory = "/specifier-cache-fixture/runtime"
-	const implementation = directory + "/index.js"
-	const added = directory + "/added.js"
+func TestCompilerExternalFileSystem(t *testing.T) {
+	const implementation = "/specifier-cache-fixture/runtime/index.js"
+	const oldText = "module.exports = {value: 1};"
+	const newText = "export const value = 1; export default {};"
 	files := specifierCacheFiles(false)
-	files["/specifier-cache-fixture/package.json"] = `{}`
-	files[implementation] = "module.exports = {value: 1};"
+	files[implementation] = oldText
 	raw, fsys := specifierCacheProgram(t, files)
 	source := specifierCacheFile(t, raw)
 	shared := lintprogram.NewFromCompiler(raw)
-	before := lintprogram.NewFromCompilerWithFileSystem(raw, fsys)
-	if raw.GetSourceFile(implementation) != nil {
-		t.Fatal("runtime implementation must be outside the compiler's source universe")
-	}
-	if got := before.NearestPackageJSONDirectory(directory); got != "/specifier-cache-fixture" {
-		t.Fatalf("initial package directory = %q", got)
-	}
-	if before.FileExists(added) {
-		t.Fatal("new runtime source already exists")
-	}
-	if resolved := before.ResolveModuleName("./runtime/added.js", source.FileName(), core.ResolutionModeNone); resolved != nil && resolved.IsResolved() {
-		t.Fatal("new runtime source already resolves")
+	overlay := utils.NewOverlayVFS(fsys, map[string]string{implementation: newText})
+	current := lintprogram.NewFromCompilerWithExternalFileSystem(raw, overlay)
+	if current.GetSourceFile(source.FileName()) != source || !current.CanProvideTypeChecker(source) || current.FS() != shared.FS() {
+		t.Fatal("external reads changed the compiler's source services")
 	}
 	type key struct{}
-	read := func(p *lintprogram.Program) string {
-		return lintprogram.Cached(p, key{}, func() string {
-			text, ok := p.FS().ReadFile(implementation)
-			if !ok {
-				t.Fatal("runtime implementation missing")
-			}
-			return text
-		})
+	build := func() *int { return new(int) }
+	if lintprogram.Cached(current, key{}, build) != lintprogram.Cached(shared, key{}, build) {
+		t.Fatal("external reads replaced the compiler's shared cache")
 	}
-	oldText := read(before)
-	if got := read(shared); got != oldText {
-		t.Fatalf("shared compiler view read %q", got)
+	if text, _ := current.FS().ReadFile(implementation); text != oldText {
+		t.Fatalf("compiler filesystem changed to %q", text)
 	}
-	const newText = "export const value = 1; export default {};"
-	newFS := utils.NewOverlayVFS(fsys, map[string]string{
-		implementation:              newText,
-		added:                       "module.exports = 1;",
-		directory + "/package.json": `{"type":"module"}`,
-	})
-	after := lintprogram.NewFromCompilerWithFileSystem(raw, newFS)
-	if after.GetSourceFile(source.FileName()) != source || !after.CanProvideTypeChecker(source) {
-		t.Fatal("filesystem generation changed compiler source identity or type capability")
+	if text, _ := current.ExternalFileSystem().ReadFile(implementation); text != newText {
+		t.Fatalf("external filesystem returned %q", text)
 	}
-	if got := read(after); got != newText {
-		t.Fatalf("new generation reused runtime text %q", got)
+	if text, _ := shared.ExternalFileSystem().ReadFile(implementation); text != oldText {
+		t.Fatalf("external overlay leaked to another facade: %q", text)
 	}
-	if got := read(before); got != oldText {
-		t.Fatalf("new filesystem changed the prior generation: %q", got)
-	}
-	if got := read(lintprogram.NewFromCompiler(raw)); got != oldText {
-		t.Fatalf("new filesystem polluted the shared compiler cache: %q", got)
-	}
-	if got := after.NearestPackageJSONDirectory(directory); got != directory {
-		t.Fatalf("new package directory = %q, want %q", got, directory)
-	}
-	if !after.FileExists(added) {
-		t.Fatal("new generation did not observe the added runtime file")
-	}
-	if resolved := after.ResolveModuleName("./runtime/added.js", source.FileName(), core.ResolutionModeNone); resolved == nil || resolved.ResolvedFileName != added {
-		t.Fatalf("new runtime lookup = %v, want %s", resolved, added)
-	}
-	if lintprogram.NewFromCompilerWithFileSystem(nil, fsys) != nil || lintprogram.NewFromCompilerWithFileSystem(raw, nil) != nil {
+	if lintprogram.NewFromCompilerWithExternalFileSystem(nil, fsys) != nil || lintprogram.NewFromCompilerWithExternalFileSystem(raw, nil) != nil {
 		t.Fatal("missing compiler or filesystem created a generation")
 	}
 }

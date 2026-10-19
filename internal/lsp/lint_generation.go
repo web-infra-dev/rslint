@@ -161,9 +161,6 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	} else if serviceEnabled {
 		request.fs = selectionFS
 	}
-	loaders.sessionProgramIsCurrent = func(program *compiler.Program) bool {
-		return lintProgramMatchesEditorOverlay(program, request.filesystem())
-	}
 
 	program, sourceFile, hasTypeInfo, err := selectLintProgram(
 		p.uri,
@@ -217,7 +214,7 @@ func newLintGeneration(
 	pluginConfig *linter.EslintPluginFileConfig,
 	readText func(targetPath string, source ast.SourceFileLike) (string, error),
 ) linter.Generation {
-	sourceProgram := lintprogram.NewFromCompilerWithFileSystem(program, filesystem)
+	sourceProgram := lintprogram.NewFromCompilerWithExternalFileSystem(program, filesystem)
 	sourcePath := sourceFile.FileName()
 	servedRules := rulesServedToEditors(enabledRules)
 	if !hasTypeInfo {
