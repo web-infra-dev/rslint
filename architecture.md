@@ -1741,6 +1741,11 @@ values, token classifications, optional fields and template raw values; it
 does not change syntax admission, rule execution or diagnostic/fix policy.
 Unparenthesized comma chains produce one final expression list, without
 encoding intermediate prefixes. Parentheses retain nested sequences.
+Directive prologues advance once per statement list. Token classification uses
+the projection's JSX name context rather than walking each identifier's ancestors.
+Long trivia runs share a per-file token-start index, avoiding repeated scans
+at the common full-start position of deep expressions. Short spacing is not
+indexed; the index is dropped on every success, failure or cancellation.
 Shared publication carries ranges for the already encoded bytes; inline fallback
 serializes owned bytes. Shared slots require the existing reader release
 acknowledgement before reuse. No whole-group frame cache is retained. Private pipeline input slots transfer their syntax
@@ -1778,9 +1783,16 @@ queries observe the public arrays. These views retain no transport capability
 or original frame buffer. Token value/range/location construction remains in
 languages/js, while caching and ESLint query behavior belong to SourceCode.
 
+The listener dispatcher preserves one specificity-sorted order for simple and
+complex selectors. Only complex ESQuery matches prepare an ancestor array,
+shared within the current enter or exit phase. Simple listeners do not copy
+ancestor paths, including in configurations that also contain complex selectors.
+
 `WithFrameAttachments` associates each file with exactly one binary attachment.
 CLI and native API use it unconditionally; LSP serializes the same owned bytes
-inline as base64 through its existing JSON-RPC route. API protocol 4.0.0 requires
+inline as base64 through its existing JSON-RPC route. The inline adapter checks
+the alphabet, padding and unused tail bits without allocating a full base64
+round-trip string. API protocol 4.0.0 requires
 matching peers, with no old text-input negotiation or parser fallback. Detached
 LSP continuations contain owned frames, diagnostic text and cloned JSON
 metadata, with no SourceFile, checker, mutable observer or native rule graph.
@@ -1793,7 +1805,9 @@ the transport envelope, never to plugin requests or results. The private pool
 and platform mapping files live in the existing IPC package. Allocation failure
 or unavailable capacity preserves complete inline attachments. The existing
 256 MiB encoded frame limit still applies, including base64 overhead on binary
-fallback. A request exceeding it fails before writing a frame; no data is
+fallback. The transport checks the actual envelope after choosing shared or
+inline storage; the linter imposes no estimated base64 ceiling on shared bytes.
+A request exceeding transport capacity fails before writing a frame; no data is
 silently truncated. The transport does not implement an unbounded streaming
 protocol. Closing the channel rejects new work, wakes pending calls and waits
 for a current memory writer before releasing the mapping; mapped slices never

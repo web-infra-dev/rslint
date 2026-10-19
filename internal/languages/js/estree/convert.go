@@ -26,16 +26,11 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 	if utils.IsJSDocSyntaxNode(node) {
 		return 0
 	}
-	p.recordTokenCover(node)
+	p.recordTokenCover(node, false)
 	switch node.Kind {
 	case ast.KindSourceFile:
 		file := node.AsSourceFile()
-		body := make([]uint32, 0, len(file.Statements.Nodes))
-		for _, statement := range file.Statements.Nodes {
-			if id := p.convertStatement(statement); id != 0 {
-				body = append(body, id)
-			}
-		}
+		body := p.convertStatements(file.Statements, true)
 		// Preserve the rule-facing span: TS begins at its first syntax token,
 		// JS at zero, and both end at EOF. Disable directives use this position.
 		start := uint32(0)
@@ -43,24 +38,18 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 		if !p.isJavaScriptFile() {
 			start = p.offsets.At(scanner.SkipTrivia(p.text, 0))
 		}
-		return p.add("Program", start, end, p.listValue(body), p.stringValue(p.sourceType))
+		return p.add("Program", start, end, body, p.stringValue(p.sourceType))
 
 	case ast.KindBlock:
-		return p.addNode("BlockStatement", node, p.convertStatements(node.AsBlock().Statements))
+		return p.addNode("BlockStatement", node, p.convertStatements(node.AsBlock().Statements, node.Parent != nil && ast.IsFunctionLike(node.Parent)))
 	case ast.KindModuleBlock:
-		return p.addNode("TSModuleBlock", node, p.convertStatements(node.AsModuleBlock().Statements))
+		return p.addNode("TSModuleBlock", node, p.convertStatements(node.AsModuleBlock().Statements, false))
 	case ast.KindEmptyStatement:
 		return p.addNode("EmptyStatement", node)
 	case ast.KindDebuggerStatement:
 		return p.addNode("DebuggerStatement", node)
 	case ast.KindExpressionStatement:
-		n := node.AsExpressionStatement()
-		directive := undefinedValue()
-		if n.Expression != nil && n.Expression.Kind == ast.KindStringLiteral && p.isDirective(node) {
-			raw := p.rawText(n.Expression)
-			directive = p.stringValue(raw[1 : len(raw)-1])
-		}
-		return p.addNode("ExpressionStatement", node, nodeValue(p.convert(n.Expression, false)), directive)
+		return p.convertExpressionStatement(node, false)
 	case ast.KindReturnStatement:
 		return p.addNode("ReturnStatement", node, nodeValue(p.convert(node.AsReturnStatement().Expression, false)))
 	case ast.KindThrowStatement:
@@ -118,7 +107,7 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 		if node.Kind == ast.KindCaseClause {
 			test = p.convert(n.Expression, false)
 		}
-		return p.addNode("SwitchCase", node, nodeValue(test), p.convertStatements(n.Statements))
+		return p.addNode("SwitchCase", node, nodeValue(test), p.convertStatements(n.Statements, false))
 	case ast.KindTryStatement:
 		n := node.AsTryStatement()
 		return p.addNode("TryStatement", node,
@@ -370,7 +359,7 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 		return p.convertPropertyDefinition(node)
 	case ast.KindClassStaticBlockDeclaration:
 		body := node.AsClassStaticBlockDeclaration().Body
-		return p.addNode("StaticBlock", node, p.convertStatements(body.AsBlock().Statements))
+		return p.addNode("StaticBlock", node, p.convertStatements(body.AsBlock().Statements, false))
 
 	case ast.KindDecorator:
 		return p.addNode("Decorator", node, nodeValue(p.convert(node.AsDecorator().Expression, false)))
@@ -545,7 +534,7 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 		id := p.addNode("TSNamedTupleMember", node,
 			nodeValue(p.convert(n.Type, false)), nodeValue(p.convert(n.Name(), false)), boolValue(n.QuestionToken != nil))
 		if n.DotDotDotToken != nil {
-			p.nodes[id-1].start = p.offsets.At(scanner.GetTokenPosOfNode(n.Name(), p.file, false))
+			p.nodes[id-1].start = p.offsets.At(p.tokenStart(n.Name()))
 			return p.addNode("TSRestType", node, nodeValue(id))
 		}
 		return id
@@ -647,17 +636,38 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 	return p.unsupported(node)
 }
 
-func (p *estreeProjector) convertStatements(list *ast.NodeList) uint32 {
+func (p *estreeProjector) convertStatements(list *ast.NodeList, prologue bool) uint32 {
 	if list == nil {
 		return p.listValue(nil)
 	}
 	ids := make([]uint32, 0, len(list.Nodes))
 	for _, statement := range list.Nodes {
-		if id := p.convertStatement(statement); id != 0 {
+		// Only source files and function bodies admit directives. Advance the
+		// prologue once instead of rescanning every preceding string statement.
+		prologue = prologue && statement.Kind == ast.KindExpressionStatement &&
+			statement.AsExpressionStatement().Expression.Kind == ast.KindStringLiteral
+		var id uint32
+		if prologue {
+			id = p.convertExpressionStatement(statement, true)
+		} else {
+			id = p.convertStatement(statement)
+		}
+		if id != 0 {
 			ids = append(ids, id)
 		}
 	}
 	return p.listValue(ids)
+}
+
+func (p *estreeProjector) convertExpressionStatement(node *ast.Node, prologue bool) uint32 {
+	p.check()
+	expression := node.AsExpressionStatement().Expression
+	directive := undefinedValue()
+	if prologue {
+		raw := p.rawText(expression)
+		directive = p.stringValue(raw[1 : len(raw)-1])
+	}
+	return p.addNode("ExpressionStatement", node, nodeValue(p.convert(expression, false)), directive)
 }
 
 func (p *estreeProjector) convertStatement(node *ast.Node) uint32 {
@@ -673,7 +683,7 @@ func (p *estreeProjector) convertStatement(node *ast.Node) uint32 {
 
 func (p *estreeProjector) wrapExport(node *ast.Node, declaration uint32) uint32 {
 	// The wrapper owns export/default; the declaration begins at its own syntax.
-	start := scanner.GetTokenPosOfNode(node, p.file, false)
+	start := p.tokenStart(node)
 	if modifiers := node.Modifiers(); modifiers != nil {
 		for _, modifier := range modifiers.Nodes {
 			if modifier.Kind != ast.KindExportKeyword && modifier.Kind != ast.KindDefaultKeyword {
@@ -696,7 +706,7 @@ func (p *estreeProjector) wrapExport(node *ast.Node, declaration uint32) uint32 
 	}
 	for _, modifier := range node.Modifiers().Nodes {
 		if modifier.Kind == ast.KindExportKeyword {
-			p.nodes[result-1].start = p.offsets.At(scanner.GetTokenPosOfNode(modifier, p.file, false))
+			p.nodes[result-1].start = p.offsets.At(p.tokenStart(modifier))
 			break
 		}
 	}
@@ -738,7 +748,7 @@ func (p *estreeProjector) addLiteral(node *ast.Node, value, bigint, regexPattern
 }
 
 func (p *estreeProjector) rawText(node *ast.Node) string {
-	start := scanner.GetTokenPosOfNode(node, p.file, false)
+	start := p.tokenStart(node)
 	if start < 0 || node.End() < start || node.End() > len(p.text) {
 		return ""
 	}
@@ -865,7 +875,7 @@ func (p *estreeProjector) convertParameter(node *ast.Node) uint32 {
 	// Accessibility and readonly belong to TSParameterProperty, not its binding.
 	p.nodes[result-1].start = p.nodes[parameter-1].start
 	if n.DotDotDotToken != nil {
-		p.nodes[result-1].start = p.offsets.At(scanner.GetTokenPosOfNode(n.DotDotDotToken, p.file, false))
+		p.nodes[result-1].start = p.offsets.At(p.tokenStart(n.DotDotDotToken))
 	}
 	if utils.ESTreeModifierFlags(node)&ast.ModifierFlagsParameterPropertyModifier != 0 {
 		return p.addNode("TSParameterProperty", node,
@@ -926,7 +936,7 @@ func (p *estreeProjector) convertBindingElement(node *ast.Node) uint32 {
 
 func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 	n := node.AsBinaryExpression()
-	p.recordTokenCover(n.OperatorToken)
+	p.recordTokenCover(n.OperatorToken, false)
 	operator := scanner.TokenToString(n.OperatorToken.Kind)
 	if n.OperatorToken.Kind == ast.KindCommaToken {
 		// Collect the native left spine before projecting it. Encoding every
@@ -1493,7 +1503,7 @@ func (p *estreeProjector) convertImportType(node *ast.Node) uint32 {
 		nodeValue(options), nodeValue(p.convert(n.Qualifier, false)),
 		nodeValue(source), p.typeParameters(n.TypeArguments, false))
 	if n.IsTypeOf {
-		start := scanner.GetTokenPosOfNode(node, p.file, false)
+		start := p.tokenStart(node)
 		p.nodes[result-1].start = p.offsets.At(scanner.SkipTrivia(p.text, start+len("typeof")))
 		return p.addNode("TSTypeQuery", node, nodeValue(result), undefinedValue())
 	}
@@ -1546,7 +1556,7 @@ func (p *estreeProjector) convertJsxName(node *ast.Node) uint32 {
 	if node == nil {
 		return 0
 	}
-	p.recordTokenCover(node)
+	p.recordTokenCover(node, true)
 	switch node.Kind {
 	case ast.KindIdentifier:
 		return p.addNode("JSXIdentifier", node, p.stringValue(node.Text()))
@@ -1632,28 +1642,4 @@ func (p *estreeProjector) convertHeritageName(node *ast.Node) uint32 {
 		return p.addNode("MemberExpression", node, nodeValue(p.convertHeritageName(data.Left)), nodeValue(p.convert(data.Right, false)), boolValue(false), boolValue(false))
 	}
 	return p.convert(node, false)
-}
-
-func (p *estreeProjector) isDirective(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-	var statements *ast.NodeList
-	if parent.Kind == ast.KindSourceFile {
-		statements = parent.AsSourceFile().Statements
-	} else if parent.Kind == ast.KindBlock && parent.Parent != nil && ast.IsFunctionLike(parent.Parent) {
-		statements = parent.AsBlock().Statements
-	} else {
-		return false
-	}
-	for _, statement := range statements.Nodes {
-		if statement == node {
-			return true
-		}
-		if statement.Kind != ast.KindExpressionStatement || statement.AsExpressionStatement().Expression.Kind != ast.KindStringLiteral {
-			return false
-		}
-	}
-	return false
 }

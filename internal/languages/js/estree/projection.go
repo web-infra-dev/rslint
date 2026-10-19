@@ -63,6 +63,7 @@ type estreeProjector struct {
 	stringIDs        map[string]uint32
 	numbers          []float64
 	tokenCovers      []tokenCover
+	triviaStarts     map[int]int
 	frameBytes       uint64
 	scan             scanner.Scanner
 }
@@ -210,6 +211,7 @@ func (p *estreeProjector) clearSource() {
 	clear(p.strings)
 	p.strings = p.strings[:0]
 	p.tokenCovers = p.tokenCovers[:0]
+	p.triviaStarts = nil
 	// Numeric caches and token state may contain source-backed strings.
 	// Reuse the scanner's storage, never state from a previous file.
 	p.scan = scanner.Scanner{}
@@ -395,6 +397,29 @@ func (p *estreeProjector) add(typeName string, start, end uint32, values ...uint
 	return id
 }
 
+func (p *estreeProjector) tokenStart(node *ast.Node) int {
+	// Missing and JSDoc/JSX nodes use different trivia rules. Keep their
+	// scanner behavior rather than sharing an ordinary-source cache entry.
+	if ast.NodeIsMissing(node) || ast.IsJSDocNode(node) ||
+		node.Kind == ast.KindJsxText || node.Flags&ast.NodeFlagsJSDoc != 0 {
+		return scanner.GetTokenPosOfNode(node, p.file, false)
+	}
+	pos := node.Pos()
+	if start, ok := p.triviaStarts[pos]; ok {
+		return start
+	}
+	start := scanner.GetTokenPosOfNode(node, p.file, false)
+	// Only index long runs: ordinary short spacing needs no extra storage.
+	// Every parent in a deep expression can share this same full-start pos.
+	if start-pos >= 64 {
+		if p.triviaStarts == nil {
+			p.triviaStarts = make(map[int]int)
+		}
+		p.triviaStarts[pos] = start
+	}
+	return start
+}
+
 func (p *estreeProjector) rangeOf(node *ast.Node) (uint32, uint32) {
 	if node == nil {
 		return 0, 0
@@ -403,7 +428,7 @@ func (p *estreeProjector) rangeOf(node *ast.Node) (uint32, uint32) {
 	if node.Kind == ast.KindSourceFile {
 		start = 0
 	} else if node.Kind != ast.KindJsxText && node.Kind != ast.KindJsxTextAllWhiteSpaces {
-		start = scanner.GetTokenPosOfNode(node, p.file, false)
+		start = p.tokenStart(node)
 	}
 	return p.offsets.At(start), p.offsets.At(node.End())
 }

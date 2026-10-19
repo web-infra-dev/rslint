@@ -17,12 +17,16 @@ describe('binary plugin frame boundary', () => {
         { path: 'a.ts', frameAttachment: 0, configKey: 'config' },
         { path: 'b.ts', frame: 'AP8B' },
         { path: 'c.ts', frameAttachment: 1 },
+        { path: 'd.ts', frame: 'AA==' },
+        { path: 'e.ts', frame: 'AAA=' },
       ],
     };
     const resolved = resolvePluginAttachments(req, [owned, capability]);
     expect(resolved.files[0].frame).toBe(owned);
     expect(resolved.files[1].frame).toEqual(Buffer.from(owned));
     expect(resolved.files[2].frame).toBe(capability);
+    expect(resolved.files[3].frame).toEqual(Buffer.from([0]));
+    expect(resolved.files[4].frame).toEqual(Buffer.from([0, 0]));
     expect(req.files[0].frameAttachment).toBe(0);
   });
   test.each([
@@ -36,13 +40,17 @@ describe('binary plugin frame boundary', () => {
     { frame: '***=' },
     { frame: 'AP8' },
     { frame: 'AB==' },
+    { frame: 'AAB=' },
+    { frame: 'AAA\n' },
     { sharedSource: {} },
     { frameAttachment: 0, sourceRange: {} },
   ])('rejects invalid or obsolete input: %j', (input) => {
     expect(() =>
       resolvePluginAttachments(
         { collectFixes: false, files: [{ path: 'a.ts', ...input }] } as never,
-        [new Uint8Array([1])],
+        'frame' in input && !('frameAttachment' in input)
+          ? []
+          : [new Uint8Array([1])],
       ),
     ).toThrow();
   });

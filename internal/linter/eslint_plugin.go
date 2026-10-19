@@ -674,24 +674,6 @@ func dispatchOneBatch(
 			continue
 		}
 		req := buildEslintPluginRequest(ready, collectFixes, suggestionsMode, timing != nil)
-		// Inline base64 plus metadata must also fit the generic 256 MiB message
-		// ceiling. Include each file's base64 padding and the enclosing RPC envelope.
-		metadata := req
-		metadata.Files = append([]EslintPluginLintFile(nil), req.Files...)
-		for index := range metadata.Files {
-			metadata.Files[index].Frame = nil
-		}
-		encoded, encodeErr := json.Marshal(metadata)
-		if encodeErr != nil {
-			return encodeErr
-		}
-		inlineBytes := 0
-		for _, file := range req.Files {
-			inlineBytes += (len(file.Frame)+2)/3*4 + len(`,"frame":""`)
-		}
-		if len(encoded)+inlineBytes > 256<<20-4096 {
-			return errors.New("plugin frame batch exceeds IPC message limit")
-		}
 		// Results use source/rule metadata. Drop their frame references and
 		// oversized scratch buffers before dispatch. Owned output remains borrowed
 		// until return; shared publication consumes the producer's byte access.

@@ -367,7 +367,7 @@ for (const fixture of CONFORMANCE_CASES.slice(jsxStart)) {
 add(
   'literals',
   [
-    "'use strict'; function f() { 'directive'; 'second'; call(); 'late'; }",
+    "'use strict'; 'second'; function f() { 'directive'; 'second'; call(); 'late'; } { 'block'; } 'late'; class C { method() { 'method'; } static { 'static'; } } if (x) 'conditional';",
     "('use strict'); function f() { ('use strict'); }",
     'const value = 0xFF + 0b101 + 0o17 + 1_000 + .5e3 + 1n;',
     String.raw`const value = '\uD800\u0061\x62\n';`,

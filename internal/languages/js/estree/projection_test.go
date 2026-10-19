@@ -128,6 +128,7 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 		"/jsx.tsx":      "const x = <A.B ns:x='&amp;amp;' {...p}>x\r\ny&amp;{/* hi */}{value}<><input /></></A.B>;",
 		"/jsdoc.js":     "/** @template T\n * @this {Object}\n * @param {string} x\n * @returns {number} */ function f(x) { return 1 } /** @type {number} */ (value); /** @satisfies {string} */ (other);",
 		"/unicode.tsx":  "/* 世界😀 */ const café = <A 字段='😃'>{`世界${value}`}</A>; const lone = '\\uD800';",
+		"/trivia.js":    "/*" + strings.Repeat("x", 128) + "*/ value.first.second;",
 	}
 	var builder Builder
 	for path, text := range cases {
@@ -142,7 +143,7 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 				t.Fatal("projection changed native source syntax")
 			}
 			saved := bytes.Clone(data)
-			if builder.p.file != nil || builder.p.text != "" || builder.p.sourceType != "" || len(builder.p.offsets.entries) != 0 || len(builder.p.stringIDs) != 0 {
+			if builder.p.file != nil || builder.p.text != "" || builder.p.sourceType != "" || len(builder.p.offsets.entries) != 0 || len(builder.p.stringIDs) != 0 || builder.p.triviaStarts != nil {
 				t.Fatal("builder retained source graph")
 			}
 			assertClearedProjectionStrings(t, &builder)

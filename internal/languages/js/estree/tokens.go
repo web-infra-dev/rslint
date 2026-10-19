@@ -24,8 +24,10 @@ type tokenCover struct {
 	start, end uint32
 }
 
-func (p *estreeProjector) recordTokenCover(node *ast.Node) {
-	if cover, start, ok := coverForNode(p.file, node); ok {
+func (p *estreeProjector) recordTokenCover(node *ast.Node, jsxName bool) {
+	// Projection already knows the name context. Walking every property's
+	// ancestors to rediscover JSX would make long member chains quadratic.
+	if cover, start, ok := p.coverForNode(node, jsxName); ok {
 		cover.start = uint32(start)
 		p.tokenCovers = append(p.tokenCovers, cover)
 	}
@@ -114,50 +116,51 @@ func scanTokensAndCommentsInto(
 	return tokens, comments
 }
 
-func coverForNode(file *ast.SourceFile, node *ast.Node) (tokenCover, int, bool) {
+func (p *estreeProjector) coverForNode(node *ast.Node, jsxName bool) (tokenCover, int, bool) {
+	file := p.file
 	start := node.Pos()
 	cover := tokenCover{kind: node.Kind, end: uint32(node.End())}
 	switch node.Kind {
 	case ast.KindThisKeyword:
-		if (file.ScriptKind != core.ScriptKindJS && file.ScriptKind != core.ScriptKindJSX) || !isJSXIdentifier(node) {
+		if (file.ScriptKind != core.ScriptKindJS && file.ScriptKind != core.ScriptKindJSX) || !jsxName {
 			return tokenCover{}, 0, false
 		}
-		start = scanner.GetTokenPosOfNode(node, file, false)
+		start = p.tokenStart(node)
 		cover.typeCode = tokenJSXIdentifier
 	case ast.KindGreaterThanEqualsToken, ast.KindGreaterThanGreaterThanToken,
 		ast.KindGreaterThanGreaterThanGreaterThanToken, ast.KindGreaterThanGreaterThanEqualsToken,
 		ast.KindGreaterThanGreaterThanGreaterThanEqualsToken:
-		start = scanner.GetTokenPosOfNode(node, file, false)
+		start = p.tokenStart(node)
 		cover.typeCode = tokenPunctuator
 	case ast.KindIdentifier:
-		start = scanner.GetTokenPosOfNode(node, file, false)
+		start = p.tokenStart(node)
 		cover.typeCode = tokenIdentifier
-		if isJSXIdentifier(node) {
+		if jsxName {
 			cover.typeCode = tokenJSXIdentifier
 			if file.ScriptKind == core.ScriptKindTSX && node.Parent != nil && node.Parent.Kind == ast.KindJsxNamespacedName {
 				cover.typeCode = tokenIdentifier
 			}
 		}
 	case ast.KindPrivateIdentifier:
-		start = scanner.GetTokenPosOfNode(node, file, false)
+		start = p.tokenStart(node)
 		cover.typeCode = tokenPrivateIdentifier
 	case ast.KindStringLiteral:
-		start = scanner.GetTokenPosOfNode(node, file, false)
+		start = p.tokenStart(node)
 		cover.typeCode = tokenString
 		if node.Parent != nil && node.Parent.Kind == ast.KindJsxAttribute {
 			cover.typeCode = tokenJSXTextRaw
 		}
 	case ast.KindNumericLiteral, ast.KindBigIntLiteral:
-		start = scanner.GetTokenPosOfNode(node, file, false)
+		start = p.tokenStart(node)
 		cover.typeCode = tokenNumeric
 	case ast.KindRegularExpressionLiteral:
-		start = scanner.GetTokenPosOfNode(node, file, false)
+		start = p.tokenStart(node)
 		cover.typeCode = tokenRegexp
 	case ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateHead:
-		start = scanner.GetTokenPosOfNode(node, file, false)
+		start = p.tokenStart(node)
 		cover.typeCode = tokenTemplate
 	case ast.KindTemplateMiddle, ast.KindTemplateTail:
-		start = scanner.GetTokenPosOfNode(node, file, false)
+		start = p.tokenStart(node)
 		cover.typeCode = tokenTemplate
 	case ast.KindJsxText, ast.KindJsxTextAllWhiteSpaces:
 		cover.typeCode = tokenJSXText
@@ -168,21 +171,6 @@ func coverForNode(file *ast.SourceFile, node *ast.Node) (tokenCover, int, bool) 
 		return tokenCover{}, 0, false
 	}
 	return cover, start, true
-}
-
-func isJSXIdentifier(node *ast.Node) bool {
-	for parent := node.Parent; parent != nil; parent = parent.Parent {
-		switch parent.Kind {
-		case ast.KindPropertyAccessExpression:
-			continue
-		case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxOpeningElement,
-			ast.KindJsxClosingElement, ast.KindJsxAttribute, ast.KindJsxNamespacedName:
-			return true
-		default:
-			return false
-		}
-	}
-	return false
 }
 
 func isReplacementKind(kind ast.Kind) bool {

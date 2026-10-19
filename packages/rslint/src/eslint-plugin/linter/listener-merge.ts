@@ -620,22 +620,21 @@ function mergeByLinearMerge(
   byType: EsqEntry[] | undefined,
   wild: EsqEntry[],
   node: ESTreeNode,
-  ancestry: ESTreeNode[],
-  fire: (e: EsqEntry, node: ESTreeNode, ancestry: ESTreeNode[]) => void,
+  fire: (e: EsqEntry, node: ESTreeNode) => void,
 ): void {
   let i = 0;
   let j = 0;
   if (!byType) {
-    while (j < wild.length) fire(wild[j++], node, ancestry);
+    while (j < wild.length) fire(wild[j++], node);
     return;
   }
   const bt = byType;
   while (i < bt.length && j < wild.length) {
-    if (compareSpecificity(bt[i], wild[j]) <= 0) fire(bt[i++], node, ancestry);
-    else fire(wild[j++], node, ancestry);
+    if (compareSpecificity(bt[i], wild[j]) <= 0) fire(bt[i++], node);
+    else fire(wild[j++], node);
   }
-  while (i < bt.length) fire(bt[i++], node, ancestry);
-  while (j < wild.length) fire(wild[j++], node, ancestry);
+  while (i < bt.length) fire(bt[i++], node);
+  while (j < wild.length) fire(wild[j++], node);
 }
 
 /**
@@ -696,11 +695,13 @@ export function visit(
   // esquery consumes ancestry synchronously; rule listeners receive only node.
   // This storage belongs to one visit, including when a listener nests visits.
   const reversed: ESTreeNode[] = [];
+  let reversedReady = false;
   const reversedAncestry = (): ESTreeNode[] => {
+    if (reversedReady) return reversed;
     reversed.length = ancestry.length;
-    if (ancestry.length === 0) return ancestry;
     for (let i = 0; i < ancestry.length; i++)
       reversed[i] = ancestry[ancestry.length - 1 - i];
+    reversedReady = true;
     return reversed;
   };
   const result: VisitResult = { cancelled: false, visitedNodes: 0 };
@@ -718,21 +719,15 @@ export function visit(
   // typescript-eslint rule set is dominated by bare-type selectors,
   // so this branch fires for most real-world configs.
   const hasEsquery =
-    merged.esqueryByType.enter.size > 0 ||
-    merged.esqueryByType.exit.size > 0 ||
-    merged.esqueryByType.enterWildcard.length > 0 ||
-    merged.esqueryByType.exitWildcard.length > 0;
+    merged.esqueryList.enter.some((entry) => !entry.isSimple) ||
+    merged.esqueryList.exit.some((entry) => !entry.isSimple);
 
   // One dispatcher per visit keeps node-specific closures out of the hot path.
-  const fire = (
-    entry: EsqEntry,
-    node: ESTreeNode,
-    ancestors: ESTreeNode[],
-  ): void => {
+  const fire = (entry: EsqEntry, node: ESTreeNode): void => {
     if (!entry.isSimple) {
       let matched: boolean;
       try {
-        matched = esquery().matches(node, entry.selector!, ancestors);
+        matched = esquery().matches(node, entry.selector!, reversedAncestry());
       } catch (err) {
         // Attribute a bad selector to its first listener and keep dispatching.
         errH?.({
@@ -763,7 +758,8 @@ export function visit(
     const byType = merged.esqueryByType.enter.get(node.type);
     const wild = merged.esqueryByType.enterWildcard;
     if ((byType && byType.length > 0) || wild.length > 0) {
-      mergeByLinearMerge(byType, wild, node, reversedAncestry(), fire);
+      reversedReady = false;
+      mergeByLinearMerge(byType, wild, node, fire);
     }
   };
 
@@ -771,7 +767,8 @@ export function visit(
     const byType = merged.esqueryByType.exit.get(node.type);
     const wild = merged.esqueryByType.exitWildcard;
     if ((byType && byType.length > 0) || wild.length > 0) {
-      mergeByLinearMerge(byType, wild, node, reversedAncestry(), fire);
+      reversedReady = false;
+      mergeByLinearMerge(byType, wild, node, fire);
     }
   };
 
