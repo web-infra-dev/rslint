@@ -1303,8 +1303,12 @@ API request buffers and every fix generation place their memory overlay above
 this same physical view, preserving exact caller-buffer precedence.
 Program IO follows the filesystem's case policy while prioritizing exact frozen
 identities; ambiguous case-equivalent anchors never collapse distinct roots.
-Each absolute disk-path query normalizes and case-folds the complete path at most
-once, then walks its ancestor keys without retaining query-specific caches. An unchanged directory
+Each absolute disk-path query normalizes once. Folded lookup keys omit an immutable
+shared directory prefix, so its case folding is reused and ordinary lowercase
+dependency suffixes allocate no strings. Differently cased prefixes use complete
+path folding before removing the folded prefix; root, mixed-root and non-disk
+views retain complete keys. Original and folded ancestors advance independently,
+without retaining query-specific caches. An unchanged directory
 anchor bypasses relative-path reconstruction; frozen file identities still take
 precedence in `Realpath` and fix-overlay lookups.
 
@@ -1317,7 +1321,10 @@ this decision and do not reconstruct owner selection independently.
 
 Git policy is independent of config-entry origin, config ownership and cwd.
 `config/gitignore.Reader` caches marker results, parsed sources and misses for one
-request. Its pure cursors keep raw source reachability separate from authored
+request. Each directory's observation initializes once; unrelated directories
+perform IO concurrently, outside the reader's publication mutex. Snapshots join
+already-published source observations outside that mutex and copy their patterns.
+Its pure cursors keep raw source reachability separate from authored
 config admission. `config.GitPolicy` compiles that snapshot once and retains
 physical repository roots, source-directory groups and precise covered
 containing directories; it owns no VFS, module loader or owner lookup.

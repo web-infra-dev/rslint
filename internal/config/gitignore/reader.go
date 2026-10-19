@@ -26,13 +26,14 @@ type Snapshot struct {
 
 // Reader observes Git metadata once per request. It never resolves paths:
 // callers pass the physical directory identities frozen at their boundary.
-// Holding the mutex through each small VFS read also coalesces concurrent misses.
+// Same-directory observations share one initializer; unrelated directories may
+// perform IO concurrently. The mutex protects publication, never filesystem IO.
 type Reader struct {
 	fs               vfs.FS
 	useCaseSensitive bool
 	mu               sync.Mutex
-	markers          map[tspath.Path]bool
-	sources          map[tspath.Path]Source
+	markers          map[tspath.Path]func() bool
+	sources          map[tspath.Path]func() Source
 	roots            map[tspath.Path]string
 	covered          map[tspath.Path]string
 	ancestors        map[tspath.Path]Cursor
@@ -41,7 +42,7 @@ type Reader struct {
 func NewReader(fsys vfs.FS) *Reader {
 	return &Reader{
 		fs: fsys, useCaseSensitive: fsys == nil || fsys.UseCaseSensitiveFileNames(),
-		markers: make(map[tspath.Path]bool), sources: make(map[tspath.Path]Source),
+		markers: make(map[tspath.Path]func() bool), sources: make(map[tspath.Path]func() Source),
 		roots: make(map[tspath.Path]string), covered: make(map[tspath.Path]string),
 		ancestors: make(map[tspath.Path]Cursor),
 	}
@@ -52,16 +53,18 @@ func (reader *Reader) pathID(path string) tspath.Path {
 }
 
 func (reader *Reader) hasMarker(directory string) bool {
-	reader.mu.Lock()
-	defer reader.mu.Unlock()
 	id := reader.pathID(directory)
-	if exists, ok := reader.markers[id]; ok {
-		return exists
+	reader.mu.Lock()
+	load, ok := reader.markers[id]
+	if !ok {
+		marker := tspath.CombinePaths(directory, ".git")
+		load = sync.OnceValue(func() bool {
+			return reader.fs != nil && (reader.fs.DirectoryExists(marker) || reader.fs.FileExists(marker))
+		})
+		reader.markers[id] = load
 	}
-	marker := tspath.CombinePaths(directory, ".git")
-	exists := reader.fs != nil && (reader.fs.DirectoryExists(marker) || reader.fs.FileExists(marker))
-	reader.markers[id] = exists
-	return exists
+	reader.mu.Unlock()
+	return load()
 }
 
 func (reader *Reader) newRoot(directory string) Cursor {
@@ -136,6 +139,8 @@ func (reader *Reader) Enter(parent Cursor, physicalDir string) (Cursor, bool) {
 
 // Observe freezes local source availability, including a proven raw traversal
 // block. Authored config negations never make a hidden Git source readable.
+// Cursors come from this reader's frozen boundary walk, so one physical source
+// always has the same repository-root coordinate, even on overlapping routes.
 func (reader *Reader) Observe(cursor Cursor, physicalDir string) Cursor {
 	physicalDir = normalizeGlobPath(physicalDir)
 	id := reader.pathID(physicalDir)
@@ -145,36 +150,50 @@ func (reader *Reader) Observe(cursor Cursor, physicalDir string) Cursor {
 		reader.mu.Unlock()
 		return cursor
 	}
-	next := cursor
-	var patterns []Pattern
-	if source, exists := reader.sources[id]; exists {
-		patterns = source.Patterns
-		next = cursor.appendPatterns(patterns)
-	} else if reader.fs != nil {
-		if content, exists := reader.fs.ReadFile(tspath.CombinePaths(physicalDir, ".gitignore")); exists {
-			next, patterns = cursor.AppendSourcePatterns(physicalDir, content)
+	load, ok := reader.sources[id]
+	if !ok {
+		relative, within := relativeDir(cursor.rootDir, physicalDir, cursor.useCaseSensitive)
+		if !within {
+			reader.mu.Unlock()
+			cursor.sourceReachable = false
+			return cursor
 		}
+		load = sync.OnceValue(func() Source {
+			source := Source{Directory: physicalDir}
+			if reader.fs != nil {
+				if content, exists := reader.fs.ReadFile(tspath.CombinePaths(physicalDir, ".gitignore")); exists {
+					source.Patterns = convertGitignoreToPatterns(content, relative)
+				}
+			}
+			return source
+		})
+		reader.sources[id] = load
 	}
-	reader.sources[id] = Source{Directory: physicalDir, Patterns: patterns}
 	reader.mu.Unlock()
-	return next
+	return cursor.appendPatterns(load().Patterns)
 }
 
 // Snapshot returns detached, deterministically ordered data. Later reader
-// observations cannot change an already compiled policy.
+// observations cannot change an already compiled policy. It waits for source
+// observations published at the snapshot boundary without holding the mutex.
 func (reader *Reader) Snapshot() Snapshot {
 	reader.mu.Lock()
-	defer reader.mu.Unlock()
 	snapshot := Snapshot{UseCaseSensitive: reader.useCaseSensitive}
 	for _, root := range reader.roots {
 		snapshot.Roots = append(snapshot.Roots, root)
 	}
-	for _, source := range reader.sources {
-		source.Patterns = append([]Pattern(nil), source.Patterns...)
-		snapshot.Sources = append(snapshot.Sources, source)
+	loads := make([]func() Source, 0, len(reader.sources))
+	for _, load := range reader.sources {
+		loads = append(loads, load)
 	}
 	for _, directory := range reader.covered {
 		snapshot.CoveredDirectories = append(snapshot.CoveredDirectories, directory)
+	}
+	reader.mu.Unlock()
+	for _, load := range loads {
+		source := load()
+		source.Patterns = append([]Pattern(nil), source.Patterns...)
+		snapshot.Sources = append(snapshot.Sources, source)
 	}
 	sort.Strings(snapshot.Roots)
 	sort.Strings(snapshot.CoveredDirectories)

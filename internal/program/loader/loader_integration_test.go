@@ -3681,6 +3681,8 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 		directories []rslintconfig.DirectoryIdentity
 		files       []target.File
 		queries     map[string]string
+		prefix      string
+		fullKeys    bool
 	}{
 		{
 			name: "self directory shields descendants from outer alias",
@@ -3753,6 +3755,88 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "/", CanonicalPath: "/"}},
 			queries:     map[string]string{"/": "/", "/child/": "/child"},
 		},
+		{
+			name: "compressed suffix does not introduce drive or dynamic roots",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/Users/Dev/C:", CanonicalPath: "/captured/drive"},
+				{LexicalPath: "/Users/Dev/^", CanonicalPath: "/captured/dynamic"},
+			},
+			queries: map[string]string{"/Users/Dev/c:/child.ts": "/captured/drive/child.ts", "/users/dev/^/child.ts": "/captured/dynamic/child.ts"},
+			prefix:  "/Users/Dev/",
+		},
+		{
+			name:        "compressed shortest anchor and trailing separator",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "/Users/Dev/Anchor", CanonicalPath: "/captured"}},
+			queries:     map[string]string{"/Users/Dev/anchor": "/captured", "/Users/Dev/anchor/": "/captured", "/elsewhere/anchor/child.ts": "/elsewhere/anchor/child.ts"},
+			prefix:      "/Users/Dev/",
+		},
+		{
+			name:        "compressed Unicode prefix changes byte length",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "/Users/\u212A/Anchor", CanonicalPath: "/captured"}},
+			queries:     map[string]string{"/Users/k/anchor/child.ts": "/captured/child.ts", "/Users/\u212A/anchor/child.ts": "/captured/child.ts"},
+			prefix:      "/Users/\u212A/",
+		},
+		{
+			name: "compressed Unicode suffix changes byte length",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/Users/Dev/k/Anchor", CanonicalPath: "/captured"},
+				{LexicalPath: "/Users/Dev/Other", CanonicalPath: "/other"},
+			},
+			queries: map[string]string{"/Users/Dev/\u212A/anchor/deep/child.ts": "/captured/deep/child.ts"},
+			prefix:  "/Users/Dev/",
+		},
+		{
+			name: "compressed nearest folded anchor precedes exact ancestor",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/Users/Dev/Base", CanonicalPath: "/fallback"},
+				{LexicalPath: "/Users/Dev/Base/Alias", CanonicalPath: "/captured"},
+			},
+			queries: map[string]string{"/Users/Dev/Base/alias/package.json": "/captured/package.json"},
+			prefix:  "/Users/Dev/",
+		},
+		{
+			name: "compressed ambiguous parents retain exact priority and ancestor fallback",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/Users/Dev/Base", CanonicalPath: "/fallback"},
+				{LexicalPath: "/Users/Dev/Base/Anchor", CanonicalPath: "/first"},
+				{LexicalPath: "/Users/Dev/Base/anchor", CanonicalPath: "/second"},
+			},
+			queries: map[string]string{"/Users/Dev/Base/Anchor/child.ts": "/first/child.ts", "/Users/Dev/Base/aNcHoR/child.ts": "/fallback/aNcHoR/child.ts"},
+			prefix:  "/Users/Dev/",
+		},
+		{
+			name: "compressed ambiguous files retain exact priority",
+			files: []target.File{
+				{PathIdentity: rslintconfig.PathIdentity{Path: "/Users/Dev/File.ts", CanonicalPath: "/Users/Dev/first.ts"}},
+				{PathIdentity: rslintconfig.PathIdentity{Path: "/Users/Dev/file.ts", CanonicalPath: "/Users/Dev/second.ts"}},
+			},
+			queries: map[string]string{"/Users/Dev/File.ts": "/Users/Dev/first.ts", "/Users/Dev/fIlE.ts": "/Users/Dev/fIlE.ts", "/Users/Dev/first.ts": "/Users/Dev/first.ts"},
+			prefix:  "/Users/Dev/",
+		},
+		{
+			name: "mixed POSIX and UNC server roots retain full keys",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/Repo", CanonicalPath: "/Repo"},
+				{LexicalPath: "//Server/", CanonicalPath: "/captured"},
+			},
+			queries:  map[string]string{"//server/share/child.ts": "/captured/share/child.ts"},
+			fullKeys: true,
+		},
+		{
+			name: "different UNC server roots retain full keys",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "//First/", CanonicalPath: "/first"},
+				{LexicalPath: "//Second/", CanonicalPath: "/second"},
+			},
+			queries:  map[string]string{"//first/share/child.ts": "/first/share/child.ts", "//second/share/child.ts": "/second/share/child.ts"},
+			fullKeys: true,
+		},
+		{
+			name:        "drive root retains full keys",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "C:/", CanonicalPath: "/captured"}},
+			queries:     map[string]string{"c:/child.ts": "/captured/child.ts"},
+			fullKeys:    true,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, test.directories...)
@@ -3760,8 +3844,12 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			view := frozen.(*frozenFileSystem)
+			if (test.prefix != "" || test.fullKeys) && view.keyPrefix != test.prefix {
+				t.Fatalf("key prefix = %q, want %q", view.keyPrefix, test.prefix)
+			}
 			for path, want := range test.queries {
-				if got := frozen.(*frozenFileSystem).ioPath(path); got != want {
+				if got := view.ioPath(path); got != want {
 					t.Errorf("ioPath(%q) = %q, want %q", path, got, want)
 				}
 			}
@@ -3790,34 +3878,41 @@ func TestProgramInputsKeepSelfFileIdentityForFixOverlay(t *testing.T) {
 }
 
 func TestProgramInputsMapUnchangedPathsWithBoundedAllocations(t *testing.T) {
-	const root, path = "/Users/Developer/Repo", "/Users/Developer/Repo/node_modules/.pnpm/Package/lib/types.d.ts"
-	spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, rslintconfig.DirectoryIdentity{LexicalPath: root, CanonicalPath: root})
-	for _, caseSensitive := range []bool{true, false} {
-		t.Run(fmt.Sprintf("caseSensitive=%v", caseSensitive), func(t *testing.T) {
-			frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			view := frozen.(*frozenFileSystem)
-			if got := view.ioPath(path); got != path {
-				t.Fatalf("unchanged path = %q, want %q", got, path)
-			}
-			limit := 0.0
-			if !caseSensitive {
-				limit = 1 // At most one complete-path case fold, independent of depth.
-			}
-			if allocations := testing.AllocsPerRun(100, func() { view.ioPath(path) }); allocations > limit {
-				t.Fatalf("unchanged IO allocated %.0f times, want at most %.0f", allocations, limit)
-			}
-		})
+	for _, test := range []struct {
+		name, root, path  string
+		foldedAllocations float64
+	}{
+		{"changing suffix", "/Users/Developer/Repo", "/Users/Developer/Repo/node_modules/.pnpm/Package/lib/types.d.ts", 1},
+		{"unchanged suffix", "/Users/Developer/repo", "/Users/Developer/repo/node_modules/.pnpm/package/lib/types.d.ts", 0},
+	} {
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, rslintconfig.DirectoryIdentity{LexicalPath: test.root, CanonicalPath: test.root})
+		for _, caseSensitive := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/caseSensitive=%v", test.name, caseSensitive), func(t *testing.T) {
+				frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				view := frozen.(*frozenFileSystem)
+				if got := view.ioPath(test.path); got != test.path {
+					t.Fatalf("unchanged path = %q, want %q", got, test.path)
+				}
+				limit := 0.0
+				if !caseSensitive {
+					limit = test.foldedAllocations
+				}
+				if allocations := testing.AllocsPerRun(100, func() { view.ioPath(test.path) }); allocations > limit {
+					t.Fatalf("unchanged IO allocated %.0f times, want at most %.0f", allocations, limit)
+				}
+			})
+		}
 	}
 }
 
 func BenchmarkFrozenIOPaths(b *testing.B) {
-	const root = "/Users/Developer/Repo"
+	const root = "/Users/Developer/repo"
 	spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, rslintconfig.DirectoryIdentity{LexicalPath: root, CanonicalPath: root})
 	for _, caseSensitive := range []bool{true, false} {
-		for _, path := range []string{root + "/package.json", root + "/node_modules/.pnpm/Package/lib/types.d.ts", "/external/node_modules/Package/lib/types.d.ts"} {
+		for _, path := range []string{root + "/package.json", root + "/node_modules/.pnpm/package/lib/types.d.ts", root + "/node_modules/.pnpm/Package/lib/types.d.ts", "/external/node_modules/Package/lib/types.d.ts"} {
 			b.Run(fmt.Sprintf("caseSensitive=%v/%s", caseSensitive, path), func(b *testing.B) {
 				frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, nil)
 				if err != nil {

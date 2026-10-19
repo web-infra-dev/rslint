@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestConvertGitignoreToGlobs_DirectoryPattern(t *testing.T) {
@@ -399,24 +400,42 @@ func TestCursorRejectsPathsOutsideOwnerVolume(t *testing.T) {
 
 type readerTestFS struct {
 	vfs.FS
+	mu            sync.Mutex
 	files         map[string]string
 	directories   map[string]bool
 	readCalls     map[string]int
 	markerCalls   map[string]int
 	caseSensitive bool
+	beforeRead    func(string)
+	beforeMarker  func(string)
 }
 
 func (fsys *readerTestFS) UseCaseSensitiveFileNames() bool { return fsys.caseSensitive }
 func (fsys *readerTestFS) DirectoryExists(path string) bool {
+	if fsys.beforeMarker != nil {
+		fsys.beforeMarker(path)
+	}
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
 	fsys.markerCalls[path]++
 	return fsys.directories[path]
 }
 func (fsys *readerTestFS) FileExists(path string) bool {
+	if fsys.beforeMarker != nil {
+		fsys.beforeMarker(path)
+	}
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
 	fsys.markerCalls[path]++
 	_, ok := fsys.files[path]
 	return ok
 }
 func (fsys *readerTestFS) ReadFile(path string) (string, bool) {
+	if fsys.beforeRead != nil {
+		fsys.beforeRead(path)
+	}
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
 	fsys.readCalls[path]++
 	content, ok := fsys.files[path]
 	return content, ok
@@ -578,6 +597,205 @@ func TestReaderConcurrentSourceAndMarkerMissesAreObservedOnce(t *testing.T) {
 	second := reader.Snapshot()
 	if second.Roots[0] != "/repo" || second.Sources[0].Patterns[0].Glob == "changed" {
 		t.Fatal("snapshot retained writable reader state")
+	}
+}
+
+func TestReaderDifferentDirectoriesDoNotSerializeIO(t *testing.T) {
+	for _, kind := range []string{"marker", "source"} {
+		t.Run(kind, func(t *testing.T) {
+			fsys := newReaderTestFS(map[string]string{"/repo/.git": "", "/repo/a/.gitignore": "dist/\n"})
+			started, release := make(chan struct{}), make(chan struct{})
+			var entered, released sync.Once
+			defer released.Do(func() { close(release) })
+			hook := func(path string) {
+				if path == "/repo/a/.git" || path == "/repo/a/.gitignore" {
+					entered.Do(func() { close(started) })
+					<-release
+				}
+			}
+			if kind == "marker" {
+				fsys.beforeMarker = hook
+			} else {
+				fsys.beforeRead = hook
+			}
+			reader := NewReader(fsys)
+			root := reader.Ancestors("/repo")
+			observe := func(directory string) {
+				if kind == "marker" {
+					reader.Enter(root, directory)
+				} else {
+					reader.Observe(root, directory)
+				}
+			}
+			firstDone := make(chan struct{})
+			go func() { defer close(firstDone); observe("/repo/a") }()
+			select {
+			case <-started:
+			case <-time.After(2 * time.Second):
+				t.Fatal("first directory did not start IO")
+			}
+			secondDone := make(chan struct{})
+			go func() { defer close(secondDone); observe("/repo/b") }()
+			select {
+			case <-secondDone:
+			case <-time.After(2 * time.Second):
+				t.Fatal("unrelated directory waited for blocked IO")
+			}
+			released.Do(func() { close(release) })
+			<-firstDone
+		})
+	}
+}
+
+func TestReaderSharedSourceKeepsEachRoutesInheritedRules(t *testing.T) {
+	fsys := newReaderTestFS(map[string]string{"/repo/.git": "", "/repo/shared/.gitignore": "/dist/\n"})
+	reader := NewReader(fsys)
+	root := reader.Ancestors("/repo")
+	left, _ := root.AppendSourcePatterns("/repo", "left/\n")
+	right, _ := root.AppendSourcePatterns("/repo", "right/\n")
+	left = reader.Observe(left, "/repo/shared")
+	right = reader.Observe(right, "/repo/shared")
+	for _, test := range []struct {
+		cursor       Cursor
+		own, sibling string
+	}{{left, "left", "right"}, {right, "right", "left"}} {
+		_, ownIgnored := test.cursor.Enter("/repo/" + test.own)
+		_, siblingIgnored := test.cursor.Enter("/repo/" + test.sibling)
+		_, localIgnored := test.cursor.Enter("/repo/shared/dist")
+		assert.Assert(t, ownIgnored && !siblingIgnored && localIgnored)
+	}
+	assert.Equal(t, fsys.readCalls["/repo/shared/.gitignore"], 1)
+	snapshot := reader.Snapshot()
+	assert.Equal(t, len(snapshot.Sources), 1)
+	assert.Equal(t, len(snapshot.Sources[0].Patterns), 1)
+	assert.Equal(t, snapshot.Sources[0].Patterns[0].Glob, "shared/dist/**/*")
+}
+
+func TestReaderSnapshotJoinsPublishedSourcesWithoutHoldingMutex(t *testing.T) {
+	fsys := newReaderTestFS(map[string]string{"/repo/.git": "", "/repo/a/.gitignore": "/dist/\n"})
+	started, release := make(chan struct{}), make(chan struct{})
+	var entered, released sync.Once
+	defer released.Do(func() { close(release) })
+	fsys.beforeRead = func(path string) {
+		if path == "/repo/a/.gitignore" {
+			entered.Do(func() { close(started) })
+			<-release
+		}
+	}
+	reader := NewReader(fsys)
+	root := reader.Ancestors("/repo")
+	observed := make(chan struct{})
+	go func() { defer close(observed); reader.Observe(root, "/repo/a") }()
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("source did not start IO")
+	}
+	// Signal the exact snapshot join boundary; scheduling the goroutine alone
+	// would not prove it had reached the pending source before the other work.
+	snapshotEntered := make(chan struct{})
+	var snapshotEntry sync.Once
+	reader.mu.Lock()
+	id := reader.pathID("/repo/a")
+	load := reader.sources[id]
+	reader.sources[id] = func() Source {
+		snapshotEntry.Do(func() { close(snapshotEntered) })
+		return load()
+	}
+	reader.mu.Unlock()
+	snapshots := make(chan Snapshot, 1)
+	go func() { snapshots <- reader.Snapshot() }()
+	select {
+	case <-snapshotEntered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("snapshot did not join the published source")
+	}
+	// A raw-blocked route must neither wait for nor inherit the reachable
+	// route's pending source observation of the same physical directory.
+	blocked := root
+	blocked.sourceReachable = false
+	otherDone := make(chan struct{})
+	go func() {
+		defer close(otherDone)
+		if got := reader.Observe(blocked, "/repo/a"); got.SourceReachable() || len(got.rules) != 0 {
+			t.Error("raw-blocked route inherited the local source")
+		}
+		reader.Observe(root, "/repo/b")
+	}()
+	select {
+	case <-otherDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("snapshot or pending source held the reader mutex")
+	}
+	select {
+	case <-snapshots:
+		t.Fatal("snapshot published an incomplete source")
+	case <-time.After(20 * time.Millisecond):
+	}
+	released.Do(func() { close(release) })
+	<-observed
+	var snapshot Snapshot
+	select {
+	case snapshot = <-snapshots:
+	case <-time.After(2 * time.Second):
+		t.Fatal("snapshot did not join the completed source")
+	}
+	index := slices.IndexFunc(snapshot.Sources, func(source Source) bool { return source.Directory == "/repo/a" })
+	if index < 0 || len(snapshot.Sources[index].Patterns) != 1 || snapshot.Sources[index].Patterns[0].Glob != "a/dist/**/*" {
+		t.Fatalf("snapshot lost the published source: %+v", snapshot.Sources)
+	}
+	snapshot.Sources[index].Patterns[0].Glob = "changed"
+	for _, source := range reader.Snapshot().Sources {
+		if source.Directory == "/repo/a" && source.Patterns[0].Glob == "changed" {
+			t.Fatal("snapshot retained writable reader state")
+		}
+	}
+}
+
+func TestReaderObservationPanicIsReplayedWithoutBlockingOtherDirectories(t *testing.T) {
+	for _, kind := range []string{"marker", "source"} {
+		t.Run(kind, func(t *testing.T) {
+			fsys := newReaderTestFS(map[string]string{"/repo/.git": ""})
+			calls := 0
+			hook := func(path string) {
+				if path == "/repo/a/.git" || path == "/repo/a/.gitignore" {
+					calls++
+					panic("observation failed")
+				}
+			}
+			if kind == "marker" {
+				fsys.beforeMarker = hook
+			} else {
+				fsys.beforeRead = hook
+			}
+			reader := NewReader(fsys)
+			root := reader.Ancestors("/repo")
+			observe := func(directory string) {
+				if kind == "marker" {
+					reader.Enter(root, directory)
+				} else {
+					reader.Observe(root, directory)
+				}
+			}
+			for range 2 {
+				recovered := make(chan any, 1)
+				go func() { defer func() { recovered <- recover() }(); observe("/repo/a") }()
+				select {
+				case value := <-recovered:
+					assert.Equal(t, value, any("observation failed"))
+				case <-time.After(2 * time.Second):
+					t.Fatal("panicking observation stranded a waiter")
+				}
+			}
+			assert.Equal(t, calls, 1)
+			otherDone := make(chan struct{})
+			go func() { defer close(otherDone); observe("/repo/b") }()
+			select {
+			case <-otherDone:
+			case <-time.After(2 * time.Second):
+				t.Fatal("panic blocked another directory")
+			}
+		})
 	}
 }
 

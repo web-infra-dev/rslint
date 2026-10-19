@@ -3,6 +3,7 @@ package loader
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -60,8 +61,10 @@ func WithFrozenIO(baseFS vfs.FS, pathSpaces *config.PathSpaceSnapshot, files []t
 		}
 	}
 	if !baseFS.UseCaseSensitiveFileNames() {
-		view.foldedFiles = foldedFrozenPaths(view.files)
-		view.foldedParents = foldedFrozenPaths(view.parents)
+		view.keyPrefix = frozenKeyPrefix(view.files, view.parents)
+		view.foldedKeyPrefix = tspath.GetCanonicalFileName(view.keyPrefix, false)
+		view.foldedFiles = foldedFrozenPaths(view.files, view.keyPrefix)
+		view.foldedParents = foldedFrozenPaths(view.parents, view.keyPrefix)
 	}
 	return view, nil
 }
@@ -70,18 +73,51 @@ func WithFrozenIO(baseFS vfs.FS, pathSpaces *config.PathSpaceSnapshot, files []t
 // inputs are immutable planning values, and no filesystem query adds mappings.
 type frozenFileSystem struct {
 	vfs.FS
-	files         map[string]string
-	parents       map[string]string
-	foldedFiles   map[string]string
-	foldedParents map[string]string
+	files           map[string]string
+	parents         map[string]string
+	foldedFiles     map[string]string
+	foldedParents   map[string]string
+	keyPrefix       string
+	foldedKeyPrefix string
+}
+
+// Fold only the varying suffix of paths in this view. In particular, an
+// uppercase request directory must not allocate a complete lowercase string
+// for every otherwise-lowercase dependency lookup. Roots and non-disk paths
+// retain the full-key algorithm.
+func frozenKeyPrefix(groups ...map[string]string) string {
+	var prefix string
+	first := true
+	for _, paths := range groups {
+		for path := range paths {
+			if !tspath.IsRootedDiskPath(path) {
+				return ""
+			}
+			if first {
+				prefix = path
+				first = false
+			}
+			length := min(len(prefix), len(path)-1)
+			index := 0
+			for index < length && prefix[index] == path[index] {
+				index++
+			}
+			prefix = prefix[:index]
+		}
+	}
+	prefix = prefix[:strings.LastIndexByte(prefix, '/')+1]
+	if len(prefix) <= tspath.GetRootLength(prefix) {
+		return ""
+	}
+	return prefix
 }
 
 // A folded spelling is usable only when all known exact spellings agree on
 // one physical identity. An empty value permanently disables an ambiguous key.
-func foldedFrozenPaths(paths map[string]string) map[string]string {
+func foldedFrozenPaths(paths map[string]string, prefix string) map[string]string {
 	folded := make(map[string]string, len(paths))
 	for path, physical := range paths {
-		id := tspath.GetCanonicalFileName(path, false)
+		id := tspath.GetCanonicalFileName(strings.TrimPrefix(path, prefix), false)
 		if existing, ok := folded[id]; !ok {
 			folded[id] = physical
 		} else if config.ExactPathID(existing) != config.ExactPathID(physical) {
@@ -89,6 +125,19 @@ func foldedFrozenPaths(paths map[string]string) map[string]string {
 		}
 	}
 	return folded
+}
+
+func (f *frozenFileSystem) foldedKey(path string) string {
+	if suffix, ok := strings.CutPrefix(path, f.keyPrefix); ok {
+		return tspath.GetCanonicalFileName(suffix, false)
+	}
+	// Fold before removing a differently-cased prefix: Unicode folding can
+	// change byte lengths, including inside the prefix itself.
+	folded := tspath.GetCanonicalFileName(path, false)
+	if suffix, ok := strings.CutPrefix(folded, f.foldedKeyPrefix); ok {
+		return suffix
+	}
+	return ""
 }
 
 func (f *frozenFileSystem) ioPath(path string) string {
@@ -113,7 +162,7 @@ func (f *frozenFileSystem) resolvePath(path string) (string, bool) {
 	// using offsets from the other.
 	folded := ""
 	if len(f.foldedFiles) != 0 || len(f.foldedParents) != 0 {
-		folded = tspath.GetCanonicalFileName(id, false)
+		folded = f.foldedKey(id)
 		if physical := f.foldedFiles[folded]; physical != "" {
 			return physical, true
 		}
@@ -153,14 +202,22 @@ func (f *frozenFileSystem) resolvePath(path string) (string, bool) {
 		if diskPath {
 			id = tspath.GetDirectoryPath(id)
 			if folded != "" {
-				folded = tspath.GetDirectoryPath(folded)
+				if f.keyPrefix == "" {
+					folded = tspath.GetDirectoryPath(folded)
+				} else if index := strings.LastIndexByte(folded, '/'); index >= 0 {
+					// A suffix such as c:/child is an ordinary directory here,
+					// not a new drive root.
+					folded = folded[:index]
+				} else {
+					folded = ""
+				}
 			}
 		} else {
 			// Relative paths and URLs have distinct root/key rules. Keep their
 			// identity semantics without adding that work to disk-path IO.
 			id = config.ExactPathID(directory)
 			if len(f.foldedParents) != 0 {
-				folded = tspath.GetCanonicalFileName(id, false)
+				folded = f.foldedKey(id)
 			}
 		}
 	}
