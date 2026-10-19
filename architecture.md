@@ -1303,6 +1303,10 @@ API request buffers and every fix generation place their memory overlay above
 this same physical view, preserving exact caller-buffer precedence.
 Program IO follows the filesystem's case policy while prioritizing exact frozen
 identities; ambiguous case-equivalent anchors never collapse distinct roots.
+Each absolute disk-path query normalizes and case-folds the complete path at most
+once, then walks its ancestor keys without retaining query-specific caches. An unchanged directory
+anchor bypasses relative-path reconstruction; frozen file identities still take
+precedence in `Realpath` and fix-overlay lookups.
 
 After Program binding, `internal/config/lint` maps each Program source path
 through its `Resolver` back to that immutable selected target and resolves rules

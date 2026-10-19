@@ -91,36 +91,80 @@ func foldedFrozenPaths(paths map[string]string) map[string]string {
 	return folded
 }
 
-func lookupFrozenPath(paths map[string]string, folded map[string]string, path string) (string, bool) {
-	id := config.ExactPathID(path)
-	if physical, ok := paths[id]; ok {
-		return physical, true
-	}
-	if len(folded) != 0 {
-		physical := folded[tspath.GetCanonicalFileName(id, false)]
-		return physical, physical != ""
-	}
-	return "", false
+func (f *frozenFileSystem) ioPath(path string) string {
+	physical, _ := f.resolvePath(path)
+	return physical
 }
 
-func (f *frozenFileSystem) ioPath(path string) string {
+// resolvePath also reports frozen file identities: Realpath must return those
+// directly instead of observing a file alias again in the underlying FS.
+func (f *frozenFileSystem) resolvePath(path string) (string, bool) {
 	path = tspath.NormalizePath(path)
-	if physical, ok := lookupFrozenPath(f.files, f.foldedFiles, path); ok {
-		return physical
+	diskPath := tspath.IsRootedDiskPath(path)
+	id := utils.NormalizeAbsoluteDrive(path)
+	if !diskPath {
+		id = config.ExactPathID(path)
+	}
+	if physical, ok := f.files[id]; ok {
+		return physical, true
+	}
+	// Fold a disk path once, then walk its ancestors independently. A
+	// Unicode case fold can change byte lengths, so never slice one spelling
+	// using offsets from the other.
+	folded := ""
+	if len(f.foldedFiles) != 0 || len(f.foldedParents) != 0 {
+		folded = tspath.GetCanonicalFileName(id, false)
+		if physical := f.foldedFiles[folded]; physical != "" {
+			return physical, true
+		}
 	}
 	// Normalize before choosing an anchor. In particular, ../outside in an
 	// aliased tsconfig keeps its lexical sibling rather than the physical one.
-	for directory := path; directory != ""; directory = tspath.GetDirectoryPath(directory) {
-		physical, ok := lookupFrozenPath(f.parents, f.foldedParents, directory)
-		if ok {
-			relative := tspath.GetRelativePathFromDirectory(directory, path, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
-			return tspath.ResolvePath(physical, relative)
+	directory := path
+	if len(directory) > tspath.GetRootLength(directory) && tspath.HasTrailingDirectorySeparator(directory) {
+		// A trailing separator still addresses this directory, not its parent.
+		directory = tspath.RemoveTrailingDirectorySeparator(directory)
+		id = tspath.RemoveTrailingDirectorySeparator(id)
+		folded = tspath.RemoveTrailingDirectorySeparator(folded)
+	}
+	for directory != "" {
+		physical, ok := f.parents[id]
+		if !ok && folded != "" {
+			physical = f.foldedParents[folded]
+			ok = physical != ""
 		}
-		if tspath.GetDirectoryPath(directory) == directory {
+		if ok {
+			if physical == directory {
+				// Relative-path projection drops a trailing separator, except at
+				// a filesystem root. Preserve that spelling without rebuilding it.
+				if len(path) > tspath.GetRootLength(path) {
+					path = tspath.RemoveTrailingDirectorySeparator(path)
+				}
+				return path, false
+			}
+			relative := tspath.GetRelativePathFromDirectory(directory, path, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+			return tspath.ResolvePath(physical, relative), false
+		}
+		parent := tspath.GetDirectoryPath(directory)
+		if parent == directory {
 			break
 		}
+		directory = parent
+		if diskPath {
+			id = tspath.GetDirectoryPath(id)
+			if folded != "" {
+				folded = tspath.GetDirectoryPath(folded)
+			}
+		} else {
+			// Relative paths and URLs have distinct root/key rules. Keep their
+			// identity semantics without adding that work to disk-path IO.
+			id = config.ExactPathID(directory)
+			if len(f.foldedParents) != 0 {
+				folded = tspath.GetCanonicalFileName(id, false)
+			}
+		}
 	}
-	return path
+	return path, false
 }
 
 func (f *frozenFileSystem) FileExists(path string) bool { return f.FS.FileExists(f.ioPath(path)) }
@@ -142,11 +186,11 @@ func (f *frozenFileSystem) GetAccessibleEntries(path string) vfs.Entries {
 func (f *frozenFileSystem) Stat(path string) vfs.FileInfo { return f.FS.Stat(f.ioPath(path)) }
 
 func (f *frozenFileSystem) Realpath(path string) string {
-	path = tspath.NormalizePath(path)
-	if physical, ok := lookupFrozenPath(f.files, f.foldedFiles, path); ok {
+	physical, frozenFile := f.resolvePath(path)
+	if frozenFile {
 		return physical
 	}
-	return f.FS.Realpath(f.ioPath(path))
+	return f.FS.Realpath(physical)
 }
 
 func (f *frozenFileSystem) WriteFile(path string, data string) error {

@@ -44,7 +44,7 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 		{name: "default format Program failure", defaultFormat: true, badProject: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			dir := t.TempDir()
+			dir := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 			targetPath := tspath.NormalizePath(filepath.Join(dir, "index.ts"))
 			const content = "const value = true; if (!!value) { debugger; }\n"
 			if err := os.WriteFile(targetPath, []byte(content), 0o644); err != nil {
