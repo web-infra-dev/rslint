@@ -1,6 +1,7 @@
 // Upstream: eslint-plugin-import v2.32.0, all semantic groups.
 // Flow typeof and executable webpack resolver cases are retained in the data
 // with skipReason; the native runtime cannot execute those configurations.
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { RuleTester } from '../rule-tester.js';
@@ -16,11 +17,24 @@ const chunks = fs
   .readFileSync(path.join(dataDir, 'modules.txtar'), 'utf8')
   .split(/^-- (.+) --\r?$/m);
 if (chunks.length < 3) throw new Error('Missing upstream fixtures');
+const fixtureFiles: { file: string; contents: Buffer }[] = [];
 for (let i = 1; i < chunks.length; i += 2) {
   const file = path.join(root, chunks[i]);
+  const contents = Buffer.from(chunks[i + 1].replace(/^\r?\n/, ''));
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, chunks[i + 1].replace(/^\r?\n/, ''));
+  fs.writeFileSync(file, contents);
+  fixtureFiles.push({ file, contents });
 }
+beforeAll(() => {
+  // Check the materialized inputs before interpreting any lint result.
+  for (const { file, contents } of fixtureFiles) {
+    assert.deepEqual(
+      fs.readFileSync(file),
+      contents,
+      `Fixture contents changed: ${file}`,
+    );
+  }
+});
 afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
 const suites = JSON.parse(
   fs.readFileSync(path.join(dataDir, 'upstream-cases.json'), 'utf8'),

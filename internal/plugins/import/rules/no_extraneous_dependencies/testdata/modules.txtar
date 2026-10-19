@@ -417,4 +417,4 @@ module.exports={};
 -- docs/node_modules/foo/package.json --
 {"name": "foo", "main": "index.js"}
 -- docs/node_modules/foo/index.js --
-module.exports={};
+module.exports = {};
