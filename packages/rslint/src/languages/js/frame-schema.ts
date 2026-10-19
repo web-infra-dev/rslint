@@ -404,4 +404,3 @@ export const FRAME_SCHEMAS: ReadonlyArray<
   ['TSNamespaceExportDeclaration', ['id']],
   ['TSNullKeyword', []],
 ];
-export const FRAME_SCHEMA_HASH = 0xc424f4a8;

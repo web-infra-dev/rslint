@@ -159,34 +159,6 @@ describe('IPC byte attachments', () => {
     }
   });
 
-  test.each([
-    'A',
-    'AA',
-    'AAA',
-    '====',
-    'AA=A',
-    'A===',
-    'AAAA=',
-    'AA\n=',
-    '-_==',
-    'AB==',
-    'AAB=',
-  ])('rejects malformed or non-canonical base64 bytes: %j', async (bytes) => {
-    const pair = receiver();
-    let dispatched = false;
-    pair.b.setInboundHandler(() => {
-      dispatched = true;
-    });
-    try {
-      const result = await pair.request({ attachments: [{ bytes }] });
-      expect(result.kind).toBe('error');
-      expect(result.data).toEqual({ message: 'invalid IPC attachment bytes' });
-      expect(dispatched).toBe(false);
-    } finally {
-      pair.cleanup();
-    }
-  });
-
   test('adds the mapping to the first request envelope only', async () => {
     const memory = createMemoryTransport();
     const pair = pairClients({ memoryTransport: memory });
@@ -458,7 +430,7 @@ describe('IPC byte attachments', () => {
     },
   );
 
-  test.each(['fd', 'configure', 'version', 'descriptor'] as const)(
+  test.each(['fd', 'configure', 'descriptor'] as const)(
     'closes native storage when initialization fails: %s',
     (failure) => {
       const binding = getNativeBinding();
@@ -475,7 +447,7 @@ describe('IPC byte attachments', () => {
         descriptor() {
           if (failure === 'descriptor')
             throw new Error('descriptor unavailable');
-          return { version: MEMORY_CONFIG.version + 1 };
+          return { version: MEMORY_CONFIG.version };
         }
         register(): number {
           throw new Error('must not register');
@@ -489,9 +461,7 @@ describe('IPC byte attachments', () => {
       };
       try {
         expect(() => createMemoryTransport().configure(MEMORY_CONFIG)).toThrow(
-          failure === 'version'
-            ? 'inconsistent shared memory version'
-            : `${failure} unavailable`,
+          `${failure} unavailable`,
         );
         expect(closed).toBe(true);
       } finally {

@@ -1278,7 +1278,15 @@ func testDispatchEslintPluginRulesWithOutcome(ctx context.Context, dispatch Esli
 func testDispatchEslintPluginRulesAsync(ctx context.Context, dispatch EslintPluginDispatchFunc, inputs []EslintPluginFileInput, fixes bool, suggestions string, timing *TimingCollector) <-chan EslintPluginDispatchOutcome {
 	return DispatchEslintPluginRulesAsync(ctx, dispatch, pluginTestFrames(inputs), fixes, suggestions, timing)
 }
-func pluginFrameText(data []byte) string { return string(data[binary.LittleEndian.Uint32(data[60:]):]) }
+func pluginFrameText(data []byte) string {
+	u32 := func(offset int) int { return int(binary.LittleEndian.Uint32(data[offset:])) }
+	nodes, tokens := u32(8), u32(32)
+	values := ((40 + nodes*2 + 3) &^ 3) + nodes*12
+	tokenTypes := values + u32(12)*4 + u32(16)*4 + u32(24) + u32(28)*8
+	tokenStarts := (tokenTypes + tokens + 3) &^ 3
+	source := tokenStarts + tokens*8 + u32(36)*12
+	return string(data[source:])
+}
 
 func TestDispatchEslintPluginProjectionWindowsOwnFrames(t *testing.T) {
 	t.Run("bounded output blocks preserve every borrowed view", func(t *testing.T) {

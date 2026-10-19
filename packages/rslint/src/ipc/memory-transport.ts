@@ -74,9 +74,6 @@ export function createMemoryTransport() {
         };
         arena.configure(config);
         const descriptor = arena.descriptor();
-        if (descriptor.version !== config.version) {
-          throw new Error('inconsistent shared memory version');
-        }
         configuration = config;
         mapping = {
           version: descriptor.version,
@@ -130,23 +127,6 @@ export function readAttachmentBytes(value: IpcAttachment): Buffer {
   if (Buffer.isBuffer(value)) return value;
   if (value instanceof Uint8Array) return Buffer.from(value);
   return getNativeBinding().readBytes(value);
-}
-
-function decodeBytes(value: string): Buffer {
-  const padding = value.indexOf('=');
-  if (
-    value.length % 4 !== 0 ||
-    /[^A-Za-z0-9+/=]/.test(value) ||
-    (padding !== -1 &&
-      value.slice(padding) !== '=' &&
-      value.slice(padding) !== '==') ||
-    (padding !== -1 &&
-      Buffer.from(value.slice(-4), 'base64').toString('base64') !==
-        value.slice(-4))
-  ) {
-    throw new Error('invalid IPC attachment bytes');
-  }
-  return Buffer.from(value, 'base64');
 }
 
 /** Validate the complete envelope before admitting a native reader. */
@@ -207,7 +187,7 @@ export function receiveAttachments(
       if (variants !== 1) throw new Error('invalid IPC attachment');
       if (typeof attachment.text === 'string') return attachment.text;
       if (typeof attachment.bytes === 'string')
-        return decodeBytes(attachment.bytes);
+        return Buffer.from(attachment.bytes, 'base64');
       const range = attachment.range;
       if (
         !batches ||

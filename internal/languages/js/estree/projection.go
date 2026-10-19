@@ -24,9 +24,7 @@ import (
 )
 
 const (
-	frameMagic   uint32 = 0x31465445 // ETF1
-	frameVersion uint32 = 3
-	headerSize          = 64
+	headerSize          = 40
 	tagShift            = 29
 	payloadMask         = 1<<tagShift - 1
 	tagNull      uint32 = 0
@@ -139,9 +137,6 @@ func (b *Builder) Build(ctx context.Context, file *ast.SourceFile, options Optio
 // storage must remain immutable until every consumer has finished; it never
 // aliases the Builder's scratch. allocate is called synchronously at most once.
 func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options Options, allocate func(int) []byte) (data []byte, err error) {
-	if ctx == nil || file == nil {
-		return nil, errors.New("ESTree projection requires a context and SourceFile")
-	}
 	if options.SourceType != "module" && options.SourceType != "script" && options.SourceType != "commonjs" {
 		return nil, fmt.Errorf("invalid ESTree sourceType %q", options.SourceType)
 	}
@@ -360,13 +355,7 @@ func (p *estreeProjector) convertListWithNulls(nodes []*ast.Node, pattern bool) 
 }
 
 func (p *estreeProjector) add(typeName string, start, end uint32, values ...uint32) uint32 {
-	typeID, ok := typeIDs[typeName]
-	if !ok {
-		panic("unknown ESTree wire type " + typeName)
-	}
-	if want := len(schemas[typeID].fields); len(values) != want {
-		panic(fmt.Sprintf("%s wire arity: got %d, want %d", typeName, len(values), want))
-	}
+	typeID := typeIDs[typeName]
 	for index, field := range schemas[typeID].fields {
 		switch field {
 		case "abstract", "accessibility", "declare", "definite", "exportKind", "importKind", "implements", "override", "readonly", "returnType", "superTypeArguments", "typeAnnotation", "typeArguments", "typeParameters":
@@ -655,33 +644,26 @@ func (b *Builder) encode(root uint32, hasBOM bool, allocate func(int) []byte) ([
 		out = make([]byte, size)
 	} else {
 		out = allocate(size)
-		if len(out) != size {
-			return nil, errors.New("ESTree output allocation has an incorrect size")
-		}
 	}
 	// A reused buffer may contain a previous frame's flags and alignment bytes.
 	clear(out[:headerSize])
 	clear(out[types+n*2 : starts])
 	clear(out[tokenTypes+len(b.tokens) : tokenStarts])
 	put := func(offset int, value uint32) { binary.LittleEndian.PutUint32(out[offset:], value) }
-	put(0, frameMagic)
-	put(4, frameVersion)
-	put(8, schemaHash)
+	// One private format shared by the matching Go and Node build. Counts
+	// locate the columns; the remaining bytes are the source text.
 	if hasBOM {
-		put(12, 1)
+		put(0, 1)
 	}
-	put(16, uint32(size))
-	put(20, root)
-	put(24, uint32(n))
-	put(28, uint32(len(p.values)))
-	put(32, uint32(len(p.lists)))
-	put(36, uint32(p.stringBytes))
-	put(40, uint32(len(p.numbers)))
-	put(44, uint32(len(b.tokens)))
-	put(48, uint32(len(b.comments)))
-	put(52, uint32(len(p.text)))
-	put(56, p.offsets.At(len(p.text)))
-	put(60, uint32(source))
+	put(4, root)
+	put(8, uint32(n))
+	put(12, uint32(len(p.values)))
+	put(16, uint32(len(p.lists)))
+	put(20, uint32(len(p.strings)))
+	put(24, uint32(p.stringBytes))
+	put(28, uint32(len(p.numbers)))
+	put(32, uint32(len(b.tokens)))
+	put(36, uint32(len(b.comments)))
 	for index, node := range p.nodes {
 		if index&1023 == 0 {
 			p.check()

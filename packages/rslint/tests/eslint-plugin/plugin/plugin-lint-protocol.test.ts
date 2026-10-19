@@ -2,6 +2,7 @@ import { describe, test, expect } from 'rstack/test';
 import {
   buildPluginLintTasks,
   buildPluginLintResult,
+  type EslintPluginLintRequest,
   type ResolvedEslintPluginLintRequest,
 } from '../../../src/eslint-plugin/plugin/plugin-lint-protocol.js';
 import type { LintFileResult } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
@@ -11,7 +12,7 @@ describe('binary plugin frame boundary', () => {
   test('resolves owned bytes and capabilities without decoding either', () => {
     const owned = new Uint8Array([0, 255, 1]),
       capability = { lease: 7, offset: 3, length: 2 };
-    const req = {
+    const req: EslintPluginLintRequest = {
       collectFixes: true,
       files: [
         { path: 'a.ts', frameAttachment: 0, configKey: 'config' },
@@ -29,59 +30,6 @@ describe('binary plugin frame boundary', () => {
     expect(resolved.files[4].frame).toEqual(Buffer.from([0, 0]));
     expect(req.files[0].frameAttachment).toBe(0);
   });
-  test.each([
-    {},
-    { text: '' },
-    { textAttachment: 0 },
-    { frameAttachment: -1 },
-    { frameAttachment: 0.5 },
-    { frameAttachment: 1 },
-    { frameAttachment: 0, frame: 'AP8B' },
-    { frame: '***=' },
-    { frame: 'AP8' },
-    { frame: 'AB==' },
-    { frame: 'AAB=' },
-    { frame: 'AAA\n' },
-    { sharedSource: {} },
-    { frameAttachment: 0, sourceRange: {} },
-  ])('rejects invalid or obsolete input: %j', (input) => {
-    expect(() =>
-      resolvePluginAttachments(
-        { collectFixes: false, files: [{ path: 'a.ts', ...input }] } as never,
-        'frame' in input && !('frameAttachment' in input)
-          ? []
-          : [new Uint8Array([1])],
-      ),
-    ).toThrow();
-  });
-  test('rejects text attachments and unused attachments', () => {
-    expect(() =>
-      resolvePluginAttachments(
-        { collectFixes: false, files: [{ path: 'a.ts', frameAttachment: 0 }] },
-        ['source'],
-      ),
-    ).toThrow();
-    expect(() =>
-      resolvePluginAttachments(
-        { collectFixes: false, files: [{ path: 'a.ts', frame: 'AP8B' }] },
-        [new Uint8Array([1])],
-      ),
-    ).toThrow();
-  });
-  test('rejects repeated attachment indices', () => {
-    expect(() =>
-      resolvePluginAttachments(
-        {
-          collectFixes: false,
-          files: [
-            { path: 'a.ts', frameAttachment: 0 },
-            { path: 'b.ts', frameAttachment: 0 },
-          ],
-        },
-        [new Uint8Array([1]), new Uint8Array([1])],
-      ),
-    ).toThrow();
-  });
 });
 
 function input(
@@ -92,35 +40,21 @@ function input(
 }
 
 describe('buildPluginLintTasks', () => {
-  test('rejects an unresolved wire range instead of reading disk', () => {
-    const request: EslintPluginLintRequest = {
-      files: [{ path: '/missing.ts', frameAttachment: 0 }],
-      collectFixes: false,
-    };
-    expect(() =>
-      // @ts-expect-error A wire request must pass through the attachment adapter.
-      buildPluginLintTasks(request, { configDirSet: new Set() }),
-    ).toThrow('unresolved plugin frame');
-  });
   test('forwards native source capabilities without decoding or reading files', () => {
     const frame = { lease: 1, offset: 0, length: 12 };
-    const tasks = buildPluginLintTasks(
-      input([{ path: '/missing.ts', frame }]),
-      { configDirSet: new Set() },
-    );
+    const tasks = buildPluginLintTasks(input([{ path: '/missing.ts', frame }]));
     expect(tasks[0].frame).toBe(frame);
     expect(tasks[0].text).toBeUndefined();
   });
   test('configKey absent on file → empty string on task', () => {
     const tasks = buildPluginLintTasks(
       input([{ path: '/a.ts', frame: new Uint8Array([1]) }]),
-      { configDirSet: new Set() },
     );
     expect(tasks).toHaveLength(1);
     expect(tasks[0].configKey).toBe('');
   });
 
-  test('configKey known in set → passed through verbatim', () => {
+  test('configKey passes through verbatim', () => {
     const tasks = buildPluginLintTasks(
       input([
         {
@@ -129,40 +63,9 @@ describe('buildPluginLintTasks', () => {
           configKey: '/proj/pkg-a',
         },
       ]),
-      { configDirSet: new Set(['/proj/pkg-a']) },
     );
     expect(tasks).toHaveLength(1);
     expect(tasks[0].configKey).toBe('/proj/pkg-a');
-  });
-
-  test('configKey unknown → onUnknownConfigKey fires, key still passed through', () => {
-    const warnings: Array<{ filePath: string; configKey: string }> = [];
-    const tasks = buildPluginLintTasks(
-      input([
-        { path: '/x.ts', frame: new Uint8Array([1]), configKey: '/nowhere' },
-      ]),
-      {
-        configDirSet: new Set(['/proj/pkg-a']),
-        onUnknownConfigKey: (filePath, configKey) =>
-          warnings.push({ filePath, configKey }),
-      },
-    );
-    expect(tasks).toHaveLength(1);
-    // The unknown key still flows through; the worker is the source of
-    // truth for whether it's actually an invariant violation. The host
-    // hook is purely for surfacing a clearer log line.
-    expect(tasks[0].configKey).toBe('/nowhere');
-    expect(warnings).toEqual([{ filePath: '/x.ts', configKey: '/nowhere' }]);
-  });
-
-  test('configKey unknown without onUnknownConfigKey → still no throw', () => {
-    const tasks = buildPluginLintTasks(
-      input([
-        { path: '/x.ts', frame: new Uint8Array([1]), configKey: '/nowhere' },
-      ]),
-      { configDirSet: new Set() },
-    );
-    expect(tasks[0].configKey).toBe('/nowhere');
   });
 
   test('shared rules / collectFixes / suggestionsMode propagate to every task', () => {
@@ -181,7 +84,6 @@ describe('buildPluginLintTasks', () => {
           suggestionsMode: 'eager',
         },
       ),
-      { configDirSet: new Set() },
     );
     expect(tasks).toHaveLength(2);
     for (const t of tasks) {
@@ -198,13 +100,10 @@ describe('buildPluginLintTasks', () => {
   });
 
   test('rules / collectFixes / suggestionsMode defaults are sensible', () => {
-    const tasks = buildPluginLintTasks(
-      {
-        files: [{ path: '/a.ts', frame: new Uint8Array([1]) }],
-        collectFixes: false,
-      },
-      { configDirSet: new Set() },
-    );
+    const tasks = buildPluginLintTasks({
+      files: [{ path: '/a.ts', frame: new Uint8Array([1]) }],
+      collectFixes: false,
+    });
     expect(tasks[0].collectFixes).toBe(false);
     expect(tasks[0].suggestionsMode).toBe('off');
     expect(tasks[0].rules).toEqual({});
@@ -222,7 +121,6 @@ describe('buildPluginLintTasks', () => {
           settings,
         },
       ]),
-      { configDirSet: new Set() },
     );
     expect(tasks[0].languageOptions).toBe(langOpts);
     expect(tasks[0].settings).toBe(settings);

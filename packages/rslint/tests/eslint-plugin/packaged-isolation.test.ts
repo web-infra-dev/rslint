@@ -131,8 +131,8 @@ native.MemoryArena.prototype.register = function(batches) {
   const lease = register.call(this, batches);
   const length = batches.reduce((total, batch) => total + batch.length, 0);
   const frame = native.readBytes({ lease, offset: 0, length });
-  assert.equal(frame.subarray(frame.readUInt32LE(60)).toString('utf8'), original.slice(1));
-  assert.equal(frame.readUInt32LE(12), 1);
+  assert.equal(frame.subarray(frame.length - Buffer.byteLength(original.slice(1))).toString('utf8'), original.slice(1));
+  assert.equal(frame.readUInt32LE(0), 1);
   registered++;
   // Observe the real CLI registration after Go published its snapshot, before
   // the adapter sends the capability to the real worker. No transport is mocked.

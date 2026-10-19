@@ -61,5 +61,4 @@ export type {
   EslintPluginLintRequest,
   ResolvedEslintPluginLintRequest,
   EslintPluginLintResult,
-  BuildPluginLintTasksOptions,
 } from './plugin/plugin-lint-protocol.js';

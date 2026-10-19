@@ -15,7 +15,7 @@ const NON_CHILD_KEYS = new Set([
 ]);
 
 /** ESLint also permits caller-created synthetic nodes in SourceCode queries.
- * Frame decoding validates known schemas independently of this API fallback. */
+ * Frame decoding uses the fixed schema table independently of this fallback. */
 export function getVisitorKeys(node: {
   type?: string;
   [key: string]: unknown;

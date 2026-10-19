@@ -56,23 +56,10 @@ export async function createPluginLintHost(
     workerCount: singleThreaded ? 1 : undefined,
   });
   await pool.init();
-  // The worker keys its plugin map on configDirectory verbatim, and the wire
-  // configKey Go sends is byte-identical to the opaque routing identity it
-  // supplied for every adapter, so no normalization is needed or wanted here.
-  const configDirSet = new Set(configs.map((c) => c.configDirectory));
   return {
     async lint(req, signal, attachments) {
       const tasks = buildPluginLintTasks(
         resolvePluginAttachments(req, attachments),
-        {
-          configDirSet,
-          onUnknownConfigKey: (filePath, configKey) =>
-            onLog?.({
-              level: 'error',
-              source: 'runner',
-              text: `eslint-plugin: file ${filePath} carries unknown configKey ${configKey}`,
-            }),
-        },
       );
       // Cancel the dispatched worker tasks if the caller aborts (a superseding
       // keystroke / document close). cancelTask works whether the task is still

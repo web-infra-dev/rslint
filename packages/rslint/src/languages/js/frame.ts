@@ -1,11 +1,11 @@
 /* rslint-disable @typescript-eslint/no-unsafe-type-assertion */
 /** Decode final ESTree records into ordinary, worker-owned JavaScript objects. */
-import { FRAME_SCHEMAS, FRAME_SCHEMA_HASH } from './frame-schema.js';
+import { FRAME_SCHEMAS } from './frame-schema.js';
 import { VISITOR_KEYS } from './visitor-keys.js';
 import { buildLineStartOffsets, offsetToLineColumn } from './positions.js';
 import type { ESTreeNode } from './types.js';
 
-const HEADER = 64;
+const HEADER = 40;
 const MASK = 0x1fffffff;
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 const defineOwnProperty = Object.defineProperty;
@@ -114,13 +114,6 @@ function constructorFor(
       view.getInt32(base + fields.indexOf('$regexFlags') * 4, true) >>> 29 ===
         3) ||
     (type === 'TemplateElement' && !('value' in Object.prototype));
-  const literalValue =
-    type === 'Literal' &&
-    view.getInt32(base, true) >>> 29 === 7 &&
-    !('value' in Object.prototype) &&
-    (extra ||
-      view.getInt32(base + fields.indexOf('bigint') * 4, true) >>> 29 === 3);
-  if (literalValue) mask |= 1 << (fields.length + 2);
   if (parentSlot) mask |= 1 << fields.length;
   if (extra) mask |= 1 << (fields.length + 1);
   const variants = NODE_VARIANTS[typeID];
@@ -132,7 +125,6 @@ function constructorFor(
     if (mask & (1 << index)) keys.push(fields[index]);
   }
   if (extra) keys.push(type === 'Literal' ? 'regex' : 'value');
-  if (literalValue) keys.push('value');
   if (parentSlot) keys.push('parent');
   const constructor = makeNodeConstructor(type, keys, true);
   variants.set(mask, constructor);
@@ -169,36 +161,19 @@ export function decodeFrame(
   const invalid = (): never => {
     throw new Error('invalid ESTree frame');
   };
-  if (
-    !(bytes instanceof Uint8Array) ||
-    bytes.buffer instanceof SharedArrayBuffer ||
-    bytes.length < HEADER
-  )
-    invalid();
+  if (bytes.byteLength < HEADER) invalid();
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const u32 = (offset: number): number => view.getUint32(offset, true);
-  if (u32(0) !== 0x31465445 || u32(4) !== 3 || u32(8) !== FRAME_SCHEMA_HASH) {
-    throw new Error('ESTree frame version or schema mismatch');
-  }
-  const flags = u32(12),
-    root = u32(20),
-    count = u32(24),
-    valueCount = u32(28);
-  const listWords = u32(32),
-    stringBytes = u32(36),
-    numberCount = u32(40);
-  const tokenCount = u32(44),
-    commentCount = u32(48),
-    sourceBytes = u32(52),
-    sourceLength = u32(56);
-  if (
-    u32(16) !== bytes.length ||
-    flags > 1 ||
-    !root ||
-    root > count ||
-    stringBytes % 4
-  )
-    invalid();
+  const flags = u32(0),
+    root = u32(4),
+    count = u32(8),
+    valueCount = u32(12);
+  const listWords = u32(16),
+    stringCount = u32(20),
+    stringBytes = u32(24),
+    numberCount = u32(28);
+  const tokenCount = u32(32),
+    commentCount = u32(36);
   // Derive every section in Number arithmetic before allocating from counts.
   // Each count is u32, so these sums cannot overflow JavaScript's safe integers.
   const align4 = (n: number): number => Math.ceil(n / 4) * 4;
@@ -215,47 +190,14 @@ export function decodeFrame(
     tokenEndsOffset = tokenStartsOffset + tokenCount * 4;
   const commentsOffset = tokenEndsOffset + tokenCount * 4,
     source = commentsOffset + commentCount * 12;
-  if (source !== u32(60) || source + sourceBytes !== bytes.length) invalid();
+  // Reject an incomplete body before allocating from header counts. Record
+  // shapes, references and ranges belong to the matching Go producer, not a
+  // second validation pass here.
+  if (source > bytes.byteLength || stringCount * 4 > stringBytes) invalid();
 
   const poll = (index: number): void => {
     if ((index & 1023) === 0) checkFrameCancellation(cancelFlag);
   };
-  // One byte per wire word marks record boundaries without boxed Set entries.
-  const listOffsets = new Uint8Array(listWords);
-
-  for (let offset = 0, index = 0; offset < listWords; index++) {
-    poll(index);
-    listOffsets[offset] = 1;
-    const length = u32(lists + offset * 4);
-    if (length > listWords - offset - 1) invalid();
-    for (let i = 0; i < length; i++) {
-      poll(i);
-      if (u32(lists + (offset + 1 + i) * 4) > count) invalid();
-    }
-    offset += length + 1;
-  }
-  let stringCount = 0;
-  for (let offset = 0; offset < stringBytes; stringCount++) {
-    poll(stringCount);
-    const encoded = view.getInt32(strings + offset, true);
-    if (encoded < 0) {
-      if (offset + 8 > stringBytes) invalid();
-      const length = ~encoded;
-      const start = u32(strings + offset + 4),
-        end = start + length;
-      if (
-        end > sourceBytes ||
-        (start < sourceBytes && (bytes[source + start] & 0xc0) === 0x80) ||
-        (end < sourceBytes && (bytes[source + end] & 0xc0) === 0x80)
-      )
-        invalid();
-      offset += 8;
-    } else {
-      const next = align4(offset + 4 + encoded * 2);
-      if (next > stringBytes) invalid();
-      offset = next;
-    }
-  }
   // String references are sequential IDs. A compact offset column and an
   // owned-string cache replace a per-file hash table of record boundaries.
   const stringOffsets = new Uint32Array(stringCount);
@@ -268,95 +210,9 @@ export function decodeFrame(
     offset = encoded < 0 ? offset + 8 : align4(offset + 4 + encoded * 2);
   }
   const text = decoder.decode(bytes.subarray(source));
-  if (text.length !== sourceLength) invalid();
   const lineStarts = buildLineStartOffsets(text);
   const typeAt = (index: number): number =>
     view.getUint16(types + index * 2, true);
-  const validValue = (encoded: number): void => {
-    const tag = encoded >>> 29,
-      payload = encoded & MASK;
-    if (tag === 1) {
-      if (!payload || payload > count) invalid();
-    } else if (tag === 2) {
-      if (listOffsets[payload] !== 1) invalid();
-    } else if (tag === 3) {
-      if (payload >= stringCount) invalid();
-    } else if (tag === 6) {
-      if (payload >= numberCount) invalid();
-    } else if (payload !== 0) invalid();
-  };
-  let nextValue = 0;
-  for (let index = 0; index < count; index++) {
-    poll(index);
-    const schema = FRAME_SCHEMAS[typeAt(index)];
-    if (
-      !schema ||
-      !VISITOR_KEYS[schema[0]] ||
-      u32(valueStarts + index * 4) !== nextValue
-    )
-      invalid();
-    if (
-      u32(starts + index * 4) > u32(ends + index * 4) ||
-      u32(ends + index * 4) > sourceLength
-    )
-      invalid();
-    nextValue += schema[1].length;
-    if (nextValue > valueCount) invalid();
-  }
-  if (
-    nextValue !== valueCount ||
-    FRAME_SCHEMAS[typeAt(root - 1)][0] !== 'Program'
-  )
-    invalid();
-  for (let index = 0; index < valueCount; index++) {
-    poll(index);
-    // The high bits are tags, not an unsigned magnitude. Signed reads keep
-    // boolean/undefined words in the integer representation; >>> restores
-    // the exact same tag bits and MASK extracts the unchanged payload.
-    validValue(view.getInt32(values + index * 4, true));
-  }
-
-  // Validate structural reachability before reserving parent slots. Detached
-  // records and the Program root must retain their absent parent property.
-  const state = new Uint8Array(count + 1);
-  const stack = [root];
-  let visited = 0;
-  while (stack.length) {
-    poll(visited++);
-    const id = stack.pop()!;
-    if (id < 0) {
-      state[-id] = 2;
-      continue;
-    }
-    if (state[id] !== 0) invalid(); // cycles and shared structural children
-    state[id] = 1;
-    stack.push(-id);
-    const base = u32(valueStarts + (id - 1) * 4);
-    // Walk the private schema index without a per-node iterator.
-    const childFields = CHILD_FIELDS[typeAt(id - 1)];
-    for (let childIndex = 0; childIndex < childFields.length; childIndex++) {
-      const field = childFields[childIndex];
-      if (field < 0) invalid();
-      const encoded = view.getInt32(values + (base + field) * 4, true),
-        tag = encoded >>> 29,
-        payload = encoded & MASK;
-      if (tag === 0 || tag === 7) continue;
-      if (tag === 1) {
-        stack.push(payload);
-      } else if (tag === 2) {
-        const list = lists + payload * 4,
-          length = u32(list);
-        for (let index = 0; index < length; index++) {
-          poll(index);
-          const childID = u32(list + (index + 1) * 4);
-          if (childID === 0) continue;
-          stack.push(childID);
-        }
-      } else {
-        invalid();
-      }
-    }
-  }
   const reserveParents =
     !('parent' in Object.prototype) &&
     !('regex' in Object.prototype) &&
@@ -409,7 +265,7 @@ export function decodeFrame(
     const start = u32(starts + (id - 1) * 4),
       end = u32(ends + (id - 1) * 4);
     const base = values + u32(valueStarts + (id - 1) * 4) * 4;
-    const parentSlot = reserveParents && id !== root && state[id] !== 0;
+    const parentSlot = reserveParents && id !== root;
     const Constructor = constructorFor(typeAt(id - 1), view, base, parentSlot);
     nodes[id] = new Constructor(start, end, lineStarts, view, base);
   }
@@ -444,10 +300,8 @@ export function decodeFrame(
         return true;
       case 6:
         return view.getFloat64(numbers + payload * 8, true);
-      case 7:
-        return undefined;
       default:
-        return invalid();
+        return undefined;
     }
   };
   for (let id = 1; id <= count; id++) {
@@ -489,34 +343,18 @@ export function decodeFrame(
       node.value = { cooked, raw };
     }
   }
-  if (
-    nodes[root].sourceType !== 'module' &&
-    nodes[root].sourceType !== 'script'
-  )
-    invalid();
-  if (!Array.isArray(nodes[root].body)) invalid();
   // Parent setters observe complete nodes, in the original traversal order.
-  // Recheck the graph: inherited setters can synchronously mutate owned input.
-  state.fill(0);
-  stack.push(root);
-  visited = 0;
+  const stack = [root];
+  let visited = 0;
   while (stack.length) {
     poll(visited++);
     const id = stack.pop()!;
-    if (id < 0) {
-      state[-id] = 2;
-      continue;
-    }
-    if (state[id] !== 0) invalid();
-    state[id] = 1;
-    stack.push(-id);
     const node = nodes[id];
     const base = u32(valueStarts + (id - 1) * 4);
     // Walk the private schema index without a per-node iterator.
     const childFields = CHILD_FIELDS[typeAt(id - 1)];
     for (let childIndex = 0; childIndex < childFields.length; childIndex++) {
       const field = childFields[childIndex];
-      if (field < 0) invalid();
       const encoded = view.getInt32(values + (base + field) * 4, true),
         tag = encoded >>> 29,
         payload = encoded & MASK;
@@ -534,49 +372,34 @@ export function decodeFrame(
           nodes[childID].parent = node;
           stack.push(childID);
         }
-      } else {
-        invalid();
       }
     }
   }
   const tokenTypes = new Uint8Array(tokenCount),
     tokenStarts = new Uint32Array(tokenCount),
     tokenEnds = new Uint32Array(tokenCount);
-  let previousEnd = 0;
   for (let index = 0; index < tokenCount; index++) {
     poll(index);
     const type = bytes[tokenTypesOffset + index],
       start = u32(tokenStartsOffset + index * 4),
       end = u32(tokenEndsOffset + index * 4);
-    if (type > 12 || start < previousEnd || start > end || end > sourceLength)
-      invalid();
     tokenTypes[index] = type;
     tokenStarts[index] = start;
     tokenEnds[index] = end;
-    previousEnd = end;
   }
   const comments: DecodedFrame['comments'] = [];
-  previousEnd = 0;
   for (let index = 0; index < commentCount; index++) {
     poll(index);
     const base = commentsOffset + index * 12,
       kind = u32(base),
       start = u32(base + 4),
       end = u32(base + 8);
-    if (
-      kind > 1 ||
-      start < previousEnd ||
-      end - start < (kind ? 4 : 2) ||
-      end > sourceLength
-    )
-      invalid();
     comments.push({
       type: kind ? 'Block' : 'Line',
       value: text.slice(start + 2, kind ? end - 2 : end),
       start,
       end,
     });
-    previousEnd = end;
   }
   checkFrameCancellation(cancelFlag);
   return {

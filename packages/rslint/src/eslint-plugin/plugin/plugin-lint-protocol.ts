@@ -1,22 +1,5 @@
 /* rslint-disable @typescript-eslint/no-unsafe-type-assertion */
-/**
- * Boundary helpers for the eslintPlugins lint protocol — the shape Go
- * sends down (`pluginLint` IPC request OR `rslint/pluginLint`
- * LSP request) and the shape it reads back.
- *
- * Both the CLI host (`packages/rslint/src/cli/engine.ts`) and the LSP host
- * (`packages/vscode-extension/src/PluginLintPool.ts`) receive an
- * EslintPluginLintRequest from Go, build per-file LintTasks against the
- * WorkerPool, and project the results back. The boundary logic is
- * identical across the two paths — only the warning sink (stderr vs
- * logger) differs, parameterized via
- * {@link BuildPluginLintTasksOptions.onUnknownConfigKey}.
- *
- * Sharing this here keeps the wire contract single-sourced: any change
- * to the request parsing or result projection lands in exactly one
- * place, and Go sees the same fields regardless of which host produced
- * them.
- */
+/** Shared Go-to-host task projection and host-to-Go result projection. */
 
 import type { LintTask } from '../worker-pool.js';
 import type { LintFileResult } from '../linter/ecma-language-plugin.js';
@@ -36,27 +19,36 @@ import type { SharedBytes } from '../../native/types.js';
 export interface EslintPluginLintRequest {
   /** LSP config/worker generation. Omitted by the CLI's single-host path. */
   generation?: string;
-  files: ReadonlyArray<{
-    path: string;
-    /** Complete final ESTree frame, base64 only on LSP's JSON transport. */
-    frame?: string;
-    /** Index into binary IPC attachments, mutually exclusive with frame. */
-    frameAttachment?: number;
-    /**
-     * Per-file `languageOptions`, computed by Go via `GetConfigForFile`
-     * (flat-config files-glob match + deep merge). Opaque here; the
-     * worker reads `sourceType`/`globals`/`parserOptions.ecmaFeatures`.
-     */
-    languageOptions?: unknown;
-    settings?: Record<string, unknown>;
-    /**
-     * The owning config's absolute filesystem directory in the same form the
-     * host used as its `ConfigDescriptor.configDirectory`.
-     * The worker uses it to pick the right `LoadedPlugins`. Empty when
-     * no JS config governs the file.
-     */
-    configKey?: string;
-  }>;
+  files: ReadonlyArray<
+    {
+      path: string;
+      /**
+       * Per-file `languageOptions`, computed by Go via `GetConfigForFile`
+       * (flat-config files-glob match + deep merge). Opaque here; the
+       * worker reads `sourceType`/`globals`/`parserOptions.ecmaFeatures`.
+       */
+      languageOptions?: unknown;
+      settings?: Record<string, unknown>;
+      /**
+       * The owning config's absolute filesystem directory in the same form the
+       * host used as its `ConfigDescriptor.configDirectory`.
+       * The worker uses it to pick the right `LoadedPlugins`. Empty when
+       * no JS config governs the file.
+       */
+      configKey?: string;
+    } & (
+      | {
+          /** Complete frame, base64 only on LSP's JSON transport. */
+          frame: string;
+          frameAttachment?: never;
+        }
+      | {
+          /** Index into the binary IPC attachments. */
+          frameAttachment: number;
+          frame?: never;
+        }
+    )
+  >;
   rules?: Record<string, { options?: readonly unknown[] }>;
   /** Materialize each diagnostic's autofix payload without applying it. */
   collectFixes: boolean;
@@ -82,23 +74,6 @@ export interface ResolvedEslintPluginLintRequest extends Omit<
   >;
 }
 
-export interface BuildPluginLintTasksOptions {
-  /**
-   * Set of `configDirectory` strings the worker pool was initialized
-   * with. Used purely to detect "unknown configKey on the wire" — the
-   * host's invariant is that every file's `configKey` was previously
-   * declared in `WorkerPoolOptions.configs[]`. A miss is an internal
-   * bug surfaced through {@link onUnknownConfigKey}.
-   */
-  configDirSet: ReadonlySet<string>;
-  /**
-   * Invoked once per file whose `configKey` is not in `configDirSet`.
-   * The helper otherwise forwards `configKey` verbatim — the worker
-   * reports the failure via `parseError`.
-   */
-  onUnknownConfigKey?: (filePath: string, configKey: string) => void;
-}
-
 // ─────────────────────────────────────────────────────────────────────
 // buildPluginLintTasks
 // ─────────────────────────────────────────────────────────────────────
@@ -107,14 +82,9 @@ export interface BuildPluginLintTasksOptions {
  * Build per-file {@link LintTask}s from a resolved plugin request. Each
  * task carries the file's `configKey` verbatim; the worker uses it to
  * pick the right `LoadedPlugins` from its per-config map.
- *
- * If a file's `configKey` is empty OR missing from `configDirSet`, we
- * still emit a task (with the empty/unknown key) and let the worker
- * report the failure via `parseError` — keeping wire-format consistency.
  */
 export function buildPluginLintTasks(
   input: ResolvedEslintPluginLintRequest,
-  options: BuildPluginLintTasksOptions,
 ): LintTask[] {
   const sharedRules = Object.fromEntries(
     Object.entries(input.rules ?? {}).map(([k, v]) => [
@@ -126,28 +96,17 @@ export function buildPluginLintTasks(
   const suggestionsMode: 'off' | 'eager' = input.suggestionsMode ?? 'off';
   const collectTiming = input.collectTiming ?? false;
 
-  return input.files.map((f) => {
-    // Only the plugin application adapter can resolve attachment references. A
-    // missing/older adapter must not turn a shared snapshot into a disk read.
-    if ('frameAttachment' in f || 'text' in f || 'sharedSource' in f) {
-      throw new Error('unresolved plugin frame');
-    }
-    const configKey = f.configKey ?? '';
-    if (configKey !== '' && !options.configDirSet.has(configKey)) {
-      options.onUnknownConfigKey?.(f.path, configKey);
-    }
-    return {
-      filePath: f.path,
-      frame: f.frame,
-      languageOptions: f.languageOptions as never,
-      settings: f.settings,
-      rules: sharedRules,
-      collectFixes,
-      suggestionsMode,
-      collectTiming,
-      configKey,
-    };
-  });
+  return input.files.map((f) => ({
+    filePath: f.path,
+    frame: f.frame,
+    languageOptions: f.languageOptions as never,
+    settings: f.settings,
+    rules: sharedRules,
+    collectFixes,
+    suggestionsMode,
+    collectTiming,
+    configKey: f.configKey ?? '',
+  }));
 }
 
 // ─────────────────────────────────────────────────────────────────────

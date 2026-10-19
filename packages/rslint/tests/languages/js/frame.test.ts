@@ -1,4 +1,4 @@
-/** Final ESTree shape, positions, and hostile frame validation. */
+/** Final ESTree shape, positions, and decoded data ownership. */
 
 import { describe, test, expect } from 'rstack/test';
 import { parse as parseUpstream } from '@typescript-eslint/parser';
@@ -672,7 +672,7 @@ test('parenthesized constructor instantiation retains its own type arguments', (
   );
 });
 
-describe('hostile frames and ownership', () => {
+describe('decoded data ownership', () => {
   test('a shared empty wire list decodes into independent mutable arrays', () => {
     const { ast } = projectSyntax(
       'file.ts',
@@ -840,96 +840,6 @@ describe('hostile frames and ownership', () => {
     }
   });
 
-  test('parent callbacks cannot introduce an unchecked wire cycle', () => {
-    const bytes = projectFrame('file.js', 'first(); second();');
-    const count = bytes.readUInt32LE(24);
-    const starts = Math.ceil((64 + count * 2) / 4) * 4;
-    const valueStarts = starts + count * 8;
-    const values = valueStarts + count * 4;
-    const lists = values + bytes.readUInt32LE(28) * 4;
-    const root = bytes.readUInt32LE(20);
-    const base = bytes.readUInt32LE(valueStarts + (root - 1) * 4);
-    const body =
-      lists + (bytes.readUInt32LE(values + base * 4) & 0x1fffffff) * 4;
-    const old = Object.getOwnPropertyDescriptor(Object.prototype, 'parent');
-    let writes = 0;
-    Object.defineProperty(Object.prototype, 'parent', {
-      configurable: true,
-      set() {
-        if (++writes > 10) throw new Error('cycle was not rejected');
-        bytes.writeUInt32LE(root, body + 8);
-      },
-    });
-    try {
-      expect(() => decodeFrame(bytes)).toThrow('invalid ESTree frame');
-      expect(writes).toBeLessThan(10);
-    } finally {
-      if (old) Object.defineProperty(Object.prototype, 'parent', old);
-      else Reflect.deleteProperty(Object.prototype, 'parent');
-    }
-  });
-
-  test('synthesized literal values keep their field order when the wire value is absent', () => {
-    const bytes = projectFrame(
-      'file.js',
-      'const pattern = /a/g; const big = 10n;',
-    );
-    const count = bytes.readUInt32LE(24);
-    const starts = Math.ceil((64 + count * 2) / 4) * 4;
-    const valueStarts = starts + count * 8;
-    const values = valueStarts + count * 4;
-    for (let index = 0; index < count; index++) {
-      if (FRAME_SCHEMAS[bytes.readUInt16LE(64 + index * 2)][0] !== 'Literal')
-        continue;
-      const first = bytes.readUInt32LE(valueStarts + index * 4);
-      bytes.writeUInt32LE(0xe0000000, values + first * 4);
-    }
-    const { ast } = decodeFrame(bytes);
-    const program = ast as ESTreeNode & {
-      body: Array<{ declarations: Array<{ init: ESTreeNode }> }>;
-    };
-    const pattern = program.body[0].declarations[0].init;
-    const big = program.body[1].declarations[0].init;
-    expect(pattern.value).toEqual(/a/g);
-    expect(big.value).toBe(10n);
-    expect(Object.keys(pattern).slice(-3)).toEqual([
-      'regex',
-      'value',
-      'parent',
-    ]);
-    expect(Object.keys(big).slice(-2)).toEqual(['value', 'parent']);
-  });
-
-  test('alternating omitted fields stay absent across node shapes', () => {
-    const original = projectFrame('file.ts', 'const value = 1;');
-    const count = original.readUInt32LE(24);
-    const starts = Math.ceil((64 + count * 2) / 4) * 4;
-    const valueStarts = starts + count * 8;
-    const values = valueStarts + count * 4;
-    const index = Array.from({ length: count }, (_, index) => index).find(
-      (index) =>
-        FRAME_SCHEMAS[original.readUInt16LE(64 + index * 2)][0] ===
-        'Identifier',
-    )!;
-    const fields = FRAME_SCHEMAS[original.readUInt16LE(64 + index * 2)][1];
-    const base = values + original.readUInt32LE(valueStarts + index * 4) * 4;
-    for (let mask = 0; mask < 1 << fields.length; mask++) {
-      const bytes = Buffer.from(original);
-      for (let i = 0; i < fields.length; i++) {
-        if (mask & (1 << i)) bytes.writeUInt32LE(0xe0000000, base + i * 4);
-      }
-      const { ast } = decodeFrame(bytes);
-      const program = ast as ESTreeNode & {
-        body: Array<{ declarations: Array<{ id: ESTreeNode }> }>;
-      };
-      const id = program.body[0].declarations[0].id;
-      for (let i = 0; i < fields.length; i++) {
-        expect(Object.hasOwn(id, fields[i])).toBe((mask & (1 << i)) === 0);
-      }
-      expect(Object.keys(id).at(-1)).toBe('parent');
-    }
-  });
-
   test('synthesized-field setters observe complete nodes before parent linking', () => {
     const bytes = projectFrame(
       'file.js',
@@ -973,45 +883,6 @@ describe('hostile frames and ownership', () => {
     }
   });
 
-  test('records reached only through non-structural fields have no parent', () => {
-    const bytes = projectFrame('file.js', 'first(); second();');
-    const count = bytes.readUInt32LE(24);
-    const starts = Math.ceil((64 + count * 2) / 4) * 4;
-    const valueStarts = starts + count * 8;
-    const values = valueStarts + count * 4;
-    const lists = values + bytes.readUInt32LE(28) * 4;
-    const fieldOffset = (id: number, key: string): number => {
-      const type = bytes.readUInt16LE(64 + (id - 1) * 2);
-      const field = FRAME_SCHEMAS[type][1].indexOf(key);
-      expect(field).toBeGreaterThanOrEqual(0);
-      return (
-        values + (bytes.readUInt32LE(valueStarts + (id - 1) * 4) + field) * 4
-      );
-    };
-    const nodeID = (offset: number): number =>
-      bytes.readUInt32LE(offset) & 0x1fffffff;
-    const root = bytes.readUInt32LE(20);
-    const body = lists + nodeID(fieldOffset(root, 'body')) * 4;
-    const first = bytes.readUInt32LE(body + 4);
-    const second = bytes.readUInt32LE(body + 8);
-    const call = nodeID(fieldOffset(first, 'expression'));
-    const callee = nodeID(fieldOffset(call, 'callee'));
-    // Remove the second statement's structural edge while exposing the same
-    // record through a scalar field. Both forms were accepted by the decoder.
-    bytes.writeUInt32LE(0, body + 8);
-    bytes.writeUInt32LE(0x20000000 | second, fieldOffset(callee, 'name'));
-    const { ast } = decodeFrame(bytes);
-    const program = ast as ESTreeNode & {
-      body: Array<{ expression: { callee: { name: ESTreeNode } } }>;
-    };
-    const detached = program.body[0].expression.callee.name;
-    expect(detached.type).toBe('ExpressionStatement');
-    expect(Object.hasOwn(detached, 'parent')).toBe(false);
-    expect(Object.hasOwn(detached.expression as ESTreeNode, 'parent')).toBe(
-      false,
-    );
-  });
-
   test('decodes long UTF-16 values across chunks without changing code units', () => {
     const value = 'a'.repeat(4095) + '\ud800\udc00\udfff' + 'b'.repeat(4096);
     const decoded = projectSyntax(
@@ -1036,101 +907,6 @@ describe('hostile frames and ownership', () => {
     bytes.fill(0);
     expect(program.body[0].declarations[0].init.value).toBe(value);
     expect(program.body[0].declarations[0].init.raw).toBe(`'${value}'`);
-  });
-
-  test('source spans reject out-of-range and partial UTF-8 boundaries', () => {
-    const original = projectFrame('file.ts', "const value = '世界😀source';");
-    const count = original.readUInt32LE(24);
-    const strings =
-      Math.ceil((64 + count * 2) / 4) * 4 +
-      count * 12 +
-      (original.readUInt32LE(28) + original.readUInt32LE(32)) * 4;
-    const source = original.readUInt32LE(60);
-    let span = -1;
-    for (let at = 0; at < original.readUInt32LE(36);) {
-      const word = original.readUInt32LE(strings + at);
-      if (word >>> 31) {
-        const start = original.readUInt32LE(strings + at + 4);
-        const length = ~word;
-        if (
-          original
-            .subarray(source + start, source + start + length)
-            .includes(Buffer.from('世界'))
-        ) {
-          span = strings + at;
-          break;
-        }
-        at += 8;
-      } else at = Math.ceil((at + 4 + word * 2) / 4) * 4;
-    }
-    expect(span).toBeGreaterThanOrEqual(0);
-    const start = original.readUInt32LE(span + 4);
-    const length = ~original.readInt32LE(span);
-    const continuation = original
-      .subarray(source + start, source + start + length)
-      .findIndex((byte) => (byte & 0xc0) === 0x80);
-    expect(continuation).toBeGreaterThan(0);
-    for (const [offset, size] of [
-      [original.readUInt32LE(52) + 1, length],
-      [start, 0x7ffffffe],
-      [start + continuation, length - continuation],
-      [start, continuation],
-    ]) {
-      const bad = Buffer.from(original);
-      bad.writeInt32LE(~size, span);
-      bad.writeUInt32LE(offset, span + 4);
-      expect(() => decodeFrame(bad)).toThrow('invalid ESTree frame');
-    }
-  });
-
-  test('rejects concurrently mutable frame storage before validating fields', () => {
-    const original = projectFrame('file.ts', 'const value = 1;');
-    const shared = new Uint8Array(new SharedArrayBuffer(original.length));
-    shared.set(original);
-    expect(() => decodeFrame(shared)).toThrow('invalid ESTree frame');
-  });
-
-  test.each([0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60])(
-    'rejects corrupt header word %s',
-    (offset) => {
-      const bytes = projectFrame('file.ts', 'const a = 1; const b = 2;');
-      bytes.writeUInt32LE(0xffffffff, offset);
-      expect(() => decodeFrame(bytes)).toThrow();
-    },
-  );
-
-  test('string IDs reject out-of-range references and prior frame versions', () => {
-    const original = projectFrame(
-      'file.ts',
-      "const value = 'long dictionary value';",
-    );
-    const oldVersion = Buffer.from(original);
-    oldVersion.writeUInt32LE(2, 4);
-    expect(() => decodeFrame(oldVersion)).toThrow('version or schema mismatch');
-    const count = original.readUInt32LE(24);
-    const starts = Math.ceil((64 + count * 2) / 4) * 4;
-    const values = starts + count * 12;
-    const strings =
-      values + (original.readUInt32LE(28) + original.readUInt32LE(32)) * 4;
-    const stringBytes = original.readUInt32LE(36);
-    let stringCount = 0;
-    for (let offset = 0; offset < stringBytes; stringCount++) {
-      const encoded = original.readUInt32LE(strings + offset);
-      offset =
-        encoded >>> 31
-          ? offset + 8
-          : Math.ceil((offset + 4 + encoded * 2) / 4) * 4;
-    }
-    const index = Array.from(
-      { length: original.readUInt32LE(28) },
-      (_, i) => i,
-    ).find((i) => original.readUInt32LE(values + i * 4) >>> 29 === 3);
-    expect(index).toBeDefined();
-    for (const id of [stringCount, 0x1fffffff]) {
-      const bad = Buffer.from(original);
-      bad.writeUInt32LE(0x60000000 | id, values + (index as number) * 4);
-      expect(() => decodeFrame(bad)).toThrow('invalid ESTree frame');
-    }
   });
 
   test('private string IDs do not read inherited array entries', () => {
@@ -1245,50 +1021,6 @@ describe('hostile frames and ownership', () => {
       ]);
     },
   );
-
-  test('rejects truncated frames, bad UTF-8 and cyclic or shared children', () => {
-    const original = projectFrame('file.ts', 'a(); b();');
-    expect(() =>
-      decodeFrame(original.subarray(0, original.length - 1)),
-    ).toThrow();
-    const badText = Buffer.from(original);
-    badText[badText.length - 1] = 0xff;
-    expect(() => decodeFrame(badText)).toThrow();
-    const count = original.readUInt32LE(24);
-    const starts = Math.ceil((64 + count * 2) / 4) * 4;
-    const values = starts + count * 12;
-    const lists = values + original.readUInt32LE(28) * 4;
-    const root = original.readUInt32LE(20);
-    const rootValues = original.readUInt32LE(
-      starts + count * 8 + (root - 1) * 4,
-    );
-    const bodyOffset =
-      original.readUInt32LE(values + rootValues * 4) & 0x1fffffff;
-    const body = lists + bodyOffset * 4;
-    // A payload must point to a list header, never an element or beyond the
-    // list column. This also exercises bounds checks in the compact index.
-    for (const offset of [
-      bodyOffset + 1,
-      original.readUInt32LE(32),
-      0x1fffffff,
-    ]) {
-      const badList = Buffer.from(original);
-      badList.writeUInt32LE(0x40000000 | offset, values + rootValues * 4);
-      expect(() => decodeFrame(badList)).toThrow('invalid ESTree frame');
-    }
-    const cycle = Buffer.from(original);
-    cycle.writeUInt32LE(root, body + 4);
-    expect(() => decodeFrame(cycle)).toThrow('invalid ESTree frame');
-    const duplicate = Buffer.from(original);
-    duplicate.writeUInt32LE(duplicate.readUInt32LE(body + 4), body + 8);
-    expect(() => decodeFrame(duplicate)).toThrow('invalid ESTree frame');
-    const wrongBody = Buffer.from(original);
-    wrongBody.writeUInt32LE(
-      0x20000000 | original.readUInt32LE(body + 4),
-      values + rootValues * 4,
-    );
-    expect(() => decodeFrame(wrongBody)).toThrow('invalid ESTree frame');
-  });
 
   test('retained AST and token columns own their data after the frame is overwritten', () => {
     const text = "const s = '\\uD800'; const n = 0x10n; // hi\n";

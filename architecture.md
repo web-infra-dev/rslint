@@ -1722,14 +1722,16 @@ bitmaps. Population counts answer byte-offset queries, including offsets inside
 a UTF-8 scalar, without a record per Unicode character or a retained source view.
 String text is staged while frame sizes are counted, then encoded directly into the final frame
 instead of a temporary UTF-16 byte column. Success, failure and cancellation clear every
-staged string reference. Frame version 3 references strings by sequential IDs.
+staged string reference. The private frame references strings by sequential IDs.
 An immutable source-backed string may use a checked UTF-8 source range instead
 of a duplicate UTF-16 record. Other strings, including unpaired surrogates,
-retain UTF-16 encoding. The Node decoder validates record and source boundaries,
-indexes offsets in a compact column and caches independently decoded strings in
-a private array; it builds no per-file string hash table and retains no source
-substring or transport view. Matching Go/Node frame versions are required. Empty wire lists share a single record, while each
-Node-side read still creates an independent mutable array.
+retain UTF-16 encoding. The matching Go producer owns record shapes, references
+and ranges. Node checks that the header and column extent fit the received bytes
+before allocating, then indexes strings in one pass and materializes nodes
+directly. It uses no list-boundary bitmap, validation graph or per-file string
+hash table. A private array caches independently decoded strings, retaining no
+source substring or transport view. Empty wire lists share a single record,
+while each Node-side read still creates an independent mutable array.
 Token coverage uses a private, source-ordered scalar buffer; the scanner walks
 it alongside tokens, preserving the last cover at repeated source positions.
 Parsed compound operators retain their full spans while TypeScript generic
@@ -1766,9 +1768,11 @@ It contains no AST pointers and is discarded when the builder resets.
 
 The frame contains the final ESTree schema, UTF-16 node/token/comment offsets,
 UTF-16 literal strings, numeric values, the BOM-stripped UTF-8 source, and an
-explicit original-BOM flag. A version and schema fingerprint reject mismatched
-Go/Node builds. Go preserves source ranges, authored modifiers and binding
-contexts while excluding compiler-created JSDoc syntax. SourceType, ecmaVersion,
+explicit original-BOM flag. Go and Node ship together and use one private
+format, without per-frame version negotiation or schema fingerprints. The schema
+contract is checked by the existing conformance suites. Go preserves source
+ranges, authored modifiers and binding contexts while excluding compiler-created
+JSDoc syntax. SourceType, ecmaVersion,
 syntax-error admission, rule selection, reporting, disable directives and fix
 policy remain in their existing owners.
 
@@ -1790,9 +1794,11 @@ ancestor paths, including in configurations that also contain complex selectors.
 
 `WithFrameAttachments` associates each file with exactly one binary attachment.
 CLI and native API use it unconditionally; LSP serializes the same owned bytes
-inline as base64 through its existing JSON-RPC route. The inline adapter checks
-the alphabet, padding and unused tail bits without allocating a full base64
-round-trip string. API protocol 4.0.0 requires
+inline as base64 through its existing JSON-RPC route. The host resolves bytes
+and forwards configuration keys; workers own configuration lookup. Neither the
+plugin adapter nor Node IPC performs a separate canonical base64 validation
+pass. Native mapping bounds, publication generations and exact release
+acknowledgements remain transport invariants. API protocol 4.0.0 requires
 matching peers, with no old text-input negotiation or parser fallback. Detached
 LSP continuations contain owned frames, diagnostic text and cloned JSON
 metadata, with no SourceFile, checker, mutable observer or native rule graph.

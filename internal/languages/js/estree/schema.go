@@ -169,8 +169,6 @@ var schemas = []nodeSchema{
 	{"TSNullKeyword", []string{}},
 }
 
-const schemaHash uint32 = 0xc424f4a8
-
 var typeIDs = func() map[string]uint16 {
 	result := make(map[string]uint16, len(schemas))
 	for index, schema := range schemas {
