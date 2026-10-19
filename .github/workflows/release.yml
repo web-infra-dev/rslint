@@ -1,4 +1,5 @@
 name: 🚀 Release packages
+# cspell:ignore mlugg
 
 on:
   workflow_dispatch:
@@ -44,10 +45,25 @@ permissions:
   contents: read
 
 jobs:
+  resolve-release:
+    name: Resolve release commit
+    runs-on: ubuntu-22.04
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+          ref: ${{ inputs.branch }}
+      - name: Freeze release commit
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   publish-npm:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - NPM Packages' || 'Publish NPM Packages' }}
-    needs: [build, build-wasm, napi-build]
+    needs: [resolve-release, build, build-wasm, napi-build]
     runs-on: ubuntu-22.04
     environment: release
     permissions:
@@ -70,7 +86,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ needs.resolve-release.outputs.sha }}
           submodules: true
 
       - name: Setup Node.js
@@ -119,6 +135,7 @@ jobs:
           git push origin v$version
 
   publish-extension-vscode:
+    needs: resolve-release
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
     runs-on: rspack-ubuntu-22.04-large
@@ -128,7 +145,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ needs.resolve-release.outputs.sha }}
           submodules: true
 
       - name: Setup Node.js
@@ -158,6 +175,7 @@ jobs:
           path: packages/vscode-extension/rslint-*.vsix
 
   publish-extension-open-vsx:
+    needs: resolve-release
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
     runs-on: ubuntu-22.04
@@ -167,7 +185,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ needs.resolve-release.outputs.sha }}
           submodules: true
 
       - name: Setup Node
@@ -193,6 +211,7 @@ jobs:
           fi
 
   build-wasm:
+    needs: resolve-release
     name: Build WASM
     runs-on: rspack-ubuntu-22.04-large
     steps:
@@ -200,7 +219,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ needs.resolve-release.outputs.sha }}
           submodules: true
 
       - name: Setup Go
@@ -220,6 +239,7 @@ jobs:
           if-no-files-found: error
 
   build:
+    needs: resolve-release
     env:
       GOMAXPROCS: 8
     name: Build-Binaries
@@ -257,7 +277,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ needs.resolve-release.outputs.sha }}
           submodules: true
 
       - name: Setup Node.js
@@ -281,6 +301,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Go Build rslint
+        # Linux outputs also ship in musl packages and must not depend on glibc.
+        env:
+          CGO_ENABLED: '0'
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint ./cmd/rslint
 
@@ -300,12 +323,14 @@ jobs:
         with:
           name: rule-schemas
           path: rule-schemas.json
+          if-no-files-found: error
 
       - name: Upload rslint artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
           path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
+          if-no-files-found: error
 
   # napi `.node` parser binaries, one per target → the @rslint/native-{tuple}
   # subpackages. Separate matrix from the Go build job (which is ubuntu-only):
@@ -316,6 +341,7 @@ jobs:
   # legs use --use-napi-cross (@napi-rs/cross-toolchain, gnu-only); musl uses
   # -x (cargo-zigbuild) since cross-toolchain has no musl sysroot.
   napi-build:
+    needs: resolve-release
     name: Build napi (${{ matrix.settings.target }})
     strategy:
       fail-fast: false
@@ -354,7 +380,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ needs.resolve-release.outputs.sha }}
           submodules: true
 
       - name: Setup Node.js

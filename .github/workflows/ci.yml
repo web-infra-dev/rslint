@@ -85,6 +85,9 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
+      - name: Test release artifact assembly
+        run: node --test .github/actions/move-artifacts/move-artifacts.test.js
+
       - name: Format
         run: pnpm format:check
 
