@@ -545,7 +545,11 @@ func dispatchOneBatch(
 	defer clear(batch)
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("eslint-plugin dispatch panicked: %v", r)
+			if cause, ok := r.(error); ok {
+				err = fmt.Errorf("eslint-plugin dispatch panicked: %w", cause)
+			} else {
+				err = fmt.Errorf("eslint-plugin dispatch panicked: %v", r)
+			}
 		}
 	}()
 	// Output buffers stay exclusive until dispatch returns, including errors

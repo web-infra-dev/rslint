@@ -86,6 +86,23 @@ add('expressions', [
   'const a = tag<T>`value${x}`;',
 ]);
 
+for (const extension of ['js', 'ts']) {
+  add(
+    'parenthesized sequences',
+    [
+      '(a, b), c;',
+      '((a, b)), c, d;',
+      '(a, b), (c, d);',
+      'a, (b, c), d;',
+      '(a, (b, c)), d;',
+      '(a, b), (c, d), e;',
+      'for ((a, b), c;;) break;',
+      'const value = ((a, b), c);',
+    ],
+    extension,
+  );
+}
+
 const patterns = [
   '{key}',
   '{key = 1}',
@@ -106,6 +123,22 @@ for (const pattern of patterns) {
     `for (const ${pattern} of inputs) {}`,
     `(${pattern} = input);`,
   ]);
+}
+
+for (const extension of ['ts', 'tsx']) {
+  for (const pattern of ['{value}', '[value]']) {
+    add(
+      `optional binding ${pattern}`,
+      [
+        `type F = (${pattern}?) => T;`,
+        `type F = (${pattern}?: T) => T;`,
+        `declare function f(${pattern}?: T): void;`,
+        `interface I { m(${pattern}?): T }`,
+        `type C = new (${pattern}?: T) => T;`,
+      ],
+      extension,
+    );
+  }
 }
 
 add('functions', [

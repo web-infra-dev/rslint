@@ -1914,6 +1914,10 @@ retain any AST node or SourceCode after lint returns. Existing scope, listener,
 SourceCode, report and fix execution consumes this final tree.
 SourceCode's private comment-aware token index reserves the known stream size
 and keeps the actual merge length, avoiding repeated backing-array growth.
+Private node tables and sparse token caches have no array prototype. AST lists
+and fully materialized token arrays gain the ordinary Array prototype after
+their own entries are filled, so inherited numeric properties cannot supply or
+discard syntax data during construction.
 Token objects, identity, public arrays, range mutations and filter callbacks
 retain their existing behavior.
 Listener dispatch uses one callback and a private reversed-ancestor buffer per

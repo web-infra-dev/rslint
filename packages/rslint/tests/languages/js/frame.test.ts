@@ -530,6 +530,13 @@ describe('projected ranges used by plugin diagnostics and fixes', () => {
       replacement: '>',
       expected: 'const valid = left > right;',
     },
+    {
+      text: '// 😀\n(a, b), c;',
+      selector: 'ExpressionStatement > SequenceExpression',
+      target: 'a, b',
+      replacement: 'selected',
+      expected: '// 😀\n(selected), c;',
+    },
   ];
   test.each(cases)('$text', async (fixture) => {
     const { lintFile } = await import('../../eslint-plugin/project-frame.js');
@@ -559,7 +566,9 @@ describe('projected ranges used by plugin diagnostics and fixes', () => {
                               candidate.left as ESTreeNode,
                               candidate.right as ESTreeNode,
                             )! as unknown as ESTreeNode)
-                          : candidate;
+                          : candidate.type === 'SequenceExpression'
+                            ? (candidate.expressions as ESTreeNode[])[0]
+                            : candidate;
                     expect(ctx.sourceCode.getText(node)).toBe(fixture.target);
                     ctx.report({
                       node,
@@ -1143,6 +1152,99 @@ describe('hostile frames and ownership', () => {
       else Reflect.deleteProperty(Array.prototype, '0');
     }
   });
+
+  test.each(['any node', 'declarations'])(
+    'inherited numeric setters cannot discard %s from decoded arrays',
+    (kind) => {
+      const text = 'const alpha = 1; const beta = 2;';
+      const frame = projectFrame('file.js', text);
+      const loaded = {
+        plugins: [],
+        rules: new Map([
+          [
+            'probe/rename',
+            {
+              meta: { fixable: 'code' as const },
+              create(ctx: RuleContext) {
+                return {
+                  Identifier(node: ESTreeNode) {
+                    ctx.report({
+                      node,
+                      message: `rename ${node.name}`,
+                      fix: (fixer) =>
+                        fixer.replaceText(node, `${node.name}_fixed`),
+                    });
+                  },
+                };
+              },
+            },
+          ],
+        ]),
+      };
+      const old = Object.getOwnPropertyDescriptor(Array.prototype, '1');
+      let calls = 0;
+      let decodeCalls = -1;
+      let decoded!: ReturnType<typeof decodeFrame>;
+      let result!: ReturnType<typeof lintFrame>;
+      Object.defineProperty(Array.prototype, '1', {
+        configurable: true,
+        get: () => undefined,
+        set(value: unknown) {
+          const type =
+            value && typeof value === 'object'
+              ? (value as { type?: unknown }).type
+              : undefined;
+          if (
+            typeof type === 'string' &&
+            (kind === 'any node' || type === 'VariableDeclaration')
+          ) {
+            calls++;
+          } else {
+            Object.defineProperty(this, '1', {
+              value,
+              writable: true,
+              enumerable: true,
+              configurable: true,
+            });
+          }
+        },
+      });
+      try {
+        decoded = decodeFrame(frame);
+        decodeCalls = calls;
+        result = lintFrame(
+          {
+            filePath: 'file.js',
+            frame,
+            rules: { 'probe/rename': { options: [] } },
+            collectFixes: true,
+            suggestionsMode: 'off',
+          },
+          loaded,
+        );
+      } finally {
+        if (old) Object.defineProperty(Array.prototype, '1', old);
+        else Reflect.deleteProperty(Array.prototype, '1');
+      }
+      expect(decodeCalls).toBe(0);
+      const body = decoded.ast.body as ESTreeNode[];
+      expect(Object.getPrototypeOf(body)).toBe(Array.prototype);
+      expect(body.map((node) => node.type)).toEqual([
+        'VariableDeclaration',
+        'VariableDeclaration',
+      ]);
+      expect(body[1].parent).toBe(decoded.ast);
+      expect(result.parseError).toBeUndefined();
+      expect(result.ruleErrors).toBeUndefined();
+      expect(
+        result.diagnostics.map((diagnostic) => diagnostic.message),
+      ).toEqual(['rename alpha', 'rename beta']);
+      expect(result.fixes).toEqual([
+        { range: [6, 11], text: 'alpha_fixed' },
+        { range: [23, 27], text: 'beta_fixed' },
+      ]);
+    },
+  );
 
   test('rejects truncated frames, bad UTF-8 and cyclic or shared children', () => {
     const original = projectFrame('file.ts', 'a(); b();');

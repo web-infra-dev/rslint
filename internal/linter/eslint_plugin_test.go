@@ -1114,6 +1114,32 @@ func TestDispatchEslintPluginRulesWithOutcomePreservesCancellation(t *testing.T)
 	if len(outcome.Diagnostics) != 0 {
 		t.Errorf("cancellation diagnostics = %v, want none", outcome.Diagnostics)
 	}
+	t.Run("frozen frame allocation after cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		released := 0
+		provider := testPluginBatchProvider(func(context.Context) (*EslintPluginBatch, error) {
+			cancel()
+			return &EslintPluginBatch{
+				Allocate: func(int) []byte { panic(ctx.Err()) },
+				Release:  func() { released++ },
+				Dispatch: func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+					t.Fatal("dispatched canceled input")
+					return &EslintPluginLintResult{}, nil
+				},
+			}, nil
+		})
+		outcome := DispatchEslintPluginRulesWithOutcome(ctx, provider, pluginTestFrames([]EslintPluginFileInput{{
+			Path:  "/repo/a.ts",
+			Rules: []rule.ConfiguredRule{pluginRule("external/rule", nil, rule.SeverityError)},
+		}}), false, SuggestionsModeOff, nil)
+		if released != 1 {
+			t.Fatalf("released output %d times, want once", released)
+		}
+		if !errors.Is(outcome.DispatchError, context.Canceled) || len(outcome.Diagnostics) != 0 {
+			t.Fatalf("canceled allocation outcome = %+v", outcome)
+		}
+	})
 }
 
 func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T) {

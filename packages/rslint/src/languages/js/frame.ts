@@ -362,7 +362,8 @@ export function decodeFrame(
     !('parent' in Object.prototype) &&
     !('regex' in Object.prototype) &&
     !('value' in Object.prototype);
-  const nodes: FrameNode[] = new Array(count + 1);
+  // Node IDs are private storage, never inherited array properties.
+  const nodes: FrameNode[] = Object.setPrototypeOf(new Array(count + 1), null);
   const stringData = Buffer.from(
     bytes.buffer,
     bytes.byteOffset,
@@ -423,12 +424,17 @@ export function decodeFrame(
       case 2: {
         const base = lists + payload * 4,
           length = u32(base),
-          result = new Array<ESTreeNode | null>(length);
+          result: Array<ESTreeNode | null> = Object.setPrototypeOf(
+            new Array(length),
+            null,
+          );
         for (let i = 0; i < length; i++) {
           poll(i);
           const id = u32(base + 4 + i * 4);
           result[i] = id === 0 ? null : nodes[id];
         }
+        // ESTree lists become ordinary arrays after every own entry exists.
+        Object.setPrototypeOf(result, Array.prototype);
         return result;
       }
       case 3:

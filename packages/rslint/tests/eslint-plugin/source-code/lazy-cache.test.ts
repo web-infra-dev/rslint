@@ -11,7 +11,7 @@
  *      the same file share one SourceCode → shared lazy caches
  *      (tokens, comments, scopeManager).
  *   2. `createSourceCode({ parsedComments })` makes `getAllComments`
- *      return ESLint-shape comments synthesized from the oxc input
+ *      return ESLint-shape comments synthesized from projected input
  *      WITHOUT triggering the full text tokenizer. Shebang lines are
  *      rewritten to type='Shebang'.
  *   3. `buildDiagnostic({ lsoCache, descriptor: { loc } })` reuses the
@@ -35,7 +35,7 @@ import { projectSyntax } from '../../languages/js/project-frame.js';
 import type { ESTreeNode } from '../../../src/languages/js/types.js';
 
 // Minimal node helper for synthesizing ASTs in these tests. We don't
-// need real oxc output — just a `type` + `range` is enough for the
+// need a complete syntax tree — just a `type` + `range` is enough for the
 // SourceCode/buildDiagnostic surfaces we exercise here.
 function mkNode(type: string, start: number, end: number): ESTreeNode {
   return {
@@ -145,6 +145,61 @@ describe('singular token queries share mutable objects with full streams', () =>
     expect(sc.getFirstToken(program)).toBe(stream[0]);
     expect(sc.getLastToken(program)).toBe(stream.at(-1));
   });
+
+  test.each(['value', 'setter', 'readonly'] as const)(
+    'sparse token cache ignores inherited numeric %s properties',
+    (kind) => {
+      const sc = makeSource('const alpha = 1;');
+      const program = mkNode('Program', 0, sc.text.length);
+      const first = sc.getFirstToken(program)!;
+      const fake = {
+        type: 'Identifier',
+        value: 'inherited',
+        range: [6, 11] as [number, number],
+        loc: {
+          start: { line: 1, column: 6 },
+          end: { line: 1, column: 11 },
+        },
+      };
+      const old = Object.getOwnPropertyDescriptor(Array.prototype, '1');
+      let calls = 0;
+      let next: ReturnType<typeof sc.getTokenAfter> = null;
+      let tokens: ReturnType<typeof sc.getTokens> = [];
+      Object.defineProperty(Array.prototype, '1', {
+        configurable: true,
+        ...(kind === 'setter'
+          ? {
+              get: () => undefined,
+              set: () => {
+                calls++;
+              },
+            }
+          : { value: fake, writable: kind === 'value' }),
+      });
+      try {
+        next = sc.getTokenAfter(first);
+        tokens = sc.tokensAndComments as typeof tokens;
+      } finally {
+        if (old) Object.defineProperty(Array.prototype, '1', old);
+        else Reflect.deleteProperty(Array.prototype, '1');
+      }
+      expect(calls).toBe(0);
+      expect(next!.value).toBe('alpha');
+      expect(tokens.map((token) => token.value)).toEqual([
+        'const',
+        'alpha',
+        '=',
+        '1',
+        ';',
+      ]);
+      expect(tokens[0]).toBe(first);
+      expect(tokens[1]).toBe(next);
+      expect(Object.getPrototypeOf(sc.tokensAndComments)).toBe(Array.prototype);
+      expect(sc.tokensAndComments.map((token) => token.value)).toEqual(
+        tokens.map((token) => token.value),
+      );
+    },
+  );
 
   test('filters and comment streams reuse tokens returned by singular queries', () => {
     const sc = makeSource('const first = 1; /* gap */ const second = 2;');
@@ -341,11 +396,9 @@ describe('getAllComments uses parsedComments without tokenize', () => {
     expect(comments[1].range).toEqual([9, 20]);
   });
 
-  test('rewrites oxc-emitted Line comment at offset 0 to Shebang when text starts with #!', () => {
-    // oxc emits the shebang line as `type: 'Line'`. ESLint exposes it
-    // as `type: 'Shebang'`. The buildCommentsFromParsed adapter must
-    // rewrite — this is the bit that broke once during the perf sweep
-    // (we double-synthesized shebangs); pin it permanently.
+  test('rewrites a projected Line comment at offset 0 to Shebang when text starts with #!', () => {
+    // Projected comments use `type: 'Line'`; the SourceCode adapter exposes
+    // the initial hashbang once as `type: 'Shebang'`.
     const text = '#!/usr/bin/env node\nlet x = 1;';
     const ast = mkNode('Program', 0, text.length);
     const parsedComments = [

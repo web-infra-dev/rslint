@@ -843,7 +843,13 @@ func (p *estreeProjector) convertParameter(node *ast.Node) uint32 {
 		parameter = p.convert(n.Name(), true)
 	}
 	if n.QuestionToken != nil {
-		parameter = p.cloneBindingOptional(parameter, true)
+		record := p.nodes[parameter-1]
+		for index, field := range schemas[record.typeID].fields {
+			if field == "optional" {
+				p.values[int(record.valueStart)+index] = boolValue(true)
+				break
+			}
+		}
 		p.nodes[parameter-1].end = max(p.nodes[parameter-1].end, p.offsets.At(n.QuestionToken.End()))
 	}
 	result := parameter
@@ -876,20 +882,6 @@ func (p *estreeProjector) convertParameter(node *ast.Node) uint32 {
 		}
 	}
 	return result
-}
-
-func (p *estreeProjector) cloneBindingOptional(id uint32, optional bool) uint32 {
-	if id == 0 || int(id) > len(p.nodes) {
-		return id
-	}
-	record := p.nodes[id-1]
-	if schemas[record.typeID].name != "Identifier" {
-		return id
-	}
-	start := int(record.valueStart)
-	values := append([]uint32(nil), p.values[start:start+4]...)
-	values[2] = boolValue(optional)
-	return p.add("Identifier", record.start, record.end, values...)
 }
 
 func (p *estreeProjector) convertBindingElement(node *ast.Node) uint32 {
@@ -938,7 +930,12 @@ func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 	operator := scanner.TokenToString(n.OperatorToken.Kind)
 	if n.OperatorToken.Kind == ast.KindCommaToken {
 		left := p.convert(n.Left, false)
-		items := p.sequenceItems(left)
+		items := []uint32{left}
+		// Only an unparenthesized comma continues the same sequence. Its
+		// projected child may also be a sequence after removing parentheses.
+		if n.Left.Kind == ast.KindBinaryExpression && n.Left.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
+			items = p.sequenceItems(left)
+		}
 		items = append(items, p.convert(n.Right, false))
 		return p.addNode("SequenceExpression", node, p.listValue(items))
 	}

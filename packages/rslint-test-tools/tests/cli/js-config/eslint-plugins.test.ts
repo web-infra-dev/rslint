@@ -68,6 +68,13 @@ const LOCAL_PLUGIN = `export default {
           AssignmentPattern(node) {
             context.report({ node, message: 'remove default', fix: fixer => fixer.replaceText(node, sc.getText(node.left)) });
           },
+          SequenceExpression(node) {
+            if (node.expressions[0]?.type !== 'SequenceExpression') return;
+            context.report({ node: node.expressions[0], message: 'replace inner sequence', fix: fixer => fixer.replaceText(node.expressions[0], 'selected') });
+          },
+          'ObjectPattern[optional=true], ArrayPattern[optional=true]'(node) {
+            context.report({ node, message: 'replace optional binding', fix: fixer => fixer.replaceText(node, 'parameter?: T') });
+          },
           BinaryExpression(node) {
             if (node.operator !== '>=') return;
             const operator = sc.getFirstTokenBetween(node.left, node.right);
@@ -268,6 +275,18 @@ export default [{ files: ['**/*.ts'],
       'operator.ts',
       '// 😀\nconst value = left >= right; left >>= 1;\n',
       '// 😀\nconst value = left > right; left >>= 1;\n',
+    ],
+    ['sequence.js', '// 😀\n(a, b), c;\n', '// 😀\n(selected), c;\n'],
+    ['sequence.ts', '// 😀\n(a, b), c;\n', '// 😀\n(selected), c;\n'],
+    [
+      'optional.ts',
+      'type F = ({value}?: T) => void;\n',
+      'type F = (parameter?: T) => void;\n',
+    ],
+    [
+      'optional.tsx',
+      'type F = ([value]?: T) => void;\n',
+      'type F = (parameter?: T) => void;\n',
     ],
     [
       'constructor.ts',
