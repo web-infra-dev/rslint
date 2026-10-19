@@ -127,7 +127,7 @@ export class RuleTester {
         }
       });
       test('invalid', async (t) => {
-        for (const item of cases.invalid) {
+        for (const [caseIndex, item] of cases.invalid.entries()) {
           assert.ok(
             item.errors || item.errors === 0,
             `Did not specify errors for an invalid test of ${ruleName}`,
@@ -174,6 +174,30 @@ export class RuleTester {
             },
           });
 
+          const expectedCount =
+            typeof item.errors === 'number' ? item.errors : item.errors.length;
+          const caseContext =
+            diags.diagnostics.length === expectedCount
+              ? ''
+              : '\nInvalid case: ' +
+                util.inspect(
+                  {
+                    caseIndex,
+                    ruleName,
+                    item,
+                    absoluteFilename,
+                    cwd,
+                    configDirectory,
+                    result: diags,
+                  },
+                  {
+                    depth: null,
+                    maxArrayLength: null,
+                    maxStringLength: null,
+                    colors: false,
+                  },
+                );
+
           if (typeof item.errors === 'number') {
             if (item.errors === 0) {
               assert.fail(
@@ -185,11 +209,12 @@ export class RuleTester {
               diags.diagnostics.length,
               item.errors,
               util.format(
-                'Should have %d error%s but had %d: %s',
+                'Should have %d error%s but had %d: %s%s',
                 item.errors,
                 item.errors === 1 ? '' : 's',
                 diags.diagnostics.length,
                 util.inspect(diags.diagnostics),
+                caseContext,
               ),
             );
           } else {
@@ -197,11 +222,12 @@ export class RuleTester {
               diags.diagnostics.length,
               item.errors.length,
               util.format(
-                'Should have %d error%s but had %d: %s',
+                'Should have %d error%s but had %d: %s%s',
                 item.errors.length,
                 item.errors.length === 1 ? '' : 's',
                 diags.diagnostics.length,
                 util.inspect(diags.diagnostics),
+                caseContext,
               ),
             );
 
