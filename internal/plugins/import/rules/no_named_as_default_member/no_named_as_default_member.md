@@ -46,6 +46,17 @@ This rule has no options. It does not provide automatic fixes or suggestions.
 
 ## Differences from upstream
 
+- **CommonJS declarations can describe a namespace default.** For example,
+  `fsExtra.outputFileSync()` is allowed even though `@types/fs-extra` declares
+  `outputFileSync` as a named export. A generic `.d.ts` that explicitly exports
+  `default`, including through a re-export, retains the named-member check.
+  Native Node ESM imports of CommonJS keep their namespace default according to
+  TypeScript's resolved module. Explicit `.mjs`, `.mts`, and `.d.mts` files are
+  checked even inside a `type: 'commonjs'` package. This check uses the resolved
+  source or declaration; it does not inspect the runtime implementation behind
+  declarations. For example, with NodeNext, a package without `type` can retain
+  a CommonJS declaration view through `types: './index.d.ts'` even if its
+  `main: './index.mjs'` points to ESM.
 - **Checking imports requires access to the imported files.** If you disable both
   `languageOptions.parserOptions.project` and `projectService`, include imported
   files in the lint targets too. For example, checking `app.ts` alone will not

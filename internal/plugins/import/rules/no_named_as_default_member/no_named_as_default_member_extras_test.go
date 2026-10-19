@@ -132,3 +132,44 @@ func TestNoNamedAsDefaultMemberExtras(t *testing.T) {
 		},
 	)
 }
+
+func TestNoNamedAsDefaultMemberModuleFormats(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, source := range []string{
+		"esm-in-cjs", "esm-in-cjs/direct.mjs", "esm-in-cjs/source.mts",
+		"esm-with-types", "default-alias", "default-reexport", "default-namespace",
+		"cjs-default", "cjs-default-no-type",
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:     "import obj from '" + source + "';\nobj.foo;\nconst { foo } = obj;",
+			FileName: "formats/consumer.ts", TSConfig: "formats/tsconfig.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				defaultMemberError("obj", "foo", source, 2, 1, 2, 8),
+				defaultMemberError("obj", "foo", source, 3, 9, 3, 12),
+			},
+		})
+	}
+	// Explicit ESM formats also win over package metadata in native Node imports.
+	for _, source := range []string{"esm-in-cjs", "esm-in-cjs/direct.mjs", "esm-in-cjs/source.mts"} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:     "import obj from '" + source + "';\nobj.foo;",
+			FileName: "formats-node/consumer.mts", TSConfig: "formats-node/tsconfig.json",
+			Errors: []rule_tester.InvalidTestCaseError{defaultMemberError("obj", "foo", source, 2, 1, 2, 8)},
+		})
+	}
+	rule_tester.RunRuleTester(defaultMemberRoot(t, "testdata/extras.txtar"), "tsconfig.json", t, &no_named_as_default_member.NoNamedAsDefaultMemberRule,
+		[]rule_tester.ValidTestCase{
+			// Unknown star exports are not evidence of an authored default.
+			{Code: `import obj from 'cjs-unknown-star'; obj.foo; const {foo} = obj;`, FileName: "formats/consumer.ts", TSConfig: "formats/tsconfig.json"},
+			// A marker name alone does not identify a separate default object.
+			{Code: `import obj from 'cjs-export-equals'; obj.foo; const {foo} = obj;`, FileName: "interop/consumer.ts", TSConfig: "interop/tsconfig.json"},
+			// Native Node ESM defaults contain the CommonJS namespace, even when
+			// that namespace also exposes its own default and __esModule members.
+			{Code: `import obj from 'cjs-default'; obj.foo; const {foo} = obj;`, FileName: "formats-node/consumer.mts", TSConfig: "formats-node/tsconfig.json"},
+			{Code: `import obj from 'cjs-default-no-type'; obj.foo; const {foo} = obj;`, FileName: "formats-node/consumer.mts", TSConfig: "formats-node/tsconfig.json"},
+			// The existing NodeNext declaration view can be CommonJS even when
+			// the hidden implementation is ESM. This rule does not inspect it.
+			{Code: `import obj from 'esm-with-types'; obj.foo; const {foo} = obj;`, FileName: "formats-node/consumer.mts", TSConfig: "formats-node/tsconfig.json"},
+		}, invalid,
+	)
+}

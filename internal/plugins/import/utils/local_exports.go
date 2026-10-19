@@ -13,9 +13,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
-// IsCommonJSModule reports whether the module requested by source resolves to
-// a CommonJS module or package without native ES named export definitions.
-func IsCommonJSModule(ctx rule.RuleContext, source modules.Source) bool {
+// HasCommonJSNamespaceDefault recognizes CommonJS namespace defaults from the
+// resolved module. An authored default in a generic declaration does not imply
+// that the module's named exports are properties of that default.
+func HasCommonJSNamespaceDefault(ctx rule.RuleContext, source modules.Source) bool {
 	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
 		return false
 	}
@@ -24,11 +25,23 @@ func IsCommonJSModule(ctx rule.RuleContext, source modules.Source) bool {
 	if !link.Resolved {
 		return false
 	}
+	if strings.HasSuffix(link.Path, ".mjs") || strings.HasSuffix(link.Path, ".mts") {
+		return false
+	}
+	if link.NodeDefault {
+		return true
+	}
 	if strings.HasSuffix(link.Path, ".cjs") || strings.HasSuffix(link.Path, ".cts") || strings.HasSuffix(link.Path, ".d.cts") {
 		return true
 	}
 	if link.Target == nil {
 		return false
+	}
+	if link.Target.IsDeclarationFile {
+		exports, available := GetExportMap(ctx, source)
+		if available && exports.Get(defaultExportName) != nil {
+			return false
+		}
 	}
 	meta := ctx.Program().SourceFileMetadata(link.Target)
 	if meta.PackageJsonType == "commonjs" {
