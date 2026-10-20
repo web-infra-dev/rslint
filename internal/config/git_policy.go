@@ -22,6 +22,7 @@ type GitPolicy struct {
 	roots            map[tspath.Path]string
 	sources          map[tspath.Path]gitPolicySource
 	covered          map[tspath.Path]struct{}
+	blockedEntries   map[tspath.Path]struct{}
 }
 
 func NewGitPolicy(snapshot gitignore.Snapshot) *GitPolicy {
@@ -30,6 +31,7 @@ func NewGitPolicy(snapshot gitignore.Snapshot) *GitPolicy {
 		roots:            make(map[tspath.Path]string),
 		sources:          make(map[tspath.Path]gitPolicySource),
 		covered:          make(map[tspath.Path]struct{}),
+		blockedEntries:   make(map[tspath.Path]struct{}),
 	}
 	for _, directory := range snapshot.Roots {
 		policy.roots[policy.pathID(directory)] = tspath.NormalizePath(directory)
@@ -46,7 +48,20 @@ func NewGitPolicy(snapshot gitignore.Snapshot) *GitPolicy {
 	for _, directory := range snapshot.CoveredDirectories {
 		policy.covered[policy.pathID(directory)] = struct{}{}
 	}
+	for _, directory := range snapshot.BlockedDirectoryEntries {
+		policy.blockedEntries[policy.pathID(directory)] = struct{}{}
+	}
 	return policy
+}
+
+// blocksDirectoryEntry retains the outer walk's admission decision even when
+// another input independently establishes this directory as a Git root.
+func (policy *GitPolicy) blocksDirectoryEntry(physicalDir string) bool {
+	if policy == nil {
+		return false
+	}
+	_, blocked := policy.blockedEntries[policy.pathID(physicalDir)]
+	return blocked
 }
 
 func (policy *GitPolicy) pathID(path string) tspath.Path {
@@ -198,9 +213,9 @@ func CollectGitPolicy(
 				}
 			}
 			childPhysical := tspath.CombinePaths(physical, name)
-			childCursor, _ := reader.Enter(cursor, childPhysical)
-			if !childCursor.SourceReachable() && !matcher.MayReopenGitDescendants(childLexical, childPhysical) {
-				reader.Observe(childCursor, childPhysical)
+			childCursor, entryBlocked := reader.Enter(cursor, childPhysical)
+			if (entryBlocked || !childCursor.SourceReachable()) && !matcher.MayReopenGitDescendants(childLexical, childPhysical) {
+				reader.Observe(childCursor.BlockSourceTraversal(), childPhysical)
 				continue
 			}
 			visit(childLexical, childPhysical, childCursor)

@@ -211,8 +211,8 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 			result.directoriesPruned++
 			continue
 		}
-		nextCursor, _ := coordinator.git.Enter(node.gitCursor, canonicalChild)
-		gitBlocked := !nextCursor.SourceReachable()
+		nextCursor, entryBlocked := coordinator.git.Enter(node.gitCursor, canonicalChild)
+		gitBlocked := entryBlocked || !nextCursor.SourceReachable()
 		childConfigReachable := !gitBlocked || coordinator.reopensGitignoredDirectory(node.ownerPath, child, canonicalChild)
 		if gitBlocked && !coordinator.mayReopenGitDescendants(node.ownerPath, child, canonicalChild) {
 			result.directoriesPruned++

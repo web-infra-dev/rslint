@@ -109,7 +109,8 @@ The CLI, JavaScript API, and LSP automatically apply the `.gitignore` rules for 
 Selecting the same config and target from a package directory therefore keeps the same Git ignore rules as selecting them from the repository root. Neither the config file's location nor an entry's [`basePath`](/config/base-path) changes the Git boundary. Authored `files` and `ignores` keep their own configuration-relative bases.
 
 - Parent patterns apply to descendants, including across child config files.
-- Each nested `.git` starts a separate Git boundary, even if that repository has no `.gitignore`.
+- When scanning from outside a nested repository, the containing repository's rules decide whether its directory can be entered. Adding a child config does not reopen an ignored directory.
+- After entering a nested repository, its `.git` starts a separate Git boundary, even if it has no `.gitignore`. Directly requesting that repository or one of its files establishes an independent entry point; its own Git ignores still apply.
 - Nested `.gitignore` files affect only their own subtree. Their negations cannot re-include a file while a parent directory remains excluded.
 - Directly supplied files also obey Git ignores. Directory aliases use the physical directory's rules; a file symlink keeps the rules for its containing directory and original filename.
 - A global config `!` pattern can override the final Git ignore result. It does not make `.gitignore` files inside a Git-excluded directory readable.

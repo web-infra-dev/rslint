@@ -523,13 +523,14 @@ func TestTargetPlanCarriesDiscoveryMatches(t *testing.T) {
 }
 
 func TestTargetPlanRetainsNestedRepositoryEntryUnderIgnoredAncestor(t *testing.T) {
-	root := tspath.NormalizePath(t.TempDir())
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	nested := tspath.ResolvePath(root, "vendor/nested")
 	for path, content := range map[string]string{
 		".gitignore":             "vendor/\n",
 		"root.ts":                "export {};\n",
 		"vendor/nested/.git":     "gitdir: /unused/worktree\n",
 		"vendor/nested/index.ts": "export {};\n",
+		"vendor/nested/other.ts": "export {};\n",
 	} {
 		fullPath := tspath.ResolvePath(root, path)
 		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
@@ -552,12 +553,29 @@ func TestTargetPlanRetainsNestedRepositoryEntryUnderIgnoredAncestor(t *testing.T
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(plan.Files) != 2 {
+		if len(plan.Files) != 3 {
 			t.Fatalf("roots %v lost or duplicated nested entry: %+v", roots, plan.Files)
 		}
 		if plan.GitPolicy() == nil {
 			t.Fatal("plan lost Git policy")
 		}
+	}
+	// A literal file is an independent entry, not permission to scan its siblings.
+	if err := os.WriteFile(tspath.ResolvePath(root, ".gitignore"), []byte("vendor/nested/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	file := rslintconfig.FreezeFileIdentity(tspath.ResolvePath(nested, "index.ts"), osvfs.FS())
+	plan, err := Resolve(withTestGitPolicy(Request{
+		Config:          rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+		ConfigDirectory: root, ScanRoot: root, FS: osvfs.FS(),
+		Files: []rslintconfig.PathIdentity{file}, Directories: rslintconfig.ResolveDirectoryIdentities([]string{root}, osvfs.FS()),
+		SingleThreaded: true,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Files) != 2 || plan.Files[0].Path != tspath.ResolvePath(root, "root.ts") || plan.Files[1].Path != file.Path {
+		t.Fatalf("literal nested input opened sibling traversal: %+v", plan.Files)
 	}
 }
 

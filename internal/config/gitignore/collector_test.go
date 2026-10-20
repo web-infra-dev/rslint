@@ -497,6 +497,26 @@ func TestReaderNoGitBoundaryStopsAtVolumeAndUNCShareRoots(t *testing.T) {
 	}
 }
 
+func TestReaderIgnoredNestedMarkerDoesNotReopenEntry(t *testing.T) {
+	fsys := newReaderTestFS(map[string]string{
+		"/repo/.git": "", "/repo/.gitignore": "nested/\n",
+		"/repo/nested/.git": "gitdir: elsewhere", "/repo/nested/.gitignore": "ignored.ts\n",
+	})
+	reader := NewReader(fsys)
+	outer := reader.Observe(reader.Ancestors("/repo"), "/repo")
+	_, blocked := reader.Enter(outer, "/repo/nested")
+	if !blocked {
+		t.Error("nested marker reopened an ignored directory entry")
+	}
+	if fsys.readCalls["/repo/nested/.gitignore"] != 0 {
+		t.Error("ignored directory source was read")
+	}
+	inner := reader.Observe(reader.Ancestors("/repo/nested"), "/repo/nested")
+	if !inner.SourceReachable() || inner.RootDirectory() != "/repo/nested" || fsys.readCalls["/repo/nested/.gitignore"] != 1 {
+		t.Fatal("direct nested input did not establish its own Git entry point")
+	}
+}
+
 func TestReaderNestedMarkerResetsUnreachableRawSources(t *testing.T) {
 	fsys := newReaderTestFS(map[string]string{
 		"/repo/.git": "", "/repo/.gitignore": "ignored/\n",

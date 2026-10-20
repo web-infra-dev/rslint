@@ -104,3 +104,14 @@ func (matcher TargetMatcher) CanPruneDirectory(directory DirectoryIdentity) bool
 		tspath.NormalizePath(directory.CanonicalPath),
 	)
 }
+
+// CanPruneDirectoryEntry additionally respects the containing repository's
+// directory admission decision. Explicit walk roots use CanPruneDirectory;
+// walking into a child must not borrow another input's independent entry point.
+func (matcher TargetMatcher) CanPruneDirectoryEntry(directory DirectoryIdentity) bool {
+	return matcher.resolver != nil && matcher.resolver.canPruneDirectoryWithEntry(
+		tspath.NormalizePath(directory.LexicalPath),
+		tspath.NormalizePath(directory.CanonicalPath),
+		true,
+	)
+}

@@ -18,10 +18,11 @@ type Source struct {
 // Snapshot owns the Git observations of one request. Empty roots and missing
 // sources remain meaningful: they establish boundaries and source coverage.
 type Snapshot struct {
-	Roots              []string
-	Sources            []Source
-	CoveredDirectories []string
-	UseCaseSensitive   bool
+	Roots                   []string
+	Sources                 []Source
+	CoveredDirectories      []string
+	BlockedDirectoryEntries []string
+	UseCaseSensitive        bool
 }
 
 // Reader observes Git metadata once per request. It never resolves paths:
@@ -36,6 +37,7 @@ type Reader struct {
 	sources          map[tspath.Path]func() Source
 	roots            map[tspath.Path]string
 	covered          map[tspath.Path]string
+	blockedEntries   map[tspath.Path]string
 	ancestors        map[tspath.Path]Cursor
 }
 
@@ -44,7 +46,8 @@ func NewReader(fsys vfs.FS) *Reader {
 		fs: fsys, useCaseSensitive: fsys == nil || fsys.UseCaseSensitiveFileNames(),
 		markers: make(map[tspath.Path]func() bool), sources: make(map[tspath.Path]func() Source),
 		roots: make(map[tspath.Path]string), covered: make(map[tspath.Path]string),
-		ancestors: make(map[tspath.Path]Cursor),
+		blockedEntries: make(map[tspath.Path]string),
+		ancestors:      make(map[tspath.Path]Cursor),
 	}
 }
 
@@ -127,14 +130,21 @@ func (reader *Reader) RootDirectory(physicalDir string) string {
 	return current
 }
 
-// Enter establishes a new repository boundary before consulting ancestor
-// rules. A nested repository can therefore reset raw source reachability.
+// Enter checks the directory entry against the current repository's rules.
+// The returned cursor describes the interior repository; blocked separately
+// preserves the outer admission decision, which callers must honor before IO.
 func (reader *Reader) Enter(parent Cursor, physicalDir string) (Cursor, bool) {
 	physicalDir = normalizeGlobPath(physicalDir)
-	if reader.hasMarker(physicalDir) {
-		return reader.newRoot(physicalDir), false
+	next, blocked := parent.Enter(physicalDir)
+	if blocked {
+		reader.mu.Lock()
+		reader.blockedEntries[reader.pathID(physicalDir)] = physicalDir
+		reader.mu.Unlock()
 	}
-	return parent.Enter(physicalDir)
+	if reader.hasMarker(physicalDir) {
+		return reader.newRoot(physicalDir), blocked
+	}
+	return next, blocked
 }
 
 // Observe freezes local source availability, including a proven raw traversal
@@ -189,6 +199,9 @@ func (reader *Reader) Snapshot() Snapshot {
 	for _, directory := range reader.covered {
 		snapshot.CoveredDirectories = append(snapshot.CoveredDirectories, directory)
 	}
+	for _, directory := range reader.blockedEntries {
+		snapshot.BlockedDirectoryEntries = append(snapshot.BlockedDirectoryEntries, directory)
+	}
 	reader.mu.Unlock()
 	for _, load := range loads {
 		source := load()
@@ -197,6 +210,7 @@ func (reader *Reader) Snapshot() Snapshot {
 	}
 	sort.Strings(snapshot.Roots)
 	sort.Strings(snapshot.CoveredDirectories)
+	sort.Strings(snapshot.BlockedDirectoryEntries)
 	sort.Slice(snapshot.Sources, func(i, j int) bool { return snapshot.Sources[i].Directory < snapshot.Sources[j].Directory })
 	return snapshot
 }

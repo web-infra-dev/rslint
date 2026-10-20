@@ -594,8 +594,15 @@ func (resolver *configTargetResolver) hasAbsoluteDirectoryBlockForDirectory(
 // below path. Unlike the final file decision, pruning must stay conservative:
 // one reachable negation in any authored path space keeps the subtree open.
 func (resolver *configTargetResolver) canPruneDirectory(path string, canonicalPath string) bool {
+	return resolver.canPruneDirectoryWithEntry(path, canonicalPath, false)
+}
+
+func (resolver *configTargetResolver) canPruneDirectoryWithEntry(path string, canonicalPath string, entering bool) bool {
 	target, matches := resolver.resolvePathSpaces(path, canonicalPath, true)
 	fileLevelCovered, negationCanReach := resolver.gitPolicy.directoryCoverage(target.gitPath)
+	if entering && resolver.gitPolicy.blocksDirectoryEntry(target.gitPath) {
+		fileLevelCovered, negationCanReach = true, false
+	}
 	for _, entryIndex := range resolver.globalEntryIndexes {
 		entry := resolver.entries[entryIndex]
 		match := &matches[entry.baseIndex]

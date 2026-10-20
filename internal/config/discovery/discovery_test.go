@@ -411,21 +411,29 @@ func TestConfigDiscoveryGitignoreDirectoryNegation(t *testing.T) {
 
 func TestConfigDiscoveryAuthoredNegationReopensMatchingGitDirectory(t *testing.T) {
 	for _, test := range []struct {
-		name       string
-		negation   string
-		wantNested bool
+		name             string
+		negation         string
+		wantNested       bool
+		nestedRepository bool
 	}{
 		{name: "bare directory node", negation: "!ignored", wantNested: true},
 		{name: "directory node", negation: "!ignored/", wantNested: true},
 		{name: "directory and contents", negation: "!ignored/**", wantNested: true},
 		{name: "contents only", negation: "!ignored/**/*", wantNested: false},
 		{name: "one file", negation: "!ignored/keep.ts", wantNested: false},
+		{name: "nested repository directory", negation: "!ignored/", wantNested: true, nestedRepository: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := discoveryTempDir(t)
 			rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
 			nestedConfig := writeConfigCandidate(t, root, "ignored/rslint.config.js")
 			writeDiscoveryFixture(t, root, ".gitignore", "ignored/\n")
+			if test.nestedRepository {
+				writeDiscoveryFixture(t, root, "ignored/.git", "gitdir: /inner\n")
+				writeDiscoveryFixture(t, root, "ignored/.gitignore", "local.ts\n")
+				writeDiscoveryFixture(t, root, "ignored/local.ts", "export {};\n")
+				writeDiscoveryFixture(t, root, "ignored/visible.ts", "export {};\n")
+			}
 			loader := newFixtureConfigLoader()
 			loader.configs[rootConfig] = rslintconfig.RslintConfig{
 				{Ignores: []string{test.negation}},
@@ -443,6 +451,14 @@ func TestConfigDiscoveryAuthoredNegationReopensMatchingGitDirectory(t *testing.T
 			)
 			if gotNested != test.wantNested {
 				t.Fatalf("nested config loaded = %v, want %v", gotNested, test.wantNested)
+			}
+			if test.nestedRepository {
+				directory := tspath.CombinePaths(root, "ignored")
+				matcher := catalogTestConfig(t, catalog, directory)
+				if !matcher.IsFileIgnored(tspath.CombinePaths(directory, "local.ts"), directory) ||
+					matcher.IsFileIgnored(tspath.CombinePaths(directory, "visible.ts"), directory) {
+					t.Fatal("authored directory admission lost the nested repository's own ignore rules")
+				}
 			}
 		})
 	}
@@ -3387,6 +3403,58 @@ func TestConfigDiscoveryExplicitConfigGitBoundaryIndependentOfCWD(t *testing.T) 
 					}
 				})
 			}
+		}
+	}
+}
+
+func TestConfigDiscoveryIgnoredNestedRepositoryDoesNotDependOnChildConfig(t *testing.T) {
+	for _, pattern := range []string{"*\n", "nested/\nordinary.ts\n", "*/\n*.ts\n"} {
+		for _, childConfig := range []bool{false, true} {
+			t.Run(strings.TrimSpace(pattern)+"/config="+strconv.FormatBool(childConfig), func(t *testing.T) {
+				root := discoveryTempDir(t)
+				rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+				writeDiscoveryFixture(t, root, "parent/.gitignore", pattern)
+				writeDiscoveryFixture(t, root, "parent/ordinary.ts", "export {};\n")
+				writeDiscoveryFixture(t, root, "parent/nested/.git", "gitdir: /inner\n")
+				hiddenSource := writeDiscoveryFixture(t, root, "parent/nested/.gitignore", "ignored.ts\n")
+				writeDiscoveryFixture(t, root, "parent/nested/index.ts", "export {};\n")
+				control := writeDiscoveryFixture(t, root, "control.ts", "export {};\n")
+				loader := newFixtureConfigLoader()
+				loader.configs[rootConfig] = namedConfig("same-rules")
+				loader.configs[rootConfig][0].Files = []string{"**/*.ts"}
+				if childConfig {
+					child := writeConfigCandidate(t, root, "parent/nested/rslint.config.js")
+					loader.configs[child] = loader.configs[rootConfig]
+				}
+				spy := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+				catalog, err := discoverTestAutomatic(context.Background(), spy, loader, ConfigDiscoveryRequest{CWD: root, ImplicitCWD: true})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig}) {
+					t.Errorf("ignored nested config was loaded: %v", got)
+				}
+				if slices.Contains(spy.gitignorePaths, hiddenSource) {
+					t.Error("ignored nested Git source was read")
+				}
+				plan, err := target.Resolve(target.Request{
+					ConfigMap: catalog.Configs, OwnerScopes: catalog.Scopes, PathSpaces: catalog.PathSpaces,
+					FS: discoveryTestFS(), Directories: catalog.TargetDirectories, GitPolicy: catalog.GitPolicy,
+					SingleThreaded: true,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				var sources []string
+				for _, file := range plan.Files {
+					if strings.HasSuffix(file.Path, ".ts") {
+						sources = append(sources, file.Path)
+					}
+				}
+				if !reflect.DeepEqual(sources, []string{control}) {
+					t.Fatalf("outer scan crossed the ignored nested entry: %v", sources)
+				}
+			})
 		}
 	}
 }

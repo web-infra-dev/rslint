@@ -312,7 +312,7 @@ func discoverLintTargetsWithinRoot(
 					childFullPath := tspath.NormalizePath(tspath.CombinePaths(normalizedScanRoot, childPath))
 					blocked := allProjectedDirectoriesMatch(
 						childFullPath, tspath.CombinePaths(physicalDirectory, name),
-						targetMatcher.CanPruneDirectory,
+						targetMatcher.CanPruneDirectoryEntry,
 					)
 					dirIgnore.Store(childPath, blocked)
 					if blocked {

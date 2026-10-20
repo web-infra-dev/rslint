@@ -998,9 +998,15 @@ Automatic discovery uses these rules:
    config bytes than the normalized entries Go is about to commit.
 5. Config ownership never resets Git state. Each target uses the nearest `.git`
    directory or file on its physical containing-directory chain, falling back
-   to the filesystem, drive, or UNC share root when there is no marker. A new
-   nested marker resets the raw Git cursor before directory admission. Git
-   bounds source inheritance, not the lexical config ancestry search.
+   to the filesystem, drive, or UNC share root when there is no marker. A
+   directory entry is checked against the current repository's rules before an
+   admitted nested marker resets the raw Git cursor. Git bounds source
+   inheritance, not the lexical config ancestry search. The frozen policy keeps
+   blocked directory entries separate from repository-internal matching:
+   recursive target walks consult those admission decisions, while separately
+   requested roots retain their independent entry points. Adding a literal
+   target inside a nested repository therefore cannot reopen its siblings to
+   the outer walk.
    Authored negations may keep traversal open without making raw Git sources
    beneath an excluded parent readable. The supplied-root config ownership
    exception remains separate from this source reachability.
