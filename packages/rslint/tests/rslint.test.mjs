@@ -1095,6 +1095,52 @@ module.exports = config;`
     }
   });
 
+  test('lintFiles falls back when two aliases share a broken config module', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-broken-config-alias-'),
+    );
+    try {
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        "export default [{ rules: { 'no-console': 'error' } }];\n",
+      );
+      const shared = path.join(tmp, 'shared');
+      await mkdir(shared);
+      await writeFile(
+        path.join(shared, 'rslint.config.mjs'),
+        'export default [;\n',
+      );
+      await writeFile(path.join(shared, 'a.ts'), 'console.log("a");\n');
+      await writeFile(path.join(shared, 'b.ts'), 'console.log("b");\n');
+      try {
+        for (const alias of ['a', 'b']) {
+          await symlink(
+            shared,
+            path.join(tmp, alias),
+            process.platform === 'win32' ? 'junction' : 'dir',
+          );
+        }
+      } catch {
+        return;
+      }
+
+      const rslint = new Rslint({ cwd: tmp });
+      try {
+        const results = await rslint.lintFiles(['a/a.ts', 'b/b.ts']);
+        expect(results).toHaveLength(2);
+        for (const result of results) {
+          expect(result.messages.map((message) => message.ruleId)).toEqual([
+            'no-console',
+          ]);
+        }
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await cleanupTempDir(tmp);
+    }
+  });
+
   test('lintText falls back from a broken nearest JS config to a loaded ancestor', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-text-broken-fallback-'),

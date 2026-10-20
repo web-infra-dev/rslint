@@ -468,6 +468,59 @@ describe('ConfigModuleHost', () => {
     }
   });
 
+  for (const separateBatches of [false, true]) {
+    test(`keeps failed module aliases independent (separateBatches=${separateBatches})`, async () => {
+      const root = createTempDir();
+      const first = candidate(
+        root,
+        'first',
+        'broken.config.mjs',
+        path.join(root, 'a'),
+      );
+      const second = {
+        ...first,
+        id: 'second',
+        configDirectory: path.join(root, 'b'),
+      };
+      const ancestor = candidate(root, 'ancestor');
+      const host = new ConfigModuleHost({
+        loadCached: async (configPath) => {
+          if (configPath === first.configPath) throw new Error('broken module');
+          return [{ name: 'ancestor' }];
+        },
+      });
+
+      try {
+        const initial = await host.loadConfigs(
+          request(
+            'tx-aliases',
+            separateBatches ? [first, ancestor] : [first, second, ancestor],
+          ),
+        );
+        const results = [...initial.results];
+        if (separateBatches) {
+          const later = await host.loadConfigs(request('tx-aliases', [second]));
+          results.push(...later.results);
+        }
+        for (const id of [first.id, second.id]) {
+          expect(results.find((result) => result.id === id)).toMatchObject({
+            status: 'failed',
+            error: { message: 'broken module' },
+          });
+        }
+        const { plan } = await activateWithPlan(host, 'tx-aliases', [
+          ancestor.id,
+        ]);
+        expect(
+          plan.configs.map(({ configDirectory }) => configDirectory),
+        ).toEqual([root]);
+      } finally {
+        host.deleteSession('tx-aliases');
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+  }
+
   test('rejects ambiguous IDs and unknown effective candidates', async () => {
     const root = createTempDir();
     const one = candidate(root, 'one');
@@ -477,7 +530,14 @@ describe('ConfigModuleHost', () => {
       await expect(
         host.loadConfigs(request('tx-duplicates', [one, one])),
       ).rejects.toThrow('duplicate id');
+      const duplicate = { ...one, id: 'duplicate' };
+      await expect(
+        host.loadConfigs(request('tx-paths', [one, duplicate])),
+      ).rejects.toThrow('same configPath and configDirectory');
       await host.loadConfigs(request('tx-known', [one]));
+      await expect(
+        host.loadConfigs(request('tx-known', [duplicate])),
+      ).rejects.toThrow('same configPath and configDirectory');
       await expect(
         host.activateConfigs({
           protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,

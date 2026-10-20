@@ -39,6 +39,11 @@ type configLoadState struct {
 	failure       *ConfigModuleError
 }
 
+type configOwnerIdentity struct {
+	lexicalDirectory  tspath.Path
+	physicalDirectory string
+}
+
 // moduleLoadCoordinator owns the Node-facing half of one discovery
 // transaction: candidate identity, ordered batch IDs, immutable load results,
 // failures, and final effective-config activation.
@@ -53,7 +58,7 @@ type moduleLoadCoordinator struct {
 
 	statesByPath     map[string]*configLoadState
 	stateByIdentity  map[tspath.Path]*configLoadState
-	ownerByIdentity  map[string]string
+	ownerByIdentity  map[configOwnerIdentity]string
 	failureByPath    map[string]ConfigFailure
 	nextCandidateID  int
 	configsRequested int
@@ -77,7 +82,7 @@ func newModuleLoadCoordinator(
 		singleThreaded:  singleThreaded,
 		statesByPath:    make(map[string]*configLoadState),
 		stateByIdentity: make(map[tspath.Path]*configLoadState),
-		ownerByIdentity: make(map[string]string),
+		ownerByIdentity: make(map[configOwnerIdentity]string),
 		failureByPath:   make(map[string]ConfigFailure),
 	}
 }
@@ -153,13 +158,14 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 	request.Candidates = make([]ConfigLoadCandidate, 0, len(paths))
 	for _, path := range paths {
 		candidate := groupByPath[path].candidate
-		// Competing filenames in one directory must share an original owner
-		// spelling before Node receives its opaque routing key.
-		ownerID := rslintconfig.ExactPathID(candidate.physicalDirectory)
+		// Competing filenames in one native-case directory share an original
+		// owner spelling. Distinct lexical aliases may fail independently;
+		// the catalog validates only the final effective owners for ambiguity.
+		ownerID := configOwnerIdentity{
+			lexicalDirectory:  tspath.ToPath(candidate.directory, "", coordinator.fs.UseCaseSensitiveFileNames()),
+			physicalDirectory: rslintconfig.ExactPathID(candidate.physicalDirectory),
+		}
 		if owner, exists := coordinator.ownerByIdentity[ownerID]; exists {
-			if owner != candidate.directory && (coordinator.fs.UseCaseSensitiveFileNames() || !strings.EqualFold(owner, candidate.directory)) {
-				return fmt.Errorf("Config directories %q and %q resolve to the same filesystem location %q", owner, candidate.directory, candidate.physicalDirectory) //nolint:staticcheck // Preserve the config-directory ambiguity contract.
-			}
 			candidate.directory = owner
 		} else {
 			coordinator.ownerByIdentity[ownerID] = candidate.directory

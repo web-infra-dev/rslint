@@ -2324,6 +2324,44 @@ func TestConfigDiscoveryBrokenNearestFallsBackToAncestor(t *testing.T) {
 	}
 }
 
+func TestConfigDiscoveryFailedDirectoryAliasKeepsAncestorFallback(t *testing.T) {
+	root := tspath.NormalizePath(discoveryTempDir(t))
+	loader := newFixtureConfigLoader()
+	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	brokenConfig := writeConfigCandidate(t, root, "rslint.config.mjs")
+	writeDiscoveryFixture(t, root, "index.ts", "export {};\n")
+	alias := tspath.NormalizePath(filepath.Join(root, "alias"))
+	if err := os.Symlink(root, alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	loader.configs[rootConfig] = rslintconfig.RslintConfig{
+		{Ignores: []string{"**/rslint.config.js"}},
+		{Name: "root", Rules: rslintconfig.Rules{}},
+	}
+	loader.failures[brokenConfig] = ConfigModuleError{Code: "ERR_MODULE", Message: "broken nearest module"}
+
+	catalog, err := discoverTestAutomatic(context.Background(), discoveryTestFS(), loader, ConfigDiscoveryRequest{
+		CWD:         root,
+		Directories: discoveryDirectoryInputs([]string{alias}),
+	})
+	if err != nil {
+		t.Fatalf("failed alias blocked its valid ancestor: %v", err)
+	}
+	if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{root}) {
+		t.Fatalf("fallback owners = %v, want %q", got, root)
+	}
+	failedAlias := tspath.CombinePaths(alias, "rslint.config.mjs")
+	if len(catalog.Failures) != 1 || catalog.Failures[0].Path != failedAlias {
+		t.Fatalf("failed alias metadata = %+v, want %q", catalog.Failures, failedAlias)
+	}
+	if got := requestedConfigPathsByBatch(loader); !reflect.DeepEqual(got, [][]string{{rootConfig}, {brokenConfig}}) {
+		t.Fatalf("fallback module requests = %v", got)
+	}
+	if len(catalog.EffectiveConfigIDs) != 1 {
+		t.Fatalf("effective candidates = %v, want only the successful ancestor", catalog.EffectiveConfigIDs)
+	}
+}
+
 func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *testing.T) {
 	t.Run("canonical file fallback", func(t *testing.T) {
 		lexicalRoot := discoveryTempDir(t)
@@ -2819,6 +2857,16 @@ func TestConfigDiscoveryReusesNativeCaseAliasAcrossLoadFrontiers(t *testing.T) {
 	}
 	if got := lowerState.candidate.path; got != upperConfig {
 		t.Fatalf("representative config path = %q, want %q", got, upperConfig)
+	}
+	alternateConfig := writeConfigCandidate(t, upperRoot, "rslint.config.mjs")
+	lowerAlternate := tspath.CombinePaths(lowerRoot, "rslint.config.mjs")
+	realpathFS.realPaths[tspath.NormalizePath(lowerAlternate)] = tspath.NormalizePath(alternateConfig)
+	loader.configs[alternateConfig] = namedConfig("alternate")
+	if err := coordinator.modules.loadCandidates([]configCandidate{{path: lowerAlternate, directory: lowerRoot}}); err != nil {
+		t.Fatalf("alternate filename frontier: %v", err)
+	}
+	if state := coordinator.modules.state(lowerAlternate); state == nil || state.candidate.directory != tspath.NormalizePath(upperRoot) {
+		t.Fatalf("alternate filename lost native-case owner spelling: %+v", state)
 	}
 }
 

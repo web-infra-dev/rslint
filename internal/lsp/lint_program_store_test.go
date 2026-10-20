@@ -138,6 +138,119 @@ func TestLintProgramStoreReusesAndUpdatesSource(t *testing.T) {
 	}
 }
 
+func TestLintProgramStoreVirtualDependencyDirectoryAliasChangesTypes(t *testing.T) {
+	for _, service := range []bool{false, true} {
+		for _, editConsumerFirst := range []bool{false, true} {
+			t.Run("service="+strconv.FormatBool(service)+"/updated="+strconv.FormatBool(editConsumerFirst), func(t *testing.T) {
+				const consumer = "import { value } from './generated/dependency';\nexport const result: string = value;\n"
+				fixture := newLintProgramStoreFixture(t, consumer)
+				if err := os.WriteFile(fixture.configPath, []byte(`{"compilerOptions":{"noLib":true,"module":"esnext","moduleResolution":"bundler"},"files":["src/index.ts"]}`), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				alias := tspath.NormalizePath(filepath.Join(filepath.Dir(fixture.configPath), "alias"))
+				if err := os.Symlink(filepath.Dir(fixture.sourcePath), alias); err != nil {
+					t.Skipf("directory symlink unavailable: %v", err)
+				}
+				virtualPath := tspath.ResolvePath(alias, "generated/dependency.ts")
+				virtualURI := documentURIFromPath(virtualPath)
+				const original = "export const value = 'initial';\n"
+				fixture.server.documents[virtualURI] = original
+				fixture.store.DidOpen(virtualURI, original, false)
+				load := func() *compiler.Program {
+					t.Helper()
+					if !service {
+						return fixture.load(t)
+					}
+					request := fixture.store.request(context.Background(), fixture.sourceURI,
+						lspConfigTarget(fixture.sourcePath, fixture.server.cwd, fixture.server.fs), true)
+					defer request.finalize()
+					selected, err := selectLintProgramRequestForTest(request, fixture.server.cwd)
+					if err != nil {
+						t.Fatal(err)
+					}
+					return selected.program
+				}
+				first := load()
+				if editConsumerFirst {
+					text := consumer + "// consumer edit\n"
+					fixture.server.documents[fixture.sourceURI] = text
+					fixture.store.DidChange(fixture.sourceURI, text)
+					first = load()
+				}
+				if len(fixture.store.programs) != 1 {
+					t.Fatal("consumer Program was not resident")
+				}
+				for _, state := range fixture.store.programs {
+					if _, selected := state.selectedSourceIdentities[lintProgramLexicalPathID(virtualPath, fixture.server.fs)]; selected {
+						t.Fatal("virtual dependency was selected as a lint root")
+					}
+				}
+				if diagnostics := first.GetSemanticDiagnostics(context.Background(), first.GetSourceFile(fixture.sourcePath)); len(diagnostics) != 0 {
+					t.Fatalf("initial consumer diagnostics = %v", diagnostics)
+				}
+				const changed = "export const value = 123;\n"
+				fixture.server.documents[virtualURI] = changed
+				fixture.store.DidChange(virtualURI, changed)
+				updated := load()
+				foundMismatch := false
+				for _, diagnostic := range updated.GetSemanticDiagnostics(context.Background(), updated.GetSourceFile(fixture.sourcePath)) {
+					foundMismatch = foundMismatch || diagnostic.Code() == 2322
+				}
+				if !foundMismatch {
+					t.Fatalf("consumer retained stale dependency types after alias edit (same Program=%t)", updated == first)
+				}
+				fixture.server.documents[virtualURI] = original
+				fixture.store.DidChange(virtualURI, original)
+				restored := load()
+				if diagnostics := restored.GetSemanticDiagnostics(context.Background(), restored.GetSourceFile(fixture.sourcePath)); len(diagnostics) != 0 {
+					t.Fatalf("consumer retained diagnostics after restoring dependency: %v", diagnostics)
+				}
+				delete(fixture.server.documents, virtualURI)
+				fixture.store.DidClose(virtualURI)
+				closed := load()
+				foundMissing := false
+				for _, diagnostic := range closed.GetSemanticDiagnostics(context.Background(), closed.GetSourceFile(fixture.sourcePath)) {
+					foundMissing = foundMissing || diagnostic.Code() == 2307
+				}
+				if !foundMissing {
+					t.Fatal("consumer retained a virtual dependency after its editor buffer closed")
+				}
+			})
+		}
+	}
+}
+
+func TestLintProgramStoreVirtualTargetDirectoryAliasReusesHost(t *testing.T) {
+	const original = "export const value = 1;\n"
+	fixture := newLintProgramStoreFixture(t, original)
+	alias := tspath.ResolvePath(fixture.server.cwd, "alias")
+	if err := os.Symlink(filepath.Dir(fixture.sourcePath), alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	if err := os.Remove(fixture.sourcePath); err != nil {
+		t.Fatal(err)
+	}
+	delete(fixture.server.documents, fixture.sourceURI)
+	fixture.sourceURI = documentURIFromPath(tspath.ResolvePath(alias, "index.ts"))
+	fixture.server.documents[fixture.sourceURI] = original
+	fixture.store.DidOpen(fixture.sourceURI, original, false)
+	first := fixture.load(t)
+	if len(fixture.store.programs) != 1 {
+		t.Fatal("virtual target Program was not resident")
+	}
+	const changed = "export const value = 2;\n"
+	fixture.server.documents[fixture.sourceURI] = changed
+	fixture.store.DidChange(fixture.sourceURI, changed)
+	updated := fixture.load(t)
+	if updated == first || updated.Host() != first.Host() {
+		t.Fatal("virtual target edit did not update through the resident compiler host")
+	}
+	sourceFile := updated.GetSourceFile(fixture.sourcePath)
+	if sourceFile == nil || sourceFile.Text() != changed {
+		t.Fatalf("virtual target source did not update: %v", sourceFile)
+	}
+}
+
 func selectLintProgramRequestForTest(request *lintProgramRequest, rootDirectory string) (selectedLintProject, error) {
 	request.prepareOverlay()
 	selected, _, err := selectConfiguredLintProject(nil, rootDirectory, request.target, request.overlayFS, lintProjectLoaders{

@@ -320,7 +320,7 @@ and cannot observe which construction path supplied it.
 
    LSP expands explicit project paths from each document snapshot's effective policy; the config catalog does not validate unmatched project declarations. After excluding ignored documents, generation providers distinguish effective project configuration errors from other lint failures. The diagnostics adapter presents those errors on the affected document and clears cached rule diagnostics and fixes; it does not reject configuration updates for unrelated documents. Speculative generation providers use the same error classification without publishing diagnostics. LSP runs the same metadata discovery against its current editor overlay before requesting a Program. Explicit selection stops after the ordered root scan; it never acquires configured Programs to probe import-only membership. Editor URI decoding uses tsgo's drive-letter spelling for overlays and file lifecycle events; document identity and protocol responses retain the original URI. Normal diagnostics and speculative fixes share the complete binding policy: disabled or unmatched targets use a source-only generation and cannot borrow a Session's default module graph. Program acquisition receives the selected parsed config, rather than only its path. Service reuse checks the actual Session Program's construction inputs and referenced config snapshots; a mismatch uses the existing standalone store with the selected metadata. Listed non-TS roots may also require the service construction mode. A missing source in an otherwise compatible selected Program remains an error.
 
-   Existing watcher coverage owns standalone cache invalidation. Metadata already observed by a request also constrains resident Program reuse, including reference changes with an unchanged root config. Construction hosts retain only immutable parsed reference snapshots; unknown references still use the compiler host's normal reads and failed-lookup tracking. Metadata observed before watcher coverage stabilized cannot become resident. Speculative fixes keep their private source overlays and do not mutate the editor Session.
+   Existing watcher coverage owns standalone cache invalidation. Metadata already observed by a request also constrains resident Program reuse, including reference changes with an unchanged root config. Source lookup uses the same editor overlay as Program construction, including directory aliases beneath missing virtual-file ancestry. Document events resolve that ancestry before comparing physical identities, even when the dependency was never selected as a lint root. Construction hosts retain only immutable parsed reference snapshots; unknown references still use the compiler host's normal reads and failed-lookup tracking. Metadata observed before watcher coverage stabilized cannot become resident. Speculative fixes keep their private source overlays and do not mutate the editor Session.
 
    Service construction clones the parsed command line and options before enabling `allowNonTsExtensions`, preserving config identity, complete roots and authored `allowJs`. This admits explicitly listed JS roots without changing config glob expansion or ordinary project options. Unmatched files retain source-only gap capabilities even if another selected Program imports them.
 
@@ -919,6 +919,12 @@ Node batches, failures, and final activation; the request-local Git reader owns 
 without mutating those shared transaction results. The coordinator merges each
 sorted frontier, loads its candidate batch, and adopts the result before the next
 frontier starts; Node activation happens only after catalog finalization.
+Physical-directory ambiguity is checked only among successful effective owners
+during finalization. A failed candidate reached through another lexical alias
+retains its failure metadata without preventing fallback to a valid ancestor.
+Node identifies each load candidate by its module IO path together with its
+opaque logical config directory, so aliases can report independent failures
+before Go selects the effective owners.
 
 Automatic discovery uses these rules:
 

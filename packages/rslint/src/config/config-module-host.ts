@@ -75,7 +75,7 @@ interface ConfigModuleSession {
   loadMode: ConfigModuleLoadMode;
   singleThreaded: boolean;
   candidatesById: Map<string, StoredCandidate>;
-  idByConfigPath: Map<string, string>;
+  idByCandidateKey: Map<string, string>;
   operation: Promise<void>;
 }
 
@@ -149,6 +149,12 @@ function cloneEntries(entriesJSON: string): Record<string, unknown>[] {
     throw protocolError('stored config entries are malformed');
   }
   return entries;
+}
+
+// Module IO paths can be shared by lexical owners. Go validates effective
+// ownership after failed candidates have been excluded.
+function candidateKey(candidate: ConfigModuleCandidate): string {
+  return JSON.stringify([candidate.configPath, candidate.configDirectory]);
 }
 
 function clonePluginEntries(
@@ -256,7 +262,7 @@ export class ConfigModuleHost {
         const candidate = newCandidates[index];
         const result = loaded[index];
         session.candidatesById.set(candidate.id, { candidate, result });
-        session.idByConfigPath.set(candidate.configPath, candidate.id);
+        session.idByCandidateKey.set(candidateKey(candidate), candidate.id);
       }
 
       return {
@@ -445,7 +451,7 @@ export class ConfigModuleHost {
       loadMode,
       singleThreaded,
       candidatesById: new Map(),
-      idByConfigPath: new Map(),
+      idByCandidateKey: new Map(),
       operation: Promise.resolve(),
     };
     this.#sessions.set(transactionId, session);
@@ -457,7 +463,7 @@ export class ConfigModuleHost {
     candidates: readonly ConfigModuleCandidate[],
   ): void {
     const ids = new Set<string>();
-    const paths = new Map<string, string>();
+    const idsByKey = new Map<string, string>();
     for (const candidate of candidates) {
       if (ids.has(candidate.id)) {
         throw protocolError(
@@ -466,13 +472,14 @@ export class ConfigModuleHost {
       }
       ids.add(candidate.id);
 
-      const batchOwner = paths.get(candidate.configPath);
+      const key = candidateKey(candidate);
+      const batchOwner = idsByKey.get(key);
       if (batchOwner && batchOwner !== candidate.id) {
         throw protocolError(
-          `candidate IDs ${JSON.stringify(batchOwner)} and ${JSON.stringify(candidate.id)} use the same configPath`,
+          `candidate IDs ${JSON.stringify(batchOwner)} and ${JSON.stringify(candidate.id)} use the same configPath and configDirectory`,
         );
       }
-      paths.set(candidate.configPath, candidate.id);
+      idsByKey.set(key, candidate.id);
 
       const existing = session.candidatesById.get(candidate.id);
       if (
@@ -484,10 +491,10 @@ export class ConfigModuleHost {
           `candidate id ${JSON.stringify(candidate.id)} changed path or directory within one transaction`,
         );
       }
-      const pathOwner = session.idByConfigPath.get(candidate.configPath);
+      const pathOwner = session.idByCandidateKey.get(key);
       if (pathOwner && pathOwner !== candidate.id) {
         throw protocolError(
-          `candidate IDs ${JSON.stringify(pathOwner)} and ${JSON.stringify(candidate.id)} use the same configPath`,
+          `candidate IDs ${JSON.stringify(pathOwner)} and ${JSON.stringify(candidate.id)} use the same configPath and configDirectory`,
         );
       }
     }

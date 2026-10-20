@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 
+	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -279,7 +280,7 @@ func (r *lintProgramRequest) load(
 	}
 
 	state.program = program
-	state.sources = utils.NewProgramSourceLookup(program, r.store.server.fs)
+	state.sources = utils.NewProgramSourceLookup(program, r.overlayFS)
 	clear(state.dirtyFiles)
 	added, safe := r.cover(state)
 	if !safe {
@@ -359,7 +360,7 @@ func (r *lintProgramRequest) rebuild(
 		state := &lintProgramState{
 			program:                  program,
 			tracker:                  tracker,
-			sources:                  utils.NewProgramSourceLookup(program, r.store.server.fs),
+			sources:                  utils.NewProgramSourceLookup(program, r.overlayFS),
 			dirtyFiles:               make(map[tspath.Path]struct{}),
 			failedLookups:            make(map[tspath.Path]struct{}),
 			selectedSourceIdentities: make(map[tspath.Path]tspath.Path),
@@ -536,7 +537,10 @@ func (s *lintProgramStore) markContent(
 	var physicalID tspath.Path
 	physicalPathID := func() tspath.Path {
 		if physicalID == "" {
-			physicalID = tspath.Path(lspFilesystemPathID(fileName, s.server.fs))
+			// An unsaved dependency can live beneath a directory alias even
+			// when its missing suffix cannot be resolved by disk Realpath.
+			identity := config.FreezeFileIdentity(fileName, s.server.fs)
+			physicalID = lintProgramLexicalPathID(identity.CanonicalPath, s.server.fs)
 		}
 		return physicalID
 	}
