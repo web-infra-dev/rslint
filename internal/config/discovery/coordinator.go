@@ -15,6 +15,7 @@ type discoveryCoordinator struct {
 	fs                 vfs.FS
 	request            ConfigDiscoveryRequest
 	explicitConfigPath string
+	projectOnly        bool
 	transactionID      string
 
 	modules             moduleLoadCoordinator
@@ -105,8 +106,10 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		if err := coordinator.adoptCandidate(state, false); err != nil {
 			return nil, err
 		}
-		if err := coordinator.collectExplicitGitSources(state); err != nil {
-			return nil, err
+		if !coordinator.projectOnly || rslintconfig.HasProjectOptions(state.entries) {
+			if err := coordinator.collectExplicitGitSources(state); err != nil {
+				return nil, err
+			}
 		}
 		return coordinator.catalog()
 	}

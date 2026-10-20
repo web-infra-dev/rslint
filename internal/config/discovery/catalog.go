@@ -71,6 +71,9 @@ type ConfigDiscoveryRequest struct {
 type ExplicitConfigRequest struct {
 	CWD        string
 	ConfigPath string
+	// ProjectOnly omits target Git-source traversal when the loaded config's
+	// project declarations do not depend on per-file service/root/reset options.
+	ProjectOnly bool
 	// TargetFiles supplies frozen exact targets. With no TargetDirectories, nil
 	// means an implicit CWD directory input; a non-nil empty slice means no targets.
 	TargetFiles []DiscoveryFile
@@ -187,7 +190,7 @@ func nextConfigDiscoveryTransactionID() string {
 // catalog. Transaction IDs are unique across concurrent builds and native
 // process restarts so adapters can stage load/activate/commit as one operation.
 func DiscoverAutomatic(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoader, request ConfigDiscoveryRequest) (*ConfigCatalog, error) {
-	return buildConfigCatalog(ctx, fsys, loader, request, "")
+	return buildConfigCatalog(ctx, fsys, loader, request, "", false)
 }
 
 // LoadExplicitConfig loads one exact invocation-wide config path. Git
@@ -208,7 +211,7 @@ func LoadExplicitConfig(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoa
 		Fresh:              request.Fresh,
 		SingleThreaded:     request.SingleThreaded,
 	}
-	return buildConfigCatalog(ctx, fsys, loader, automatic, request.ConfigPath)
+	return buildConfigCatalog(ctx, fsys, loader, automatic, request.ConfigPath, request.ProjectOnly)
 }
 
 func buildConfigCatalog(
@@ -217,6 +220,7 @@ func buildConfigCatalog(
 	loader ConfigModuleLoader,
 	request ConfigDiscoveryRequest,
 	explicitConfigPath string,
+	projectOnly bool,
 ) (*ConfigCatalog, error) {
 	if fsys == nil {
 		return nil, errors.New("config discovery requires a filesystem")
@@ -231,6 +235,7 @@ func buildConfigCatalog(
 		explicitConfigPath,
 		transactionID,
 	)
+	coordinator.projectOnly = projectOnly
 	return coordinator.build()
 }
 

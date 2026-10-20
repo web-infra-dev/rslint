@@ -209,7 +209,9 @@ type Server struct {
 	// gitPolicy is committed atomically with the configuration and resolvers.
 	// A nil value means discovery has not committed yet; bootstrap operations
 	// collect one exact target with a request-local reader.
-	gitPolicy                    *config.GitPolicy
+	gitPolicy *config.GitPolicy
+	// Failed uncovered-directory refreshes belong to the committed generation.
+	failedGitPolicyDirectories   map[string]struct{}
 	gitPolicyWatcherID           project.WatcherID
 	retiredGitPolicyWatcherID    project.WatcherID
 	gitPolicyWatcherGeneration   uint64

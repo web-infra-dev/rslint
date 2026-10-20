@@ -1947,8 +1947,7 @@ func TestProjectPathThroughRequestedDirectoriesPreservesCallerCasing(t *testing.
 		false,
 	)
 	if len(projections) != 1 ||
-		projections[0].Path != "c:/repo/src/a.TS" ||
-		projections[0].CanonicalPath != "C:/Repo/src/a.TS" {
+		projections[0] != "c:/repo/src/a.TS" {
 		t.Fatalf("projections = %+v", projections)
 	}
 
@@ -1962,8 +1961,7 @@ func TestProjectPathThroughRequestedDirectoriesPreservesCallerCasing(t *testing.
 		false,
 	)
 	if len(projections) != 1 ||
-		projections[0].Path != "C:/Repo/src/a.TS" ||
-		projections[0].CanonicalPath != "" {
+		projections[0] != "C:/Repo/src/a.TS" {
 		t.Fatalf("distinct case-only roots produced projections %+v", projections)
 	}
 }

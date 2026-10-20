@@ -806,6 +806,43 @@ describe('Gitignore: monorepo gap file interaction', () => {
 });
 
 describe('Gitignore: overlap and edge cases', () => {
+  test('overlapping directory symlink targets retain physical ignores', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': CONFIG_NO_CONSOLE,
+      'root.ts': 'console.log("root");\n',
+    });
+    const physicalDir = await createTempDir({
+      '.git': '',
+      '.gitignore': 'ignored.ts\nblocked/\n',
+      'blocked/deep.ts': 'console.log("blocked");\n',
+      'kept.ts': 'console.log("kept");\n',
+      'ignored.ts': 'console.log("ignored");\n',
+    });
+    try {
+      fs.symlinkSync(physicalDir, path.join(tempDir, 'linked'), 'junction');
+      for (const targets of [['linked'], ['.', 'linked'], ['linked', '.']]) {
+        const result = await runRslint(
+          ['--format', 'jsonline', ...targets],
+          tempDir,
+        );
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toBe('');
+        const diagnostics = result.stdout
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line) as Diagnostic);
+        expect(diagnostics.map((d) => d.filePath).sort()).toEqual(
+          targets.includes('.')
+            ? ['linked/kept.ts', 'root.ts']
+            : ['linked/kept.ts'],
+        );
+      }
+    } finally {
+      await cleanupTempDir(tempDir);
+      await cleanupTempDir(physicalDir);
+    }
+  });
+
   test('gitignore and config ignores same pattern — no conflict', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'dist/\n',

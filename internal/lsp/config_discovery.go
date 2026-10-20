@@ -825,6 +825,7 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	s.ruleCatalog = snapshot.ruleCatalog
 	s.configDiscoveryHasLastGood = snapshot.usableLastGood
 	s.gitPolicy = snapshot.gitPolicy
+	s.failedGitPolicyDirectories = nil
 	s.committedGitWatchDirectories = snapshot.gitWatchDirectories
 	for _, ruleName := range snapshot.shadowedPluginRules {
 		fmt.Fprintf(

@@ -89,11 +89,6 @@ func isStoppedWalkPath(walkPath string, stopWalkDirs []string, useCaseSensitive 
 
 type resolvedAllowedDirectory = rslintconfig.DirectoryIdentity
 
-type requestedPathProjection struct {
-	Path          string
-	CanonicalPath string
-}
-
 // projectPathThroughRequestedDirectories returns every caller-visible spelling
 // of one walked physical path. Multiple requested directory aliases may point
 // at the same subtree, and each spelling remains a legitimate config target;
@@ -101,26 +96,20 @@ type requestedPathProjection struct {
 // only after selection.
 func projectPathThroughRequestedDirectories(
 	filePath string,
-	matchPath string,
+	physicalPath string,
 	allowDirs []resolvedAllowedDirectory,
 	useCaseSensitive bool,
-) []requestedPathProjection {
-	projections := make([]requestedPathProjection, 0, len(allowDirs))
+) []string {
+	projections := make([]string, 0, len(allowDirs))
 	seen := make(map[string]struct{}, len(allowDirs))
-	appendProjection := func(path string, canonicalPath string) {
+	appendProjection := func(path string) {
 		path = tspath.NormalizePath(path)
-		if canonicalPath != "" {
-			canonicalPath = tspath.NormalizePath(canonicalPath)
-		}
 		key := rslintconfig.ExactPathID(path)
 		if _, exists := seen[key]; exists {
 			return
 		}
 		seen[key] = struct{}{}
-		projections = append(projections, requestedPathProjection{
-			Path:          path,
-			CanonicalPath: canonicalPath,
-		})
+		projections = append(projections, path)
 	}
 	for _, dir := range allowDirs {
 		if _, within := rslintconfig.RelativePathWithinConfigRoot(filePath, dir.LexicalPath, useCaseSensitive); within {
@@ -139,9 +128,9 @@ func projectPathThroughRequestedDirectories(
 					dir.CanonicalPath,
 					true,
 				)
-				if !verified && matchPath != filePath {
+				if !verified && physicalPath != filePath {
 					physicalRelative, verified = rslintconfig.RelativePathWithinConfigRoot(
-						matchPath,
+						physicalPath,
 						dir.CanonicalPath,
 						true,
 					)
@@ -151,29 +140,20 @@ func projectPathThroughRequestedDirectories(
 				}
 				relative = physicalRelative
 			}
-			canonicalPath := ""
-			if dir.LexicalPath != dir.CanonicalPath {
-				canonicalPath = tspath.ResolvePath(dir.CanonicalPath, relative)
-			}
-			appendProjection(tspath.ResolvePath(dir.LexicalPath, relative), canonicalPath)
+			appendProjection(tspath.ResolvePath(dir.LexicalPath, relative))
 		}
 		if dir.LexicalPath == dir.CanonicalPath {
 			continue
 		}
 		relative, within := rslintconfig.RelativePathWithinConfigRoot(filePath, dir.CanonicalPath, true)
-		if !within && matchPath != filePath {
-			relative, within = rslintconfig.RelativePathWithinConfigRoot(matchPath, dir.CanonicalPath, true)
+		if !within && physicalPath != filePath {
+			relative, within = rslintconfig.RelativePathWithinConfigRoot(physicalPath, dir.CanonicalPath, true)
 		}
 		if within {
-			appendProjection(
-				tspath.ResolvePath(dir.LexicalPath, relative),
-				tspath.ResolvePath(dir.CanonicalPath, relative),
-			)
+			appendProjection(tspath.ResolvePath(dir.LexicalPath, relative))
 		}
 	}
-	sort.Slice(projections, func(i, j int) bool {
-		return projections[i].Path < projections[j].Path
-	})
+	sort.Strings(projections)
 	return projections
 }
 

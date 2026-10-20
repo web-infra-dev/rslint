@@ -1741,7 +1741,7 @@ func TestDocumentGitPolicyCoverageRejectsRetargetedAliasesAndCodeActions(t *test
 	}
 }
 
-func TestHandleDidOpenCollectsOnlyGitChainAndRetriesFailedRefresh(t *testing.T) {
+func TestHandleDidOpenCollectsGitChainWithoutRetryingEveryEdit(t *testing.T) {
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	entries := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
@@ -1789,8 +1789,33 @@ func TestHandleDidOpenCollectsOnlyGitChainAndRetriesFailedRefresh(t *testing.T) 
 		t.Fatal("uncovered external document escaped last-good policy")
 	}
 
-	changed := make(chan error, 1)
-	go func() { changed <- s.handleDidChange(context.Background(), makeDidChangeParams(uri, 2, "debugger;\n")) }()
+	for version := int32(2); version <= 4; version++ {
+		changed := make(chan error, 1)
+		go func() {
+			changed <- s.handleDidChange(context.Background(), makeDidChangeParams(uri, version, "debugger;\n"))
+		}()
+		select {
+		case err := <-changed:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case message := <-outgoing:
+			load := message.AsRequest()
+			t.Errorf("content-only edit %d reloaded workspace configuration", version)
+			_, failed := failedConfigResponse(t, load, "workspace config still broken")
+			respondToConfigReverseRequest(t, s, load, failed, nil)
+			abort := nextConfigReverseRequest(t, outgoing, methodAbortConfigs)
+			respondToConfigReverseRequest(t, s, abort, abortResponseForRequest(t, abort), nil)
+			if err := awaitConfigWatchEvent(t, changed); err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("document edit did not complete")
+		}
+	}
+
+	// Config changes still retry the failed transaction and recover coverage.
+	retried := startConfigRefreshForTest(s, "config-change")
 	load = nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
 	request, response = loadedConfigResponse(t, load, entries)
 	if request.Candidates[0].ConfigDirectory != root {
@@ -1798,8 +1823,8 @@ func TestHandleDidOpenCollectsOnlyGitChainAndRetriesFailedRefresh(t *testing.T) 
 	}
 	respondToConfigReverseRequest(t, s, load, response, nil)
 	completeConfigWatchActivation(t, s, outgoing)
-	if err := awaitConfigWatchEvent(t, changed); err != nil {
-		t.Fatal(err)
+	if result := awaitConfigRefreshResult(t, retried); result.err != nil {
+		t.Fatal(result.err)
 	}
 	snapshot := s.documentLintSnapshot(uri)
 	if snapshot.unavailable || !snapshot.resolvedConfig.GloballyIgnored || snapshot.configKey != "" {

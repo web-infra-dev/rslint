@@ -128,16 +128,25 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 
 // New documents and moved directory aliases need their physical source
 // chains in the committed generation. This uses the existing serialized full
-// refresh; failure leaves the document unavailable under the old policy.
+// refresh once per uncovered physical directory. Config/watch refreshes can
+// retry failures; content-only edits retain the last-good generation.
 func (s *Server) refreshUncoveredDocument(ctx context.Context, uri lsproto.DocumentUri) {
 	if !s.configDiscoveryActive || !isLintableScriptFile(uri) {
 		return
 	}
 	identity := config.FreezeFileIdentity(uriToPath(uri), s.fs)
-	if s.gitPolicy != nil && s.gitPolicy.CoversDirectory(lspGitDirectory(identity)) {
+	directory := lspGitDirectory(identity)
+	if s.gitPolicy.CoversDirectory(directory) {
+		return
+	}
+	if _, failed := s.failedGitPolicyDirectories[directory]; failed {
 		return
 	}
 	if _, err := s.refreshConfig(ctx); err != nil {
+		if s.failedGitPolicyDirectories == nil {
+			s.failedGitPolicyDirectories = make(map[string]struct{})
+		}
+		s.failedGitPolicyDirectories[directory] = struct{}{}
 		log.Printf("[rslint] Failed to collect Git policy for %s: %v", uri, err)
 	}
 }

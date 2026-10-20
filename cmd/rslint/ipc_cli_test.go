@@ -67,7 +67,7 @@ func TestClassifyPaths(t *testing.T) {
 }
 
 func TestDiscoverCLIExplicitConfigProjectsMixedTargetsOnly(t *testing.T) {
-	root := t.TempDir()
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	t.Chdir(root)
 	selectedDir := filepath.Join(root, "selected")
 	unrelatedDir := filepath.Join(root, "unrelated")
@@ -97,56 +97,85 @@ func TestDiscoverCLIExplicitConfigProjectsMixedTargetsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cli, peer := newCLIChannelPair(t)
-	peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
-		switch msg.Kind {
-		case kindLoadConfigs:
-			var request discovery.ConfigLoadBatchRequest
-			if err := msg.Decode(&request); err != nil {
-				return nil, err
-			}
-			if len(request.Candidates) != 1 || request.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
-				return nil, fmt.Errorf("unexpected config candidates: %+v", request.Candidates)
-			}
-			return discovery.ConfigLoadBatchResponse{
-				TransactionID: request.TransactionID,
-				Results: []discovery.ConfigLoadResult{{
-					ID:     request.Candidates[0].ID,
-					Status: "loaded",
-				}},
-			}, nil
-		case kindPrepareConfigs:
-			var request discovery.ConfigActivationRequest
-			if err := msg.Decode(&request); err != nil {
-				return nil, err
-			}
-			return discovery.ConfigActivationResponse{TransactionID: request.TransactionID}, nil
-		default:
-			return nil, fmt.Errorf("unexpected request kind %q", msg.Kind)
-		}
-	})
-	cli.Start()
-	peer.Start()
-	spy := &directoryAccessSpyFS{FS: osvfs.FS()}
-	args := lintArgs{
-		FS:             spy,
-		AllowFiles:     []string{tspath.NormalizePath(exactFile)},
-		AllowDirs:      []string{tspath.NormalizePath(selectedDir)},
-		SingleThreaded: true,
-	}
-	payload := initPayload{ConfigDiscovery: &configDiscoveryPayload{ExplicitConfigPath: configPath}}
+	for _, test := range []struct {
+		name          string
+		typeCheckOnly bool
+		noTargets     bool
+		noWalk        bool
+		options       *config.ParserOptions
+	}{
+		{name: "mixed lint targets"},
+		{name: "project-only", typeCheckOnly: true, noTargets: true, noWalk: true, options: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
+		{name: "project service", typeCheckOnly: true, noTargets: true, options: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 
-	if err := discoverCLIConfigCatalog(context.Background(), &args, &payload, cli); err != nil {
-		t.Fatalf("discoverCLIConfigCatalog: %v", err)
-	}
-	if args.ConfigCatalog == nil || !args.ConfigCatalog.Explicit {
-		t.Fatal("explicit config catalog was not installed")
-	}
-	unrelatedDir = tspath.NormalizePath(unrelatedDir)
-	for _, accessed := range spy.accessedDirs {
-		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
-			t.Fatalf("explicit CLI projection entered unrelated directory %q", accessed)
-		}
+			cli, peer := newCLIChannelPair(t)
+			peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
+				switch msg.Kind {
+				case kindLoadConfigs:
+					var request discovery.ConfigLoadBatchRequest
+					if err := msg.Decode(&request); err != nil {
+						return nil, err
+					}
+					if len(request.Candidates) != 1 || request.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+						return nil, fmt.Errorf("unexpected config candidates: %+v", request.Candidates)
+					}
+					return discovery.ConfigLoadBatchResponse{
+						TransactionID: request.TransactionID,
+						Results: []discovery.ConfigLoadResult{{
+							ID:      request.Candidates[0].ID,
+							Status:  "loaded",
+							Entries: config.RslintConfig{{LanguageOptions: &config.LanguageOptions{ParserOptions: test.options}}},
+						}},
+					}, nil
+				case kindPrepareConfigs:
+					var request discovery.ConfigActivationRequest
+					if err := msg.Decode(&request); err != nil {
+						return nil, err
+					}
+					return discovery.ConfigActivationResponse{TransactionID: request.TransactionID}, nil
+				default:
+					return nil, fmt.Errorf("unexpected request kind %q", msg.Kind)
+				}
+			})
+			cli.Start()
+			peer.Start()
+			spy := &directoryAccessSpyFS{FS: osvfs.FS()}
+			args := lintArgs{
+				FS:             spy,
+				AllowFiles:     []string{tspath.NormalizePath(exactFile)},
+				AllowDirs:      []string{tspath.NormalizePath(selectedDir)},
+				SingleThreaded: true,
+				TypeCheckOnly:  test.typeCheckOnly,
+			}
+			if test.noTargets {
+				args.AllowFiles, args.AllowDirs = nil, nil
+			}
+			payload := initPayload{ConfigDiscovery: &configDiscoveryPayload{ExplicitConfigPath: configPath}}
+
+			if err := discoverCLIConfigCatalog(context.Background(), &args, &payload, cli); err != nil {
+				t.Fatalf("discoverCLIConfigCatalog: %v", err)
+			}
+			if args.ConfigCatalog == nil || !args.ConfigCatalog.Explicit {
+				t.Fatal("explicit config catalog was not installed")
+			}
+			if test.noWalk {
+				if len(spy.accessedDirs) != 0 || len(spy.gitignoreReads) != 0 {
+					t.Fatalf("project-only config load scanned directories %v and Git sources %v", spy.accessedDirs, spy.gitignoreReads)
+				}
+			} else if test.noTargets {
+				if len(spy.gitignoreReads) == 0 {
+					t.Fatal("per-file project policy did not collect target Git sources")
+				}
+			} else {
+				for _, accessed := range spy.accessedDirs {
+					if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+						t.Fatalf("explicit CLI projection entered unrelated directory %q", accessed)
+					}
+				}
+			}
+		})
 	}
 }
 

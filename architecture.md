@@ -881,6 +881,8 @@ config/ownership catalog and observes `.gitignore` sources during the same
 directory walk. Explicit loading first selects the exact module unconditionally,
 then freezes target-tree Git sources with the same frontier
 without probing nested config candidates. Neither path collects lint targets.
+For explicit-project `--type-check-only`, explicit loading omits target-tree
+Git collection unless the loaded config has per-file service/root/reset options.
 For LSP, the client's first `rslint/configRefresh` may include one absolute
 `configPath`. The server fixes that optional path for its lifetime: later client
 refreshes must repeat the same choice, while Go-owned `.gitignore` refreshes
@@ -1384,7 +1386,9 @@ Additional current behaviors:
   covers exact physical containing directories, not every descendant of a
   known repository. New documents and uncovered documents with moved directory aliases trigger the existing
   serialized refresh after the config handshake; failed refreshes leave them
-  unavailable for diagnostics, quick fixes and fix-all.
+  unavailable for diagnostics, quick fixes and fix-all. Content edits do not
+  repeat a failed refresh for the same physical directory. Config/watch events
+  can retry it, and a successful commit clears the failed-directory set.
 - Dynamic Git watches cover workspace lexical/physical trees and open-document
   ancestor chains for `.gitignore` and `.git` marker creation/deletion, never
   `.git` contents. Watch ranges are registered before source observation and

@@ -564,6 +564,7 @@ func discoverCLIConfigCatalog(
 			discovery.ExplicitConfigRequest{
 				CWD:               cwd,
 				ConfigPath:        payload.ConfigDiscovery.ExplicitConfigPath,
+				ProjectOnly:       args.TypeCheckOnly,
 				TargetFiles:       targetFiles,
 				TargetDirectories: targetDirectories,
 				SingleThreaded:    args.SingleThreaded,
