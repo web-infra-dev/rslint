@@ -70,7 +70,7 @@ func TestDiscoverCLIExplicitConfigProjectsMixedTargetsOnly(t *testing.T) {
 	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	t.Chdir(root)
 	selectedDir := filepath.Join(root, "selected")
-	unrelatedDir := filepath.Join(root, "unrelated")
+	unrelatedDir := tspath.NormalizePath(filepath.Join(root, "unrelated"))
 	toolsDir := filepath.Join(root, "tools")
 	for _, path := range []string{selectedDir, filepath.Join(selectedDir, "deep"), unrelatedDir, toolsDir} {
 		if err := os.MkdirAll(path, 0o755); err != nil {
