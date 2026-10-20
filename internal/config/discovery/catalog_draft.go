@@ -84,6 +84,20 @@ func (draft *catalogDraft) addExplicitFile(ownerDirectory string, filePath strin
 	draft.scopes[ownerDirectory] = scope
 }
 
+func (draft *catalogDraft) addDirectory(ownerDirectory string, directory rslintconfig.DirectoryIdentity) {
+	scope := draft.scopes[ownerDirectory]
+	for _, existing := range scope.Directories {
+		if rslintconfig.ExactPathID(existing.LexicalPath) == rslintconfig.ExactPathID(directory.LexicalPath) {
+			return
+		}
+	}
+	scope.Directories = append(scope.Directories, directory)
+	sort.Slice(scope.Directories, func(i, j int) bool {
+		return scope.Directories[i].LexicalPath < scope.Directories[j].LexicalPath
+	})
+	draft.scopes[ownerDirectory] = scope
+}
+
 // finalize validates physical owner identity, publishes explicit-only
 // provenance, and returns stable
 // effective IDs. Node activation happens only after this method succeeds.
@@ -102,6 +116,9 @@ func (draft *catalogDraft) finalize(
 	for directory, source := range draft.selectedSources {
 		scope := draft.scopes[directory]
 		scope.ExplicitOnly = source.explicitOnly
+		if scope.Directories == nil {
+			scope.Directories = []rslintconfig.DirectoryIdentity{}
+		}
 		draft.scopes[directory] = scope
 	}
 	effectiveIDs := make([]string, 0, len(draft.selectedSources))

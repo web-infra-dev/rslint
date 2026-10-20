@@ -204,6 +204,11 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		if err := coordinator.adoptCandidate(state, seed.explicitFile); err != nil {
 			return nil, err
 		}
+		if !seed.explicitFile {
+			coordinator.draft.addDirectory(seed.ownerDir, rslintconfig.DirectoryIdentity{
+				LexicalPath: seed.path, CanonicalPath: seed.physicalDirectory,
+			})
+		}
 	}
 	for _, seed := range explicitSeeds {
 		if seed.ownerDir == "" {

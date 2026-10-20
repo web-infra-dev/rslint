@@ -806,6 +806,51 @@ describe('Gitignore: monorepo gap file interaction', () => {
 });
 
 describe('Gitignore: overlap and edge cases', () => {
+  test('mixed directory targets do not promote a child config into a wider scan', async () => {
+    const tempDir = await createTempDir({
+      '.git': '',
+      '.gitignore': 'nested/\n',
+      'rslint.config.mjs': CONFIG_NO_CONSOLE,
+      'control.ts': 'console.log("control");\n',
+      'nested/.git': 'gitdir: /unused/worktree\n',
+      'nested/.gitignore': 'ignored.ts\n',
+      'nested/extra.ts': 'console.log("extra");\n',
+      'nested/selected/keep.ts': 'console.log("keep");\n',
+      'nested/selected/ignored.ts': 'console.log("ignored");\n',
+    });
+    try {
+      for (const childConfig of [false, true]) {
+        if (childConfig) {
+          fs.writeFileSync(
+            path.join(tempDir, 'nested/rslint.config.mjs'),
+            CONFIG_NO_CONSOLE,
+          );
+        }
+        for (const targets of [
+          ['.', 'nested/selected'],
+          ['nested/selected', '.'],
+        ]) {
+          const result = await runRslint(
+            ['--format', 'jsonline', ...targets],
+            tempDir,
+          );
+          expect(result.exitCode).toBe(1);
+          expect(result.stderr).toBe('');
+          const diagnostics = result.stdout
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line) as Diagnostic);
+          expect(diagnostics.map((d) => d.filePath).sort()).toEqual([
+            'control.ts',
+            'nested/selected/keep.ts',
+          ]);
+        }
+      }
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('overlapping directory symlink targets retain physical ignores', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': CONFIG_NO_CONSOLE,

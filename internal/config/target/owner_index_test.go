@@ -266,6 +266,30 @@ func TestOwnerIndexForAutomaticTargetsExcludesExplicitOnlyBoundary(t *testing.T)
 	}
 }
 
+func TestAutomaticOwnerIndexUsesAdmittedDirectoryEntries(t *testing.T) {
+	configs := map[string]rslintconfig.RslintConfig{"/repo": nil, "/repo/nested": nil}
+	directories := rslintconfig.ResolveDirectoryIdentities([]string{"/repo", "/repo/other", "/repo/nested/selected"}, nil)
+	scopes := map[string]OwnerScope{
+		"/repo":        {Directories: directories[:2]},
+		"/repo/nested": {Directories: directories[2:]},
+	}
+	spaces := rslintconfig.NewPathSpaceSnapshot(configs, nil, directories...)
+	index := newAutomaticOwnerIndex(configs, scopes, nil, spaces)
+	for path, want := range map[string]string{
+		"/repo/nested/extra.ts":         "/repo",
+		"/repo/nested/selected/keep.ts": "/repo/nested",
+		"/repo/other/keep.ts":           "/repo",
+	} {
+		if owner, _ := index.Resolve(rslintconfig.FreezeFileIdentity(path, nil)); owner != want {
+			t.Fatalf("owner of %s = %s, want %s", path, owner, want)
+		}
+	}
+	children := index.ChildOwnerDirectories("/repo")
+	if len(children) != 1 || children[0] != "/repo/nested/selected" {
+		t.Fatalf("handoff expanded past the selected entry: %v", children)
+	}
+}
+
 func TestOwnerIndexUsesPhysicalFallbackWithoutLexicalOwner(t *testing.T) {
 	fs := &configPathSpaceFS{
 		caseSensitive: true,

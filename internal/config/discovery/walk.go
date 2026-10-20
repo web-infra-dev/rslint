@@ -66,6 +66,10 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 				if err := coordinator.adoptCandidate(result.candidateToAdopt, false); err != nil {
 					return err
 				}
+				candidate := result.candidateToAdopt.candidate
+				coordinator.draft.addDirectory(candidate.directory, rslintconfig.DirectoryIdentity{
+					LexicalPath: candidate.directory, CanonicalPath: candidate.physicalDirectory,
+				})
 			}
 			next = append(next, result.children...)
 			if result.pending != nil {
@@ -83,6 +87,9 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 					if err := coordinator.adoptCandidate(state, false); err != nil {
 						return err
 					}
+					coordinator.draft.addDirectory(state.candidate.directory, rslintconfig.DirectoryIdentity{
+						LexicalPath: state.candidate.directory, CanonicalPath: state.candidate.physicalDirectory,
+					})
 					item.node.ownerDir = state.candidate.directory
 					item.node.ownerPath = state.candidate.path
 				}

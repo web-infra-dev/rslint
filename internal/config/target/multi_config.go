@@ -34,9 +34,9 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 	// subtree handoff decisions from the normally reachable config set; the full
 	// map is still processed below so catalog-scoped literal files use their
 	// explicit-only config.
-	automaticConfigMap := configMapForAutomaticTargets(configMap, scopes)
-	automaticOwnerIndex := mustOwnerIndexWithPathSpaces(
-		automaticConfigMap,
+	automaticOwnerIndex := newAutomaticOwnerIndex(
+		configMap,
+		scopes,
 		fsys,
 		ownerIndex.PathSpaces(),
 	)
@@ -112,6 +112,13 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 			}
 		}
 		configAllowDirs := allowDirs
+		if directories := scopes[configDir].Directories; len(allowDirs) > 0 && directories != nil {
+			// Config ancestry chooses the rules, not a wider scan root. Reuse
+			// only entries discovery admitted for this owner, including requested
+			// subdirectories and normally reached child-config boundaries. A
+			// file-only request never acquires directory traversal from a catalog.
+			configAllowDirs = directories
+		}
 		if scopes[configDir].ExplicitOnly {
 			configAllowDirs = []rslintconfig.DirectoryIdentity{}
 		}

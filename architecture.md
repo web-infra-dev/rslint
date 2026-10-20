@@ -1760,9 +1760,14 @@ Other invariants:
   file instead of treating it as regular.
   Canonical identities use exact comparison, and aliases governed by different
   configs are rejected instead of choosing an owner by scan order.
-- Multi-config target discovery processes config roots in stable order. It uses
-  catalog-provided scopes for explicit-file ownership and invokes the bounded
-  lint-target walker for each config. Its automatic ownership index omits
+- Multi-config target discovery processes config roots in stable order. The
+  catalog records admitted directory entries separately from config locations:
+  requested directories retain their original bounds, while normally reached
+  child configs receive only their admitted subtree. Target planning consumes
+  those entries and explicit-file scopes in the bounded walker for each config;
+  the automatic ownership index uses the same directory entries for config
+  handoffs. Loading an ancestor config never expands a requested subdirectory
+  or takes files still reached through an enclosing owner. The index omits
   explicit-only configs, while their scoped literal files are still processed
   by the corresponding config.
 - Explicit targets stay in the caller's lexical path space for config

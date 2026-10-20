@@ -3459,6 +3459,70 @@ func TestConfigDiscoveryIgnoredNestedRepositoryDoesNotDependOnChildConfig(t *tes
 	}
 }
 
+func TestConfigDiscoveryMixedDirectoryTargetsRetainRequestedScope(t *testing.T) {
+	for _, reopenExtra := range []bool{false, true} {
+		for _, marker := range []string{"directory", "file"} {
+			for _, owner := range []string{"nested", "nested/deeper"} {
+				for _, childConfig := range []bool{false, true} {
+					t.Run(marker+"/"+owner+"/config="+strconv.FormatBool(childConfig)+"/reopen="+strconv.FormatBool(reopenExtra), func(t *testing.T) {
+						root := discoveryTempDir(t)
+						rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+						writeDiscoveryFixture(t, root, ".gitignore", "nested/\n")
+						if marker == "directory" {
+							if err := os.MkdirAll(filepath.Join(root, "nested", ".git"), 0o755); err != nil {
+								t.Fatal(err)
+							}
+						} else {
+							writeDiscoveryFixture(t, root, "nested/.git", "gitdir: /unused/worktree\n")
+						}
+						writeDiscoveryFixture(t, root, "nested/.gitignore", "ignored.ts\n")
+						control := writeDiscoveryFixture(t, root, "control.ts", "export {};\n")
+						keep := writeDiscoveryFixture(t, root, owner+"/selected/keep.ts", "export {};\n")
+						extra := writeDiscoveryFixture(t, root, owner+"/extra.ts", "export {};\n")
+						writeDiscoveryFixture(t, root, owner+"/selected/ignored.ts", "export {};\n")
+						loader := newFixtureConfigLoader()
+						loader.configs[rootConfig] = namedConfig("same-rules")
+						if reopenExtra {
+							loader.configs[rootConfig] = append(rslintconfig.RslintConfig{{Ignores: []string{"!" + owner + "/extra.ts"}}}, loader.configs[rootConfig]...)
+						}
+						if childConfig {
+							child := writeConfigCandidate(t, root, owner+"/rslint.config.js")
+							loader.configs[child] = loader.configs[rootConfig]
+						}
+						selected := tspath.GetDirectoryPath(keep)
+						for _, inputs := range [][]string{{root, selected}, {selected, root}} {
+							catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+								CWD: root, Directories: discoveryDirectoryInputs(inputs),
+							})
+							plan, err := target.Resolve(target.Request{
+								ConfigMap: catalog.Configs, OwnerScopes: catalog.Scopes, PathSpaces: catalog.PathSpaces,
+								FS: discoveryTestFS(), Directories: catalog.TargetDirectories, GitPolicy: catalog.GitPolicy,
+								SingleThreaded: true,
+							})
+							if err != nil {
+								t.Fatal(err)
+							}
+							var sources []string
+							for _, file := range plan.Files {
+								if strings.HasSuffix(file.Path, ".ts") {
+									sources = append(sources, file.Path)
+								}
+							}
+							want := []string{control, keep}
+							if reopenExtra {
+								want = []string{control, extra, keep}
+							}
+							if !reflect.DeepEqual(sources, want) {
+								t.Fatalf("inputs %v changed the requested source set: got %v, want %v", inputs, sources, want)
+							}
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
 func TestConfigDiscoveryNestedGitBoundaryAndOverlappingRoots(t *testing.T) {
 	for _, marker := range []string{"directory", "file"} {
 		for _, nestedLocation := range []string{"nested", "hidden/nested"} {
