@@ -29,13 +29,30 @@ function findBinaries(dir = 'binaries', suffix) {
   return files;
 }
 
+function requireArtifact(files, filename) {
+  const matches = files.filter(
+    (file) => path.basename(file) === filename && fs.existsSync(file),
+  );
+  if (matches.length !== 1) {
+    throw new Error(
+      `Expected exactly one ${filename} artifact, found ${matches.length}`,
+    );
+  }
+  const file = matches[0];
+  const stat = fs.statSync(file);
+  if (!stat.isFile() || stat.size === 0) {
+    throw new Error(`Empty or invalid artifact: ${file}`);
+  }
+  return file;
+}
+
 async function moveArtifacts() {
   console.log('Starting artifact move process...');
 
   try {
     // Move Go CLI binaries into the @rslint/native-{tuple} subpackages (flat,
-    // alongside the .node). Artifacts are named `{platform}-rslint`. Go
-    // binaries are statically linked, so one linux build serves both glibc and
+    // alongside the .node). Artifacts are named `{platform}-rslint`. Linux
+    // binaries are built with cgo disabled, so one build serves both glibc and
     // musl — it's copied into both the -gnu and -musl tuple dirs.
     const platformToTuples = {
       'darwin-arm64': ['darwin-arm64'],
@@ -48,19 +65,31 @@ async function moveArtifacts() {
 
     const rslintFiles = findBinaries('binaries', '-rslint');
     console.log(`Found ${rslintFiles.length} rslint binary files`);
+    const nativeFiles = findBinaries('binaries', 'rslint.').filter((file) =>
+      file.endsWith('.node'),
+    );
+    // Validate this run's complete input before touching package outputs.
+    // A previous local build must not conceal a missing or duplicate artifact.
+    const goArtifacts = Object.entries(platformToTuples).map(
+      ([platform, tuples]) => ({
+        file: requireArtifact(rslintFiles, `${platform}-rslint`),
+        tuples,
+        binName: platform.startsWith('win32-') ? 'rslint.exe' : 'rslint',
+      }),
+    );
+    const nodeArtifacts = Object.values(platformToTuples)
+      .flat()
+      .map((tuple) => ({
+        file: requireArtifact(nativeFiles, `rslint.${tuple}.node`),
+        tuple,
+      }));
+    const ruleSchemasSrc = requireArtifact(
+      [path.join('binaries', 'rule-schemas', 'rule-schemas.json')],
+      'rule-schemas.json',
+    );
 
-    for (const file of rslintFiles) {
+    for (const { file, tuples, binName } of goArtifacts) {
       console.log(`Processing ${file}`);
-      const isWindows = file.includes('win32');
-      const filename = path.basename(file);
-      const platform = filename.replace(/-rslint$/, ''); // e.g. linux-x64
-      const tuples = platformToTuples[platform];
-      if (!tuples) {
-        console.log(`Warning: no tuple mapping for ${platform}, skipping`);
-        continue;
-      }
-      const binName = isWindows ? 'rslint.exe' : 'rslint';
-
       for (const tuple of tuples) {
         const targetDir = path.join('npm', 'rslint', tuple);
         const targetFile = path.join(targetDir, binName);
@@ -75,15 +104,11 @@ async function moveArtifacts() {
     // subpackages (flat, alongside the Go binary). Artifacts are named
     // `rslint.{tuple}.node`; target is `npm/rslint/{tuple}/` (libc suffix kept
     // so gnu/musl stay separate). Not chmod'd — a `.node` is dlopen'd.
-    const nodeFiles = findBinaries('binaries', 'rslint.').filter((file) =>
-      file.endsWith('.node'),
-    );
-    console.log(`Found ${nodeFiles.length} napi .node files`);
+    console.log(`Found ${nodeArtifacts.length} napi .node files`);
 
-    for (const file of nodeFiles) {
+    for (const { file, tuple } of nodeArtifacts) {
       console.log(`Processing ${file}`);
       const filename = path.basename(file); // rslint.linux-x64-gnu.node
-      const tuple = filename.replace(/^rslint\./, '').replace(/\.node$/, ''); // linux-x64-gnu
       const targetDir = path.join('npm', 'rslint', tuple);
       const targetFile = path.join(targetDir, filename);
 
@@ -99,22 +124,13 @@ async function moveArtifacts() {
     // the generate-rule-option-types rslib plugin reads — see
     // packages/rslint/rstack.config.ts's onAfterBuild hook, which runs during
     // publish-npm's `build:js` step.
-    const ruleSchemasSrc = path.join(
-      'binaries',
-      'rule-schemas',
+    const ruleSchemasTarget = path.join(
+      'packages',
+      'rslint',
       'rule-schemas.json',
     );
-    if (fs.existsSync(ruleSchemasSrc)) {
-      const ruleSchemasTarget = path.join(
-        'packages',
-        'rslint',
-        'rule-schemas.json',
-      );
-      fs.copyFileSync(ruleSchemasSrc, ruleSchemasTarget);
-      console.log(`Copied ${ruleSchemasSrc} to ${ruleSchemasTarget}`);
-    } else {
-      console.log(`Warning: rule schemas dump not found at ${ruleSchemasSrc}`);
-    }
+    fs.copyFileSync(ruleSchemasSrc, ruleSchemasTarget);
+    console.log(`Copied ${ruleSchemasSrc} to ${ruleSchemasTarget}`);
 
     console.log('Artifact move process completed successfully!');
   } catch (error) {

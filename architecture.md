@@ -1943,6 +1943,13 @@ Local verification uses existing Go, pnpm/Rstack and Cargo commands with explici
 ### Release Lines
 
 - **rslint packages**: `scripts/version.mjs` and `.github/workflows/release.yml` own the unified rslint npm version. They explicitly exclude the tsgo server packages.
+- **Release assembly**: the release workflow resolves the requested branch once
+  and gives the same commit SHA to every Go, WASM, native addon, JavaScript and
+  extension job. Artifact assembly requires one nonempty input per expected Go
+  target and native addon tuple, plus the rule schema dump, before writing any
+  platform package output. Existing local binaries cannot conceal missing inputs.
+  Linux Go release builds disable cgo so the same executable can serve both gnu
+  and musl packages; native addons retain their separate libc targets.
 - **tsgo distribution**: `pnpm version:crates` updates `tsgo-client`, `Cargo.lock`, `@rslint/tsgo-server`, and all six platform packages to one version. `.github/workflows/release-crates.yml` assembles the platform packages and publishes npm and crates.io artifacts together.
 
 ## 13. Adding a New Rule (Checklist)

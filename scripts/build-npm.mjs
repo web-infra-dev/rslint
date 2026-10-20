@@ -23,7 +23,7 @@ const platforms = [
 
 // The rslint Go binary ships inside each napi-tuple subpackage (next to the
 // parser `.node`). One row per subpackage dir; linux gnu/musl reuse the same
-// GOOS/GOARCH (Go is statically linked) and rely on the Go build cache.
+// GOOS/GOARCH with cgo disabled and rely on the Go build cache.
 const rslintTargets = [
   { goos: 'darwin', goarch: 'amd64', dir: 'darwin-x64' },
   { goos: 'darwin', goarch: 'arm64', dir: 'darwin-arm64' },
@@ -38,8 +38,12 @@ const rslintTargets = [
 async function build_rslint() {
   for (const { goos, goarch, dir } of rslintTargets) {
     const ext = goos === 'windows' ? '.exe' : '';
+    const buildEnvironment =
+      goos === 'linux' ? { ...process.env, CGO_ENABLED: '0' } : process.env;
     fs.mkdirSync(`npm/rslint/${dir}`, { recursive: true });
-    await $`GOOS=${goos} GOARCH=${goarch} go build -o npm/rslint/${dir}/rslint${ext} ./cmd/rslint`;
+    await $({
+      env: buildEnvironment,
+    })`GOOS=${goos} GOARCH=${goarch} go build -o npm/rslint/${dir}/rslint${ext} ./cmd/rslint`;
   }
 }
 
