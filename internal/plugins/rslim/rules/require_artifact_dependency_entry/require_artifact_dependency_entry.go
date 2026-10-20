@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 var RequireArtifactDependencyEntryRule = rule.Rule{
@@ -30,7 +31,7 @@ var RequireArtifactDependencyEntryRule = rule.Rule{
 			if specifier == nil || !ast.IsStringLiteralLike(specifier) {
 				return
 			}
-			resolved, target, found := program.ResolveModule(ctx.SourceFile, specifier)
+			resolved, target, found := program.ResolveModule(ctx.SourceFile, modules.SourceFromSpecifier(specifier))
 			if !found {
 				return
 			}
