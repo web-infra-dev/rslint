@@ -143,3 +143,13 @@ cp .vscode/launch.template.json .vscode/launch.json
 - Open the Command Palette (`Cmd+Shift+P`)
 - Run `Debug: Start Debugging` or press `F5`
 - Alternatively, go to the `Run and Debug` sidebar and select `Run Extension`
+
+## Experimental Rust lint engine
+
+The direct tsrs migration is incomplete and does not replace the default
+public engine yet. For changes in `crates/rslint-core`, run
+`cargo test --locked -p rslint-core`; for the direct Node boundary, rebuild
+`pnpm --filter @rslint/native build` and run the targeted native and JS tests
+listed in [the migration guide](docs/tsrs-migration/README.md). These commands
+do not build Go. Existing public entry points still require the original
+toolchain until their migration passes compatibility checks.

@@ -1,0 +1,19 @@
+npm/rslint/darwin-x64                    |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["darwin"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+npm/rslint/linux-arm64-gnu               |  WARN  Unsupported platform: wanted: {"cpu":["arm64"],"os":["linux"],"libc":["glibc"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+npm/rslint/linux-arm64-musl              |  WARN  Unsupported platform: wanted: {"cpu":["arm64"],"os":["linux"],"libc":["musl"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+npm/rslint/linux-x64-gnu                 |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["linux"],"libc":["glibc"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+npm/rslint/linux-x64-musl                |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["linux"],"libc":["musl"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+npm/rslint/win32-arm64-msvc              |  WARN  Unsupported platform: wanted: {"cpu":["arm64"],"os":["win32"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+npm/rslint/win32-x64-msvc                |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["win32"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+npm/tsgo/darwin-x64                      |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["darwin"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+npm/tsgo/linux-arm64                     |  WARN  Unsupported platform: wanted: {"cpu":["arm64"],"os":["linux"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+npm/tsgo/linux-x64                       |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["linux"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+npm/tsgo/win32-arm64                     |  WARN  Unsupported platform: wanted: {"cpu":["arm64"],"os":["win32"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+npm/tsgo/win32-x64                       |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["win32"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+
+> @rslint/native@0.0.0 build <checkout>/crates/rslint-native
+> napi build --platform --release --no-js -- --locked && node ../../scripts/place-host-build.mjs node
+
+   Compiling rslint-core v0.0.0 (<checkout>/crates/rslint-core)
+   Compiling rslint-native v0.0.0 (<checkout>/crates/rslint-native)
+    Finished `release` profile [optimized] target(s) in 46.07s

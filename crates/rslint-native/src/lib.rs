@@ -11,6 +11,7 @@ mod memory_transport;
 mod parse;
 #[cfg(feature = "test-worker-termination")]
 mod parser_worker_test;
+mod rust_lint;
 mod token_map;
 
 use napi::{Env, JsString};
@@ -26,6 +27,7 @@ pub use parser_worker_test::{
     create_worker_termination_fixture, republish_worker_fixture, resume_worker_parse,
     wait_for_worker_parse, worker_parsed_program,
 };
+pub use rust_lint::lint_tsrs_sync;
 
 /// Reject sources whose serialized ESTree JSON would exceed V8's ~512MB single-string
 /// cap (the JSON is ~9-26x the source size). This is the JSON-transfer ceiling

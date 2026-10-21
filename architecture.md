@@ -2221,3 +2221,15 @@ Playground source dependency types are allowlisted by package and fetched from e
 ---
 
 This architecture document should be updated as the project evolves. For questions or clarifications, please refer to the source code or open an issue on the [GitHub repository](https://github.com/web-infra-dev/rslint).
+
+## Rust and JavaScript migration in progress
+
+The experimental `crates/rslint-core` owns tsrs AST/checker state and executes
+ported lint rules in Rust. `crates/rslint-native` calls it directly through
+N-API; `packages/rslint/src/rust` supplies an explicit-file JavaScript adapter.
+This path has no compiler subprocess or Go fallback. It is not yet the
+default CLI/API and does not yet cover the complete rule/config/fix contract.
+The final target is a repository and product without Go. See
+[the migration status and checks](docs/tsrs-migration/README.md) for the
+current supported scope and pending entry points. Existing architecture
+sections below/above describe the current public path until it is replaced.

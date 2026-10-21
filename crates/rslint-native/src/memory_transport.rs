@@ -312,7 +312,7 @@ impl MemoryArena {
         registry.try_reserve(1).map_err(|_| invalid())?;
         // Never wrap and accidentally validate a capability from an old session.
         let id = NEXT_LEASE
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
             .map_err(|_| invalid())?;
         registry.insert(
             id,

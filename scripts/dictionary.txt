@@ -799,3 +799,13 @@ myflowtyped
 rightpad
 donthaveit
 doesn
+tsrs
+dtolnay
+optionless
+nondirective
+rfind
+rsplit
+GOFLAGS
+GOWORK
+killpg
+getloadavg

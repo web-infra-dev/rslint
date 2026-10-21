@@ -18,6 +18,9 @@ module.exports = {
     'packages/rslint/THIRD-PARTY-NOTICES.md',
     'packages/rslint/pkg/mod',
     'packages/rslint/rule-schemas.json',
+    // Frozen baseline rule schemas, source paths and hashes.
+    'scripts/tsrs/rust-migration-catalog.json',
+    'docs/tsrs-migration/rsbuild-workload.json',
     'internal/rules/**/*.schema.json',
     'internal/plugins/*/rules/**/*.schema.json',
     'internal/utils/test_framework/rules/**/*.schema.json',

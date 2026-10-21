@@ -1,0 +1,69 @@
+   Compiling rslint-core v0.0.0 (<checkout>/crates/rslint-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.76s
+     Running unittests src/lib.rs (target/debug/deps/rslint_core-b573129ecd1c0f26)
+
+running 3 tests
+test tests::cross_file_types_and_silent_files_use_the_native_checker ... ok
+test tests::unsupported_rules_and_missing_admissions_fail_instead_of_skipping ... ok
+test tests::positions_use_javascript_utf16_and_line_terminators ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running tests/comments.rs (target/debug/deps/comments-fd8625f3bca8fc9d)
+
+running 5 tests
+test ordinary_comments_and_line_only_nondirective_prefixes_remain_supported ... ok
+test directive_like_string_regex_template_and_jsx_contents_are_not_comments ... ok
+test jsx_expression_attribute_type_argument_and_outer_trailing_comments_are_seen ... ok
+test comments_between_tokens_and_inside_template_expressions_are_seen ... ok
+test all_directive_forms_are_explicitly_rejected_in_real_comments ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+
+     Running tests/control_flow_rules.rs (target/debug/deps/control_flow_rules-4ad9535ee46e3c69)
+
+running 6 tests
+test continue_statements_keep_labels_and_complete_ranges ... ok
+test useless_catch_preserves_first_statement_and_finally_report_targets ... ok
+test negated_conditions_check_plain_else_and_transparent_parentheses ... ok
+test awaits_respect_each_loop_position_and_function_boundary ... ok
+test constructor_returns_preserve_the_baseline_boundary_set ... ok
+test finally_control_flow_uses_function_class_loop_switch_and_label_sentinels ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/syntax_rules.rs (target/debug/deps/syntax_rules-e81924520145e816)
+
+running 9 tests
+test optionless_syntax_rules_reject_options_instead_of_ignoring_them ... ok
+test comparison_negative_zero_deduplicates_operands_and_reports_full_comparison ... ok
+test caller_checks_dot_access_and_heritage_but_preserves_ts_wrappers ... ok
+test with_statements_report_the_complete_statement_and_nested_statements ... ok
+test comparison_negative_zero_checks_all_operators_and_numeric_spellings ... ok
+test debugger_statements_include_computed_assignment_keys ... ok
+test ternaries_preserve_inner_ranges_and_do_not_visit_conditional_types_as_expressions ... ok
+test template_placeholders_use_decoded_strings_and_require_nonempty_content ... ok
+test nested_ternary_checks_only_direct_branches_after_parentheses ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+     Running tests/typed_rules.rs (target/debug/deps/typed_rules-17f93dbe23ae7d9f)
+
+running 9 tests
+test accessors_keep_untyped_and_missing_or_invalid_pairs_silent ... ok
+test mixed_enums_query_cross_file_types_and_global_declaration_merging ... ok
+test mixed_enums_use_computed_initializer_types_and_merged_declarations ... ok
+test enum_switch_cases_and_imported_enums_have_exact_diagnostics_without_fixes ... ok
+test accessors_use_full_assignability_and_both_declaration_orders ... ok
+test mixed_enums_stop_at_unknown_members_and_keep_consistent_enums_silent ... ok
+test enum_comparisons_preserve_union_intersection_and_shared_type_semantics ... ok
+test accessor_names_and_imported_types_preserve_existing_matching ... ok
+test enum_comparisons_cover_every_comparison_operator_and_both_directions ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+   Doc-tests rslint_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

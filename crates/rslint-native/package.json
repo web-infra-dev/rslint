@@ -17,8 +17,8 @@
     ]
   },
   "scripts": {
-    "build": "napi build --platform --release --no-js && node ../../scripts/place-host-build.mjs node",
-    "build:debug": "napi build --platform --no-js && node ../../scripts/place-host-build.mjs node"
+    "build": "napi build --platform --release --no-js -- --locked && node ../../scripts/place-host-build.mjs node",
+    "build:debug": "napi build --platform --no-js -- --locked && node ../../scripts/place-host-build.mjs node"
   },
   "devDependencies": {
     "@napi-rs/cli": "catalog:"

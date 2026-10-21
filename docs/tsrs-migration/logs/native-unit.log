@@ -1,0 +1,158 @@
+   Compiling serde_core v1.0.228
+   Compiling dragonbox_ecma v0.1.12
+   Compiling rustc-hash v2.1.2
+   Compiling allocator-api2 v0.2.21
+   Compiling hashbrown v0.17.1
+   Compiling memchr v2.7.6
+   Compiling zerofrom v0.1.8
+   Compiling num-traits v0.2.19
+   Compiling stable_deref_trait v1.2.1
+   Compiling unicode-id-start v1.1.2
+   Compiling yoke v0.8.3
+   Compiling zerovec v0.11.8
+   Compiling bitflags v2.13.0
+   Compiling num-integer v0.1.46
+   Compiling tinystr v0.8.4
+   Compiling writeable v0.6.4
+   Compiling litemap v0.8.3
+   Compiling icu_normalizer_data v2.3.0
+   Compiling icu_locale_core v2.3.0
+   Compiling libc v0.2.191
+   Compiling potential_utf v0.1.6
+   Compiling zerotrie v0.2.5
+   Compiling utf8_iter v1.0.4
+   Compiling icu_collections v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling equivalent v1.0.3
+   Compiling smallvec v1.16.3
+   Compiling tsrs_core v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling icu_normalizer v2.3.0
+   Compiling indexmap v2.14.2
+   Compiling num-bigint v0.5.1
+   Compiling simdutf8 v0.1.5
+   Compiling tsrs_diagnostics v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling crossbeam-utils v0.8.23
+   Compiling crossbeam-epoch v0.9.21
+   Compiling tsrs_spanmap v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling tsrs_ast v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling crossbeam-deque v0.8.8
+   Compiling rayon-core v1.13.0
+   Compiling tsrs_scanner v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling either v1.19.0
+   Compiling rayon v1.12.0
+   Compiling serde v1.0.228
+   Compiling itoa v1.0.17
+   Compiling tsrs_vfs v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling cfg-if v1.0.4
+   Compiling tsrs_parser v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling tsrs_module v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling aho-corasick v1.1.5
+   Compiling xxhash-rust v0.8.19
+   Compiling regex-syntax v0.8.11
+   Compiling owo-colors v4.3.0
+   Compiling regex-automata v0.4.18
+   Compiling tsrs_tsoptions v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling thiserror v2.0.18
+   Compiling unicode-linebreak v0.1.5
+   Compiling oxc_data_structures v0.133.0
+   Compiling unicode-width v0.2.2
+   Compiling smawk v0.3.2
+   Compiling textwrap v0.16.2
+   Compiling oxc_estree v0.133.0
+   Compiling castaway v0.2.4
+   Compiling regex v1.13.1
+   Compiling tsrs_sourcemap v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling ryu v1.0.23
+   Compiling static_assertions v1.1.0
+   Compiling unicode-segmentation v1.13.2
+   Compiling oxc-miette v2.7.1
+   Compiling compact_str v0.9.1
+   Compiling tsrs_printer v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling tsrs_modulespecifiers v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling oxc_allocator v0.133.0
+   Compiling tsrs_astnav v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling tsrs_binder v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling tsrs_pseudochecker v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling siphasher v1.0.3
+   Compiling phf_shared v0.13.1
+   Compiling tsrs_checker v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling oxc_str v0.133.0
+   Compiling cow-utils v0.1.3
+   Compiling phf v0.13.1
+   Compiling oxc_span v0.133.0
+   Compiling tsrs_ipc v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling percent-encoding v2.3.2
+   Compiling nonmax v0.5.5
+   Compiling oxc_index v4.1.0
+   Compiling zmij v1.0.17
+   Compiling oxc_diagnostics v0.133.0
+   Compiling tsrs_contentmapper v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling futures-core v0.3.32
+   Compiling futures-sink v0.3.32
+   Compiling futures-channel v0.3.32
+   Compiling serde_json v1.0.149
+   Compiling oxc_regular_expression v0.133.0
+   Compiling tsrs_transformers v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling tsrs_declarations v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling tsrs_compiler v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling oxc_syntax v0.133.0
+   Compiling tsrs_lsproto v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling tsrs_projectutil v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling pin-project-lite v0.2.17
+   Compiling futures-io v0.3.32
+   Compiling slab v0.4.12
+   Compiling futures-task v0.3.32
+   Compiling futures-util v0.3.32
+   Compiling tsrs_ls v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling oxc_ast v0.133.0
+   Compiling base64 v0.23.1
+   Compiling tsrs_api_transport v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling tsrs_project v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling futures-executor v0.3.32
+   Compiling libloading v0.9.0
+   Compiling tsrs_api_codec v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling num-bigint v0.4.6
+   Compiling oxc_ecmascript v0.133.0
+   Compiling tsrs_api v0.18.0 (https://github.com/oxc-project/tsrs.git?rev=280b426b89cd4ecd6153cf48228826bd60a99c61#280b426b)
+   Compiling napi-sys v3.3.0
+   Compiling napi v3.12.1
+   Compiling futures v0.3.32
+   Compiling ctor v1.0.7
+   Compiling nohash-hasher v0.2.0
+   Compiling oxc_parser v0.133.0
+   Compiling rslint-native v0.0.0 (<checkout>/crates/rslint-native)
+   Compiling rslint-core v0.0.0 (<checkout>/crates/rslint-core)
+   Compiling oxc_ast_visit v0.133.0
+    Finished `release` profile [optimized] target(s) in 1m 13s
+     Running unittests src/lib.rs (target/release/deps/rslint_native-4bed34809ec7ad5d)
+
+running 27 tests
+test memory_transport::tests::close_before_configuration_disposes_backing ... ok
+test memory_transport::tests::logical_space_must_fit_capability_offsets ... ok
+test memory_transport::tests::arenas_cannot_revoke_each_others_bytes ... ok
+test memory_transport::tests::ordered_batches_preserve_binary_bytes_and_cross_batch_ranges ... ok
+test memory_transport::tests::requires_one_configuration_before_reading ... ok
+test memory_transport::tests::registration_checks_all_batches_before_publishing_any_lease ... ok
+test memory_transport::tests::slot_state_is_allocated_only_for_registered_slots ... ok
+test memory_transport::tests::revocation_during_read_pins_mapping_through_close ... ok
+test memory_transport::mapping::platform::control_is_writable_and_data_is_read_only ... ok
+test memory_transport::tests::successful_release_reuses_all_batches_without_reviving_old_capabilities ... ok
+test memory_transport::tests::rejects_invalid_and_replayed_leases ... ok
+test memory_transport::tests::non_default_layout_bounds_the_last_slot ... ok
+test memory_transport::tests::cross_batch_reader_pins_whole_lease_through_close ... ok
+test memory_transport::tests::rejects_invalid_layouts_without_allowing_reconfiguration ... ok
+test memory_transport::tests::release_waits_for_every_reader_then_reuses_all_batches ... ok
+test token_map::tests::let_yield_stay_keyword ... ok
+test token_map::tests::template_grain ... ok
+test token_map::tests::await_is_identifier ... ok
+test token_map::tests::keyword_classification_js ... ok
+test token_map::tests::string_and_private_identifier ... ok
+test token_map::tests::literals_and_templates ... ok
+test token_map::tests::utf16_offsets_not_bytes ... ok
+test token_map::tests::keyword_classification_ts ... ok
+test token_map::tests::this_and_meta ... ok
+test token_map::tests::typeof_this_is_identifier ... ok
+test token_map::tests::jsx_names_and_text ... ok
+test token_map::tests::regex_vs_division_is_parser_driven ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

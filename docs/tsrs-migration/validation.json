@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "status": "partial_draft_full_goal_active",
+  "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+  "compiler": {
+    "repository": "https://github.com/oxc-project/tsrs.git",
+    "revision": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+    "localPatches": []
+  },
+  "environment": {
+    "node": "24.20.0",
+    "rust": "1.99.1",
+    "pnpm": "10.34.4",
+    "platform": "macOS arm64",
+    "cargoBuildJobs": 2,
+    "exclusiveMachineLock": true
+  },
+  "addonSha256": "c517a1f47b21e97c98cee0323e61550a43353954556e0cea396b1fda0bbc71ec",
+  "ruleNames": [
+    "@typescript-eslint/no-mixed-enums",
+    "@typescript-eslint/no-unsafe-enum-comparison",
+    "@typescript-eslint/no-unsafe-unary-minus",
+    "@typescript-eslint/related-getter-setter-pairs",
+    "no-await-in-loop",
+    "no-caller",
+    "no-compare-neg-zero",
+    "no-constructor-return",
+    "no-continue",
+    "no-debugger",
+    "no-negated-condition",
+    "no-nested-ternary",
+    "no-template-curly-in-string",
+    "no-ternary",
+    "no-unsafe-finally",
+    "no-useless-catch",
+    "no-with"
+  ],
+  "sourceSha256": {
+    "Cargo.lock": "a8b38a77bda8d69f4f6e644d825c54c896c0aa5bbec5dc96003cef80a7625eec",
+    "crates/rslint-core/Cargo.toml": "39dd2950c14bbd5892562177c42e8dce4e9262e9b7fe0e17fec3b04d6e81e1a2",
+    "crates/rslint-core/src/comments.rs": "eb9a0d6afb9728dcd0cdd0cf5332bf3063736b430825361e433916ff0827fee0",
+    "crates/rslint-core/src/lib.rs": "0c2d6427a1f21e9d73e550b6bc2220b61629e2220837d22a3dcc9c7534ab152a",
+    "crates/rslint-core/src/rules/control_flow.rs": "1c241f3e13c3f785c482bb595e9640245d16cb7c1660b72bb64556f3fc490a84",
+    "crates/rslint-core/src/rules/mod.rs": "657095f1424ad36b0e9fb564fd760ec525f9952539f7930770df5a155b0f7324",
+    "crates/rslint-core/src/rules/syntax.rs": "1b217e10f9653930d4c5f3aecbb4a53521ceb9d59cd46946d29b1ca0a862520f",
+    "crates/rslint-core/src/rules/typed.rs": "f160e980298ebe567ef32a27164ed96cddfed41a0c734ab1e3158b5b718bc6ea",
+    "crates/rslint-core/src/tests.rs": "cd640b523db41f4fc97c3153dc018a702818b1dd242df4a4265dada46035be3e",
+    "crates/rslint-core/tests/comments.rs": "564c850077c2ed483fee142a27ed8f9cbb3ad0735d95f8a5037c91dac6efcdba",
+    "crates/rslint-core/tests/control_flow_rules.rs": "31b8e422c3863d6fcb0cce664baee784b21555066abace8216710bbba84536de",
+    "crates/rslint-core/tests/syntax_rules.rs": "5c2e12de4912d22242619b73267a68f07ef4da51fbde3db7d215940764f24dc7",
+    "crates/rslint-core/tests/typed_rules.rs": "cf1c1a41c5e8e087c100f650c176f9abbc0ed92662e211feaed38bd75e160a51",
+    "crates/rslint-native/Cargo.toml": "b8b189717f88d073fd75365636b467944ac6e9e2d372573ffde8e84d29f06c43",
+    "crates/rslint-native/package.json": "36489f4b13e1a4b7921eaf04219067c07b793c19716ab13e8f1b96f888d6b7bb",
+    "crates/rslint-native/src/lib.rs": "00bbc4272b3e18c23f55fa908b6b7b6d4d7dee301e9bc506aa3d1b8526cbc560",
+    "crates/rslint-native/src/memory_transport.rs": "1db3105ae9e01f7672194b6d4a8c72ed4a1269e90ca4e53e6b1285c695c44e68",
+    "crates/rslint-native/src/rust_lint.rs": "632d33ba6d3b40d3fc3736710d88724c2376a0cacd6c622af753ffce5680b215",
+    "crates/rslint-native/tests/rust-lint.test.mjs": "d7e3cc105e33ac452b42b68c6cbe04d284a98962a08bf08a0c0f087c80026f8d",
+    "packages/rslint/src/rust/engine.ts": "1d997ca82e5fa2ff35c3742dc2afb8c86e5ed2c0ad12f4437eae90fb0d058e57",
+    "packages/rslint/src/rust/index.ts": "147b46218f30fb6d3b53648b43f67222ced5261b49fc35c510094bef34c53d47",
+    "packages/rslint/tests/rust-engine.test.ts": "cc5cde5fec10af2fb5715f002ef63e63bc167dba4886d0be2e814bd56697ab62",
+    "rust-toolchain.toml": "f715f440167e20fd8ea9afa0498c3d1ab80174cfcb8cbc895f106a34d907a1e1",
+    "scripts/tsrs/rust-no-child-process.mjs": "594775e4f865999c0301bb37846b17612fbb293f1ecc71f8cd52a4b99f6f510e",
+    "scripts/tsrs/rust-oracle.mjs": "954a198dccff2e02bffea65dbd2f0e39b0e84e1bf5b3917b8fea45025733a155",
+    "scripts/tsrs/rust-rsbuild-gate.mjs": "e68fcef767e39f48363bf8ad46220f208877424a7d72aa82994b5afe54b2479c"
+  },
+  "checks": [
+    {
+      "command": "cargo test --locked -p rslint-core",
+      "status": "passed",
+      "tests": 32,
+      "log": "logs/core-tests.log"
+    },
+    {
+      "command": "cargo test --locked -p rslint-native --release",
+      "status": "passed",
+      "tests": 27,
+      "log": "logs/native-unit.log",
+      "scope": "Existing parser/memory unit tests; unchanged behavior after the later core-only syntax validation fix and module ordering."
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 pnpm --filter @rslint/native build",
+      "status": "passed",
+      "log": "logs/native-build.log"
+    },
+    {
+      "command": "cargo clippy --locked -p rslint-core -p rslint-native --all-targets --all-features -- -D warnings",
+      "status": "passed",
+      "log": "logs/clippy.log"
+    },
+    {
+      "command": "PATH=/nonexistent RSLINT_NATIVE_BINDING=$ADDON $NODE --test-isolation=none --import ./scripts/tsrs/rust-no-child-process.mjs --test crates/rslint-native/tests/rust-lint.test.mjs",
+      "status": "passed",
+      "tests": 4,
+      "log": "logs/node-runtime.log"
+    },
+    {
+      "command": "CI=true pnpm --dir packages/rslint exec rs test run tests/rust-engine.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "log": "logs/js-api.log"
+    },
+    {
+      "command": "node scripts/tsrs/rust-oracle.mjs $BASELINE $ADDON $OUTPUT",
+      "status": "passed",
+      "positiveRules": 17,
+      "files": 7,
+      "result": "oracle.json"
+    },
+    {
+      "command": "node scripts/tsrs/rust-rsbuild-gate.mjs check --project $RSBUILD --addon $ADDON --output $OUTPUT",
+      "status": "incomplete",
+      "expectedExitCode": 1,
+      "result": "rsbuild-gate.json"
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "status": "passed"
+    },
+    {
+      "command": "node scripts/tsrs/rust-rsbuild-gate.mjs self-test",
+      "status": "passed"
+    },
+    {
+      "command": "python3 scripts/tsrs/rust-migration-inventory.py --self-test",
+      "status": "passed"
+    },
+    {
+      "command": "pnpm run check-spell <explicit changed text paths>",
+      "status": "passed",
+      "filesChecked": 38
+    },
+    {
+      "command": "pnpm run format:check",
+      "status": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed"
+    }
+  ],
+  "performance": null,
+  "fullCompatibilityAccepted": false,
+  "zeroGoRepositoryAccepted": false,
+  "notRun": [
+    "All original 813 rule suites",
+    "Complete configuration/ignore/plugin/fix/LSP/WASM parity",
+    "Other target platforms and release packaging",
+    "Complete candidate rsbuild lint and performance A/B"
+  ]
+}

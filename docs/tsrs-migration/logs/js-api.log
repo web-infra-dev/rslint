@@ -1,0 +1,57 @@
+
+---
+tool: "@rstest/core@0.12.1"
+timestamp: "2026-10-21T04:26:38.527Z"
+runtime: {"node":"v24.20.0","platform":"darwin","cwd":"<checkout>/packages/rslint"}
+---
+
+# Rstest Test Execution Report
+
+## Summary
+
+```json
+{
+  "status": "pass",
+  "counts": {
+    "testFiles": 1,
+    "failedFiles": 0,
+    "tests": 7,
+    "failedTests": 0,
+    "passedTests": 7,
+    "skippedTests": 0,
+    "todoTests": 0
+  },
+  "durationMs": {
+    "total": 210,
+    "build": 60,
+    "tests": 150
+  },
+  "snapshot": {
+    "added": 0,
+    "updated": 0,
+    "unmatched": 0,
+    "removed": 0,
+    "unchecked": 0
+  }
+}
+```
+
+## Tests
+
+### Passed
+
+- tests/rust-engine.test.ts :: experimental direct Rust lint engine > executes typed cross-file rules and retains silent admitted files
+- tests/rust-engine.test.ts :: experimental direct Rust lint engine > loads only an explicit JS config and lints disk sources in one tsconfig
+- tests/rust-engine.test.ts :: experimental direct Rust lint engine > preserves UTF-16 locations, config order, and explicit disabled rules
+- tests/rust-engine.test.ts :: experimental direct Rust lint engine > rejects enabled rules pending migration, unsupported options, and duplicate admissions
+- tests/rust-engine.test.ts :: experimental direct Rust lint engine > rejects source directives and syntax failures rather than reporting partial success
+- tests/rust-engine.test.ts :: experimental direct Rust lint engine > rejects unsupported config semantics before normalization can discard fields
+- tests/rust-engine.test.ts :: experimental direct Rust lint engine > does not silently JSON-coerce unsupported options or accept ambiguous config sources
+
+### Skipped
+
+None.
+
+## Failures
+
+No test failures reported.

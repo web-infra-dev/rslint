@@ -1,0 +1,598 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "scope": "targeted rule parity; not complete migration or performance",
+  "baselineRevision": "e0a29f751d4def86d27931759098f27748fa3003",
+  "compilerRevision": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+  "nodeVersion": "v24.20.0",
+  "addonSha256": "c517a1f47b21e97c98cee0323e61550a43353954556e0cea396b1fda0bbc71ec",
+  "sources": {
+    "types.ts": "export declare const bad: string; export declare const good: number; export enum External { A, B }\n",
+    "main.ts": "// 🦀\nimport { bad, good } from './types';\n-bad; -good; debugger;\nfunction f() { arguments.caller; arguments.callee; }\n0 === -0; -0 !== 1;\nconst message = '${value}';\nconst x = true ? false ? 1 : 2 : 3;\n",
+    "clean.ts": "export const safe = -1; const message = `${1}`;\n",
+    "flow.ts": "async function run() { for (let i = 0; i < 2; i++) { await Promise.resolve(); continue; } }\nfunction cleanup() { try { return 1; } finally { return 2; } }\nclass Constructor { constructor() { return {}; } }\ntry { run(); } catch (error) { throw error; }\nif (!Boolean(1)) { run(); } else { cleanup(); }\n",
+    "enums.ts": "import { External } from './types';\nenum Mixed { A = 1, B = 'b' }\nenum Other { A, B }\nExternal.A === Other.A;\nclass Accessors { get value(): string { return ''; } set value(input: number) {} }\n",
+    "with.js": "with (environment) { work(); }\n",
+    "bom.ts": "﻿debugger;\r\n'😀'; debugger;\n"
+  },
+  "rules": [
+    {
+      "name": "no-debugger",
+      "severity": 2
+    },
+    {
+      "name": "no-caller",
+      "severity": 1
+    },
+    {
+      "name": "no-compare-neg-zero",
+      "severity": 2
+    },
+    {
+      "name": "no-template-curly-in-string",
+      "severity": 1
+    },
+    {
+      "name": "no-ternary",
+      "severity": 2
+    },
+    {
+      "name": "no-nested-ternary",
+      "severity": 1
+    },
+    {
+      "name": "no-with",
+      "severity": 2
+    },
+    {
+      "name": "@typescript-eslint/no-unsafe-unary-minus",
+      "severity": 1
+    },
+    {
+      "name": "no-continue",
+      "severity": 2
+    },
+    {
+      "name": "no-await-in-loop",
+      "severity": 1
+    },
+    {
+      "name": "no-unsafe-finally",
+      "severity": 2
+    },
+    {
+      "name": "no-constructor-return",
+      "severity": 1
+    },
+    {
+      "name": "no-useless-catch",
+      "severity": 2
+    },
+    {
+      "name": "no-negated-condition",
+      "severity": 1
+    },
+    {
+      "name": "@typescript-eslint/no-mixed-enums",
+      "severity": 2
+    },
+    {
+      "name": "@typescript-eslint/no-unsafe-enum-comparison",
+      "severity": 1
+    },
+    {
+      "name": "@typescript-eslint/related-getter-setter-pairs",
+      "severity": 2
+    }
+  ],
+  "baseline": [
+    {
+      "filePath": "bom.ts",
+      "messages": [
+        {
+          "ruleId": "no-debugger",
+          "severity": 2,
+          "message": "Unexpected 'debugger' statement.",
+          "line": 1,
+          "column": 1,
+          "endLine": 1,
+          "endColumn": 10,
+          "messageId": "no-debugger"
+        },
+        {
+          "ruleId": "no-debugger",
+          "severity": 2,
+          "message": "Unexpected 'debugger' statement.",
+          "line": 2,
+          "column": 7,
+          "endLine": 2,
+          "endColumn": 16,
+          "messageId": "no-debugger"
+        }
+      ]
+    },
+    {
+      "filePath": "clean.ts",
+      "messages": []
+    },
+    {
+      "filePath": "enums.ts",
+      "messages": [
+        {
+          "ruleId": "@typescript-eslint/no-mixed-enums",
+          "severity": 2,
+          "message": "Mixing number and string enums can be confusing.",
+          "line": 2,
+          "column": 25,
+          "endLine": 2,
+          "endColumn": 28,
+          "messageId": "mixed"
+        },
+        {
+          "ruleId": "@typescript-eslint/no-unsafe-enum-comparison",
+          "severity": 1,
+          "message": "The two values in this comparison do not have a shared enum type.",
+          "line": 4,
+          "column": 1,
+          "endLine": 4,
+          "endColumn": 23,
+          "messageId": "mismatchedCondition"
+        },
+        {
+          "ruleId": "@typescript-eslint/related-getter-setter-pairs",
+          "severity": 2,
+          "message": "`get()` type should be assignable to its equivalent `set()` type.",
+          "line": 5,
+          "column": 32,
+          "endLine": 5,
+          "endColumn": 38,
+          "messageId": "mismatch"
+        }
+      ]
+    },
+    {
+      "filePath": "flow.ts",
+      "messages": [
+        {
+          "ruleId": "no-await-in-loop",
+          "severity": 1,
+          "message": "Unexpected `await` inside a loop.",
+          "line": 1,
+          "column": 54,
+          "endLine": 1,
+          "endColumn": 77,
+          "messageId": "unexpectedAwait"
+        },
+        {
+          "ruleId": "no-continue",
+          "severity": 2,
+          "message": "Unexpected use of continue statement.",
+          "line": 1,
+          "column": 79,
+          "endLine": 1,
+          "endColumn": 88,
+          "messageId": "unexpected"
+        },
+        {
+          "ruleId": "no-unsafe-finally",
+          "severity": 2,
+          "message": "Unsafe usage of ReturnStatement.",
+          "line": 2,
+          "column": 50,
+          "endLine": 2,
+          "endColumn": 59,
+          "messageId": "unsafeUsage"
+        },
+        {
+          "ruleId": "no-constructor-return",
+          "severity": 1,
+          "message": "Unexpected return statement in constructor.",
+          "line": 3,
+          "column": 37,
+          "endLine": 3,
+          "endColumn": 47,
+          "messageId": "unexpected"
+        },
+        {
+          "ruleId": "no-useless-catch",
+          "severity": 2,
+          "message": "Unnecessary try/catch wrapper.",
+          "line": 4,
+          "column": 1,
+          "endLine": 4,
+          "endColumn": 46,
+          "messageId": "unnecessaryCatch"
+        },
+        {
+          "ruleId": "no-negated-condition",
+          "severity": 1,
+          "message": "Unexpected negated condition.",
+          "line": 5,
+          "column": 1,
+          "endLine": 5,
+          "endColumn": 48,
+          "messageId": "unexpectedNegated"
+        }
+      ]
+    },
+    {
+      "filePath": "main.ts",
+      "messages": [
+        {
+          "ruleId": "@typescript-eslint/no-unsafe-unary-minus",
+          "severity": 1,
+          "message": "Argument of unary negation should be assignable to number | bigint but is string instead.",
+          "line": 3,
+          "column": 1,
+          "endLine": 3,
+          "endColumn": 5,
+          "messageId": "unaryMinus"
+        },
+        {
+          "ruleId": "no-debugger",
+          "severity": 2,
+          "message": "Unexpected 'debugger' statement.",
+          "line": 3,
+          "column": 14,
+          "endLine": 3,
+          "endColumn": 23,
+          "messageId": "no-debugger"
+        },
+        {
+          "ruleId": "no-caller",
+          "severity": 1,
+          "message": "Avoid arguments.caller.",
+          "line": 4,
+          "column": 16,
+          "endLine": 4,
+          "endColumn": 32,
+          "messageId": "unexpected"
+        },
+        {
+          "ruleId": "no-caller",
+          "severity": 1,
+          "message": "Avoid arguments.callee.",
+          "line": 4,
+          "column": 34,
+          "endLine": 4,
+          "endColumn": 50,
+          "messageId": "unexpected"
+        },
+        {
+          "ruleId": "no-compare-neg-zero",
+          "severity": 2,
+          "message": "Do not use the '===' operator to compare against -0.",
+          "line": 5,
+          "column": 1,
+          "endLine": 5,
+          "endColumn": 9,
+          "messageId": "unexpected"
+        },
+        {
+          "ruleId": "no-compare-neg-zero",
+          "severity": 2,
+          "message": "Do not use the '!==' operator to compare against -0.",
+          "line": 5,
+          "column": 11,
+          "endLine": 5,
+          "endColumn": 19,
+          "messageId": "unexpected"
+        },
+        {
+          "ruleId": "no-template-curly-in-string",
+          "severity": 1,
+          "message": "Template literal placeholder syntax in regular strings is not allowed.",
+          "line": 6,
+          "column": 17,
+          "endLine": 6,
+          "endColumn": 27,
+          "messageId": "unexpectedTemplateExpression"
+        },
+        {
+          "ruleId": "no-nested-ternary",
+          "severity": 1,
+          "message": "Do not nest ternary expressions.",
+          "line": 7,
+          "column": 11,
+          "endLine": 7,
+          "endColumn": 35,
+          "messageId": "noNestedTernary"
+        },
+        {
+          "ruleId": "no-ternary",
+          "severity": 2,
+          "message": "Ternary operator used.",
+          "line": 7,
+          "column": 11,
+          "endLine": 7,
+          "endColumn": 35,
+          "messageId": "noTernaryOperator"
+        },
+        {
+          "ruleId": "no-ternary",
+          "severity": 2,
+          "message": "Ternary operator used.",
+          "line": 7,
+          "column": 18,
+          "endLine": 7,
+          "endColumn": 31,
+          "messageId": "noTernaryOperator"
+        }
+      ]
+    },
+    {
+      "filePath": "types.ts",
+      "messages": []
+    },
+    {
+      "filePath": "with.js",
+      "messages": [
+        {
+          "ruleId": "no-with",
+          "severity": 2,
+          "message": "Unexpected use of 'with' statement.",
+          "line": 1,
+          "column": 1,
+          "endLine": 1,
+          "endColumn": 31,
+          "messageId": "unexpectedWith"
+        }
+      ]
+    }
+  ],
+  "candidate": [
+    {
+      "filePath": "bom.ts",
+      "messages": [
+        {
+          "ruleId": "no-debugger",
+          "messageId": "no-debugger",
+          "message": "Unexpected 'debugger' statement.",
+          "severity": 2,
+          "line": 1,
+          "column": 1,
+          "endLine": 1,
+          "endColumn": 10
+        },
+        {
+          "ruleId": "no-debugger",
+          "messageId": "no-debugger",
+          "message": "Unexpected 'debugger' statement.",
+          "severity": 2,
+          "line": 2,
+          "column": 7,
+          "endLine": 2,
+          "endColumn": 16
+        }
+      ]
+    },
+    {
+      "filePath": "clean.ts",
+      "messages": []
+    },
+    {
+      "filePath": "enums.ts",
+      "messages": [
+        {
+          "ruleId": "@typescript-eslint/no-mixed-enums",
+          "messageId": "mixed",
+          "message": "Mixing number and string enums can be confusing.",
+          "severity": 2,
+          "line": 2,
+          "column": 25,
+          "endLine": 2,
+          "endColumn": 28
+        },
+        {
+          "ruleId": "@typescript-eslint/no-unsafe-enum-comparison",
+          "messageId": "mismatchedCondition",
+          "message": "The two values in this comparison do not have a shared enum type.",
+          "severity": 1,
+          "line": 4,
+          "column": 1,
+          "endLine": 4,
+          "endColumn": 23
+        },
+        {
+          "ruleId": "@typescript-eslint/related-getter-setter-pairs",
+          "messageId": "mismatch",
+          "message": "`get()` type should be assignable to its equivalent `set()` type.",
+          "severity": 2,
+          "line": 5,
+          "column": 32,
+          "endLine": 5,
+          "endColumn": 38
+        }
+      ]
+    },
+    {
+      "filePath": "flow.ts",
+      "messages": [
+        {
+          "ruleId": "no-await-in-loop",
+          "messageId": "unexpectedAwait",
+          "message": "Unexpected `await` inside a loop.",
+          "severity": 1,
+          "line": 1,
+          "column": 54,
+          "endLine": 1,
+          "endColumn": 77
+        },
+        {
+          "ruleId": "no-continue",
+          "messageId": "unexpected",
+          "message": "Unexpected use of continue statement.",
+          "severity": 2,
+          "line": 1,
+          "column": 79,
+          "endLine": 1,
+          "endColumn": 88
+        },
+        {
+          "ruleId": "no-unsafe-finally",
+          "messageId": "unsafeUsage",
+          "message": "Unsafe usage of ReturnStatement.",
+          "severity": 2,
+          "line": 2,
+          "column": 50,
+          "endLine": 2,
+          "endColumn": 59
+        },
+        {
+          "ruleId": "no-constructor-return",
+          "messageId": "unexpected",
+          "message": "Unexpected return statement in constructor.",
+          "severity": 1,
+          "line": 3,
+          "column": 37,
+          "endLine": 3,
+          "endColumn": 47
+        },
+        {
+          "ruleId": "no-useless-catch",
+          "messageId": "unnecessaryCatch",
+          "message": "Unnecessary try/catch wrapper.",
+          "severity": 2,
+          "line": 4,
+          "column": 1,
+          "endLine": 4,
+          "endColumn": 46
+        },
+        {
+          "ruleId": "no-negated-condition",
+          "messageId": "unexpectedNegated",
+          "message": "Unexpected negated condition.",
+          "severity": 1,
+          "line": 5,
+          "column": 1,
+          "endLine": 5,
+          "endColumn": 48
+        }
+      ]
+    },
+    {
+      "filePath": "main.ts",
+      "messages": [
+        {
+          "ruleId": "@typescript-eslint/no-unsafe-unary-minus",
+          "messageId": "unaryMinus",
+          "message": "Argument of unary negation should be assignable to number | bigint but is string instead.",
+          "severity": 1,
+          "line": 3,
+          "column": 1,
+          "endLine": 3,
+          "endColumn": 5
+        },
+        {
+          "ruleId": "no-debugger",
+          "messageId": "no-debugger",
+          "message": "Unexpected 'debugger' statement.",
+          "severity": 2,
+          "line": 3,
+          "column": 14,
+          "endLine": 3,
+          "endColumn": 23
+        },
+        {
+          "ruleId": "no-caller",
+          "messageId": "unexpected",
+          "message": "Avoid arguments.caller.",
+          "severity": 1,
+          "line": 4,
+          "column": 16,
+          "endLine": 4,
+          "endColumn": 32
+        },
+        {
+          "ruleId": "no-caller",
+          "messageId": "unexpected",
+          "message": "Avoid arguments.callee.",
+          "severity": 1,
+          "line": 4,
+          "column": 34,
+          "endLine": 4,
+          "endColumn": 50
+        },
+        {
+          "ruleId": "no-compare-neg-zero",
+          "messageId": "unexpected",
+          "message": "Do not use the '===' operator to compare against -0.",
+          "severity": 2,
+          "line": 5,
+          "column": 1,
+          "endLine": 5,
+          "endColumn": 9
+        },
+        {
+          "ruleId": "no-compare-neg-zero",
+          "messageId": "unexpected",
+          "message": "Do not use the '!==' operator to compare against -0.",
+          "severity": 2,
+          "line": 5,
+          "column": 11,
+          "endLine": 5,
+          "endColumn": 19
+        },
+        {
+          "ruleId": "no-template-curly-in-string",
+          "messageId": "unexpectedTemplateExpression",
+          "message": "Template literal placeholder syntax in regular strings is not allowed.",
+          "severity": 1,
+          "line": 6,
+          "column": 17,
+          "endLine": 6,
+          "endColumn": 27
+        },
+        {
+          "ruleId": "no-nested-ternary",
+          "messageId": "noNestedTernary",
+          "message": "Do not nest ternary expressions.",
+          "severity": 1,
+          "line": 7,
+          "column": 11,
+          "endLine": 7,
+          "endColumn": 35
+        },
+        {
+          "ruleId": "no-ternary",
+          "messageId": "noTernaryOperator",
+          "message": "Ternary operator used.",
+          "severity": 2,
+          "line": 7,
+          "column": 11,
+          "endLine": 7,
+          "endColumn": 35
+        },
+        {
+          "ruleId": "no-ternary",
+          "messageId": "noTernaryOperator",
+          "message": "Ternary operator used.",
+          "severity": 2,
+          "line": 7,
+          "column": 18,
+          "endLine": 7,
+          "endColumn": 31
+        }
+      ]
+    },
+    {
+      "filePath": "types.ts",
+      "messages": []
+    },
+    {
+      "filePath": "with.js",
+      "messages": [
+        {
+          "ruleId": "no-with",
+          "messageId": "unexpectedWith",
+          "message": "Unexpected use of 'with' statement.",
+          "severity": 2,
+          "line": 1,
+          "column": 1,
+          "endLine": 1,
+          "endColumn": 31
+        }
+      ]
+    }
+  ]
+}

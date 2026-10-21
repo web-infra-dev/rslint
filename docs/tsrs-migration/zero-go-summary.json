@@ -1,0 +1,11 @@
+{
+  "scope": "draft source snapshot; final migration gate is NOT passed",
+  "counts": {
+    "go_build_or_runtime_reference": 82,
+    "go_manifest": 64,
+    "go_source": 3106,
+    "unresolved_submodule": 1
+  },
+  "sourceFiles": 6819,
+  "zeroGoGatePassed": false
+}

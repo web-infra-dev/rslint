@@ -1,0 +1,12 @@
+✔ the addon exposes the direct Rust lint entry point (0.353625ms)
+✔ invalid lint requests become JavaScript exceptions (0.258459ms)
+✔ the Rust compiler resolves cross-file types and reports UTF-16 ranges (23.36525ms)
+✔ unsupported rules and duplicate files fail instead of reducing work (1.296958ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 144.751584
