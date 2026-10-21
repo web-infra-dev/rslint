@@ -378,83 +378,16 @@ func TestRunLinterProgramAdmissionSingleWorker(t *testing.T) {
 	}
 }
 
-func TestProgramLintWorkGroupQueuesBeforeAdmission(t *testing.T) {
-	previousProcs := runtime.GOMAXPROCS(2)
-	t.Cleanup(func() { runtime.GOMAXPROCS(previousProcs) })
-	const programCount = 8
-	work := newProgramLintWorkGroup(false, programCount)
-	release := make(chan struct{})
-	var releaseOnce sync.Once
-	unblock := func() { releaseOnce.Do(func() { close(release) }) }
-	entered := make(chan struct{}, programCount)
-	var completed atomic.Int32
-	callback := func() {
-		entered <- struct{}{}
-		<-release
-		completed.Add(1)
-	}
-	queued := make(chan struct{})
-	submitPending := make(chan struct{})
-	done := make(chan struct{})
-	finished := make(chan struct{})
-	t.Cleanup(func() {
-		unblock()
-		joinProgramAdmissionTestWorker(t, finished)
-	})
-	go func() {
-		defer close(finished)
-		work.Queue(callback)
-		work.Queue(callback)
-		select {
-		case <-submitPending:
-		case <-release:
-		}
-		for range programCount - 2 {
-			work.Queue(callback)
-		}
-		close(queued)
-		work.RunAndWait()
-		close(done)
-	}()
-	for range 2 {
-		select {
-		case <-entered:
-		case <-time.After(5 * time.Second):
-			t.Fatal("admitted callbacks did not start")
-		}
-	}
-	close(submitPending)
-	select {
-	case <-queued:
-	case <-time.After(5 * time.Second):
-		t.Fatal("Queue blocked on Program admission instead of submitting the callback")
-	}
-	select {
-	case <-entered:
-		t.Fatal("pending Program callback bypassed the admission limit")
-	default:
-	}
-	unblock()
-	select {
-	case <-done:
-		if completed.Load() != programCount {
-			t.Fatalf("completed callbacks = %d, want %d", completed.Load(), programCount)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("pending callbacks did not make progress as admission tokens were released")
-	}
-}
-
-func TestProgramLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
+func TestLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
 	previousProcs := runtime.GOMAXPROCS(2)
 	defer runtime.GOMAXPROCS(previousProcs)
 	for _, exit := range []string{"panic", "Goexit"} {
 		for _, siblingExits := range []bool{false, true} {
 			name := fmt.Sprintf("%s/sibling-abnormal-%t", exit, siblingExits)
 			t.Run(name, func(t *testing.T) {
-				const programCount = 8
-				const marker = "admitted Program failed"
-				work := newProgramLintWorkGroup(false, programCount)
+				const taskCount = 8
+				const marker = "lint worker failed"
+				work := newLintWorkGroup(false)
 				started := make(chan struct{}, 2)
 				releaseFailure := make(chan struct{})
 				releaseSibling := make(chan struct{})
@@ -472,11 +405,14 @@ func TestProgramLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
 				var pendingRan atomic.Int32
 				queued := make(chan struct{})
 				submitPending := make(chan struct{})
+				var submitOnce sync.Once
+				submit := func() { submitOnce.Do(func() { close(submitPending) }) }
 				done := make(chan any, 1)
 				finished := make(chan struct{})
 				t.Cleanup(func() {
 					unblockFailure()
 					unblockSibling()
+					submit()
 					joinProgramAdmissionTestWorker(t, finished)
 				})
 				go func() {
@@ -496,11 +432,8 @@ func TestProgramLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
 							abort()
 						}
 					})
-					select {
-					case <-submitPending:
-					case <-releaseFailure:
-					}
-					for range programCount - 2 {
+					<-submitPending
+					for range taskCount - 2 {
 						work.Queue(func() { pendingRan.Add(1) })
 					}
 					close(queued)
@@ -510,29 +443,29 @@ func TestProgramLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
 					select {
 					case <-started:
 					case <-time.After(5 * time.Second):
-						t.Fatal("both admitted Program callbacks did not start")
+						t.Fatal("both lint callbacks did not start")
 					}
-				}
-				close(submitPending)
-				select {
-				case <-queued:
-				case <-time.After(5 * time.Second):
-					t.Fatal("pending Program callbacks could not be submitted")
 				}
 				unblockFailure()
 				select {
 				case <-failureStopped:
 				case <-time.After(5 * time.Second):
-					t.Fatal("abnormal Program callback did not exit")
+					t.Fatal("abnormal lint callback did not exit")
 				}
 				// The callback's defer precedes workerPanic's abort publication.
 				// Wait for that publication only to arrange the already-aborted scenario.
 				abortDeadline := time.Now().Add(5 * time.Second)
 				for !work.panics.aborted.Load() {
 					if time.Now().After(abortDeadline) {
-						t.Fatal("abnormal Program exit was not recorded")
+						t.Fatal("abnormal lint exit was not recorded")
 					}
 					runtime.Gosched()
+				}
+				submit()
+				select {
+				case <-queued:
+				case <-time.After(5 * time.Second):
+					t.Fatal("pending lint callbacks could not be submitted")
 				}
 				select {
 				case got := <-done:
@@ -557,10 +490,10 @@ func TestProgramLintWorkGroupJoinsAbnormalWorkers(t *testing.T) {
 						t.Fatal("workgroup returned before the admitted sibling stopped")
 					}
 					if pendingRan.Load() != 0 {
-						t.Fatalf("%d pending Program callbacks ran after the workgroup aborted", pendingRan.Load())
+						t.Fatalf("%d pending lint callbacks ran after the workgroup aborted", pendingRan.Load())
 					}
 				case <-time.After(5 * time.Second):
-					t.Fatal("admitted or skipped callbacks retained admission tokens and blocked join")
+					t.Fatal("abnormal or skipped callbacks blocked join")
 				}
 			})
 		}
@@ -614,57 +547,92 @@ func programAdmissionTestOptions(t *testing.T, count int, singleThreaded bool, r
 }
 
 func TestDynamicProgramAdmissionReplenishesBeforeProgramCompletes(t *testing.T) {
-	firstReady := make(chan *programReservation, 1)
-	secondEntered := make(chan struct{})
-	release := make(chan struct{})
-	var releaseOnce sync.Once
-	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	previousProcs := runtime.GOMAXPROCS(2)
+	defer runtime.GOMAXPROCS(previousProcs)
+	started := make(chan struct{}, 2)
+	nextEntered := make(chan struct{})
+	fastRelease, slowRelease := make(chan struct{}), make(chan struct{})
+	var fastOnce, slowOnce sync.Once
+	releaseFast := func() { fastOnce.Do(func() { close(fastRelease) }) }
+	releaseSlow := func() { slowOnce.Do(func() { close(slowRelease) }) }
+	var fastFile, slowFile, nextFile string
+	run := func(ctx rule.RuleContext) rule.RuleListeners {
+		switch ctx.SourceFile.FileName() {
+		case fastFile:
+			started <- struct{}{}
+			<-fastRelease
+		case slowFile:
+			started <- struct{}{}
+			<-slowRelease
+		case nextFile:
+			close(nextEntered)
+		}
+		return nil
+	}
+	firstOptions := checkerFreeExecutionTestOptions(t, false, run)
+	first := firstOptions.LintPlan.programs[0]
+	fastFile = first.files[0].file.FileName()
+	slowFile = first.files[minCheckerFreeFilesPerLintWorker].file.FileName()
+	followingOptions, followingPaths := programAdmissionTestOptions(t, 2, false, run)
+	following := followingOptions.LintPlan.programs
+	nextFile = followingPaths[0]
+	firstTargets := make([]string, len(first.files))
+	for index, file := range first.files {
+		firstTargets[index] = file.file.FileName()
+	}
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         []*program.Program{first.program, following[0].program, following[1].program},
+		TargetsByProgram: [][]string{firstTargets, {followingPaths[0]}, {followingPaths[1]}},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{Name: "native/admission", Run: run}}
+		},
+	})
+	done := make(chan programAdmissionOutcome, 1)
 	finished := make(chan struct{})
 	t.Cleanup(func() {
-		unblock()
+		releaseFast()
+		releaseSlow()
 		joinProgramAdmissionTestWorker(t, finished)
 	})
 	go func() {
 		defer close(finished)
-		runWithProgramAdmission([]int{4, 7, 1}, 4, func(index int, reservation *programReservation) {
-			switch index {
-			case 0:
-				reservation.ready(4)
-				firstReady <- reservation
-				<-release
-				for range 3 {
-					reservation.done()
-				}
-			case 1:
-				// An oversized estimate may enter as a whole, then shrink to
-				// the actual work. No shard needs to be artificially serialized.
-				reservation.ready(2)
-				reservation.done()
-				reservation.done()
-				close(secondEntered)
-			case 2:
-				reservation.ready(0)
-			}
-		})
+		result, err := RunLinter(RunLinterOptions{LintPlan: plan})
+		done <- programAdmissionOutcome{result: result, err: err}
 	}()
-	var first *programReservation
-	select {
-	case first = <-firstReady:
-	case <-time.After(5 * time.Second):
-		t.Fatal("first Program did not enter")
+	// The first Program has two real native shards. Both must be blocked
+	// before we return one shard's capacity while retaining the other borrower.
+	for range 2 {
+		select {
+		case <-started:
+		case <-time.After(5 * time.Second):
+			t.Fatal("both native shards did not start")
+		}
 	}
 	select {
-	case <-secondEntered:
+	case <-nextEntered:
 		t.Fatal("admitted another Program before any shard completed")
 	case <-time.After(20 * time.Millisecond):
 	}
-	first.done()
+	releaseFast()
 	select {
-	case <-secondEntered:
+	case <-nextEntered:
 	case <-time.After(5 * time.Second):
-		t.Fatal("did not replenish after one shard completed while its Program was still active")
+		t.Fatal("did not replenish after one native shard completed while its Program was still active")
 	}
-	unblock()
+	select {
+	case <-done:
+		t.Fatal("RunLinter returned while the slow native shard was still active")
+	default:
+	}
+	releaseSlow()
+	select {
+	case got := <-done:
+		if got.err != nil || got.result == nil || got.result.LintedFileCount != int32(len(first.files)+len(followingPaths)) {
+			t.Fatalf("RunLinter: result=%+v error=%v", got.result, got.err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("native shards and following Programs did not all complete")
+	}
 }
 
 func TestDynamicProgramAdmissionReusesMixedPlan(t *testing.T) {
@@ -717,7 +685,7 @@ func TestDynamicProgramAdmissionReusesMixedPlan(t *testing.T) {
 			}
 		},
 	})
-	for _, single := range []bool{true, false} {
+	for _, single := range []bool{false, true} {
 		for _, typeCheck := range []bool{false, true} {
 			before := calls.Load()
 			result, err := RunLinter(RunLinterOptions{

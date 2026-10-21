@@ -62,36 +62,6 @@ func checkerFreeLintWorkerCount(fileCount int, maxWorkers int) int {
 	return max(1, min(maxWorkers, fileCount/minCheckerFreeFilesPerLintWorker))
 }
 
-// estimateProgramLintShards reads only the frozen native file projection. It
-// must not acquire a checker: admission precedes binding/checker creation.
-// The executor corrects this hint after discovering the actual associations.
-func estimateProgramLintShards(plan *programLintPlan, maxWorkers int) int {
-	capable, plain := 0, 0
-	for _, file := range plan.files {
-		if file.rules == nil || len(file.rules.native) == 0 {
-			continue
-		}
-		if file.hasTypeChecker {
-			capable++
-		} else {
-			plain++
-		}
-	}
-	if capable == 0 {
-		return max(1, checkerFreeLintWorkerCount(plain, maxWorkers))
-	}
-	// Match the compiler pool's default shape without making it a contract.
-	checkers := 4
-	if configured := plan.program.Options().Checkers; configured != nil {
-		checkers = max(1, *configured)
-	}
-	shards := min(capable, checkers)
-	if plain > 0 {
-		shards++
-	}
-	return shards
-}
-
 type lintShard struct {
 	checker *checker.Checker
 	files   []*lintFilePlan
