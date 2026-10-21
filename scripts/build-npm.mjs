@@ -21,9 +21,8 @@ const platforms = [
   { os: 'windows', arch: 'arm64', 'node-arch': 'arm64', 'node-os': 'win32' },
 ];
 
-// The rslint Go binary ships inside each napi-tuple subpackage (next to the
-// parser `.node`). One row per subpackage dir; linux gnu/musl reuse the same
-// GOOS/GOARCH with cgo disabled and rely on the Go build cache.
+// Each platform package contains a Go executable and a native addon. Linux
+// gnu/musl targets reuse GOOS/GOARCH with cgo disabled and share the build cache.
 const rslintTargets = [
   { goos: 'darwin', goarch: 'amd64', dir: 'darwin-x64' },
   { goos: 'darwin', goarch: 'arm64', dir: 'darwin-arm64' },

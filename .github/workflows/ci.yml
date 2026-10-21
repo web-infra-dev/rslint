@@ -134,19 +134,13 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      # napi build drops the host .node into its @rslint/native-{tuple} package;
-      # the worker loads it at test runtime.
+      # Place the host addon in its platform package before building consumers.
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
-      - name: Build napi parser (native)
+      - name: Build native addon
         run: pnpm --filter @rslint/native run build
 
-      # Rule options JSON Schema dump for the generate-rule-option-types
-      # rslib plugin (see packages/rslint/plugins/generate-rule-option-types.ts).
-      # Without this, `pnpm run build` below still succeeds but the plugin
-      # skips with a warning and dist/index.d.ts never gets typed rule
-      # options — so the vscode-extension e2e suite that exercises them
-      # (suite-rule-option-types) needs it in place first.
+      # Generate metadata required by the package build and downstream tests.
       - name: Dump rule schemas
         run: go run ./tools/dump_rule_schemas > packages/rslint/rule-schemas.json
 
@@ -203,8 +197,7 @@ jobs:
   binary-size:
     name: Binary Size
     needs: test-node
-    # Reports only, deliberately kept out of `done` below: porting a rule
-    # legitimately grows the binary.
+    # Report size changes without making them a required check.
     if: ${{ github.event_name == 'pull_request' && !cancelled() }}
     runs-on: rspack-ubuntu-22.04-mini
     permissions:
@@ -296,11 +289,10 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      # napi build drops the host (win32) .node into its @rslint/native-{tuple}
-      # package; the worker loads it at test runtime.
+      # Place the host addon in its platform package before building consumers.
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
-      - name: Build napi parser (native)
+      - name: Build native addon
         run: pnpm --filter @rslint/native run build
 
       - name: Test native Rust crate on Windows
@@ -310,10 +302,7 @@ jobs:
         shell: pwsh
         run: go build -o npm/rslint/win32-x64-msvc/rslint.exe ./cmd/rslint
 
-      # Rule options JSON Schema dump for the generate-rule-option-types
-      # rslib plugin (see packages/rslint/plugins/generate-rule-option-types.ts).
-      # test-vscode-windows has no Go toolchain, so it's generated here (where
-      # Go is already set up) and handed off the same way rslint.exe is below.
+      # Generate shared metadata where the Go toolchain is available.
       - name: Dump rule schemas
         shell: pwsh
         run: go run ./tools/dump_rule_schemas > rule-schemas.json
@@ -356,11 +345,10 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      # napi build drops the host (win32) .node into its @rslint/native-{tuple}
-      # package; the worker loads it at test runtime.
+      # Place the host addon in its platform package before building consumers.
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
-      - name: Build napi parser (native)
+      - name: Build native addon
         run: pnpm --filter @rslint/native run build
 
       - name: Download rslint.exe
@@ -419,9 +407,7 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      # build:js is one rslib build (library surface + eslint-plugin worker).
-      # The worker's native loader is bundled from core sources and resolves the
-      # platform .node at runtime, so no napi build / Rust is needed to compile.
+      # Build JavaScript and WASM without producing host-native artifacts.
       - name: Build
         run: |
           pnpm --filter '@rslint/core' build:js

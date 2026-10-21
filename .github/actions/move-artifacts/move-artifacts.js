@@ -100,7 +100,7 @@ async function moveArtifacts() {
       }
     }
 
-    // Move napi `.node` parser binaries into the @rslint/native-{tuple}
+    // Move native addons into the @rslint/native-{tuple}
     // subpackages (flat, alongside the Go binary). Artifacts are named
     // `rslint.{tuple}.node`; target is `npm/rslint/{tuple}/` (libc suffix kept
     // so gnu/musl stay separate). Not chmod'd — a `.node` is dlopen'd.
@@ -118,12 +118,7 @@ async function moveArtifacts() {
       console.log(`Copied ${file} to ${targetFile}`);
     }
 
-    // Move the rule options JSON Schema dump (a single, platform-independent
-    // artifact named `rule-schemas`, uploaded once from the `build` job's
-    // linux-amd64 leg) to the fixed path
-    // the generate-rule-option-types rslib plugin reads — see
-    // packages/rslint/rstack.config.ts's onAfterBuild hook, which runs during
-    // publish-npm's `build:js` step.
+    // Install shared build metadata before assembling JavaScript packages.
     const ruleSchemasTarget = path.join(
       'packages',
       'rslint',
