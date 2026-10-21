@@ -2854,7 +2854,7 @@ func TestConfigDiscoveryReusesNativeCaseAliasAcrossLoadFrontiers(t *testing.T) {
 		fsys,
 		loader,
 		ConfigDiscoveryRequest{CWD: upperRoot},
-		"",
+		nil,
 		"case-alias-frontiers",
 	)
 	if err := coordinator.modules.loadCandidates([]configCandidate{{path: upperConfig, directory: upperRoot}}); err != nil {

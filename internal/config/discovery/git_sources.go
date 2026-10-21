@@ -35,10 +35,13 @@ func (coordinator *discoveryCoordinator) physicalDirectory(directory string) str
 	return physical
 }
 
-// collectExactGitFiles supplements the same reader with every supplied file,
-// including glob-expanded inputs and documents that do not discover configs.
+// collectExactGitFiles supplements the reader with independent files and
+// documents. Bounded glob candidates acquire sources only through their inputs.
 func (coordinator *discoveryCoordinator) collectExactGitFiles() {
 	for _, file := range coordinator.request.Files {
+		if coordinator.request.LimitDirectoryWalkToFiles && len(coordinator.targetDirectories) > 0 && !file.Explicit {
+			continue
+		}
 		coordinator.collectExactGitFile(file.PathIdentity)
 	}
 	for _, file := range coordinator.request.AdditionalGitFiles {

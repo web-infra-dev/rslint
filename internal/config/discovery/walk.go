@@ -15,6 +15,7 @@ type discoveryWalkNode struct {
 	canonicalDirectory string
 	ownerDir           string
 	ownerPath          string
+	ignoreMatcher      rslintconfig.GlobalIgnoreMatcher
 	configReachable    bool
 	gitCursor          gitignore.Cursor
 	targets            *discoveryTargetTrie
@@ -26,6 +27,7 @@ type suspendedDiscoveryNode struct {
 
 type discoveryWalkResult struct {
 	children           []discoveryWalkNode
+	files              []string
 	pending            *suspendedDiscoveryNode
 	candidateToAdopt   *configLoadState
 	directoriesVisited int
@@ -62,6 +64,9 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 			}
 			coordinator.walkStats.directoriesVisited += result.directoriesVisited
 			coordinator.walkStats.directoriesPruned += result.directoriesPruned
+			for _, file := range result.files {
+				coordinator.reachableFiles[file] = true
+			}
 			if result.candidateToAdopt != nil {
 				if err := coordinator.adoptCandidate(result.candidateToAdopt, false); err != nil {
 					return err
@@ -92,6 +97,7 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 					})
 					item.node.ownerDir = state.candidate.directory
 					item.node.ownerPath = state.candidate.path
+					item.node.ignoreMatcher = state.ignoreMatcher
 				}
 				next = append(next, item.node)
 			}
@@ -147,12 +153,12 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 	if err := coordinator.ctx.Err(); err != nil {
 		return discoveryWalkResult{err: err}
 	}
-	if coordinator.isGloballyIgnoredDirectory(node.ownerPath, node.directory, node.canonicalDirectory) {
+	if node.ignoreMatcher.BlocksDirectory(node.directory, node.canonicalDirectory) {
 		return discoveryWalkResult{directoriesPruned: 1}
 	}
 	result := discoveryWalkResult{}
 
-	if coordinator.explicitConfigPath == "" && node.configReachable {
+	if coordinator.explicit == nil && node.configReachable {
 		if candidate, found := coordinator.findCandidateForOwner(
 			node.directory,
 			node.ownerPath,
@@ -167,6 +173,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 				result.candidateToAdopt = state
 				node.ownerDir = state.candidate.directory
 				node.ownerPath = state.candidate.path
+				node.ignoreMatcher = state.ignoreMatcher
 			}
 		}
 	}
@@ -175,13 +182,13 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 	// A supplied directory may select its own config while remaining a raw Git
 	// traversal boundary. That ownership exception does not authorize searching
 	// its hidden children for another repository.
-	if !node.gitCursor.SourceReachable() && !coordinator.mayReopenGitDescendants(node.ownerPath, node.directory, node.canonicalDirectory) {
+	if !node.gitCursor.SourceReachable() && !node.ignoreMatcher.MayReopenGitDescendants(node.directory, node.canonicalDirectory) {
 		result.directoriesPruned = 1
 		return result
 	}
 	walkTargets := node.targets
-	if walkTargets != nil && walkTargets.recursive {
-		walkTargets = nil
+	if walkTargets != nil {
+		result.files = walkTargets.files
 	}
 	if walkTargets != nil && len(walkTargets.children) == 0 {
 		return result
@@ -214,14 +221,14 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 		if node.canonicalDirectory != "" {
 			canonicalChild = tspath.CombinePaths(node.canonicalDirectory, name)
 		}
-		if coordinator.isGloballyIgnoredDirectory(node.ownerPath, child, canonicalChild) {
+		if node.ignoreMatcher.BlocksDirectory(child, canonicalChild) {
 			result.directoriesPruned++
 			continue
 		}
 		nextCursor, entryBlocked := coordinator.git.Enter(node.gitCursor, canonicalChild)
 		gitBlocked := entryBlocked || !nextCursor.SourceReachable()
-		childConfigReachable := !gitBlocked || coordinator.reopensGitignoredDirectory(node.ownerPath, child, canonicalChild)
-		if gitBlocked && !coordinator.mayReopenGitDescendants(node.ownerPath, child, canonicalChild) {
+		childConfigReachable := !gitBlocked || node.ignoreMatcher.ReopensDirectoryNode(child, canonicalChild)
+		if gitBlocked && !node.ignoreMatcher.MayReopenGitDescendants(child, canonicalChild) {
 			result.directoriesPruned++
 			continue
 		}
@@ -230,6 +237,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 			canonicalDirectory: canonicalChild,
 			ownerDir:           node.ownerDir,
 			ownerPath:          node.ownerPath,
+			ignoreMatcher:      node.ignoreMatcher,
 			configReachable:    childConfigReachable,
 			gitCursor:          nextCursor,
 			targets:            childTargets,
@@ -240,23 +248,15 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 }
 
 func (coordinator *discoveryCoordinator) isGloballyIgnoredDirectory(ownerPath string, directory string, canonicalDirectory string) bool {
-	matcher, ok := coordinator.modules.globalIgnoreMatcher(ownerPath)
-	return ok && matcher.BlocksDirectory(directory, canonicalDirectory)
+	return coordinator.globalIgnoreMatcher(ownerPath).BlocksDirectory(directory, canonicalDirectory)
 }
 
 func (coordinator *discoveryCoordinator) reopensGitignoredDirectory(ownerPath string, directory string, canonicalDirectory string) bool {
-	matcher, ok := coordinator.modules.globalIgnoreMatcher(ownerPath)
-	return ok && matcher.ReopensDirectoryNode(directory, canonicalDirectory)
+	return coordinator.globalIgnoreMatcher(ownerPath).ReopensDirectoryNode(directory, canonicalDirectory)
 }
 
 func (coordinator *discoveryCoordinator) isGloballyIgnoredCandidate(ownerPath string, candidate rslintconfig.PathIdentity) bool {
-	matcher, ok := coordinator.modules.globalIgnoreMatcher(ownerPath)
-	return ok && matcher.IgnoresFile(candidate)
-}
-
-// A file-level authored negation may require traversal to reach a nested
-// repository without authorizing execution of the enclosing config module.
-func (coordinator *discoveryCoordinator) mayReopenGitDescendants(ownerPath string, directory string, canonicalDirectory string) bool {
-	matcher, ok := coordinator.modules.globalIgnoreMatcher(ownerPath)
-	return ok && matcher.MayReopenGitDescendants(directory, canonicalDirectory)
+	// Only an actual ancestor owner can hide a module filename; fallback
+	// directory policy must not hide the module that establishes ownership.
+	return ownerPath != "" && coordinator.globalIgnoreMatcher(ownerPath).IgnoresFile(candidate)
 }

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -2053,6 +2054,77 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 	}
 	if response.FileCount != 1 || len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
 		t.Fatalf("unexpected target response: %+v", response)
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryExpandedFilesKeepTheirScanEntries(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	inner := tspath.ResolvePath(root, "nested/selected")
+	writeProgramTestFiles(t, root, map[string]string{
+		".git/HEAD":                "ref: refs/heads/main\n",
+		".gitignore":               "nested/\n",
+		"rslint.config.js":         "export default [];\n",
+		"control.js":               "debugger;\n",
+		"nested/.git/HEAD":         "ref: refs/heads/main\n",
+		"nested/selected/keep.js":  "debugger;\n",
+		"nested/selected/other.js": "debugger;\n",
+	})
+	entries := mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`)
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		switch kind {
+		case api.KindLoadConfigs:
+			request := payload.(discovery.ConfigLoadBatchRequest)
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			for _, candidate := range request.Candidates {
+				response.Results = append(response.Results, discovery.ConfigLoadResult{
+					ID: candidate.ID, Status: "loaded", Entries: entries,
+				})
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, response)
+		case api.KindActivateConfigs:
+			request := payload.(discovery.ConfigActivationRequest)
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{TransactionID: request.TransactionID})
+		default:
+			return nil, fmt.Errorf("unexpected reverse request %q", kind)
+		}
+	})
+	for _, mode := range []string{"automatic", "explicit", "inline"} {
+		t.Run(mode, func(t *testing.T) {
+			configDiscovery := &api.ConfigDiscoveryRequest{
+				Directories:   []string{root, inner},
+				ExplicitFiles: []bool{false, false, false},
+			}
+			if mode == "explicit" {
+				configDiscovery.ExplicitConfigPath = tspath.ResolvePath(root, "rslint.config.js")
+			}
+			request := api.LintRequest{
+				Files: []string{
+					tspath.ResolvePath(root, "control.js"),
+					tspath.ResolvePath(inner, "keep.js"),
+					tspath.ResolvePath(inner, "other.js"),
+				},
+				WorkingDirectory:    root,
+				ConfigDiscovery:     configDiscovery,
+				FileScanDirectories: [][]string{{root}, {root, inner}, {root}},
+			}
+			if mode == "inline" {
+				request.ConfigDiscovery = nil
+				request.Config = json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`)
+				request.ConfigDirectory = root
+			}
+			response, err := (&Handler{}).HandleLintWithContext(context.Background(), request, requester)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var files []string
+			for _, diagnostic := range response.Diagnostics {
+				files = append(files, diagnostic.FilePath)
+			}
+			slices.Sort(files)
+			if response.FileCount != 2 || !reflect.DeepEqual(files, []string{"control.js", "nested/selected/keep.js"}) {
+				t.Fatalf("expanded files borrowed another input's scan entry: %+v", response)
+			}
+		})
 	}
 }
 

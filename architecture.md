@@ -878,9 +878,11 @@ CLI, the native JavaScript API path, and transactional LSP refreshes reuse
 the one-shot `internal/config/discovery.DiscoverAutomatic` operation (or
 `LoadExplicitConfig` for an exact path). Automatic discovery builds an immutable
 config/ownership catalog and observes `.gitignore` sources during the same
-directory walk. Explicit loading first selects the exact module unconditionally,
+directory walk. Explicit loading selects the exact module unconditionally, or
+accepts an already-resolved inline array without module loading,
 then freezes target-tree Git sources with the same frontier
-without probing nested config candidates. Neither path collects lint targets.
+without probing nested config candidates. Neither path applies file selectors;
+both preserve the reachable subset of an already-expanded candidate set.
 For explicit-project `--type-check-only`, explicit loading omits target-tree
 Git collection unless the loaded config has per-file service/root/reset options.
 For LSP, the client's first `rslint/configRefresh` may include one absolute
@@ -1056,10 +1058,13 @@ The transport and target phase differ by surface:
   source-keyed projection.
 - `Rslint.lintFiles()` still expands target globs with `tinyglobby`, preserves
   literal provenance and canonical identities, and sends the resulting files
-  plus their static config-scan roots in one API lint request. Go bounds catalog
-  discovery to the supplied files' ancestor trie, owns file-to-config
+  plus the static roots that actually matched each file in one API lint request.
+  Go bounds catalog discovery to each root's candidate ancestor trie and removes
+  candidates that no matching input can reach before file-to-config
   assignment, then applies selectors and ignores once to that exact target set;
-  configs in unrelated descendants are not evaluated. The bidirectional API
+  configs in unrelated descendants are not evaluated. Explicit-module and
+  inline-only arrays use the same bounded input walk, independently of config
+  location. The bidirectional API
   advertises `reverseConfigLoadV1`; low-level pre-resolved `config` requests and
   WASM do not use staged module discovery. If the resulting catalog contains
   object-form community plugins, Go additionally requires the peer's
@@ -1070,7 +1075,9 @@ The transport and target phase differ by surface:
   entries are structurally validated before that load and attached at the
   loader boundary as the final suffix of every successful config. Their global
   ignores and negations therefore participate in staged reachability and are
-  published exactly once; an empty catalog uses the same override directly.
+  published exactly once. Before a module owns a route, the override array
+  supplies directory policy without becoming a config owner or load candidate;
+  an empty catalog uses the same override directly.
 - Extension activation makes a one-time stand-down decision through
   `rstackEditorTakesOver()`: an enabled `rstack.rstack` alone takes over, and
   `Extension`, `RuntimeManager`, and LSP startup are skipped entirely. The

@@ -164,6 +164,41 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 	}
 	var targetDirectories []rslintconfig.DirectoryIdentity
+	if req.FileScanDirectories != nil && len(req.FileScanDirectories) != len(req.Files) {
+		return nil, errors.New("fileScanDirectories must be parallel to files")
+	}
+	if req.ConfigDiscovery == nil && req.FileScanDirectories != nil {
+		// A resolved inline config uses the same bounded input walk without a
+		// module loader. Config location never supplies directory scan entries.
+		request := discovery.ExplicitConfigRequest{
+			CWD:                       currentDirectory,
+			Config:                    append(rslintconfig.RslintConfig{}, rslintConfig...),
+			ConfigDirectory:           configDirectory,
+			TargetFiles:               make([]discovery.DiscoveryFile, 0, len(req.Files)),
+			LimitDirectoryWalkToFiles: true,
+		}
+		scanDirectories := make(map[string]struct{})
+		for index, path := range req.Files {
+			directories := req.FileScanDirectories[index]
+			request.TargetFiles = append(request.TargetFiles, discovery.DiscoveryFile{
+				PathIdentity:    targetFileByPath[rslintconfig.ExactPathID(resolveRequestPath(path))],
+				Explicit:        directories == nil,
+				ScanDirectories: directories,
+			})
+			for _, directory := range directories {
+				directory = resolveRequestPath(directory)
+				if _, seen := scanDirectories[directory]; !seen {
+					scanDirectories[directory] = struct{}{}
+					request.TargetDirectories = append(request.TargetDirectories, rslintconfig.ResolveDirectoryIdentities([]string{directory}, fs)...)
+				}
+			}
+		}
+		catalog, err := discovery.LoadExplicitConfig(ctx, fs, nil, request)
+		if err != nil {
+			return nil, fmt.Errorf("resolve inline config inputs: %w", err)
+		}
+		gitPolicy, pathSpaces, targetFiles = catalog.GitPolicy, catalog.PathSpaces, catalog.TargetFiles
+	}
 	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
 			return nil, errors.New("configDiscovery requires a bidirectional API host")
@@ -183,6 +218,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 		discoveryRequest := discovery.ConfigDiscoveryRequest{
 			CWD:                       currentDirectory,
+			FallbackConfig:            rslintconfig.ConfigWithResolvedBasePaths(overrideConfig, currentDirectory),
 			Fresh:                     true,
 			LimitDirectoryWalkToFiles: len(configDiscovery.Directories) > 0,
 			ImplicitCWD:               allowedFiles == nil && len(configDiscovery.Directories) == 0,
@@ -196,12 +232,17 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 		for index, path := range req.Files {
 			explicit := true
-			if len(configDiscovery.ExplicitFiles) > 0 {
+			var scanDirectories []string
+			if req.FileScanDirectories != nil {
+				scanDirectories = req.FileScanDirectories[index]
+				explicit = scanDirectories == nil
+			} else if len(configDiscovery.ExplicitFiles) > 0 {
 				explicit = configDiscovery.ExplicitFiles[index]
 			}
 			discoveryRequest.Files = append(discoveryRequest.Files, discovery.DiscoveryFile{
-				PathIdentity: targetFileByPath[rslintconfig.ExactPathID(resolveRequestPath(path))],
-				Explicit:     explicit,
+				PathIdentity:    targetFileByPath[rslintconfig.ExactPathID(resolveRequestPath(path))],
+				Explicit:        explicit,
+				ScanDirectories: scanDirectories,
 			})
 		}
 
@@ -218,22 +259,17 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		var configCatalog *discovery.ConfigCatalog
 		var err error
 		if configDiscovery.ExplicitConfigPath != "" {
-			var gitFiles []discovery.DiscoveryFile
-			if targetFiles != nil {
-				gitFiles = make([]discovery.DiscoveryFile, len(targetFiles))
-				for index, file := range targetFiles {
-					gitFiles[index] = discovery.DiscoveryFile{PathIdentity: file}
-				}
-			}
 			configCatalog, err = discovery.LoadExplicitConfig(
 				ctx,
 				fs,
 				loader,
 				discovery.ExplicitConfigRequest{
-					CWD:         currentDirectory,
-					ConfigPath:  resolveRequestPath(configDiscovery.ExplicitConfigPath),
-					TargetFiles: gitFiles,
-					Fresh:       true,
+					CWD:                       currentDirectory,
+					ConfigPath:                resolveRequestPath(configDiscovery.ExplicitConfigPath),
+					TargetFiles:               discoveryRequest.Files,
+					TargetDirectories:         discoveryRequest.Directories,
+					LimitDirectoryWalkToFiles: discoveryRequest.LimitDirectoryWalkToFiles,
+					Fresh:                     true,
 				},
 			)
 		} else {

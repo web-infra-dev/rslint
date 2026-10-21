@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -10,45 +11,29 @@ import (
 
 // discoveryTargetTrie bounds a directory walk to branches that can govern an
 // invocation target. A nil trie means the current subtree is unbounded. A
-// recursive node makes its subtree unbounded, while a non-recursive leaf still
-// visits that directory so its sources can govern a file directly within it.
+// leaf still visits that directory so its sources can govern files within it.
 type discoveryTargetTrie struct {
-	recursive bool
-	children  map[tspath.Path]*discoveryTargetTrie
+	children map[tspath.Path]*discoveryTargetTrie
+	files    []string
 }
 
 func addDiscoveryTarget(
 	root *discoveryTargetTrie,
 	configDir string,
-	targetDirectory string,
-	recursive bool,
+	filePath string,
 	useCaseSensitive bool,
 ) bool {
 	relative, within := rslintconfig.RelativePathWithinConfigRoot(
-		targetDirectory,
+		tspath.GetDirectoryPath(filePath),
 		configDir,
 		useCaseSensitive,
 	)
 	if !within {
-		if recursive {
-			if _, containsRoot := rslintconfig.RelativePathWithinConfigRoot(
-				configDir,
-				targetDirectory,
-				useCaseSensitive,
-			); containsRoot {
-				root.recursive = true
-				root.children = nil
-				return true
-			}
-		}
 		return false
 	}
 
 	node := root
 	for _, component := range splitDiscoveryPath(relative) {
-		if node.recursive {
-			return true
-		}
 		if node.children == nil {
 			node.children = make(map[tspath.Path]*discoveryTargetTrie)
 		}
@@ -60,10 +45,7 @@ func addDiscoveryTarget(
 		}
 		node = child
 	}
-	if recursive {
-		node.recursive = true
-		node.children = nil
-	}
+	node.files = append(node.files, filePath)
 	return true
 }
 
@@ -108,8 +90,19 @@ func (coordinator *discoveryCoordinator) normalizedFiles() []DiscoveryFile {
 		if file.CanonicalParentPath != "" {
 			file.CanonicalParentPath = normalizeDiscoveryPath(file.CanonicalParentPath, coordinator.request.CWD)
 		}
+		file.ScanDirectories = slices.Clone(file.ScanDirectories)
+		for index, directory := range file.ScanDirectories {
+			file.ScanDirectories[index] = normalizeDiscoveryPath(directory, coordinator.request.CWD)
+		}
 		if index, exists := indexByPath[file.Path]; exists {
 			files[index].Explicit = files[index].Explicit || file.Explicit
+			if files[index].ScanDirectories != nil {
+				if file.ScanDirectories == nil {
+					files[index].ScanDirectories = nil
+				} else {
+					files[index].ScanDirectories = append(files[index].ScanDirectories, file.ScanDirectories...)
+				}
+			}
 			if files[index].CanonicalPath == "" {
 				files[index].CanonicalPath = file.CanonicalPath
 			}
@@ -139,11 +132,16 @@ func (coordinator *discoveryCoordinator) targetAncestorTries(
 	for _, file := range files {
 		for _, directory := range roots {
 			root := directory.LexicalPath
+			if !file.Explicit && file.ScanDirectories != nil && !slices.ContainsFunc(file.ScanDirectories, func(directory string) bool {
+				return discoveryPathsEqual(directory, root, useCaseSensitive)
+			}) {
+				continue
+			}
 			trie := tries[root]
 			if trie == nil {
 				trie = &discoveryTargetTrie{}
 			}
-			if addDiscoveryTarget(trie, root, tspath.GetDirectoryPath(file.Path), false, useCaseSensitive) {
+			if addDiscoveryTarget(trie, root, file.Path, useCaseSensitive) {
 				tries[root] = trie
 			}
 		}

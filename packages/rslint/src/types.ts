@@ -69,6 +69,8 @@ export interface LintOptions {
   // Optional physical paths parallel to files. High-level Node APIs provide
   // these after target planning so Go does not repeat realpath resolution.
   canonicalFiles?: string[];
+  /** Parallel to `files`: matched scan roots, or null for a literal file. */
+  fileScanDirectories?: (string[] | null)[];
   // A caller-supplied, already normalized config (normalizeConfig output:
   // plain objects, plugins as string[], no live functions). High-level Node
   // APIs normally use configDiscovery instead; overrideConfigFile:true uses

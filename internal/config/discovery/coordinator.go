@@ -11,20 +11,21 @@ import (
 )
 
 type discoveryCoordinator struct {
-	ctx                context.Context
-	fs                 vfs.FS
-	request            ConfigDiscoveryRequest
-	explicitConfigPath string
-	projectOnly        bool
-	transactionID      string
+	ctx           context.Context
+	fs            vfs.FS
+	request       ConfigDiscoveryRequest
+	explicit      *ExplicitConfigRequest
+	transactionID string
 
-	modules             moduleLoadCoordinator
-	git                 *gitignore.Reader
-	draft               catalogDraft
-	walkStats           discoveryWalkStats
-	physicalDirectories map[string]string
-	targetFiles         []rslintconfig.PathIdentity
-	targetDirectories   []rslintconfig.DirectoryIdentity
+	modules               moduleLoadCoordinator
+	git                   *gitignore.Reader
+	draft                 catalogDraft
+	walkStats             discoveryWalkStats
+	physicalDirectories   map[string]string
+	targetFiles           []rslintconfig.PathIdentity
+	targetDirectories     []rslintconfig.DirectoryIdentity
+	reachableFiles        map[string]bool
+	fallbackIgnoreMatcher rslintconfig.GlobalIgnoreMatcher
 }
 
 func newDiscoveryCoordinator(
@@ -32,15 +33,15 @@ func newDiscoveryCoordinator(
 	fsys vfs.FS,
 	loader ConfigModuleLoader,
 	request ConfigDiscoveryRequest,
-	explicitConfigPath string,
+	explicit *ExplicitConfigRequest,
 	transactionID string,
 ) discoveryCoordinator {
 	return discoveryCoordinator{
-		ctx:                ctx,
-		fs:                 fsys,
-		request:            request,
-		explicitConfigPath: explicitConfigPath,
-		transactionID:      transactionID,
+		ctx:           ctx,
+		fs:            fsys,
+		request:       request,
+		explicit:      explicit,
+		transactionID: transactionID,
 		modules: newModuleLoadCoordinator(
 			ctx,
 			fsys,
@@ -70,11 +71,20 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 	coordinator.request.Files = files
 	coordinator.request.Directories = directoryRoots
 	coordinator.targetDirectories = directoryRoots
+	boundedDirectoryWalk := coordinator.request.LimitDirectoryWalkToFiles && len(directoryRoots) > 0 && len(files) > 0
+	var targetsByRoot map[string]*discoveryTargetTrie
+	if boundedDirectoryWalk {
+		targetsByRoot = coordinator.targetAncestorTries(directoryRoots, files)
+		coordinator.reachableFiles = make(map[string]bool, len(files))
+	}
 	if files != nil {
 		coordinator.targetFiles = make([]rslintconfig.PathIdentity, 0, len(files))
 	}
 	for _, file := range files {
 		coordinator.targetFiles = append(coordinator.targetFiles, file.PathIdentity)
+		if boundedDirectoryWalk && file.Explicit {
+			coordinator.reachableFiles[file.Path] = true
+		}
 		parent := tspath.GetDirectoryPath(file.Path)
 		physicalParent := file.CanonicalParentPath
 		if physicalParent == "" {
@@ -90,9 +100,32 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		anchors = append(anchors, rslintconfig.DirectoryIdentity{LexicalPath: lexical, CanonicalPath: physical})
 	}
 	coordinator.modules.pathSpaces = coordinator.modules.pathSpaces.WithConfigBases(nil, coordinator.fs, anchors...)
+	if len(coordinator.request.FallbackConfig) > 0 {
+		coordinator.modules.pathSpaces = coordinator.modules.pathSpaces.WithConfigBases(
+			map[string]rslintconfig.RslintConfig{cwd: coordinator.request.FallbackConfig}, coordinator.fs,
+		)
+		matcher, err := rslintconfig.NewGlobalIgnoreMatcherWithPathSpaces(coordinator.request.FallbackConfig, cwd, coordinator.fs, coordinator.modules.pathSpaces)
+		if err != nil {
+			return nil, err
+		}
+		coordinator.fallbackIgnoreMatcher = matcher
+	}
 
-	if coordinator.explicitConfigPath != "" {
-		configPath := normalizeDiscoveryPath(coordinator.explicitConfigPath, cwd)
+	if explicit := coordinator.explicit; explicit != nil {
+		if explicit.Config != nil {
+			directory := normalizeDiscoveryPath(explicit.ConfigDirectory, cwd)
+			coordinator.draft.configs[directory] = explicit.Config
+			coordinator.modules.pathSpaces = coordinator.modules.pathSpaces.WithConfigBases(coordinator.draft.configs, coordinator.fs)
+			matcher, err := rslintconfig.NewGlobalIgnoreMatcherWithPathSpaces(explicit.Config, directory, coordinator.fs, coordinator.modules.pathSpaces)
+			if err != nil {
+				return nil, err
+			}
+			if err := coordinator.collectExplicitGitSources(directory, "", matcher, targetsByRoot); err != nil {
+				return nil, err
+			}
+			return coordinator.catalog()
+		}
+		configPath := normalizeDiscoveryPath(explicit.ConfigPath, cwd)
 		candidate := configCandidate{
 			path:              configPath,
 			directory:         tspath.GetDirectoryPath(configPath),
@@ -106,19 +139,14 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		if err := coordinator.adoptCandidate(state, false); err != nil {
 			return nil, err
 		}
-		if !coordinator.projectOnly || rslintconfig.HasProjectOptions(state.entries) {
-			if err := coordinator.collectExplicitGitSources(state); err != nil {
+		if !explicit.ProjectOnly || rslintconfig.HasProjectOptions(state.entries) {
+			if err := coordinator.collectExplicitGitSources(state.candidate.directory, state.candidate.path, state.ignoreMatcher, targetsByRoot); err != nil {
 				return nil, err
 			}
 		}
 		return coordinator.catalog()
 	}
 
-	var targetsByRoot map[string]*discoveryTargetTrie
-	boundedDirectoryWalk := coordinator.request.LimitDirectoryWalkToFiles && len(directoryRoots) > 0 && len(files) > 0
-	if boundedDirectoryWalk {
-		targetsByRoot = coordinator.targetAncestorTries(directoryRoots, files)
-	}
 	seeds := make([]*discoverySeed, 0, len(directoryRoots)+len(coordinator.request.Files))
 	directorySeeds := make([]*discoverySeed, 0, len(directoryRoots))
 	directorySeedByPath := make(map[string]*discoverySeed, len(directoryRoots))
@@ -225,11 +253,13 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		if seed == nil {
 			continue
 		}
+		ignoreMatcher := coordinator.globalIgnoreMatcher(seed.ownerPath)
 		walkRoots = append(walkRoots, discoveryWalkNode{
 			directory:          directory,
 			canonicalDirectory: seed.physicalDirectory,
 			ownerDir:           seed.ownerDir,
 			ownerPath:          seed.ownerPath,
+			ignoreMatcher:      ignoreMatcher,
 			configReachable:    true,
 			gitCursor:          seed.gitCursor,
 			targets:            targetsByRoot[directory],
@@ -250,6 +280,14 @@ func (coordinator *discoveryCoordinator) adoptCandidate(state *configLoadState, 
 	return nil
 }
 
+func (coordinator *discoveryCoordinator) globalIgnoreMatcher(ownerPath string) rslintconfig.GlobalIgnoreMatcher {
+	state := coordinator.modules.state(ownerPath)
+	if state != nil && state.failure == nil {
+		return state.ignoreMatcher
+	}
+	return coordinator.fallbackIgnoreMatcher
+}
+
 func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
 	configs, scopes, effectiveIDs, err := coordinator.draft.finalize(coordinator.physicalDirectory, coordinator.fs.UseCaseSensitiveFileNames())
 	if err != nil {
@@ -259,11 +297,20 @@ func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
 	if err != nil {
 		return nil, err
 	}
+	targetFiles := coordinator.targetFiles
+	if coordinator.reachableFiles != nil {
+		targetFiles = make([]rslintconfig.PathIdentity, 0, len(coordinator.targetFiles))
+		for _, file := range coordinator.targetFiles {
+			if coordinator.reachableFiles[file.Path] {
+				targetFiles = append(targetFiles, file)
+			}
+		}
+	}
 	return &ConfigCatalog{
 		TransactionID:      coordinator.transactionID,
 		GitPolicy:          rslintconfig.NewGitPolicy(coordinator.git.Snapshot()),
 		PathSpaces:         coordinator.modules.pathSpaces,
-		TargetFiles:        coordinator.targetFiles,
+		TargetFiles:        targetFiles,
 		TargetDirectories:  coordinator.targetDirectories,
 		Configs:            configs,
 		EffectiveConfigIDs: effectiveIDs,
@@ -276,6 +323,6 @@ func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
 			ConfigsLoaded:      coordinator.modules.configsLoaded,
 			DirectoriesPruned:  coordinator.walkStats.directoriesPruned,
 		},
-		Explicit: coordinator.explicitConfigPath != "",
+		Explicit: coordinator.explicit != nil,
 	}, nil
 }

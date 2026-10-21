@@ -1480,6 +1480,144 @@ module.exports = config;`
     },
   );
 
+  test.each(['directory', 'file'])(
+    'lintFiles preserves scan entries across nested Git repositories (%s marker)',
+    async (marker) => {
+      const tmp = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-api-git-entry-'),
+      );
+      try {
+        await mkdir(path.join(tmp, '.git'));
+        await mkdir(path.join(tmp, 'nested', 'selected'), { recursive: true });
+        if (marker === 'directory') {
+          await mkdir(path.join(tmp, 'nested', '.git'));
+        } else {
+          await mkdir(path.join(tmp, 'git-storage'));
+          // cspell:ignore gitdir
+          await writeFile(
+            path.join(tmp, 'nested', '.git'),
+            'gitdir: ../git-storage\n',
+          );
+        }
+        const config =
+          "export default [{ rules: { 'no-debugger': 'error' } }];\n";
+        await writeFile(path.join(tmp, 'rslint.config.mjs'), config);
+        await writeFile(path.join(tmp, 'nested', 'rslint.config.mjs'), config);
+        await writeFile(path.join(tmp, '.gitignore'), 'nested/\n');
+        const keep = 'nested/selected/keep.ts';
+        const other = 'nested/selected/other.ts';
+        for (const file of ['control.ts', 'nested/extra.ts', keep, other]) {
+          await writeFile(path.join(tmp, file), 'debugger;\n');
+        }
+        const escapedDirectory = path.join(tmp, 'nested', 'literal[dir]');
+        await mkdir(escapedDirectory);
+        const escapedFile = path.join(escapedDirectory, 'keep[0].ts');
+        await writeFile(escapedFile, 'debugger;\n');
+        const cases = [
+          [['.'], ['control.ts']],
+          [['nested/selected'], [keep, other]],
+          [
+            ['.', 'nested/selected'],
+            ['control.ts', keep, other],
+          ],
+          [
+            ['nested/selected', '.'],
+            ['control.ts', keep, other],
+          ],
+          [['**/*.ts'], ['control.ts']],
+          [['nested/selected/**/*.ts'], [keep, other]],
+          [
+            ['.', keep],
+            ['control.ts', keep],
+          ],
+          // The inner pattern admits keep, but not other from the outer glob.
+          [
+            ['**/*.ts', 'nested/selected/keep.*'],
+            ['control.ts', keep],
+          ],
+          [
+            ['**/*.ts', 'nested/selected/**/*.ts', '!**/other.ts'],
+            ['control.ts', keep],
+          ],
+          [
+            ['nested/selected/keep.*', 'nested/extra.*'],
+            ['nested/extra.ts', keep],
+          ],
+          [
+            [`${convertPathToPattern(escapedDirectory)}/**/*.ts`],
+            ['nested/literal[dir]/keep[0].ts'],
+          ],
+          [
+            [convertPathToPattern(escapedFile)],
+            ['nested/literal[dir]/keep[0].ts'],
+          ],
+        ];
+        for (const options of [
+          {},
+          { overrideConfigFile: 'rslint.config.mjs' },
+          {
+            overrideConfigFile: true,
+            overrideConfig: [{ rules: { 'no-debugger': 'error' } }],
+          },
+        ]) {
+          const rslint = new Rslint({
+            cwd: tmp,
+            ...options,
+          });
+          try {
+            const diagnosticFiles = async (patterns) =>
+              (await rslint.lintFiles(patterns))
+                .filter((result) =>
+                  result.messages.some(
+                    (message) => message.ruleId === 'no-debugger',
+                  ),
+                )
+                .map((result) =>
+                  path.relative(tmp, result.filePath).split(path.sep).join('/'),
+                )
+                .sort();
+            for (const [patterns, expected] of cases) {
+              expect(await diagnosticFiles(patterns)).toEqual(expected);
+            }
+            await writeFile(
+              path.join(tmp, 'nested', '.gitignore'),
+              'selected/keep.ts\n',
+            );
+            expect(await diagnosticFiles('nested/selected')).toEqual([other]);
+            expect(await diagnosticFiles(['.', keep])).toEqual(['control.ts']);
+            await writeFile(path.join(tmp, 'nested', '.gitignore'), '');
+          } finally {
+            await rslint.close();
+          }
+        }
+        await rm(path.join(tmp, 'rslint.config.mjs'));
+        await rm(path.join(tmp, 'nested', 'rslint.config.mjs'));
+        await mkdir(path.join(tmp, 'ignored'));
+        await writeFile(path.join(tmp, '.gitignore'), 'nested/\nignored/\n');
+        for (const file of ['keep.ts', 'other.ts']) {
+          await writeFile(path.join(tmp, 'ignored', file), 'debugger;\n');
+        }
+        const fallback = new Rslint({
+          cwd: tmp,
+          overrideConfig: [
+            { ignores: ['!ignored/keep.ts'] },
+            { rules: { 'no-debugger': 'error' } },
+          ],
+        });
+        try {
+          const results = await fallback.lintFiles('**/*.ts');
+          expect(
+            results.map((result) => path.relative(tmp, result.filePath)).sort(),
+          ).toEqual(['control.ts', path.join('ignored', 'keep.ts')]);
+        } finally {
+          await fallback.close();
+        }
+      } finally {
+        await cleanupTempDir(tmp);
+      }
+    },
+  );
+
   test('lintFiles includes dotfiles but skips default excluded directories', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-dotfiles-'));
     try {

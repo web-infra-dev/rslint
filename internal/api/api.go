@@ -90,6 +90,9 @@ type LintRequest struct {
 	// identity. Go uses these paths for this request instead of repeating realpath
 	// calls; omitted by lower-level clients that have no pre-resolved identity.
 	CanonicalFiles []string `json:"canonicalFiles,omitempty"`
+	// Parallel to Files. Nil entries are literal files; other entries list the
+	// directory/glob inputs that actually expanded the candidate file.
+	FileScanDirectories [][]string `json:"fileScanDirectories,omitempty"`
 	// Config is the low-level, already-resolved RslintConfig path used by WASM
 	// and custom service clients. High-level native callers normally leave it
 	// empty and use ConfigDiscovery: Go then discovers candidates/ownership and
