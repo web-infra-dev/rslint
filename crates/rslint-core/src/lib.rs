@@ -5,6 +5,7 @@
 //! process, AST export, or fallback engine is used by this entry point.
 
 mod comments;
+mod edits;
 mod rules;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -89,12 +90,74 @@ struct Diagnostic {
     end_line: usize,
     end_column: usize,
     range: [usize; 2],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fix: Option<edits::Fix>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    suggestions: Vec<ReportedSuggestion>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReportedSuggestion {
+    message_id: &'static str,
+    desc: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<BTreeMap<String, String>>,
+    fix: edits::Fix,
+}
+
+pub(crate) struct Suggestion {
+    message_id: &'static str,
+    message: String,
+    data: Option<BTreeMap<String, String>>,
+    edits: Vec<edits::Edit>,
 }
 
 pub(crate) struct Violation {
     pub node: P<Node>,
     pub message_id: &'static str,
     pub message: String,
+    pub byte_range: Option<[usize; 2]>,
+    pub edits: Vec<edits::Edit>,
+    pub suggestions: Vec<Suggestion>,
+}
+
+impl Violation {
+    pub fn new(node: P<Node>, message_id: &'static str, message: impl Into<String>) -> Self {
+        Self {
+            node,
+            message_id,
+            message: message.into(),
+            byte_range: None,
+            edits: Vec::new(),
+            suggestions: Vec::new(),
+        }
+    }
+
+    pub fn with_byte_range(mut self, range: [usize; 2]) -> Self {
+        self.byte_range = Some(range);
+        self
+    }
+
+    pub fn with_fix(mut self, edits: Vec<edits::Edit>) -> Self {
+        self.edits = edits;
+        self
+    }
+
+    pub fn with_suggestion(
+        mut self,
+        message_id: &'static str,
+        message: impl Into<String>,
+        edits: Vec<edits::Edit>,
+    ) -> Self {
+        self.suggestions.push(Suggestion {
+            message_id,
+            message: message.into(),
+            data: None,
+            edits,
+        });
+        self
+    }
 }
 
 struct SessionOwner(Arc<Session>);
@@ -263,7 +326,8 @@ fn lint(request: Request) -> Result<LintResult, String> {
             &mut messages,
         )?;
         drop(checker);
-        messages.sort_by(|a, b| (a.range, &a.rule_id).cmp(&(b.range, &b.rule_id)));
+        // Equal starts retain emission order, matching the original engine.
+        messages.sort_by_key(|message| message.range[0]);
         files.push(FileResult {
             file_path: name,
             messages,
@@ -289,22 +353,39 @@ fn visit(
     for rule in rules {
         for violation in rules::check(&rule.name, node, file, checker) {
             let text = file.text();
-            let pos = violation
-                .node
-                .pos()
-                .source_offset()
-                .ok_or("synthetic diagnostic start")?;
-            let start = tsrs_scanner::skip_trivia(text, pos) as usize;
-            let end = violation
-                .node
-                .end()
-                .source_offset()
-                .ok_or("synthetic diagnostic end")? as usize;
+            let [start, end] = match violation.byte_range {
+                Some(range) => range,
+                None => {
+                    let pos = violation
+                        .node
+                        .pos()
+                        .source_offset()
+                        .ok_or("synthetic diagnostic start")?;
+                    let end = violation
+                        .node
+                        .end()
+                        .source_offset()
+                        .ok_or("synthetic diagnostic end")?;
+                    [tsrs_scanner::skip_trivia(text, pos) as usize, end as usize]
+                }
+            };
             if start > end || !text.is_char_boundary(start) || !text.is_char_boundary(end) {
                 return Err("invalid compiler diagnostic range".into());
             }
             let (offset, line, column) = position(text, start);
             let (end_offset, end_line, end_column) = position(text, end);
+            let fix = edits::merge_edits(text, &violation.edits)?;
+            let mut suggestions = Vec::new();
+            for suggestion in violation.suggestions {
+                if let Some(fix) = edits::merge_edits(text, &suggestion.edits)? {
+                    suggestions.push(ReportedSuggestion {
+                        message_id: suggestion.message_id,
+                        desc: suggestion.message,
+                        data: suggestion.data,
+                        fix,
+                    });
+                }
+            }
             out.push(Diagnostic {
                 rule_id: rule.name.clone(),
                 message_id: violation.message_id,
@@ -315,6 +396,8 @@ fn visit(
                 end_line,
                 end_column,
                 range: [offset, end_offset],
+                fix,
+                suggestions,
             });
         }
     }

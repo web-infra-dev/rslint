@@ -14,6 +14,6 @@ npm/tsgo/win32-x64                       |  WARN  Unsupported platform: want
 > @rslint/native@0.0.0 build <checkout>/crates/rslint-native
 > napi build --platform --release --no-js -- --locked && node ../../scripts/place-host-build.mjs node
 
-   Compiling rslint-core v0.0.0 (<checkout>/crates/rslint-core)
    Compiling rslint-native v0.0.0 (<checkout>/crates/rslint-native)
-    Finished `release` profile [optimized] target(s) in 46.07s
+   Compiling rslint-core v0.0.0 (<checkout>/crates/rslint-core)
+    Finished `release` profile [optimized] target(s) in 45.13s

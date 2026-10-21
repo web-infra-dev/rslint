@@ -5,7 +5,7 @@
   "baselineRevision": "e0a29f751d4def86d27931759098f27748fa3003",
   "compilerRevision": "280b426b89cd4ecd6153cf48228826bd60a99c61",
   "nodeVersion": "v24.20.0",
-  "addonSha256": "c517a1f47b21e97c98cee0323e61550a43353954556e0cea396b1fda0bbc71ec",
+  "addonSha256": "67c7e366efca46dfed8ac520763b4d2e197e31a149f0d13612815fe11c0b3132",
   "sources": {
     "types.ts": "export declare const bad: string; export declare const good: number; export enum External { A, B }\n",
     "main.ts": "// 🦀\nimport { bad, good } from './types';\n-bad; -good; debugger;\nfunction f() { arguments.caller; arguments.callee; }\n0 === -0; -0 !== 1;\nconst message = '${value}';\nconst x = true ? false ? 1 : 2 : 3;\n",
@@ -13,7 +13,9 @@
     "flow.ts": "async function run() { for (let i = 0; i < 2; i++) { await Promise.resolve(); continue; } }\nfunction cleanup() { try { return 1; } finally { return 2; } }\nclass Constructor { constructor() { return {}; } }\ntry { run(); } catch (error) { throw error; }\nif (!Boolean(1)) { run(); } else { cleanup(); }\n",
     "enums.ts": "import { External } from './types';\nenum Mixed { A = 1, B = 'b' }\nenum Other { A, B }\nExternal.A === Other.A;\nclass Accessors { get value(): string { return ''; } set value(input: number) {} }\n",
     "with.js": "with (environment) { work(); }\n",
-    "bom.ts": "﻿debugger;\r\n'😀'; debugger;\n"
+    "bom.ts": "﻿debugger;\r\n'😀'; debugger;\n",
+    "structural.ts": "const sparse = [, 1, ,];\ndelete value;\nfunction duplicate(a, a) {}\nenum DuplicateEnum { A = 1, B = 1 }\ninterface Factory { new(): Factory; }\ninterface Merged { value: number; }\nclass Merged {}\n",
+    "assertions.ts": "﻿'😀'; const extra = value!!; const optional = object?.prop /* keep */ !;\n"
   },
   "rules": [
     {
@@ -83,9 +85,80 @@
     {
       "name": "@typescript-eslint/related-getter-setter-pairs",
       "severity": 2
+    },
+    {
+      "name": "no-delete-var",
+      "severity": 1
+    },
+    {
+      "name": "no-dupe-args",
+      "severity": 2
+    },
+    {
+      "name": "no-sparse-arrays",
+      "severity": 1
+    },
+    {
+      "name": "@typescript-eslint/no-duplicate-enum-values",
+      "severity": 2
+    },
+    {
+      "name": "@typescript-eslint/no-misused-new",
+      "severity": 1
+    },
+    {
+      "name": "@typescript-eslint/no-unsafe-declaration-merging",
+      "severity": 2
+    },
+    {
+      "name": "@typescript-eslint/no-extra-non-null-assertion",
+      "severity": 1
+    },
+    {
+      "name": "@typescript-eslint/no-non-null-asserted-optional-chain",
+      "severity": 2
     }
   ],
   "baseline": [
+    {
+      "filePath": "assertions.ts",
+      "messages": [
+        {
+          "ruleId": "@typescript-eslint/no-extra-non-null-assertion",
+          "severity": 1,
+          "message": "Forbidden extra non-null assertion.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 27,
+          "messageId": "noExtraNonNullAssertion",
+          "fix": {
+            "range": [25, 26],
+            "text": ""
+          }
+        },
+        {
+          "ruleId": "@typescript-eslint/no-non-null-asserted-optional-chain",
+          "severity": 2,
+          "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+          "line": 1,
+          "column": 47,
+          "endLine": 1,
+          "endColumn": 72,
+          "messageId": "noNonNullOptionalChain",
+          "suggestions": [
+            {
+              "desc": "You should remove the non-null assertion.",
+              "fix": {
+                "range": [70, 71],
+                "text": ""
+              },
+              "messageId": "suggestRemovingNonNull"
+            }
+          ]
+        }
+      ]
+    },
     {
       "filePath": "bom.ts",
       "messages": [
@@ -321,6 +394,91 @@
       ]
     },
     {
+      "filePath": "structural.ts",
+      "messages": [
+        {
+          "ruleId": "no-sparse-arrays",
+          "severity": 1,
+          "message": "Unexpected comma in middle of array.",
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 18,
+          "messageId": "unexpectedSparseArray"
+        },
+        {
+          "ruleId": "no-sparse-arrays",
+          "severity": 1,
+          "message": "Unexpected comma in middle of array.",
+          "line": 1,
+          "column": 22,
+          "endLine": 1,
+          "endColumn": 23,
+          "messageId": "unexpectedSparseArray"
+        },
+        {
+          "ruleId": "no-delete-var",
+          "severity": 1,
+          "message": "Variables should not be deleted.",
+          "line": 2,
+          "column": 1,
+          "endLine": 2,
+          "endColumn": 13,
+          "messageId": "unexpected"
+        },
+        {
+          "ruleId": "no-dupe-args",
+          "severity": 2,
+          "message": "Duplicate param 'a'.",
+          "line": 3,
+          "column": 23,
+          "endLine": 3,
+          "endColumn": 24,
+          "messageId": "unexpected"
+        },
+        {
+          "ruleId": "@typescript-eslint/no-duplicate-enum-values",
+          "severity": 2,
+          "message": "Duplicate enum member value 1.",
+          "line": 4,
+          "column": 29,
+          "endLine": 4,
+          "endColumn": 34,
+          "messageId": "duplicateValue"
+        },
+        {
+          "ruleId": "@typescript-eslint/no-misused-new",
+          "severity": 1,
+          "message": "interfaces cannot be constructed, only classes.",
+          "line": 5,
+          "column": 21,
+          "endLine": 5,
+          "endColumn": 36,
+          "messageId": "errorMessageInterface"
+        },
+        {
+          "ruleId": "@typescript-eslint/no-unsafe-declaration-merging",
+          "severity": 2,
+          "message": "Unsafe declaration merging between classes and interfaces.",
+          "line": 6,
+          "column": 11,
+          "endLine": 6,
+          "endColumn": 17,
+          "messageId": "unsafeMerging"
+        },
+        {
+          "ruleId": "@typescript-eslint/no-unsafe-declaration-merging",
+          "severity": 2,
+          "message": "Unsafe declaration merging between classes and interfaces.",
+          "line": 7,
+          "column": 7,
+          "endLine": 7,
+          "endColumn": 13,
+          "messageId": "unsafeMerging"
+        }
+      ]
+    },
+    {
       "filePath": "types.ts",
       "messages": []
     },
@@ -341,6 +499,45 @@
     }
   ],
   "candidate": [
+    {
+      "filePath": "assertions.ts",
+      "messages": [
+        {
+          "ruleId": "@typescript-eslint/no-extra-non-null-assertion",
+          "messageId": "noExtraNonNullAssertion",
+          "message": "Forbidden extra non-null assertion.",
+          "severity": 1,
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 27,
+          "fix": {
+            "range": [25, 26],
+            "text": ""
+          }
+        },
+        {
+          "ruleId": "@typescript-eslint/no-non-null-asserted-optional-chain",
+          "messageId": "noNonNullOptionalChain",
+          "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+          "severity": 2,
+          "line": 1,
+          "column": 47,
+          "endLine": 1,
+          "endColumn": 72,
+          "suggestions": [
+            {
+              "messageId": "suggestRemovingNonNull",
+              "desc": "You should remove the non-null assertion.",
+              "fix": {
+                "range": [70, 71],
+                "text": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
     {
       "filePath": "bom.ts",
       "messages": [
@@ -572,6 +769,91 @@
           "column": 18,
           "endLine": 7,
           "endColumn": 31
+        }
+      ]
+    },
+    {
+      "filePath": "structural.ts",
+      "messages": [
+        {
+          "ruleId": "no-sparse-arrays",
+          "messageId": "unexpectedSparseArray",
+          "message": "Unexpected comma in middle of array.",
+          "severity": 1,
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 18
+        },
+        {
+          "ruleId": "no-sparse-arrays",
+          "messageId": "unexpectedSparseArray",
+          "message": "Unexpected comma in middle of array.",
+          "severity": 1,
+          "line": 1,
+          "column": 22,
+          "endLine": 1,
+          "endColumn": 23
+        },
+        {
+          "ruleId": "no-delete-var",
+          "messageId": "unexpected",
+          "message": "Variables should not be deleted.",
+          "severity": 1,
+          "line": 2,
+          "column": 1,
+          "endLine": 2,
+          "endColumn": 13
+        },
+        {
+          "ruleId": "no-dupe-args",
+          "messageId": "unexpected",
+          "message": "Duplicate param 'a'.",
+          "severity": 2,
+          "line": 3,
+          "column": 23,
+          "endLine": 3,
+          "endColumn": 24
+        },
+        {
+          "ruleId": "@typescript-eslint/no-duplicate-enum-values",
+          "messageId": "duplicateValue",
+          "message": "Duplicate enum member value 1.",
+          "severity": 2,
+          "line": 4,
+          "column": 29,
+          "endLine": 4,
+          "endColumn": 34
+        },
+        {
+          "ruleId": "@typescript-eslint/no-misused-new",
+          "messageId": "errorMessageInterface",
+          "message": "interfaces cannot be constructed, only classes.",
+          "severity": 1,
+          "line": 5,
+          "column": 21,
+          "endLine": 5,
+          "endColumn": 36
+        },
+        {
+          "ruleId": "@typescript-eslint/no-unsafe-declaration-merging",
+          "messageId": "unsafeMerging",
+          "message": "Unsafe declaration merging between classes and interfaces.",
+          "severity": 2,
+          "line": 6,
+          "column": 11,
+          "endLine": 6,
+          "endColumn": 17
+        },
+        {
+          "ruleId": "@typescript-eslint/no-unsafe-declaration-merging",
+          "messageId": "unsafeMerging",
+          "message": "Unsafe declaration merging between classes and interfaces.",
+          "severity": 2,
+          "line": 7,
+          "column": 7,
+          "endLine": 7,
+          "endColumn": 13
         }
       ]
     },

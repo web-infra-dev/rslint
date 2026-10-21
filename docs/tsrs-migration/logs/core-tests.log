@@ -1,15 +1,23 @@
-   Compiling rslint-core v0.0.0 (<checkout>/crates/rslint-core)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.76s
-     Running unittests src/lib.rs (target/debug/deps/rslint_core-b573129ecd1c0f26)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/rslint_core-8fd67dd3d09e2a8d)
 
-running 3 tests
+running 12 tests
+test edits::tests::empty_group_has_no_fix_payload ... ok
+test edits::tests::adjacent_edits_inside_one_group_remain_atomic ... ok
+test edits::tests::empty_source_allows_insertions_and_empty_replacements ... ok
+test edits::tests::equal_point_insertions_keep_input_order ... ok
+test edits::tests::multiple_edits_sort_and_preserve_exact_source_gaps ... ok
+test edits::tests::bom_coordinates_and_removal_are_explicit ... ok
+test edits::tests::malformed_ranges_and_overlapping_atomic_groups_fail ... ok
+test edits::tests::single_edits_use_flat_utf16_offsets_across_emoji_and_crlf ... ok
+test rules::ts_structural::tests::duplicate_enum_rule_ignores_templates_with_invalid_escapes ... ok
 test tests::cross_file_types_and_silent_files_use_the_native_checker ... ok
 test tests::unsupported_rules_and_missing_admissions_fail_instead_of_skipping ... ok
 test tests::positions_use_javascript_utf16_and_line_terminators ... ok
 
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
 
-     Running tests/comments.rs (target/debug/deps/comments-fd8625f3bca8fc9d)
+     Running tests/comments.rs (target/debug/deps/comments-f93e07fe2a74a49c)
 
 running 5 tests
 test ordinary_comments_and_line_only_nondirective_prefixes_remain_supported ... ok
@@ -18,21 +26,40 @@ test jsx_expression_attribute_type_argument_and_outer_trailing_comments_are_seen
 test comments_between_tokens_and_inside_template_expressions_are_seen ... ok
 test all_directive_forms_are_explicitly_rejected_in_real_comments ... ok
 
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s
 
-     Running tests/control_flow_rules.rs (target/debug/deps/control_flow_rules-4ad9535ee46e3c69)
+     Running tests/control_flow_rules.rs (target/debug/deps/control_flow_rules-c207ab84f84dd7d1)
 
 running 6 tests
-test continue_statements_keep_labels_and_complete_ranges ... ok
 test useless_catch_preserves_first_statement_and_finally_report_targets ... ok
+test continue_statements_keep_labels_and_complete_ranges ... ok
 test negated_conditions_check_plain_else_and_transparent_parentheses ... ok
 test awaits_respect_each_loop_position_and_function_boundary ... ok
-test constructor_returns_preserve_the_baseline_boundary_set ... ok
 test finally_control_flow_uses_function_class_loop_switch_and_label_sentinels ... ok
+test constructor_returns_preserve_the_baseline_boundary_set ... ok
 
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
 
-     Running tests/syntax_rules.rs (target/debug/deps/syntax_rules-e81924520145e816)
+     Running tests/non_null_rules.rs (target/debug/deps/non_null_rules-e0b7063ca8fe9262)
+
+running 3 tests
+test optional_chain_reports_suggestions_instead_of_automatic_fixes ... ok
+test valid_assertions_and_chain_boundaries_stay_silent ... ok
+test redundant_assertions_keep_comments_parentheses_and_utf16_fix_ranges ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/structural_rules.rs (target/debug/deps/structural_rules-47fdaa95054298a6)
+
+running 4 tests
+test structural_rule_options_remain_optionless ... ok
+test sparse_arrays_keep_all_baseline_elisions_and_assignment_target_exemptions ... ok
+test duplicate_args_preserve_each_binding_occurrence_and_function_kind_scope ... ok
+test delete_var_preserves_parentheses_and_typescript_wrapper_boundaries ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/syntax_rules.rs (target/debug/deps/syntax_rules-44a07ab108098980)
 
 running 9 tests
 test optionless_syntax_rules_reject_options_instead_of_ignoring_them ... ok
@@ -42,25 +69,43 @@ test with_statements_report_the_complete_statement_and_nested_statements ... ok
 test comparison_negative_zero_checks_all_operators_and_numeric_spellings ... ok
 test debugger_statements_include_computed_assignment_keys ... ok
 test ternaries_preserve_inner_ranges_and_do_not_visit_conditional_types_as_expressions ... ok
-test template_placeholders_use_decoded_strings_and_require_nonempty_content ... ok
 test nested_ternary_checks_only_direct_branches_after_parentheses ... ok
+test template_placeholders_use_decoded_strings_and_require_nonempty_content ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
 
-     Running tests/typed_rules.rs (target/debug/deps/typed_rules-17f93dbe23ae7d9f)
+     Running tests/ts_structural_rules.rs (target/debug/deps/ts_structural_rules-59d44d168f80aab4)
+
+running 12 tests
+test public_entry_rejects_invalid_template_syntax_without_claiming_rule_success ... ok
+test declaration_merging_keeps_distinct_bindings_and_reopened_scopes_silent ... ok
+test duplicate_enum_values_preserve_literal_kinds_and_unary_js_conversions ... ok
+test duplicate_enum_values_distinguish_signed_zero_through_overflow_storage ... ok
+test enum_diagnostics_keep_utf16_positions_and_declaration_local_state ... ok
+test duplicate_enum_values_keep_nonliteral_expressions_and_nan_silent ... ok
+test declaration_merging_caches_large_symbols_without_losing_scopes_or_reports ... ok
+test declaration_merging_distinguishes_cross_file_symbols_and_module_augmentation ... ok
+test declaration_merging_preserves_generic_interface_listener_asymmetry ... ok
+test misused_new_does_not_expand_to_implementations_qualified_or_wrapped_types ... ok
+test misused_new_preserves_parent_type_and_static_name_checks ... ok
+test declaration_merging_checks_same_scope_and_default_export_local_symbols ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+     Running tests/typed_rules.rs (target/debug/deps/typed_rules-d156e3a1b6cd07dc)
 
 running 9 tests
-test accessors_keep_untyped_and_missing_or_invalid_pairs_silent ... ok
+test accessors_use_full_assignability_and_both_declaration_orders ... ok
 test mixed_enums_query_cross_file_types_and_global_declaration_merging ... ok
 test mixed_enums_use_computed_initializer_types_and_merged_declarations ... ok
 test enum_switch_cases_and_imported_enums_have_exact_diagnostics_without_fixes ... ok
-test accessors_use_full_assignability_and_both_declaration_orders ... ok
 test mixed_enums_stop_at_unknown_members_and_keep_consistent_enums_silent ... ok
-test enum_comparisons_preserve_union_intersection_and_shared_type_semantics ... ok
+test accessors_keep_untyped_and_missing_or_invalid_pairs_silent ... ok
 test accessor_names_and_imported_types_preserve_existing_matching ... ok
+test enum_comparisons_preserve_union_intersection_and_shared_type_semantics ... ok
 test enum_comparisons_cover_every_comparison_operator_and_both_directions ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
 
    Doc-tests rslint_core
 

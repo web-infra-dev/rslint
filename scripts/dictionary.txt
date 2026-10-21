@@ -809,3 +809,5 @@ GOFLAGS
 GOWORK
 killpg
 getloadavg
+nonliteral
+secondfirst

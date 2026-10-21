@@ -58,11 +58,7 @@ pub(crate) fn check(rule: &str, node: P<Node>, _file: P<SourceFile>) -> Vec<Viol
 }
 
 fn violation(node: P<Node>, message_id: &'static str, message: &str) -> Violation {
-    Violation {
-        node,
-        message_id,
-        message: message.to_owned(),
-    }
+    Violation::new(node, message_id, message)
 }
 
 fn check_caller(node: P<Node>) -> Option<Violation> {

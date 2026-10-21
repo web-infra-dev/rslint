@@ -57,6 +57,14 @@ export interface RustLintDiagnostic {
   endColumn: number;
   /** BOM-free JavaScript UTF-16 offsets, with an exclusive end. */
   range: [number, number];
+  /** Proposed edit; fix application remains unsupported by this entry. */
+  fix?: { range: [number, number]; text: string };
+  suggestions?: Array<{
+    messageId: string;
+    desc: string;
+    data?: Record<string, string>;
+    fix: { range: [number, number]; text: string };
+  }>;
 }
 
 export interface RustLintFileResult {
@@ -292,6 +300,31 @@ function integer(value: unknown, minimum: number): value is number {
   );
 }
 
+function isFix(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.text === 'string' &&
+    Array.isArray(value.range) &&
+    value.range.length === 2 &&
+    integer(value.range[0], -1) &&
+    // -1 removes the BOM. Merging that edit with a later edit can extend
+    // the end beyond zero, but no replacement may end before the source.
+    integer(value.range[1], Math.max(0, value.range[0]))
+  );
+}
+
+function isSuggestion(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.messageId === 'string' &&
+    typeof value.desc === 'string' &&
+    isFix(value.fix) &&
+    (!('data' in value) ||
+      (isRecord(value.data) &&
+        Object.values(value.data).every((entry) => typeof entry === 'string')))
+  );
+}
+
 function validateResult(
   value: unknown,
   request: RustLintRequest,
@@ -343,7 +376,11 @@ function validateResult(
         !Array.isArray(message.range) ||
         message.range.length !== 2 ||
         !integer(message.range[0], 0) ||
-        !integer(message.range[1], message.range[0])
+        !integer(message.range[1], message.range[0]) ||
+        ('fix' in message && !isFix(message.fix)) ||
+        ('suggestions' in message &&
+          (!Array.isArray(message.suggestions) ||
+            !message.suggestions.every(isSuggestion)))
       ) {
         return fail();
       }

@@ -1,5 +1,8 @@
 pub(crate) mod control_flow;
+pub(crate) mod non_null;
+pub(crate) mod structural;
 pub(crate) mod syntax;
+pub(crate) mod ts_structural;
 pub(crate) mod typed;
 
 use crate::Violation;
@@ -14,6 +17,9 @@ pub(crate) fn supported(name: &str) -> bool {
         || syntax::NAMES.contains(&name)
         || control_flow::NAMES.contains(&name)
         || typed::NAMES.contains(&name)
+        || structural::NAMES.contains(&name)
+        || non_null::NAMES.contains(&name)
+        || ts_structural::NAMES.contains(&name)
 }
 
 pub(crate) fn check(
@@ -22,6 +28,15 @@ pub(crate) fn check(
     file: P<SourceFile>,
     checker: &mut Checker,
 ) -> Vec<Violation> {
+    if ts_structural::NAMES.contains(&name) {
+        return ts_structural::check(name, node, checker);
+    }
+    if structural::NAMES.contains(&name) {
+        return structural::check(name, node, file);
+    }
+    if non_null::NAMES.contains(&name) {
+        return non_null::check(name, node);
+    }
     if control_flow::NAMES.contains(&name) {
         return control_flow::check(name, node, file);
     }
@@ -49,14 +64,14 @@ pub(crate) fn check(
         if !part.flags().intersects(
             TypeFlags::Any | TypeFlags::Never | TypeFlags::BigIntLike | TypeFlags::NumberLike,
         ) {
-            return vec![Violation {
+            return vec![Violation::new(
                 node,
-                message_id: "unaryMinus",
-                message: format!(
+                "unaryMinus",
+                format!(
                     "Argument of unary negation should be assignable to number | bigint but is {} instead.",
                     checker.type_to_string_exported(part),
                 ),
-            }];
+            )];
         }
     }
     Vec::new()

@@ -52,6 +52,16 @@ class Accessors { get value(): string { return ''; } set value(input: number) {}
 `,
   'with.js': 'with (environment) { work(); }\n',
   'bom.ts': "\uFEFFdebugger;\r\n'😀'; debugger;\n",
+  'structural.ts': `const sparse = [, 1, ,];
+delete value;
+function duplicate(a, a) {}
+enum DuplicateEnum { A = 1, B = 1 }
+interface Factory { new(): Factory; }
+interface Merged { value: number; }
+class Merged {}
+`,
+  'assertions.ts':
+    "\uFEFF'😀'; const extra = value!!; const optional = object?.prop /* keep */ !;\n",
 };
 const names = [
   'no-debugger',
@@ -71,6 +81,14 @@ const names = [
   '@typescript-eslint/no-mixed-enums',
   '@typescript-eslint/no-unsafe-enum-comparison',
   '@typescript-eslint/related-getter-setter-pairs',
+  'no-delete-var',
+  'no-dupe-args',
+  'no-sparse-arrays',
+  '@typescript-eslint/no-duplicate-enum-values',
+  '@typescript-eslint/no-misused-new',
+  '@typescript-eslint/no-unsafe-declaration-merging',
+  '@typescript-eslint/no-extra-non-null-assertion',
+  '@typescript-eslint/no-non-null-asserted-optional-chain',
 ];
 const rules = names.map((name, index) => ({
   name,

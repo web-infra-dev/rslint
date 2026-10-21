@@ -22,8 +22,8 @@ bridge experiment. License and upstream notice copies are in
 
 ## Current implementation
 
-Seventeen rules have Rust implementations: thirteen syntax/control-flow
-rules and four type-aware rules. Their list and targeted parity evidence are
+Twenty-five rules have Rust implementations: twenty-one syntax/control-flow
+or binder-based rules and four type-aware rules. Their list and targeted parity evidence are
 in [`validation.json`](validation.json). The frozen
 [`catalog`](../../scripts/tsrs/rust-migration-catalog.json) enumerates **813**
 baseline rules, their full option schemas, source/test hashes and fourteen
@@ -35,16 +35,17 @@ public surfaces. The previous count of 812 missed
 `Rslint` API and are not package exports. They support explicit files, uniform
 rules and an optional explicit project/config module. Results retain silent
 files and the applied rule list, with UTF-16 diagnostic ranges. Unsupported
-rules/options, scoped configuration, plugins, ignores, discovery, fixes,
+rules/options, scoped configuration, plugins, ignores, discovery, automatic fixes,
 directives and malformed syntax fail explicitly. Lone-surrogate request text
-is currently rejected. These limitations are compatibility gaps, not intended
+is currently rejected. Proposed fixes/suggestions are returned for implemented
+rules; they are not applied by this entry. These limitations are compatibility gaps, not intended
 changes to the finished public API.
 
 The remaining rules, all default entry points, configuration/ignore/project
 discovery, fix/suggestion execution, plugin contracts, compiler diagnostics,
 LSP and browser WASM still require migration and oracle validation. Existing
 Go code is retained until its behavior has a verified replacement. A draft
-with seventeen rules is not completion of the full migration.
+with twenty-five rules is not completion of the full migration.
 
 ## Reproduce the implemented path
 
@@ -81,8 +82,9 @@ python3 scripts/tsrs/rust-migration-inventory.py --help
 
 The oracle declares the original native plugin explicitly, requires every
 rule to produce a positive sentinel, retains silent files and compares all
-message fields. It does not substitute for every original test or for fix
-compatibility. The Go baseline is exclusively a test oracle, outside the
+message fields, including fix and suggestion payloads for the two non-null
+assertion rules. It does not substitute for every original test or iterative
+autofix compatibility. The Go baseline is exclusively a test oracle, outside the
 candidate repository.
 
 On a shared machine, wrap heavy builds and measurements in

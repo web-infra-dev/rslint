@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'rstack/test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { getNativeBinding } from '../src/native/binding.js';
 import {
   lintRustFiles,
   lintRustFilesSync,
@@ -31,7 +32,169 @@ function request(overrides: Partial<RustLintOptions> = {}): RustLintOptions {
   };
 }
 
+function withNativeResponse(
+  input: RustLintOptions,
+  payload: Record<string, unknown>,
+  check: () => void,
+): void {
+  // Match the existing IPC tests' scoped native-export replacement. Keep the
+  // real addon for integration cases, restoring it even if an assertion fails.
+  const binding = getNativeBinding() as ReturnType<typeof getNativeBinding> & {
+    lintTsrsSync(request: string): string;
+  };
+  const original = binding.lintTsrsSync;
+  expect(typeof original).toBe('function');
+  const response = {
+    schemaVersion: 1,
+    backend: 'tsrs-rust',
+    compiler: { revision: '280b426b89cd4ecd6153cf48228826bd60a99c61' },
+    files: [
+      {
+        filePath: path.resolve(input.cwd!, input.files[0].path),
+        appliedRules: ['no-debugger'],
+        messages: [
+          {
+            ruleId: 'no-debugger',
+            messageId: 'no-debugger',
+            message: "Unexpected 'debugger' statement.",
+            severity: 2,
+            line: 1,
+            column: 1,
+            endLine: 1,
+            endColumn: 10,
+            range: [0, 9],
+            ...payload,
+          },
+        ],
+      },
+    ],
+  };
+  binding.lintTsrsSync = () => JSON.stringify(response);
+  try {
+    check();
+  } finally {
+    binding.lintTsrsSync = original;
+  }
+}
+
 describe('experimental direct Rust lint engine', () => {
+  test('rejects malformed native fix and suggestion payloads without coercion', () => {
+    const input = request();
+    const fix = { range: [0, 1], text: '' };
+    const suggestion = { messageId: 'remove', desc: 'Remove it.', fix };
+    const malformedFixes: unknown[] = [
+      null,
+      [],
+      {},
+      { range: [0, 1], text: 1 },
+      { range: ['0', 1], text: '' },
+      { range: [0, '1'], text: '' },
+      { range: [-2, 0], text: '' },
+      { range: [-1, -1], text: '' },
+      { range: [2, 1], text: '' },
+      { range: [0, 1, 2], text: '' },
+      { range: [0, 0.5], text: '' },
+      { range: [0, Number.MAX_SAFE_INTEGER + 1], text: '' },
+      { range: [null, 0], text: '' },
+      { range: { 0: 0, 1: 1, length: 2 }, text: '' },
+    ];
+    const payloads = [
+      ...malformedFixes.map((fix) => ({ fix })),
+      ...malformedFixes.map((fix) => ({
+        suggestions: [{ ...suggestion, fix }],
+      })),
+      ...[
+        null,
+        {},
+        [null],
+        [{}],
+        [{ ...suggestion, messageId: 1 }],
+        [{ ...suggestion, desc: 1 }],
+        [{ ...suggestion, messageId: undefined }],
+        [{ ...suggestion, desc: undefined }],
+        [{ ...suggestion, fix: undefined }],
+        [{ ...suggestion, data: null }],
+        [{ ...suggestion, data: [] }],
+        [{ ...suggestion, data: { name: 42 } }],
+        [{ ...suggestion, data: { name: false } }],
+      ].map((suggestions) => ({ suggestions })),
+    ];
+    for (const payload of payloads) {
+      withNativeResponse(input, payload, () => {
+        expect(() => lintRustFilesSync(input)).toThrow(
+          'native addon returned an invalid or incomplete lint result',
+        );
+      });
+    }
+  });
+
+  test('preserves valid native edits including merged BOM removal and suggestion data', () => {
+    const input = request({
+      files: [{ path: 'input.ts', text: '\uFEFFdebugger;' }],
+    });
+    for (const range of [
+      [0, 0],
+      [1, 2],
+      [-1, 0],
+      [-1, 3],
+    ]) {
+      const fix = { range, text: '😀' };
+      const suggestions = [
+        { messageId: 'replace', desc: 'Replace it.', fix },
+        {
+          messageId: 'replace',
+          desc: 'Replace the name.',
+          data: { name: 'value' },
+          fix,
+        },
+      ];
+      withNativeResponse(input, { fix, suggestions }, () => {
+        const message = lintRustFilesSync(input).files[0].messages[0];
+        expect(message.fix).toEqual(fix);
+        expect(message.suggestions).toEqual(suggestions);
+        expect(message.suggestions![0]).not.toHaveProperty('data');
+      });
+    }
+  });
+
+  test('returns UTF-16 fix and suggestion payloads without changing source', () => {
+    const source = "\uFEFF'😀'; value!!; object?.prop!;";
+    const result = lintRustFilesSync(
+      request({
+        files: [{ path: 'assertions.ts', text: source }],
+        config: [
+          {
+            rules: {
+              '@typescript-eslint/no-extra-non-null-assertion': 'error',
+              '@typescript-eslint/no-non-null-asserted-optional-chain': 'warn',
+            },
+          },
+        ],
+      }),
+    );
+    const messages = result.files[0].messages;
+    expect(messages).toHaveLength(2);
+    const text = source.slice(1);
+    const fix = messages[0].fix!;
+    expect(fix).toEqual({
+      range: [text.indexOf('!!'), text.indexOf('!!') + 1],
+      text: '',
+    });
+    expect(messages[0].suggestions).toBeUndefined();
+    expect(messages[1].fix).toBeUndefined();
+    expect(messages[1].suggestions).toEqual([
+      {
+        messageId: 'suggestRemovingNonNull',
+        desc: 'You should remove the non-null assertion.',
+        fix: {
+          range: [text.lastIndexOf('!'), text.lastIndexOf('!') + 1],
+          text: '',
+        },
+      },
+    ]);
+    expect(result.files[0]).not.toHaveProperty('output');
+    expect(source).toBe("\uFEFF'😀'; value!!; object?.prop!;");
+  });
   test('executes typed cross-file rules and retains silent admitted files', () => {
     const input = request({
       files: [

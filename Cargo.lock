@@ -933,6 +933,7 @@ dependencies = [
  "tsrs_ast",
  "tsrs_checker",
  "tsrs_core",
+ "tsrs_parser",
  "tsrs_project",
  "tsrs_scanner",
  "tsrs_vfs",

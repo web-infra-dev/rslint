@@ -15,3 +15,6 @@ tsrs_core = { git = "https://github.com/oxc-project/tsrs.git", rev = "280b426b89
 tsrs_project = { git = "https://github.com/oxc-project/tsrs.git", rev = "280b426b89cd4ecd6153cf48228826bd60a99c61" }
 tsrs_scanner = { git = "https://github.com/oxc-project/tsrs.git", rev = "280b426b89cd4ecd6153cf48228826bd60a99c61" }
 tsrs_vfs = { git = "https://github.com/oxc-project/tsrs.git", rev = "280b426b89cd4ecd6153cf48228826bd60a99c61" }
+
+[dev-dependencies]
+tsrs_parser = { git = "https://github.com/oxc-project/tsrs.git", rev = "280b426b89cd4ecd6153cf48228826bd60a99c61" }

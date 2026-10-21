@@ -81,11 +81,7 @@ pub(crate) fn check(rule: &str, node: P<Node>, checker: &mut Checker) -> Vec<Vio
 }
 
 fn violation(node: P<Node>, message_id: &'static str, message: &str) -> Violation {
-    Violation {
-        node,
-        message_id,
-        message: message.to_owned(),
-    }
+    Violation::new(node, message_id, message)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

@@ -2229,6 +2229,8 @@ ported lint rules in Rust. `crates/rslint-native` calls it directly through
 N-API; `packages/rslint/src/rust` supplies an explicit-file JavaScript adapter.
 This path has no compiler subprocess or Go fallback. It is not yet the
 default CLI/API and does not yet cover the complete rule/config/fix contract.
+The direct result now carries UTF-16 fix/suggestion payloads, with explicit
+BOM handling and atomic edit-group merging; automatic application is pending.
 The final target is a repository and product without Go. See
 [the migration status and checks](docs/tsrs-migration/README.md) for the
 current supported scope and pending entry points. Existing architecture

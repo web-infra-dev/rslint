@@ -1,7 +1,7 @@
 
 ---
 tool: "@rstest/core@0.12.1"
-timestamp: "2026-10-21T04:26:38.527Z"
+timestamp: "2026-10-21T04:44:04.230Z"
 runtime: {"node":"v24.20.0","platform":"darwin","cwd":"<checkout>/packages/rslint"}
 ---
 
@@ -15,16 +15,16 @@ runtime: {"node":"v24.20.0","platform":"darwin","cwd":"<checkout>/packages/rslin
   "counts": {
     "testFiles": 1,
     "failedFiles": 0,
-    "tests": 7,
+    "tests": 10,
     "failedTests": 0,
-    "passedTests": 7,
+    "passedTests": 10,
     "skippedTests": 0,
     "todoTests": 0
   },
   "durationMs": {
-    "total": 210,
-    "build": 60,
-    "tests": 150
+    "total": 176,
+    "build": 21,
+    "tests": 155
   },
   "snapshot": {
     "added": 0,
@@ -40,6 +40,9 @@ runtime: {"node":"v24.20.0","platform":"darwin","cwd":"<checkout>/packages/rslin
 
 ### Passed
 
+- tests/rust-engine.test.ts :: experimental direct Rust lint engine > rejects malformed native fix and suggestion payloads without coercion
+- tests/rust-engine.test.ts :: experimental direct Rust lint engine > preserves valid native edits including merged BOM removal and suggestion data
+- tests/rust-engine.test.ts :: experimental direct Rust lint engine > returns UTF-16 fix and suggestion payloads without changing source
 - tests/rust-engine.test.ts :: experimental direct Rust lint engine > executes typed cross-file rules and retains silent admitted files
 - tests/rust-engine.test.ts :: experimental direct Rust lint engine > loads only an explicit JS config and lints disk sources in one tsconfig
 - tests/rust-engine.test.ts :: experimental direct Rust lint engine > preserves UTF-16 locations, config order, and explicit disabled rules

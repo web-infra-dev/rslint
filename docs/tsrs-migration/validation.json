@@ -15,9 +15,14 @@
     "cargoBuildJobs": 2,
     "exclusiveMachineLock": true
   },
-  "addonSha256": "c517a1f47b21e97c98cee0323e61550a43353954556e0cea396b1fda0bbc71ec",
+  "addonSha256": "67c7e366efca46dfed8ac520763b4d2e197e31a149f0d13612815fe11c0b3132",
   "ruleNames": [
+    "@typescript-eslint/no-duplicate-enum-values",
+    "@typescript-eslint/no-extra-non-null-assertion",
+    "@typescript-eslint/no-misused-new",
     "@typescript-eslint/no-mixed-enums",
+    "@typescript-eslint/no-non-null-asserted-optional-chain",
+    "@typescript-eslint/no-unsafe-declaration-merging",
     "@typescript-eslint/no-unsafe-enum-comparison",
     "@typescript-eslint/no-unsafe-unary-minus",
     "@typescript-eslint/related-getter-setter-pairs",
@@ -27,8 +32,11 @@
     "no-constructor-return",
     "no-continue",
     "no-debugger",
+    "no-delete-var",
+    "no-dupe-args",
     "no-negated-condition",
     "no-nested-ternary",
+    "no-sparse-arrays",
     "no-template-curly-in-string",
     "no-ternary",
     "no-unsafe-finally",
@@ -36,18 +44,25 @@
     "no-with"
   ],
   "sourceSha256": {
-    "Cargo.lock": "a8b38a77bda8d69f4f6e644d825c54c896c0aa5bbec5dc96003cef80a7625eec",
-    "crates/rslint-core/Cargo.toml": "39dd2950c14bbd5892562177c42e8dce4e9262e9b7fe0e17fec3b04d6e81e1a2",
+    "Cargo.lock": "32198b7c0bd6fb1f899a19d75e516bfeac3ae0950322a432dbaf6c26cc6e8dee",
+    "crates/rslint-core/Cargo.toml": "77aeb20ee061816b7522eb2b94dbb597f38ce6aba54521c59672d500be23a64f",
     "crates/rslint-core/src/comments.rs": "eb9a0d6afb9728dcd0cdd0cf5332bf3063736b430825361e433916ff0827fee0",
-    "crates/rslint-core/src/lib.rs": "0c2d6427a1f21e9d73e550b6bc2220b61629e2220837d22a3dcc9c7534ab152a",
-    "crates/rslint-core/src/rules/control_flow.rs": "1c241f3e13c3f785c482bb595e9640245d16cb7c1660b72bb64556f3fc490a84",
-    "crates/rslint-core/src/rules/mod.rs": "657095f1424ad36b0e9fb564fd760ec525f9952539f7930770df5a155b0f7324",
-    "crates/rslint-core/src/rules/syntax.rs": "1b217e10f9653930d4c5f3aecbb4a53521ceb9d59cd46946d29b1ca0a862520f",
-    "crates/rslint-core/src/rules/typed.rs": "f160e980298ebe567ef32a27164ed96cddfed41a0c734ab1e3158b5b718bc6ea",
+    "crates/rslint-core/src/edits.rs": "491b06b02f535cab8ab5753ac49b192935343e2bcf4ab0a1a64a1cdd2240eb6d",
+    "crates/rslint-core/src/lib.rs": "24ae6e8e24c40a09ee9e2eaafa8580fb994ef006d8dfc31b613697447eb47289",
+    "crates/rslint-core/src/rules/control_flow.rs": "bc8e2f26cc06f939a89f976b979e327734780789fc064d37fd1f054cc121b60a",
+    "crates/rslint-core/src/rules/mod.rs": "cc0b0b8d9c46adc3eeb64dd0c6cae472bdaa1f9b2582fb3f0ceec309ba4628eb",
+    "crates/rslint-core/src/rules/non_null.rs": "51b38cfec22d08c39d9716b4a572172ff5a633af2834af9a779f12bb77ee1742",
+    "crates/rslint-core/src/rules/structural.rs": "b5e2dfb8030e6b6a6450041411df078897bca3a770c049efb02905a25b2e7785",
+    "crates/rslint-core/src/rules/syntax.rs": "69c3b1f0f8646095144722655abf661dec39a865f6b9808a6aab51c4699b7df6",
+    "crates/rslint-core/src/rules/ts_structural.rs": "6fba290a6b7db0fce1cb131cf076aee40c35b65a594c95f45152060860c0da2c",
+    "crates/rslint-core/src/rules/typed.rs": "49d7d4f8bce3a241da03088c4473610d954628830d1ba0a33523e5c73865303d",
     "crates/rslint-core/src/tests.rs": "cd640b523db41f4fc97c3153dc018a702818b1dd242df4a4265dada46035be3e",
     "crates/rslint-core/tests/comments.rs": "564c850077c2ed483fee142a27ed8f9cbb3ad0735d95f8a5037c91dac6efcdba",
     "crates/rslint-core/tests/control_flow_rules.rs": "31b8e422c3863d6fcb0cce664baee784b21555066abace8216710bbba84536de",
+    "crates/rslint-core/tests/non_null_rules.rs": "a3442ad4de4153af38046e775524f4f09e4e167509c78dc0326cb88a3e9a50f3",
+    "crates/rslint-core/tests/structural_rules.rs": "5627c4fa6096ee9b3b171b57e2e69f91e7d6c4e45538a9fcf0de367f17a3d723",
     "crates/rslint-core/tests/syntax_rules.rs": "5c2e12de4912d22242619b73267a68f07ef4da51fbde3db7d215940764f24dc7",
+    "crates/rslint-core/tests/ts_structural_rules.rs": "20cf6b35d44493df625d9b3acd5101c1fed4654ea31a330e08a12a5ab5a505aa",
     "crates/rslint-core/tests/typed_rules.rs": "cf1c1a41c5e8e087c100f650c176f9abbc0ed92662e211feaed38bd75e160a51",
     "crates/rslint-native/Cargo.toml": "b8b189717f88d073fd75365636b467944ac6e9e2d372573ffde8e84d29f06c43",
     "crates/rslint-native/package.json": "36489f4b13e1a4b7921eaf04219067c07b793c19716ab13e8f1b96f888d6b7bb",
@@ -55,19 +70,19 @@
     "crates/rslint-native/src/memory_transport.rs": "1db3105ae9e01f7672194b6d4a8c72ed4a1269e90ca4e53e6b1285c695c44e68",
     "crates/rslint-native/src/rust_lint.rs": "632d33ba6d3b40d3fc3736710d88724c2376a0cacd6c622af753ffce5680b215",
     "crates/rslint-native/tests/rust-lint.test.mjs": "d7e3cc105e33ac452b42b68c6cbe04d284a98962a08bf08a0c0f087c80026f8d",
-    "packages/rslint/src/rust/engine.ts": "1d997ca82e5fa2ff35c3742dc2afb8c86e5ed2c0ad12f4437eae90fb0d058e57",
+    "packages/rslint/src/rust/engine.ts": "866c3e9289a8f92c9c2365b6c7c2199eebc99a13f0d45dcc15e884e7f8e95836",
     "packages/rslint/src/rust/index.ts": "147b46218f30fb6d3b53648b43f67222ced5261b49fc35c510094bef34c53d47",
-    "packages/rslint/tests/rust-engine.test.ts": "cc5cde5fec10af2fb5715f002ef63e63bc167dba4886d0be2e814bd56697ab62",
+    "packages/rslint/tests/rust-engine.test.ts": "7701be012585610f81cb8cd81d5f6b2ad5ae9c58ff7ba082ac806de31a322362",
     "rust-toolchain.toml": "f715f440167e20fd8ea9afa0498c3d1ab80174cfcb8cbc895f106a34d907a1e1",
     "scripts/tsrs/rust-no-child-process.mjs": "594775e4f865999c0301bb37846b17612fbb293f1ecc71f8cd52a4b99f6f510e",
-    "scripts/tsrs/rust-oracle.mjs": "954a198dccff2e02bffea65dbd2f0e39b0e84e1bf5b3917b8fea45025733a155",
+    "scripts/tsrs/rust-oracle.mjs": "31f770df8d8da2fe1a7b23b8aba55845f654b7fb3d8846a513da21472c8de72a",
     "scripts/tsrs/rust-rsbuild-gate.mjs": "e68fcef767e39f48363bf8ad46220f208877424a7d72aa82994b5afe54b2479c"
   },
   "checks": [
     {
       "command": "cargo test --locked -p rslint-core",
       "status": "passed",
-      "tests": 32,
+      "tests": 60,
       "log": "logs/core-tests.log"
     },
     {
@@ -75,7 +90,7 @@
       "status": "passed",
       "tests": 27,
       "log": "logs/native-unit.log",
-      "scope": "Existing parser/memory unit tests; unchanged behavior after the later core-only syntax validation fix and module ordering."
+      "scope": "Reused original 27 parser/memory unit tests: those native implementation files are unchanged. Current core and final addon are validated separately below."
     },
     {
       "command": "CARGO_BUILD_JOBS=2 pnpm --filter @rslint/native build",
@@ -96,15 +111,17 @@
     {
       "command": "CI=true pnpm --dir packages/rslint exec rs test run tests/rust-engine.test.ts",
       "status": "passed",
-      "tests": 7,
-      "log": "logs/js-api.log"
+      "tests": 10,
+      "log": "logs/js-api.log",
+      "scope": "Eight actual-addon integration tests and two scoped native-response contract tests; the latter restore the real addon after each case."
     },
     {
       "command": "node scripts/tsrs/rust-oracle.mjs $BASELINE $ADDON $OUTPUT",
       "status": "passed",
-      "positiveRules": 17,
-      "files": 7,
-      "result": "oracle.json"
+      "positiveRules": 25,
+      "files": 9,
+      "result": "oracle.json",
+      "scope": "Full normalized messages, including two rules' fix/suggestion payloads; not iterative autofix parity."
     },
     {
       "command": "node scripts/tsrs/rust-rsbuild-gate.mjs check --project $RSBUILD --addon $ADDON --output $OUTPUT",
@@ -127,7 +144,7 @@
     {
       "command": "pnpm run check-spell <explicit changed text paths>",
       "status": "passed",
-      "filesChecked": 38
+      "log": "logs/spelling.log"
     },
     {
       "command": "pnpm run format:check",
@@ -146,5 +163,17 @@
     "Complete configuration/ignore/plugin/fix/LSP/WASM parity",
     "Other target platforms and release packaging",
     "Complete candidate rsbuild lint and performance A/B"
+  ],
+  "resolvedAttempts": [
+    {
+      "log": "logs/core-attempt-01.log",
+      "failure": "Symbol table pointer get() resolved to the pointer accessor instead of name lookup.",
+      "resolution": "Use the stock SymbolTable.lookup(name) API; final compilation and declaration tests pass."
+    },
+    {
+      "log": "logs/core-attempt-02.log",
+      "failure": "A malformed template in an isolated rule case was rejected by the public syntax guard.",
+      "resolution": "Preserve the same malformed source in a real parser rule-unit assertion (no duplicate enum reports) and a separate explicit public syntax-rejection assertion. Full compiler diagnostic parity remains pending."
+    }
   ]
 }

@@ -1,0 +1,119 @@
+   Compiling rslint-core v0.0.0 (<checkout>/crates/rslint-core)
+warning: variant `RemoveBom` is never constructed
+  --> crates/rslint-core/src/edits.rs:14:5
+   |
+12 | pub(crate) enum Edit {
+   |                 ---- variant in this enum
+13 |     Replace { range: [usize; 2], text: String },
+14 |     RemoveBom,
+   |     ^^^^^^^^^
+   |
+   = note: `Edit` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rslint-core` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.66s
+     Running unittests src/lib.rs (target/debug/deps/rslint_core-b573129ecd1c0f26)
+
+running 11 tests
+test edits::tests::empty_group_has_no_fix_payload ... ok
+test edits::tests::empty_source_allows_insertions_and_empty_replacements ... ok
+test edits::tests::bom_coordinates_and_removal_are_explicit ... ok
+test edits::tests::equal_point_insertions_keep_input_order ... ok
+test edits::tests::adjacent_edits_inside_one_group_remain_atomic ... ok
+test edits::tests::single_edits_use_flat_utf16_offsets_across_emoji_and_crlf ... ok
+test edits::tests::malformed_ranges_and_overlapping_atomic_groups_fail ... ok
+test edits::tests::multiple_edits_sort_and_preserve_exact_source_gaps ... ok
+test tests::cross_file_types_and_silent_files_use_the_native_checker ... ok
+test tests::positions_use_javascript_utf16_and_line_terminators ... ok
+test tests::unsupported_rules_and_missing_admissions_fail_instead_of_skipping ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running tests/comments.rs (target/debug/deps/comments-fd8625f3bca8fc9d)
+
+running 5 tests
+test directive_like_string_regex_template_and_jsx_contents_are_not_comments ... ok
+test ordinary_comments_and_line_only_nondirective_prefixes_remain_supported ... ok
+test jsx_expression_attribute_type_argument_and_outer_trailing_comments_are_seen ... ok
+test comments_between_tokens_and_inside_template_expressions_are_seen ... ok
+test all_directive_forms_are_explicitly_rejected_in_real_comments ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.43s
+
+     Running tests/control_flow_rules.rs (target/debug/deps/control_flow_rules-4ad9535ee46e3c69)
+
+running 6 tests
+test continue_statements_keep_labels_and_complete_ranges ... ok
+test constructor_returns_preserve_the_baseline_boundary_set ... ok
+test negated_conditions_check_plain_else_and_transparent_parentheses ... ok
+test useless_catch_preserves_first_statement_and_finally_report_targets ... ok
+test awaits_respect_each_loop_position_and_function_boundary ... ok
+test finally_control_flow_uses_function_class_loop_switch_and_label_sentinels ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+     Running tests/non_null_rules.rs (target/debug/deps/non_null_rules-e09b67cc1e67d9ab)
+
+running 3 tests
+test optional_chain_reports_suggestions_instead_of_automatic_fixes ... ok
+test valid_assertions_and_chain_boundaries_stay_silent ... ok
+test redundant_assertions_keep_comments_parentheses_and_utf16_fix_ranges ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/structural_rules.rs (target/debug/deps/structural_rules-e7d19667d3e9122f)
+
+running 4 tests
+test structural_rule_options_remain_optionless ... ok
+test sparse_arrays_keep_all_baseline_elisions_and_assignment_target_exemptions ... ok
+test duplicate_args_preserve_each_binding_occurrence_and_function_kind_scope ... ok
+test delete_var_preserves_parentheses_and_typescript_wrapper_boundaries ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/syntax_rules.rs (target/debug/deps/syntax_rules-e81924520145e816)
+
+running 9 tests
+test optionless_syntax_rules_reject_options_instead_of_ignoring_them ... ok
+test comparison_negative_zero_deduplicates_operands_and_reports_full_comparison ... ok
+test caller_checks_dot_access_and_heritage_but_preserves_ts_wrappers ... ok
+test with_statements_report_the_complete_statement_and_nested_statements ... ok
+test debugger_statements_include_computed_assignment_keys ... ok
+test template_placeholders_use_decoded_strings_and_require_nonempty_content ... ok
+test comparison_negative_zero_checks_all_operators_and_numeric_spellings ... ok
+test ternaries_preserve_inner_ranges_and_do_not_visit_conditional_types_as_expressions ... ok
+test nested_ternary_checks_only_direct_branches_after_parentheses ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests/ts_structural_rules.rs (target/debug/deps/ts_structural_rules-58ffbd2fc55be283)
+
+running 11 tests
+test declaration_merging_distinguishes_cross_file_symbols_and_module_augmentation ... ok
+test duplicate_enum_values_keep_nonliteral_expressions_and_nan_silent ... FAILED
+test declaration_merging_checks_same_scope_and_default_export_local_symbols ... ok
+test duplicate_enum_values_distinguish_signed_zero_through_overflow_storage ... ok
+test declaration_merging_keeps_distinct_bindings_and_reopened_scopes_silent ... ok
+test declaration_merging_preserves_generic_interface_listener_asymmetry ... ok
+test misused_new_preserves_parent_type_and_static_name_checks ... ok
+test duplicate_enum_values_preserve_literal_kinds_and_unary_js_conversions ... ok
+test enum_diagnostics_keep_utf16_positions_and_declaration_local_state ... ok
+test misused_new_does_not_expand_to_implementations_qualified_or_wrapped_types ... ok
+test declaration_merging_caches_large_symbols_without_losing_scopes_or_reports ... ok
+
+failures:
+
+---- duplicate_enum_values_keep_nonliteral_expressions_and_nan_silent stdout ----
+
+thread 'duplicate_enum_values_keep_nonliteral_expressions_and_nan_silent' (30030281) panicked at crates/rslint-core/tests/ts_structural_rules.rs:18:77:
+called `Result::unwrap()` on an `Err` value: "syntax diagnostics are not yet supported by the Rust entry point: /rslint-ts-structural-tests/case-9.ts"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    duplicate_enum_values_keep_nonliteral_expressions_and_nan_silent
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+error: test failed, to rerun pass `-p rslint-core --test ts_structural_rules`

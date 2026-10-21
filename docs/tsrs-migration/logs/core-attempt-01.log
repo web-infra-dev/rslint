@@ -1,0 +1,36 @@
+   Compiling rslint-core v0.0.0 (<checkout>/crates/rslint-core)
+error[E0061]: this method takes 0 arguments but 1 argument was supplied
+   --> crates/rslint-core/src/rules/ts_structural.rs:319:61
+    |
+319 |                 .and_then(|container| get_locals(container).get(name.text()))
+    |                                                             ^^^ ----------- unexpected argument of type `&'static str`
+    |
+note: method defined here
+   --> <cargo-cache>/git/checkouts/tsrs-521f21c19488a2e8/280b426/crates/tsrs_core/src/ptr.rs:486:12
+    |
+486 |     pub fn get(self) -> &'static T
+    |            ^^^
+help: remove the extra argument
+    |
+319 -                 .and_then(|container| get_locals(container).get(name.text()))
+319 +                 .and_then(|container| get_locals(container).get())
+    |
+
+error[E0308]: mismatched types
+   --> crates/rslint-core/src/rules/ts_structural.rs:319:39
+    |
+319 |                 .and_then(|container| get_locals(container).get(name.text()))
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<_>`, found `&SymbolTable`
+    |
+    = note:   expected enum `std::option::Option<_>`
+            found reference `&'static SymbolTable`
+help: try wrapping the expression in `Some`
+    |
+319 |                 .and_then(|container| Some(get_locals(container).get(name.text())))
+    |                                       +++++                                      +
+
+Some errors have detailed explanations: E0061, E0308.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `rslint-core` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `rslint-core` (lib test) due to 2 previous errors
