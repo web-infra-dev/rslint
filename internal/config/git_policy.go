@@ -64,6 +64,25 @@ func (policy *GitPolicy) blocksDirectoryEntry(physicalDir string) bool {
 	return blocked
 }
 
+// blockedDirectoryOnRoute finds the nearest raw admission restriction within
+// the scan entry's initial repository, including across later nested roots.
+func (policy *GitPolicy) blockedDirectoryOnRoute(physicalDir, scanRoot string) string {
+	if policy == nil || len(policy.blockedEntries) == 0 {
+		return ""
+	}
+	root, _ := policy.repository(scanRoot, true)
+	if root == "" {
+		return ""
+	}
+	rootID := policy.pathID(root)
+	for current := physicalDir; current != "" && policy.pathID(current) != rootID; current = gitignore.ParentDirectory(current) {
+		if policy.blocksDirectoryEntry(current) {
+			return current
+		}
+	}
+	return ""
+}
+
 func (policy *GitPolicy) pathID(path string) tspath.Path {
 	return gitignore.DirectoryPathID(path, policy.useCaseSensitive)
 }

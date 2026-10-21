@@ -108,6 +108,10 @@ func discoverLintTargetsWithinRoot(
 
 	resolvedAllowDirs := allowDirs
 	directWalkRoot := frozenWalkRoot(scanRoot, allowDirs, pathSpaces)
+	gitWalkRoot := directWalkRoot
+	if len(allowDirs) == 1 {
+		gitWalkRoot = allowDirs[0]
+	}
 	directWalkProjection := allowDirs == nil
 	if len(resolvedAllowDirs) == 1 &&
 		rslintconfig.ExactPathID(resolvedAllowDirs[0].LexicalPath) == rslintconfig.ExactPathID(scanRoot) {
@@ -240,7 +244,7 @@ func discoverLintTargetsWithinRoot(
 		return true
 	}
 
-	processFile := func(walkPath, physicalPath string, needsRealpath bool) {
+	processFile := func(walkPath, physicalPath string, needsRealpath, gitEntryBlocked bool) {
 		fullPath := tspath.NormalizePath(tspath.CombinePaths(normalizedScanRoot, walkPath))
 		projections := pathProjectionsForWalk(fullPath, physicalPath)
 		if len(projections) == 0 {
@@ -275,7 +279,7 @@ func discoverLintTargetsWithinRoot(
 			if !rslintconfig.IsSupportedLintFile(target.Path) {
 				continue
 			}
-			match := targetMatcher.MatchFile(target.Identity())
+			match := targetMatcher.MatchFileWithGitEntryBlock(target.Identity(), gitEntryBlocked)
 			if !match.Selected() || match.GloballyIgnored() {
 				continue
 			}
@@ -290,6 +294,9 @@ func discoverLintTargetsWithinRoot(
 
 	work := func(walkPath string) []string {
 		physicalDirectory := physicalWalkPath(walkPath)
+		gitEntryBlocked := targetMatcher.GitEntryBlocked(rslintconfig.DirectoryIdentity{
+			LexicalPath: tspath.CombinePaths(normalizedScanRoot, walkPath), CanonicalPath: physicalDirectory,
+		}, gitWalkRoot)
 		entries := readLintDirectory(fsys, physicalDirectory)
 
 		var childDirs []string
@@ -321,7 +328,7 @@ func discoverLintTargetsWithinRoot(
 				}
 				childDirs = append(childDirs, childPath)
 			} else {
-				processFile(path.Join(walkPath, name), tspath.CombinePaths(physicalDirectory, name), e.needsRealpath)
+				processFile(path.Join(walkPath, name), tspath.CombinePaths(physicalDirectory, name), e.needsRealpath, gitEntryBlocked)
 			}
 		}
 		return childDirs

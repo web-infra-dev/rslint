@@ -3592,8 +3592,8 @@ func TestConfigDiscoveryLeafNegationWalksWithoutExecutingHiddenConfig(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig, nestedConfig}) {
-		t.Fatalf("leaf negation executed a hidden enclosing config or hid a visited Git boundary: %v", got)
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig}) {
+		t.Fatalf("leaf negation executed a hidden config: %v", got)
 	}
 	if slices.Contains(spy.gitignorePaths, hiddenSource) {
 		t.Fatalf("authored negation reopened raw Git source reachability: %v", spy.gitignorePaths)
@@ -3601,8 +3601,21 @@ func TestConfigDiscoveryLeafNegationWalksWithoutExecutingHiddenConfig(t *testing
 	if catalogTestConfig(t, catalog, root).IsFileIgnored(keep, root) {
 		t.Fatal("authored leaf negation did not reopen its lint target")
 	}
-	if catalogTestConfig(t, catalog, nestedDirectory).IsFileIgnored(nestedFile, nestedDirectory) {
-		t.Fatal("visited nested Git root retained the outer raw ignore")
+	plan, err := target.Resolve(target.Request{
+		ConfigMap: catalog.Configs, OwnerScopes: catalog.Scopes, PathSpaces: catalog.PathSpaces,
+		FS: discoveryTestFS(), Directories: catalog.TargetDirectories, GitPolicy: catalog.GitPolicy,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	for _, file := range plan.Files {
+		if strings.HasSuffix(file.Path, ".ts") {
+			paths = append(paths, file.Path)
+		}
+	}
+	if !reflect.DeepEqual(paths, []string{keep}) {
+		t.Fatalf("leaf negation expanded the outer scan: %v", paths)
 	}
 }
 
@@ -3806,8 +3819,11 @@ func TestConfigDiscoveryIgnoredDirectoryRootDoesNotDependOnCWD(t *testing.T) {
 							if slices.Contains(requestedConfigPaths(loader), nestedConfig) || catalog.GitPolicy.CoversDirectory(nested) {
 								t.Fatal("hidden nested repository entered the catalog")
 							}
-						} else if !catalog.GitPolicy.CoversDirectory(nested) {
-							t.Fatal("explicit nested input or authored negation lost nested Git coverage")
+						} else if separateNestedInput && !catalog.GitPolicy.CoversDirectory(nested) {
+							t.Fatal("explicit nested input lost nested Git coverage")
+						}
+						if !separateNestedInput && slices.Contains(requestedConfigPaths(loader), nestedConfig) {
+							t.Fatal("leaf negation executed an unrelated nested config")
 						}
 						request := target.Request{ConfigDirectory: root, ScanRoot: cwd, FS: discoveryTestFS(), Files: catalog.TargetFiles, Directories: catalog.TargetDirectories, GitPolicy: catalog.GitPolicy}
 						if explicit {
@@ -3827,8 +3843,8 @@ func TestConfigDiscoveryIgnoredDirectoryRootDoesNotDependOnCWD(t *testing.T) {
 						if !mayVisitNested && len(paths) != 0 {
 							t.Fatalf("ignored root gained lint targets at cwd %s: %v", cwd, paths)
 						}
-						if mayVisitNested && !slices.Contains(paths, nestedFile) {
-							t.Fatalf("reachable nested input was lost at cwd %s: %v", cwd, paths)
+						if got := slices.Contains(paths, nestedFile); got != separateNestedInput {
+							t.Fatalf("nested target admission at cwd %s = %t, want %t: %v", cwd, got, separateNestedInput, paths)
 						}
 						if previousPaths != nil && !reflect.DeepEqual(paths, previousPaths) {
 							t.Fatalf("same target/config changed with cwd: %v != %v", paths, previousPaths)

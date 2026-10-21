@@ -14,17 +14,17 @@ import (
 // leaf still visits that directory so its sources can govern files within it.
 type discoveryTargetTrie struct {
 	children map[tspath.Path]*discoveryTargetTrie
-	files    []string
+	files    []*rslintconfig.PathIdentity
 }
 
 func addDiscoveryTarget(
 	root *discoveryTargetTrie,
 	configDir string,
-	filePath string,
+	file *rslintconfig.PathIdentity,
 	useCaseSensitive bool,
 ) bool {
 	relative, within := rslintconfig.RelativePathWithinConfigRoot(
-		tspath.GetDirectoryPath(filePath),
+		tspath.GetDirectoryPath(file.Path),
 		configDir,
 		useCaseSensitive,
 	)
@@ -45,7 +45,7 @@ func addDiscoveryTarget(
 		}
 		node = child
 	}
-	node.files = append(node.files, filePath)
+	node.files = append(node.files, file)
 	return true
 }
 
@@ -129,7 +129,8 @@ func (coordinator *discoveryCoordinator) targetAncestorTries(
 ) map[string]*discoveryTargetTrie {
 	tries := make(map[string]*discoveryTargetTrie, len(roots))
 	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
-	for _, file := range files {
+	for index := range files {
+		file := &files[index]
 		for _, directory := range roots {
 			root := directory.LexicalPath
 			if !file.Explicit && file.ScanDirectories != nil && !slices.ContainsFunc(file.ScanDirectories, func(directory string) bool {
@@ -141,7 +142,7 @@ func (coordinator *discoveryCoordinator) targetAncestorTries(
 			if trie == nil {
 				trie = &discoveryTargetTrie{}
 			}
-			if addDiscoveryTarget(trie, root, file.Path, useCaseSensitive) {
+			if addDiscoveryTarget(trie, root, &file.PathIdentity, useCaseSensitive) {
 				tries[root] = trie
 			}
 		}

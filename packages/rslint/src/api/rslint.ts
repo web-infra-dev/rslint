@@ -15,7 +15,7 @@
  */
 import path from 'node:path';
 import { readFile, stat, writeFile } from 'node:fs/promises';
-import { convertPathToPattern, glob, isDynamicPattern } from 'tinyglobby';
+import { convertPathToPattern, glob } from 'tinyglobby';
 import picomatch from 'picomatch';
 
 import { RSLintService } from '../service/service.js';
@@ -159,11 +159,26 @@ interface PlannedLintFile extends ResolvedFilesystemPath {
 
 const DEFAULT_LINT_GLOB_IGNORES = ['**/node_modules/**', '**/.git/**'];
 
-function staticGlobRoot(pattern: string, cwd: string): string {
-  return path.resolve(
-    cwd,
-    picomatch.scan(pattern, { unescape: true }).base || '.',
-  );
+function staticGlobRoot(pattern: string, cwd: string): string | undefined {
+  // scan() can stop at literal/escaped braces before seeing a later wildcard.
+  // Use the matcher's parser for both classification and the static prefix.
+  let prefix = '';
+  for (const token of picomatch.parse(pattern, {}).tokens) {
+    if (
+      ['bos', 'text', 'dot', 'slash', 'comma'].includes(token.type) ||
+      token.value.startsWith('\\') ||
+      token.output === `\\${token.value}`
+    ) {
+      prefix += token.value;
+      continue;
+    }
+    const directory = prefix.slice(0, prefix.lastIndexOf('/') + 1);
+    return path.resolve(
+      cwd,
+      picomatch.scan(directory, { unescape: true }).base || '.',
+    );
+  }
+  return undefined;
 }
 
 function normalizeGlobPatternForCwd(pattern: string, cwd: string): string {
@@ -215,8 +230,8 @@ async function classifyLintPatterns(
 
   for (const pattern of patterns) {
     if (globPatternRole(pattern) !== 'match') continue;
-    if (isDynamicPattern(pattern)) {
-      const scanRoot = staticGlobRoot(pattern, cwd);
+    const scanRoot = staticGlobRoot(pattern, cwd);
+    if (scanRoot !== undefined) {
       try {
         if ((await stat(scanRoot)).isDirectory()) {
           const matches = scanPatterns.get(scanRoot) ?? [];

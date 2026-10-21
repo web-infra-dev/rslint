@@ -1009,6 +1009,11 @@ Automatic discovery uses these rules:
    requested roots retain their independent entry points. Adding a literal
    target inside a nested repository therefore cannot reopen its siblings to
    the outer walk.
+   A walk kept open only for an authored leaf negation retains its outer
+   admission restriction across nested Git roots. Each file must still match
+   an effective exception; discovering a marker does not authorize hidden
+   configs or unrelated files. Target walks check this route restriction once
+   per directory and apply the same ordered global-ignore matcher to its files.
    Authored negations may keep traversal open without making raw Git sources
    beneath an excluded parent readable. The supplied-root config ownership
    exception remains separate from this source reachability.

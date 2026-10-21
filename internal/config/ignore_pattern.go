@@ -100,7 +100,17 @@ func (matcher GlobalIgnoreMatcher) IgnoresFile(file PathIdentity) bool {
 		return false
 	}
 	target, matches := matcher.resolver.resolvePathSpacesWithCanonicalParent(file.Path, file.CanonicalPath, file.CanonicalParentPath, false)
-	return matcher.resolver.globallyIgnores(target, matches)
+	return matcher.resolver.globallyIgnores(target, matches, false)
+}
+
+// ReopensGitignoredFile applies authored global ignores to an initially blocked
+// file. Keeping a directory walk open for a possible exception is not admission.
+func (matcher GlobalIgnoreMatcher) ReopensGitignoredFile(file PathIdentity) bool {
+	if matcher.resolver == nil {
+		return false
+	}
+	target, matches := matcher.resolver.resolvePathSpacesWithCanonicalParent(file.Path, file.CanonicalPath, file.CanonicalParentPath, false)
+	return !matcher.resolver.globallyIgnores(target, matches, true)
 }
 
 // dirKind classifies an ignore pattern by how it bears on DIRECTORY decisions.

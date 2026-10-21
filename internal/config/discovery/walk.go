@@ -17,6 +17,7 @@ type discoveryWalkNode struct {
 	ownerPath          string
 	ignoreMatcher      rslintconfig.GlobalIgnoreMatcher
 	configReachable    bool
+	gitEntryBlocked    bool
 	gitCursor          gitignore.Cursor
 	targets            *discoveryTargetTrie
 }
@@ -179,16 +180,21 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 	}
 	result.directoriesVisited = 1
 	node.gitCursor = coordinator.git.Observe(node.gitCursor, node.canonicalDirectory)
+	node.gitEntryBlocked = node.gitEntryBlocked || !node.gitCursor.SourceReachable()
 	// A supplied directory may select its own config while remaining a raw Git
 	// traversal boundary. That ownership exception does not authorize searching
 	// its hidden children for another repository.
-	if !node.gitCursor.SourceReachable() && !node.ignoreMatcher.MayReopenGitDescendants(node.directory, node.canonicalDirectory) {
+	if node.gitEntryBlocked && !node.ignoreMatcher.MayReopenGitDescendants(node.directory, node.canonicalDirectory) {
 		result.directoriesPruned = 1
 		return result
 	}
 	walkTargets := node.targets
 	if walkTargets != nil {
-		result.files = walkTargets.files
+		for _, file := range walkTargets.files {
+			if !node.gitEntryBlocked || node.ignoreMatcher.ReopensGitignoredFile(*file) {
+				result.files = append(result.files, file.Path)
+			}
+		}
 	}
 	if walkTargets != nil && len(walkTargets.children) == 0 {
 		return result
@@ -226,7 +232,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 			continue
 		}
 		nextCursor, entryBlocked := coordinator.git.Enter(node.gitCursor, canonicalChild)
-		gitBlocked := entryBlocked || !nextCursor.SourceReachable()
+		gitBlocked := node.gitEntryBlocked || entryBlocked || !nextCursor.SourceReachable()
 		childConfigReachable := !gitBlocked || node.ignoreMatcher.ReopensDirectoryNode(child, canonicalChild)
 		if gitBlocked && !node.ignoreMatcher.MayReopenGitDescendants(child, canonicalChild) {
 			result.directoriesPruned++
@@ -239,6 +245,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 			ownerPath:          node.ownerPath,
 			ignoreMatcher:      node.ignoreMatcher,
 			configReachable:    childConfigReachable,
+			gitEntryBlocked:    gitBlocked && !childConfigReachable,
 			gitCursor:          nextCursor,
 			targets:            childTargets,
 		})

@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 )
 
 // TargetMatch is an immutable selection result for one target and config
@@ -86,14 +87,44 @@ func NewTargetMatcherWithPathSpaces(
 
 // MatchFile evaluates files, ignores, and the implicit extension baseline.
 func (matcher TargetMatcher) MatchFile(target PathIdentity) TargetMatch {
+	return matcher.MatchFileWithGitEntryBlock(target, false)
+}
+
+// MatchFileWithGitEntryBlock preserves the current walk's outer Git admission
+// restriction even when the file's own repository has different raw rules.
+func (matcher TargetMatcher) MatchFileWithGitEntryBlock(target PathIdentity, gitEntryBlocked bool) TargetMatch {
 	if matcher.resolver == nil {
 		return TargetMatch{}
 	}
 	return TargetMatch{
 		target:   target,
 		source:   matcher.source,
-		decision: matcher.resolver.resolveTarget(target),
+		decision: matcher.resolver.resolveTargetWithGitEntryBlock(target, gitEntryBlocked),
 	}
+}
+
+// GitEntryBlocked retains the current scan route's outer admission gate. A
+// negation admitting a nested Git root can reset that gate; a possible leaf
+// exception only keeps traversal open. Compute this once per directory.
+func (matcher TargetMatcher) GitEntryBlocked(directory, scanRoot DirectoryIdentity) bool {
+	if matcher.resolver == nil {
+		return false
+	}
+	policy := matcher.resolver.gitPolicy
+	blocked := policy.blockedDirectoryOnRoute(directory.CanonicalPath, scanRoot.CanonicalPath)
+	if blocked == "" {
+		return false
+	}
+	for physical, lexical := directory.CanonicalPath, directory.LexicalPath; physical != ""; physical, lexical = gitignore.ParentDirectory(physical), tspath.GetDirectoryPath(lexical) {
+		_, repositoryRoot := policy.roots[policy.pathID(physical)]
+		if repositoryRoot && matcher.resolver.reopensDirectory(lexical, physical) {
+			return false
+		}
+		if policy.pathID(physical) == policy.pathID(blocked) {
+			return true
+		}
+	}
+	return false
 }
 
 // CanPruneDirectory reports whether no descendant can be selected after

@@ -736,6 +736,53 @@ describe('Gitignore: tsconfig + gitignore interaction', () => {
 });
 
 describe('Gitignore: monorepo gap file interaction', () => {
+  test.each(['ignored', 'ignored/nested'])(
+    'a leaf exception does not reopen the nested repository at %s',
+    async (nested) => {
+      const other = `${nested}/other.ts`;
+      const tempDir = await createTempDir({
+        '.git': '',
+        '.gitignore': 'ignored/\n',
+        [`${nested}/.git`]: '',
+        'rslint.config.mjs': `export default [
+        { ignores: ['!ignored/keep.ts'] },
+        { rules: { 'no-debugger': 'error' } },
+      ];`,
+        'ignored/keep.ts': 'debugger;\n',
+        [other]: 'debugger;\n',
+      });
+      try {
+        for (const configArgs of [[], ['--config', 'rslint.config.mjs']]) {
+          for (const [inputs, expected] of [
+            [['.'], ['ignored/keep.ts']],
+            [['.', nested], ['ignored/keep.ts', other].sort()],
+          ]) {
+            const result = await runRslint(
+              ['--format', 'jsonline', ...configArgs, ...inputs],
+              tempDir,
+            );
+            const diagnostics = result.stdout
+              .split('\n')
+              .filter((line) => line.startsWith('{'))
+              .map((line) => JSON.parse(line) as Diagnostic);
+            expect(
+              diagnostics
+                .map((diagnostic) => diagnostic.filePath.replaceAll('\\', '/'))
+                .sort(),
+            ).toEqual(expected);
+            expect(
+              diagnostics.every(
+                (diagnostic) => diagnostic.ruleName === 'no-debugger',
+              ),
+            ).toBe(true);
+          }
+        }
+      } finally {
+        await cleanupTempDir(tempDir);
+      }
+    },
+  );
+
   test('automatic discovery prunes a Git-hidden child config, while an explicit directory root reopens it', async () => {
     const tempDir = await createTempDir({
       '.gitignore': 'packages/ignored/\n',

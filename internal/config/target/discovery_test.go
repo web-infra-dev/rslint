@@ -1,6 +1,6 @@
 package target
 
-// cspell:ignore cmpopts
+// cspell:ignore cmpopts gitdir
 
 import (
 	"os"
@@ -151,6 +151,54 @@ func TestTargetWalkPreservesFilesBesideDirectoryOnlyGitWildcards(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestTargetWalkLeafNegationDoesNotReopenNestedRepository(t *testing.T) {
+	for _, nested := range []string{"ignored", "ignored/nested"} {
+		t.Run(nested, func(t *testing.T) {
+			other := tspath.CombinePaths(nested, "other.ts")
+			root := setupDiscoveryContentFixture(t, map[string]string{
+				".git": "", ".gitignore": "ignored/\n",
+				tspath.CombinePaths(nested, ".git"): "gitdir: /unused\n",
+				"ignored/keep.ts":                   "debugger;\n",
+				other:                               "debugger;\n",
+			})
+			inner := tspath.ResolvePath(root, nested)
+			directoryExceptionFiles := []string{other}
+			if nested == "ignored" {
+				directoryExceptionFiles = append(directoryExceptionFiles, "ignored/keep.ts")
+			}
+			for _, test := range []struct {
+				inputs   []string
+				negation string
+				want     []string
+			}{
+				{[]string{root}, "!ignored/keep.ts", []string{"ignored/keep.ts"}},
+				{[]string{root, inner}, "!ignored/keep.ts", []string{"ignored/keep.ts", other}},
+				{[]string{inner, root}, "!ignored/keep.ts", []string{"ignored/keep.ts", other}},
+				{[]string{root}, "!" + nested, directoryExceptionFiles},
+			} {
+				config := rslintconfig.RslintConfig{{Ignores: []string{test.negation}}, {Files: []string{"**/*.ts"}}}
+				directories := rslintconfig.ResolveDirectoryIdentities(test.inputs, osvfs.FS())
+				plan, err := Resolve(withTestGitPolicy(Request{
+					Config: config, ConfigDirectory: root, FS: osvfs.FS(), Directories: directories,
+				}))
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := make([]string, 0, len(test.want))
+				for _, file := range test.want {
+					want = append(want, tspath.ResolvePath(root, file))
+				}
+				sort.Strings(want)
+				var got []string
+				for _, file := range plan.Files {
+					got = append(got, file.Path)
+				}
+				assert.DeepEqual(t, got, want)
+			}
+		})
 	}
 }
 

@@ -462,6 +462,70 @@ describe('Rslint class', () => {
     }
   });
 
+  test('lintFiles uses the same glob syntax for expansion and scan entries', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-braces-'));
+    const config = [{ rules: { 'no-debugger': 'error' } }];
+    try {
+      await mkdir(path.join(tmp, '.git'));
+      const directories = ['brace{dir}', 'plus+dir', 'close)dir', 'comma,dir'];
+      for (const directory of directories) {
+        await mkdir(path.join(tmp, directory, '.git'), { recursive: true });
+        await writeFile(path.join(tmp, directory, 'one.ts'), 'debugger;\n');
+      }
+      await mkdir(path.join(tmp, 'src'));
+      await writeFile(
+        path.join(tmp, '.gitignore'),
+        directories.map((directory) => `${directory}/\n`).join(''),
+      );
+      await writeFile(path.join(tmp, 'src', 'control.ts'), 'debugger;\n');
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        `export default ${JSON.stringify(config)};\n`,
+      );
+      for (const options of [
+        {},
+        { overrideConfigFile: 'rslint.config.mjs' },
+        { overrideConfigFile: true, overrideConfig: config },
+      ]) {
+        const rslint = new Rslint({ cwd: tmp, ...options });
+        try {
+          for (const [pattern, expected] of [
+            ['brace{dir}/**/*.ts', ['brace{dir}/one.ts']],
+            [String.raw`brace\{dir\}/**/*.ts`, ['brace{dir}/one.ts']],
+            ['brace{dir}/one.ts', ['brace{dir}/one.ts']],
+            ['plus+dir/**/*.ts', ['plus+dir/one.ts']],
+            ['plus+dir/one.ts', ['plus+dir/one.ts']],
+            ['close)dir/**/*.ts', ['close)dir/one.ts']],
+            ['comma,dir/**/*.ts', ['comma,dir/one.ts']],
+            ['comma,dir/one.ts', ['comma,dir/one.ts']],
+            ['src/**/*.ts', ['src/control.ts']],
+            ['**/*.ts', ['src/control.ts']],
+          ]) {
+            const results = await rslint.lintFiles(pattern);
+            expect(
+              results
+                .map((result) =>
+                  path.relative(tmp, result.filePath).split(path.sep).join('/'),
+                )
+                .sort(),
+            ).toEqual(expected);
+            expect(
+              results.every((result) =>
+                result.messages.some(
+                  (message) => message.ruleId === 'no-debugger',
+                ),
+              ),
+            ).toBe(true);
+          }
+        } finally {
+          await rslint.close();
+        }
+      }
+    } finally {
+      await cleanupTempDir(tmp);
+    }
+  });
+
   test('outputFixes writes output to absolute paths, skips no-output/relative', async () => {
     const { readFile, mkdtemp } = await import('node:fs/promises');
     const os = await import('node:os');
@@ -1586,6 +1650,52 @@ module.exports = config;`
             expect(await diagnosticFiles('nested/selected')).toEqual([other]);
             expect(await diagnosticFiles(['.', keep])).toEqual(['control.ts']);
             await writeFile(path.join(tmp, 'nested', '.gitignore'), '');
+          } finally {
+            await rslint.close();
+          }
+        }
+        for (const options of [
+          {},
+          { overrideConfigFile: 'rslint.config.mjs' },
+          { overrideConfigFile: true },
+        ]) {
+          const rslint = new Rslint({
+            cwd: tmp,
+            ...options,
+            overrideConfig: [
+              { ignores: ['!nested/selected/keep.ts'] },
+              { rules: { 'no-debugger': 'error' } },
+            ],
+          });
+          try {
+            for (const [inputs, expected] of [
+              [['.'], ['control.ts', keep]],
+              [
+                ['.', 'nested/extra.ts'],
+                ['control.ts', 'nested/extra.ts', keep],
+              ],
+              [
+                ['.', 'nested/selected'],
+                ['control.ts', keep, other],
+              ],
+            ]) {
+              const results = await rslint.lintFiles(inputs);
+              expect(
+                results
+                  .filter((result) =>
+                    result.messages.some(
+                      (message) => message.ruleId === 'no-debugger',
+                    ),
+                  )
+                  .map((result) =>
+                    path
+                      .relative(tmp, result.filePath)
+                      .split(path.sep)
+                      .join('/'),
+                  )
+                  .sort(),
+              ).toEqual(expected);
+            }
           } finally {
             await rslint.close();
           }

@@ -308,6 +308,10 @@ func (resolver *configTargetResolver) resolve(path string, canonicalPath string)
 func (resolver *configTargetResolver) resolveTarget(
 	discovered PathIdentity,
 ) configTargetDecision {
+	return resolver.resolveTargetWithGitEntryBlock(discovered, false)
+}
+
+func (resolver *configTargetResolver) resolveTargetWithGitEntryBlock(discovered PathIdentity, gitEntryBlocked bool) configTargetDecision {
 	target, matches := resolver.resolvePathSpacesWithCanonicalParent(
 		discovered.Path,
 		discovered.CanonicalPath,
@@ -316,7 +320,7 @@ func (resolver *configTargetResolver) resolveTarget(
 	)
 
 	decision := configTargetDecision{selected: isDefaultLintFile(target.path)}
-	decision.globallyIgnored = resolver.globallyIgnores(target, matches)
+	decision.globallyIgnored = resolver.globallyIgnores(target, matches, gitEntryBlocked)
 	if decision.globallyIgnored {
 		return decision
 	}
@@ -478,8 +482,9 @@ func (resolver *configTargetResolver) needsCanonicalPath(path string) bool {
 func (resolver *configTargetResolver) globallyIgnores(
 	target configTargetIdentity,
 	matches []configTargetMatch,
+	gitEntryBlocked bool,
 ) bool {
-	ignored := resolver.gitPolicy.ignored(target.gitPath)
+	ignored := gitEntryBlocked || resolver.gitPolicy.ignored(target.gitPath)
 	if resolver.hasAbsoluteDirectoryBlock(target, matches, true) {
 		return true
 	}

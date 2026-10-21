@@ -182,18 +182,22 @@ func discoverLintTargetsForConfigInMap(
 	}
 
 	stopDirs := ownerIndex.ChildOwnerDirectories(configDir)
-	targets := discoverLintTargetsWithinRoot(
-		cfg,
-		configDir,
-		configDir,
-		fsys,
-		explicitFiles,
-		allowDirs,
-		stopDirs,
-		singleThreaded,
-		pathSpaces,
-		gitPolicy,
-	)
+	var targets []File
+	visit := func(directories []rslintconfig.DirectoryIdentity) {
+		targets = append(targets, discoverLintTargetsWithinRoot(
+			cfg, configDir, configDir, fsys, explicitFiles, directories,
+			stopDirs, singleThreaded, pathSpaces, gitPolicy,
+		)...)
+	}
+	// Keep each input's Git entry independent while retaining the owner's
+	// existing walk clipping and lexical projections.
+	if len(allowDirs) > 1 {
+		for _, directory := range allowDirs {
+			visit([]rslintconfig.DirectoryIdentity{directory})
+		}
+	} else {
+		visit(allowDirs)
+	}
 	if len(targets) == 0 {
 		return targets
 	}
