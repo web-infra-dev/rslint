@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/jsonrpc"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/project"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
@@ -2027,24 +2028,27 @@ func TestConfigRefreshRegistersPhysicalGitWatchesBeforeReadingSources(t *testing
 		t.Fatal("new Git sources were read while watcher registration was pending")
 	}
 	respondToConfigReverseRequest(t, s, registration, nil, nil)
-	unregistration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
-	respondToConfigReverseRequest(t, s, unregistration, nil, errors.New("temporary unregistration failure"))
-	if result := awaitConfigRefreshResult(t, refresh); result.err == nil {
-		t.Fatal("failed handoff did not stop collection")
-	}
-	if s.retiredGitPolicyWatcherID != previousID || s.gitPolicyWatcherID == previousID {
-		t.Fatal("failed handoff did not retain both watcher ranges")
-	}
-	if fsys.observations != previousObservations {
-		t.Fatal("failed handoff observed new Git sources")
+	for attempt := range 3 {
+		if attempt > 0 {
+			refresh = startConfigRefreshForTest(s, "gitignore-change")
+		}
+		unregistration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
+		respondToConfigReverseRequest(t, s, unregistration, nil, errors.New("temporary unregistration failure"))
+		completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{}})
+		if result := awaitConfigRefreshResult(t, refresh); result.err != nil {
+			t.Fatalf("old watcher cleanup blocked refresh %d: %v", attempt, result.err)
+		}
+		if s.gitPolicyWatcherID == previousID || !s.watchers.Has(previousID) || !s.watchers.Has(s.gitPolicyWatcherID) {
+			t.Fatal("failed cleanup lost an active or pending registration")
+		}
+		if !s.gitPolicy.CoversDirectory(physicalExternal) {
+			t.Fatal("failed cleanup prevented new Git source coverage")
+		}
 	}
 	refresh = startConfigRefreshForTest(s, "gitignore-change")
-	unregistration = nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
+	unregistration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
 	respondToConfigReverseRequest(t, s, unregistration, nil, nil)
-	load = nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
-	_, response = loadedConfigResponse(t, load, config.RslintConfig{{}})
-	respondToConfigReverseRequest(t, s, load, response, nil)
-	completeConfigWatchActivation(t, s, outgoing)
+	completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{}})
 	if result := awaitConfigRefreshResult(t, refresh); result.err != nil {
 		t.Fatal(result.err)
 	}
@@ -2269,7 +2273,7 @@ func TestGitWatchRegistrationKeyIncludesRetargetedRecursiveRoots(t *testing.T) {
 	}
 }
 
-func TestCanceledGitWatcherRegistrationCleansAttemptBeforeRetry(t *testing.T) {
+func TestCanceledGitWatcherRegistrationCleansAttemptOnNextRefresh(t *testing.T) {
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	fsys := &gitObservationGuardFS{FS: s.fs}
@@ -2309,8 +2313,8 @@ func TestCanceledGitWatcherRegistrationCleansAttemptBeforeRetry(t *testing.T) {
 	default:
 		t.Fatal("registration cancellation was not forwarded")
 	}
-	uncertainID := s.retiredGitPolicyWatcherID
-	if string(uncertainID) != attemptedID || !s.watchers.Has(uncertainID) {
+	uncertainID := project.WatcherID(attemptedID)
+	if !s.watchers.Has(uncertainID) {
 		t.Fatal("canceled registration attempt was forgotten")
 	}
 	if s.gitPolicyWatcherID != activeID || s.gitPolicy != activePolicy || !s.watchers.Has(activeID) {
@@ -2321,30 +2325,20 @@ func TestCanceledGitWatcherRegistrationCleansAttemptBeforeRetry(t *testing.T) {
 	}
 
 	retry := startConfigRefreshForTest(s, "gitignore-change")
-	unregistration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
-	removed := unregistration.Params.(*lsproto.UnregistrationParams).Unregisterations
-	if len(removed) != 1 || removed[0].Id != attemptedID {
-		t.Fatalf("retry did not clean the uncertain attempt first: %+v", removed)
-	}
-	if fsys.observations != observations {
-		t.Fatal("pending cleanup observed new Git sources")
-	}
-	respondToConfigReverseRequest(t, s, unregistration, nil, nil)
 	registration = nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
-	if s.watchers.Has(uncertainID) || s.retiredGitPolicyWatcherID != "" {
-		t.Fatal("retry retained the uncertain registration")
-	}
 	if fsys.observations != observations {
 		t.Fatal("retry read Git sources before the new registration completed")
 	}
 	respondToConfigReverseRequest(t, s, registration, nil, nil)
-	unregistration = nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
-	respondToConfigReverseRequest(t, s, unregistration, nil, nil)
+	for range 2 {
+		unregistration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
+		respondToConfigReverseRequest(t, s, unregistration, nil, nil)
+	}
 	completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{}})
 	if completed := awaitConfigRefreshResult(t, retry); completed.err != nil {
 		t.Fatal(completed.err)
 	}
-	if s.watchers.Has(activeID) || s.watchers.Has(uncertainID) || !s.watchers.Has(s.gitPolicyWatcherID) || s.retiredGitPolicyWatcherID != "" {
+	if s.watchers.Has(activeID) || s.watchers.Has(uncertainID) || !s.watchers.Has(s.gitPolicyWatcherID) {
 		t.Fatal("retry leaked a superseded or uncertain registration")
 	}
 }

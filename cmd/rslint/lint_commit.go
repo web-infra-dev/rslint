@@ -18,20 +18,13 @@ import (
 // cliFinalChangeCommitter performs the CLI's one terminal disk projection.
 // All fix rounds happen in linter-owned memory before this adapter is called.
 type cliFinalChangeCommitter struct {
-	// Only the low-level zero value permits identity writes. A constructed
-	// committer accepts the selected target set, including when it is empty.
 	canonicalByPath map[string]string
 }
 
 func newCLIFinalChangeCommitter(files []target.File) cliFinalChangeCommitter {
 	paths := make(map[string]string, len(files))
 	for _, file := range files {
-		physical := file.CanonicalPath
-		if physical == "" {
-			// Filesystems without a physical identity retain their lexical path.
-			physical = file.Path
-		}
-		paths[rslintconfig.ExactPathID(file.Path)] = tspath.NormalizePath(physical)
+		paths[rslintconfig.ExactPathID(file.Path)] = tspath.NormalizePath(file.CanonicalPath)
 	}
 	return cliFinalChangeCommitter{canonicalByPath: paths}
 }
@@ -55,14 +48,10 @@ func (committer cliFinalChangeCommitter) CommitFinalChanges(
 			preflightErrors = append(preflightErrors, err)
 			break
 		}
-		physical := change.Path
-		if committer.canonicalByPath != nil {
-			var selected bool
-			physical, selected = committer.canonicalByPath[rslintconfig.ExactPathID(change.Path)]
-			if !selected {
-				preflightErrors = append(preflightErrors, fmt.Errorf("fix target %q is not a selected lint target", change.Path))
-				continue
-			}
+		physical, selected := committer.canonicalByPath[rslintconfig.ExactPathID(change.Path)]
+		if !selected {
+			preflightErrors = append(preflightErrors, fmt.Errorf("fix target %q is not a selected lint target", change.Path))
+			continue
 		}
 		destinations[index] = physical
 		current, ok := readPhysicalFileText(physical)

@@ -3681,8 +3681,6 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 		directories []rslintconfig.DirectoryIdentity
 		files       []target.File
 		queries     map[string]string
-		prefix      string
-		fullKeys    bool
 	}{
 		{
 			name: "self directory shields descendants from outer alias",
@@ -3762,19 +3760,16 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 				{LexicalPath: "/Users/Dev/^", CanonicalPath: "/captured/dynamic"},
 			},
 			queries: map[string]string{"/Users/Dev/c:/child.ts": "/captured/drive/child.ts", "/users/dev/^/child.ts": "/captured/dynamic/child.ts"},
-			prefix:  "/Users/Dev/",
 		},
 		{
 			name:        "compressed shortest anchor and trailing separator",
 			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "/Users/Dev/Anchor", CanonicalPath: "/captured"}},
 			queries:     map[string]string{"/Users/Dev/anchor": "/captured", "/Users/Dev/anchor/": "/captured", "/elsewhere/anchor/child.ts": "/elsewhere/anchor/child.ts"},
-			prefix:      "/Users/Dev/",
 		},
 		{
 			name:        "compressed Unicode prefix changes byte length",
 			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "/Users/\u212A/Anchor", CanonicalPath: "/captured"}},
 			queries:     map[string]string{"/Users/k/anchor/child.ts": "/captured/child.ts", "/Users/\u212A/anchor/child.ts": "/captured/child.ts"},
-			prefix:      "/Users/\u212A/",
 		},
 		{
 			name: "compressed Unicode suffix changes byte length",
@@ -3783,7 +3778,6 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 				{LexicalPath: "/Users/Dev/Other", CanonicalPath: "/other"},
 			},
 			queries: map[string]string{"/Users/Dev/\u212A/anchor/deep/child.ts": "/captured/deep/child.ts"},
-			prefix:  "/Users/Dev/",
 		},
 		{
 			name: "compressed nearest folded anchor precedes exact ancestor",
@@ -3792,7 +3786,6 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 				{LexicalPath: "/Users/Dev/Base/Alias", CanonicalPath: "/captured"},
 			},
 			queries: map[string]string{"/Users/Dev/Base/alias/package.json": "/captured/package.json"},
-			prefix:  "/Users/Dev/",
 		},
 		{
 			name: "compressed ambiguous parents retain exact priority and ancestor fallback",
@@ -3802,7 +3795,6 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 				{LexicalPath: "/Users/Dev/Base/anchor", CanonicalPath: "/second"},
 			},
 			queries: map[string]string{"/Users/Dev/Base/Anchor/child.ts": "/first/child.ts", "/Users/Dev/Base/aNcHoR/child.ts": "/fallback/aNcHoR/child.ts"},
-			prefix:  "/Users/Dev/",
 		},
 		{
 			name: "compressed ambiguous files retain exact priority",
@@ -3811,7 +3803,6 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 				{PathIdentity: rslintconfig.PathIdentity{Path: "/Users/Dev/file.ts", CanonicalPath: "/Users/Dev/second.ts"}},
 			},
 			queries: map[string]string{"/Users/Dev/File.ts": "/Users/Dev/first.ts", "/Users/Dev/fIlE.ts": "/Users/Dev/fIlE.ts", "/Users/Dev/first.ts": "/Users/Dev/first.ts"},
-			prefix:  "/Users/Dev/",
 		},
 		{
 			name: "mixed POSIX and UNC server roots retain full keys",
@@ -3819,8 +3810,7 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 				{LexicalPath: "/Repo", CanonicalPath: "/Repo"},
 				{LexicalPath: "//Server/", CanonicalPath: "/captured"},
 			},
-			queries:  map[string]string{"//server/share/child.ts": "/captured/share/child.ts"},
-			fullKeys: true,
+			queries: map[string]string{"//server/share/child.ts": "/captured/share/child.ts"},
 		},
 		{
 			name: "different UNC server roots retain full keys",
@@ -3828,14 +3818,12 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 				{LexicalPath: "//First/", CanonicalPath: "/first"},
 				{LexicalPath: "//Second/", CanonicalPath: "/second"},
 			},
-			queries:  map[string]string{"//first/share/child.ts": "/first/share/child.ts", "//second/share/child.ts": "/second/share/child.ts"},
-			fullKeys: true,
+			queries: map[string]string{"//first/share/child.ts": "/first/share/child.ts", "//second/share/child.ts": "/second/share/child.ts"},
 		},
 		{
 			name:        "drive root retains full keys",
 			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "C:/", CanonicalPath: "/captured"}},
 			queries:     map[string]string{"c:/child.ts": "/captured/child.ts"},
-			fullKeys:    true,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -3845,9 +3833,6 @@ func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
 				t.Fatal(err)
 			}
 			view := frozen.(*frozenFileSystem)
-			if (test.prefix != "" || test.fullKeys) && view.keyPrefix != test.prefix {
-				t.Fatalf("key prefix = %q, want %q", view.keyPrefix, test.prefix)
-			}
 			for path, want := range test.queries {
 				if got := view.ioPath(path); got != want {
 					t.Errorf("ioPath(%q) = %q, want %q", path, got, want)

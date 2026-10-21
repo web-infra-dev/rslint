@@ -84,14 +84,6 @@ func (s *Server) updateGitPolicyWatchers(ctx context.Context, roots []config.Dir
 	if !s.watchEnabled || s.outgoingQueue == nil {
 		return nil
 	}
-	// A failed handoff retains at most one superseded or uncertain registration.
-	// Finish its cleanup before installing another generation.
-	if s.retiredGitPolicyWatcherID != "" {
-		if err := s.UnwatchFiles(ctx, s.retiredGitPolicyWatcherID); err != nil {
-			return err
-		}
-		s.retiredGitPolicyWatcherID = ""
-	}
 	directorySet := make(map[string]struct{}, len(current)+len(s.committedGitWatchDirectories))
 	for _, directory := range append(append([]string(nil), current...), s.committedGitWatchDirectories...) {
 		directorySet[directory] = struct{}{}
@@ -113,32 +105,35 @@ func (s *Server) updateGitPolicyWatchers(ctx context.Context, roots []config.Dir
 	}
 	sort.Strings(scopeKeys)
 	key := strings.Join(scopeKeys, "\x00")
-	if key == s.gitPolicyWatcherKey {
-		return nil
-	}
-	relativePatterns := false
-	if s.initializeParams != nil && s.initializeParams.Capabilities != nil && s.initializeParams.Capabilities.Workspace != nil && s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles != nil {
-		relativePatterns = ptrIsTrue(s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles.RelativePatternSupport)
-	}
-	s.gitPolicyWatcherGeneration++
-	id := project.WatcherID(fmt.Sprintf("%s-%d", gitignoreWatcherID, s.gitPolicyWatcherGeneration))
-	if err := s.WatchFiles(ctx, id, gitPolicyFileWatchers(roots, directories, relativePatterns)); err != nil {
-		// The client may have installed this ID before cancellation or a lost
-		// response. Track the attempt so the next refresh unregisters it first.
-		s.watchers.Add(id)
-		s.retiredGitPolicyWatcherID = id
-		return err
-	}
-	previous := s.gitPolicyWatcherID
-	s.gitPolicyWatcherID, s.gitPolicyWatcherKey = id, key
-	if previous != "" {
-		s.retiredGitPolicyWatcherID = previous
-		if err := s.UnwatchFiles(ctx, previous); err != nil {
+	if key != s.gitPolicyWatcherKey {
+		relativePatterns := false
+		if s.initializeParams != nil && s.initializeParams.Capabilities != nil && s.initializeParams.Capabilities.Workspace != nil && s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles != nil {
+			relativePatterns = ptrIsTrue(s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles.RelativePatternSupport)
+		}
+		s.gitPolicyWatcherGeneration++
+		id := project.WatcherID(fmt.Sprintf("%s-%d", gitignoreWatcherID, s.gitPolicyWatcherGeneration))
+		if err := s.WatchFiles(ctx, id, gitPolicyFileWatchers(roots, directories, relativePatterns)); err != nil {
+			// A failed or canceled response may still have installed this ID.
+			// Keep it in the existing registration set for later cleanup.
+			s.watchers.Add(id)
 			return err
 		}
-		s.retiredGitPolicyWatcherID = ""
+		s.gitPolicyWatcherID, s.gitPolicyWatcherKey = id, key
 	}
-	return nil
+	// The current range is installed. Old registrations can cause redundant
+	// notifications, but their cleanup cannot invalidate this configuration.
+	for id := range s.watchers.Keys() {
+		if id == s.gitPolicyWatcherID || !strings.HasPrefix(string(id), string(gitignoreWatcherID)+"-") {
+			continue
+		}
+		if err := s.UnwatchFiles(ctx, id); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			log.Printf("[rslint] Failed to remove old Git policy watcher %s: %v", id, err)
+		}
+	}
+	return ctx.Err()
 }
 
 // ancestorJSConfigFileWatchers covers the strict lexical ancestors that Go's

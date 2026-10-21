@@ -61,8 +61,7 @@ func Resolve(request Request) (Plan, error) {
 		if spaces == nil {
 			spaces = rslintconfig.NewPathSpaceSnapshot(request.ConfigMap, request.FS, request.Directories...)
 		}
-		ownerIndex := mustOwnerIndexWithPathSpaces(request.ConfigMap, request.FS, spaces)
-		plan.pathSpaces = ownerIndex.PathSpaces()
+		plan.pathSpaces = spaces
 		discoveredFiles = discoverLintTargetsMultiConfigWithPreparedFiles(
 			request.ConfigMap,
 			request.OwnerScopes,
@@ -70,7 +69,7 @@ func Resolve(request Request) (Plan, error) {
 			request.Files,
 			request.Directories,
 			request.SingleThreaded,
-			ownerIndex,
+			spaces,
 			explicitFiles,
 			request.GitPolicy,
 		)

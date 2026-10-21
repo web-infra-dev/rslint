@@ -1399,6 +1399,10 @@ Additional current behaviors:
   ancestor chains for `.gitignore` and `.git` marker creation/deletion, never
   `.git` contents. Watch ranges are registered before source observation and
   replaced without dropping last-good or newly requested ranges after failure.
+  Once the current range is registered, old-subscription cleanup failures do
+  not block configuration refresh. The existing watcher set retains failed or
+  uncertain registrations for cleanup on a later refresh; cancellation still
+  aborts the transaction.
   Extension watchers still own descendant JS/TS config and lockfile refreshes;
   Go retains strict-ancestor JS config watchers.
 - LSP prepares and atomically commits authored configs, unavailable boundaries,

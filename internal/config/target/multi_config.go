@@ -15,7 +15,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 	allowFiles []rslintconfig.PathIdentity,
 	allowDirs []rslintconfig.DirectoryIdentity,
 	singleThreaded bool,
-	ownerIndex *OwnerIndex,
+	pathSpaces *rslintconfig.PathSpaceSnapshot,
 	explicitSet *explicitLintTargetSet,
 	gitPolicy *rslintconfig.GitPolicy,
 ) []File {
@@ -38,7 +38,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 		configMap,
 		scopes,
 		fsys,
-		ownerIndex.PathSpaces(),
+		pathSpaces,
 	)
 
 	// Explicit files are assigned to their nearest config once. Passing the
@@ -131,7 +131,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 			configAllowFiles,
 			configAllowDirs,
 			singleThreaded,
-			ownerIndex.PathSpaces(),
+			pathSpaces,
 			gitPolicy,
 		)
 		for _, target := range targets {

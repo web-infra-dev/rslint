@@ -2368,7 +2368,10 @@ func TestCLIFinalChangeCommitterValidatesCompleteDeltaBeforeWriting(t *testing.T
 	if err := os.WriteFile(filePath, []byte("a"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	committer := cliFinalChangeCommitter{}
+	committer := newCLIFinalChangeCommitter([]target.File{
+		{PathIdentity: rslintconfig.FreezeFileIdentity(directoryPath, osvfs.FS())},
+		{PathIdentity: rslintconfig.FreezeFileIdentity(filePath, osvfs.FS())},
+	})
 
 	result, err := committer.CommitFinalChanges(context.Background(), []linter.FileChange{
 		{Path: directoryPath, Before: "a", After: "b", AppliedDiagnostics: 1},
@@ -2399,7 +2402,7 @@ func TestCLIFinalChangeCommitterCommitsCompleteFinalDelta(t *testing.T) {
 	// Low-level targets without a realpath retain their lexical disk paths.
 	files := make([]target.File, len(paths))
 	for index, path := range paths {
-		files[index] = target.File{PathIdentity: rslintconfig.PathIdentity{Path: path}}
+		files[index] = target.File{PathIdentity: rslintconfig.FreezeFileIdentity(path, nil)}
 	}
 	committer := newCLIFinalChangeCommitter(files)
 	changes := make([]linter.FileChange, len(paths))
@@ -2555,7 +2558,7 @@ func TestCLIFinalChangeCommitterRejectsStaleDiskGeneration(t *testing.T) {
 	if err := os.WriteFile(filePath, []byte("new"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	committer := cliFinalChangeCommitter{}
+	committer := newCLIFinalChangeCommitter([]target.File{{PathIdentity: rslintconfig.FreezeFileIdentity(filePath, osvfs.FS())}})
 
 	result, err := committer.CommitFinalChanges(context.Background(), []linter.FileChange{{
 		Path:               filePath,

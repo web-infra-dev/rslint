@@ -213,7 +213,6 @@ type Server struct {
 	// Failed uncovered-directory refreshes belong to the committed generation.
 	failedGitPolicyDirectories   map[string]struct{}
 	gitPolicyWatcherID           project.WatcherID
-	retiredGitPolicyWatcherID    project.WatcherID
 	gitPolicyWatcherGeneration   uint64
 	gitPolicyWatcherKey          string
 	committedGitWatchDirectories []string

@@ -76,7 +76,7 @@ func discoverLintTargetsMultiConfig(
 	allowDirs []string,
 	singleThreaded bool,
 ) []File {
-	ownerIndex := NewOwnerIndex(configMap, fsys)
+	pathSpaces := rslintconfig.NewPathSpaceSnapshot(configMap, fsys)
 	files := freezeFilePathsForTest(allowFiles, fsys)
 	explicitSet := newExplicitLintTargetSet(files, fsys)
 	directories := allowDirs
@@ -94,7 +94,7 @@ func discoverLintTargetsMultiConfig(
 		files,
 		rslintconfig.ResolveDirectoryIdentities(allowDirs, fsys),
 		singleThreaded,
-		ownerIndex,
+		pathSpaces,
 		explicitSet,
 		policy,
 	)
