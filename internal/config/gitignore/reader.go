@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Source is one observed .gitignore in physical repository coordinates.
@@ -225,5 +226,5 @@ func DirectoryPathID(directory string, useCaseSensitive bool) tspath.Path {
 	if directory != "/" && (len(directory) != 3 || directory[1] != ':') {
 		directory = strings.TrimSuffix(directory, "/")
 	}
-	return tspath.ToPath(directory, "", useCaseSensitive)
+	return tspath.ToPath(utils.NormalizeAbsoluteDrive(directory), "", useCaseSensitive)
 }

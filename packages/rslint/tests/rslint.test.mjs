@@ -463,21 +463,39 @@ describe('Rslint class', () => {
   });
 
   test('lintFiles uses the same glob syntax for expansion and scan entries', async () => {
-    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-braces-'));
-    const config = [{ rules: { 'no-debugger': 'error' } }];
+    const tmp = await mkdtemp(path.join(os.tmpdir(), '[rslint-api-braces]-'));
+    const absolutePattern = convertPathToPattern(tmp.split(path.sep).join('/'));
+    const config = [
+      { ignores: ['rslint.config.mjs'] },
+      { rules: { 'no-debugger': 'error' } },
+    ];
     try {
       await mkdir(path.join(tmp, '.git'));
-      const directories = ['brace{dir}', 'plus+dir', 'close)dir', 'comma,dir'];
+      const directories = [
+        'brace{dir}',
+        'nested/[dir]',
+        'plus+dir',
+        'close)dir',
+        'comma,dir',
+        '!dir',
+        '!!src',
+      ];
       for (const directory of directories) {
         await mkdir(path.join(tmp, directory, '.git'), { recursive: true });
         await writeFile(path.join(tmp, directory, 'one.ts'), 'debugger;\n');
       }
       await mkdir(path.join(tmp, 'src'));
+      await mkdir(path.join(tmp, 'scratch', 'sub'), { recursive: true });
       await writeFile(
         path.join(tmp, '.gitignore'),
-        directories.map((directory) => `${directory}/\n`).join(''),
+        directories
+          .map(
+            (directory) => `${directory.split('/')[0].replace(/^!/, '\\!')}/\n`,
+          )
+          .join(''),
       );
       await writeFile(path.join(tmp, 'src', 'control.ts'), 'debugger;\n');
+      await writeFile(path.join(tmp, 'control.ts'), 'debugger;\n');
       await writeFile(
         path.join(tmp, 'rslint.config.mjs'),
         `export default ${JSON.stringify(config)};\n`,
@@ -491,6 +509,7 @@ describe('Rslint class', () => {
         try {
           for (const [pattern, expected] of [
             ['brace{dir}/**/*.ts', ['brace{dir}/one.ts']],
+            [String.raw`nested/\[dir\]`, ['nested/[dir]/one.ts']],
             [String.raw`brace\{dir\}/**/*.ts`, ['brace{dir}/one.ts']],
             ['brace{dir}/one.ts', ['brace{dir}/one.ts']],
             ['plus+dir/**/*.ts', ['plus+dir/one.ts']],
@@ -499,7 +518,21 @@ describe('Rslint class', () => {
             ['comma,dir/**/*.ts', ['comma,dir/one.ts']],
             ['comma,dir/one.ts', ['comma,dir/one.ts']],
             ['src/**/*.ts', ['src/control.ts']],
-            ['**/*.ts', ['src/control.ts']],
+            ['', []],
+            [['', 'src/*.ts'], ['src/control.ts']],
+            ['./!src', ['control.ts']],
+            ['./!!src', ['src/control.ts']],
+            [String.raw`\!dir`, ['!dir/one.ts']],
+            ['scratch/*/../../!src', ['control.ts']],
+            [`${absolutePattern}/scratch/*/../../!src`, ['control.ts']],
+            ['scratch/*/../../!!src', ['src/control.ts']],
+            [`${absolutePattern}/scratch/*/../../!!src`, ['src/control.ts']],
+            ['scratch/*/../../src/*.ts', ['src/control.ts']],
+            ['scratch/**/../../src/*.ts', ['src/control.ts']],
+            [`${absolutePattern}/scratch/*/../../src/*.ts`, ['src/control.ts']],
+            ['scratch/*/../../src/control.ts', ['src/control.ts']],
+            ['scratch/*/../../brace{dir}', ['brace{dir}/one.ts']],
+            ['**/*.ts', ['control.ts', 'src/control.ts']],
           ]) {
             const results = await rslint.lintFiles(pattern);
             expect(
@@ -1444,17 +1477,22 @@ module.exports = config;`
 
       const rslint = new Rslint({ cwd: tmp });
       try {
-        const results = await rslint.lintFiles([
-          'packages/app/*.ts',
+        for (const literal of [
           'packages/app/index.ts',
-        ]);
-        expect(results).toHaveLength(1);
-        expect(results[0].filePath).toBe(
-          path.join(tmp, 'packages', 'app', 'index.ts'),
-        );
-        const ruleIds = results[0].messages.map((m) => m.ruleId);
-        expect(ruleIds).toContain('no-debugger');
-        expect(ruleIds).not.toContain('no-console');
+          '././packages/app/index.ts',
+        ]) {
+          const results = await rslint.lintFiles([
+            'packages/app/*.ts',
+            literal,
+          ]);
+          expect(results).toHaveLength(1);
+          expect(results[0].filePath).toBe(
+            path.join(tmp, 'packages', 'app', 'index.ts'),
+          );
+          const ruleIds = results[0].messages.map((m) => m.ruleId);
+          expect(ruleIds).toContain('no-debugger');
+          expect(ruleIds).not.toContain('no-console');
+        }
       } finally {
         await rslint.close();
       }
@@ -1479,6 +1517,7 @@ module.exports = config;`
         ].join('\n'),
       );
       await mkdir(path.join(tmp, 'packages', 'app'), { recursive: true });
+      await mkdir(path.join(tmp, 'scratch', 'sub'), { recursive: true });
       await writeFile(
         path.join(tmp, 'packages', 'app', 'rslint.config.mjs'),
         "export default [{ rules: { 'no-debugger': 'error' } }];\n",
@@ -1490,7 +1529,12 @@ module.exports = config;`
 
       const rslint = new Rslint({ cwd: tmp });
       try {
-        expect(await rslint.lintFiles('**/*.ts')).toEqual([]);
+        for (const pattern of [
+          '**/*.ts',
+          'scratch/*/../../packages/app/index.ts',
+        ]) {
+          expect(await rslint.lintFiles(pattern)).toEqual([]);
+        }
       } finally {
         await rslint.close();
       }

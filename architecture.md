@@ -1066,6 +1066,9 @@ The transport and target phase differ by surface:
 - `Rslint.lintFiles()` still expands target globs with `tinyglobby`, preserves
   literal provenance and canonical identities, and sends the resulting files
   plus the static roots that actually matched each file in one API lint request.
+  Static roots follow glob dot-segment normalization while retaining the
+  authored literal/scan role and native volume boundaries. A glob that reduces
+  to a static file still enters through its directory.
   Go bounds catalog discovery to each root's candidate ancestor trie and removes
   candidates that no matching input can reach before file-to-config
   assignment, then applies selectors and ignores once to that exact target set;

@@ -532,6 +532,33 @@ func (fsys gitPolicyVolumeRootFS) ReadFile(path string) (string, bool) {
 	}
 	return "", false
 }
+
+func TestGitPolicyDriveSpellingPreservesDirectoryCase(t *testing.T) {
+	_, patterns := gitignore.NewCursor("C:/Repo", true).AppendSourcePatterns("C:/Repo", "*.ts\n")
+	policy := NewGitPolicy(gitignore.Snapshot{
+		UseCaseSensitive:   true,
+		Roots:              []string{"C:/Repo"},
+		Sources:            []gitignore.Source{{Directory: "C:/Repo", Patterns: patterns}},
+		CoveredDirectories: []string{"C:/Repo"},
+	})
+	matcher := gitPolicyMatcher(t, RslintConfig{{Files: []string{"**/*.ts"}}}, "C:/Repo", nil, policy)
+	for _, test := range []struct {
+		directory string
+		ignored   bool
+	}{
+		{"C:/Repo", true}, {"c:/Repo", true}, {"c:/repo", false},
+	} {
+		file := tspath.CombinePaths(test.directory, "input.ts")
+		identity := PathIdentity{Path: file, CanonicalPath: file, CanonicalParentPath: test.directory}
+		if got := matcher.MatchFile(identity).GloballyIgnored(); got != test.ignored {
+			t.Errorf("%s ignored=%v, want %v", file, got, test.ignored)
+		}
+		if got := policy.CoversDirectory(test.directory); got != test.ignored {
+			t.Errorf("%s covered=%v, want %v", test.directory, got, test.ignored)
+		}
+	}
+}
+
 func TestGitPolicyVolumeRootRulesApplyToFilesAndDirectories(t *testing.T) {
 	for _, root := range []string{"C:/", "//server/share/", "//server/share"} {
 		t.Run(root, func(t *testing.T) {

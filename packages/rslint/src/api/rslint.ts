@@ -147,6 +147,7 @@ type GlobPatternRole = 'match' | 'ignore' | 'skip';
 // Keep this classification aligned with tinyglobby's processPatterns(): a
 // leading `!(` starts a positive extglob, while `!pattern` is an exclusion.
 function globPatternRole(pattern: string): GlobPatternRole {
+  if (!pattern) return 'skip';
   if (pattern[0] !== '!' || pattern[1] === '(') return 'match';
   if (pattern[1] !== '!' || pattern[2] === '(') return 'ignore';
   return 'skip';
@@ -161,24 +162,51 @@ const DEFAULT_LINT_GLOB_IGNORES = ['**/node_modules/**', '**/.git/**'];
 
 function staticGlobRoot(pattern: string, cwd: string): string | undefined {
   // scan() can stop at literal/escaped braces before seeing a later wildcard.
-  // Use the matcher's parser for both classification and the static prefix.
-  let prefix = '';
-  for (const token of picomatch.parse(pattern, {}).tokens) {
-    if (
-      ['bos', 'text', 'dot', 'slash', 'comma'].includes(token.type) ||
-      token.value.startsWith('\\') ||
-      token.output === `\\${token.value}`
-    ) {
-      prefix += token.value;
-      continue;
-    }
-    const directory = prefix.slice(0, prefix.lastIndexOf('/') + 1);
-    return path.resolve(
-      cwd,
-      picomatch.scan(directory, { unescape: true }).base || '.',
+  // Keep the authored literal/scan role, then derive the effective static path
+  // after dot-segment normalization. Preserve Windows volume boundaries.
+  const volume =
+    path.sep === '\\'
+      ? /^(?:[a-z]:|\/\/[^/]+\/[^/]+)(?=\/|$)/i.exec(pattern)?.[0] || ''
+      : '';
+  let normalized =
+    volume + path.posix.normalize(pattern.slice(volume.length) || '/');
+  if (path.isAbsolute(normalized)) {
+    const relative = path.posix.relative(
+      convertPathToPattern(cwd.split(path.sep).join('/')),
+      normalized,
     );
+    // tinyglobby makes absolute patterns relative before parsing negations.
+    if (relative.startsWith('!')) normalized = relative;
   }
-  return undefined;
+  let prefix = '';
+  for (const input of normalized === pattern
+    ? [pattern]
+    : [pattern, normalized]) {
+    prefix = '';
+    const parsed = picomatch.parse(input, {});
+    let dynamic = Boolean(parsed.negated);
+    for (const token of parsed.negated ? [] : parsed.tokens) {
+      if (
+        ['bos', 'text', 'dot', 'slash', 'comma'].includes(token.type) ||
+        token.value.startsWith('\\') ||
+        token.output === `\\${token.value}`
+      ) {
+        prefix += token.value;
+        continue;
+      }
+      dynamic = true;
+      break;
+    }
+    // scan() records leading negation syntax even when two bangs cancel out.
+    if (input === pattern && !dynamic && !picomatch.scan(input).negated) {
+      return undefined;
+    }
+    if (dynamic) prefix = prefix.slice(0, prefix.lastIndexOf('/') + 1);
+  }
+  return path.resolve(
+    cwd,
+    picomatch.scan(prefix, { unescape: true }).base || '.',
+  );
 }
 
 function normalizeGlobPatternForCwd(pattern: string, cwd: string): string {
@@ -230,10 +258,13 @@ async function classifyLintPatterns(
 
   for (const pattern of patterns) {
     if (globPatternRole(pattern) !== 'match') continue;
-    const scanRoot = staticGlobRoot(pattern, cwd);
+    let scanRoot = staticGlobRoot(pattern, cwd);
     if (scanRoot !== undefined) {
       try {
-        if ((await stat(scanRoot)).isDirectory()) {
+        const info = await stat(scanRoot);
+        // A glob reduced to a static file still enters through its directory.
+        if (info.isFile()) scanRoot = path.dirname(scanRoot);
+        if (info.isDirectory() || info.isFile()) {
           const matches = scanPatterns.get(scanRoot) ?? [];
           matches.push(pattern);
           scanPatterns.set(scanRoot, matches);
@@ -258,7 +289,9 @@ async function classifyLintPatterns(
       }
       if (info.isDirectory()) {
         const matches = scanPatterns.get(absolute) ?? [];
-        matches.push(`${convertPathToPattern(absolute)}/**/*`);
+        const relative =
+          path.relative(cwd, absolute).split(path.sep).join('/') || '.';
+        matches.push(`${convertPathToPattern(relative)}/**/*`);
         scanPatterns.set(absolute, matches);
       } else if (info.isFile()) {
         if (!matchesExcludedLiteral(absolute, excludedLiteralPatterns, cwd)) {
