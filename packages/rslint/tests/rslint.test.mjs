@@ -1612,6 +1612,30 @@ module.exports = config;`
         } finally {
           await fallback.close();
         }
+        await mkdir(path.join(tmp, 'scoped', 'deep'), { recursive: true });
+        await writeFile(
+          path.join(tmp, 'scoped', 'deep', 'rslint.config.mjs'),
+          config,
+        );
+        await writeFile(
+          path.join(tmp, 'scoped', 'deep', 'index.ts'),
+          'debugger;\n',
+        );
+        const scoped = new Rslint({
+          cwd: tmp,
+          overrideConfig: [{ basePath: 'scoped', ignores: ['**'] }],
+        });
+        try {
+          const results = await scoped.lintFiles('scoped/**/*.ts');
+          expect(
+            results.map((result) => path.relative(tmp, result.filePath)),
+          ).toEqual([path.join('scoped', 'deep', 'index.ts')]);
+          expect(results[0].messages.map((message) => message.ruleId)).toEqual([
+            'no-debugger',
+          ]);
+        } finally {
+          await scoped.close();
+        }
       } finally {
         await cleanupTempDir(tmp);
       }

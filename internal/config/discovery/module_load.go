@@ -292,6 +292,17 @@ func (coordinator *moduleLoadCoordinator) validateNativeCaseAlias(left configCan
 	return nil
 }
 
+func (coordinator *moduleLoadCoordinator) globalIgnoreMatcher(ownerPath string) (rslintconfig.GlobalIgnoreMatcher, bool) {
+	if ownerPath == "" {
+		return rslintconfig.GlobalIgnoreMatcher{}, false
+	}
+	state := coordinator.state(ownerPath)
+	if state == nil || state.failure != nil {
+		return rslintconfig.GlobalIgnoreMatcher{}, false
+	}
+	return state.ignoreMatcher, true
+}
+
 func (coordinator *moduleLoadCoordinator) failures() []ConfigFailure {
 	failures := make([]ConfigFailure, 0, len(coordinator.failureByPath))
 	for _, failure := range coordinator.failureByPath {

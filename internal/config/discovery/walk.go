@@ -39,7 +39,7 @@ type discoveryWalkStats struct {
 	directoriesPruned  int
 }
 
-func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNode) error {
+func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNode, discoverConfigs bool) error {
 	queue := append([]discoveryWalkNode(nil), roots...)
 	for len(queue) > 0 {
 		if err := coordinator.ctx.Err(); err != nil {
@@ -54,7 +54,7 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 		var next []discoveryWalkNode
 		var suspended []suspendedDiscoveryNode
 		var candidates []configCandidate
-		results := coordinator.processWalkFrontier(queue)
+		results := coordinator.processWalkFrontier(queue, discoverConfigs)
 		// Results are indexed by the already-sorted frontier. Merging on this
 		// goroutine keeps catalog state, stats, and loader batches deterministic
 		// regardless of worker completion order.
@@ -111,7 +111,7 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 	return nil
 }
 
-func (coordinator *discoveryCoordinator) processWalkFrontier(nodes []discoveryWalkNode) []discoveryWalkResult {
+func (coordinator *discoveryCoordinator) processWalkFrontier(nodes []discoveryWalkNode, discoverConfigs bool) []discoveryWalkResult {
 	results := make([]discoveryWalkResult, len(nodes))
 	workers := runtime.GOMAXPROCS(0)
 	if workers < 2 {
@@ -125,7 +125,7 @@ func (coordinator *discoveryCoordinator) processWalkFrontier(nodes []discoveryWa
 	}
 	if workers <= 1 {
 		for index, node := range nodes {
-			results[index] = coordinator.processWalkNode(node)
+			results[index] = coordinator.processWalkNode(node, discoverConfigs)
 		}
 		return results
 	}
@@ -137,7 +137,7 @@ func (coordinator *discoveryCoordinator) processWalkFrontier(nodes []discoveryWa
 		go func() {
 			defer waitGroup.Done()
 			for index := range jobs {
-				results[index] = coordinator.processWalkNode(nodes[index])
+				results[index] = coordinator.processWalkNode(nodes[index], discoverConfigs)
 			}
 		}()
 	}
@@ -149,7 +149,7 @@ func (coordinator *discoveryCoordinator) processWalkFrontier(nodes []discoveryWa
 	return results
 }
 
-func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode) discoveryWalkResult {
+func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode, discoverConfigs bool) discoveryWalkResult {
 	if err := coordinator.ctx.Err(); err != nil {
 		return discoveryWalkResult{err: err}
 	}
@@ -158,7 +158,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 	}
 	result := discoveryWalkResult{}
 
-	if coordinator.explicit == nil && node.configReachable {
+	if discoverConfigs && node.configReachable {
 		if candidate, found := coordinator.findCandidateForOwner(
 			node.directory,
 			node.ownerPath,
@@ -248,15 +248,16 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 }
 
 func (coordinator *discoveryCoordinator) isGloballyIgnoredDirectory(ownerPath string, directory string, canonicalDirectory string) bool {
-	return coordinator.globalIgnoreMatcher(ownerPath).BlocksDirectory(directory, canonicalDirectory)
+	matcher, ok := coordinator.modules.globalIgnoreMatcher(ownerPath)
+	return ok && matcher.BlocksDirectory(directory, canonicalDirectory)
 }
 
 func (coordinator *discoveryCoordinator) reopensGitignoredDirectory(ownerPath string, directory string, canonicalDirectory string) bool {
-	return coordinator.globalIgnoreMatcher(ownerPath).ReopensDirectoryNode(directory, canonicalDirectory)
+	matcher, ok := coordinator.modules.globalIgnoreMatcher(ownerPath)
+	return ok && matcher.ReopensDirectoryNode(directory, canonicalDirectory)
 }
 
 func (coordinator *discoveryCoordinator) isGloballyIgnoredCandidate(ownerPath string, candidate rslintconfig.PathIdentity) bool {
-	// Only an actual ancestor owner can hide a module filename; fallback
-	// directory policy must not hide the module that establishes ownership.
-	return ownerPath != "" && coordinator.globalIgnoreMatcher(ownerPath).IgnoresFile(candidate)
+	matcher, ok := coordinator.modules.globalIgnoreMatcher(ownerPath)
+	return ok && matcher.IgnoresFile(candidate)
 }

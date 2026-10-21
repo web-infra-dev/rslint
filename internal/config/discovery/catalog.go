@@ -55,8 +55,8 @@ type ConfigDiscoveryRequest struct {
 	CWD         string
 	Files       []DiscoveryFile
 	Directories []rslintconfig.DirectoryIdentity
-	// FallbackConfig supplies authored directory policy until a successful
-	// module owns the route. It is not a config owner or a load candidate.
+	// FallbackConfig supplies input policy when discovery finds no config owner.
+	// It is not a config owner or a load candidate.
 	FallbackConfig rslintconfig.RslintConfig
 	// LimitDirectoryWalkToFiles is used when a host has already expanded its
 	// directory/glob inputs to an exact target set. Only target-ancestor branches

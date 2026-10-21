@@ -26,5 +26,5 @@ func (coordinator *discoveryCoordinator) collectExplicitGitSources(ownerDirector
 			targets:            targetsByRoot[directory.LexicalPath],
 		})
 	}
-	return coordinator.walkDirectories(roots)
+	return coordinator.walkDirectories(roots, false)
 }

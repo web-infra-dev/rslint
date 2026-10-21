@@ -17,15 +17,14 @@ type discoveryCoordinator struct {
 	explicit      *ExplicitConfigRequest
 	transactionID string
 
-	modules               moduleLoadCoordinator
-	git                   *gitignore.Reader
-	draft                 catalogDraft
-	walkStats             discoveryWalkStats
-	physicalDirectories   map[string]string
-	targetFiles           []rslintconfig.PathIdentity
-	targetDirectories     []rslintconfig.DirectoryIdentity
-	reachableFiles        map[string]bool
-	fallbackIgnoreMatcher rslintconfig.GlobalIgnoreMatcher
+	modules             moduleLoadCoordinator
+	git                 *gitignore.Reader
+	draft               catalogDraft
+	walkStats           discoveryWalkStats
+	physicalDirectories map[string]string
+	targetFiles         []rslintconfig.PathIdentity
+	targetDirectories   []rslintconfig.DirectoryIdentity
+	reachableFiles      map[string]bool
 }
 
 func newDiscoveryCoordinator(
@@ -71,7 +70,7 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 	coordinator.request.Files = files
 	coordinator.request.Directories = directoryRoots
 	coordinator.targetDirectories = directoryRoots
-	boundedDirectoryWalk := coordinator.request.LimitDirectoryWalkToFiles && len(directoryRoots) > 0 && len(files) > 0
+	boundedDirectoryWalk := coordinator.request.LimitDirectoryWalkToFiles && len(directoryRoots) > 0 && files != nil
 	var targetsByRoot map[string]*discoveryTargetTrie
 	if boundedDirectoryWalk {
 		targetsByRoot = coordinator.targetAncestorTries(directoryRoots, files)
@@ -100,16 +99,6 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		anchors = append(anchors, rslintconfig.DirectoryIdentity{LexicalPath: lexical, CanonicalPath: physical})
 	}
 	coordinator.modules.pathSpaces = coordinator.modules.pathSpaces.WithConfigBases(nil, coordinator.fs, anchors...)
-	if len(coordinator.request.FallbackConfig) > 0 {
-		coordinator.modules.pathSpaces = coordinator.modules.pathSpaces.WithConfigBases(
-			map[string]rslintconfig.RslintConfig{cwd: coordinator.request.FallbackConfig}, coordinator.fs,
-		)
-		matcher, err := rslintconfig.NewGlobalIgnoreMatcherWithPathSpaces(coordinator.request.FallbackConfig, cwd, coordinator.fs, coordinator.modules.pathSpaces)
-		if err != nil {
-			return nil, err
-		}
-		coordinator.fallbackIgnoreMatcher = matcher
-	}
 
 	if explicit := coordinator.explicit; explicit != nil {
 		if explicit.Config != nil {
@@ -253,7 +242,7 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		if seed == nil {
 			continue
 		}
-		ignoreMatcher := coordinator.globalIgnoreMatcher(seed.ownerPath)
+		ignoreMatcher, _ := coordinator.modules.globalIgnoreMatcher(seed.ownerPath)
 		walkRoots = append(walkRoots, discoveryWalkNode{
 			directory:          directory,
 			canonicalDirectory: seed.physicalDirectory,
@@ -265,8 +254,27 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 			targets:            targetsByRoot[directory],
 		})
 	}
-	if err := coordinator.walkDirectories(walkRoots); err != nil {
+	if err := coordinator.walkDirectories(walkRoots, true); err != nil {
 		return nil, err
+	}
+	if len(coordinator.draft.configs) == 0 && len(coordinator.request.FallbackConfig) > 0 {
+		// The fallback's array base is known only after module discovery. Reuse
+		// this reader and the bounded frontier without evaluating more modules.
+		coordinator.modules.pathSpaces = coordinator.modules.pathSpaces.WithConfigBases(
+			map[string]rslintconfig.RslintConfig{cwd: coordinator.request.FallbackConfig}, coordinator.fs,
+		)
+		matcher, err := rslintconfig.NewGlobalIgnoreMatcherWithPathSpaces(coordinator.request.FallbackConfig, cwd, coordinator.fs, coordinator.modules.pathSpaces)
+		if err != nil {
+			return nil, err
+		}
+		if coordinator.reachableFiles != nil {
+			for _, file := range files {
+				coordinator.reachableFiles[file.Path] = file.Explicit
+			}
+		}
+		if err := coordinator.collectExplicitGitSources(cwd, "", matcher, targetsByRoot); err != nil {
+			return nil, err
+		}
 	}
 
 	return coordinator.catalog()
@@ -278,14 +286,6 @@ func (coordinator *discoveryCoordinator) adoptCandidate(state *configLoadState, 
 		return err
 	}
 	return nil
-}
-
-func (coordinator *discoveryCoordinator) globalIgnoreMatcher(ownerPath string) rslintconfig.GlobalIgnoreMatcher {
-	state := coordinator.modules.state(ownerPath)
-	if state != nil && state.failure == nil {
-		return state.ignoreMatcher
-	}
-	return coordinator.fallbackIgnoreMatcher
 }
 
 func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {

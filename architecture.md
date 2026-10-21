@@ -1075,9 +1075,10 @@ The transport and target phase differ by surface:
   entries are structurally validated before that load and attached at the
   loader boundary as the final suffix of every successful config. Their global
   ignores and negations therefore participate in staged reachability and are
-  published exactly once. Before a module owns a route, the override array
-  supplies directory policy without becoming a config owner or load candidate;
-  an empty catalog uses the same override directly.
+  published exactly once. An empty catalog applies its fallback override array
+  through the same bounded input traversal and Git reader without evaluating
+  more modules. Its array base is then the invocation cwd; a discovered module
+  retains its own array base. The fallback is not a config owner or candidate.
 - Extension activation makes a one-time stand-down decision through
   `rstackEditorTakesOver()`: an enabled `rstack.rstack` alone takes over, and
   `Extension`, `RuntimeManager`, and LSP startup are skipped entirely. The

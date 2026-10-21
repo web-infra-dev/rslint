@@ -2055,6 +2055,18 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 	if response.FileCount != 1 || len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
 		t.Fatalf("unexpected target response: %+v", response)
 	}
+	requestedPaths = nil
+	response, err = (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Files:            []string{},
+		WorkingDirectory: root,
+		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Directories: []string{root}},
+	}, requester)
+	if err != nil {
+		t.Fatalf("empty expanded set: %v", err)
+	}
+	if len(requestedPaths) != 0 || response.FileCount != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("empty expanded set triggered discovery or lint: configs=%v, response=%+v", requestedPaths, response)
+	}
 }
 
 func TestHandleLint_ConfigDiscoveryExpandedFilesKeepTheirScanEntries(t *testing.T) {
