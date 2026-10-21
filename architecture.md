@@ -1917,25 +1917,25 @@ exclude them from file discovery, while public plugin entry points continue to
 export their types from the modules that own them. There are no old internal
 path forwarding modules.
 
-The worker checks cancellation before capability reads, validates the complete
-frame layout and references before allocating AST objects, then eagerly
+The worker checks cancellation before capability reads and checks the frame
+header and column extents before allocating AST objects. The matching Go
+producer owns record shapes, references and ranges. Node eagerly
 materializes ordinary ESTree objects, ranges, loc, canonical parent links and
 owned token columns. Schema-local constructors allocate each node's own present
-fields together, including reachable nodes' final parent slots. Structural
-reachability is validated first; parents are still assigned after all fields
-are complete, in the existing traversal order. Constructors are cached by
-present-field shape, with at most eight variants per schema and a generic
-constructor for additional shapes. They retain schema constants only and
-preserve the ordinary Object prototype, mutable data properties, absent
-optional fields and inherited setter behavior. String
-validation and decoding share one index, and decoding uses one temporary byte
-view for the string table instead of a Buffer wrapper per string. Tagged words
-use signed reads to avoid boxed unsigned magnitudes while preserving their tag
-and payload bits; a byte per list word indexes validated record boundaries.
-No input view
-survives materialization. BigInt and RegExp values are created in JavaScript. No
-mapped Buffer, lazy AST proxy or capability escapes to plugin code; plugins may
-retain any AST node or SourceCode after lint returns. Existing scope, listener,
+fields together, including non-root nodes' final parent slots. Parents are
+assigned after all fields are complete, in the existing traversal order.
+Constructors are cached by present-field shape, with at most eight variants per
+schema and a generic constructor for additional shapes. They retain schema
+constants only and preserve the ordinary Object prototype, mutable data properties, absent
+optional fields and inherited setter behavior. String offsets are indexed once,
+and decoding uses one temporary byte view for the string table instead of a
+Buffer wrapper per string. Tagged words use signed reads to avoid boxed unsigned
+magnitudes while preserving their tag and payload bits. No record-validation
+pass or graph-validation scratch is
+allocated. No input view survives materialization. BigInt and RegExp values are
+created in JavaScript. No mapped Buffer, lazy AST proxy or capability escapes to
+plugin code; plugins may retain any AST node or SourceCode after lint returns.
+Existing scope, listener,
 SourceCode, report and fix execution consumes this final tree.
 SourceCode's private comment-aware token index reserves the known stream size
 and keeps the actual merge length, avoiding repeated backing-array growth.
@@ -1955,10 +1955,11 @@ root during rule callbacks. Caller-owned inline frames keep their ownership.
 Lazy scope resources capture language metadata and the owned AST, never the
 transport request. Retaining SourceCode therefore does not retain an inline
 frame Buffer or a shared-memory capability after decoding.
-The decoder rejects concurrently writable SharedArrayBuffer input and uses
-wire node IDs directly for tree validation and parent assignment. SourceCode's
-generic visitor fallback for caller-created nodes and its shebang comment API
-remain SDK behavior; framed production syntax accepts only the fixed schema.
+The decoder uses wire node IDs directly for parent assignment. Production
+transport supplies an owned Buffer; mapped bytes are copied before decoding.
+SourceCode's generic visitor fallback for caller-created nodes and its shebang
+comment API remain SDK behavior; framed production syntax accepts only the fixed
+schema.
 
 Revocation removes the capability from the reader registry immediately. Active
 readers keep the revoked lease and all its slots occupied. Reuse is acknowledged

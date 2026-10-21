@@ -1,5 +1,5 @@
 /**
- * ESTree child order used by frame validation, parent linking, and rule traversal.
+ * ESTree child order used by parent linking and rule traversal.
  * Shared node types are checked against @typescript-eslint/visitor-keys and
  * eslint-visitor-keys. Unsupported syntax is rejected by the Go projector.
  */
