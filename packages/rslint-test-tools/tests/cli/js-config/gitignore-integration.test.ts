@@ -736,6 +736,62 @@ describe('Gitignore: tsconfig + gitignore interaction', () => {
 });
 
 describe('Gitignore: monorepo gap file interaction', () => {
+  test('directory negations retain aliases with a physical config owner', async () => {
+    const tempDir = await createTempDir({
+      '.git': '',
+      '.gitignore': 'ignored/\n',
+      'real/rslint.config.mjs': '',
+      'real/sub/visible.ts': 'debugger;\n',
+      'real/sub/ignored/.git': '',
+      'real/sub/ignored/.gitignore': 'local.ts\n',
+      'real/sub/ignored/keep.ts': 'debugger;\n',
+      'real/sub/ignored/other.ts': 'debugger;\n',
+      'real/sub/ignored/local.ts': 'debugger;\n',
+    });
+    try {
+      fs.symlinkSync(
+        path.join(tempDir, 'real/sub'),
+        path.join(tempDir, 'link'),
+        'junction',
+      );
+      for (const [negation, expected] of [
+        ['', ['link/visible.ts']],
+        [
+          '!link/ignored',
+          ['link/ignored/keep.ts', 'link/ignored/other.ts', 'link/visible.ts'],
+        ],
+        ['!link/ignored/keep.ts', ['link/ignored/keep.ts', 'link/visible.ts']],
+      ] as const) {
+        fs.writeFileSync(
+          path.join(tempDir, 'real/rslint.config.mjs'),
+          `export default ${JSON.stringify([
+            { basePath: fs.realpathSync(tempDir), ignores: [negation] },
+            { rules: { 'no-debugger': 'error' } },
+          ])};`,
+        );
+        for (const configArgs of [[], ['--config', 'real/rslint.config.mjs']]) {
+          const result = await runRslint(
+            ['--format', 'jsonline', ...configArgs, 'link'],
+            tempDir,
+          );
+          expect(result.exitCode).toBe(1);
+          expect(result.stderr).toBe('');
+          const diagnostics = result.stdout
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line) as Diagnostic);
+          expect(
+            diagnostics
+              .map((diagnostic) => diagnostic.filePath.replaceAll('\\', '/'))
+              .sort(),
+          ).toEqual(expected);
+        }
+      }
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test.each(['ignored', 'ignored/nested'])(
     'a leaf exception does not reopen the nested repository at %s',
     async (nested) => {

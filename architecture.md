@@ -1014,6 +1014,8 @@ Automatic discovery uses these rules:
    an effective exception; discovering a marker does not authorize hidden
    configs or unrelated files. Target walks check this route restriction once
    per directory and apply the same ordered global-ignore matcher to its files.
+   Route checks use caller-visible directory projections, as do directory
+   pruning and file matching, including physical config-owner fallbacks.
    Authored negations may keep traversal open without making raw Git sources
    beneath an excluded parent readable. The supplied-root config ownership
    exception remains separate from this source reachability.

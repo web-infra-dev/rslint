@@ -1833,6 +1833,52 @@ func TestDiscoverLintTargetsMultiConfig_PrunesUsingCallerVisibleDirectoryAlias(t
 	}
 }
 
+func TestDiscoverLintTargetsMultiConfig_ReopensGitRepositoryThroughDirectoryAlias(t *testing.T) {
+	root := setupDiscoveryContentFixture(t, map[string]string{
+		".git": "", ".gitignore": "ignored/\n",
+		"real/sub/visible.ts":         "debugger;\n",
+		"real/sub/ignored/.git":       "gitdir: /unused\n",
+		"real/sub/ignored/.gitignore": "local.ts\n",
+		"real/sub/ignored/keep.ts":    "debugger;\n",
+		"real/sub/ignored/other.ts":   "debugger;\n",
+		"real/sub/ignored/local.ts":   "debugger;\n",
+	})
+	owner := tspath.CombinePaths(root, "real")
+	link := tspath.CombinePaths(root, "link")
+	if err := os.Symlink(tspath.CombinePaths(owner, "sub"), link); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	fsys := osvfs.FS()
+	directories := rslintconfig.ResolveDirectoryIdentities([]string{link}, fsys)
+	for _, test := range []struct {
+		negation string
+		want     []string
+	}{
+		{"", []string{"link/visible.ts"}},
+		{"!link/ignored", []string{"link/ignored/keep.ts", "link/ignored/other.ts", "link/visible.ts"}},
+		{"!link/ignored/keep.ts", []string{"link/ignored/keep.ts", "link/visible.ts"}},
+	} {
+		t.Run(test.negation, func(t *testing.T) {
+			entries := rslintconfig.ConfigWithAuthoredPathBase(rslintconfig.RslintConfig{
+				{Ignores: []string{test.negation}}, {Files: []string{"**/*.ts"}},
+			}, root)
+			plan, err := Resolve(Request{
+				ConfigMap: map[string]rslintconfig.RslintConfig{owner: entries},
+				FS:        fsys, Directories: directories, SingleThreaded: true,
+				GitPolicy: rslintconfig.CollectGitPolicy(entries, owner, fsys, nil, directories),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, file := range plan.Files {
+				got = append(got, strings.TrimPrefix(file.Path, root+"/"))
+			}
+			assert.DeepEqual(t, got, test.want)
+		})
+	}
+}
+
 func TestDiscoverLintTargetsMultiConfig_EvaluatesEveryRequestedDirectoryAlias(t *testing.T) {
 	rootDir := tspath.NormalizePath(t.TempDir())
 	realConfigDir := tspath.CombinePaths(rootDir, "real")

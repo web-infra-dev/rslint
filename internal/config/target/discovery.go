@@ -294,9 +294,12 @@ func discoverLintTargetsWithinRoot(
 
 	work := func(walkPath string) []string {
 		physicalDirectory := physicalWalkPath(walkPath)
-		gitEntryBlocked := targetMatcher.GitEntryBlocked(rslintconfig.DirectoryIdentity{
-			LexicalPath: tspath.CombinePaths(normalizedScanRoot, walkPath), CanonicalPath: physicalDirectory,
-		}, gitWalkRoot)
+		gitEntryBlocked := allProjectedDirectoriesMatch(
+			tspath.CombinePaths(normalizedScanRoot, walkPath), physicalDirectory,
+			func(directory rslintconfig.DirectoryIdentity) bool {
+				return targetMatcher.GitEntryBlocked(directory, gitWalkRoot)
+			},
+		)
 		entries := readLintDirectory(fsys, physicalDirectory)
 
 		var childDirs []string
