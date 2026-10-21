@@ -1,6 +1,6 @@
 /**
  * Unit edges for JSXText token decoding. Go-projected AST text and attribute
- * values are covered by jsx-value-decode.test.ts.
+ * values are covered by the shared conformance corpus.
  */
 import { describe, test, expect } from 'rstack/test';
 

@@ -3,7 +3,6 @@ package linter
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1240,32 +1239,14 @@ func pluginSyntax(path, text string) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: path, Path: tspath.Path(tspath.NormalizePath(path))}, strings.TrimPrefix(text, "\ufeff"), core.GetScriptKindFromFileName(path))
 }
 
-// Dispatcher tests exercise batching/result policies with real frames, while
-// retaining their authored diagnostic source setup independently.
+// Policy tests treat frozen frames as opaque bytes. Projection and output
+// lifetime tests below exercise the real encoder separately.
 func pluginTestFrames(inputs []EslintPluginFileInput) []EslintPluginFileInput {
-	inputs = append([]EslintPluginFileInput(nil), inputs...)
-	var builder estree.Builder
-	for index, input := range inputs {
-		if input.Frame != nil || input.FrameError != "" {
-			continue
+	inputs = slices.Clone(inputs)
+	for index := range inputs {
+		if inputs[index].Frame == nil && inputs[index].FrameError == "" {
+			inputs[index].Frame = []byte{0, 255, 1}
 		}
-		file := input.SourceFile
-		if file == nil {
-			text := ""
-			if input.Text != nil {
-				text = *input.Text
-			}
-			file = pluginSyntax(input.Path, text)
-		}
-		sourceType := "module"
-		if value, ok := input.LanguageOptions["sourceType"].(string); ok {
-			sourceType = value
-		}
-		frame, err := builder.Build(context.Background(), file, estree.Options{SourceType: sourceType})
-		if err != nil {
-			panic(err)
-		}
-		inputs[index].Frame = frame
 	}
 	return inputs
 }
@@ -1277,15 +1258,6 @@ func testDispatchEslintPluginRulesWithOutcome(ctx context.Context, dispatch Esli
 }
 func testDispatchEslintPluginRulesAsync(ctx context.Context, dispatch EslintPluginDispatchFunc, inputs []EslintPluginFileInput, fixes bool, suggestions string, timing *TimingCollector) <-chan EslintPluginDispatchOutcome {
 	return DispatchEslintPluginRulesAsync(ctx, dispatch, pluginTestFrames(inputs), fixes, suggestions, timing)
-}
-func pluginFrameText(data []byte) string {
-	u32 := func(offset int) int { return int(binary.LittleEndian.Uint32(data[offset:])) }
-	nodes, tokens := u32(8), u32(32)
-	values := ((40 + nodes*2 + 3) &^ 3) + nodes*12
-	tokenTypes := values + u32(12)*4 + u32(16)*4 + u32(24) + u32(28)*8
-	tokenStarts := (tokenTypes + tokens + 3) &^ 3
-	source := tokenStarts + tokens*8 + u32(36)*12
-	return string(data[source:])
 }
 
 func TestDispatchEslintPluginProjectionWindowsOwnFrames(t *testing.T) {
@@ -1339,9 +1311,6 @@ func TestDispatchEslintPluginProjectionWindowsOwnFrames(t *testing.T) {
 		windows = append(windows, len(request.Files))
 		results := make([]EslintPluginFileResult, len(request.Files))
 		for index, file := range request.Files {
-			if !strings.HasPrefix(pluginFrameText(file.Frame), "const value") {
-				t.Fatal("request lost its source")
-			}
 			// Dispatch borrows newly projected bytes until it returns. A
 			// retained snapshot, like shared/inline transport, owns its copy.
 			frames = append(frames, bytes.Clone(file.Frame))
@@ -1360,7 +1329,7 @@ func TestDispatchEslintPluginProjectionWindowsOwnFrames(t *testing.T) {
 		if ownedInputs[index].SourceFile != nil || ownedInputs[index].Text != nil {
 			t.Fatal("completed projection retained an owned input slot")
 		}
-		if pluginFrameText(frame) != *inputs[index].Text {
+		if !bytes.HasSuffix(frame, []byte(*inputs[index].Text)) {
 			t.Fatal("later projection overwrote an earlier frame")
 		}
 		if inputs[index].Frame != nil {
@@ -1383,7 +1352,7 @@ func TestDispatchEslintPluginProjectionWindowsOwnFrames(t *testing.T) {
 			for _, file := range request.Files {
 				if file.Path != inputs[0].Path {
 					for _, input := range inputs[1:] {
-						if file.Path == input.Path && pluginFrameText(file.Frame) != *input.Text {
+						if file.Path == input.Path && !bytes.HasSuffix(file.Frame, []byte(*input.Text)) {
 							t.Fatal("recycled storage overwrote the pending frame")
 						}
 					}

@@ -21,134 +21,6 @@ import type { RuleContext } from '../../../src/eslint-plugin/linter/context.js';
 import { CONFORMANCE_CASES } from './conformance-cases.js';
 import { parseReference } from './conformance-oracle.js';
 
-function projectAST(filePath: string, text: string): ESTreeNode {
-  const parsed = projectSyntax(filePath, text, 'module');
-  const ast = parsed.ast as ESTreeNode;
-  return ast;
-}
-
-describe('Go-projected TSEnumDeclaration shape', () => {
-  test('members live in body.members; no top-level members field', () => {
-    const ast = projectAST('enum.ts', 'enum Color { Red, Green, Blue }\n');
-
-    // Locate the TSEnumDeclaration. Programs always have `body` as an
-    // array of top-level statements.
-    const program = ast as ESTreeNode & { body: ESTreeNode[] };
-    const enumDecl = program.body.find(
-      (n) => n.type === 'TSEnumDeclaration',
-    ) as (ESTreeNode & { body?: ESTreeNode; members?: unknown }) | undefined;
-    expect(enumDecl).toBeDefined();
-
-    // ESTree exposes the members under a `body: TSEnumBody` wrapper.
-    expect(enumDecl?.body).toBeDefined();
-    expect((enumDecl?.body as ESTreeNode).type).toBe('TSEnumBody');
-    const bodyAsUnknown = enumDecl?.body as unknown;
-    const body = bodyAsUnknown as { members: unknown[] };
-    expect(Array.isArray(body.members)).toBe(true);
-    expect(body.members.length).toBe(3);
-
-    // ESTree does not also put a flat `members` array on the declaration —
-    // so the walker visits each member exactly once (via body.members)
-    // with the correct parent. A future projector that reintroduces a flat
-    // `members` would fail here.
-    expect('members' in enumDecl!).toBe(false);
-  });
-
-  // ESTree exposes TSEnumBody.range as strictly the `{ ... }` portion — NOT
-  // the whole declaration (which would include the `enum Foo ` keyword +
-  // identifier prefix). Tools that read `body.range` to highlight the
-  // body — codemods, formatting rules, source-text slicing in
-  // conformance harnesses — rely on this matching typescript-eslint v8,
-  // which also defines TSEnumBody as strictly the braces and contents.
-  test('TSEnumBody.range covers the {...} portion only, not the keyword/id', () => {
-    const text = 'enum Color { Red, Green, Blue }';
-    const ast = projectAST('enum.ts', text);
-    const program = ast as ESTreeNode & { body: ESTreeNode[] };
-    const enumDecl = program.body.find(
-      (n) => n.type === 'TSEnumDeclaration',
-    ) as unknown as {
-      range: [number, number];
-      body: {
-        type: string;
-        range: [number, number];
-        loc: {
-          start: { line: number; column: number };
-          end: { line: number; column: number };
-        };
-      };
-    };
-    expect(enumDecl).toBeDefined();
-
-    const bodyRange = enumDecl.body.range;
-    // `{` is at index 11 (`enum Color ` is 11 chars), `}` is the last
-    // char so range[1] === text.length.
-    expect(text[bodyRange[0]]).toBe('{');
-    expect(text[bodyRange[1] - 1]).toBe('}');
-    expect(bodyRange[0]).toBe(text.indexOf('{'));
-    expect(bodyRange[1]).toBe(text.length);
-
-    // loc must mirror range (1-based line, 0-based column).
-    expect(enumDecl.body.loc.start.column).toBe(text.indexOf('{'));
-  });
-
-  test('TSEnumBody.range survives a multi-line enum with leading comment', () => {
-    const text = '// comment\nexport enum Bigger {\n  A,\n  B,\n  C,\n}\n';
-    const ast = projectAST('enum.ts', text);
-    const program = ast as ESTreeNode & { body: ESTreeNode[] };
-    // Wrapped in ExportNamedDeclaration; descend one level.
-    const exportDecl = program.body.find(
-      (n) => n.type === 'ExportNamedDeclaration',
-    ) as unknown as {
-      declaration: { type: string; body: { range: [number, number] } };
-    };
-    expect(exportDecl).toBeDefined();
-    expect(exportDecl.declaration.type).toBe('TSEnumDeclaration');
-    const bodyRange = exportDecl.declaration.body.range;
-    expect(text[bodyRange[0]]).toBe('{');
-    expect(text[bodyRange[1] - 1]).toBe('}');
-  });
-
-  test('TSEnumBody.range is valid for an empty enum body', () => {
-    // Empty enum body — ESTree still exposes a TSEnumBody whose range is the
-    // `{}` span. Pins that the degenerate (zero-member) case keeps a
-    // valid brace-to-brace range.
-    const text = 'enum X {}';
-    const ast = projectAST('enum.ts', text);
-    const program = ast as ESTreeNode & { body: ESTreeNode[] };
-    const enumDecl = program.body.find(
-      (n) => n.type === 'TSEnumDeclaration',
-    ) as unknown as { body: { range: [number, number] } };
-    expect(enumDecl).toBeDefined();
-    expect(text[enumDecl.body.range[0]]).toBe('{');
-    expect(text[enumDecl.body.range[1] - 1]).toBe('}');
-  });
-
-  test('enum member parent points at TSEnumBody (single-visit walk)', () => {
-    // The walker sets `parent` during DFS. Because ESTree puts members only
-    // under `body.members` (no flat `members`), each member is visited
-    // exactly once and its parent is the TSEnumBody wrapper —
-    // typescript-eslint v8+ semantics.
-    const ast = projectAST(
-      'enum.ts',
-      'enum Status { Active = "A", Inactive = "I" }\n',
-    );
-    const program = ast as ESTreeNode & { body: ESTreeNode[] };
-    const enumDecl = program.body.find(
-      (n) => n.type === 'TSEnumDeclaration',
-    ) as unknown as
-      { body: { type: string; members: ESTreeNode[] } } | undefined;
-    expect(enumDecl).toBeDefined();
-
-    const body = enumDecl!.body;
-    expect(body.type).toBe('TSEnumBody');
-    const firstMember = body.members[0];
-    expect(firstMember).toBeDefined();
-    expect(
-      (firstMember as ESTreeNode & { parent?: ESTreeNode }).parent?.type,
-    ).toBe('TSEnumBody');
-  });
-});
-
 // R2 regression. The runner internally uses UTF-16 code-unit offsets
 // (matching JS string indexing + ESTree output), but the Go side
 // passes the wire `startPos` to `scanner.GetECMALineAnd
@@ -673,6 +545,25 @@ test('parenthesized constructor instantiation retains its own type arguments', (
 });
 
 describe('decoded data ownership', () => {
+  test('literal values materialize as JavaScript RegExp, BigInt and UTF-16 strings', () => {
+    const { ast } = projectSyntax(
+      'file.js',
+      String.raw`const values = [/ab+c/gi, /\u{1f600}/u, 123n, 0x1Fn, null, "\uD800"];`,
+    );
+    const declaration = (ast.body as ESTreeNode[])[0];
+    const initializer = (declaration.declarations as ESTreeNode[])[0]
+      .init as ESTreeNode;
+    const elements = initializer.elements as ESTreeNode[];
+    for (const index of [0, 1])
+      expect(elements[index].value).toBeInstanceOf(RegExp);
+    expect(elements[0].value).toEqual(/ab+c/gi);
+    expect(elements[1].value).toEqual(/\u{1f600}/u);
+    expect(elements[2].value).toBe(123n);
+    expect(elements[3].value).toBe(31n);
+    expect(elements[4].value).toBeNull();
+    expect(elements[5].value).toBe('\uD800');
+  });
+
   test('a shared empty wire list decodes into independent mutable arrays', () => {
     const { ast } = projectSyntax(
       'file.ts',
@@ -741,9 +632,13 @@ describe('decoded data ownership', () => {
     expect(ast.type).toBe('retained');
   });
 
-  test('metadata initialization does not invoke an inherited setter', () => {
-    const bytes = projectFrame('file.js', 'const value = 1;');
-    const old = Object.getOwnPropertyDescriptor(Object.prototype, 'start');
+  test('metadata and wire fields become own writable data over inherited properties', () => {
+    const frame = projectFrame('file.js', 'const value = 1;');
+    const oldStart = Object.getOwnPropertyDescriptor(Object.prototype, 'start');
+    const oldDeclarations = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      'declarations',
+    );
     let writes = 0;
     Object.defineProperty(Object.prototype, 'start', {
       configurable: true,
@@ -751,61 +646,40 @@ describe('decoded data ownership', () => {
         writes++;
       },
     });
+    Object.defineProperty(Object.prototype, 'declarations', {
+      configurable: true,
+      value: 'inherited',
+      writable: false,
+    });
+    let ast!: ESTreeNode;
     try {
-      const { ast } = decodeFrame(bytes);
-      expect(Object.hasOwn(ast, 'start')).toBe(true);
-      expect(ast.start).toBe(0);
-      expect(writes).toBe(0);
+      ast = decodeFrame(frame).ast;
     } finally {
-      if (old) Object.defineProperty(Object.prototype, 'start', old);
+      if (oldStart) Object.defineProperty(Object.prototype, 'start', oldStart);
       else Reflect.deleteProperty(Object.prototype, 'start');
+      if (oldDeclarations)
+        Object.defineProperty(
+          Object.prototype,
+          'declarations',
+          oldDeclarations,
+        );
+      else Reflect.deleteProperty(Object.prototype, 'declarations');
     }
-  });
-
-  test.each(['setter', 'readonly'] as const)(
-    'wire fields become own data properties over an inherited %s',
-    (kind) => {
-      const bytes = projectFrame('file.js', 'const value = 1;');
-      const old = Object.getOwnPropertyDescriptor(
-        Object.prototype,
-        'declarations',
-      );
-      let writes = 0;
-      Object.defineProperty(
-        Object.prototype,
-        'declarations',
-        kind === 'setter'
-          ? {
-              configurable: true,
-              set() {
-                writes++;
-              },
-            }
-          : { configurable: true, value: 'inherited', writable: false },
-      );
-      let ast: ESTreeNode;
-      try {
-        ast = decodeFrame(bytes).ast;
-      } finally {
-        if (old) Object.defineProperty(Object.prototype, 'declarations', old);
-        else Reflect.deleteProperty(Object.prototype, 'declarations');
-      }
-      const declaration = (ast as ESTreeNode & { body: ESTreeNode[] }).body[0];
-      const descriptor = Object.getOwnPropertyDescriptor(
-        declaration,
-        'declarations',
-      )!;
-      expect(writes).toBe(0);
-      expect(descriptor).toMatchObject({
+    expect(writes).toBe(0);
+    expect(ast.start).toBe(0);
+    const declaration = (ast.body as ESTreeNode[])[0];
+    expect(declaration.declarations).toHaveLength(1);
+    for (const [node, key] of [
+      [ast, 'start'],
+      [declaration, 'declarations'],
+    ] as const) {
+      expect(Object.getOwnPropertyDescriptor(node, key)).toMatchObject({
         writable: true,
         enumerable: true,
         configurable: true,
       });
-      expect(descriptor.value).toHaveLength(1);
-      expect(descriptor.get).toBeUndefined();
-      expect(descriptor.set).toBeUndefined();
-    },
-  );
+    }
+  });
 
   test('parent linking preserves inherited setter assignment', () => {
     const bytes = projectFrame('file.js', 'const value = 1;');

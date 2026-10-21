@@ -295,7 +295,7 @@ add('modules', [
   'declare namespace A.B {}',
   'declare module "mod" {}',
   'declare global { interface I {} }',
-  'enum E { A, B = 1, C = "text" }',
+  '// enum comment\nexport enum E {\n A,\n B = 1,\n C = "text",\n}',
   'const enum E {}',
   'declare enum E {}',
 ]);
@@ -521,3 +521,36 @@ for (const extension of ['jsx', 'tsx']) {
     extension,
   );
 }
+
+add(
+  'JSX entity values',
+  [
+    [
+      '<a>caf&eacute; &amp; x</a>',
+      '<a>&#88; &#x59; &#x1d;</a>',
+      '<a>a & b &amp; c</a>',
+      '<a>&foo; &bar;</a>',
+      '<a>&amp x &lt</a>',
+      '<a>&; &#; &#x;</a>',
+      '<a>&#X59;</a>',
+      '<a>&nbsp;&copy;&trade;&hearts;</a>',
+      '<a>&int;&le;&ge;</a>',
+      '<a>x\r\ny</a>',
+      '<a>x\ry\nz</a>',
+      '<a>&#13;\n</a>',
+      '<a>&#x1F600;</a>',
+      '<a>&amp;amp;</a>',
+      '<a>plain text no entities</a>',
+      '<a b="caf&eacute; &amp; &#88;" />',
+      '<a b="x & y" />',
+      '<a b="&foo; &amp;" />',
+      '<a b="x\r\ny" />',
+      '<a b="&amp;amp;" />',
+      '<a b="plain" />',
+      'const s = "x&amp;y";',
+      '<a>{"x&amp;y caf&eacute;"}</a>',
+      'const t = "&#88; &nbsp;";',
+    ].join(';\n'),
+  ],
+  'jsx',
+);

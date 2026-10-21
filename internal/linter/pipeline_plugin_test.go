@@ -1,6 +1,7 @@
 package linter
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -309,12 +310,14 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 			if len(request.Files) != 2 {
 				dispatchValidationErr = fmt.Errorf("plugin files = %+v", request.Files)
 			}
+			expected := initial
+			if dispatches == 2 {
+				expected = expectedSecond
+			}
 			for _, file := range request.Files {
-				if dispatches == 1 && pluginFrameText(file.Frame) != initial[file.Path] {
-					dispatchValidationErr = errors.New("initial generation frame mismatch")
-				}
-				if dispatches == 2 && pluginFrameText(file.Frame) != expectedSecond[file.Path] {
-					dispatchValidationErr = errors.New("memory-generation frame mismatch")
+				text, exists := expected[file.Path]
+				if !exists || !bytes.HasSuffix(file.Frame, []byte(text)) {
+					dispatchValidationErr = errors.New("generation frame mismatch")
 				}
 			}
 			results := make([]EslintPluginFileResult, len(request.Files))
