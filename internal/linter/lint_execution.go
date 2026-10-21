@@ -81,19 +81,29 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 	result := &LintResult{ExecutedRules: make(map[string]struct{})}
 	programResults := make([]programLintResult, len(e.programs))
 	if len(e.programs) > 0 {
-		work := newProgramLintWorkGroup(e.options.SingleThreaded, len(e.programs))
-		for index := range e.programs {
+		runProgram := func(index int, reservation *programReservation) {
 			task := e.programs[index]
 			e.programs[index] = nil
-			resultSlot := &programResults[index]
+			defer func() { *task = programLintPlan{} }()
 			options := e.options
-			work.Queue(func() {
-				defer func() { *task = programLintPlan{} }()
-				*resultSlot = runLintRulesInProgram(task, options, consumer)
-			})
+			options.reservation = reservation
+			programResults[index] = runLintRulesInProgram(task, options, consumer)
+		}
+		budget := runtime.GOMAXPROCS(0)
+		if !e.options.SingleThreaded && len(e.programs) > budget {
+			estimates := make([]int, len(e.programs))
+			for index, task := range e.programs {
+				estimates[index] = estimateProgramLintShards(task, budget)
+			}
+			runWithProgramAdmission(estimates, budget, runProgram)
+		} else {
+			work := newProgramLintWorkGroup(e.options.SingleThreaded, len(e.programs))
+			for index := range e.programs {
+				work.Queue(func() { runProgram(index, nil) })
+			}
+			work.RunAndWait()
 		}
 		e.programs = nil
-		work.RunAndWait()
 	}
 	for _, programResult := range programResults {
 		result.LintedFileCount += programResult.lintedFileCount

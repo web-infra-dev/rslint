@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestPreparedRuleSetsPublishCompleteConcurrentViews(t *testing.T) {
@@ -610,4 +611,186 @@ func programAdmissionTestOptions(t *testing.T, count int, singleThreaded bool, r
 		},
 	})
 	return RunLinterOptions{LintPlan: plan, SingleThreaded: singleThreaded}, paths
+}
+
+func TestDynamicProgramAdmissionReplenishesBeforeProgramCompletes(t *testing.T) {
+	firstReady := make(chan *programReservation, 1)
+	secondEntered := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	finished := make(chan struct{})
+	t.Cleanup(func() {
+		unblock()
+		joinProgramAdmissionTestWorker(t, finished)
+	})
+	go func() {
+		defer close(finished)
+		runWithProgramAdmission([]int{4, 7, 1}, 4, func(index int, reservation *programReservation) {
+			switch index {
+			case 0:
+				reservation.ready(4)
+				firstReady <- reservation
+				<-release
+				for range 3 {
+					reservation.done()
+				}
+			case 1:
+				// An oversized estimate may enter as a whole, then shrink to
+				// the actual work. No shard needs to be artificially serialized.
+				reservation.ready(2)
+				reservation.done()
+				reservation.done()
+				close(secondEntered)
+			case 2:
+				reservation.ready(0)
+			}
+		})
+	}()
+	var first *programReservation
+	select {
+	case first = <-firstReady:
+	case <-time.After(5 * time.Second):
+		t.Fatal("first Program did not enter")
+	}
+	select {
+	case <-secondEntered:
+		t.Fatal("admitted another Program before any shard completed")
+	case <-time.After(20 * time.Millisecond):
+	}
+	first.done()
+	select {
+	case <-secondEntered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("did not replenish after one shard completed while its Program was still active")
+	}
+	unblock()
+}
+
+func TestDynamicProgramAdmissionReusesMixedPlan(t *testing.T) {
+	previousProcs := runtime.GOMAXPROCS(2)
+	defer runtime.GOMAXPROCS(previousProcs)
+	var calls atomic.Int32
+	run := func(rule.RuleContext) rule.RuleListeners {
+		calls.Add(1)
+		return nil
+	}
+	raw, paths := createTestProgramWithFilesAndCompilerOptions(t, map[string]string{
+		"one.ts":    "export const one = 1;",
+		"two.ts":    "export const two = 2;",
+		"plugin.ts": "export {};",
+		"empty.ts":  "export {};",
+	}, `{"noLib":true}`)
+	template := program.NewFromCompiler(raw)
+	var programs []*program.Program
+	var targets [][]string
+	for _, count := range []int{1, 4, 8} {
+		options := *raw.Options()
+		options.Checkers = &count
+		parallel, err := utils.CreateProgramFromOptions(false, &options, template.RootFileNames(),
+			utils.CreateCompilerHost(template.CurrentDirectory(), template.FS()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		programs = append(programs, program.NewFromCompiler(parallel))
+		targets = append(targets, []string{paths["one.ts"], paths["two.ts"], paths["plugin.ts"], paths["empty.ts"]})
+	}
+	plain := checkerFreeExecutionTestOptions(t, false, run).LintPlan.programs[0]
+	plainTargets := make([]string, len(plain.files))
+	for index, file := range plain.files {
+		plainTargets[index] = file.file.FileName()
+	}
+	// Keep a shared compiler, a checker-free Program large enough to split,
+	// a plugin-only task and an empty task in the same reusable plan.
+	programs = append(programs, plain.program, programs[1], programs[0], programs[0])
+	targets = append(targets, plainTargets, targets[1], []string{paths["plugin.ts"]}, nil)
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs: programs, TargetsByProgram: targets,
+		GetRulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
+			switch file.FileName() {
+			case paths["empty.ts"]:
+				return nil
+			case paths["plugin.ts"]:
+				return []rule.ConfiguredRule{{Name: "plugin", IsEslintPluginRule: true}}
+			default:
+				return []rule.ConfiguredRule{{Name: "native/admission", Run: run}}
+			}
+		},
+	})
+	for _, single := range []bool{true, false} {
+		for _, typeCheck := range []bool{false, true} {
+			before := calls.Load()
+			result, err := RunLinter(RunLinterOptions{
+				LintPlan: plan, SingleThreaded: single, TypeCheck: typeCheck,
+				Consumer: rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}},
+			})
+			if err != nil || result == nil {
+				t.Fatalf("RunLinter: result=%v error=%v", result, err)
+			}
+			if result.LintedFileCount != 273 || calls.Load()-before != 264 ||
+				!reflect.DeepEqual(result.ExecutedRules, map[string]struct{}{"native/admission": {}, "plugin": {}}) {
+				t.Fatalf("reused plan: result=%+v native calls=%d", result, calls.Load()-before)
+			}
+		}
+	}
+}
+
+func TestDynamicProgramAdmissionJoinsAbnormalWorkers(t *testing.T) {
+	for _, exit := range []string{"panic", "Goexit"} {
+		t.Run(exit, func(t *testing.T) {
+			release := make(chan struct{})
+			var releaseOnce sync.Once
+			unblock := func() { releaseOnce.Do(func() { close(release) }) }
+			started := make(chan struct{}, 2)
+			failed := make(chan struct{})
+			done := make(chan any, 1)
+			finished := make(chan struct{})
+			t.Cleanup(func() {
+				unblock()
+				joinProgramAdmissionTestWorker(t, finished)
+			})
+			go func() {
+				defer close(finished)
+				defer func() { done <- recover() }()
+				runWithProgramAdmission([]int{1, 1, 4, 4, 4}, 2, func(index int, reservation *programReservation) {
+					if index > 1 {
+						return
+					}
+					started <- struct{}{}
+					if index == 0 {
+						<-started
+						<-started
+						defer close(failed)
+						// Fail before ready, leaving the estimate to be returned.
+						if exit == "Goexit" {
+							runtime.Goexit()
+						}
+						panic("admission-marker")
+					}
+					reservation.ready(3)
+					reservation.done()
+					<-release // close must return the two unstarted shards.
+				})
+			}()
+			select {
+			case <-failed:
+			case <-time.After(5 * time.Second):
+				t.Fatal("first Program did not fail")
+			}
+			select {
+			case failure := <-done:
+				t.Fatalf("propagated abnormal exit before its sibling joined: %v", failure)
+			case <-time.After(20 * time.Millisecond):
+			}
+			unblock()
+			select {
+			case failure := <-done:
+				if failure == nil || (exit == "panic" && failure != "admission-marker") {
+					t.Fatalf("lost original abnormal exit: %v", failure)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("abnormal worker stranded the dispatcher")
+			}
+		})
+	}
 }
