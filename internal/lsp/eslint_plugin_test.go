@@ -2,7 +2,6 @@ package lsp
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -23,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/testutil/estree"
 )
 
 // textOnlySourceFile is a minimal ast.SourceFileLike (Text + ECMALineMap) — the
@@ -563,7 +563,7 @@ func TestPreparedPluginInputUsesExactPassContent(t *testing.T) {
 		s.documentLintSnapshot(uri),
 	)
 	input := request.Files[0]
-	if content := pluginFrameTextForTest(t, input.Frame); content != "const current = 1;" {
+	if content := estree.SourceText(t, input.Frame); content != "const current = 1;" {
 		t.Errorf("prepared pass used stale text: %q", content)
 	}
 	if input.ConfigKey != "/proj" {
@@ -981,7 +981,7 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 	s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(_ context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		pluginPasses++
 		f := req.Files[0]
-		content := pluginFrameTextForTest(t, f.Frame)
+		content := estree.SourceText(t, f.Frame)
 		idx := strings.Index(content, "bar")
 		if idx < 0 {
 			return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{FilePath: f.Path}}}, nil
@@ -1891,16 +1891,4 @@ func TestMergePluginDiagnosticsRetargetedAliasRejectsInvalidPolicy(t *testing.T)
 			}
 		})
 	}
-}
-
-func pluginFrameTextForTest(t *testing.T, frame []byte) string {
-	t.Helper()
-	if len(frame) < 64 {
-		t.Fatal("missing ESTree frame")
-	}
-	offset := binary.LittleEndian.Uint32(frame[60:])
-	if uint64(offset) > uint64(len(frame)) {
-		t.Fatal("invalid frame source offset")
-	}
-	return string(frame[offset:])
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +34,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/testutil/estree"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -1491,7 +1491,7 @@ func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
 				t.Fatalf("CLI plugin request failed: code=%d request=%+v stdout=%q stderr=%q", code, request, stdout, stderr)
 			}
 			frame := request.Files[0].Frame
-			if len(frame) < 64 || string(frame[binary.LittleEndian.Uint32(frame[60:]):]) != strings.TrimPrefix(content, "\ufeff") {
+			if estree.SourceText(t, frame) != strings.TrimPrefix(content, "\ufeff") {
 				t.Fatal("CLI frame did not freeze its filesystem generation")
 			}
 		})

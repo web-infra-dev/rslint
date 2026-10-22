@@ -3,7 +3,6 @@ package server
 import (
 	"bufio"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/api"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/testutil/estree"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -425,10 +425,10 @@ func TestHandleLint_FixProjectsOutputToRequestedAlias(t *testing.T) {
 	var calls atomic.Int32
 	dispatch := linter.EslintPluginDispatchFunc(func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		call := calls.Add(1)
-		if len(request.Files) != 1 || len(request.Files[0].Frame) < 64 {
+		if len(request.Files) != 1 || len(request.Files[0].Frame) < 40 {
 			t.Fatalf("plugin call %d has no source", call)
 		}
-		text := string(request.Files[0].Frame[binary.LittleEndian.Uint32(request.Files[0].Frame[60:]):])
+		text := estree.SourceText(t, request.Files[0].Frame)
 		result := linter.EslintPluginFileResult{FilePath: request.Files[0].Path}
 		if strings.Contains(text, "bad") {
 			result.Diagnostics = []linter.EslintPluginDiagnostic{{
@@ -571,9 +571,9 @@ func attachmentFrameText(t *testing.T, attachments []ipc.Attachment) string {
 	if err := reply.Decode(&values); err != nil {
 		t.Fatal(err)
 	}
-	if len(values) != 1 || values[0].Bytes == nil || len(*values[0].Bytes) < 64 {
+	if len(values) != 1 || values[0].Bytes == nil || len(*values[0].Bytes) < 40 {
 		t.Fatal("missing ESTree attachment")
 	}
 	data := *values[0].Bytes
-	return string(data[binary.LittleEndian.Uint32(data[60:]):])
+	return estree.SourceText(t, data)
 }

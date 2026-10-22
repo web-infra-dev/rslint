@@ -2,7 +2,6 @@ package lsp
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"os"
 	"path/filepath"
@@ -20,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/testutil/estree"
 )
 
 func runLSPGenerationForTest(
@@ -157,7 +157,7 @@ func TestLSPGenerationReleaseLifecycle(t *testing.T) {
 		if err != nil || outcome.DispatchError != nil {
 			t.Fatalf("plugin work errors = %v/%v", err, outcome.DispatchError)
 		}
-		if len(request.Files) != 1 || len(request.Files[0].Frame) < 64 || string(request.Files[0].Frame[binary.LittleEndian.Uint32(request.Files[0].Frame[60:]):]) != content {
+		if len(request.Files) != 1 || estree.SourceText(t, request.Files[0].Frame) != content {
 			t.Fatalf("detached plugin request = %+v", request.Files)
 		}
 	})
