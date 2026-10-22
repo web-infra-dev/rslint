@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
 	"github.com/web-infra-dev/rslint/internal/api/server"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -77,14 +76,13 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			},
 		},
 		{
-			name:      "parent ignore does not affect nested config",
+			name:      "parent ignore applies across nested config",
 			configDir: "packages/app",
 			relative:  "ignored/keep.ts",
 			gitignores: map[string]string{
 				".gitignore":                      "/packages/app/ignored/\n",
 				"packages/app/ignored/.gitignore": "!keep.ts\n",
 			},
-			wantLinted: true,
 		},
 		{
 			name:     "excluded parent blocks child negation and nested source",
@@ -101,17 +99,17 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			wantLinted: true,
 		},
 		{
-			name:       "directory symlink obeys lexical root gitignore",
+			name:       "directory symlink uses physical root gitignore",
 			relative:   "link/source.ts",
 			gitignores: map[string]string{".gitignore": "link/source.ts\n"},
 			symlinkDir: true,
+			wantLinted: true,
 		},
 		{
-			name:         "directory symlink skips target gitignore source",
+			name:         "directory symlink reads physical target gitignore",
 			relative:     "link/source.ts",
 			symlinkDir:   true,
 			targetIgnore: "source.ts\n",
-			wantLinted:   true,
 		},
 	}
 
@@ -174,14 +172,6 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			if err := json.Unmarshal(configJSON, &cliConfig); err != nil {
 				t.Fatal(err)
 			}
-			cliConfig = rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
-				cliConfig,
-				configDir,
-				configDir,
-				osvfs.FS(),
-				[]string{tspath.NormalizePath(target)},
-				nil,
-			)
 
 			code, stdout, stderr := runLintCommandForTest(t, configDir, lintArgs{
 				ConfigCatalog:  explicitConfigCatalogForTest(configDir, cliConfig),
@@ -243,18 +233,8 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 	}}
 	catalog := &discovery.ConfigCatalog{
 		Configs: map[string]rslintconfig.RslintConfig{
-			tspath.NormalizePath(firstDir): rslintconfig.ConfigWithGitignore(
-				entry,
-				tspath.NormalizePath(firstDir),
-				osvfs.FS(),
-				[]string{tspath.NormalizePath(firstTarget)},
-			),
-			tspath.NormalizePath(secondDir): rslintconfig.ConfigWithGitignore(
-				entry,
-				tspath.NormalizePath(secondDir),
-				osvfs.FS(),
-				[]string{tspath.NormalizePath(secondTarget)},
-			),
+			tspath.NormalizePath(firstDir):  entry,
+			tspath.NormalizePath(secondDir): entry,
 		},
 		Scopes: map[string]target.OwnerScope{
 			tspath.NormalizePath(firstDir):  {ExplicitFiles: []string{tspath.NormalizePath(firstTarget)}, ExplicitOnly: true},
@@ -299,18 +279,8 @@ func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
 
 	catalog := &discovery.ConfigCatalog{
 		Configs: map[string]rslintconfig.RslintConfig{
-			tspath.NormalizePath(workspace): rslintconfig.ConfigWithGitignore(
-				rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-console": "error"}}},
-				tspath.NormalizePath(workspace),
-				osvfs.FS(),
-				nil,
-			),
-			tspath.NormalizePath(ignoredDir): rslintconfig.ConfigWithGitignore(
-				rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
-				tspath.NormalizePath(ignoredDir),
-				osvfs.FS(),
-				[]string{tspath.NormalizePath(explicitTarget)},
-			),
+			tspath.NormalizePath(workspace):  rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-console": "error"}}},
+			tspath.NormalizePath(ignoredDir): rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
 		},
 		Scopes: map[string]target.OwnerScope{
 			tspath.NormalizePath(ignoredDir): {
@@ -338,7 +308,7 @@ func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
 	}
 }
 
-func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
+func TestCLIMultiConfigGitignoreIndependentOfConfigOwner(t *testing.T) {
 	workspace := t.TempDir()
 	childDir := filepath.Join(workspace, "packages", "app")
 	parentOwnedTarget := filepath.Join(childDir, "parent-owned.ts")
@@ -365,22 +335,8 @@ func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
 	}}
 	catalog := &discovery.ConfigCatalog{
 		Configs: map[string]rslintconfig.RslintConfig{
-			tspath.NormalizePath(workspace): rslintconfig.ConfigWithGitignoreWithBoundaries(
-				entry,
-				tspath.NormalizePath(workspace),
-				osvfs.FS(),
-				[]string{
-					tspath.NormalizePath(parentOwnedTarget),
-					tspath.NormalizePath(parentIgnoredTarget),
-				},
-				[]string{tspath.NormalizePath(childDir)},
-			),
-			tspath.NormalizePath(childDir): rslintconfig.ConfigWithGitignore(
-				entry,
-				tspath.NormalizePath(childDir),
-				osvfs.FS(),
-				[]string{tspath.NormalizePath(childOwnedTarget)},
-			),
+			tspath.NormalizePath(workspace): entry,
+			tspath.NormalizePath(childDir):  entry,
 		},
 		Scopes: map[string]target.OwnerScope{
 			tspath.NormalizePath(workspace): {
@@ -410,16 +366,13 @@ func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
 				NoColor:        true,
 				SingleThreaded: test.singleThreaded,
 			})
-			if code != 1 {
-				t.Fatalf("expected both boundary targets to fail lint: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+			if code != 0 {
+				t.Fatalf("ignored targets must exit cleanly: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 			}
-			for _, targetName := range []string{"parent-owned.ts", "child-owned.ts"} {
-				if !strings.Contains(stdout, targetName) {
-					t.Fatalf("%s was polluted by another config's .gitignore: stdout=%q stderr=%q", targetName, stdout, stderr)
+			for _, targetName := range []string{"parent-owned.ts", "parent-ignored.ts", "child-owned.ts"} {
+				if strings.Contains(stdout, targetName) || !strings.Contains(stderr, targetName+" is ignored") {
+					t.Fatalf("%s must inherit its physical Git chain for either config owner: stdout=%q stderr=%q", targetName, stdout, stderr)
 				}
-			}
-			if strings.Contains(stdout, "parent-ignored.ts") {
-				t.Fatalf("parent-owned .gitignore did not apply before child boundary: stdout=%q stderr=%q", stdout, stderr)
 			}
 		})
 	}

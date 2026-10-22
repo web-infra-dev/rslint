@@ -106,6 +106,14 @@ func ResolveConfigDirectoryPathSpace(directory string, configDir string, fsys vf
 // without treating a symlink on the config directory alone as authority over
 // unrelated physical siblings. Filesystem roots are deliberately excluded.
 func verifiedConfigAliasAncestors(configDir string, physicalConfigDir string, fsys vfs.FS) []string {
+	var lookup func(string) string
+	if fsys != nil {
+		lookup = fsys.Realpath
+	}
+	return verifiedConfigAliasAncestorsWithLookup(configDir, physicalConfigDir, fsys, lookup)
+}
+
+func verifiedConfigAliasAncestorsWithLookup(configDir string, physicalConfigDir string, fsys vfs.FS, lookup func(string) string) []string {
 	if fsys == nil {
 		return nil
 	}
@@ -119,7 +127,7 @@ func verifiedConfigAliasAncestors(configDir string, physicalConfigDir string, fs
 		if current == configDir {
 			physicalCurrent = physicalConfigDir
 		} else {
-			physicalCurrent = fsys.Realpath(current)
+			physicalCurrent = lookup(current)
 		}
 		if physicalCurrent != "" {
 			physicalCurrent = tspath.NormalizePath(physicalCurrent)

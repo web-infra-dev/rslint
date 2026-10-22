@@ -165,9 +165,6 @@ func TestFileIgnoreMatcherMatchesSequentialEvaluation(t *testing.T) {
 	for _, unsupported := range []IgnorePattern{
 		{Glob: "src/app.ts", GitPattern: true},
 		{Glob: "src/app.ts", CaseInsensitive: true},
-		{Glob: "src/app.ts", MatchDirectory: "/repo"},
-		{Glob: "src/app.ts", PhysicalMatchDirectory: "/repo"},
-		{Glob: "src/app.ts", LexicalMatchDirectory: "/repo"},
 	} {
 		patterns := append(ParseIgnorePatterns(literals), unsupported)
 		if matcher := newFileIgnoreMatcher(patterns); matcher.steps != nil {
@@ -794,10 +791,6 @@ func TestFileConfigResolverTargetMatchCompatibility(t *testing.T) {
 		{"global becomes local", func(c RslintConfig) RslintConfig { c[0].Rules = Rules{}; return c }, false},
 		{"authored origin", func(c RslintConfig) RslintConfig { return ConfigWithAuthoredPathBase(c, "/other") }, false},
 		{"scoped base", func(c RslintConfig) RslintConfig { value := "src"; c[1].BasePath = &value; return c }, false},
-		{"collected git scope", func(c RslintConfig) RslintConfig {
-			c[0].collectedGitignore = &collectedGitignoreMetadata{scopes: []collectedGitignoreScope{{lexicalDirectory: "/repo"}}}
-			return c
-		}, false},
 		{"appended selector", func(c RslintConfig) RslintConfig { return append(c, ConfigEntry{Files: []string{"**/*.vue"}}) }, false},
 		{"appended ignore", func(c RslintConfig) RslintConfig { return append(c, ConfigEntry{Ignores: []string{"src/**"}}) }, false},
 		{"appended scoped entry", func(c RslintConfig) RslintConfig {
@@ -809,11 +802,11 @@ func TestFileConfigResolverTargetMatchCompatibility(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			final := test.change(slices.Clone(base))
 			spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": append(slices.Clone(base), final...)}, nil)
-			matcher, err := NewTargetMatcherWithPathSpaces(base, "/repo", nil, spaces)
+			matcher, err := NewTargetMatcherWithPathSpaces(base, "/repo", nil, spaces, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			resolver, err := NewFileConfigResolverWithPathSpaces(final, "/repo", nil, spaces, baseRuleCatalog())
+			resolver, err := NewFileConfigResolverWithPathSpaces(final, "/repo", nil, spaces, baseRuleCatalog(), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -847,7 +840,7 @@ func assertTargetMatchResolution(t testing.TB, resolver *FileConfigResolver, ide
 func TestFileConfigResolverTargetMatchProvenance(t *testing.T) {
 	entries := RslintConfig{{Files: []string{"src/**"}, Rules: Rules{"no-console": "error"}}}
 	spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": entries, "/other": entries}, nil)
-	matcher, err := NewTargetMatcherWithPathSpaces(entries, "/repo", nil, spaces)
+	matcher, err := NewTargetMatcherWithPathSpaces(entries, "/repo", nil, spaces, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -872,7 +865,7 @@ func TestFileConfigResolverTargetMatchProvenance(t *testing.T) {
 		{"other generation", "/repo", NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": entries}, nil), identity, &match, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			resolver, err := NewFileConfigResolverWithPathSpaces(entries, test.owner, nil, test.spaces, baseRuleCatalog())
+			resolver, err := NewFileConfigResolverWithPathSpaces(entries, test.owner, nil, test.spaces, baseRuleCatalog(), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -907,11 +900,11 @@ func TestFileConfigResolverTargetMatchOverlayBitsets(t *testing.T) {
 					after = append(after, ConfigEntry{Rules: Rules{"no-console": "off"}, Settings: Settings{fmt.Sprintf("overlay%d", index): true}})
 				}
 				spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": before}, nil)
-				matcher, err := NewTargetMatcherWithPathSpaces(before, "/repo", nil, spaces)
+				matcher, err := NewTargetMatcherWithPathSpaces(before, "/repo", nil, spaces, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
-				resolver, err := NewFileConfigResolverWithPathSpaces(after, "/repo", nil, spaces, baseRuleCatalog())
+				resolver, err := NewFileConfigResolverWithPathSpaces(after, "/repo", nil, spaces, baseRuleCatalog(), nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -932,11 +925,11 @@ func TestFileConfigResolverTargetMatchOverlayBitsets(t *testing.T) {
 func TestFileConfigResolverTargetMatchConcurrentPublication(t *testing.T) {
 	entries := RslintConfig{{Files: []string{"**/*.ts"}, Rules: Rules{"no-console": "error"}}}
 	spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": entries}, nil)
-	matcher, err := NewTargetMatcherWithPathSpaces(entries, "/repo", nil, spaces)
+	matcher, err := NewTargetMatcherWithPathSpaces(entries, "/repo", nil, spaces, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolver, err := NewFileConfigResolverWithPathSpaces(entries, "/repo", nil, spaces, baseRuleCatalog())
+	resolver, err := NewFileConfigResolverWithPathSpaces(entries, "/repo", nil, spaces, baseRuleCatalog(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -968,7 +961,7 @@ func TestFileConfigResolverTargetMatchConcurrentPublication(t *testing.T) {
 func TestFileConfigResolverTargetMatchFilesystemMode(t *testing.T) {
 	entries := RslintConfig{{Files: []string{"**/*.ts"}}}
 	spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": entries}, nil)
-	matcher, err := NewTargetMatcherWithPathSpaces(entries, "/repo", nil, spaces)
+	matcher, err := NewTargetMatcherWithPathSpaces(entries, "/repo", nil, spaces, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -976,7 +969,7 @@ func TestFileConfigResolverTargetMatchFilesystemMode(t *testing.T) {
 	match := matcher.MatchFile(identity)
 	for _, sensitive := range []bool{false, true} {
 		fsys := &pathSpaceTestFS{caseSensitive: sensitive}
-		resolver, err := NewFileConfigResolverWithPathSpaces(entries, "/repo", fsys, spaces, baseRuleCatalog())
+		resolver, err := NewFileConfigResolverWithPathSpaces(entries, "/repo", fsys, spaces, baseRuleCatalog(), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1043,11 +1036,11 @@ func FuzzTargetMatchReuse(f *testing.F) {
 			after = append(after, ConfigEntry{BasePath: &value, Rules: Rules{"no-console": "error"}})
 		}
 		spaces := NewPathSpaceSnapshot(map[string]RslintConfig{"/repo": append(slices.Clone(before), after...)}, nil)
-		matcher, err := NewTargetMatcherWithPathSpaces(before, "/repo", nil, spaces)
+		matcher, err := NewTargetMatcherWithPathSpaces(before, "/repo", nil, spaces, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		resolver, err := NewFileConfigResolverWithPathSpaces(after, "/repo", nil, spaces, baseRuleCatalog())
+		resolver, err := NewFileConfigResolverWithPathSpaces(after, "/repo", nil, spaces, baseRuleCatalog(), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

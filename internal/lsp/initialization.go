@@ -71,14 +71,8 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		relativePatterns := ptrIsTrue(
 			s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles.RelativePatternSupport,
 		)
-		gitignoreWatchers := gitignoreFileWatchers(s.cwd, relativePatterns)
 		ancestorConfigWatchers := ancestorJSConfigFileWatchers(s.cwd, relativePatterns)
 		go func() {
-			if err := s.WatchFiles(s.backgroundCtx, gitignoreWatcherID, gitignoreWatchers); err != nil {
-				if s.backgroundCtx.Err() == nil {
-					log.Printf("[rslint] Failed to register .gitignore watchers: %v", err)
-				}
-			}
 			if len(ancestorConfigWatchers) == 0 {
 				return
 			}

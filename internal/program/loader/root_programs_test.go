@@ -515,17 +515,16 @@ func resolveTargetPlanForTest(
 	allowDirs []string,
 	singleThreaded bool,
 ) (target.Plan, error) {
-	return target.Resolve(target.Request{
+	return target.Resolve(withGitPolicyForTest(target.Request{
 		ConfigMap:       configMap,
 		Config:          config,
 		ConfigDirectory: currentDirectory,
 		ScanRoot:        currentDirectory,
 		OwnerScopes:     scopes,
 		FS:              fsys,
-		Files:           allowFiles,
-		Directories:     allowDirs,
-		SingleThreaded:  singleThreaded,
-	})
+		Files:           rslintconfig.ResolveFileIdentities(allowFiles, fsys), Directories: rslintconfig.ResolveDirectoryIdentities(allowDirs, fsys),
+		SingleThreaded: singleThreaded,
+	}))
 }
 
 func preferredCallerPathsForTest(plan target.Plan) map[string]string {
@@ -674,4 +673,19 @@ func configuredRuleNameSet(rules []rule.ConfiguredRule) map[string]struct{} {
 		result[configured.Name] = struct{}{}
 	}
 	return result
+}
+
+func withGitPolicyForTest(request target.Request) target.Request {
+	if request.GitPolicy != nil {
+		return request
+	}
+	root := request.ScanRoot
+	if root == "" {
+		root = request.ConfigDirectory
+	}
+	if request.Files == nil && request.Directories == nil {
+		request.Directories = rslintconfig.ResolveDirectoryIdentities([]string{root}, request.FS)
+	}
+	request.GitPolicy = rslintconfig.CollectGitPolicy(request.Config, request.ConfigDirectory, request.FS, request.Files, request.Directories)
+	return request
 }

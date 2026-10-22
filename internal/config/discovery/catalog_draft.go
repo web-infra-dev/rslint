@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 )
@@ -31,10 +30,6 @@ func newCatalogDraft() catalogDraft {
 		selectedSources: make(map[string]selectedConfigSource),
 		scopes:          make(map[string]target.OwnerScope),
 	}
-}
-
-func (draft *catalogDraft) hasConfigs() bool {
-	return len(draft.configs) > 0
 }
 
 // adoptCandidate selects one successfully loaded config for an owner. Literal
@@ -89,27 +84,41 @@ func (draft *catalogDraft) addExplicitFile(ownerDirectory string, filePath strin
 	draft.scopes[ownerDirectory] = scope
 }
 
-// finalize validates physical owner identity, writes each Git-materialized
-// config exactly once, publishes explicit-only provenance, and returns stable
+func (draft *catalogDraft) addDirectory(ownerDirectory string, directory rslintconfig.DirectoryIdentity) {
+	scope := draft.scopes[ownerDirectory]
+	for _, existing := range scope.Directories {
+		if rslintconfig.ExactPathID(existing.LexicalPath) == rslintconfig.ExactPathID(directory.LexicalPath) {
+			return
+		}
+	}
+	scope.Directories = append(scope.Directories, directory)
+	sort.Slice(scope.Directories, func(i, j int) bool {
+		return scope.Directories[i].LexicalPath < scope.Directories[j].LexicalPath
+	})
+	draft.scopes[ownerDirectory] = scope
+}
+
+// finalize validates physical owner identity, publishes explicit-only
+// provenance, and returns stable
 // effective IDs. Node activation happens only after this method succeeds.
 func (draft *catalogDraft) finalize(
-	fsys vfs.FS,
-	projection *gitProjection,
+	physicalDirectory func(string) string,
+	useCaseSensitive bool,
 ) (
 	map[string]rslintconfig.RslintConfig,
 	map[string]target.OwnerScope,
 	[]string,
 	error,
 ) {
-	if err := draft.validateDirectoryIdentities(fsys); err != nil {
+	if err := draft.validateDirectoryIdentities(physicalDirectory, useCaseSensitive); err != nil {
 		return nil, nil, nil, err
-	}
-	for ownerDirectory, entries := range draft.configs {
-		draft.configs[ownerDirectory] = projection.materialize(ownerDirectory, entries)
 	}
 	for directory, source := range draft.selectedSources {
 		scope := draft.scopes[directory]
 		scope.ExplicitOnly = source.explicitOnly
+		if scope.Directories == nil {
+			scope.Directories = []rslintconfig.DirectoryIdentity{}
+		}
 		draft.scopes[directory] = scope
 	}
 	effectiveIDs := make([]string, 0, len(draft.selectedSources))
@@ -123,7 +132,7 @@ func (draft *catalogDraft) finalize(
 // validateDirectoryIdentities rejects ambiguous ownership before Node
 // activates the effective candidate set. Alternate native casing is safe only
 // after Realpath verifies one exact physical directory.
-func (draft *catalogDraft) validateDirectoryIdentities(fsys vfs.FS) error {
+func (draft *catalogDraft) validateDirectoryIdentities(physicalDirectory func(string) string, useCaseSensitive bool) error {
 	directories := make([]string, 0, len(draft.configs))
 	for directory := range draft.configs {
 		directories = append(directories, tspath.NormalizePath(directory))
@@ -132,24 +141,21 @@ func (draft *catalogDraft) validateDirectoryIdentities(fsys vfs.FS) error {
 
 	lexicalByPhysical := make(map[tspath.Path]string, len(directories))
 	for _, directory := range directories {
-		physicalDirectory := directory
-		if realPath := fsys.Realpath(directory); realPath != "" {
-			physicalDirectory = tspath.NormalizePath(realPath)
-		}
-		physicalID := tspath.ToPath(physicalDirectory, "", true)
+		physicalPath := physicalDirectory(directory)
+		physicalID := tspath.ToPath(physicalPath, "", true)
 		existing, collision := lexicalByPhysical[physicalID]
 		if !collision {
 			lexicalByPhysical[physicalID] = directory
 			continue
 		}
-		if !fsys.UseCaseSensitiveFileNames() && strings.EqualFold(existing, directory) {
+		if !useCaseSensitive && strings.EqualFold(existing, directory) {
 			continue
 		}
 		return fmt.Errorf( //nolint:staticcheck // Preserve the established user-facing JS API error contract.
 			"Config directories %q and %q resolve to the same filesystem location %q",
 			existing,
 			directory,
-			physicalDirectory,
+			physicalPath,
 		)
 	}
 	return nil

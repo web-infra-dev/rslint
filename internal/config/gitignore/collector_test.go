@@ -1,67 +1,16 @@
+// cspell:ignore gitdir
+
 package gitignore
 
 import (
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
-
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"gotest.tools/v3/assert"
+	"slices"
+	"sync"
+	"testing"
+	"time"
 )
-
-type gitignoreMockFS struct {
-	vfs.FS
-	entries         map[string]vfs.Entries
-	files           map[string]string
-	resolvedPaths   map[string]string
-	readFileCalls   []string
-	accessedDirs    []string
-	realpathCalls   []string
-	caseSensitiveFS bool
-}
-
-func (m *gitignoreMockFS) ReadFile(path string) (string, bool) {
-	m.readFileCalls = append(m.readFileCalls, path)
-	content, ok := m.files[path]
-	return content, ok
-}
-
-func (m *gitignoreMockFS) GetAccessibleEntries(path string) vfs.Entries {
-	m.accessedDirs = append(m.accessedDirs, path)
-	return m.entries[path]
-}
-
-func (m *gitignoreMockFS) Realpath(path string) string {
-	m.realpathCalls = append(m.realpathCalls, path)
-	if realpath, ok := m.resolvedPaths[path]; ok {
-		return realpath
-	}
-	return path
-}
-
-func (m *gitignoreMockFS) UseCaseSensitiveFileNames() bool {
-	return m.caseSensitiveFS
-}
-
-func setupGitignoreFixture(t *testing.T, files map[string]string) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-	for name, content := range files {
-		fp := filepath.Join(tmpDir, name)
-		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
-			t.Fatalf("mkdir: %v", err)
-		}
-		if err := os.WriteFile(fp, []byte(content), 0644); err != nil {
-			t.Fatalf("write: %v", err)
-		}
-	}
-	return tspath.NormalizePath(tmpDir)
-}
-
-// --- Pattern conversion tests ---
 
 func TestConvertGitignoreToGlobs_DirectoryPattern(t *testing.T) {
 	globs := convertGitignoreToGlobs("dist/\n", "")
@@ -246,152 +195,6 @@ func TestConvertGitignoreToPatterns_QuotesNestedFilesystemDirectory(t *testing.T
 
 // --- Collector integration tests ---
 
-func TestReadGitignoreAsGlobs_RootOnly(t *testing.T) {
-	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore": "dist/\n*.log\n",
-		"src/a.ts":   "x",
-	})
-	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
-	assert.Equal(t, len(globs), 2, "got: %v", globs)
-
-	hasDistGlob := false
-	hasLogGlob := false
-	for _, g := range globs {
-		if g == "**/dist/**/*" {
-			hasDistGlob = true
-		}
-		if g == "**/*.log" {
-			hasLogGlob = true
-		}
-	}
-	assert.Assert(t, hasDistGlob, "should have dist glob")
-	assert.Assert(t, hasLogGlob, "should have *.log glob")
-}
-
-func TestReadGitignoreAsGlobs_NoGitignore(t *testing.T) {
-	dir := setupGitignoreFixture(t, map[string]string{
-		"src/a.ts": "x",
-	})
-	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
-	assert.Assert(t, globs == nil, "should return nil when no .gitignore")
-}
-
-func TestReadGitignoreAsGlobs_Nested(t *testing.T) {
-	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":              "dist/\n",
-		"packages/app/.gitignore": "tmp/\n",
-		"src/a.ts":                "x",
-	})
-	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
-
-	hasDistGlob := false
-	hasTmpGlob := false
-	for _, g := range globs {
-		if g == "**/dist/**/*" {
-			hasDistGlob = true
-		}
-		if g == "packages/app/**/tmp/**/*" {
-			hasTmpGlob = true
-		}
-	}
-	assert.Assert(t, hasDistGlob, "should have root dist glob")
-	assert.Assert(t, hasTmpGlob, "should have nested tmp glob with packages/app prefix")
-}
-
-func TestReadGitignoreAsGlobs_NestedNegation(t *testing.T) {
-	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":              "dist/\n",
-		"packages/app/.gitignore": "!dist/\n",
-		"src/a.ts":                "x",
-	})
-	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
-
-	hasDistGlob := false
-	hasNegation := false
-	for _, g := range globs {
-		if g == "**/dist/**/*" {
-			hasDistGlob = true
-		}
-		if g == "!packages/app/**/dist/**/*" {
-			hasNegation = true
-		}
-	}
-	assert.Assert(t, hasDistGlob, "should have root dist glob")
-	assert.Assert(t, hasNegation, "should have child negation glob with prefix")
-}
-
-func TestReadGitignoreAsGlobs_PrunesGitignoredDirs(t *testing.T) {
-	// The collector should not enter a directory excluded by a parent pattern.
-	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":                     "ignored/\n",
-		"src/a.ts":                       "x",
-		"ignored/deep/nested/.gitignore": "# should not be read\nfoo\n",
-	})
-	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
-
-	assert.Assert(t, len(globs) >= 1, "should contain the root ignore pattern")
-
-	// The nested ignore source is unreachable and must not be collected.
-	for _, g := range globs {
-		if strings.Contains(g, "ignored/deep") {
-			t.Errorf("collected a pattern from an excluded directory: %s", g)
-		}
-	}
-}
-
-func TestCollectors_ConfigRootPatternPrunesDescendantIgnoreSource(t *testing.T) {
-	dir := setupGitignoreFixture(t, map[string]string{
-		"packages/app/.gitignore":           "/ignored/\n",
-		"packages/app/ignored/.gitignore":   "!keep.ts\n",
-		"packages/app/ignored/keep.ts":      "x",
-		"packages/app/ignored/unrelated.ts": "x",
-	})
-	configDir := tspath.ResolvePath(dir, "packages/app")
-	target := tspath.ResolvePath(configDir, "ignored/keep.ts")
-
-	full := Collect(configDir, osvfs.FS(), nil, nil)
-	explicit := Collect(configDir, osvfs.FS(), []string{target}, nil)
-
-	assert.DeepEqual(t, full, explicit)
-	assert.DeepEqual(t, full, []string{"ignored/**/*"})
-}
-
-func TestReadGitignoreAsGlobs_SkipsNodeModules(t *testing.T) {
-	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":                  "dist/\n",
-		"node_modules/pkg/.gitignore": "# should not be read\n",
-		"src/a.ts":                    "x",
-	})
-	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
-
-	// Only root .gitignore should be read
-	assert.Equal(t, len(globs), 1)
-	assert.Equal(t, globs[0], "**/dist/**/*")
-}
-
-func TestReadGitignoreAsGlobs_SkipsDefaultDirsCaseInsensitively(t *testing.T) {
-	mock := &gitignoreMockFS{
-		FS: osvfs.FS(),
-		entries: map[string]vfs.Entries{
-			"/repo": {
-				Directories: []string{"NODE_MODULES"},
-				Symlinks:    map[string]struct{}{},
-			},
-		},
-		files:           map[string]string{},
-		caseSensitiveFS: false,
-	}
-
-	readGitignoreAsGlobs("/repo", mock, nil)
-	for _, accessed := range mock.accessedDirs {
-		if strings.EqualFold(accessed, "/repo/node_modules") {
-			t.Fatalf("case-insensitive filesystem must not scan default excluded directory %q", accessed)
-		}
-	}
-}
-
-// --- Scope isolation tests ---
-
 func TestConvertGitignoreToGlobs_ScopeIsolation(t *testing.T) {
 	// packages/app/.gitignore has "src/" → should only affect packages/app/
 	globs := convertGitignoreToGlobs("src/\n", "packages/app")
@@ -399,94 +202,6 @@ func TestConvertGitignoreToGlobs_ScopeIsolation(t *testing.T) {
 	// Must be prefixed with packages/app, NOT a bare **/src/**/*
 	assert.Equal(t, globs[0], "packages/app/**/src/**/*")
 }
-
-func TestReadGitignoreAsGlobs_ThreeLevelNested(t *testing.T) {
-	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":                  "dist/\n",
-		"packages/app/.gitignore":     "tmp/\n",
-		"packages/app/sub/.gitignore": "cache/\n",
-		"src/a.ts":                    "x",
-	})
-	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
-
-	hasRoot := false
-	hasApp := false
-	hasSub := false
-	for _, g := range globs {
-		if g == "**/dist/**/*" {
-			hasRoot = true
-		}
-		if g == "packages/app/**/tmp/**/*" {
-			hasApp = true
-		}
-		if g == "packages/app/sub/**/cache/**/*" {
-			hasSub = true
-		}
-	}
-	assert.Assert(t, hasRoot, "root dist")
-	assert.Assert(t, hasApp, "app tmp")
-	assert.Assert(t, hasSub, "sub cache")
-}
-
-func TestReadGitignoreAsGlobs_SkipsDescendantSymlinkCycle(t *testing.T) {
-	mock := &gitignoreMockFS{
-		FS: osvfs.FS(),
-		files: map[string]string{
-			"/repo/.gitignore":        "root-cache/\n",
-			"/repo/a/.gitignore":      "nested-cache/\n",
-			"/repo/a/loop/.gitignore": "cycle-cache/\n",
-		},
-		entries: map[string]vfs.Entries{
-			"/repo": {
-				Directories: []string{"a"},
-				Symlinks:    map[string]struct{}{},
-			},
-			"/repo/a": {
-				Directories: []string{"loop"},
-				Symlinks:    map[string]struct{}{"loop": {}},
-			},
-			"/repo/a/loop": {
-				Directories: []string{"a"},
-				Symlinks:    map[string]struct{}{},
-			},
-		},
-		resolvedPaths: map[string]string{"/repo/a/loop": "/repo"},
-	}
-
-	globs := readGitignoreAsGlobs("/repo", mock, nil)
-
-	assert.DeepEqual(t, globs, []string{"**/root-cache/**/*", "a/**/nested-cache/**/*"})
-	assert.DeepEqual(t, mock.accessedDirs, []string{"/repo", "/repo/a"})
-	assert.Equal(t, len(mock.realpathCalls), 0, "symlink metadata should avoid Realpath fallback")
-}
-
-func TestReadGitignoreAsGlobs_LegacySymlinkCycleUsesCachedRealPaths(t *testing.T) {
-	mock := &gitignoreMockFS{
-		FS: osvfs.FS(),
-		files: map[string]string{
-			"/repo/.gitignore":        "root-cache/\n",
-			"/repo/a/.gitignore":      "nested-cache/\n",
-			"/repo/a/loop/.gitignore": "cycle-cache/\n",
-		},
-		entries: map[string]vfs.Entries{
-			"/repo":   {Directories: []string{"a"}},
-			"/repo/a": {Directories: []string{"loop"}},
-		},
-		resolvedPaths: map[string]string{
-			"/repo":        "/repo",
-			"/repo/a":      "/repo/a",
-			"/repo/a/loop": "/repo",
-		},
-	}
-
-	globs := readGitignoreAsGlobs("/repo", mock, nil)
-
-	assert.DeepEqual(t, globs, []string{"**/root-cache/**/*", "a/**/nested-cache/**/*"})
-	assert.DeepEqual(t, mock.accessedDirs, []string{"/repo", "/repo/a"})
-	assert.DeepEqual(t, mock.realpathCalls, []string{"/repo", "/repo/a", "/repo/a/loop"})
-}
-
-// --- Additional edge case tests ---
 
 func TestConvertGitignoreToGlobs_WindowsLineEndings(t *testing.T) {
 	globs := convertGitignoreToGlobs("dist/\r\ncoverage/\r\n", "")
@@ -527,6 +242,7 @@ func TestConvertGitignoreToGlobs_NestedStarMatchAll(t *testing.T) {
 // line whose body already ends "/**/*" (e.g. "src/**/*/") exercises it. Without
 // the guard the result over-matches one level deeper. Pin the deduped output so
 // the guard can't be silently dropped.
+
 func TestConvertGitignoreToGlobs_DirOnlySuffixDedup(t *testing.T) {
 	// Body "src/**/*" (rooted via the internal '/'), trailing '/' → dirOnly.
 	// glob already ends "/**/*" → must NOT become "src/**/*/**/*".
@@ -592,22 +308,6 @@ func TestRelativeDirIsVolumeAndShareAware(t *testing.T) {
 	rel, ok := relativeDir("/Repo", "/repo/pkg", false)
 	assert.Assert(t, ok)
 	assert.Equal(t, rel, "pkg")
-}
-
-func TestSortByPathDepthTreatsUNCShareAsRoot(t *testing.T) {
-	paths := []string{
-		"//server/share/repo/pkg",
-		"//server/share/repo",
-		"//server/share/",
-	}
-
-	sortByPathDepth(paths)
-
-	assert.DeepEqual(t, paths, []string{
-		"//server/share/",
-		"//server/share/repo",
-		"//server/share/repo/pkg",
-	})
 }
 
 func TestCursorDirectoryReachability(t *testing.T) {
@@ -698,270 +398,304 @@ func TestCursorRejectsPathsOutsideOwnerVolume(t *testing.T) {
 	}
 }
 
-func TestReadGitignoreAsGlobs_StopsAtConfigDirAcrossFilesystemRoots(t *testing.T) {
-	tests := []struct {
-		name         string
-		configDir    string
-		rootIgnore   string
-		configIgnore string
-	}{
-		{name: "posix", configDir: "/repo", rootIgnore: "/.gitignore", configIgnore: "/repo/.gitignore"},
-		{name: "drive", configDir: "C:/repo", rootIgnore: "C:/.gitignore", configIgnore: "C:/repo/.gitignore"},
-		{name: "unc", configDir: "//server/share/repo", rootIgnore: "//server/share/.gitignore", configIgnore: "//server/share/repo/.gitignore"},
-	}
+type readerTestFS struct {
+	vfs.FS
+	mu            sync.Mutex
+	files         map[string]string
+	directories   map[string]bool
+	readCalls     map[string]int
+	markerCalls   map[string]int
+	caseSensitive bool
+	beforeRead    func(string)
+	beforeMarker  func(string)
+}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			mock := &gitignoreMockFS{
-				FS: osvfs.FS(),
-				files: map[string]string{
-					test.rootIgnore:   "root-cache/\n",
-					test.configIgnore: "local-cache/\n",
-				},
-				entries: map[string]vfs.Entries{
-					test.configDir: {Symlinks: map[string]struct{}{}},
-				},
+func (fsys *readerTestFS) UseCaseSensitiveFileNames() bool { return fsys.caseSensitive }
+func (fsys *readerTestFS) DirectoryExists(path string) bool {
+	if fsys.beforeMarker != nil {
+		fsys.beforeMarker(path)
+	}
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+	fsys.markerCalls[path]++
+	return fsys.directories[path]
+}
+func (fsys *readerTestFS) FileExists(path string) bool {
+	if fsys.beforeMarker != nil {
+		fsys.beforeMarker(path)
+	}
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+	fsys.markerCalls[path]++
+	_, ok := fsys.files[path]
+	return ok
+}
+func (fsys *readerTestFS) ReadFile(path string) (string, bool) {
+	if fsys.beforeRead != nil {
+		fsys.beforeRead(path)
+	}
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+	fsys.readCalls[path]++
+	content, ok := fsys.files[path]
+	return content, ok
+}
+
+func newReaderTestFS(files map[string]string, directories ...string) *readerTestFS {
+	fsys := &readerTestFS{files: files, directories: make(map[string]bool), readCalls: make(map[string]int), markerCalls: make(map[string]int), caseSensitive: true}
+	for _, directory := range directories {
+		fsys.directories[directory] = true
+	}
+	return fsys
+}
+
+func TestReaderNearestGitBoundaryIncludesDirectoryAndFileMarkers(t *testing.T) {
+	for _, markerIsDirectory := range []bool{false, true} {
+		fsys := newReaderTestFS(map[string]string{"/.gitignore": "outside/\n", "/work/.gitignore": "dist/\n"})
+		if markerIsDirectory {
+			fsys.directories["/work/.git"] = true
+		} else {
+			fsys.files["/work/.git"] = "gitdir: unrelated"
+		}
+		reader := NewReader(fsys)
+		cursor := reader.Ancestors("/work/package")
+		if cursor.RootDirectory() != "/work" {
+			t.Fatalf("root=%q", cursor.RootDirectory())
+		}
+		if fsys.readCalls["/.gitignore"] != 0 || fsys.readCalls["/work/.git"] != 0 {
+			t.Fatal("read above boundary or parsed marker contents")
+		}
+		if fsys.readCalls["/work/package/.gitignore"] != 0 {
+			t.Fatal("Ancestors observed local source prematurely")
+		}
+		cursor = reader.Observe(cursor, "/work/package")
+		_, blocked := reader.Enter(cursor, "/work/package/dist")
+		if !blocked {
+			t.Fatal("boundary local rules were not inherited")
+		}
+	}
+}
+
+func TestReaderNoGitBoundaryStopsAtVolumeAndUNCShareRoots(t *testing.T) {
+	for _, test := range []struct{ directory, root string }{
+		{"/work/pkg", "/"}, {"C:/work/pkg", "C:/"}, {"//server/share/work/pkg", "//server/share/"},
+	} {
+		fsys := newReaderTestFS(map[string]string{tspath.CombinePaths(test.root, ".gitignore"): "dist/\n"})
+		reader := NewReader(fsys)
+		cursor := reader.Ancestors(test.directory)
+		if cursor.RootDirectory() != test.root {
+			t.Errorf("%s root=%s want=%s", test.directory, cursor.RootDirectory(), test.root)
+		}
+		if fsys.readCalls[tspath.CombinePaths(test.root, ".gitignore")] != 1 {
+			t.Errorf("root source missing for %s", test.directory)
+		}
+		for path := range fsys.markerCalls {
+			if path == "//server/.git" {
+				t.Fatal("escaped UNC share")
 			}
-
-			globs := readGitignoreAsGlobs(test.configDir, mock, nil)
-
-			assert.DeepEqual(t, globs, []string{"**/local-cache/**/*"})
-			assert.DeepEqual(t, mock.readFileCalls, []string{test.configIgnore})
-		})
-	}
-}
-
-func TestExplicitCollectorNeverAccessesOutsideConfigDir(t *testing.T) {
-	t.Run("outside target only", func(t *testing.T) {
-		mock := &gitignoreMockFS{
-			FS: osvfs.FS(),
-			files: map[string]string{
-				"/.gitignore":         "global-cache/\n",
-				"/outside/.gitignore": "outside-cache/\n",
-			},
-			caseSensitiveFS: true,
 		}
-
-		globs := Collect("/repo", mock, []string{"/outside/source.ts"}, nil)
-		assert.Assert(t, globs == nil, "outside target produced %v", globs)
-		assert.Assert(t, len(mock.readFileCalls) == 0, "outside target triggered reads: %v", mock.readFileCalls)
-		assert.Assert(t, len(mock.accessedDirs) == 0, "outside target triggered directory access: %v", mock.accessedDirs)
-		assert.Assert(t, len(mock.realpathCalls) == 0, "outside target triggered realpath: %v", mock.realpathCalls)
-	})
-
-	t.Run("mixed targets collect only the valid chain", func(t *testing.T) {
-		mock := &gitignoreMockFS{
-			FS: osvfs.FS(),
-			files: map[string]string{
-				"/repo/.gitignore":     "root-cache/\n",
-				"/repo/src/.gitignore": "generated.ts\n",
-				"/outside/.gitignore":  "outside-cache/\n",
-			},
-			entries: map[string]vfs.Entries{
-				"/repo": {Symlinks: map[string]struct{}{}},
-			},
-			caseSensitiveFS: true,
-		}
-
-		globs := Collect("/repo", mock, []string{
-			"/outside/source.ts",
-			"/repo/src/source.ts",
-		}, nil)
-		assert.DeepEqual(t, globs, []string{
-			"**/root-cache/**/*",
-			"src/**/generated.ts",
-		})
-		assert.DeepEqual(t, mock.readFileCalls, []string{
-			"/repo/.gitignore",
-			"/repo/src/.gitignore",
-		})
-		assert.DeepEqual(t, mock.accessedDirs, []string{"/repo"})
-		assert.Assert(t, len(mock.realpathCalls) == 0, "mixed targets triggered unexpected realpath: %v", mock.realpathCalls)
-	})
-}
-
-func TestTargetCollectorVisitsOnlyDirectorySubtreesAndFileChains(t *testing.T) {
-	mock := &gitignoreMockFS{
-		FS: osvfs.FS(),
-		files: map[string]string{
-			"/repo/.gitignore":                 "root.ts\n",
-			"/repo/packages/.gitignore":        "package.ts\n",
-			"/repo/packages/a/.gitignore":      "a.ts\n",
-			"/repo/packages/a/deep/.gitignore": "deep.ts\n",
-			"/repo/packages/b/.gitignore":      "b.ts\n",
-			"/repo/tools/.gitignore":           "tool.ts\n",
-			"/repo/unrelated/.gitignore":       "unrelated.ts\n",
-		},
-		entries: map[string]vfs.Entries{
-			"/repo":                 {Directories: []string{"packages", "tools", "unrelated"}, Symlinks: map[string]struct{}{}},
-			"/repo/packages":        {Directories: []string{"a", "b"}, Symlinks: map[string]struct{}{}},
-			"/repo/packages/a":      {Directories: []string{"deep"}, Symlinks: map[string]struct{}{}},
-			"/repo/packages/a/deep": {Symlinks: map[string]struct{}{}},
-			"/repo/packages/b":      {Symlinks: map[string]struct{}{}},
-			"/repo/tools":           {Symlinks: map[string]struct{}{}},
-			"/repo/unrelated":       {Symlinks: map[string]struct{}{}},
-		},
-		caseSensitiveFS: true,
 	}
-
-	patterns := CollectPatternsForTargets(
-		"/repo",
-		mock,
-		[]string{"/repo/tools/index.ts"},
-		[]string{"/repo/packages/a"},
-		nil,
-	)
-
-	assert.DeepEqual(t, patternGlobs(patterns), []string{
-		"**/root.ts",
-		"packages/**/package.ts",
-		"packages/a/**/a.ts",
-		"packages/a/deep/**/deep.ts",
-		"tools/**/tool.ts",
-	})
-	assert.DeepEqual(t, mock.readFileCalls, []string{
-		"/repo/.gitignore",
-		"/repo/packages/.gitignore",
-		"/repo/packages/a/.gitignore",
-		"/repo/packages/a/deep/.gitignore",
-		"/repo/tools/.gitignore",
-	})
-	assert.DeepEqual(t, mock.accessedDirs, []string{
-		"/repo",
-		"/repo/packages",
-		"/repo/packages/a",
-		"/repo/packages/a/deep",
-	})
-	assert.Assert(t, len(mock.realpathCalls) == 0, "target collector resolved unexpected paths: %v", mock.realpathCalls)
 }
 
-func TestCollectionTargetsTreatContainingDirectoryAsFullRoot(t *testing.T) {
-	for _, directory := range []string{"/repo", "/"} {
-		targets := buildCollectionTargets("/repo", nil, []string{directory}, true)
-		assert.Equal(
-			t,
-			targets[tspath.ToPath("/repo", "", true)],
-			collectionTargetRecursive,
-			"containing directory %q did not cover the config root",
-			directory,
-		)
+func TestReaderIgnoredNestedMarkerDoesNotReopenEntry(t *testing.T) {
+	fsys := newReaderTestFS(map[string]string{
+		"/repo/.git": "", "/repo/.gitignore": "nested/\n",
+		"/repo/nested/.git": "gitdir: elsewhere", "/repo/nested/.gitignore": "ignored.ts\n",
+	})
+	reader := NewReader(fsys)
+	outer := reader.Observe(reader.Ancestors("/repo"), "/repo")
+	_, blocked := reader.Enter(outer, "/repo/nested")
+	if !blocked {
+		t.Error("nested marker reopened an ignored directory entry")
 	}
-
-	targets := buildCollectionTargets("/repo", nil, []string{"/unrelated"}, true)
-	assert.Equal(t, len(targets), 0, "unrelated directory entered the target set")
+	if fsys.readCalls["/repo/nested/.gitignore"] != 0 {
+		t.Error("ignored directory source was read")
+	}
+	inner := reader.Observe(reader.Ancestors("/repo/nested"), "/repo/nested")
+	if !inner.SourceReachable() || inner.RootDirectory() != "/repo/nested" || fsys.readCalls["/repo/nested/.gitignore"] != 1 {
+		t.Fatal("direct nested input did not establish its own Git entry point")
+	}
 }
 
-func TestCollectionTargetsAreVolumeAndCaseAware(t *testing.T) {
+func TestReaderNestedMarkerResetsUnreachableRawSources(t *testing.T) {
+	fsys := newReaderTestFS(map[string]string{
+		"/repo/.git": "", "/repo/.gitignore": "ignored/\n",
+		"/repo/ignored/.gitignore": "*.ts\n", "/repo/ignored/inner/.git": "gitdir: elsewhere",
+		"/repo/ignored/inner/.gitignore": "*.generated.ts\n",
+	})
+	reader := NewReader(fsys)
+	cursor := reader.Observe(reader.Ancestors("/repo"), "/repo")
+	blockedCursor, blocked := reader.Enter(cursor, "/repo/ignored")
+	if !blocked || blockedCursor.SourceReachable() {
+		t.Fatal("ignored source remained reachable")
+	}
+	reader.Observe(blockedCursor, "/repo/ignored")
+	inner, blocked := reader.Enter(blockedCursor, "/repo/ignored/inner")
+	if blocked || !inner.SourceReachable() || inner.RootDirectory() != "/repo/ignored/inner" {
+		t.Fatal("nested marker did not establish fresh Git state")
+	}
+	reader.Observe(inner, "/repo/ignored/inner")
+	if fsys.readCalls["/repo/ignored/.gitignore"] != 0 || fsys.readCalls["/repo/ignored/inner/.gitignore"] != 1 {
+		t.Fatalf("source reads=%v", fsys.readCalls)
+	}
+	snapshot := reader.Snapshot()
+	if len(snapshot.Roots) != 2 {
+		t.Fatalf("roots=%v", snapshot.Roots)
+	}
+	if !slices.Contains(snapshot.CoveredDirectories, "/repo/ignored") {
+		t.Fatal("proven unreachable source was not covered")
+	}
+}
+
+func TestReaderSourceObservationsRemainFrozenForOneRequest(t *testing.T) {
+	const directory = "/repo/src"
+	const source = directory + "/.gitignore"
 	for _, test := range []struct {
-		name   string
-		root   string
-		target string
+		name          string
+		exists        bool
+		content       string
+		removeOnWrite bool
 	}{
-		{name: "case insensitive", root: "/Repo", target: "/repo/PACKAGES"},
-		{name: "drive", root: "C:/Repo", target: "c:/repo/Packages"},
-		{name: "UNC", root: "//server/share/repo", target: "//SERVER/SHARE/REPO/packages"},
+		{name: "missing"},
+		{name: "empty", exists: true},
+		{name: "replaced", exists: true, content: "before/\n"},
+		{name: "deleted", exists: true, content: "before/\n", removeOnWrite: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			targets := buildCollectionTargets(test.root, nil, []string{test.target}, false)
-			assert.Equal(
-				t,
-				targets[tspath.ToPath(test.target, "", false)],
-				collectionTargetRecursive,
-				"target set = %+v",
-				targets,
-			)
+			fsys := newReaderTestFS(map[string]string{"/repo/.git": ""})
+			if test.exists {
+				fsys.files[source] = test.content
+			}
+			reader := NewReader(fsys)
+			reader.Observe(reader.Ancestors(directory), directory)
+			first := reader.Snapshot()
+			if test.removeOnWrite {
+				delete(fsys.files, source)
+			} else {
+				fsys.files[source] = "after/\n"
+			}
+
+			cursor := reader.Observe(reader.Ancestors(directory), directory)
+			assert.DeepEqual(t, reader.Snapshot(), first)
+			_, beforeIgnored := reader.Enter(cursor, directory+"/before")
+			_, afterIgnored := reader.Enter(cursor, directory+"/after")
+			assert.Equal(t, beforeIgnored, test.content != "")
+			assert.Assert(t, !afterIgnored)
+			assert.Equal(t, fsys.readCalls[source], 1)
+
+			fresh := NewReader(fsys)
+			cursor = fresh.Observe(fresh.Ancestors(directory), directory)
+			_, beforeIgnored = fresh.Enter(cursor, directory+"/before")
+			_, afterIgnored = fresh.Enter(cursor, directory+"/after")
+			assert.Assert(t, !beforeIgnored)
+			assert.Equal(t, afterIgnored, !test.removeOnWrite)
+			assert.Equal(t, fsys.readCalls[source], 2)
 		})
 	}
-
-	targets := buildCollectionTargets("C:/repo", nil, []string{"D:/repo/packages"}, false)
-	assert.Equal(t, len(targets), 0, "a different drive entered the target set")
-	targets = buildCollectionTargets(
-		"//server/share/repo",
-		nil,
-		[]string{"//server/other/repo/packages"},
-		false,
-	)
-	assert.Equal(t, len(targets), 0, "a different UNC share entered the target set")
 }
 
-func TestCollectionBoundariesAreVolumeAndCaseAware(t *testing.T) {
-	tests := []struct {
-		name             string
-		configDir        string
-		stopDir          string
-		candidate        string
-		useCaseSensitive bool
-	}{
-		{name: "posix", configDir: "/repo", stopDir: "/repo/packages/app", candidate: "/repo/packages/app", useCaseSensitive: true},
-		{name: "case insensitive", configDir: "/Repo", stopDir: "/repo/Packages/App", candidate: "/REPO/packages/app"},
-		{name: "drive", configDir: "C:/Repo", stopDir: "c:/repo/Packages/App", candidate: "C:/REPO/packages/app"},
-		{name: "unc", configDir: "//server/share/repo", stopDir: "//SERVER/SHARE/REPO/packages/app", candidate: "//server/share/repo/PACKAGES/APP"},
+func TestReaderConcurrentSourceAndMarkerMissesAreObservedOnce(t *testing.T) {
+	fsys := newReaderTestFS(map[string]string{"/repo/.git": "", "/repo/.gitignore": "dist/\n"})
+	reader := NewReader(fsys)
+	var wait sync.WaitGroup
+	for range 32 {
+		wait.Add(1)
+		go func() { defer wait.Done(); reader.Observe(reader.Ancestors("/repo/src"), "/repo/src") }()
 	}
+	wait.Wait()
+	for _, path := range []string{"/repo/.gitignore", "/repo/src/.gitignore"} {
+		if fsys.readCalls[path] != 1 {
+			t.Errorf("%s read %d times", path, fsys.readCalls[path])
+		}
+	}
+	if fsys.markerCalls["/repo/src/.git"] != 2 {
+		t.Fatalf("marker misses repeated: %v", fsys.markerCalls)
+	}
+	first := reader.Snapshot()
+	first.Roots[0] = "/changed"
+	first.Sources[0].Patterns[0].Glob = "changed"
+	second := reader.Snapshot()
+	if second.Roots[0] != "/repo" || second.Sources[0].Patterns[0].Glob == "changed" {
+		t.Fatal("snapshot retained writable reader state")
+	}
+}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			boundaries := normalizeCollectionBoundaries(test.configDir, []string{test.stopDir}, test.useCaseSensitive)
-			assert.Equal(t, len(boundaries), 1)
-			assert.Assert(t, isCollectionBoundary(test.candidate, boundaries, test.useCaseSensitive))
+func TestReaderDifferentDirectoriesDoNotSerializeIO(t *testing.T) {
+	for _, kind := range []string{"marker", "source"} {
+		t.Run(kind, func(t *testing.T) {
+			fsys := newReaderTestFS(map[string]string{"/repo/.git": "", "/repo/a/.gitignore": "dist/\n"})
+			started, release := make(chan struct{}), make(chan struct{})
+			var entered, released sync.Once
+			defer released.Do(func() { close(release) })
+			hook := func(path string) {
+				if path == "/repo/a/.git" || path == "/repo/a/.gitignore" {
+					entered.Do(func() { close(started) })
+					<-release
+				}
+			}
+			if kind == "marker" {
+				fsys.beforeMarker = hook
+			} else {
+				fsys.beforeRead = hook
+			}
+			reader := NewReader(fsys)
+			root := reader.Ancestors("/repo")
+			observe := func(directory string) {
+				if kind == "marker" {
+					reader.Enter(root, directory)
+				} else {
+					reader.Observe(root, directory)
+				}
+			}
+			firstDone := make(chan struct{})
+			go func() { defer close(firstDone); observe("/repo/a") }()
+			select {
+			case <-started:
+			case <-time.After(2 * time.Second):
+				t.Fatal("first directory did not start IO")
+			}
+			secondDone := make(chan struct{})
+			go func() { defer close(secondDone); observe("/repo/b") }()
+			select {
+			case <-secondDone:
+			case <-time.After(2 * time.Second):
+				t.Fatal("unrelated directory waited for blocked IO")
+			}
+			released.Do(func() { close(release) })
+			<-firstDone
 		})
 	}
-
-	assert.Assert(t, len(normalizeCollectionBoundaries("/repo", []string{"/other/app", "/repo"}, true)) == 0)
 }
 
-func TestCollectors_StopAtChildConfigBoundary(t *testing.T) {
-	mock := &gitignoreMockFS{
-		FS: osvfs.FS(),
-		files: map[string]string{
-			"/repo/.gitignore":                    "root-cache/\n",
-			"/repo/packages/.gitignore":           "package-cache/\n",
-			"/repo/packages/app/.gitignore":       "child-cache/\n",
-			"/repo/packages/app/src/.gitignore":   "generated.ts\n",
-			"/repo/packages/other/.gitignore":     "other-cache/\n",
-			"/repo/packages/other/src/.gitignore": "other-generated.ts\n",
-		},
-		entries: map[string]vfs.Entries{
-			"/repo":                    {Directories: []string{"packages"}, Symlinks: map[string]struct{}{}},
-			"/repo/packages":           {Directories: []string{"app", "other"}, Symlinks: map[string]struct{}{}},
-			"/repo/packages/app":       {Directories: []string{"src"}, Symlinks: map[string]struct{}{}},
-			"/repo/packages/app/src":   {Symlinks: map[string]struct{}{}},
-			"/repo/packages/other":     {Directories: []string{"src"}, Symlinks: map[string]struct{}{}},
-			"/repo/packages/other/src": {Symlinks: map[string]struct{}{}},
-		},
-		caseSensitiveFS: true,
+func TestReaderSharedSourceKeepsEachRoutesInheritedRules(t *testing.T) {
+	fsys := newReaderTestFS(map[string]string{"/repo/.git": "", "/repo/shared/.gitignore": "/dist/\n"})
+	reader := NewReader(fsys)
+	root := reader.Ancestors("/repo")
+	left, _ := root.AppendSourcePatterns("/repo", "left/\n")
+	right, _ := root.AppendSourcePatterns("/repo", "right/\n")
+	left = reader.Observe(left, "/repo/shared")
+	right = reader.Observe(right, "/repo/shared")
+	for _, test := range []struct {
+		cursor       Cursor
+		own, sibling string
+	}{{left, "left", "right"}, {right, "right", "left"}} {
+		_, ownIgnored := test.cursor.Enter("/repo/" + test.own)
+		_, siblingIgnored := test.cursor.Enter("/repo/" + test.sibling)
+		_, localIgnored := test.cursor.Enter("/repo/shared/dist")
+		assert.Assert(t, ownIgnored && !siblingIgnored && localIgnored)
 	}
-	boundary := "/repo/packages/app"
+	assert.Equal(t, fsys.readCalls["/repo/shared/.gitignore"], 1)
+	snapshot := reader.Snapshot()
+	assert.Equal(t, len(snapshot.Sources), 1)
+	assert.Equal(t, len(snapshot.Sources[0].Patterns), 1)
+	assert.Equal(t, snapshot.Sources[0].Patterns[0].Glob, "shared/dist/**/*")
+}
 
-	full := CollectWithBoundaries("/repo", mock, nil, nil, []string{boundary})
-	assert.DeepEqual(t, full, []string{
-		"**/root-cache/**/*",
-		"packages/**/package-cache/**/*",
-		"packages/other/**/other-cache/**/*",
-		"packages/other/src/**/other-generated.ts",
-	})
-	for _, path := range append(append([]string(nil), mock.readFileCalls...), mock.accessedDirs...) {
-		if _, ok := relativeDir(boundary, path, true); ok {
-			t.Fatalf("collector crossed child config boundary: %q", path)
-		}
+// convertSinglePattern exposes the projection used by collector tests.
+func convertSinglePattern(line string, baseDir string) string {
+	patterns := convertGitignoreToPatterns(line, baseDir)
+	if len(patterns) == 0 {
+		return ""
 	}
-
-	mock.readFileCalls = nil
-	mock.accessedDirs = nil
-	mock.realpathCalls = nil
-	explicit := CollectWithBoundaries(
-		"/repo",
-		mock,
-		[]string{"/repo/packages/app/src/file.ts"},
-		nil,
-		[]string{boundary},
-	)
-	assert.DeepEqual(t, explicit, []string{
-		"**/root-cache/**/*",
-		"packages/**/package-cache/**/*",
-	})
-	for _, path := range append(append(append([]string(nil), mock.readFileCalls...), mock.accessedDirs...), mock.realpathCalls...) {
-		if _, ok := relativeDir(boundary, path, true); ok {
-			t.Fatalf("explicit collector crossed child config boundary: %q", path)
-		}
-	}
+	return patterns[0].Glob
 }

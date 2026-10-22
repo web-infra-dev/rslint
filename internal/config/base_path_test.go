@@ -324,7 +324,7 @@ func TestBasePathGlobalIgnoreKeepsAliasedConfigArrayRootReachable(t *testing.T) 
 	}, configRoot)
 	fsys := osvfs.FS()
 	snapshot := NewPathSpaceSnapshot(map[string]RslintConfig{configRoot: config}, fsys)
-	matcher, err := NewTargetMatcherWithPathSpaces(config, configRoot, fsys, snapshot)
+	matcher, err := NewTargetMatcherWithPathSpaces(config, configRoot, fsys, snapshot, nil)
 	assert.NilError(t, err)
 	matchFile := func(file string) TargetMatch {
 		file = tspath.NormalizePath(file)
@@ -410,7 +410,7 @@ func TestBasePathNegationReopensPhysicalAliasSubtree(t *testing.T) {
 	physical = tspath.NormalizePath(fsys.Realpath(physical))
 	target = tspath.NormalizePath(target)
 	snapshot := NewPathSpaceSnapshot(map[string]RslintConfig{root: config}, fsys)
-	matcher, err := NewTargetMatcherWithPathSpaces(config, root, fsys, snapshot)
+	matcher, err := NewTargetMatcherWithPathSpaces(config, root, fsys, snapshot, nil)
 	assert.NilError(t, err)
 
 	decision := matcher.MatchFile(PathIdentity{
@@ -445,6 +445,6 @@ func TestConfigWithResolvedBasePathsUsesOneInternalPathOrigin(t *testing.T) {
 	snapshot := NewPathSpaceSnapshot(map[string]RslintConfig{"/owner": effective}, nil)
 	_, configArrayBaseFrozen := snapshot.PhysicalDirectory("/configs")
 	assert.Assert(t, configArrayBaseFrozen)
-	_, err := NewTargetMatcherWithPathSpaces(effective, "/owner", nil, snapshot)
+	_, err := NewTargetMatcherWithPathSpaces(effective, "/owner", nil, snapshot, nil)
 	assert.NilError(t, err)
 }

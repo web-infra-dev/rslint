@@ -87,6 +87,7 @@ export class RSLintService {
     const {
       files,
       canonicalFiles,
+      fileScanDirectories,
       config,
       configDiscovery,
       eslintPlugins,
@@ -104,6 +105,7 @@ export class RSLintService {
     return this.service.sendMessage('lint', {
       files,
       canonicalFiles,
+      fileScanDirectories,
       config,
       configDiscovery,
       eslintPlugins,

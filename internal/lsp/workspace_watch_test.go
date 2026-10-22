@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -242,8 +243,7 @@ func TestAncestorGitignoreWatcherRefreshesAncestorOwnedConfig(t *testing.T) {
 	installLastGoodConfig(s, ancestor)
 	s.configDiscoveryActive = true
 	uri := documentURIFromPath(target)
-	effective, configDir, _ := s.getLintConfigForURI(uri)
-	if effective.IsFileIgnored(target, configDir) {
+	if s.documentLintSnapshot(documentURIFromPath(target)).resolvedConfig.GloballyIgnored {
 		t.Fatal("target was ignored before the ancestor-chain .gitignore existed")
 	}
 
@@ -265,11 +265,11 @@ func TestAncestorGitignoreWatcherRefreshesAncestorOwnedConfig(t *testing.T) {
 		t.Fatalf("ancestor-chain .gitignore refresh failed: %v", err)
 	}
 
-	effective, configDir, _ = s.getLintConfigForURI(uri)
+	_, configDir, _ := s.getLintConfigForURI(uri)
 	if configDir != ancestor {
 		t.Fatalf("effective config directory=%q, want %q", configDir, ancestor)
 	}
-	if !effective.IsFileIgnored(target, configDir) {
+	if !s.documentLintSnapshot(documentURIFromPath(target)).resolvedConfig.GloballyIgnored {
 		t.Fatal("ancestor-chain .gitignore was not committed into the active snapshot")
 	}
 }
@@ -347,41 +347,39 @@ func awaitConfigWatchEvent(t *testing.T, result <-chan error) error {
 	}
 }
 
-func TestGitignoreFileWatchers(t *testing.T) {
-	watchers := gitignoreFileWatchers("/workspace/packages/app", true)
-	if len(watchers) != 4 {
-		t.Fatalf("watcher count=%d, want workspace recursive plus three strict ancestors", len(watchers))
-	}
-	recursive := watchers[0].GlobPattern.RelativePattern
-	if recursive == nil || recursive.BaseUri.URI == nil || string(*recursive.BaseUri.URI) != "file:///workspace/packages/app" || recursive.Pattern != "**/.gitignore" {
-		t.Fatalf("recursive watcher=%+v", watchers[0])
-	}
-	wantAncestorBases := []string{"file:///workspace/packages", "file:///workspace", "file:///"}
-	for index, wantBase := range wantAncestorBases {
-		relative := watchers[index+1].GlobPattern.RelativePattern
-		if relative == nil || relative.BaseUri.URI == nil || string(*relative.BaseUri.URI) != wantBase || relative.Pattern != ".gitignore" {
-			t.Fatalf("ancestor watcher[%d]=%+v, want base %q", index, watchers[index+1], wantBase)
+func TestGitPolicyFileWatchers(t *testing.T) {
+	roots := []config.DirectoryIdentity{{LexicalPath: "/workspace/packages/app", CanonicalPath: "/physical/app"}}
+	files := []config.PathIdentity{{Path: "/external-link/source.ts", CanonicalParentPath: "/outside/src"}}
+	directories := gitPolicyWatchDirectories(roots, files)
+	for _, relative := range []bool{false, true} {
+		watchers := gitPolicyFileWatchers(roots, directories, relative)
+		patterns := make(map[string]bool)
+		for _, watcher := range watchers {
+			pattern := watcher.GlobPattern.Pattern
+			if relative {
+				rp := watcher.GlobPattern.RelativePattern
+				if rp == nil || rp.BaseUri.URI == nil {
+					t.Fatalf("invalid relative watcher: %+v", watcher)
+				}
+				patterns[tspath.ResolvePath(uriToPath(lsproto.DocumentUri(*rp.BaseUri.URI)), rp.Pattern)] = true
+			} else if pattern != nil {
+				patterns[*pattern] = true
+			}
 		}
-	}
-	withoutRelativePatterns := gitignoreFileWatchers("/workspace/packages/app", false)
-	if len(withoutRelativePatterns) != 4 {
-		t.Fatalf("watchers without relative-pattern support=%+v", withoutRelativePatterns)
-	}
-	wantPatterns := []string{
-		"/workspace/packages/app/**/.gitignore",
-		"/workspace/packages/.gitignore",
-		"/workspace/.gitignore",
-		"/.gitignore",
-	}
-	for index, want := range wantPatterns {
-		pattern := withoutRelativePatterns[index].GlobPattern.Pattern
-		if pattern == nil || *pattern != want {
-			t.Fatalf("absolute watcher[%d]=%+v, want %q", index, withoutRelativePatterns[index], want)
+		for _, path := range []string{
+			"/workspace/packages/app/**/.gitignore", "/workspace/packages/app/**/.git",
+			"/physical/app/**/.gitignore", "/physical/app/**/.git",
+			"/outside/src/.gitignore", "/outside/src/.git", "/outside/.git", "/.gitignore", "/.git",
+		} {
+			if !patterns[path] {
+				t.Fatalf("relative=%v missing watcher %q: %+v", relative, path, patterns)
+			}
 		}
-	}
-	rootWatchers := gitignoreFileWatchers("/", true)
-	if len(rootWatchers) != 1 || rootWatchers[0].GlobPattern.RelativePattern == nil {
-		t.Fatalf("filesystem root watchers=%+v", rootWatchers)
+		for pattern := range patterns {
+			if strings.HasSuffix(pattern, ".git/**") {
+				t.Fatalf("watching marker contents: %q", pattern)
+			}
+		}
 	}
 }
 

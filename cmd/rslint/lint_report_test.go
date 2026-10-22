@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/output"
@@ -408,21 +409,23 @@ func TestDefaultStartWriterCompletesBeforePostStartWarnings(t *testing.T) {
 		}
 	}()
 	codeCh := make(chan int, 1)
+	args := lintArgs{
+		ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{
+			{Ignores: []string{"ignored.js"}},
+			{Rules: rslintconfig.Rules{"no-debugger": "error"}},
+		}),
+		Format:         "default",
+		NoColor:        true,
+		SingleThreaded: true,
+		AllowFiles:     []string{filePath},
+		StartWriter: gatedStartWriter{
+			entered: startEntered,
+			release: releaseStart,
+		},
+	}
+	prepareCommandCatalogForTest(tspath.NormalizePath(dir), &args)
 	go func() {
-		codeCh <- handleLintCommand(lintArgs{
-			ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{
-				{Ignores: []string{"ignored.js"}},
-				{Rules: rslintconfig.Rules{"no-debugger": "error"}},
-			}),
-			Format:         "default",
-			NoColor:        true,
-			SingleThreaded: true,
-			AllowFiles:     []string{filePath},
-			StartWriter: gatedStartWriter{
-				entered: startEntered,
-				release: releaseStart,
-			},
-		}, context.Background(), nil)
+		codeCh <- handleLintCommand(args, context.Background(), nil)
 	}()
 
 	select {

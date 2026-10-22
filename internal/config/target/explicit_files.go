@@ -62,47 +62,49 @@ func (target *explicitLintTarget) selectedBy(
 }
 
 func newExplicitLintTargetSet(
-	filePaths []string,
+	files []rslintconfig.PathIdentity,
 	fsys vfs.FS,
 ) *explicitLintTargetSet {
-	if filePaths == nil {
+	if files == nil {
 		return nil
 	}
 	set := &explicitLintTargetSet{
-		byPath:         make(map[tspath.Path]*explicitLintTarget, len(filePaths)),
-		requestedPaths: make([]string, 0, len(filePaths)),
+		byPath:         make(map[tspath.Path]*explicitLintTarget, len(files)),
+		requestedPaths: make([]string, 0, len(files)),
 	}
-	set.add(filePaths, true, fsys)
-	return set
-}
-
-func (set *explicitLintTargetSet) add(
-	filePaths []string,
-	requested bool,
-	fsys vfs.FS,
-) {
-	if set == nil {
-		return
-	}
-	for _, filePath := range filePaths {
-		filePath = tspath.NormalizePath(filePath)
-		if requested {
-			set.requestedPaths = append(set.requestedPaths, filePath)
-		}
+	for _, identity := range files {
+		filePath := tspath.NormalizePath(identity.Path)
+		set.requestedPaths = append(set.requestedPaths, filePath)
 		pathID := tspath.ToPath(filePath, "", true)
 		if _, exists := set.byPath[pathID]; exists {
 			continue
 		}
 		exists := true
 		if fsys != nil {
-			exists = fsys.FileExists(filePath)
+			physicalPath := identity.CanonicalPath
+			if physicalPath == "" {
+				physicalPath = filePath
+			}
+			exists = fsys.FileExists(tspath.NormalizePath(physicalPath))
 		}
 		set.byPath[pathID] = &explicitLintTarget{
-			target:    File{PathIdentity: FreezeFileIdentity(filePath, fsys)},
+			target:    File{PathIdentity: identity},
 			supported: rslintconfig.IsSupportedLintFile(filePath),
 			exists:    exists,
 		}
 	}
+	return set
+}
+
+func (set *explicitLintTargetSet) targetsForIdentities(files []rslintconfig.PathIdentity) []*explicitLintTarget {
+	if files == nil {
+		return nil
+	}
+	paths := make([]string, len(files))
+	for index, file := range files {
+		paths[index] = file.Path
+	}
+	return set.targetsForPaths(paths)
 }
 
 func (set *explicitLintTargetSet) targetsForPaths(filePaths []string) []*explicitLintTarget {

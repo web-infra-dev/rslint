@@ -9,7 +9,7 @@ func (r *FileConfigResolver) reuseTargetMatch(target PathIdentity, match *Target
 	}
 	source := match.source
 	current := r.matchSource
-	if current == nil || source.pathSpaces != current.pathSpaces ||
+	if current == nil || source.pathSpaces != current.pathSpaces || source.gitPolicy != current.gitPolicy ||
 		source.configDirectory != current.configDirectory || source.useCaseSensitive != current.useCaseSensitive ||
 		source.hasFS != current.hasFS {
 		return configTargetDecision{}, false
@@ -54,13 +54,12 @@ func hasSameSelectionPrefix(before, after RslintConfig, owner string) bool {
 			configEntryPathOrigin(left, owner) != configEntryPathOrigin(right, owner) ||
 			!reflect.DeepEqual(left.Files, right.Files) ||
 			!reflect.DeepEqual(left.FilePatternGroups, right.FilePatternGroups) ||
-			!reflect.DeepEqual(left.Ignores, right.Ignores) ||
-			!reflect.DeepEqual(left.collectedGitignore, right.collectedGitignore) {
+			!reflect.DeepEqual(left.Ignores, right.Ignores) {
 			return false
 		}
 	}
 	for _, entry := range after[len(before):] {
-		if hasFileSelectors(entry) || len(entry.Ignores) != 0 || entry.collectedGitignore != nil ||
+		if hasFileSelectors(entry) || len(entry.Ignores) != 0 ||
 			configEntryPathOrigin(entry, owner).basePathScoped {
 			return false
 		}

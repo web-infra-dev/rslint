@@ -31,6 +31,10 @@ materialized independently so cases cannot leak state into one another.
 
 -- case-insensitive/src/a.ts --
 // src/a.ts
+-- case-insensitive/.gitignore --
+target/
+scripts/*
+!Scripts/**/Debug/
 -- case-insensitive/target/deep/x.ts --
 // target/deep/x.ts
 -- case-insensitive/scripts/debug/keep.ts --

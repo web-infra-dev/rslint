@@ -49,6 +49,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -541,25 +542,21 @@ func discoverCLIConfigCatalog(
 	cwd = tspath.NormalizePath(cwd)
 	request := discovery.ConfigDiscoveryRequest{
 		CWD:            cwd,
-		Directories:    append([]string(nil), args.AllowDirs...),
+		Directories:    rslintconfig.ResolveDirectoryIdentities(args.AllowDirs, args.FS),
 		ImplicitCWD:    len(args.AllowFiles) == 0 && len(args.AllowDirs) == 0,
 		SingleThreaded: args.SingleThreaded,
 	}
 	for _, filePath := range args.AllowFiles {
 		request.Files = append(request.Files, discovery.DiscoveryFile{
-			Path:     filePath,
-			Explicit: true,
+			PathIdentity: rslintconfig.FreezeFileIdentity(filePath, args.FS),
+			Explicit:     true,
 		})
 	}
 	loader := &ipcConfigModuleLoader{channel: channel}
 	var catalog *discovery.ConfigCatalog
 	if payload.ConfigDiscovery.ExplicitConfigPath != "" {
 		targetFiles := append([]discovery.DiscoveryFile(nil), request.Files...)
-		targetDirectories := append([]string(nil), request.Directories...)
-		if args.TypeCheckOnly {
-			targetFiles = []discovery.DiscoveryFile{}
-			targetDirectories = nil
-		}
+		targetDirectories := append([]rslintconfig.DirectoryIdentity(nil), request.Directories...)
 		catalog, err = discovery.LoadExplicitConfig(
 			ctx,
 			args.FS,
@@ -567,6 +564,7 @@ func discoverCLIConfigCatalog(
 			discovery.ExplicitConfigRequest{
 				CWD:               cwd,
 				ConfigPath:        payload.ConfigDiscovery.ExplicitConfigPath,
+				ProjectOnly:       args.TypeCheckOnly,
 				TargetFiles:       targetFiles,
 				TargetDirectories: targetDirectories,
 				SingleThreaded:    args.SingleThreaded,
@@ -583,6 +581,9 @@ func discoverCLIConfigCatalog(
 		return err
 	}
 	printConfigDiscoveryFailures(catalog.Failures)
+	if failure := catalog.AllConfigsFailedError(); failure != nil {
+		return failure
+	}
 	if !catalog.Explicit && len(catalog.Configs) == 0 {
 		return errors.New("no rslint config found; run `rslint --init` to create one")
 	}

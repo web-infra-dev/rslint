@@ -2,6 +2,7 @@ package target
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
@@ -49,17 +50,21 @@ func discoverLintTargetsFromRoot(
 		map[string]rslintconfig.RslintConfig{configDir: config},
 		fsys,
 	)
-	explicitSet := newExplicitLintTargetSet(allowFiles, fsys)
+	files := freezeFilePathsForTest(allowFiles, fsys)
+	explicitSet := newExplicitLintTargetSet(files, fsys)
+	policy := rslintconfig.CollectGitPolicy(config, configDir, fsys, files, testDirectoryInputs(configDir, files, allowDirs, fsys))
+	resetTargetWalkSpy(fsys)
 	return discoverLintTargetsWithPreparedFiles(
 		config,
 		configDir,
 		scanRoot,
 		fsys,
 		explicitSet.targetsForPaths(allowFiles),
-		allowDirs,
+		rslintconfig.ResolveDirectoryIdentities(allowDirs, fsys),
 		nil,
 		singleThreaded,
 		pathSpaces,
+		policy,
 	)
 }
 
@@ -71,18 +76,35 @@ func discoverLintTargetsMultiConfig(
 	allowDirs []string,
 	singleThreaded bool,
 ) []File {
-	ownerIndex := NewOwnerIndex(configMap, fsys)
-	explicitSet := newExplicitLintTargetSet(allowFiles, fsys)
+	pathSpaces := rslintconfig.NewPathSpaceSnapshot(configMap, fsys)
+	files := freezeFilePathsForTest(allowFiles, fsys)
+	explicitSet := newExplicitLintTargetSet(files, fsys)
+	directories := allowDirs
+	if files == nil && directories == nil {
+		for directory := range configMap {
+			directories = append(directories, directory)
+		}
+	}
+	policy := rslintconfig.CollectGitPolicy(nil, "", fsys, files, testDirectoryInputs("", files, directories, fsys))
+	resetTargetWalkSpy(fsys)
 	return discoverLintTargetsMultiConfigWithPreparedFiles(
 		configMap,
 		scopes,
 		fsys,
-		allowFiles,
-		allowDirs,
+		files,
+		rslintconfig.ResolveDirectoryIdentities(allowDirs, fsys),
 		singleThreaded,
-		ownerIndex,
+		pathSpaces,
 		explicitSet,
+		policy,
 	)
+}
+
+// These suites measure target traversal after the independent Git observation.
+func resetTargetWalkSpy(fsys vfs.FS) {
+	if spy, ok := fsys.(interface{ resetAccessedDirs() }); ok {
+		spy.resetAccessedDirs()
+	}
 }
 
 func discoverLintFilesMultiConfig(
@@ -119,4 +141,49 @@ func newOwnerIndexForAutomaticTargets(
 	fsys vfs.FS,
 ) *OwnerIndex {
 	return NewOwnerIndex(configMapForAutomaticTargets(configMap, scopes), fsys)
+}
+
+func freezeFilePathsForTest(paths []string, fsys vfs.FS) []rslintconfig.PathIdentity {
+	if paths == nil {
+		return nil
+	}
+	files := make([]rslintconfig.PathIdentity, len(paths))
+	for index, path := range paths {
+		files[index] = rslintconfig.FreezeFileIdentity(path, fsys)
+	}
+	return files
+}
+
+func testDirectoryInputs(root string, files []rslintconfig.PathIdentity, directories []string, fsys vfs.FS) []rslintconfig.DirectoryIdentity {
+	if files == nil && directories == nil && root != "" {
+		directories = []string{root}
+	}
+	return rslintconfig.ResolveDirectoryIdentities(directories, fsys)
+}
+
+func withTestGitPolicy(request Request) Request {
+	root := request.ScanRoot
+	if root == "" {
+		root = request.ConfigDirectory
+	}
+	if request.Files == nil && request.Directories == nil {
+		request.Directories = rslintconfig.ResolveDirectoryIdentities([]string{root}, request.FS)
+	}
+	request.GitPolicy = rslintconfig.CollectGitPolicy(request.Config, request.ConfigDirectory, request.FS, request.Files, request.Directories)
+	return request
+}
+
+func configWithGitForFileForTest(authored rslintconfig.RslintConfig, path, directory string) *rslintconfig.MergedConfig {
+	fsys := osvfs.FS()
+	identity := rslintconfig.FreezeFileIdentity(path, fsys)
+	policy := rslintconfig.CollectGitPolicy(authored, directory, fsys, []rslintconfig.PathIdentity{identity}, nil)
+	spaces := rslintconfig.NewPathSpaceSnapshot(map[string]rslintconfig.RslintConfig{directory: authored}, fsys)
+	matcher, err := rslintconfig.NewTargetMatcherWithPathSpaces(authored, directory, fsys, spaces, policy)
+	if err != nil {
+		panic(err)
+	}
+	if matcher.MatchFile(identity).GloballyIgnored() {
+		return nil
+	}
+	return authored.GetConfigForFile(path, directory)
 }

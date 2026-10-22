@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+
+	"github.com/web-infra-dev/rslint/internal/config"
 )
 
 // lintDebounceDelay is how long to wait after the last keystroke before
@@ -45,6 +47,9 @@ func (s *Server) handleDidOpen(ctx context.Context, params *lsproto.DidOpenTextD
 	// Notify session about the opened file so it creates the overlay.
 	if s.session != nil {
 		s.session.DidOpenFile(ctx, uri, params.TextDocument.Version, content, params.TextDocument.LanguageId)
+	}
+	s.refreshUncoveredDocument(ctx, uri)
+	if s.session != nil {
 		s.pushDiagnostics(uri)
 	}
 	return nil
@@ -83,6 +88,7 @@ func (s *Server) handleDidChange(ctx context.Context, params *lsproto.DidChangeT
 		s.session.DidChangeFile(ctx, uri, params.TextDocument.Version, params.ContentChanges)
 		s.scheduleLint(uri)
 	}
+	s.refreshUncoveredDocument(ctx, uri)
 	return nil
 }
 
@@ -108,6 +114,8 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 		s.lintPrograms.DidSave(uri, open)
 	}
 
+	s.refreshUncoveredDocument(ctx, uri)
+
 	// Notify session about the save event.
 	if s.session != nil {
 		if forwardSave {
@@ -116,6 +124,31 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 		s.pushDiagnostics(uri)
 	}
 	return nil
+}
+
+// New documents and moved directory aliases need their physical source
+// chains in the committed generation. This uses the existing serialized full
+// refresh once per uncovered physical directory. Config/watch refreshes can
+// retry failures; content-only edits retain the last-good generation.
+func (s *Server) refreshUncoveredDocument(ctx context.Context, uri lsproto.DocumentUri) {
+	if !s.configDiscoveryActive || !isLintableScriptFile(uri) {
+		return
+	}
+	identity := config.FreezeFileIdentity(uriToPath(uri), s.fs)
+	directory := lspGitDirectory(identity)
+	if s.gitPolicy.CoversDirectory(directory) {
+		return
+	}
+	if _, failed := s.failedGitPolicyDirectories[directory]; failed {
+		return
+	}
+	if _, err := s.refreshConfig(ctx); err != nil {
+		if s.failedGitPolicyDirectories == nil {
+			s.failedGitPolicyDirectories = make(map[string]struct{})
+		}
+		s.failedGitPolicyDirectories[directory] = struct{}{}
+		log.Printf("[rslint] Failed to collect Git policy for %s: %v", uri, err)
+	}
 }
 
 // shouldForwardDidSave suppresses only saves that are known to describe an

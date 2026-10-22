@@ -44,6 +44,14 @@ func (fs *retargetingConfigDirectoryFS) Realpath(filePath string) string {
 	return "/owner-b"
 }
 
+func (fs *configPathSpaceFS) DirectoryExists(string) bool    { return false }
+func (fs *configPathSpaceFS) FileExists(string) bool         { return false }
+func (fs *configPathSpaceFS) ReadFile(string) (string, bool) { return "", false }
+func (fs *configPathSpaceFS) Stat(string) vfs.FileInfo       { return nil }
+func (fs *configPathSpaceFS) GetAccessibleEntries(string) vfs.Entries {
+	return vfs.Entries{Symlinks: map[string]struct{}{}}
+}
+
 func (fs *configPathSpaceFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
 func (fs *configPathSpaceFS) Realpath(filePath string) string {
 	if realPath := fs.realPaths[filePath]; realPath != "" {
@@ -61,7 +69,7 @@ func resolveConfigOwnerWithFS(
 	configMap map[string]rslintconfig.RslintConfig,
 	fsys vfs.FS,
 ) (string, rslintconfig.RslintConfig) {
-	target := FreezeFileIdentity(filePath, fsys)
+	target := rslintconfig.FreezeFileIdentity(filePath, fsys)
 	owner, ok := NewOwnerIndex(configMap, fsys).Resolve(target)
 	if !ok {
 		return "", nil
@@ -167,6 +175,7 @@ func TestOwnerIndexFreezesOwnerAndAuthoredBaseTogether(t *testing.T) {
 		fs,
 		resolver.PathSpaces(),
 		rules.All(),
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -196,7 +205,7 @@ func TestOwnerIndexPrefersLexicalHierarchy(t *testing.T) {
 	}
 	resolver := NewOwnerIndex(configMap, fs)
 
-	dir, ok := resolver.Resolve(FreezeFileIdentity("/real/pkg/src/a.ts", fs))
+	dir, ok := resolver.Resolve(rslintconfig.FreezeFileIdentity("/real/pkg/src/a.ts", fs))
 	if dir != "/real" || !ok {
 		t.Fatalf("physical config replaced lexical owner: dir=%q ok=%v", dir, ok)
 	}
@@ -241,7 +250,7 @@ func TestOwnerIndexForAutomaticTargetsExcludesExplicitOnlyBoundary(t *testing.T)
 	}
 
 	automatic := newOwnerIndexForAutomaticTargets(configMap, scopes, nil)
-	dir, _ := automatic.Resolve(FreezeFileIdentity("/repo/ignored/automatic.ts", nil))
+	dir, _ := automatic.Resolve(rslintconfig.FreezeFileIdentity("/repo/ignored/automatic.ts", nil))
 	if dir != "/repo" {
 		t.Fatalf("explicit-only config claimed automatic target: %q", dir)
 	}
@@ -251,9 +260,33 @@ func TestOwnerIndexForAutomaticTargetsExcludesExplicitOnlyBoundary(t *testing.T)
 	}
 
 	complete := NewOwnerIndex(configMap, nil)
-	dir, _ = complete.Resolve(FreezeFileIdentity("/repo/ignored/explicit.ts", nil))
+	dir, _ = complete.Resolve(rslintconfig.FreezeFileIdentity("/repo/ignored/explicit.ts", nil))
 	if dir != "/repo/ignored" {
 		t.Fatalf("complete resolver lost literal owner: %q", dir)
+	}
+}
+
+func TestAutomaticOwnerIndexUsesAdmittedDirectoryEntries(t *testing.T) {
+	configs := map[string]rslintconfig.RslintConfig{"/repo": nil, "/repo/nested": nil}
+	directories := rslintconfig.ResolveDirectoryIdentities([]string{"/repo", "/repo/other", "/repo/nested/selected"}, nil)
+	scopes := map[string]OwnerScope{
+		"/repo":        {Directories: directories[:2]},
+		"/repo/nested": {Directories: directories[2:]},
+	}
+	spaces := rslintconfig.NewPathSpaceSnapshot(configs, nil, directories...)
+	index := newAutomaticOwnerIndex(configs, scopes, nil, spaces)
+	for path, want := range map[string]string{
+		"/repo/nested/extra.ts":         "/repo",
+		"/repo/nested/selected/keep.ts": "/repo/nested",
+		"/repo/other/keep.ts":           "/repo",
+	} {
+		if owner, _ := index.Resolve(rslintconfig.FreezeFileIdentity(path, nil)); owner != want {
+			t.Fatalf("owner of %s = %s, want %s", path, owner, want)
+		}
+	}
+	children := index.ChildOwnerDirectories("/repo")
+	if len(children) != 1 || children[0] != "/repo/nested/selected" {
+		t.Fatalf("handoff expanded past the selected entry: %v", children)
 	}
 }
 
@@ -377,11 +410,11 @@ func TestOwnerIndexSnapshotsDirectorySet(t *testing.T) {
 	delete(configMap, "/project")
 	configMap["/other"] = rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"other-rule": "error"}}}
 
-	dir, ok := resolver.Resolve(FreezeFileIdentity("/project/src/a.ts", nil))
+	dir, ok := resolver.Resolve(rslintconfig.FreezeFileIdentity("/project/src/a.ts", nil))
 	if dir != "/project" || !ok {
 		t.Fatalf("resolver changed after caller map mutation: dir=%q ok=%v", dir, ok)
 	}
-	if dir, ok := resolver.Resolve(FreezeFileIdentity("/other/a.ts", nil)); dir != "" || ok {
+	if dir, ok := resolver.Resolve(rslintconfig.FreezeFileIdentity("/other/a.ts", nil)); dir != "" || ok {
 		t.Fatalf("resolver observed a directory added after construction: dir=%q ok=%v", dir, ok)
 	}
 }

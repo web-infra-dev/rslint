@@ -104,28 +104,27 @@ For directory-level patterns (`dir/**`), `!` negation cannot re-include files be
 
 ## .gitignore integration
 
-The CLI, JavaScript API, and LSP automatically read `.gitignore` files and treat their patterns as additional global ignores. Automatically discovered configs and ordinary LSP files start collection at the governing config directory. An explicitly selected invocation-wide config (`--config`, API `overrideConfigFile`, or the LSP `configPath` setting) starts at the invocation or workspace-folder `cwd`, even when the config file is elsewhere. A requested directory outside `cwd` gets its own independent Git scope. Collection never searches a scope's parents. In the editor, saved `.gitignore` changes refresh diagnostics for open files.
+The CLI, JavaScript API, and LSP automatically apply the `.gitignore` rules for each target tree. Starting at the target's physical directory, rslint searches upward for the nearest `.git` directory or file, including Git worktree checkouts. It reads applicable `.gitignore` files from that repository root down to the target. Without a `.git` marker, the ancestor search ends at the filesystem root (the drive or network-share root on Windows).
 
-An entry's [`basePath`](/config/base-path) does not move these `.gitignore` roots. It only scopes that authored entry and rebases its own `ignores` patterns.
+Selecting the same config and target from a package directory therefore keeps the same Git ignore rules as selecting them from the repository root. Neither the config file's location nor an entry's [`basePath`](/config/base-path) changes the Git boundary. Authored `files` and `ignores` keep their own configuration-relative bases.
 
-- **Nested `.gitignore` files** inside one Git scope are supported — each one only affects its own directory subtree
-- **Parent patterns cascade** to child directories within that scope (e.g., root `dist/` also ignores `packages/app/dist/`)
-- **Child `.gitignore` can override** parent patterns with `!` negation
-- **Multiple requested directory scopes stay independent** — patterns from one sibling directory never apply to another, including through filesystem aliases
-- **Child configs are boundaries** — they do not inherit `.gitignore` files from a parent config directory
-- Config `!` negation can also override `.gitignore` patterns (they are evaluated sequentially in the same global ignores list)
+- Parent patterns apply to descendants, including across child config files.
+- When scanning from outside a nested repository, the containing repository's rules decide whether its directory can be entered. Adding a child config does not reopen an ignored directory.
+- After entering a nested repository, its `.git` starts a separate Git boundary, even if it has no `.gitignore`. Directly requesting that repository or one of its files establishes an independent entry point; its own Git ignores still apply.
+- Nested `.gitignore` files affect only their own subtree. Their negations cannot re-include a file while a parent directory remains excluded.
+- Directly supplied files also obey Git ignores. Directory aliases use the physical directory's rules; a file symlink keeps the rules for its containing directory and original filename.
+- A global config `!` pattern can override the final Git ignore result. It does not make `.gitignore` files inside a Git-excluded directory readable.
+
+For example, a bare directory pattern applies at every depth:
 
 ```text
-# .gitignore
+# .gitignore at the repository root
 dist/
-coverage/
-*.log
-
-# packages/app/.gitignore
-!dist/          # re-include dist/ under packages/app/
 ```
 
-To make a lint target reachable, re-include it in the applicable `.gitignore` policy or with a later global ignore entry in `rslint.config.*`:
+This ignores both `dist/index.js` and `packages/app/dist/index.js`, regardless of where rslint runs or which config owns the file.
+
+To allow selected contents with Git patterns, keep their parent directories reachable:
 
 ```text
 # .gitignore
@@ -133,4 +132,6 @@ dist/*
 !dist/important.ts
 ```
 
-Configuration discovery is independent of `.gitignore`: an automatically discovered or explicitly selected `rslint.config.*` is still loaded when its path matches an ignore rule. `.gitignore` is applied later, when Go selects lint targets inside that config's ownership scope.
+A directory request visits its ancestor chain and reachable descendants. It does not scan unrelated directories to locate repositories, and it does not search beneath a pruned directory for hidden nested repositories. Directly requesting such a nested repository establishes its own entry point.
+
+Git ignores can stop automatic config discovery from entering an excluded directory. They do not filter config filenames in a reachable directory or prevent an explicitly selected config module from loading. In the editor, saved `.gitignore` changes and `.git` marker creation or deletion refresh the config and Git policy together. A newly opened target outside the committed policy is checked after a successful refresh; a failed refresh does not lint or fix it with an incomplete policy.

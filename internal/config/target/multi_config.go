@@ -12,11 +12,12 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 	configMap map[string]rslintconfig.RslintConfig,
 	scopes map[string]OwnerScope,
 	fsys vfs.FS,
-	allowFiles []string,
-	allowDirs []string,
+	allowFiles []rslintconfig.PathIdentity,
+	allowDirs []rslintconfig.DirectoryIdentity,
 	singleThreaded bool,
-	ownerIndex *OwnerIndex,
+	pathSpaces *rslintconfig.PathSpaceSnapshot,
 	explicitSet *explicitLintTargetSet,
+	gitPolicy *rslintconfig.GitPolicy,
 ) []File {
 	if len(configMap) == 0 {
 		return nil
@@ -33,11 +34,11 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 	// subtree handoff decisions from the normally reachable config set; the full
 	// map is still processed below so catalog-scoped literal files use their
 	// explicit-only config.
-	automaticConfigMap := configMapForAutomaticTargets(configMap, scopes)
-	automaticOwnerIndex := mustOwnerIndexWithPathSpaces(
-		automaticConfigMap,
+	automaticOwnerIndex := newAutomaticOwnerIndex(
+		configMap,
+		scopes,
 		fsys,
-		ownerIndex.PathSpaces(),
+		pathSpaces,
 	)
 
 	// Explicit files are assigned to their nearest config once. Passing the
@@ -60,13 +61,10 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 		}
 	}
 	if explicitSet == nil {
-		explicitSet = newExplicitLintTargetSet([]string{}, fsys)
-	}
-	for _, scope := range scopes {
-		explicitSet.add(scope.ExplicitFiles, false, fsys)
+		explicitSet = newExplicitLintTargetSet([]rslintconfig.PathIdentity{}, fsys)
 	}
 	filesByConfig := make(map[string][]*explicitLintTarget)
-	for _, explicitFile := range explicitSet.targetsForPaths(allowFiles) {
+	for _, explicitFile := range explicitSet.targetsForIdentities(allowFiles) {
 		pathID := tspath.ToPath(explicitFile.target.Path, "", true)
 		if _, assigned := assignedExplicitOwners[pathID]; assigned {
 			continue
@@ -114,8 +112,15 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 			}
 		}
 		configAllowDirs := allowDirs
+		if directories := scopes[configDir].Directories; len(allowDirs) > 0 && directories != nil {
+			// Config ancestry chooses the rules, not a wider scan root. Reuse
+			// only entries discovery admitted for this owner, including requested
+			// subdirectories and normally reached child-config boundaries. A
+			// file-only request never acquires directory traversal from a catalog.
+			configAllowDirs = directories
+		}
 		if scopes[configDir].ExplicitOnly {
-			configAllowDirs = []string{}
+			configAllowDirs = []rslintconfig.DirectoryIdentity{}
 		}
 		targets := discoverLintTargetsForConfigInMap(
 			configMap,
@@ -126,7 +131,8 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 			configAllowFiles,
 			configAllowDirs,
 			singleThreaded,
-			ownerIndex.PathSpaces(),
+			pathSpaces,
+			gitPolicy,
 		)
 		for _, target := range targets {
 			pathID := tspath.ToPath(tspath.NormalizePath(target.Path), "", true)
@@ -165,9 +171,10 @@ func discoverLintTargetsForConfigInMap(
 	configDir string,
 	fsys vfs.FS,
 	explicitFiles []*explicitLintTarget,
-	allowDirs []string,
+	allowDirs []rslintconfig.DirectoryIdentity,
 	singleThreaded bool,
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
+	gitPolicy *rslintconfig.GitPolicy,
 ) []File {
 	cfg, ok := configMap[configDir]
 	if !ok {
@@ -175,17 +182,22 @@ func discoverLintTargetsForConfigInMap(
 	}
 
 	stopDirs := ownerIndex.ChildOwnerDirectories(configDir)
-	targets := discoverLintTargetsWithinRoot(
-		cfg,
-		configDir,
-		configDir,
-		fsys,
-		explicitFiles,
-		allowDirs,
-		stopDirs,
-		singleThreaded,
-		pathSpaces,
-	)
+	var targets []File
+	visit := func(directories []rslintconfig.DirectoryIdentity) {
+		targets = append(targets, discoverLintTargetsWithinRoot(
+			cfg, configDir, configDir, fsys, explicitFiles, directories,
+			stopDirs, singleThreaded, pathSpaces, gitPolicy,
+		)...)
+	}
+	// Keep each input's Git entry independent while retaining the owner's
+	// existing walk clipping and lexical projections.
+	if len(allowDirs) > 1 {
+		for _, directory := range allowDirs {
+			visit([]rslintconfig.DirectoryIdentity{directory})
+		}
+	} else {
+		visit(allowDirs)
+	}
 	if len(targets) == 0 {
 		return targets
 	}

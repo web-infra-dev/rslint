@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -117,69 +118,76 @@ func TestHandleLint_RejectsMismatchedCanonicalFiles(t *testing.T) {
 }
 
 func TestHandleLint_PluginWirePathUsesProgramIdentityWhileResultsUseRequestedAlias(t *testing.T) {
-	root := t.TempDir()
-	realPath := filepath.Join(root, "real.ts")
-	aliasPath := filepath.Join(root, "alias.ts")
-	if err := os.WriteFile(realPath, []byte("const value = 1;\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(root, "tsconfig.json"),
-		[]byte(`{"compilerOptions":{"noLib":true},"files":["real.ts"]}`),
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(realPath, aliasPath); err != nil {
-		t.Skipf("symlink unavailable: %v", err)
-	}
-	var wirePath string
-	response, err := (&Handler{}).handleLint(
-		context.Background(),
-		api.LintRequest{
-			Files:          []string{aliasPath},
-			CanonicalFiles: []string{realPath},
-			Config: json.RawMessage(`[{
-				"files":["**/*.ts"],
-				"plugins":["community"],
-				"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}},
-				"rules":{"community/check":"error"}
-			}]`),
-			ConfigDirectory:  root,
-			WorkingDirectory: root,
-			EslintPlugins: []api.EslintPluginEntry{{
-				Prefix:    "community",
-				RuleNames: []string{"check"},
-			}},
-		},
-		func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-			if len(request.Files) != 1 {
-				return nil, fmt.Errorf("plugin files = %d, want 1", len(request.Files))
+	for _, symlink := range []bool{false, true} {
+		t.Run(fmt.Sprintf("symlink=%t", symlink), func(t *testing.T) {
+			root := t.TempDir()
+			realPath := filepath.Join(root, "real.ts")
+			aliasPath := filepath.Join(root, "alias.ts")
+			if err := os.WriteFile(realPath, []byte("const value = 1;\n"), 0o644); err != nil {
+				t.Fatal(err)
 			}
-			wirePath = request.Files[0].Path
-			return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
-				FilePath: wirePath,
-				Diagnostics: []linter.EslintPluginDiagnostic{{
-					RuleName: "community/check",
-					Message:  "reported",
-					StartPos: 0,
-					EndPos:   5,
-				}},
-			}}}, nil
-		},
-		nil,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if wirePath != tspath.NormalizePath(realPath) {
-		t.Fatalf("plugin wire path = %q, want Program identity %q", wirePath, tspath.NormalizePath(realPath))
-	}
-	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "alias.ts" {
-		t.Fatalf("projected diagnostics = %+v, want requested alias", response.Diagnostics)
-	}
-	if !reflect.DeepEqual(response.LintedFiles, []string{"alias.ts"}) {
-		t.Fatalf("linted files = %v, want requested alias", response.LintedFiles)
+			if err := os.WriteFile(
+				filepath.Join(root, "tsconfig.json"),
+				[]byte(`{"compilerOptions":{"noLib":true},"files":["real.ts"]}`),
+				0o644,
+			); err != nil {
+				t.Fatal(err)
+			}
+			if symlink {
+				if err := os.Symlink(realPath, aliasPath); err != nil {
+					t.Skipf("symlink unavailable: %v", err)
+				}
+			}
+			var wirePath string
+			response, err := (&Handler{}).handleLint(
+				context.Background(),
+				api.LintRequest{
+					Files:          []string{aliasPath},
+					CanonicalFiles: []string{realPath},
+					FileContents:   map[string]string{aliasPath: "const value = 1;\n"},
+					Config: json.RawMessage(`[{
+						"files":["**/*.ts"],
+						"plugins":["community"],
+						"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}},
+						"rules":{"community/check":"error"}
+					}]`),
+					ConfigDirectory:  root,
+					WorkingDirectory: root,
+					EslintPlugins: []api.EslintPluginEntry{{
+						Prefix:    "community",
+						RuleNames: []string{"check"},
+					}},
+				},
+				func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+					if len(request.Files) != 1 {
+						return nil, fmt.Errorf("plugin files = %d, want 1", len(request.Files))
+					}
+					wirePath = request.Files[0].Path
+					return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
+						FilePath: wirePath,
+						Diagnostics: []linter.EslintPluginDiagnostic{{
+							RuleName: "community/check",
+							Message:  "reported",
+							StartPos: 0,
+							EndPos:   5,
+						}},
+					}}}, nil
+				},
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if wirePath != tspath.NormalizePath(realPath) {
+				t.Fatalf("plugin wire path = %q, want Program identity %q", wirePath, tspath.NormalizePath(realPath))
+			}
+			if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "alias.ts" {
+				t.Fatalf("projected diagnostics = %+v, want requested alias", response.Diagnostics)
+			}
+			if !reflect.DeepEqual(response.LintedFiles, []string{"alias.ts"}) {
+				t.Fatalf("linted files = %v, want requested alias", response.LintedFiles)
+			}
+		})
 	}
 }
 
@@ -966,28 +974,48 @@ func TestHandleLint_LowLevelExternalConfigSeparatesAuthoredAndScanRoots(t *testi
 }
 
 func TestHandleLint_OverlayGitignoreIsApplied(t *testing.T) {
-	dir := t.TempDir()
-	target := filepath.Join(dir, "source.js")
-	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
-		t.Fatalf("write target: %v", err)
-	}
-
-	response, err := (&Handler{}).HandleLint(api.LintRequest{
-		Config: json.RawMessage(`[
-			{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
-		]`),
-		ConfigDirectory:  dir,
-		WorkingDirectory: dir,
-		Files:            []string{target},
-		FileContents: map[string]string{
-			filepath.Join(dir, ".gitignore"): "source.js\n",
-		},
-	})
-	if err != nil {
-		t.Fatalf("HandleLint returned error: %v", err)
-	}
-	if response.FileCount != 0 || len(response.LintedFiles) != 0 || len(response.Diagnostics) != 0 {
-		t.Fatalf("overlay .gitignore was not applied: %+v", response)
+	for _, mode := range []string{"direct", "directory alias", "directory alias with external config"} {
+		t.Run(mode, func(t *testing.T) {
+			root := t.TempDir()
+			physical := filepath.Join(root, "workspace")
+			if err := os.Mkdir(physical, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			workingDirectory := physical
+			if mode != "direct" {
+				workingDirectory = filepath.Join(root, "alias")
+				if err := os.Symlink(physical, workingDirectory); err != nil {
+					t.Skipf("directory symlink unavailable: %v", err)
+				}
+			}
+			configDirectory := workingDirectory
+			if mode == "directory alias with external config" {
+				configDirectory = filepath.Join(root, "external-config")
+				if err := os.Mkdir(configDirectory, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			target := tspath.NormalizePath(filepath.Join(workingDirectory, "source.js"))
+			if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			request := api.LintRequest{
+				Config: json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`), ConfigDirectory: configDirectory,
+				WorkingDirectory: workingDirectory, Files: []string{target},
+			}
+			response, err := (&Handler{}).HandleLint(request)
+			if err != nil || response.FileCount != 1 || len(response.Diagnostics) != 1 {
+				t.Fatalf("target without overlay: response=%+v error=%v", response, err)
+			}
+			request.FileContents = map[string]string{filepath.Join(workingDirectory, ".gitignore"): "source.js\n"}
+			response, err = (&Handler{}).HandleLint(request)
+			if err != nil {
+				t.Fatalf("HandleLint returned error: %v", err)
+			}
+			if response.FileCount != 0 || len(response.LintedFiles) != 0 || len(response.Diagnostics) != 0 {
+				t.Fatalf("overlay .gitignore was not applied: %+v", response)
+			}
+		})
 	}
 }
 
@@ -1031,7 +1059,7 @@ func TestHandleLint_GitignoredParentBlocksNestedNegation(t *testing.T) {
 	}
 }
 
-func TestHandleLint_ParentGitignoreDoesNotSuppressConfigRoot(t *testing.T) {
+func TestHandleLint_ParentGitignoreAppliesAcrossConfigRoot(t *testing.T) {
 	dir := t.TempDir()
 	appDir := filepath.Join(dir, "packages", "app")
 	target := filepath.Join(appDir, "src", "file.js")
@@ -1061,14 +1089,8 @@ func TestHandleLint_ParentGitignoreDoesNotSuppressConfigRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
-	if response.FileCount != 1 {
-		t.Fatalf("parent .gitignore must not suppress a config-owned file, got FileCount=%d", response.FileCount)
-	}
-	if len(response.LintedFiles) != 1 {
-		t.Fatalf("config-owned file must be in LintedFiles, got %v", response.LintedFiles)
-	}
-	if len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("expected no-debugger for config-owned file, got %+v", response.Diagnostics)
+	if response.FileCount != 0 || len(response.LintedFiles) != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("ancestor Git policy must suppress the target: %+v", response)
 	}
 }
 
@@ -1102,18 +1124,12 @@ func TestHandleLint_IntermediateParentGitignoreIsNotRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
-	if response.FileCount != 1 {
-		t.Fatalf("parent .gitignore files must not suppress a config-owned file, got FileCount=%d", response.FileCount)
-	}
-	if len(response.LintedFiles) != 1 {
-		t.Fatalf("config-owned file must be in LintedFiles, got %v", response.LintedFiles)
-	}
-	if len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("expected no-debugger for config-owned file, got %+v", response.Diagnostics)
+	if response.FileCount != 0 || len(response.LintedFiles) != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("ancestor Git policy must suppress the target: %+v", response)
 	}
 }
 
-func TestHandleLint_ParentWildcardDoesNotReadIntermediateGitignore(t *testing.T) {
+func TestHandleLint_ParentWildcardReadsReachableIntermediateGitignore(t *testing.T) {
 	dir := t.TempDir()
 	appDir := filepath.Join(dir, "packages", "app")
 	target := filepath.Join(appDir, "src", "generated", "file.js")
@@ -1143,14 +1159,8 @@ func TestHandleLint_ParentWildcardDoesNotReadIntermediateGitignore(t *testing.T)
 	if err != nil {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
-	if response.FileCount != 1 {
-		t.Fatalf("parent intermediate .gitignore must not skip generated explicit file, got FileCount=%d", response.FileCount)
-	}
-	if len(response.LintedFiles) != 1 {
-		t.Fatalf("config-owned generated file must be in LintedFiles, got %v", response.LintedFiles)
-	}
-	if len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("expected no-debugger for config-owned generated file, got %+v", response.Diagnostics)
+	if response.FileCount != 0 || len(response.LintedFiles) != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("ancestor Git policy must suppress the target: %+v", response)
 	}
 }
 
@@ -1279,6 +1289,75 @@ func TestHandleLint_FileContentsKeepTypeInfoWhenProgramUsesSymlinkSource(t *test
 	}
 	if _, ok := response.EncodedSourceFiles[expectedPath]; !ok {
 		t.Fatalf("expected requested target path %q in encoded source files, got keys %v", expectedPath, response.EncodedSourceFiles)
+	}
+}
+
+func TestHandleLint_FileContentsPreferRequestedAliasAcrossGenerations(t *testing.T) {
+	for _, project := range []bool{false, true} {
+		for _, symlink := range []bool{false, true} {
+			for _, fix := range []bool{false, true} {
+				t.Run(fmt.Sprintf("project=%v/symlink=%v/fix=%v", project, symlink, fix), func(t *testing.T) {
+					dir := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+					canonical := tspath.ResolvePath(dir, "real.ts")
+					alias := tspath.ResolvePath(dir, "alias.ts")
+					dependency := tspath.ResolvePath(dir, "dependency.ts")
+					const diskSource = "export const diskValue = 0;\n"
+					const buffer = "\uFEFFvar value = 1; debugger;\n"
+					writeProgramTestFiles(t, dir, map[string]string{
+						"real.ts":       diskSource,
+						"tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["alias.ts"]}`,
+					})
+					if symlink {
+						if err := os.Symlink(canonical, alias); err != nil {
+							t.Skipf("file symlink unavailable: %v", err)
+						}
+					}
+					config := json.RawMessage(`[{"rules":{"no-var":"error","no-debugger":"error"}}]`)
+					if project {
+						config = json.RawMessage(`[{"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}},"rules":{"no-var":"error","no-debugger":"error"}}]`)
+					}
+					response, err := (&Handler{}).HandleLint(api.LintRequest{
+						Config: config, ConfigDirectory: dir, WorkingDirectory: dir,
+						Files: []string{alias}, CanonicalFiles: []string{canonical},
+						FileContents: map[string]string{
+							alias:      buffer,
+							canonical:  "export const canonicalBuffer = 2;\n",
+							dependency: "debugger;\n",
+						},
+						Fix: fix, IncludeEncodedSourceFiles: true,
+					})
+					if err != nil {
+						t.Fatal(err)
+					}
+					wantDiagnostics := 2
+					if fix {
+						wantDiagnostics = 1
+						if got := response.Output["alias.ts"]; got != strings.Replace(buffer, "var value", "let value", 1) || len(response.Output) != 1 {
+							t.Fatalf("fix generation lost requested buffer/BOM: %v", response.Output)
+						}
+					} else if len(response.Output) != 0 {
+						t.Fatalf("lint returned fix output: %v", response.Output)
+					}
+					if response.FileCount != 1 || !reflect.DeepEqual(response.LintedFiles, []string{"alias.ts"}) || len(response.Diagnostics) != wantDiagnostics {
+						t.Fatalf("requested buffer was replaced or dependency became a target: %+v", response)
+					}
+					for _, diagnostic := range response.Diagnostics {
+						if diagnostic.FilePath != "alias.ts" || (fix && diagnostic.RuleName != "no-debugger") {
+							t.Errorf("unexpected requested-buffer diagnostic: %+v", diagnostic)
+						}
+					}
+					if _, ok := response.EncodedSourceFiles["alias.ts"]; !ok || len(response.EncodedSourceFiles) != 1 {
+						t.Fatalf("encoded sources lost caller path: %v", response.EncodedSourceFiles)
+					}
+					if got, err := os.ReadFile(canonical); err != nil || string(got) != diskSource {
+						t.Fatalf("API modified disk source: text=%q error=%v", got, err)
+					}
+					if _, err := os.Stat(dependency); !os.IsNotExist(err) {
+						t.Fatalf("API persisted overlay dependency: %v", err)
+					}
+				})
+			}
+		}
 	}
 }
 
@@ -1709,12 +1788,12 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 					Status: "loaded",
 				}
 				switch filepath.Clean(candidate.ConfigPath) {
-				case filepath.Clean(rootConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(rootConfigPath)):
 					if filepath.Clean(candidate.ConfigDirectory) != filepath.Clean(root) {
 						return nil, fmt.Errorf("root configDirectory = %q, want %q", candidate.ConfigDirectory, root)
 					}
 					result.Entries = rootEntries
-				case filepath.Clean(nestedConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)):
 					if filepath.Clean(candidate.ConfigDirectory) != filepath.Clean(nestedDir) {
 						return nil, fmt.Errorf("nested configDirectory = %q, want %q", candidate.ConfigDirectory, nestedDir)
 					}
@@ -1933,10 +2012,10 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
 				requestedPaths = append(requestedPaths, filepath.Clean(candidate.ConfigPath))
-				if filepath.Clean(candidate.ConfigPath) == filepath.Clean(unrelatedConfigPath) {
+				if filepath.Clean(candidate.ConfigPath) == filepath.Clean(osvfs.FS().Realpath(unrelatedConfigPath)) {
 					return nil, fmt.Errorf("unrelated config was evaluated: %q", candidate.ConfigPath)
 				}
-				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(rootConfigPath) {
+				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(osvfs.FS().Realpath(rootConfigPath)) {
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
 				response.Results = append(response.Results, discovery.ConfigLoadResult{
@@ -1970,11 +2049,94 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 	if err != nil {
 		t.Fatalf("HandleLintWithContext: %v", err)
 	}
-	if !reflect.DeepEqual(requestedPaths, []string{filepath.Clean(rootConfigPath)}) {
+	if !reflect.DeepEqual(requestedPaths, []string{filepath.Clean(osvfs.FS().Realpath(rootConfigPath))}) {
 		t.Fatalf("requested config paths = %v, want only root", requestedPaths)
 	}
 	if response.FileCount != 1 || len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
 		t.Fatalf("unexpected target response: %+v", response)
+	}
+	requestedPaths = nil
+	response, err = (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Files:            []string{},
+		WorkingDirectory: root,
+		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Directories: []string{root}},
+	}, requester)
+	if err != nil {
+		t.Fatalf("empty expanded set: %v", err)
+	}
+	if len(requestedPaths) != 0 || response.FileCount != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("empty expanded set triggered discovery or lint: configs=%v, response=%+v", requestedPaths, response)
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryExpandedFilesKeepTheirScanEntries(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	inner := tspath.ResolvePath(root, "nested/selected")
+	writeProgramTestFiles(t, root, map[string]string{
+		".git/HEAD":                "ref: refs/heads/main\n",
+		".gitignore":               "nested/\n",
+		"rslint.config.js":         "export default [];\n",
+		"control.js":               "debugger;\n",
+		"nested/.git/HEAD":         "ref: refs/heads/main\n",
+		"nested/selected/keep.js":  "debugger;\n",
+		"nested/selected/other.js": "debugger;\n",
+	})
+	entries := mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`)
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		switch kind {
+		case api.KindLoadConfigs:
+			request := payload.(discovery.ConfigLoadBatchRequest)
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			for _, candidate := range request.Candidates {
+				response.Results = append(response.Results, discovery.ConfigLoadResult{
+					ID: candidate.ID, Status: "loaded", Entries: entries,
+				})
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, response)
+		case api.KindActivateConfigs:
+			request := payload.(discovery.ConfigActivationRequest)
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{TransactionID: request.TransactionID})
+		default:
+			return nil, fmt.Errorf("unexpected reverse request %q", kind)
+		}
+	})
+	for _, mode := range []string{"automatic", "explicit", "inline"} {
+		t.Run(mode, func(t *testing.T) {
+			configDiscovery := &api.ConfigDiscoveryRequest{
+				Directories:   []string{root, inner},
+				ExplicitFiles: []bool{false, false, false},
+			}
+			if mode == "explicit" {
+				configDiscovery.ExplicitConfigPath = tspath.ResolvePath(root, "rslint.config.js")
+			}
+			request := api.LintRequest{
+				Files: []string{
+					tspath.ResolvePath(root, "control.js"),
+					tspath.ResolvePath(inner, "keep.js"),
+					tspath.ResolvePath(inner, "other.js"),
+				},
+				WorkingDirectory:    root,
+				ConfigDiscovery:     configDiscovery,
+				FileScanDirectories: [][]string{{root}, {root, inner}, {root}},
+			}
+			if mode == "inline" {
+				request.ConfigDiscovery = nil
+				request.Config = json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`)
+				request.ConfigDirectory = root
+			}
+			response, err := (&Handler{}).HandleLintWithContext(context.Background(), request, requester)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var files []string
+			for _, diagnostic := range response.Diagnostics {
+				files = append(files, diagnostic.FilePath)
+			}
+			slices.Sort(files)
+			if response.FileCount != 2 || !reflect.DeepEqual(files, []string{"control.js", "nested/selected/keep.js"}) {
+				t.Fatalf("expanded files borrowed another input's scan entry: %+v", response)
+			}
+		})
 	}
 }
 
@@ -1996,7 +2158,7 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 			request := payload.(discovery.ConfigLoadBatchRequest)
 			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
-				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(configPath) {
+				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(osvfs.FS().Realpath(configPath)) {
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
 				response.Results = append(response.Results, discovery.ConfigLoadResult{
@@ -2071,9 +2233,9 @@ func TestHandleLint_ConfigDiscoveryOverrideNegationReopensGitHiddenConfig(t *tes
 					Status: "loaded",
 				}
 				switch filepath.Clean(candidate.ConfigPath) {
-				case filepath.Clean(rootConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(rootConfigPath)):
 					result.Entries = rootEntries
-				case filepath.Clean(nestedConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)):
 					result.Entries = nestedEntries
 				default:
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
@@ -2104,8 +2266,8 @@ func TestHandleLint_ConfigDiscoveryOverrideNegationReopensGitHiddenConfig(t *tes
 		t.Fatalf("HandleLintWithContext: %v", err)
 	}
 	wantRequestedPaths := []string{
-		filepath.Clean(rootConfigPath),
-		filepath.Clean(nestedConfigPath),
+		filepath.Clean(osvfs.FS().Realpath(rootConfigPath)),
+		filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)),
 	}
 	if !reflect.DeepEqual(requestedPaths, wantRequestedPaths) {
 		t.Fatalf("requested config paths = %v, want %v", requestedPaths, wantRequestedPaths)
@@ -2152,9 +2314,9 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(
 					Status: "loaded",
 				}
 				switch filepath.Clean(candidate.ConfigPath) {
-				case filepath.Clean(rootConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(rootConfigPath)):
 					result.Entries = rootEntries
-				case filepath.Clean(nestedConfigPath):
+				case filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)):
 					result.Entries = nestedEntries
 				default:
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
@@ -2209,7 +2371,7 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(
 	}
 }
 
-func TestHandleLint_ExplicitConfigUsesOnlyWorkingDirectoryGitignore(t *testing.T) {
+func TestHandleLint_ExplicitConfigUsesEachTargetGitignore(t *testing.T) {
 	workingDirectory := t.TempDir()
 	targetDirectory := t.TempDir()
 	configPath := filepath.Join(workingDirectory, "custom.config.mjs")
@@ -2231,7 +2393,7 @@ func TestHandleLint_ExplicitConfigUsesOnlyWorkingDirectoryGitignore(t *testing.T
 		switch kind {
 		case api.KindLoadConfigs:
 			request := payload.(discovery.ConfigLoadBatchRequest)
-			if len(request.Candidates) != 1 || filepath.Clean(request.Candidates[0].ConfigPath) != filepath.Clean(configPath) {
+			if len(request.Candidates) != 1 || filepath.Clean(request.Candidates[0].ConfigPath) != filepath.Clean(osvfs.FS().Realpath(configPath)) {
 				return nil, fmt.Errorf("unexpected explicit candidates: %+v", request.Candidates)
 			}
 			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigLoadBatchResponse{
@@ -2261,11 +2423,8 @@ func TestHandleLint_ExplicitConfigUsesOnlyWorkingDirectoryGitignore(t *testing.T
 	if err != nil {
 		t.Fatalf("HandleLintWithContext: %v", err)
 	}
-	if response.FileCount != 1 ||
-		len(response.Diagnostics) != 1 ||
-		response.Diagnostics[0].RuleName != "no-debugger" ||
-		filepath.Base(response.Diagnostics[0].FilePath) != "outside.js" {
-		t.Fatalf("explicit config Git projection crossed its working-directory boundary: %+v", response)
+	if response.FileCount != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("explicit config must apply the target tree's Git policy even outside cwd: %+v", response)
 	}
 }
 
@@ -2842,5 +3001,266 @@ func TestHandleLint_ExplicitRootMembershipTracksConfigChanges(t *testing.T) {
 		if response.FileCount != 1 || len(response.Diagnostics) != want {
 			t.Fatalf("roots=%s stale membership: %+v", roots, response)
 		}
+	}
+}
+
+func TestHandleLint_ConfigGitignoreIndependentOfWorkingDirectory(t *testing.T) {
+	root := t.TempDir()
+	writeProgramTestFiles(t, root, map[string]string{
+		".gitignore":                 "dist/\n",
+		"rslint.config.mjs":          "export default [];\n",
+		"packages/app/.gitignore":    "local.js\n",
+		"packages/app/dist/index.js": "debugger;\n",
+		"packages/app/src/index.js":  "debugger;\n",
+	})
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	entries := mustAPIConfig(t, `[{"files":["**/*.js"],"rules":{"no-debugger":"error"}}]`)
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		switch kind {
+		case api.KindLoadConfigs:
+			request := payload.(discovery.ConfigLoadBatchRequest)
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			for _, candidate := range request.Candidates {
+				response.Results = append(response.Results, discovery.ConfigLoadResult{ID: candidate.ID, Status: "loaded", Entries: entries})
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, response)
+		case api.KindActivateConfigs:
+			request := payload.(discovery.ConfigActivationRequest)
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{TransactionID: request.TransactionID})
+		default:
+			return nil, fmt.Errorf("unexpected reverse kind %q", kind)
+		}
+	})
+	for _, explicit := range []bool{false, true} {
+		for _, cwd := range []string{root, filepath.Join(root, "packages/app")} {
+			t.Run(fmt.Sprintf("explicit=%t/cwd=%s", explicit, filepath.Base(cwd)), func(t *testing.T) {
+				selection := &api.ConfigDiscoveryRequest{}
+				if explicit {
+					selection.ExplicitConfigPath = filepath.Join(root, "rslint.config.mjs")
+				}
+				visible := filepath.Join(root, "packages/app/src/index.js")
+				response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+					WorkingDirectory: cwd,
+					Files:            []string{filepath.Join(root, "packages/app/dist/index.js"), visible, visible},
+					ConfigDiscovery:  selection,
+				}, requester)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if response.FileCount != 1 || len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
+					t.Fatalf("target Git policy changed with cwd/config mode or repeated inputs: %+v", response)
+				}
+			})
+		}
+	}
+}
+
+func TestHandleLint_VirtualDirectoryAliasesInheritAncestorGitignore(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	repo := tspath.ResolvePath(root, "repo")
+	physical := tspath.ResolvePath(repo, "packages/app")
+	writeProgramTestFiles(t, repo, map[string]string{
+		".gitignore":           "generated/\n",
+		"packages/app/keep.js": "",
+	})
+	if err := os.Mkdir(tspath.ResolvePath(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alias := tspath.ResolvePath(root, "alias")
+	if err := os.Symlink(physical, alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	for _, test := range []struct {
+		path    string
+		ignored bool
+	}{
+		{"generated/new.js", true},
+		{"generated/deep/nested/new.js", true},
+		{"src/new.js", false},
+		{"src/deep/nested/new.js", false},
+	} {
+		for _, spelling := range []string{physical, alias} {
+			for _, canonicalHint := range []bool{false, true} {
+				for _, fix := range []bool{false, true} {
+					t.Run(fmt.Sprintf("%s/%s/canonical=%t/fix=%t", test.path, filepath.Base(spelling), canonicalHint, fix), func(t *testing.T) {
+						file := tspath.ResolvePath(spelling, test.path)
+						request := api.LintRequest{
+							Config:           json.RawMessage(`[{"rules":{"no-debugger":"error","no-var":"error"}}]`),
+							ConfigDirectory:  repo,
+							WorkingDirectory: repo,
+							Files:            []string{file},
+							FileContents:     map[string]string{file: "var value = 1; debugger;\n"},
+							Fix:              fix,
+						}
+						if canonicalHint {
+							request.CanonicalFiles = []string{tspath.ResolvePath(physical, test.path)}
+						}
+						response, err := (&Handler{}).HandleLint(request)
+						if err != nil {
+							t.Fatal(err)
+						}
+						wantFiles, wantDiagnostics, wantOutput := 0, 0, 0
+						if !test.ignored {
+							wantFiles, wantDiagnostics = 1, 2
+							if fix {
+								wantDiagnostics, wantOutput = 1, 1
+							}
+						}
+						if response.FileCount != wantFiles || len(response.LintedFiles) != wantFiles || len(response.Diagnostics) != wantDiagnostics || len(response.Output) != wantOutput {
+							t.Fatalf("virtual target ignored=%t: %+v", test.ignored, response)
+						}
+						if wantFiles > 0 {
+							wantPath := tspath.GetRelativePathFromDirectory(repo, file, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+							if response.LintedFiles[0] != wantPath {
+								t.Fatalf("lost caller path %s: %v", wantPath, response.LintedFiles)
+							}
+							for _, diagnostic := range response.Diagnostics {
+								if diagnostic.FilePath != wantPath {
+									t.Fatalf("diagnostic changed caller path: %+v", diagnostic)
+								}
+							}
+							if wantOutput > 0 && response.Output[wantPath] == "" {
+								t.Fatalf("fix output changed caller path: %v", response.Output)
+							}
+						}
+						if _, err := os.Stat(tspath.GetDirectoryPath(file)); !os.IsNotExist(err) {
+							t.Fatalf("virtual parent must remain absent: %v", err)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
+func TestHandleLint_VirtualDirectoryAliasOverlayGitignore(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	physical := tspath.ResolvePath(root, "repo/packages/app")
+	if err := os.MkdirAll(physical, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alias := tspath.ResolvePath(root, "alias")
+	if err := os.Symlink(physical, alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	for _, spelling := range []string{physical, alias} {
+		t.Run(filepath.Base(spelling), func(t *testing.T) {
+			file := tspath.ResolvePath(spelling, "virtual/deep/new.js")
+			request := api.LintRequest{
+				Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
+				ConfigDirectory:  tspath.ResolvePath(root, "repo"),
+				WorkingDirectory: tspath.ResolvePath(root, "repo"),
+				Files:            []string{file},
+				FileContents: map[string]string{
+					file: "debugger;\n",
+					tspath.ResolvePath(spelling, "virtual/.gitignore"): "deep/\n",
+				},
+			}
+			response, err := (&Handler{}).HandleLint(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response.FileCount != 0 || len(response.Diagnostics) != 0 {
+				t.Fatalf("overlay Git source lost its physical alias: %+v", response)
+			}
+		})
+	}
+}
+
+func TestHandleLint_FileSymlinkKeepsContainingRepositoryGitPolicy(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	repo, external := tspath.ResolvePath(root, "repo"), tspath.ResolvePath(root, "external")
+	writeProgramTestFiles(t, repo, map[string]string{".gitignore": "ignored-link.js\n", "packages/app/keep.js": ""})
+	writeProgramTestFiles(t, external, map[string]string{".gitignore": "ignored.js\n", "ignored.js": "", "visible.js": ""})
+	for _, directory := range []string{repo, external} {
+		if err := os.Mkdir(tspath.ResolvePath(directory, ".git"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, test := range []struct {
+		name, destination string
+		ignored           bool
+	}{
+		{"ignored-link.js", "visible.js", true},
+		{"visible-link.js", "ignored.js", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			file := tspath.ResolvePath(repo, "packages/app/"+test.name)
+			destination := tspath.ResolvePath(external, test.destination)
+			if err := os.Symlink(destination, file); err != nil {
+				t.Skipf("file symlink unavailable: %v", err)
+			}
+			response, err := (&Handler{}).HandleLint(api.LintRequest{
+				Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
+				ConfigDirectory:  repo,
+				WorkingDirectory: repo,
+				Files:            []string{file},
+				CanonicalFiles:   []string{destination},
+				FileContents:     map[string]string{file: "debugger;\n"},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := 1
+			if test.ignored {
+				want = 0
+			}
+			if response.FileCount != want || len(response.Diagnostics) != want {
+				t.Fatalf("file symlink used its destination's Git policy: %+v", response)
+			}
+		})
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryPreservesExactOverlayTargets(t *testing.T) {
+	for _, test := range []struct {
+		name            string
+		explicit, empty bool
+	}{
+		{name: "omitted files"}, {name: "explicit config", explicit: true}, {name: "empty exact list", empty: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeProgramTestFiles(t, root, map[string]string{"unrelated.js": "debugger;\n"})
+			selection := &api.ConfigDiscoveryRequest{OverrideConfig: json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`)}
+			requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+				switch kind {
+				case api.KindLoadConfigs:
+					request := payload.(discovery.ConfigLoadBatchRequest)
+					response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+					for _, candidate := range request.Candidates {
+						response.Results = append(response.Results, discovery.ConfigLoadResult{ID: candidate.ID, Status: "loaded", Entries: mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`)})
+					}
+					return ipc.NewMessage(ipc.KindResponse, 1, response)
+				case api.KindActivateConfigs:
+					request := payload.(discovery.ConfigActivationRequest)
+					return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{TransactionID: request.TransactionID})
+				default:
+					return nil, fmt.Errorf("unexpected reverse request %s", kind)
+				}
+			})
+			if test.explicit {
+				selection.ExplicitConfigPath = filepath.Join(root, "custom.config.mjs")
+				writeProgramTestFiles(t, root, map[string]string{"custom.config.mjs": "export default [];\n"})
+			}
+			request := api.LintRequest{WorkingDirectory: root, ConfigDiscovery: selection, FileContents: map[string]string{filepath.Join(root, "overlay.js"): "debugger;\n"}}
+			want := 1
+			if test.empty {
+				request.Files = []string{}
+				want = 0
+			}
+			response, err := (&Handler{}).HandleLintWithContext(context.Background(), request, requester)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response.FileCount != want || len(response.Diagnostics) != want {
+				t.Fatalf("exact overlay targets widened or disappeared: %+v", response)
+			}
+			if want > 0 && response.Diagnostics[0].FilePath != "overlay.js" {
+				t.Fatalf("disk target outside the requested set was linted: %+v", response)
+			}
+		})
 	}
 }

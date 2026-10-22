@@ -327,7 +327,7 @@ describe('Gitignore: interaction with config ignores', () => {
 });
 
 describe('Gitignore: monorepo scenarios', () => {
-  test('package configs do not inherit root .gitignore', async () => {
+  test('package configs inherit root .gitignore within the repository', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'dist/\ncoverage/\n',
       'rslint.config.mjs': `export default [{ files: ["**/*.ts"], rules: { "no-debugger": "error" } }];`,
@@ -345,12 +345,12 @@ describe('Gitignore: monorepo scenarios', () => {
       expect(
         diagsAt(diagnostics, 'packages/lib/src/utils.ts').length,
       ).toBeGreaterThan(0);
-      expect(
-        diagsAt(diagnostics, 'packages/app/dist/bundle.ts').length,
-      ).toBeGreaterThan(0);
-      expect(
-        diagsAt(diagnostics, 'packages/lib/coverage/lcov.ts').length,
-      ).toBeGreaterThan(0);
+      expect(diagsAt(diagnostics, 'packages/app/dist/bundle.ts').length).toBe(
+        0,
+      );
+      expect(diagsAt(diagnostics, 'packages/lib/coverage/lcov.ts').length).toBe(
+        0,
+      );
     } finally {
       await cleanup();
     }
@@ -736,6 +736,109 @@ describe('Gitignore: tsconfig + gitignore interaction', () => {
 });
 
 describe('Gitignore: monorepo gap file interaction', () => {
+  test('directory negations retain aliases with a physical config owner', async () => {
+    const tempDir = await createTempDir({
+      '.git': '',
+      '.gitignore': 'ignored/\n',
+      'real/rslint.config.mjs': '',
+      'real/sub/visible.ts': 'debugger;\n',
+      'real/sub/ignored/.git': '',
+      'real/sub/ignored/.gitignore': 'local.ts\n',
+      'real/sub/ignored/keep.ts': 'debugger;\n',
+      'real/sub/ignored/other.ts': 'debugger;\n',
+      'real/sub/ignored/local.ts': 'debugger;\n',
+    });
+    try {
+      fs.symlinkSync(
+        path.join(tempDir, 'real/sub'),
+        path.join(tempDir, 'link'),
+        'junction',
+      );
+      for (const [negation, expected] of [
+        ['', ['link/visible.ts']],
+        [
+          '!link/ignored',
+          ['link/ignored/keep.ts', 'link/ignored/other.ts', 'link/visible.ts'],
+        ],
+        ['!link/ignored/keep.ts', ['link/ignored/keep.ts', 'link/visible.ts']],
+      ] as const) {
+        fs.writeFileSync(
+          path.join(tempDir, 'real/rslint.config.mjs'),
+          `export default ${JSON.stringify([
+            { basePath: fs.realpathSync(tempDir), ignores: [negation] },
+            { rules: { 'no-debugger': 'error' } },
+          ])};`,
+        );
+        for (const configArgs of [[], ['--config', 'real/rslint.config.mjs']]) {
+          const result = await runRslint(
+            ['--format', 'jsonline', ...configArgs, 'link'],
+            tempDir,
+          );
+          expect(result.exitCode).toBe(1);
+          expect(result.stderr).toBe('');
+          const diagnostics = result.stdout
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line) as Diagnostic);
+          expect(
+            diagnostics
+              .map((diagnostic) => diagnostic.filePath.replaceAll('\\', '/'))
+              .sort(),
+          ).toEqual(expected);
+        }
+      }
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test.each(['ignored', 'ignored/nested'])(
+    'a leaf exception does not reopen the nested repository at %s',
+    async (nested) => {
+      const other = `${nested}/other.ts`;
+      const tempDir = await createTempDir({
+        '.git': '',
+        '.gitignore': 'ignored/\n',
+        [`${nested}/.git`]: '',
+        'rslint.config.mjs': `export default [
+        { ignores: ['!ignored/keep.ts'] },
+        { rules: { 'no-debugger': 'error' } },
+      ];`,
+        'ignored/keep.ts': 'debugger;\n',
+        [other]: 'debugger;\n',
+      });
+      try {
+        for (const configArgs of [[], ['--config', 'rslint.config.mjs']]) {
+          for (const [inputs, expected] of [
+            [['.'], ['ignored/keep.ts']],
+            [['.', nested], ['ignored/keep.ts', other].sort()],
+          ]) {
+            const result = await runRslint(
+              ['--format', 'jsonline', ...configArgs, ...inputs],
+              tempDir,
+            );
+            const diagnostics = result.stdout
+              .split('\n')
+              .filter((line) => line.startsWith('{'))
+              .map((line) => JSON.parse(line) as Diagnostic);
+            expect(
+              diagnostics
+                .map((diagnostic) => diagnostic.filePath.replaceAll('\\', '/'))
+                .sort(),
+            ).toEqual(expected);
+            expect(
+              diagnostics.every(
+                (diagnostic) => diagnostic.ruleName === 'no-debugger',
+              ),
+            ).toBe(true);
+          }
+        }
+      } finally {
+        await cleanupTempDir(tempDir);
+      }
+    },
+  );
+
   test('automatic discovery prunes a Git-hidden child config, while an explicit directory root reopens it', async () => {
     const tempDir = await createTempDir({
       '.gitignore': 'packages/ignored/\n',
@@ -784,7 +887,7 @@ describe('Gitignore: monorepo gap file interaction', () => {
     }
   });
 
-  test('root .gitignore does not prune child config discovery', async () => {
+  test('root .gitignore applies after child config discovery', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'build/\n',
       'rslint.config.mjs': `export default [{ files: ["*.ts"], rules: { "no-console": "error" } }];`,
@@ -796,9 +899,9 @@ describe('Gitignore: monorepo gap file interaction', () => {
       expect(
         diagsAt(diagnostics, 'packages/app/src/index.ts').length,
       ).toBeGreaterThan(0);
-      expect(
-        diagsAt(diagnostics, 'packages/app/build/output.ts').length,
-      ).toBeGreaterThan(0);
+      expect(diagsAt(diagnostics, 'packages/app/build/output.ts').length).toBe(
+        0,
+      );
     } finally {
       await cleanup();
     }
@@ -806,6 +909,88 @@ describe('Gitignore: monorepo gap file interaction', () => {
 });
 
 describe('Gitignore: overlap and edge cases', () => {
+  test('mixed directory targets do not promote a child config into a wider scan', async () => {
+    const tempDir = await createTempDir({
+      '.git': '',
+      '.gitignore': 'nested/\n',
+      'rslint.config.mjs': CONFIG_NO_CONSOLE,
+      'control.ts': 'console.log("control");\n',
+      'nested/.git': 'gitdir: /unused/worktree\n',
+      'nested/.gitignore': 'ignored.ts\n',
+      'nested/extra.ts': 'console.log("extra");\n',
+      'nested/selected/keep.ts': 'console.log("keep");\n',
+      'nested/selected/ignored.ts': 'console.log("ignored");\n',
+    });
+    try {
+      for (const childConfig of [false, true]) {
+        if (childConfig) {
+          fs.writeFileSync(
+            path.join(tempDir, 'nested/rslint.config.mjs'),
+            CONFIG_NO_CONSOLE,
+          );
+        }
+        for (const targets of [
+          ['.', 'nested/selected'],
+          ['nested/selected', '.'],
+        ]) {
+          const result = await runRslint(
+            ['--format', 'jsonline', ...targets],
+            tempDir,
+          );
+          expect(result.exitCode).toBe(1);
+          expect(result.stderr).toBe('');
+          const diagnostics = result.stdout
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line) as Diagnostic);
+          expect(diagnostics.map((d) => d.filePath).sort()).toEqual([
+            'control.ts',
+            'nested/selected/keep.ts',
+          ]);
+        }
+      }
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('overlapping directory symlink targets retain physical ignores', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': CONFIG_NO_CONSOLE,
+      'root.ts': 'console.log("root");\n',
+    });
+    const physicalDir = await createTempDir({
+      '.git': '',
+      '.gitignore': 'ignored.ts\nblocked/\n',
+      'blocked/deep.ts': 'console.log("blocked");\n',
+      'kept.ts': 'console.log("kept");\n',
+      'ignored.ts': 'console.log("ignored");\n',
+    });
+    try {
+      fs.symlinkSync(physicalDir, path.join(tempDir, 'linked'), 'junction');
+      for (const targets of [['linked'], ['.', 'linked'], ['linked', '.']]) {
+        const result = await runRslint(
+          ['--format', 'jsonline', ...targets],
+          tempDir,
+        );
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toBe('');
+        const diagnostics = result.stdout
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line) as Diagnostic);
+        expect(diagnostics.map((d) => d.filePath).sort()).toEqual(
+          targets.includes('.')
+            ? ['linked/kept.ts', 'root.ts']
+            : ['linked/kept.ts'],
+        );
+      }
+    } finally {
+      await cleanupTempDir(tempDir);
+      await cleanupTempDir(physicalDir);
+    }
+  });
+
   test('gitignore and config ignores same pattern — no conflict', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'dist/\n',

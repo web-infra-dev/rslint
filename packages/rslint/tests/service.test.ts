@@ -310,12 +310,14 @@ describe('RSLintService reverse lint request scoping', () => {
       {
         files: ['/lexical/a.ts'],
         canonicalFiles: ['/physical/a.ts'],
+        fileScanDirectories: [['/work/src']],
       },
       { pluginLint: () => ({ diagnostics: [] }) },
     );
     expect(backend.lintPayloads[0]).toMatchObject({
       files: ['/lexical/a.ts'],
       canonicalFiles: ['/physical/a.ts'],
+      fileScanDirectories: [['/work/src']],
     });
     await service.close();
   });

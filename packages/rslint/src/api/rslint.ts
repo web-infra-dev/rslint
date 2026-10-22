@@ -14,8 +14,8 @@
  * service; `close()` tears it down (mirrors RSLintService.close()).
  */
 import path from 'node:path';
-import { lstat, readFile, stat, writeFile } from 'node:fs/promises';
-import { convertPathToPattern, glob, isDynamicPattern } from 'tinyglobby';
+import { readFile, stat, writeFile } from 'node:fs/promises';
+import { convertPathToPattern, glob } from 'tinyglobby';
 import picomatch from 'picomatch';
 
 import { RSLintService } from '../service/service.js';
@@ -139,8 +139,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 interface ClassifiedLintPatterns {
   literalFilePatterns: string[];
-  literalDirectorySymlinks: string[];
-  scanDirectories: string[];
+  scanPatterns: Map<string, string[]>;
 }
 
 type GlobPatternRole = 'match' | 'ignore' | 'skip';
@@ -148,6 +147,7 @@ type GlobPatternRole = 'match' | 'ignore' | 'skip';
 // Keep this classification aligned with tinyglobby's processPatterns(): a
 // leading `!(` starts a positive extglob, while `!pattern` is an exclusion.
 function globPatternRole(pattern: string): GlobPatternRole {
+  if (!pattern) return 'skip';
   if (pattern[0] !== '!' || pattern[1] === '(') return 'match';
   if (pattern[1] !== '!' || pattern[2] === '(') return 'ignore';
   return 'skip';
@@ -155,31 +155,57 @@ function globPatternRole(pattern: string): GlobPatternRole {
 
 interface PlannedLintFile extends ResolvedFilesystemPath {
   explicit: boolean;
+  scanDirectories: string[];
 }
 
 const DEFAULT_LINT_GLOB_IGNORES = ['**/node_modules/**', '**/.git/**'];
 
-function staticGlobRoot(pattern: string, cwd: string): string {
-  const absolutePattern = path.resolve(cwd, pattern);
-  const root = path.parse(absolutePattern).root;
-  const segments = absolutePattern.slice(root.length).split(path.sep);
-  let current = root;
-  for (const segment of segments) {
-    if (!segment || isDynamicPattern(segment)) break;
-    current = path.join(current, segment);
+function staticGlobRoot(pattern: string, cwd: string): string | undefined {
+  // scan() can stop at literal/escaped braces before seeing a later wildcard.
+  // Keep the authored literal/scan role, then derive the effective static path
+  // after dot-segment normalization. Preserve Windows volume boundaries.
+  const volume =
+    path.sep === '\\'
+      ? /^(?:[a-z]:|\/\/[^/]+\/[^/]+)(?=\/|$)/i.exec(pattern)?.[0] || ''
+      : '';
+  let normalized =
+    volume + path.posix.normalize(pattern.slice(volume.length) || '/');
+  if (path.isAbsolute(normalized)) {
+    const relative = path.posix.relative(
+      convertPathToPattern(cwd.split(path.sep).join('/')),
+      normalized,
+    );
+    // tinyglobby makes absolute patterns relative before parsing negations.
+    if (relative.startsWith('!')) normalized = relative;
   }
-  return current || cwd;
-}
-
-function deduplicateScanDirectories(directories: Iterable<string>): string[] {
-  const byIdentity = new Map<string, string>();
-  for (const directory of directories) {
-    const normalized = path.normalize(directory);
-    const key = nativePathIdentity.key(normalized);
-    if (!byIdentity.has(key)) byIdentity.set(key, normalized);
+  let prefix = '';
+  for (const input of normalized === pattern
+    ? [pattern]
+    : [pattern, normalized]) {
+    prefix = '';
+    const parsed = picomatch.parse(input, {});
+    let dynamic = Boolean(parsed.negated);
+    for (const token of parsed.negated ? [] : parsed.tokens) {
+      if (
+        ['bos', 'text', 'dot', 'slash', 'comma'].includes(token.type) ||
+        token.value.startsWith('\\') ||
+        token.output === `\\${token.value}`
+      ) {
+        prefix += token.value;
+        continue;
+      }
+      dynamic = true;
+      break;
+    }
+    // scan() records leading negation syntax even when two bangs cancel out.
+    if (input === pattern && !dynamic && !picomatch.scan(input).negated) {
+      return undefined;
+    }
+    if (dynamic) prefix = prefix.slice(0, prefix.lastIndexOf('/') + 1);
   }
-  return [...byIdentity.values()].sort((left, right) =>
-    nativePathIdentity.compare(left, right),
+  return path.resolve(
+    cwd,
+    picomatch.scan(prefix, { unescape: true }).base || '.',
   );
 }
 
@@ -224,8 +250,7 @@ async function classifyLintPatterns(
   cwd: string,
 ): Promise<ClassifiedLintPatterns> {
   const literalFilePatterns: string[] = [];
-  const literalDirectorySymlinks: string[] = [];
-  const scanDirectories = new Set<string>();
+  const scanPatterns = new Map<string, string[]>();
   const excludedLiteralPatterns = [
     ...DEFAULT_LINT_GLOB_IGNORES,
     ...patterns.filter((pattern) => globPatternRole(pattern) === 'ignore'),
@@ -233,11 +258,16 @@ async function classifyLintPatterns(
 
   for (const pattern of patterns) {
     if (globPatternRole(pattern) !== 'match') continue;
-    if (isDynamicPattern(pattern)) {
-      const scanRoot = staticGlobRoot(pattern, cwd);
+    let scanRoot = staticGlobRoot(pattern, cwd);
+    if (scanRoot !== undefined) {
       try {
-        if ((await stat(scanRoot)).isDirectory()) {
-          scanDirectories.add(scanRoot);
+        const info = await stat(scanRoot);
+        // A glob reduced to a static file still enters through its directory.
+        if (info.isFile()) scanRoot = path.dirname(scanRoot);
+        if (info.isDirectory() || info.isFile()) {
+          const matches = scanPatterns.get(scanRoot) ?? [];
+          matches.push(pattern);
+          scanPatterns.set(scanRoot, matches);
         }
       } catch {
         // A missing static root cannot contribute a matched target.
@@ -245,20 +275,27 @@ async function classifyLintPatterns(
       continue;
     }
 
-    const absolute = path.resolve(cwd, pattern);
+    let absolute = path.resolve(cwd, pattern);
     try {
-      const info = await stat(absolute);
+      let info;
+      try {
+        info = await stat(absolute);
+      } catch {
+        absolute = path.resolve(
+          cwd,
+          picomatch.scan(pattern, { unescape: true }).base || pattern,
+        );
+        info = await stat(absolute);
+      }
       if (info.isDirectory()) {
-        scanDirectories.add(absolute);
-        if ((await lstat(absolute)).isSymbolicLink()) {
-          literalDirectorySymlinks.push(absolute);
-        }
+        const matches = scanPatterns.get(absolute) ?? [];
+        const relative =
+          path.relative(cwd, absolute).split(path.sep).join('/') || '.';
+        matches.push(`${convertPathToPattern(relative)}/**/*`);
+        scanPatterns.set(absolute, matches);
       } else if (info.isFile()) {
-        const absolutePattern = path.resolve(cwd, pattern);
-        if (
-          !matchesExcludedLiteral(absolutePattern, excludedLiteralPatterns, cwd)
-        ) {
-          literalFilePatterns.push(absolutePattern);
+        if (!matchesExcludedLiteral(absolute, excludedLiteralPatterns, cwd)) {
+          literalFilePatterns.push(absolute);
         }
       }
     } catch {
@@ -268,8 +305,7 @@ async function classifyLintPatterns(
 
   return {
     literalFilePatterns,
-    literalDirectorySymlinks,
-    scanDirectories: deduplicateScanDirectories(scanDirectories),
+    scanPatterns,
   };
 }
 
@@ -378,8 +414,10 @@ export class Rslint {
    */
   async lintFiles(patterns: string | string[]): Promise<LintResult[]> {
     const globs = Array.isArray(patterns) ? patterns : [patterns];
-    const { literalFilePatterns, literalDirectorySymlinks, scanDirectories } =
-      await classifyLintPatterns(globs, this.#cwd);
+    const { literalFilePatterns, scanPatterns } = await classifyLintPatterns(
+      globs,
+      this.#cwd,
+    );
     const globOptions = {
       cwd: this.#cwd,
       absolute: true,
@@ -387,47 +425,45 @@ export class Rslint {
       dot: true,
       ignore: DEFAULT_LINT_GLOB_IGNORES,
     } as const;
-    const matched = await glob(globs, {
-      ...globOptions,
-      followSymbolicLinks: false,
-    });
-    const directorySymlinkMatches =
-      literalDirectorySymlinks.length === 0
-        ? []
-        : await glob(
-            [
-              ...literalDirectorySymlinks.map(
-                (directory) => `${convertPathToPattern(directory)}/**/*`,
-              ),
-              ...globs.filter((pattern) => pattern.startsWith('!')),
-            ],
-            {
-              ...globOptions,
-              // The explicitly named symlink is the scan root; nested directory
-              // symlinks remain excluded.
-              followSymbolicLinks: false,
-            },
-          );
     // stat() already established each literal as a file. Keep its caller
     // spelling directly, including file symlinks, without a second glob crawl.
     const literalMatches = literalFilePatterns;
 
     const filesByIdentity = new Map<
       string,
-      { filePath: string; explicit: boolean }
+      { filePath: string; explicit: boolean; scanDirectories: string[] }
     >();
-    for (const file of [...matched, ...directorySymlinkMatches]) {
-      const normalized = path.normalize(file);
-      const key = nativePathIdentity.key(normalized);
-      if (!filesByIdentity.has(key)) {
-        filesByIdentity.set(key, { filePath: normalized, explicit: false });
+    const exclusions = globs.filter(
+      (pattern) => globPatternRole(pattern) !== 'match',
+    );
+    // Keep each static root's actual matches. A file matched by an outer glob
+    // cannot borrow an unrelated inner glob's independent scan entry.
+    for (const [directory, patterns] of scanPatterns) {
+      const matched = await glob([...patterns, ...exclusions], {
+        ...globOptions,
+        followSymbolicLinks: false,
+      });
+      for (const file of matched) {
+        const normalized = path.normalize(file);
+        const key = nativePathIdentity.key(normalized);
+        const entry = filesByIdentity.get(key) ?? {
+          filePath: normalized,
+          explicit: false,
+          scanDirectories: [],
+        };
+        entry.scanDirectories.push(directory);
+        filesByIdentity.set(key, entry);
       }
     }
     for (const file of literalMatches) {
       const normalized = path.normalize(file);
       const key = nativePathIdentity.key(normalized);
       // Preserve the spelling of a literal target over an overlapping glob.
-      filesByIdentity.set(key, { filePath: normalized, explicit: true });
+      filesByIdentity.set(key, {
+        filePath: normalized,
+        explicit: true,
+        scanDirectories: [],
+      });
     }
 
     const lexicalFiles = [...filesByIdentity.values()];
@@ -441,6 +477,7 @@ export class Rslint {
       (resolved, index) => ({
         ...resolved,
         explicit: lexicalFiles[index].explicit,
+        scanDirectories: lexicalFiles[index].scanDirectories,
       }),
     );
 
@@ -468,14 +505,16 @@ export class Rslint {
                   typeof this.#overrideConfigFile === 'string'
                     ? path.resolve(this.#cwd, this.#overrideConfigFile)
                     : undefined,
-                directories: scanDirectories,
-                explicitFiles: selectedFiles.map((file) => file.explicit),
+                directories: [...scanPatterns.keys()],
                 overrideConfig,
               }
             : undefined,
           configDirectory: usesNativeDiscovery ? undefined : this.#cwd,
           workingDirectory: this.#cwd,
           files,
+          fileScanDirectories: selectedFiles.map((file) =>
+            file.explicit ? null : file.scanDirectories,
+          ),
           canonicalFiles: selectedFiles.map((file) => file.canonicalPath),
           // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
           fileContents: overlay,

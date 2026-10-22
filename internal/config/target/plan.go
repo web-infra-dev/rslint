@@ -1,6 +1,7 @@
 package target
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
@@ -18,6 +19,7 @@ type Plan struct {
 	ExplicitFileOutcomes []ExplicitFileOutcome
 
 	pathSpaces *rslintconfig.PathSpaceSnapshot
+	gitPolicy  *rslintconfig.GitPolicy
 }
 
 // Request keeps the two directory roles explicit. ConfigDirectory
@@ -32,8 +34,10 @@ type Request struct {
 	ScanRoot        string
 	OwnerScopes     map[string]OwnerScope
 	FS              vfs.FS
-	Files           []string
-	Directories     []string
+	Files           []rslintconfig.PathIdentity
+	Directories     []rslintconfig.DirectoryIdentity
+	GitPolicy       *rslintconfig.GitPolicy
+	PathSpaces      *rslintconfig.PathSpaceSnapshot
 	SingleThreaded  bool
 }
 
@@ -46,12 +50,18 @@ func Resolve(request Request) (Plan, error) {
 	if scanRoot == "" {
 		scanRoot = configDirectory
 	}
-	plan := Plan{}
+	if request.GitPolicy == nil {
+		return Plan{}, errors.New("git policy is required")
+	}
+	plan := Plan{gitPolicy: request.GitPolicy}
 	explicitFiles := newExplicitLintTargetSet(request.Files, request.FS)
 	var discoveredFiles []File
 	if request.ConfigMap != nil {
-		ownerIndex := NewOwnerIndex(request.ConfigMap, request.FS)
-		plan.pathSpaces = ownerIndex.PathSpaces()
+		spaces := request.PathSpaces
+		if spaces == nil {
+			spaces = rslintconfig.NewPathSpaceSnapshot(request.ConfigMap, request.FS, request.Directories...)
+		}
+		plan.pathSpaces = spaces
 		discoveredFiles = discoverLintTargetsMultiConfigWithPreparedFiles(
 			request.ConfigMap,
 			request.OwnerScopes,
@@ -59,22 +69,27 @@ func Resolve(request Request) (Plan, error) {
 			request.Files,
 			request.Directories,
 			request.SingleThreaded,
-			ownerIndex,
+			spaces,
 			explicitFiles,
+			request.GitPolicy,
 		)
 	} else {
 		configMap := map[string]rslintconfig.RslintConfig{configDirectory: request.Config}
-		plan.pathSpaces = rslintconfig.NewPathSpaceSnapshot(configMap, request.FS)
+		plan.pathSpaces = request.PathSpaces
+		if plan.pathSpaces == nil {
+			plan.pathSpaces = rslintconfig.NewPathSpaceSnapshot(configMap, request.FS, request.Directories...)
+		}
 		discoveredFiles = discoverLintTargetsWithPreparedFiles(
 			request.Config,
 			configDirectory,
 			scanRoot,
 			request.FS,
-			explicitFiles.targetsForPaths(request.Files),
+			explicitFiles.targetsForIdentities(request.Files),
 			request.Directories,
 			nil,
 			request.SingleThreaded,
 			plan.pathSpaces,
+			request.GitPolicy,
 		)
 	}
 	useCaseSensitive := request.FS == nil || request.FS.UseCaseSensitiveFileNames()
@@ -173,6 +188,9 @@ func (plan Plan) ActiveOwners() []string {
 // plan. Callers use it to construct config resolvers without observing the
 // filesystem again.
 func (plan Plan) PathSpaces() *rslintconfig.PathSpaceSnapshot { return plan.pathSpaces }
+
+// GitPolicy returns the immutable Git observations used to select these targets.
+func (plan Plan) GitPolicy() *rslintconfig.GitPolicy { return plan.gitPolicy }
 
 // PreferredCallerPaths maps canonical target identity to the first lexical
 // path supplied by discovery. Diagnostic deduplication uses this to retain the

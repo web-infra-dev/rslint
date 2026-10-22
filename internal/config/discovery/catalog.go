@@ -37,19 +37,14 @@ func IsSupportedConfigModulePath(filePath string) bool {
 	}
 }
 
-// DiscoveryFile is a file target that may participate in config discovery.
-// CanonicalPath supplies an optional physical identity for path-space
-// resolution. Automatic ownership falls back to canonical ancestry only when
-// the complete lexical ancestry contains no candidate; fixed-owner exact Git
-// projection may use it directly to map the target into the owner's lexical
-// space.
+// DiscoveryFile keeps a frozen target identity and its config-ownership role.
+// Only literal files get the authored-global-ignore ownership exception.
 type DiscoveryFile struct {
-	Path          string
-	CanonicalPath string
-	// Explicit distinguishes a literal CLI/API/LSP target from a file found by
-	// a directory or glob walk. Only literal files get the config-global-ignore
-	// ownership exception.
+	rslintconfig.PathIdentity
 	Explicit bool
+	// ScanDirectories lists the inputs that actually expanded this file. Nil
+	// associates a non-literal file with all supplied containing roots.
+	ScanDirectories []string
 }
 
 // ConfigDiscoveryRequest describes one immutable config-catalog build.
@@ -59,33 +54,46 @@ type DiscoveryFile struct {
 type ConfigDiscoveryRequest struct {
 	CWD         string
 	Files       []DiscoveryFile
-	Directories []string
+	Directories []rslintconfig.DirectoryIdentity
+	// FallbackConfig supplies input policy when discovery finds no config owner.
+	// It is not a config owner or a load candidate.
+	FallbackConfig rslintconfig.RslintConfig
 	// LimitDirectoryWalkToFiles is used when a host has already expanded its
 	// directory/glob inputs to an exact target set. Only target-ancestor branches
 	// can govern that request. CLI/LSP directory roots leave this false and retain
 	// the full recursive catalog walk, including mixed CLI file+directory input.
 	LimitDirectoryWalkToFiles bool
 	ImplicitCWD               bool
-	Fresh                     bool
-	SingleThreaded            bool
+	// AdditionalGitFiles add exact Git chains without participating in config discovery.
+	AdditionalGitFiles []rslintconfig.PathIdentity
+	Fresh              bool
+	SingleThreaded     bool
 }
 
-// ExplicitConfigRequest loads one invocation-wide JS/TS config. It is a
-// separate operation from automatic discovery: absence of this request means
-// automatic discovery, while absence of config discovery at the adapter means
-// the low-level pre-resolved config path.
+// ExplicitConfigRequest supplies one invocation-wide config array, either
+// from a JS/TS module or already resolved by the caller. It is a
+// separate operation from automatic discovery; inline arrays do not invoke
+// the module loader.
 type ExplicitConfigRequest struct {
 	CWD        string
 	ConfigPath string
-	// TargetFiles limits Git projection to exact target directory chains. With
-	// no TargetDirectories, a nil slice projects the complete CWD-owned subtree
-	// and a non-nil empty slice projects nothing, as used by --type-check-only.
+	// Config supplies an already-resolved inline array instead of a module.
+	Config          rslintconfig.RslintConfig
+	ConfigDirectory string
+	// ProjectOnly omits target Git-source traversal when the loaded config's
+	// project declarations do not depend on per-file service/root/reset options.
+	ProjectOnly bool
+	// TargetFiles supplies frozen exact targets. With no TargetDirectories, nil
+	// means an implicit CWD directory input; a non-nil empty slice means no targets.
 	TargetFiles []DiscoveryFile
-	// TargetDirectories limits Git projection to recursive directory targets.
+	// TargetDirectories supplies independent frozen recursive directory inputs.
 	// It may be combined with TargetFiles for mixed CLI invocations.
-	TargetDirectories []string
-	Fresh             bool
-	SingleThreaded    bool
+	TargetDirectories []rslintconfig.DirectoryIdentity
+	// LimitDirectoryWalkToFiles bounds these roots to the supplied candidates.
+	LimitDirectoryWalkToFiles bool
+	AdditionalGitFiles        []rslintconfig.PathIdentity
+	Fresh                     bool
+	SingleThreaded            bool
 }
 
 type ConfigFailure struct {
@@ -102,15 +110,15 @@ type ConfigDiscoveryStats struct {
 	DirectoriesPruned  int
 }
 
-// ConfigCatalog is the deterministic snapshot produced by one build. Configs
-// contains only effective, successfully loaded ownership boundaries. Requested
-// failures remain in Failures/Stats; ignored or unreachable candidates are
-// omitted because their modules are never requested. Every staged catalog
-// freezes each owner's invocation-scoped Git projection into Configs before
-// publication, so automatic and explicit JS/TS adapters consume the same
-// finalized-config contract.
+// ConfigCatalog freezes authored configs, their ownership routes, and Git
+// policy independently for one discovery transaction. Failures are business
+// results: even a catalog without successful modules has complete Git policy.
 type ConfigCatalog struct {
 	TransactionID      string
+	GitPolicy          *rslintconfig.GitPolicy
+	PathSpaces         *rslintconfig.PathSpaceSnapshot
+	TargetFiles        []rslintconfig.PathIdentity
+	TargetDirectories  []rslintconfig.DirectoryIdentity
 	Configs            map[string]rslintconfig.RslintConfig
 	EffectiveConfigIDs []string
 	EslintPlugins      []rslintconfig.EslintPluginEntry
@@ -132,6 +140,15 @@ func (catalog *ConfigCatalog) ConfigDirectories() []string {
 	}
 	sort.Strings(directories)
 	return directories
+}
+
+// AllConfigsFailedError derives the adapter-facing failure without discarding
+// the completed catalog. A request with no candidates is not a load failure.
+func (catalog *ConfigCatalog) AllConfigsFailedError() error {
+	if catalog == nil || len(catalog.Configs) > 0 || len(catalog.Failures) == 0 {
+		return nil
+	}
+	return allConfigsFailedError(catalog.Failures)
 }
 
 var ErrAllConfigsFailed = errors.New("all discovered JavaScript configs failed to load")
@@ -184,28 +201,29 @@ func nextConfigDiscoveryTransactionID() string {
 // catalog. Transaction IDs are unique across concurrent builds and native
 // process restarts so adapters can stage load/activate/commit as one operation.
 func DiscoverAutomatic(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoader, request ConfigDiscoveryRequest) (*ConfigCatalog, error) {
-	return buildConfigCatalog(ctx, fsys, loader, request, "")
+	return buildConfigCatalog(ctx, fsys, loader, request, nil)
 }
 
-// LoadExplicitConfig loads one exact invocation-wide config path. Git
-// reachability never gates that exact source and automatic candidates are not
-// discovered. After the source loads, its invocation-scoped Git projection is
-// frozen into the returned catalog.
+// LoadExplicitConfig loads one exact module or accepts an inline array. Git
+// reachability never gates that source, and its location does not set Git roots.
 func LoadExplicitConfig(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoader, request ExplicitConfigRequest) (*ConfigCatalog, error) {
-	if request.ConfigPath == "" {
+	if request.Config == nil && request.ConfigPath == "" {
 		return nil, errors.New("explicit config discovery requires a config path")
 	}
-	if !IsSupportedConfigModulePath(request.ConfigPath) {
+	if request.Config == nil && !IsSupportedConfigModulePath(request.ConfigPath) {
 		return nil, fmt.Errorf("explicit config path must name a JS/TS config module: %q", request.ConfigPath)
 	}
 	automatic := ConfigDiscoveryRequest{
-		CWD:            request.CWD,
-		Files:          request.TargetFiles,
-		Directories:    request.TargetDirectories,
-		Fresh:          request.Fresh,
-		SingleThreaded: request.SingleThreaded,
+		CWD:                       request.CWD,
+		Files:                     request.TargetFiles,
+		Directories:               request.TargetDirectories,
+		LimitDirectoryWalkToFiles: request.LimitDirectoryWalkToFiles,
+		AdditionalGitFiles:        request.AdditionalGitFiles,
+		ImplicitCWD:               request.TargetFiles == nil && request.TargetDirectories == nil,
+		Fresh:                     request.Fresh,
+		SingleThreaded:            request.SingleThreaded,
 	}
-	return buildConfigCatalog(ctx, fsys, loader, automatic, request.ConfigPath)
+	return buildConfigCatalog(ctx, fsys, loader, automatic, &request)
 }
 
 func buildConfigCatalog(
@@ -213,7 +231,7 @@ func buildConfigCatalog(
 	fsys vfs.FS,
 	loader ConfigModuleLoader,
 	request ConfigDiscoveryRequest,
-	explicitConfigPath string,
+	explicit *ExplicitConfigRequest,
 ) (*ConfigCatalog, error) {
 	if fsys == nil {
 		return nil, errors.New("config discovery requires a filesystem")
@@ -225,7 +243,7 @@ func buildConfigCatalog(
 		fsys,
 		loader,
 		request,
-		explicitConfigPath,
+		explicit,
 		transactionID,
 	)
 	return coordinator.build()

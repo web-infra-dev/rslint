@@ -24,6 +24,7 @@ type documentLintSnapshot struct {
 	config                config.RslintConfig
 	resolvedConfig        config.ResolvedFileConfig
 	pathSpaces            *config.PathSpaceSnapshot
+	gitPolicy             *config.GitPolicy
 	ruleCatalog           *rule.Catalog
 	configResolved        bool
 	projectPolicy         config.ProjectPolicy
@@ -57,6 +58,7 @@ func resolveDocumentLintSnapshotConfig(
 		fs,
 		snapshot.pathSpaces,
 		snapshot.ruleCatalog,
+		snapshot.gitPolicy,
 	)
 	if err != nil {
 		panic(err)
@@ -122,7 +124,7 @@ func lspFilesystemPathID(filePath string, fs vfs.FS) string {
 
 func lspTargetIdentity(filePath string, fs vfs.FS) target.File {
 	return target.File{
-		PathIdentity: target.FreezeFileIdentity(filePath, fs),
+		PathIdentity: config.FreezeFileIdentity(filePath, fs),
 	}
 }
 
@@ -144,6 +146,8 @@ type documentConfigSelection struct {
 	entries       config.RslintConfig
 	resolved      config.ResolvedFileConfig
 	pathSpaces    *config.PathSpaceSnapshot
+	gitPolicy     *config.GitPolicy
+	unavailable   bool
 	ruleCatalog   *rule.Catalog
 	directory     string
 	configKey     string
@@ -152,10 +156,17 @@ type documentConfigSelection struct {
 
 func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelection {
 	jsRuleCatalog := s.currentRuleCatalog()
+	if s.configDiscoveryActive && s.gitPolicy == nil {
+		// The handshake has started, but no transaction has committed. A failed
+		// first refresh must not silently resume live bootstrap observations.
+		return documentConfigSelection{directory: s.cwd, ruleCatalog: jsRuleCatalog, configMissing: true, unavailable: true}
+	}
+	gitPolicy := s.gitPolicy
+	gitDirectory := lspGitDirectory(lintFile.Identity())
 	evaluationFS := s.fs
 	jsOwnerIndex := s.jsConfigOwnerIndex
 	jsFileConfigResolvers := s.jsFileConfigResolvers
-	if !s.configSnapshotIncludesGitignore {
+	if s.gitPolicy == nil {
 		// The target identity was frozen before entering this function. Bootstrap
 		// config evaluation now gets its own short-lived filesystem generation so
 		// owner selection, Git collection, and authored path bases cannot observe
@@ -175,13 +186,8 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 		catalog *rule.Catalog,
 	) (config.RslintConfig, config.ResolvedFileConfig, *config.PathSpaceSnapshot, bool) {
 		configDirectory = tspath.NormalizePath(configDirectory)
-		if !s.configSnapshotIncludesGitignore {
-			entries = config.ConfigWithGitignoreForExactTarget(
-				entries,
-				configDirectory,
-				evaluationFS,
-				lintFile.Identity(),
-			)
+		if s.gitPolicy == nil {
+			gitPolicy = config.CollectGitPolicy(entries, configDirectory, evaluationFS, []config.PathIdentity{lintFile.Identity()}, nil)
 			ownerIndex = nil
 			fileConfigResolver = nil
 		}
@@ -194,8 +200,11 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 		if _, ok := ownerIndex.PathSpaces().PhysicalDirectory(configDirectory); !ok {
 			return nil, config.ResolvedFileConfig{}, ownerIndex.PathSpaces(), false
 		}
+		if !gitPolicy.CoversDirectory(gitDirectory) {
+			return entries, config.ResolvedFileConfig{}, ownerIndex.PathSpaces(), false
+		}
 		if fileConfigResolver == nil {
-			if s.configSnapshotIncludesGitignore {
+			if s.gitPolicy != nil {
 				panic("committed config snapshot is missing its file config resolver")
 			}
 			var err error
@@ -205,6 +214,7 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 				evaluationFS,
 				ownerIndex.PathSpaces(),
 				catalog,
+				gitPolicy,
 			)
 			if err != nil {
 				panic(err)
@@ -230,6 +240,8 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 					entries:       entries,
 					resolved:      resolved,
 					pathSpaces:    pathSpaces,
+					gitPolicy:     gitPolicy,
+					unavailable:   !gitPolicy.CoversDirectory(gitDirectory),
 					ruleCatalog:   jsRuleCatalog,
 					directory:     configKey,
 					configKey:     configKey,
@@ -251,6 +263,8 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 					entries:       entries,
 					resolved:      resolved,
 					pathSpaces:    pathSpaces,
+					gitPolicy:     gitPolicy,
+					unavailable:   !gitPolicy.CoversDirectory(gitDirectory),
 					ruleCatalog:   jsRuleCatalog,
 					directory:     configKey,
 					configKey:     configKey,
@@ -273,6 +287,8 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 		entries:       entries,
 		resolved:      resolved,
 		pathSpaces:    pathSpaces,
+		gitPolicy:     gitPolicy,
+		unavailable:   !gitPolicy.CoversDirectory(gitDirectory),
 		ruleCatalog:   goRuleCatalog,
 		directory:     configDirectory,
 		configMissing: !ok,
@@ -292,11 +308,12 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 		config:           selection.entries,
 		resolvedConfig:   selection.resolved,
 		pathSpaces:       selection.pathSpaces,
+		gitPolicy:        selection.gitPolicy,
 		ruleCatalog:      selection.ruleCatalog,
 		configResolved:   !selection.configMissing,
 		configKey:        selection.configKey,
 		pluginGeneration: s.eslintPluginConfigGeneration,
-		unavailable:      selection.configKey != "" && unavailable,
+		unavailable:      selection.unavailable || selection.configKey != "" && unavailable,
 	}
 	if snapshot.configResolved {
 		snapshot = resolveDocumentLintSnapshotProjects(snapshot, s.fs)
@@ -319,13 +336,14 @@ func (s *Server) getLintConfigForURI(uri lsproto.DocumentUri) (config.RslintConf
 }
 
 func (s *Server) isUnavailableConfigForURI(uri lsproto.DocumentUri) bool {
-	target := lspTargetIdentity(uriToPath(uri), s.fs)
-	configKey, ok := s.jsConfigKeyForTarget(target)
-	if !ok {
-		return false
+	return s.documentLintSnapshot(uri).unavailable
+}
+
+func lspGitDirectory(identity config.PathIdentity) string {
+	if identity.CanonicalParentPath != "" {
+		return identity.CanonicalParentPath
 	}
-	_, unavailable := s.jsUnavailableConfigs[configKey]
-	return unavailable
+	return tspath.GetDirectoryPath(identity.Path)
 }
 
 // nearestJSConfigKey returns the nearest supplied JS/TS config directory for

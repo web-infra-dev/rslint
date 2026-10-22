@@ -11,53 +11,44 @@ import (
 type discoverySeed struct {
 	path               string
 	searchDir          string
+	physicalDirectory  string
 	canonicalSearchDir string
-	canonicalWalkDir   string
 	usingCanonical     bool
 	lexicalCandidate   bool
 	explicitFile       bool
 	ownerDir           string
 	ownerPath          string
-	gitignoreRoot      string
-	gitDirectory       string
 	gitCursor          gitignore.Cursor
-	gitActive          bool
 	done               bool
 }
+
 type directorySeedResolution struct {
-	seed            *discoverySeed
-	candidates      []configCandidate
-	next            int
-	gitDirectory    string
-	gitCursor       gitignore.Cursor
-	gitActive       bool
-	configReachable bool
+	seed             *discoverySeed
+	candidates       []configCandidate
+	next             int
+	currentDirectory string
+	gitRoot          string
 }
 
-// addCanonicalSeedFallback records one physical ancestry without replacing the
-// authored path. The fallback is intentionally dormant until the complete
-// lexical ancestry has produced no candidate at all.
+// addCanonicalSeedFallback preserves lexical config ancestry as the first
+// choice. Physical ancestry is searched only when no lexical candidate exists.
 func (coordinator *discoveryCoordinator) addCanonicalSeedFallback(seed *discoverySeed, canonicalPath string, isDirectory bool) {
 	if seed == nil || canonicalPath == "" {
 		return
 	}
-	canonicalPath = tspath.NormalizePath(canonicalPath)
-	canonicalDirectory := canonicalPath
+	canonicalDirectory := tspath.NormalizePath(canonicalPath)
 	if !isDirectory {
-		canonicalDirectory = tspath.GetDirectoryPath(canonicalPath)
+		canonicalDirectory = tspath.GetDirectoryPath(canonicalDirectory)
 	}
 	if canonicalDirectory == "" || canonicalDirectory == seed.searchDir {
 		return
 	}
-	seed.canonicalWalkDir = canonicalDirectory
 	seed.canonicalSearchDir = canonicalDirectory
 }
 
-// resolveDirectorySeedOwners evaluates each directory's complete config
-// ancestry from outermost to innermost. This ordering is what makes an
-// ancestor config's global ignore a discovery boundary for a nested config.
-// Only the final reachable successful owner is activated later; ancestors
-// loaded solely to decide reachability never leak into the effective catalog.
+// resolveDirectorySeedOwners evaluates authored config ancestry from outer to
+// inner. Git source state is target-scoped and never resets when the owner
+// changes. A supplied root retains its existing config-ownership exception.
 func (coordinator *discoveryCoordinator) resolveDirectorySeedOwners(seeds []*discoverySeed) error {
 	resolutions := make([]directorySeedResolution, 0, len(seeds))
 	for _, seed := range seeds {
@@ -67,9 +58,9 @@ func (coordinator *discoveryCoordinator) resolveDirectorySeedOwners(seeds []*dis
 			candidates = coordinator.findCandidateChain(seed.canonicalSearchDir)
 		}
 		resolutions = append(resolutions, directorySeedResolution{
-			seed:            seed,
-			candidates:      candidates,
-			configReachable: true,
+			seed:       seed,
+			candidates: candidates,
+			gitRoot:    coordinator.git.RootDirectory(seed.physicalDirectory),
 		})
 	}
 
@@ -78,54 +69,37 @@ func (coordinator *discoveryCoordinator) resolveDirectorySeedOwners(seeds []*dis
 			return err
 		}
 		var candidates []configCandidate
-		pending := make([]*directorySeedResolution, 0, len(resolutions))
+		var pending []*directorySeedResolution
 		for index := range resolutions {
 			resolution := &resolutions[index]
 			for resolution.next < len(resolution.candidates) {
 				candidateDirectory := resolution.candidates[resolution.next].directory
-				if resolution.gitActive {
-					rootDirectory := resolution.seed.searchDir
-					if resolution.seed.usingCanonical {
-						rootDirectory = resolution.seed.canonicalSearchDir
-					}
-					reachable, authoredBlocked := coordinator.advanceDirectorySeedGit(
-						resolution,
-						candidateDirectory,
-						discoveryPathsEqual(
-							candidateDirectory,
-							rootDirectory,
-							coordinator.fs.UseCaseSensitiveFileNames(),
-						),
-					)
-					if authoredBlocked {
-						resolution.gitActive = false
-						resolution.next = len(resolution.candidates)
-						break
-					}
-					if !reachable {
-						// Only the supplied root itself may reopen an inherited
-						// Git-inaccessible ancestry. Hidden intermediate configs are
-						// never evaluated.
-						resolution.next++
-						continue
-					}
+				rootDirectory := resolution.seed.searchDir
+				if resolution.seed.usingCanonical {
+					rootDirectory = resolution.seed.canonicalSearchDir
+				}
+				reachable, authoredBlocked := coordinator.advanceDirectorySeedGit(
+					resolution,
+					candidateDirectory,
+					discoveryPathsEqual(candidateDirectory, rootDirectory, coordinator.fs.UseCaseSensitiveFileNames()),
+				)
+				if authoredBlocked {
+					resolution.next = len(resolution.candidates)
+					break
+				}
+				if !reachable {
+					resolution.next++
+					continue
 				}
 				candidate, found := coordinator.findCandidateForOwner(
 					candidateDirectory,
 					resolution.seed.ownerPath,
-					candidateDirectory,
+					coordinator.physicalDirectory(candidateDirectory),
 				)
 				if !found {
-					// File-cover ignores keep the directory traversable for later
-					// negations, but a config candidate that remains ignored is not
-					// evaluated. Continue at the next candidate-bearing directory.
 					resolution.next++
 					continue
 				}
-				// The highest-priority on-disk candidate may be hidden by the
-				// current owner's authored ignore while a lower-priority filename
-				// remains reachable. Persist the actual request candidate so the
-				// post-batch ownership update reads the matching load state.
 				resolution.candidates[resolution.next] = candidate
 				candidates = append(candidates, candidate)
 				pending = append(pending, resolution)
@@ -139,18 +113,10 @@ func (coordinator *discoveryCoordinator) resolveDirectorySeedOwners(seeds []*dis
 			return err
 		}
 		for _, resolution := range pending {
-			candidate := resolution.candidates[resolution.next]
-			state := coordinator.modules.state(candidate.path)
+			state := coordinator.modules.state(resolution.candidates[resolution.next].path)
 			if state != nil && state.failure == nil {
 				resolution.seed.ownerDir = state.candidate.directory
 				resolution.seed.ownerPath = state.candidate.path
-				resolution.gitCursor = gitignore.NewCursor(
-					state.candidate.directory,
-					coordinator.fs.UseCaseSensitiveFileNames(),
-				)
-				resolution.gitDirectory = state.candidate.directory
-				resolution.gitActive = true
-				resolution.configReachable = true
 			}
 			resolution.next++
 		}
@@ -158,9 +124,6 @@ func (coordinator *discoveryCoordinator) resolveDirectorySeedOwners(seeds []*dis
 
 	for index := range resolutions {
 		resolution := &resolutions[index]
-		if !resolution.gitActive {
-			continue
-		}
 		rootDirectory := resolution.seed.searchDir
 		if resolution.seed.usingCanonical {
 			rootDirectory = resolution.seed.canonicalSearchDir
@@ -169,97 +132,50 @@ func (coordinator *discoveryCoordinator) resolveDirectorySeedOwners(seeds []*dis
 		if authoredBlocked {
 			continue
 		}
-		resolution.seed.gitDirectory = resolution.gitDirectory
-		resolution.seed.gitCursor = resolution.gitCursor
-		resolution.seed.gitActive = true
+		resolution.seed.gitCursor = coordinator.git.Ancestors(resolution.seed.physicalDirectory)
 	}
 	return nil
 }
 
-// advanceDirectorySeedGit advances one requested directory root through the
-// current owner's Git path space without reading the destination's local
-// .gitignore. A candidate in the destination is therefore evaluated first; a
-// successful candidate can reset ownership before that source is observed.
+// advanceDirectorySeedGit checks the requested ancestry before executing a
+// candidate. Git gates only the physical chain below the target's Git root;
+// config search may continue above that boundary or along another lexical
+// ancestry. Sources in an authored-pruned subtree are never observed here.
 func (coordinator *discoveryCoordinator) advanceDirectorySeedGit(
 	resolution *directorySeedResolution,
 	destination string,
 	reopenDestination bool,
 ) (reachable bool, authoredBlocked bool) {
-	if resolution == nil || !resolution.gitActive {
-		return true, false
-	}
 	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
 	destination = tspath.NormalizePath(destination)
-	if discoveryPathsEqual(resolution.gitDirectory, destination, useCaseSensitive) {
-		if reopenDestination {
-			resolution.configReachable = true
+	var reverse []string
+	for directory := destination; directory != ""; directory = configDiscoveryParent(directory) {
+		reverse = append(reverse, directory)
+		if resolution.currentDirectory == "" || discoveryPathsEqual(directory, resolution.currentDirectory, useCaseSensitive) {
+			break
 		}
-		return resolution.configReachable, false
 	}
-	relative, within := rslintconfig.RelativePathWithinConfigRoot(
-		destination,
-		resolution.gitDirectory,
-		useCaseSensitive,
-	)
-	if !within {
-		resolution.gitCursor, _ = resolution.gitCursor.Enter(destination)
-		resolution.gitDirectory = destination
-		resolution.configReachable = false
-		return false, false
-	}
-
-	current := resolution.gitDirectory
-	for _, component := range splitDiscoveryPath(relative) {
-		resolution.gitCursor = coordinator.git.observeSource(
-			resolution.seed.ownerDir,
-			current,
-			current,
-			resolution.gitCursor,
-		)
-
-		nextDirectory := tspath.CombinePaths(current, component)
-		nextCursor, gitBlocked := resolution.gitCursor.Enter(nextDirectory)
-		if nextCursor.SourceReachable() {
-			entries := coordinator.fs.GetAccessibleEntries(current)
-			parentRealPath := ""
-			if entries.Symlinks == nil {
-				parentRealPath = coordinator.fs.Realpath(current)
-			}
-			if isSymlinkDirectoryChild(
-				coordinator.fs,
-				current,
-				parentRealPath,
-				component,
-				entries,
-			) {
-				nextCursor = nextCursor.BlockSourceTraversal()
-			}
-		}
-		resolution.gitCursor = nextCursor
-		resolution.gitDirectory = nextDirectory
-
-		if coordinator.isGloballyIgnoredDirectory(
-			resolution.seed.ownerPath,
-			nextDirectory,
-			nextDirectory,
-		) {
-			resolution.configReachable = false
+	for index := len(reverse) - 1; index >= 0; index-- {
+		directory := reverse[index]
+		physical := coordinator.physicalDirectory(directory)
+		if coordinator.isGloballyIgnoredDirectory(resolution.seed.ownerPath, directory, physical) {
 			return false, true
 		}
-		if gitBlocked && !coordinator.reopensGitignoredDirectory(
-			resolution.seed.ownerPath,
-			nextDirectory,
-			nextDirectory,
-		) {
-			resolution.configReachable = false
+		reachable = true
+		_, belowGitRoot := rslintconfig.RelativePathWithinConfigRoot(physical, resolution.gitRoot, useCaseSensitive)
+		_, targetDescends := rslintconfig.RelativePathWithinConfigRoot(resolution.seed.physicalDirectory, physical, useCaseSensitive)
+		if belowGitRoot && targetDescends {
+			cursor := coordinator.git.Ancestors(physical)
+			if !cursor.SourceReachable() && !coordinator.reopensGitignoredDirectory(resolution.seed.ownerPath, directory, physical) {
+				reachable = false
+			}
 		}
-		if reopenDestination &&
-			discoveryPathsEqual(nextDirectory, destination, useCaseSensitive) {
-			resolution.configReachable = true
-		}
-		current = nextDirectory
+		resolution.currentDirectory = directory
 	}
-	return resolution.configReachable, false
+	if reopenDestination {
+		reachable = true
+	}
+	return reachable, false
 }
 
 // configDiscoveryParent returns the lexical filesystem parent without walking
@@ -373,20 +289,22 @@ func (coordinator *discoveryCoordinator) findCandidateForOwner(
 	ownerPath string,
 	canonicalDirectory string,
 ) (configCandidate, bool) {
+	if canonicalDirectory == "" {
+		canonicalDirectory = coordinator.physicalDirectory(directory)
+	}
 	for _, name := range AutoJSConfigFileNames {
 		candidatePath := tspath.CombinePaths(directory, name)
+		canonicalCandidate := tspath.CombinePaths(canonicalDirectory, name)
 		if isDefaultDiscoveryExcluded(candidatePath, coordinator.request.CWD, coordinator.fs.UseCaseSensitiveFileNames()) ||
-			!coordinator.fs.FileExists(candidatePath) {
+			!coordinator.fs.FileExists(canonicalCandidate) {
 			continue
 		}
-		canonicalCandidate := ""
-		if canonicalDirectory != "" {
-			canonicalCandidate = tspath.CombinePaths(canonicalDirectory, name)
-		}
-		if coordinator.isGloballyIgnoredCandidate(ownerPath, candidatePath, canonicalCandidate) {
+		if coordinator.isGloballyIgnoredCandidate(ownerPath, rslintconfig.PathIdentity{
+			Path: candidatePath, CanonicalPath: canonicalCandidate, CanonicalParentPath: canonicalDirectory,
+		}) {
 			continue
 		}
-		return configCandidate{path: tspath.NormalizePath(candidatePath), directory: directory}, true
+		return configCandidate{path: tspath.NormalizePath(candidatePath), directory: directory, physicalDirectory: canonicalDirectory}, true
 	}
 	return configCandidate{}, false
 }

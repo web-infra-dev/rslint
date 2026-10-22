@@ -82,12 +82,14 @@ func NewFileConfigResolverWithPathSpaces(
 	fsys vfs.FS,
 	pathSpaces *PathSpaceSnapshot,
 	catalog *rule.Catalog,
+	gitPolicy *GitPolicy,
 ) (*FileConfigResolver, error) {
 	matcher, err := NewTargetMatcherWithPathSpaces(
 		config,
 		configDirectory,
 		fsys,
 		pathSpaces,
+		gitPolicy,
 	)
 	if err != nil {
 		return nil, err

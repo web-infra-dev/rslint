@@ -46,6 +46,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 
 	// Create filesystem
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	programBaseFS := fs
 	var allowedFiles []string
 	seenAllowedFiles := make(map[string]struct{})
 
@@ -133,26 +134,71 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		)
 	}
 	if len(fileContents) > 0 {
-		addEquivalentFileContentPaths(fileContents, configDirectory, currentDirectory, fs)
+		addEquivalentFileContentPaths(fileContents, configDirectory, currentDirectory, fs, canonicalPaths)
 		fs = utils.NewOverlayVFS(fs, fileContents)
 	}
+	identityFS := fs
 	if len(canonicalPaths) > 0 {
 		fs = &canonicalPathVFS{FS: fs, canonicalPaths: canonicalPaths}
 	}
-	sourceFS := fs
-	// The Program context must wrap the fully composed request VFS so metadata
-	// snapshots observe overlay contents and canonical aliases exactly as the
-	// rest of this request does. A new context is created for every API call.
-	programSession := loader.NewSession(fs)
-	fs = programSession.FS()
-
 	var (
 		configMap              map[string]rslintconfig.RslintConfig
 		configTargetScopes     map[string]target.OwnerScope
 		catalogPlugins         []rslintconfig.EslintPluginEntry
 		pluginConfigKeyByOwner map[string]string
-		configGitignoreFrozen  bool
+		gitPolicy              *rslintconfig.GitPolicy
+		pathSpaces             *rslintconfig.PathSpaceSnapshot
 	)
+	var targetFiles []rslintconfig.PathIdentity
+	targetFileByPath := make(map[string]rslintconfig.PathIdentity, len(allowedFiles))
+	if allowedFiles != nil {
+		targetFiles = make([]rslintconfig.PathIdentity, 0, len(allowedFiles))
+		for _, path := range allowedFiles {
+			identity := rslintconfig.FreezeFileIdentity(path, identityFS)
+			if canonicalPath := canonicalPaths[rslintconfig.ExactPathID(path)]; canonicalPath != "" {
+				// The host's file hint is independent of the containing directory.
+				identity.CanonicalPath = canonicalPath
+			}
+			targetFiles = append(targetFiles, identity)
+			targetFileByPath[rslintconfig.ExactPathID(path)] = identity
+		}
+	}
+	var targetDirectories []rslintconfig.DirectoryIdentity
+	if req.FileScanDirectories != nil && len(req.FileScanDirectories) != len(req.Files) {
+		return nil, errors.New("fileScanDirectories must be parallel to files")
+	}
+	if req.ConfigDiscovery == nil && req.FileScanDirectories != nil {
+		// A resolved inline config uses the same bounded input walk without a
+		// module loader. Config location never supplies directory scan entries.
+		request := discovery.ExplicitConfigRequest{
+			CWD:                       currentDirectory,
+			Config:                    append(rslintconfig.RslintConfig{}, rslintConfig...),
+			ConfigDirectory:           configDirectory,
+			TargetFiles:               make([]discovery.DiscoveryFile, 0, len(req.Files)),
+			LimitDirectoryWalkToFiles: true,
+		}
+		scanDirectories := make(map[string]struct{})
+		for index, path := range req.Files {
+			directories := req.FileScanDirectories[index]
+			request.TargetFiles = append(request.TargetFiles, discovery.DiscoveryFile{
+				PathIdentity:    targetFileByPath[rslintconfig.ExactPathID(resolveRequestPath(path))],
+				Explicit:        directories == nil,
+				ScanDirectories: directories,
+			})
+			for _, directory := range directories {
+				directory = resolveRequestPath(directory)
+				if _, seen := scanDirectories[directory]; !seen {
+					scanDirectories[directory] = struct{}{}
+					request.TargetDirectories = append(request.TargetDirectories, rslintconfig.ResolveDirectoryIdentities([]string{directory}, fs)...)
+				}
+			}
+		}
+		catalog, err := discovery.LoadExplicitConfig(ctx, fs, nil, request)
+		if err != nil {
+			return nil, fmt.Errorf("resolve inline config inputs: %w", err)
+		}
+		gitPolicy, pathSpaces, targetFiles = catalog.GitPolicy, catalog.PathSpaces, catalog.TargetFiles
+	}
 	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
 			return nil, errors.New("configDiscovery requires a bidirectional API host")
@@ -172,28 +218,38 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 		discoveryRequest := discovery.ConfigDiscoveryRequest{
 			CWD:                       currentDirectory,
+			FallbackConfig:            rslintconfig.ConfigWithResolvedBasePaths(overrideConfig, currentDirectory),
 			Fresh:                     true,
 			LimitDirectoryWalkToFiles: len(configDiscovery.Directories) > 0,
-			ImplicitCWD:               len(req.Files) == 0 && len(configDiscovery.Directories) == 0,
+			ImplicitCWD:               allowedFiles == nil && len(configDiscovery.Directories) == 0,
 			SingleThreaded:            false,
 		}
-		for _, directory := range configDiscovery.Directories {
-			discoveryRequest.Directories = append(discoveryRequest.Directories, resolveRequestPath(directory))
+		if targetFiles != nil {
+			discoveryRequest.Files = make([]discovery.DiscoveryFile, 0, len(targetFiles))
 		}
-		for index, filePath := range req.Files {
+		for _, directory := range configDiscovery.Directories {
+			discoveryRequest.Directories = append(discoveryRequest.Directories, rslintconfig.ResolveDirectoryIdentities([]string{resolveRequestPath(directory)}, fs)...)
+		}
+		for index, path := range req.Files {
 			explicit := true
-			if len(configDiscovery.ExplicitFiles) > 0 {
+			var scanDirectories []string
+			if req.FileScanDirectories != nil {
+				scanDirectories = req.FileScanDirectories[index]
+				explicit = scanDirectories == nil
+			} else if len(configDiscovery.ExplicitFiles) > 0 {
 				explicit = configDiscovery.ExplicitFiles[index]
 			}
-			canonicalPath := ""
-			if len(req.CanonicalFiles) > 0 {
-				canonicalPath = resolveRequestPath(req.CanonicalFiles[index])
-			}
 			discoveryRequest.Files = append(discoveryRequest.Files, discovery.DiscoveryFile{
-				Path:          resolveRequestPath(filePath),
-				CanonicalPath: canonicalPath,
-				Explicit:      explicit,
+				PathIdentity:    targetFileByPath[rslintconfig.ExactPathID(resolveRequestPath(path))],
+				Explicit:        explicit,
+				ScanDirectories: scanDirectories,
 			})
+		}
+
+		if req.Files == nil {
+			for _, identity := range targetFiles {
+				discoveryRequest.Files = append(discoveryRequest.Files, discovery.DiscoveryFile{PathIdentity: identity, Explicit: true})
+			}
 		}
 
 		loader := &apiConfigModuleLoader{
@@ -203,26 +259,17 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		var configCatalog *discovery.ConfigCatalog
 		var err error
 		if configDiscovery.ExplicitConfigPath != "" {
-			var targetFiles []discovery.DiscoveryFile
-			if allowedFiles != nil {
-				targetFiles = make([]discovery.DiscoveryFile, 0, len(allowedFiles))
-				for _, filePath := range allowedFiles {
-					targetFiles = append(targetFiles, discovery.DiscoveryFile{
-						Path:          filePath,
-						CanonicalPath: canonicalPaths[rslintconfig.ExactPathID(filePath)],
-					})
-				}
-			}
 			configCatalog, err = discovery.LoadExplicitConfig(
 				ctx,
 				fs,
 				loader,
 				discovery.ExplicitConfigRequest{
-					CWD:               currentDirectory,
-					ConfigPath:        resolveRequestPath(configDiscovery.ExplicitConfigPath),
-					TargetFiles:       targetFiles,
-					TargetDirectories: append([]string(nil), discoveryRequest.Directories...),
-					Fresh:             true,
+					CWD:                       currentDirectory,
+					ConfigPath:                resolveRequestPath(configDiscovery.ExplicitConfigPath),
+					TargetFiles:               discoveryRequest.Files,
+					TargetDirectories:         discoveryRequest.Directories,
+					LimitDirectoryWalkToFiles: discoveryRequest.LimitDirectoryWalkToFiles,
+					Fresh:                     true,
 				},
 			)
 		} else {
@@ -230,6 +277,15 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 		if err != nil {
 			return nil, fmt.Errorf("discover config catalog: %w", err)
+		}
+		if failure := configCatalog.AllConfigsFailedError(); failure != nil {
+			return nil, fmt.Errorf("discover config catalog: %w", failure)
+		}
+		gitPolicy = configCatalog.GitPolicy
+		pathSpaces = configCatalog.PathSpaces
+		targetFiles = configCatalog.TargetFiles
+		if targetFiles == nil {
+			targetDirectories = configCatalog.TargetDirectories
 		}
 		if len(configCatalog.Failures) > 0 {
 			printConfigDiscoveryFailures(configCatalog.Failures)
@@ -252,7 +308,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				defaultRootDirectory = configDirectory
 				rslintConfig = append(rslintconfig.RslintConfig(nil), configCatalog.Configs[configDirectory]...)
 				pluginConfigKeyByOwner = map[string]string{configDirectory: configDirectory}
-				configGitignoreFrozen = true
 			} else {
 				configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
 				pluginConfigKeyByOwner = make(map[string]string, len(configCatalog.Configs))
@@ -279,15 +334,11 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		catalogPlugins = configCatalog.EslintPlugins
 	}
 
-	if configMap == nil && !configGitignoreFrozen {
-		rslintConfig = rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
-			rslintConfig,
-			configDirectory,
-			currentDirectory,
-			fs,
-			allowedFiles,
-			nil,
-		)
+	if gitPolicy == nil {
+		if targetFiles == nil {
+			targetDirectories = rslintconfig.ResolveDirectoryIdentities([]string{currentDirectory}, fs)
+		}
+		gitPolicy = rslintconfig.CollectGitPolicy(rslintConfig, configDirectory, fs, targetFiles, targetDirectories)
 	}
 	pluginEntries := append([]rslintconfig.EslintPluginEntry(nil), catalogPlugins...)
 	for _, plugin := range req.EslintPlugins {
@@ -328,6 +379,13 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// invocation-wide single-config paths.
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
+	if pathSpaces != nil {
+		configsForBases := configMap
+		if configsForBases == nil {
+			configsForBases = map[string]rslintconfig.RslintConfig{configDirectory: rslintConfig}
+		}
+		pathSpaces = pathSpaces.WithConfigBases(configsForBases, fs)
+	}
 	targetPlan, err := target.Resolve(target.Request{
 		ConfigMap:       configMap,
 		Config:          rslintConfig,
@@ -335,7 +393,10 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		ScanRoot:        currentDirectory,
 		OwnerScopes:     configTargetScopes,
 		FS:              fs,
-		Files:           allowedFiles,
+		Files:           targetFiles,
+		Directories:     targetDirectories,
+		GitPolicy:       gitPolicy,
+		PathSpaces:      pathSpaces,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("resolve lint targets: %w", err)
@@ -347,6 +408,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		DefaultRootDirectory: defaultRootDirectory,
 		Catalog:              ruleCatalog,
 		PathSpaces:           targetPlan.PathSpaces(),
+		GitPolicy:            targetPlan.GitPolicy(),
 		FS:                   fs,
 	})
 	projectPolicies, err := configResolver.ProjectPolicies(targetPlan.Files, false)
@@ -363,6 +425,20 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		Policies: projectPolicies,
 		Scope:    loader.Targeted,
 	}
+	// Keep exact request buffers above physical IO projection, including when
+	// callers supply different contents under two spellings of the same file.
+	// Discovery uses its composed view; Program caches see this final view.
+	sourceFS, err := loader.WithFrozenIO(programBaseFS, targetPlan.PathSpaces(), targetPlan.Files)
+	if err != nil {
+		return nil, err
+	}
+	if len(canonicalPaths) > 0 {
+		sourceFS = &canonicalPathVFS{FS: sourceFS, canonicalPaths: canonicalPaths}
+	}
+	if len(fileContents) > 0 {
+		sourceFS = utils.NewOverlayVFS(sourceFS, fileContents)
+	}
+	programSession := loader.NewSession(sourceFS)
 	// A plain API lint only needs type information when at least one target is
 	// selected. The stable target/config plan is reused while each source
 	// snapshot gets a fresh request-local Program generation.
@@ -443,7 +519,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			for _, file := range files {
 				overrides[tspath.NormalizePath(file.Path)] = file.Text
 			}
-			addEquivalentFileContentPaths(overrides, configDirectory, currentDirectory, sourceFS)
+			addEquivalentFileContentPaths(overrides, configDirectory, currentDirectory, sourceFS, canonicalPaths)
 			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides))
 			roundBinding, rebuildErr := buildBinding(roundSession)
 			if rebuildErr != nil {

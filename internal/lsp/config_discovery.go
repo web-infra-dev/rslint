@@ -307,6 +307,8 @@ type preparedLSPConfigSnapshot struct {
 	fallbackConfigDirectory  string
 	transactionID            string
 	usableLastGood           bool
+	gitPolicy                *config.GitPolicy
+	gitWatchDirectories      []string
 }
 
 // lspDiscoveredConfigSnapshot is commit-ready: its configuration state and
@@ -419,58 +421,52 @@ func (s *Server) refreshConfig(ctx context.Context) (configRefreshResponse, erro
 	snapshotFS := newConfigSnapshotFS(bundled.WrapFS(cachedvfs.From(s.fs)))
 	loader := &lspConfigModuleLoader{server: s}
 	cwd := tspath.NormalizePath(s.cwd)
+	directories := config.ResolveDirectoryIdentities([]string{cwd}, snapshotFS)
+	documentURIs := make([]string, 0, len(s.documents))
+	for uri := range s.documents {
+		if isLintableScriptFile(uri) {
+			documentURIs = append(documentURIs, string(uri))
+		}
+	}
+	sort.Strings(documentURIs)
+	gitFiles := make([]config.PathIdentity, 0, len(documentURIs))
+	for _, uri := range documentURIs {
+		gitFiles = append(gitFiles, config.FreezeFileIdentity(uriToPath(lsproto.DocumentUri(uri)), s.fs))
+	}
+	gitWatchDirectories := gitPolicyWatchDirectories(directories, gitFiles)
+	if err := s.updateGitPolicyWatchers(ctx, directories, gitWatchDirectories); err != nil {
+		return configRefreshResponse{}, err
+	}
 	var configCatalog *discovery.ConfigCatalog
 	var err error
 	if s.configRefreshConfigPath == "" {
 		configCatalog, err = discovery.DiscoverAutomatic(ctx, snapshotFS, loader, discovery.ConfigDiscoveryRequest{
-			CWD:         cwd,
-			ImplicitCWD: true,
-			Fresh:       true,
+			CWD:                cwd,
+			ImplicitCWD:        true,
+			Directories:        directories,
+			AdditionalGitFiles: gitFiles,
+			Fresh:              true,
 		})
 	} else {
 		configCatalog, err = discovery.LoadExplicitConfig(ctx, snapshotFS, loader, discovery.ExplicitConfigRequest{
-			CWD:        cwd,
-			ConfigPath: s.configRefreshConfigPath,
-			Fresh:      true,
+			CWD:                cwd,
+			ConfigPath:         s.configRefreshConfigPath,
+			TargetDirectories:  directories,
+			AdditionalGitFiles: gitFiles,
+			Fresh:              true,
 		})
 	}
-	recoveredUnavailable := false
-	var unavailableCause error
 	if err != nil {
-		if !errors.Is(err, discovery.ErrAllConfigsFailed) || s.configDiscoveryHasLastGood {
-			return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, loader.transactionID, err)
-		}
-		// A broken config on first startup must not tear down the language
-		// client, and the workspace fallback must not lint through that broken
-		// boundary. Commit a real empty Node generation plus unavailable Go
-		// ownership boundaries. This is intentionally not "last-good": a later
-		// refresh may replace it with another recovery snapshot until one full
-		// usable catalog has committed.
-		unavailableCause = err
-		var allFailed *discovery.AllConfigsFailedError
-		if !errors.As(err, &allFailed) || len(allFailed.Failures) == 0 || loader.transactionID == "" {
-			return configRefreshResponse{}, s.abortFailedConfigRefresh(
-				ctx,
-				loader,
-				loader.transactionID,
-				errors.Join(unavailableCause, errors.New("all-config-failed recovery has no typed failure catalog")),
-			)
-		}
-		configCatalog = &discovery.ConfigCatalog{
-			TransactionID:      loader.transactionID,
-			Configs:            make(map[string]config.RslintConfig),
-			EffectiveConfigIDs: []string{},
-			Failures:           append([]discovery.ConfigFailure(nil), allFailed.Failures...),
-			Explicit:           s.configRefreshConfigPath != "",
-		}
-		recoveredUnavailable = true
-	} else if s.configDiscoveryHasLastGood {
+		return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, loader.transactionID, err)
+	}
+	unavailableCause := configCatalog.AllConfigsFailedError()
+	recoveredUnavailable := unavailableCause != nil
+	if recoveredUnavailable && s.configDiscoveryHasLastGood {
+		return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, configCatalog.TransactionID, unavailableCause)
+	}
+	if !recoveredUnavailable && s.configDiscoveryHasLastGood {
 		if failure, invalidates := s.failureAtCommittedConfigBoundary(snapshotFS, configCatalog); invalidates {
-			err = fmt.Errorf(
-				"config refresh failed at last-good boundary %q: %s",
-				failure.Directory,
-				failure.Message,
-			)
+			err = fmt.Errorf("config refresh failed at last-good boundary %q: %s", failure.Directory, failure.Message)
 			return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, configCatalog.TransactionID, err)
 		}
 	}
@@ -487,7 +483,8 @@ func (s *Server) refreshConfig(ctx context.Context) (configRefreshResponse, erro
 			errors.Join(unavailableCause, errors.New("all-config-failed recovery has no valid failure boundary")),
 		)
 	}
-	// The candidate already contains materialized .gitignore patterns. A later
+	preparedSnapshot.gitWatchDirectories = gitWatchDirectories
+	// The candidate already contains an immutable Git policy. A later
 	// filesystem mutation belongs to the next transaction and cannot alter this
 	// catalog while Node activation and commit complete.
 	if err := loader.ensureActivated(ctx, configCatalog); err != nil {
@@ -596,6 +593,9 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 	if configCatalog == nil {
 		return nil, errors.New("cannot prepare a nil config catalog")
 	}
+	if configCatalog.GitPolicy == nil {
+		return nil, errors.New("config catalog is missing its Git policy")
+	}
 	ruleCatalog := rules.All()
 	snapshot := &preparedLSPConfigSnapshot{
 		configs:            make(map[string]config.RslintConfig, len(configCatalog.Configs)),
@@ -606,6 +606,11 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		// config appears later, it must establish an unavailable boundary rather
 		// than exposing the workspace fallback beneath that new boundary.
 		usableLastGood: len(configCatalog.Configs) > 0,
+		gitPolicy:      configCatalog.GitPolicy,
+	}
+	pathSpaces := configCatalog.PathSpaces
+	if pathSpaces == nil {
+		pathSpaces = config.NewPathSpaceSnapshot(configCatalog.Configs, fsys)
 	}
 	seenConfigDirs := make(map[string]string, len(configCatalog.Configs))
 	for _, configDir := range configCatalog.ConfigDirectories() {
@@ -618,7 +623,8 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 			return nil, err
 		}
 		entries = normalizedEntries
-		configID := lspFilesystemPathID(configDir, fsys)
+		physical, _ := pathSpaces.PhysicalDirectory(configDir)
+		configID := lspLexicalPathID(physical, fsys == nil || fsys.UseCaseSensitiveFileNames())
 		if previous, exists := seenConfigDirs[configID]; exists {
 			return nil, fmt.Errorf(
 				"discovered config contains duplicate directories %q and %q",
@@ -646,38 +652,29 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 	// Build the owner index only after all successful and unavailable
 	// boundaries are present. Config values remain owned by this LSP snapshot;
 	// the target package retains only routing and frozen path-space state.
-	// Successful automatic catalog entries already contain the Git sources read
-	// by their discovery generation; unavailable boundaries intentionally remain
-	// empty and only stop workspace fallback ownership.
-	snapshot.ownerIndex = target.NewOwnerIndex(snapshot.configs, fsys)
+	// Authored entries and unavailable boundaries remain separate from the Git
+	// policy frozen by the same discovery generation.
+	pathSpaces = pathSpaces.WithConfigBases(snapshot.configs, fsys)
+	ownerIndex, err := target.NewOwnerIndexWithPathSpaces(snapshot.configs, fsys, pathSpaces)
+	if err != nil {
+		return nil, err
+	}
+	snapshot.ownerIndex = ownerIndex
 	if configCatalog.Explicit {
 		// An explicit config is invocation-wide and owns every editor target, so
 		// no workspace fallback participates in this mode.
 		return snapshot, nil
 	}
 
-	// The empty workspace fallback owns only portions of the workspace not
-	// handed to a discovered or unavailable config boundary. Include a synthetic
-	// cwd owner solely to calculate its direct source boundaries; discovered
-	// config ownership remains unchanged.
-	fallbackBoundaryConfigs := make(map[string]config.RslintConfig, len(snapshot.configs)+1)
-	for configDir, entries := range snapshot.configs {
-		fallbackBoundaryConfigs[configDir] = entries
-	}
+	// Fallback has no authored rules. The catalog's Git policy applies equally
+	// to discovered configs and to documents without a config owner.
 	fallbackCWD := tspath.NormalizePath(s.cwd)
-	fallbackBoundaryConfigs[fallbackCWD] = config.RslintConfig{}
-	fallbackBoundaryResolver := target.NewOwnerIndex(fallbackBoundaryConfigs, fsys)
-	snapshot.fallbackConfig = config.ConfigWithGitignoreWithBoundaries(
-		config.RslintConfig{},
-		fallbackCWD,
-		fsys,
-		nil,
-		fallbackBoundaryResolver.ChildOwnerDirectories(fallbackCWD),
-	)
-	snapshot.fallbackConfigOwnerIndex = target.NewOwnerIndex(
-		map[string]config.RslintConfig{fallbackCWD: snapshot.fallbackConfig},
-		fsys,
-	)
+	snapshot.fallbackConfig = config.RslintConfig{}
+	fallbackConfigs := map[string]config.RslintConfig{fallbackCWD: snapshot.fallbackConfig}
+	snapshot.fallbackConfigOwnerIndex, err = target.NewOwnerIndexWithPathSpaces(fallbackConfigs, fsys, pathSpaces.WithConfigBases(fallbackConfigs, fsys))
+	if err != nil {
+		return nil, err
+	}
 	snapshot.fallbackConfigDirectory = fallbackCWD
 	return snapshot, nil
 }
@@ -699,6 +696,7 @@ func completeDiscoveredConfigSnapshot(
 			fsys,
 			prepared.ownerIndex.PathSpaces(),
 			ruleCatalog,
+			prepared.gitPolicy,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("prepare file config resolver for %q: %w", configDirectory, err)
@@ -715,6 +713,7 @@ func completeDiscoveredConfigSnapshot(
 			fsys,
 			prepared.fallbackConfigOwnerIndex.PathSpaces(),
 			rules.All(),
+			prepared.gitPolicy,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("prepare workspace fallback resolver for %q: %w", fallbackCWD, err)
@@ -825,7 +824,9 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	s.eslintPluginConfigGeneration = snapshot.transactionID
 	s.ruleCatalog = snapshot.ruleCatalog
 	s.configDiscoveryHasLastGood = snapshot.usableLastGood
-	s.configSnapshotIncludesGitignore = true
+	s.gitPolicy = snapshot.gitPolicy
+	s.failedGitPolicyDirectories = nil
+	s.committedGitWatchDirectories = snapshot.gitWatchDirectories
 	for _, ruleName := range snapshot.shadowedPluginRules {
 		fmt.Fprintf(
 			os.Stderr,

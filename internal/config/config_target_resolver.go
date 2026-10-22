@@ -19,6 +19,7 @@ type configTargetResolver struct {
 	bases              []configTargetBase
 	entries            []configTargetEntry
 	globalEntryIndexes []int
+	gitPolicy          *GitPolicy
 	directoryBlocks    publishOnceCache[configTargetIdentity, bool]
 }
 
@@ -32,7 +33,6 @@ type configTargetEntry struct {
 	baseIndex            int
 	configArrayBaseIndex int
 	fileIgnores          fileIgnoreMatcher
-	gitScopes            []collectedGitignoreScope
 	ignorePatternGroups  []ignorePatternCoordinateGroup
 }
 
@@ -184,13 +184,12 @@ func (resolver *configTargetResolver) targetContainsBase(
 	return false
 }
 
-// configTargetIdentity is the immutable caller-visible/canonical pair for one
-// target decision. Entry matching may project this pair into several authored
-// config bases, but root-scoped matchers such as collected .gitignore rules
-// must always derive their coordinates from this original identity.
+// configTargetIdentity keeps authored matching identity separate from the
+// physical directory entry used by Git policy.
 type configTargetIdentity struct {
 	path               string
 	canonicalMatchPath string
+	gitPath            string
 }
 
 type configTargetDecision struct {
@@ -201,7 +200,7 @@ type configTargetDecision struct {
 }
 
 func newConfigTargetResolver(config RslintConfig, defaultDirectory string, fsys vfs.FS) *configTargetResolver {
-	return newConfigTargetResolverWithBases(config, defaultDirectory, fsys, nil)
+	return newConfigTargetResolverWithBases(config, defaultDirectory, fsys, nil, nil)
 }
 
 func newConfigTargetResolverWithBases(
@@ -209,9 +208,11 @@ func newConfigTargetResolverWithBases(
 	defaultDirectory string,
 	fsys vfs.FS,
 	frozenBases map[string]configTargetBase,
+	gitPolicy *GitPolicy,
 ) *configTargetResolver {
 	resolver := &configTargetResolver{
 		config:           config,
+		gitPolicy:        gitPolicy,
 		fs:               fsys,
 		useCaseSensitive: fsys == nil || fsys.UseCaseSensitiveFileNames(),
 		entries:          make([]configTargetEntry, len(config)),
@@ -244,9 +245,6 @@ func newConfigTargetResolverWithBases(
 			baseIndex:            baseIndex,
 			configArrayBaseIndex: configArrayBaseIndex,
 		}
-		if entry.collectedGitignore != nil {
-			resolver.entries[index].gitScopes = entry.collectedGitignore.scopes
-		}
 		if isGlobalIgnoreEntry(entry) {
 			resolver.entries[index].ignorePatternGroups = buildIgnorePatternCoordinateGroups(patterns)
 			resolver.globalEntryIndexes = append(resolver.globalEntryIndexes, index)
@@ -273,9 +271,6 @@ func freezeConfigTargetBase(directory string, fsys vfs.FS) configTargetBase {
 }
 
 func configEntryIgnorePatterns(entry ConfigEntry) []IgnorePattern {
-	if entry.collectedGitignore != nil {
-		return entry.collectedGitignore.ignores
-	}
 	return ParseIgnorePatterns(entry.Ignores)
 }
 
@@ -300,18 +295,7 @@ func patternsShareTargetCoordinate(left IgnorePattern, right IgnorePattern) bool
 	if left.GitPattern != right.GitPattern || left.CaseInsensitive != right.CaseInsensitive {
 		return false
 	}
-	leftScoped := patternHasMatchDirectory(left)
-	rightScoped := patternHasMatchDirectory(right)
-	if leftScoped != rightScoped {
-		return false
-	}
-	if !leftScoped {
-		return true
-	}
-	return left.gitScope == right.gitScope &&
-		left.MatchDirectory == right.MatchDirectory &&
-		left.PhysicalMatchDirectory == right.PhysicalMatchDirectory &&
-		left.LexicalMatchDirectory == right.LexicalMatchDirectory
+	return true
 }
 
 func (resolver *configTargetResolver) resolve(path string, canonicalPath string) configTargetDecision {
@@ -324,6 +308,10 @@ func (resolver *configTargetResolver) resolve(path string, canonicalPath string)
 func (resolver *configTargetResolver) resolveTarget(
 	discovered PathIdentity,
 ) configTargetDecision {
+	return resolver.resolveTargetWithGitEntryBlock(discovered, false)
+}
+
+func (resolver *configTargetResolver) resolveTargetWithGitEntryBlock(discovered PathIdentity, gitEntryBlocked bool) configTargetDecision {
 	target, matches := resolver.resolvePathSpacesWithCanonicalParent(
 		discovered.Path,
 		discovered.CanonicalPath,
@@ -332,7 +320,7 @@ func (resolver *configTargetResolver) resolveTarget(
 	)
 
 	decision := configTargetDecision{selected: isDefaultLintFile(target.path)}
-	decision.globallyIgnored = resolver.globallyIgnores(target, matches)
+	decision.globallyIgnored = resolver.globallyIgnores(target, matches, gitEntryBlocked)
 	if decision.globallyIgnored {
 		return decision
 	}
@@ -437,7 +425,14 @@ func (resolver *configTargetResolver) resolvePathSpacesWithCanonicalParent(
 			canonicalMatchPath = ""
 		}
 	}
+	gitPath := canonicalPath
+	if !directory {
+		gitPath = GitPath(PathIdentity{Path: path, CanonicalParentPath: canonicalParentPath})
+	} else if gitPath == "" {
+		gitPath = path
+	}
 	target := configTargetIdentity{
+		gitPath:            gitPath,
 		path:               path,
 		canonicalMatchPath: canonicalMatchPath,
 	}
@@ -469,11 +464,8 @@ func (resolver *configTargetResolver) filesystemFreeCaseInsensitivePath(director
 		(len(directory) >= 2 && directory[1] == ':'))
 }
 
-// needsCanonicalPath reports whether lexical containment alone cannot resolve
-// every authored config base and collected Git scope. Directory walks normally
-// stay inside both, so they avoid a redundant filesystem Realpath per node;
-// aliases, native-casing fallbacks, external configs, and independent Git
-// scopes still request the canonical identity before the shared decision.
+// needsCanonicalPath reports whether lexical containment can resolve every
+// authored base. Git matching always uses the input's frozen parent identity.
 func (resolver *configTargetResolver) needsCanonicalPath(path string) bool {
 	for _, base := range resolver.bases {
 		if isPathWithinNormalizedRoot(path, base.directory) {
@@ -483,59 +475,16 @@ func (resolver *configTargetResolver) needsCanonicalPath(path string) bool {
 			return true
 		}
 	}
-	for _, entry := range resolver.entries {
-		if len(entry.gitScopes) == 0 {
-			continue
-		}
-		withinLexicalScope := false
-		for _, scope := range entry.gitScopes {
-			if (!scope.caseInsensitive && isPathWithinNormalizedRoot(path, scope.lexicalDirectory)) ||
-				(scope.caseInsensitive && isPathWithinRootCaseInsensitive(path, scope.lexicalDirectory)) {
-				withinLexicalScope = true
-				break
-			}
-		}
-		if !withinLexicalScope {
-			return true
-		}
-	}
+
 	return false
-}
-
-func isPathWithinRootCaseInsensitive(path string, root string) bool {
-	_, within := RelativePathWithinConfigRoot(path, root, false)
-	return within
-}
-
-// selectGitScope chooses exactly one collection scope for a target. Lexical
-// containment is authoritative. Canonical-to-physical containment is only a
-// fallback for targets that have no lexical scope, and uses the same stable
-// scope order produced by collection planning. A projected config-owner path
-// never participates in authority selection.
-func (entry configTargetEntry) selectGitScope(target configTargetIdentity) uint32 {
-	for index, scope := range entry.gitScopes {
-		if (!scope.caseInsensitive && isPathWithinNormalizedRoot(target.path, scope.lexicalDirectory)) ||
-			(scope.caseInsensitive && isPathWithinRootCaseInsensitive(target.path, scope.lexicalDirectory)) {
-			return uint32(index + 1)
-		}
-	}
-	if target.canonicalMatchPath == "" {
-		return 0
-	}
-	for index, scope := range entry.gitScopes {
-		if (!scope.caseInsensitive && isPathWithinNormalizedRoot(target.canonicalMatchPath, scope.physicalDirectory)) ||
-			(scope.caseInsensitive && isPathWithinRootCaseInsensitive(target.canonicalMatchPath, scope.physicalDirectory)) {
-			return uint32(index + 1)
-		}
-	}
-	return 0
 }
 
 func (resolver *configTargetResolver) globallyIgnores(
 	target configTargetIdentity,
 	matches []configTargetMatch,
+	gitEntryBlocked bool,
 ) bool {
-	ignored := false
+	ignored := gitEntryBlocked || resolver.gitPolicy.ignored(target.gitPath)
 	if resolver.hasAbsoluteDirectoryBlock(target, matches, true) {
 		return true
 	}
@@ -545,66 +494,26 @@ func (resolver *configTargetResolver) globallyIgnores(
 		if entry.configArrayBaseIndex >= 0 && !resolver.entryAppliesTo(entry, matches, true) {
 			continue
 		}
-		ignored = target.applyIgnorePatternGroups(
-			match,
+		ignored = match.applyIgnorePatternGroups(
 			entry.ignorePatternGroups,
-			entry.selectGitScope(target),
 			ignored,
 		)
 	}
 	return ignored
 }
 
-func (target configTargetIdentity) applyIgnorePatternGroups(
-	match *configTargetMatch,
+func (match *configTargetMatch) applyIgnorePatternGroups(
 	groups []ignorePatternCoordinateGroup,
-	selectedGitScope uint32,
 	ignored bool,
 ) bool {
 	for _, group := range groups {
 		patterns := group.patterns
-		var normalizedPath, unixPath string
-		var ok bool
-		if patternHasMatchDirectory(patterns[0]) {
-			if patterns[0].gitScope != 0 && patterns[0].gitScope != selectedGitScope {
-				continue
-			}
-			normalizedPath, unixPath, ok = target.pathsForPatternGroup(match, patterns)
-		} else {
-			normalizedPath, unixPath, ok = match.matcher.pathsForPatternGroup(patterns)
-		}
+		normalizedPath, unixPath, ok := match.matcher.pathsForPatternGroup(patterns)
 		if ok {
 			ignored = applyIgnorePatternGroup(patterns, normalizedPath, unixPath, ignored)
 		}
 	}
 	return ignored
-}
-
-func (target configTargetIdentity) pathsForPatternGroup(
-	match *configTargetMatch,
-	patterns []IgnorePattern,
-) (string, string, bool) {
-	pattern := patterns[0]
-	lexicalRoot := pattern.LexicalMatchDirectory
-	if lexicalRoot == "" {
-		lexicalRoot = pattern.MatchDirectory
-	}
-	if target.path == match.path && lexicalRoot == match.directory {
-		normalizedPath, unixPath := match.matcher.normalizedPaths()
-		if pathEscapesCwd(unixPath) && hasCaseInsensitivePattern(patterns) {
-			normalizedPath = normalizePathWithCaseSensitivity(match.path, match.directory, false)
-			unixPath = strings.ReplaceAll(normalizedPath, "\\", "/")
-		}
-		if !pathEscapesCwd(unixPath) {
-			return normalizedPath, unixPath, true
-		}
-	}
-	return pathsForGitPatternGroup(
-		target.path,
-		target.canonicalMatchPath,
-		match.path,
-		patterns,
-	)
 }
 
 func (resolver *configTargetResolver) blocksDirectory(path string, canonicalPath string) bool {
@@ -619,25 +528,24 @@ func (resolver *configTargetResolver) hasAbsoluteDirectoryBlock(
 ) bool {
 	if fileTarget {
 		target.path = tspath.GetDirectoryPath(target.path)
+		target.gitPath = ""
 		if target.canonicalMatchPath != "" {
 			target.canonicalMatchPath = tspath.GetDirectoryPath(target.canonicalMatchPath)
 		}
 		return resolver.directoryBlocks.getOrInit(target, func() bool {
-			return resolver.hasAbsoluteDirectoryBlockForDirectory(target, matches, true)
+			return resolver.hasAbsoluteDirectoryBlockForDirectory(matches, true)
 		})
 	}
-	return resolver.hasAbsoluteDirectoryBlockForDirectory(target, matches, false)
+	return resolver.hasAbsoluteDirectoryBlockForDirectory(matches, false)
 }
 
 func (resolver *configTargetResolver) hasAbsoluteDirectoryBlockForDirectory(
-	target configTargetIdentity,
 	matches []configTargetMatch,
 	fileTarget bool,
 ) bool {
 	for _, entryIndex := range resolver.globalEntryIndexes {
 		entry := resolver.entries[entryIndex]
 		match := &matches[entry.baseIndex]
-		selectedGitScope := entry.selectGitScope(target)
 		directoryMatch := match
 		if fileTarget {
 			path := tspath.GetDirectoryPath(match.path)
@@ -660,10 +568,8 @@ func (resolver *configTargetResolver) hasAbsoluteDirectoryBlockForDirectory(
 		}
 		for _, group := range entry.ignorePatternGroups {
 			relative, ok := targetPathForPatternGroup(
-				target,
 				directoryMatch,
 				group.patterns,
-				selectedGitScope,
 			)
 			if !ok {
 				continue
@@ -693,9 +599,15 @@ func (resolver *configTargetResolver) hasAbsoluteDirectoryBlockForDirectory(
 // below path. Unlike the final file decision, pruning must stay conservative:
 // one reachable negation in any authored path space keeps the subtree open.
 func (resolver *configTargetResolver) canPruneDirectory(path string, canonicalPath string) bool {
+	return resolver.canPruneDirectoryWithEntry(path, canonicalPath, false)
+}
+
+func (resolver *configTargetResolver) canPruneDirectoryWithEntry(path string, canonicalPath string, entering bool) bool {
 	target, matches := resolver.resolvePathSpaces(path, canonicalPath, true)
-	negationCanReach := false
-	fileLevelCovered := false
+	fileLevelCovered, negationCanReach := resolver.gitPolicy.directoryCoverage(target.gitPath)
+	if entering && resolver.gitPolicy.blocksDirectoryEntry(target.gitPath) {
+		fileLevelCovered, negationCanReach = true, false
+	}
 	for _, entryIndex := range resolver.globalEntryIndexes {
 		entry := resolver.entries[entryIndex]
 		match := &matches[entry.baseIndex]
@@ -714,13 +626,14 @@ func (resolver *configTargetResolver) canPruneDirectory(path string, canonicalPa
 				continue
 			}
 		}
-		selectedGitScope := entry.selectGitScope(target)
+		_, atBase := resolver.configTargetMatchWithinBase(match)
 		for _, group := range entry.ignorePatternGroups {
+			if atBase && len(group.negationReach.prefixes) > 0 {
+				negationCanReach = true
+			}
 			relative, ok := targetPathForPatternGroup(
-				target,
 				match,
 				group.patterns,
-				selectedGitScope,
 			)
 			if !ok {
 				continue
@@ -762,35 +675,20 @@ func (resolver *configTargetResolver) canPruneDirectory(path string, canonicalPa
 }
 
 func targetPathForPatternGroup(
-	target configTargetIdentity,
 	match *configTargetMatch,
 	patterns []IgnorePattern,
-	selectedGitScope uint32,
 ) (string, bool) {
-	pattern := patterns[0]
-	if !patternHasMatchDirectory(pattern) {
-		_, relative := match.matcher.normalizedPaths()
-		relative = strings.TrimSuffix(relative, "/")
-		if pathEscapesCwd(relative) && hasCaseInsensitivePattern(patterns) {
-			relative = normalizePathWithCaseSensitivity(match.path, match.directory, false)
-			relative = strings.TrimSuffix(strings.ReplaceAll(relative, "\\", "/"), "/")
-		}
-		return relative, relative != "" && relative != "."
-	}
-	if pattern.gitScope != 0 && pattern.gitScope != selectedGitScope {
-		return "", false
-	}
-
-	_, relative, ok := target.pathsForPatternGroup(match, patterns)
-	if !ok {
-		return "", false
-	}
+	_, relative := match.matcher.normalizedPaths()
 	relative = strings.TrimSuffix(relative, "/")
+	if pathEscapesCwd(relative) && hasCaseInsensitivePattern(patterns) {
+		relative = normalizePathWithCaseSensitivity(match.path, match.directory, false)
+		relative = strings.TrimSuffix(strings.ReplaceAll(relative, "\\", "/"), "/")
+	}
 	return relative, relative != "" && relative != "."
 }
 
 func (resolver *configTargetResolver) reopensDirectory(path string, canonicalPath string) bool {
-	target, matches := resolver.resolvePathSpaces(path, canonicalPath, true)
+	_, matches := resolver.resolvePathSpaces(path, canonicalPath, true)
 	reopened := false
 	for _, entryIndex := range resolver.globalEntryIndexes {
 		entry := resolver.entries[entryIndex]
@@ -798,13 +696,10 @@ func (resolver *configTargetResolver) reopensDirectory(path string, canonicalPat
 		if entry.configArrayBaseIndex >= 0 && !resolver.entryAppliesTo(entry, matches, true) {
 			continue
 		}
-		selectedGitScope := entry.selectGitScope(target)
 		for _, group := range entry.ignorePatternGroups {
 			relativePath, ok := targetPathForPatternGroup(
-				target,
 				match,
 				group.patterns,
-				selectedGitScope,
 			)
 			if !ok {
 				continue

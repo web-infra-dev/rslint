@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/jsonrpc"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/project"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
@@ -20,6 +21,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/config/target"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type configRefreshTestResult struct {
@@ -294,9 +297,8 @@ func installLastGoodConfig(s *Server, root string) {
 			"last-good/check": "error",
 		},
 	}}
-	s.jsConfigs = map[string]config.RslintConfig{root: entries}
-	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
-	s.jsUnavailableConfigs = make(map[string]struct{})
+	s.gitPolicy = config.CollectGitPolicy(entries, root, s.fs, nil, config.ResolveDirectoryIdentities([]string{root}, s.fs))
+	installJSConfigsForTest(s, map[string]config.RslintConfig{root: entries})
 	s.eslintPluginConfigGeneration = "last-good"
 	s.ruleCatalog, _ = deriveLSPRuleCatalog(s.currentRuleCatalog(), []config.EslintPluginEntry{{
 		Prefix:    "last-good",
@@ -477,8 +479,9 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	if completed := awaitConfigRefreshResult(t, initial); completed.err != nil {
 		t.Fatalf("explicit initial refresh failed: %v", completed.err)
 	}
-	if len(loadRequest.Candidates) != 1 || loadRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
-		t.Fatalf("explicit candidates = %+v, want only %q", loadRequest.Candidates, configPath)
+	wantModulePath := tspath.NormalizePath(osvfs.FS().Realpath(configPath))
+	if len(loadRequest.Candidates) != 1 || loadRequest.Candidates[0].ConfigPath != wantModulePath {
+		t.Fatalf("explicit candidates = %+v, want only %q", loadRequest.Candidates, wantModulePath)
 	}
 	configDir := tspath.NormalizePath(externalRoot)
 	if loadRequest.Candidates[0].ConfigDirectory != configDir {
@@ -506,7 +509,7 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	if completed := awaitConfigRefreshResult(t, reload); completed.err != nil {
 		t.Fatalf("same-path refresh failed: %v", completed.err)
 	}
-	if len(reloadRequest.Candidates) != 1 || reloadRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+	if len(reloadRequest.Candidates) != 1 || reloadRequest.Candidates[0].ConfigPath != wantModulePath {
 		t.Fatalf("same-path candidates = %+v", reloadRequest.Candidates)
 	}
 
@@ -529,7 +532,7 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	if err := <-watchResult; err != nil {
 		t.Fatalf("explicit .gitignore refresh failed: %v", err)
 	}
-	if len(watchRequest.Candidates) != 1 || watchRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+	if len(watchRequest.Candidates) != 1 || watchRequest.Candidates[0].ConfigPath != wantModulePath {
 		t.Fatalf("explicit watcher candidates = %+v", watchRequest.Candidates)
 	}
 
@@ -598,69 +601,57 @@ func TestHandleConfigRefreshKeepsExplicitPathAfterInitialLoadFailure(t *testing.
 	}
 }
 
-func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *testing.T) {
+func TestPrepareDiscoveredConfigSnapshotSharesGitPolicyAcrossOwners(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
-	child := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
-	rootTarget := tspath.NormalizePath(filepath.Join(root, "root.ts"))
-	childTarget := tspath.NormalizePath(filepath.Join(child, "source.ts"))
+	child := tspath.ResolvePath(root, "packages/app")
 	if err := os.MkdirAll(child, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for filePath := range map[string]struct{}{rootTarget: {}, childTarget: {}} {
-		if err := os.WriteFile(filePath, []byte("debugger;\n"), 0o644); err != nil {
+	for path, content := range map[string]string{
+		tspath.ResolvePath(root, ".gitignore"):  "ignored.ts\n",
+		tspath.ResolvePath(root, "ignored.ts"):  "debugger;\n",
+		tspath.ResolvePath(child, "ignored.ts"): "debugger;\n",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte("root.ts\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(child, ".gitignore"), []byte("source.ts\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
 	fsys := bundled.WrapFS(osvfs.FS())
+	policy := config.CollectGitPolicy(nil, root, fsys, nil, config.ResolveDirectoryIdentities([]string{root}, fsys))
 	catalog := &discovery.ConfigCatalog{
 		TransactionID: "snapshot-boundaries",
+		GitPolicy:     policy,
 		Configs: map[string]config.RslintConfig{
-			root: config.ConfigWithGitignoreWithBoundaries(
-				config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}},
-				root,
-				fsys,
-				nil,
-				[]string{child},
-			),
-			child: config.ConfigWithGitignore(
-				config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
-				child,
-				fsys,
-				nil,
-			),
+			root:  {{Rules: config.Rules{"no-console": "error"}}},
+			child: {{Rules: config.Rules{"no-debugger": "error"}}},
 		},
 	}
 	s := newTestServer()
-	s.cwd = root
-	snapshot, err := s.prepareDiscoveredConfigSnapshot(fsys, catalog)
+	s.cwd, s.fs = root, fsys
+	if catalog.GitPolicy == nil {
+		catalog.GitPolicy = config.CollectGitPolicy(nil, root, fsys, nil, config.ResolveDirectoryIdentities([]string{root}, fsys))
+	}
+	prepared, err := s.prepareDiscoveredConfigSnapshot(fsys, catalog)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !snapshot.configs[root].IsFileIgnored(rootTarget, root) {
-		t.Fatal("root config did not collect its own .gitignore")
+	snapshot, err := completeDiscoveredConfigSnapshot(prepared, nil, fsys)
+	if err != nil {
+		t.Fatal(err)
 	}
-	resolvedDir, resolved := snapshot.ownerIndex.Resolve(
-		target.FreezeFileIdentity(rootTarget, fsys),
-	)
-	resolvedConfig := snapshot.configs[resolvedDir]
-	if resolvedDir != root || !resolved || !resolvedConfig.IsFileIgnored(rootTarget, root) {
-		t.Fatalf("committed owner index returned stale config: dir=%q resolved=%v config=%+v", resolvedDir, resolved, resolvedConfig)
+	s.commitDiscoveredConfigSnapshot(context.Background(), snapshot)
+	for _, directory := range []string{root, child} {
+		file := tspath.ResolvePath(directory, "ignored.ts")
+		document := s.documentLintSnapshot(documentURIFromPath(file))
+		if document.gitPolicy != policy || !document.resolvedConfig.GloballyIgnored || document.unavailable {
+			t.Fatalf("owner %q did not share the complete Git policy: %+v", directory, document)
+		}
+		if catalog.Configs[directory].IsFileIgnored(file, directory) {
+			t.Fatal("Git policy was embedded into authored config")
+		}
 	}
-	if snapshot.configs[root].IsFileIgnored(childTarget, root) {
-		t.Fatal("root config crossed the child config's .gitignore source boundary")
-	}
-	if !snapshot.configs[child].IsFileIgnored(childTarget, child) {
-		t.Fatal("child config did not collect its own .gitignore")
-	}
-	if snapshot.fallbackConfig.IsFileIgnored(childTarget, root) {
-		t.Fatal("workspace fallback crossed the child config's .gitignore source boundary")
+	if snapshot.gitPolicy != policy {
+		t.Fatal("fallback policy generation differs")
 	}
 }
 
@@ -681,6 +672,9 @@ func TestPrepareDiscoveredConfigSnapshotDefersProjectPathsUntilDocumentMatch(t *
 	}
 	s := newTestServer()
 	s.cwd, s.fs = root, fsys
+	if catalog.GitPolicy == nil {
+		catalog.GitPolicy = config.CollectGitPolicy(nil, root, fsys, nil, config.ResolveDirectoryIdentities([]string{root}, fsys))
+	}
 	prepared, err := s.prepareDiscoveredConfigSnapshot(fsys, catalog)
 	if err != nil {
 		t.Fatalf("unmatched project prevented config preparation: %v", err)
@@ -882,6 +876,9 @@ func TestCompleteDiscoveredConfigSnapshotBuildsOneResolverPerOwner(t *testing.T)
 	}
 	s := newTestServer()
 	s.cwd = root
+	if catalog.GitPolicy == nil {
+		catalog.GitPolicy = config.CollectGitPolicy(nil, root, fsys, nil, config.ResolveDirectoryIdentities([]string{root}, fsys))
+	}
 	prepared, err := s.prepareDiscoveredConfigSnapshot(fsys, catalog)
 	if err != nil {
 		t.Fatal(err)
@@ -1050,6 +1047,12 @@ func TestHandleConfigRefreshCommitFailureAbortsAndKeepsLastGood(t *testing.T) {
 func TestHandleConfigRefreshInitialAllFailedCommitsUnavailableBoundaries(t *testing.T) {
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
+	external := tspath.NormalizePath(t.TempDir())
+	if err := os.WriteFile(tspath.ResolvePath(external, ".gitignore"), []byte("outside.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	outside := documentURIFromPath(tspath.ResolvePath(external, "outside.ts"))
+	s.documents[outside] = "debugger;"
 	if err := os.WriteFile(
 		filepath.Join(root, "rslint.json"),
 		[]byte(`[{"rules":{"no-console":"error"}}]`),
@@ -1091,7 +1094,9 @@ func TestHandleConfigRefreshInitialAllFailedCommitsUnavailableBoundaries(t *test
 	if !isJS || hasPublicConfigContent(entries) {
 		t.Fatalf("broken boundary config = %+v, isJS=%t; want empty JS boundary", entries, isJS)
 	}
-	outside := documentURIFromPath(filepath.Join(filepath.Dir(root), "outside.ts"))
+	if snapshot := s.documentLintSnapshot(outside); snapshot.unavailable || !snapshot.resolvedConfig.GloballyIgnored {
+		t.Fatalf("all-failed recovery lost its frozen fallback Git policy: %+v", snapshot)
+	}
 	outsideConfig, _, outsideUsesCatalog := s.getConfigForURI(outside)
 	if outsideUsesCatalog || hasPublicConfigContent(outsideConfig) {
 		t.Fatalf("legacy JSON leaked into workspace fallback: config=%+v, usesCatalog=%t", outsideConfig, outsideUsesCatalog)
@@ -1106,6 +1111,7 @@ func TestHandleConfigRefreshPartialCatalogCommitsUnavailableParentAndUsableChild
 	}
 	writeConfigCandidate(t, root)
 	writeConfigCandidate(t, nested)
+	s.documents[documentURIFromPath(tspath.ResolvePath(nested, "src/index.ts"))] = "debugger;"
 	if err := os.WriteFile(
 		filepath.Join(root, "rslint.json"),
 		[]byte(`[{"rules":{"no-console":"error"}}]`),
@@ -1206,7 +1212,7 @@ func TestUnavailableConfigBoundaryKeepsLexicalSymlinkFailure(t *testing.T) {
 		Failures: []discovery.ConfigFailure{{Directory: aliasRoot}},
 	}
 	resolver := target.NewOwnerIndex(catalog.Configs, fsy)
-	if owner, _ := resolver.Resolve(target.FreezeFileIdentity(
+	if owner, _ := resolver.Resolve(config.FreezeFileIdentity(
 		filepath.Join(aliasRoot, "src", "index.ts"),
 		fsy,
 	)); owner != realRoot {
@@ -1491,6 +1497,8 @@ func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterDeletion(t *testing.
 		t.Fatal(err)
 	}
 
+	s.documents[documentURIFromPath(target)] = "debugger;"
+
 	// Commit a usable root config together with the current ignore snapshot.
 	initial := startConfigRefreshForTest(s, "initial")
 	initialLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
@@ -1507,10 +1515,8 @@ func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterDeletion(t *testing.
 		t.Fatalf("initial configRefresh failed: %v", completed.err)
 	}
 
-	targetURI := documentURIFromPath(target)
 	isIgnored := func() bool {
-		effective, cwd, _ := s.getLintConfigForURI(targetURI)
-		return effective.IsFileIgnored(target, cwd)
+		return s.documentLintSnapshot(documentURIFromPath(target)).resolvedConfig.GloballyIgnored
 	}
 	if !isIgnored() {
 		t.Fatal("target behind the committed .gitignore would produce diagnostics")
@@ -1563,10 +1569,8 @@ func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterCreation(t *testing.
 		t.Fatalf("initial configRefresh failed: %v", completed.err)
 	}
 
-	targetURI := documentURIFromPath(target)
 	isIgnored := func() bool {
-		effective, cwd, _ := s.getLintConfigForURI(targetURI)
-		return effective.IsFileIgnored(target, cwd)
+		return s.documentLintSnapshot(documentURIFromPath(target)).resolvedConfig.GloballyIgnored
 	}
 	if isIgnored() {
 		t.Fatal("target was not diagnostic-visible in the committed generation")
@@ -1693,5 +1697,648 @@ func TestHandleConfigRefreshRejectsInvalidProtocolWithoutMutation(t *testing.T) 
 	}
 	if s.configDiscoveryActive {
 		t.Fatal("invalid protocol enabled reverse watcher transactions")
+	}
+}
+
+func TestDocumentGitPolicyCoverageRejectsRetargetedAliasesAndCodeActions(t *testing.T) {
+	fsys := &configBoundaryIdentityFS{
+		FS:            &mockFS{files: map[string]bool{}},
+		caseSensitive: true,
+		realPaths: map[string]string{
+			"/alias":           "/owner-a",
+			"/alias/source.ts": "/owner-a/source.ts",
+		},
+	}
+	s := newTestServer()
+	s.cwd, s.fs = "/alias", fsys
+	s.gitPolicy = config.CollectGitPolicy(nil, s.cwd, fsys, nil, config.ResolveDirectoryIdentities([]string{s.cwd}, fsys))
+	installJSConfigsForTest(s, map[string]config.RslintConfig{s.cwd: {{Rules: config.Rules{"no-debugger": "error"}}}})
+	uri := lsproto.DocumentUri("file:///alias/source.ts")
+	if snapshot := s.documentLintSnapshot(uri); snapshot.unavailable || !snapshot.configResolved {
+		t.Fatalf("covered document was rejected: %+v", snapshot)
+	}
+	fsys.realPaths["/alias"] = "/owner-b"
+	fsys.realPaths["/alias/source.ts"] = "/owner-b/source.ts"
+	snapshot := s.documentLintSnapshot(uri)
+	if !snapshot.unavailable || snapshot.configResolved {
+		t.Fatalf("retargeted alias reused a policy from a different parent: %+v", snapshot)
+	}
+	// Stored results must not offer edits after the URI changes identity.
+	s.diagnostics[uri] = []rule.RuleDiagnostic{{}}
+	actions, err := s.handleCodeAction(context.Background(), &lsproto.CodeActionParams{TextDocument: lsproto.TextDocumentIdentifier{Uri: uri}})
+	if err != nil || actions.CommandOrCodeActionArray == nil || len(*actions.CommandOrCodeActionArray) != 0 {
+		t.Fatalf("uncovered document offered cached edits: %+v, %v", actions, err)
+	}
+	provider := &documentGenerationProvider{server: s, uri: uri, snapshot: snapshot}
+	if _, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{}); err != nil {
+		t.Fatalf("uncovered diagnostic generation did not stop: %v", err)
+	} else if release != nil {
+		release()
+	}
+	if _, release, err := acquireSpeculativeGeneration(context.Background(), "debugger;", snapshot, speculativeLintEnvironment{processCwd: s.cwd}); err != nil {
+		t.Fatalf("uncovered fix generation did not stop: %v", err)
+	} else if release != nil {
+		release()
+	}
+}
+
+func TestHandleDidOpenCollectsGitChainWithoutRetryingEveryEdit(t *testing.T) {
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	entries := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	initial := startConfigRefreshForTest(s, "initial")
+	load := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, response := loadedConfigResponse(t, load, entries)
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if result := awaitConfigRefreshResult(t, initial); result.err != nil {
+		t.Fatal(result.err)
+	}
+	previousPolicy, previousGeneration := s.gitPolicy, s.eslintPluginConfigGeneration
+
+	external := tspath.NormalizePath(t.TempDir())
+	for name, content := range map[string]string{
+		".git":             "gitdir: elsewhere\n",
+		".gitignore":       "ignored.ts\n",
+		"rslint.config.js": "throw new Error('must not execute outside workspace');\n",
+		"ignored.ts":       "debugger;\n",
+	} {
+		if err := os.WriteFile(tspath.ResolvePath(external, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	uri := documentURIFromPath(tspath.ResolvePath(external, "ignored.ts"))
+	opened := make(chan error, 1)
+	go func() {
+		opened <- s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{TextDocument: &lsproto.TextDocumentItem{Uri: uri, Text: "debugger;", LanguageId: "typescript", Version: 1}})
+	}()
+	load = nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	request, failed := failedConfigResponse(t, load, "transient workspace config failure")
+	if len(request.Candidates) != 1 || request.Candidates[0].ConfigDirectory != root {
+		t.Fatalf("open document became a config discovery seed: %+v", request.Candidates)
+	}
+	respondToConfigReverseRequest(t, s, load, failed, nil)
+	abort := nextConfigReverseRequest(t, outgoing, methodAbortConfigs)
+	respondToConfigReverseRequest(t, s, abort, abortResponseForRequest(t, abort), nil)
+	if err := awaitConfigWatchEvent(t, opened); err != nil {
+		t.Fatal(err)
+	}
+	if s.gitPolicy != previousPolicy || s.eslintPluginConfigGeneration != previousGeneration {
+		t.Fatal("failed open refresh mixed configuration and Git generations")
+	}
+	if !s.documentLintSnapshot(uri).unavailable {
+		t.Fatal("uncovered external document escaped last-good policy")
+	}
+
+	for version := int32(2); version <= 4; version++ {
+		changed := make(chan error, 1)
+		go func() {
+			changed <- s.handleDidChange(context.Background(), makeDidChangeParams(uri, version, "debugger;\n"))
+		}()
+		select {
+		case err := <-changed:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case message := <-outgoing:
+			load := message.AsRequest()
+			t.Errorf("content-only edit %d reloaded workspace configuration", version)
+			_, failed := failedConfigResponse(t, load, "workspace config still broken")
+			respondToConfigReverseRequest(t, s, load, failed, nil)
+			abort := nextConfigReverseRequest(t, outgoing, methodAbortConfigs)
+			respondToConfigReverseRequest(t, s, abort, abortResponseForRequest(t, abort), nil)
+			if err := awaitConfigWatchEvent(t, changed); err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("document edit did not complete")
+		}
+	}
+
+	// Config changes still retry the failed transaction and recover coverage.
+	retried := startConfigRefreshForTest(s, "config-change")
+	load = nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	request, response = loadedConfigResponse(t, load, entries)
+	if request.Candidates[0].ConfigDirectory != root {
+		t.Fatal("retry discovered external config")
+	}
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if result := awaitConfigRefreshResult(t, retried); result.err != nil {
+		t.Fatal(result.err)
+	}
+	snapshot := s.documentLintSnapshot(uri)
+	if snapshot.unavailable || !snapshot.resolvedConfig.GloballyIgnored || snapshot.configKey != "" {
+		t.Fatalf("external Git chain was not committed independently of config ownership: %+v", snapshot)
+	}
+	select {
+	case message := <-outgoing:
+		t.Fatalf("covered snapshot made reverse request: %+v", message)
+	default:
+	}
+}
+
+type gitObservationGuardFS struct {
+	vfs.FS
+	reject       bool
+	observations int
+}
+
+func (fsys *gitObservationGuardFS) ReadFile(path string) (string, bool) {
+	if tspath.GetBaseFileName(path) == ".gitignore" {
+		fsys.observations++
+	}
+	if fsys.reject && tspath.GetBaseFileName(path) == ".gitignore" {
+		panic("Git source read after discovery")
+	}
+	return fsys.FS.ReadFile(path)
+}
+func (fsys *gitObservationGuardFS) DirectoryExists(path string) bool {
+	if tspath.GetBaseFileName(path) == ".git" {
+		fsys.observations++
+	}
+	if fsys.reject && tspath.GetBaseFileName(path) == ".git" {
+		panic("Git marker read after discovery")
+	}
+	return fsys.FS.DirectoryExists(path)
+}
+func (fsys *gitObservationGuardFS) FileExists(path string) bool {
+	if tspath.GetBaseFileName(path) == ".git" {
+		fsys.observations++
+	}
+	if fsys.reject && tspath.GetBaseFileName(path) == ".git" {
+		panic("Git marker read after discovery")
+	}
+	return fsys.FS.FileExists(path)
+}
+
+func TestHandleConfigRefreshDoesNotObserveGitAfterDiscovery(t *testing.T) {
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	for name, content := range map[string]string{".gitignore": "source.ts\n", "source.ts": "debugger;\n"} {
+		if err := os.WriteFile(tspath.ResolvePath(root, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fsys := &gitObservationGuardFS{FS: s.fs}
+	s.fs = fsys
+	uri := documentURIFromPath(tspath.ResolvePath(root, "source.ts"))
+	entries := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	result := startConfigRefreshForTest(s, "initial")
+	load := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, response := loadedConfigResponse(t, load, entries)
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	activation := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
+	// These changes belong to the next generation. Preparing resolvers and
+	// committing the current generation must not consult either file again.
+	if err := os.WriteFile(tspath.ResolvePath(root, ".gitignore"), []byte("# now visible\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tspath.ResolvePath(root, ".git"), []byte("gitdir: elsewhere\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fsys.reject = true
+	_, active := activationResponseForRequest(t, activation, true)
+	respondToConfigReverseRequest(t, s, activation, active, nil)
+	commit := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
+	respondToConfigReverseRequest(t, s, commit, commitResponseForRequest(t, commit, true), nil)
+	if completed := awaitConfigRefreshResult(t, result); completed.err != nil {
+		t.Fatal(completed.err)
+	}
+	if snapshot := s.documentLintSnapshot(uri); snapshot.unavailable || !snapshot.resolvedConfig.GloballyIgnored {
+		t.Fatalf("committed policy observed later filesystem state: %+v", snapshot)
+	}
+	fsys.reject = false
+	result = startConfigRefreshForTest(s, "gitignore-change")
+	load = nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, response = loadedConfigResponse(t, load, entries)
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if completed := awaitConfigRefreshResult(t, result); completed.err != nil {
+		t.Fatal(completed.err)
+	}
+	if s.documentLintSnapshot(uri).resolvedConfig.GloballyIgnored {
+		t.Fatal("next generation did not observe changed Git sources")
+	}
+}
+
+func TestGitMarkerWatcherCreatesAndRemovesBoundary(t *testing.T) {
+	outer := tspath.NormalizePath(t.TempDir())
+	root := tspath.ResolvePath(outer, "workspace")
+	if err := os.MkdirAll(tspath.ResolvePath(outer, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeConfigCandidate(t, root)
+	if err := os.WriteFile(tspath.ResolvePath(outer, ".gitignore"), []byte("source.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tspath.ResolvePath(root, "source.ts"), []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, outgoing := newAncestorConfigWatchTestServer(root)
+	entries := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	initial := startConfigRefreshForTest(s, "initial")
+	load := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, response := loadedConfigResponse(t, load, entries)
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if completed := awaitConfigRefreshResult(t, initial); completed.err != nil {
+		t.Fatal(completed.err)
+	}
+	uri := documentURIFromPath(tspath.ResolvePath(root, "source.ts"))
+	if !s.documentLintSnapshot(uri).resolvedConfig.GloballyIgnored {
+		t.Fatal("initial ancestor source did not apply")
+	}
+	marker := tspath.ResolvePath(root, ".git")
+	for _, create := range []bool{true, false} {
+		event := lsproto.FileChangeTypeDeleted
+		if create {
+			if err := os.WriteFile(marker, []byte("gitdir: elsewhere\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			event = lsproto.FileChangeTypeCreated
+		} else if err := os.Remove(marker); err != nil {
+			t.Fatal(err)
+		}
+		changed := startConfigWatchEvent(s, marker, event)
+		load = nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+		_, response = loadedConfigResponse(t, load, entries)
+		respondToConfigReverseRequest(t, s, load, response, nil)
+		completeConfigWatchActivation(t, s, outgoing)
+		if err := awaitConfigWatchEvent(t, changed); err != nil {
+			t.Fatal(err)
+		}
+		if ignored := s.documentLintSnapshot(uri).resolvedConfig.GloballyIgnored; ignored == create {
+			t.Fatalf("marker exists=%v ignored=%v", create, ignored)
+		}
+	}
+}
+
+func TestConfigRefreshRegistersPhysicalGitWatchesBeforeReadingSources(t *testing.T) {
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	fsys := &gitObservationGuardFS{FS: s.fs}
+	s.fs, s.watchEnabled = fsys, true
+	initial := startConfigRefreshForTest(s, "initial")
+	registration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
+	if fsys.observations != 0 {
+		t.Fatal("Git sources were observed before watcher registration completed")
+	}
+	respondToConfigReverseRequest(t, s, registration, nil, nil)
+	load := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, response := loadedConfigResponse(t, load, config.RslintConfig{{}})
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if result := awaitConfigRefreshResult(t, initial); result.err != nil {
+		t.Fatal(result.err)
+	}
+	previousID := s.gitPolicyWatcherID
+
+	external := tspath.NormalizePath(t.TempDir())
+	physicalExternal := tspath.NormalizePath(fsys.Realpath(external))
+	uri := documentURIFromPath(tspath.ResolvePath(external, "source.ts"))
+	s.documents[uri] = "debugger;"
+	previousObservations := fsys.observations
+	refresh := startConfigRefreshForTest(s, "gitignore-change")
+	registration = nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
+	params, ok := registration.Params.(*lsproto.RegistrationParams)
+	if !ok || len(params.Registrations) != 1 {
+		t.Fatalf("invalid registration: %+v", registration.Params)
+	}
+	watchers := params.Registrations[0].RegisterOptions.WorkspaceDidChangeWatchedFiles.Watchers
+	foundMarker, foundIgnore := false, false
+	for _, watcher := range watchers {
+		if watcher.GlobPattern.Pattern == nil {
+			t.Fatal("unexpected relative watcher")
+		}
+		switch *watcher.GlobPattern.Pattern {
+		case tspath.ResolvePath(physicalExternal, ".git"):
+			foundMarker = true
+		case tspath.ResolvePath(physicalExternal, ".gitignore"):
+			foundIgnore = true
+		}
+	}
+	if !foundMarker || !foundIgnore {
+		t.Fatal("external source and missing marker were not watched")
+	}
+	if fsys.observations != previousObservations {
+		t.Fatal("new Git sources were read while watcher registration was pending")
+	}
+	respondToConfigReverseRequest(t, s, registration, nil, nil)
+	for attempt := range 3 {
+		if attempt > 0 {
+			refresh = startConfigRefreshForTest(s, "gitignore-change")
+		}
+		unregistration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
+		respondToConfigReverseRequest(t, s, unregistration, nil, errors.New("temporary unregistration failure"))
+		completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{}})
+		if result := awaitConfigRefreshResult(t, refresh); result.err != nil {
+			t.Fatalf("old watcher cleanup blocked refresh %d: %v", attempt, result.err)
+		}
+		if s.gitPolicyWatcherID == previousID || !s.watchers.Has(previousID) || !s.watchers.Has(s.gitPolicyWatcherID) {
+			t.Fatal("failed cleanup lost an active or pending registration")
+		}
+		if !s.gitPolicy.CoversDirectory(physicalExternal) {
+			t.Fatal("failed cleanup prevented new Git source coverage")
+		}
+	}
+	refresh = startConfigRefreshForTest(s, "gitignore-change")
+	unregistration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
+	respondToConfigReverseRequest(t, s, unregistration, nil, nil)
+	completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{}})
+	if result := awaitConfigRefreshResult(t, refresh); result.err != nil {
+		t.Fatal(result.err)
+	}
+	if s.gitPolicyWatcherID == previousID || s.watchers.Has(previousID) {
+		t.Fatal("watch registration was not replaced")
+	}
+}
+
+func TestHandleDidOpenCollectsIgnoredDirectoryWithoutLoadingItsConfig(t *testing.T) {
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	deep := tspath.ResolvePath(root, "ignored/deep")
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for path, content := range map[string]string{
+		tspath.ResolvePath(root, ".gitignore"):       "ignored/\n",
+		tspath.ResolvePath(deep, "rslint.config.js"): "throw new Error('ignored config must not execute');\n",
+		tspath.ResolvePath(deep, ".gitignore"):       "!source.ts\n",
+		tspath.ResolvePath(deep, "source.ts"):        "debugger;\n",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	entries := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	initial := startConfigRefreshForTest(s, "initial")
+	load := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, response := loadedConfigResponse(t, load, entries)
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if result := awaitConfigRefreshResult(t, initial); result.err != nil {
+		t.Fatal(result.err)
+	}
+	uri := documentURIFromPath(tspath.ResolvePath(deep, "source.ts"))
+	if !s.documentLintSnapshot(uri).unavailable {
+		t.Fatal("pruned directory was treated as already covered")
+	}
+	opened := make(chan error, 1)
+	go func() {
+		opened <- s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{TextDocument: &lsproto.TextDocumentItem{Uri: uri, Text: "debugger;", Version: 1, LanguageId: "typescript"}})
+	}()
+	load = nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	request, response := loadedConfigResponse(t, load, entries)
+	if request.Candidates[0].ConfigDirectory != root {
+		t.Fatal("ignored document enabled a new config seed")
+	}
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if err := awaitConfigWatchEvent(t, opened); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot := s.documentLintSnapshot(uri); snapshot.unavailable || !snapshot.resolvedConfig.GloballyIgnored {
+		t.Fatalf("ignored document did not acquire its complete Git chain: %+v", snapshot)
+	}
+	if err := s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{TextDocument: &lsproto.TextDocumentItem{Uri: uri, Text: "debugger;", Version: 2, LanguageId: "typescript"}}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case message := <-outgoing:
+		t.Fatalf("covered didOpen refreshed again: %+v", message)
+	default:
+	}
+}
+
+func TestHandleDidOpenVirtualDirectoryAliasInheritsPhysicalGitPolicy(t *testing.T) {
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	physical := tspath.ResolvePath(root, "packages/app")
+	if err := os.MkdirAll(physical, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tspath.ResolvePath(root, ".gitignore"), []byte("generated/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	alias := tspath.ResolvePath(tspath.NormalizePath(t.TempDir()), "alias")
+	if err := os.Symlink(physical, alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	entries := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	initial := startConfigRefreshForTest(s, "initial")
+	load := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, response := loadedConfigResponse(t, load, entries)
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if result := awaitConfigRefreshResult(t, initial); result.err != nil {
+		t.Fatal(result.err)
+	}
+	file := tspath.ResolvePath(alias, "generated/deep/new.ts")
+	uri := documentURIFromPath(file)
+	if !s.documentLintSnapshot(uri).unavailable {
+		t.Fatal("unobserved virtual parent was treated as covered")
+	}
+	opened := make(chan error, 1)
+	go func() {
+		opened <- s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{TextDocument: &lsproto.TextDocumentItem{Uri: uri, Text: "debugger;", Version: 1, LanguageId: "typescript"}})
+	}()
+	load = nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	request, response := loadedConfigResponse(t, load, entries)
+	if len(request.Candidates) != 1 || request.Candidates[0].ConfigDirectory != root {
+		t.Fatalf("virtual document became a config discovery seed: %+v", request.Candidates)
+	}
+	respondToConfigReverseRequest(t, s, load, response, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if err := awaitConfigWatchEvent(t, opened); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := s.documentLintSnapshot(uri)
+	wantParent := tspath.ResolvePath(tspath.NormalizePath(osvfs.FS().Realpath(physical)), "generated/deep")
+	if snapshot.unavailable || !snapshot.configResolved || !snapshot.resolvedConfig.GloballyIgnored || snapshot.target.Path != uriToPath(uri) || snapshot.target.CanonicalParentPath != wantParent {
+		t.Fatalf("virtual alias lost its physical Git chain: %+v", snapshot)
+	}
+	if _, err := os.Stat(tspath.GetDirectoryPath(file)); !os.IsNotExist(err) {
+		t.Fatalf("virtual parent must remain absent: %v", err)
+	}
+}
+
+func TestDocumentSnapshotDoesNotBootstrapAfterHandshakeWithoutCommit(t *testing.T) {
+	s := newTestServer()
+	fsys := &gitObservationGuardFS{FS: &mockFS{files: map[string]bool{}}, reject: true}
+	s.cwd, s.fs, s.configDiscoveryActive = "/project", fsys, true
+	uri := lsproto.DocumentUri("file:///project/source.ts")
+	if snapshot := s.documentLintSnapshot(uri); !snapshot.unavailable || snapshot.configResolved || snapshot.gitPolicy != nil {
+		t.Fatalf("uncommitted handshake resumed bootstrap policy: %+v", snapshot)
+	}
+	fsys.reject = false
+	s.configDiscoveryActive = false
+	if snapshot := s.documentLintSnapshot(uri); snapshot.unavailable || !snapshot.configResolved || snapshot.gitPolicy == nil {
+		t.Fatalf("pre-handshake bootstrap could not collect the exact document: %+v", snapshot)
+	}
+}
+
+func TestDocumentGitPolicyCoveredIgnoredAliasSuppressesCachedEdits(t *testing.T) {
+	s, _, root := newConfigRefreshTestServer(t)
+	for name, content := range map[string]string{".gitignore": "b/source.ts\n", "a/source.ts": "debugger;", "b/source.ts": "debugger;"} {
+		path := tspath.ResolvePath(root, name)
+		if err := os.MkdirAll(tspath.GetDirectoryPath(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	alias := tspath.ResolvePath(root, "alias")
+	if err := os.Symlink(tspath.ResolvePath(root, "a"), alias); err != nil {
+		t.Skip(err)
+	}
+	s.gitPolicy = config.CollectGitPolicy(nil, root, s.fs, nil, config.ResolveDirectoryIdentities([]string{root}, s.fs))
+	installJSConfigsForTest(s, map[string]config.RslintConfig{root: {{Rules: config.Rules{"no-debugger": "error"}}}})
+	uri := documentURIFromPath(tspath.ResolvePath(alias, "source.ts"))
+	s.documents[uri] = "debugger;"
+	if snap := s.documentLintSnapshot(uri); snap.unavailable || snap.resolvedConfig.GloballyIgnored {
+		t.Fatalf("bad original snapshot: %+v", snap)
+	}
+	s.diagnostics[uri] = []rule.RuleDiagnostic{pluginDiag("debugger;", "no-debugger", "old target diagnostic", 0, 8)}
+	if err := os.Remove(alias); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(tspath.ResolvePath(root, "b"), alias); err != nil {
+		t.Fatal(err)
+	}
+	snap := s.documentLintSnapshot(uri)
+	if snap.unavailable || !snap.resolvedConfig.GloballyIgnored {
+		t.Fatalf("test requires covered ignored destination: %+v", snap)
+	}
+	actions, err := s.handleCodeAction(context.Background(), &lsproto.CodeActionParams{TextDocument: lsproto.TextDocumentIdentifier{Uri: uri}, Range: lsproto.Range{Start: lsproto.Position{}, End: lsproto.Position{Character: 8}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if actions.CommandOrCodeActionArray != nil && len(*actions.CommandOrCodeActionArray) != 0 {
+		t.Fatalf("ignored retargeted alias offered %d stale code actions", len(*actions.CommandOrCodeActionArray))
+	}
+}
+
+func TestGitWatchRegistrationKeyIncludesRetargetedRecursiveRoots(t *testing.T) {
+	s, outgoing, _ := newConfigRefreshTestServer(t)
+	s.watchEnabled = true
+	rootsA := []config.DirectoryIdentity{{LexicalPath: "/alias", CanonicalPath: "/a"}}
+	files := []config.PathIdentity{{Path: "/b/source.ts", CanonicalParentPath: "/b"}}
+	watchedA := gitPolicyWatchDirectories(rootsA, files)
+	result := make(chan error, 1)
+	go func() { result <- s.updateGitPolicyWatchers(context.Background(), rootsA, watchedA) }()
+	registration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
+	respondToConfigReverseRequest(t, s, registration, nil, nil)
+	if err := awaitConfigWatchEvent(t, result); err != nil {
+		t.Fatal(err)
+	}
+	oldID := s.gitPolicyWatcherID
+	s.committedGitWatchDirectories = watchedA
+	rootsB := []config.DirectoryIdentity{{LexicalPath: "/alias", CanonicalPath: "/b"}}
+	go func() {
+		result <- s.updateGitPolicyWatchers(context.Background(), rootsB, gitPolicyWatchDirectories(rootsB, files))
+	}()
+	registration = nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
+	params, ok := registration.Params.(*lsproto.RegistrationParams)
+	if !ok || len(params.Registrations) != 1 {
+		t.Fatalf("invalid registration: %+v", registration.Params)
+	}
+	var sourceWatch, markerWatch bool
+	for _, watcher := range params.Registrations[0].RegisterOptions.WorkspaceDidChangeWatchedFiles.Watchers {
+		if watcher.GlobPattern.Pattern == nil {
+			t.Fatal("unexpected relative watcher")
+		}
+		switch *watcher.GlobPattern.Pattern {
+		case "/b/**/.gitignore":
+			sourceWatch = true
+		case "/b/**/.git":
+			markerWatch = true
+		}
+	}
+	if !sourceWatch || !markerWatch {
+		t.Fatal("retargeting lost recursive watches for the new physical root")
+	}
+	respondToConfigReverseRequest(t, s, registration, nil, nil)
+	unregistration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
+	respondToConfigReverseRequest(t, s, unregistration, nil, nil)
+	if err := awaitConfigWatchEvent(t, result); err != nil {
+		t.Fatal(err)
+	}
+	if s.gitPolicyWatcherID == oldID || s.watchers.Has(oldID) {
+		t.Fatal("unchanged exact-directory union suppressed recursive watch replacement")
+	}
+}
+
+func TestCanceledGitWatcherRegistrationCleansAttemptOnNextRefresh(t *testing.T) {
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	fsys := &gitObservationGuardFS{FS: s.fs}
+	s.fs, s.watchEnabled = fsys, true
+	initial := startConfigRefreshForTest(s, "initial")
+	registration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
+	respondToConfigReverseRequest(t, s, registration, nil, nil)
+	completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{}})
+	if completed := awaitConfigRefreshResult(t, initial); completed.err != nil {
+		t.Fatal(completed.err)
+	}
+	activeID, activePolicy := s.gitPolicyWatcherID, s.gitPolicy
+	external := tspath.NormalizePath(t.TempDir())
+	s.documents[documentURIFromPath(tspath.ResolvePath(external, "source.ts"))] = "debugger;"
+	observations := fsys.observations
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	result := make(chan configRefreshTestResult, 1)
+	go func() {
+		response, err := s.refreshConfig(ctx)
+		result <- configRefreshTestResult{response: response, err: err}
+	}()
+	registration = nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
+	params := registration.Params.(*lsproto.RegistrationParams)
+	attemptedID := params.Registrations[0].Id
+	// The request reached the client, which may install it before Go observes
+	// cancellation. Its missing acknowledgement cannot prove it was rejected.
+	cancel()
+	if completed := awaitConfigRefreshResult(t, result); !errors.Is(completed.err, context.Canceled) {
+		t.Fatalf("registration cancellation = %v", completed.err)
+	}
+	select {
+	case message := <-outgoing:
+		if message.AsRequest().Method != lsproto.MethodCancelRequest {
+			t.Fatalf("unexpected cancellation message: %+v", message)
+		}
+	default:
+		t.Fatal("registration cancellation was not forwarded")
+	}
+	uncertainID := project.WatcherID(attemptedID)
+	if !s.watchers.Has(uncertainID) {
+		t.Fatal("canceled registration attempt was forgotten")
+	}
+	if s.gitPolicyWatcherID != activeID || s.gitPolicy != activePolicy || !s.watchers.Has(activeID) {
+		t.Fatal("cancellation replaced the active watcher or config generation")
+	}
+	if fsys.observations != observations {
+		t.Fatal("canceled registration read new Git sources")
+	}
+
+	retry := startConfigRefreshForTest(s, "gitignore-change")
+	registration = nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
+	if fsys.observations != observations {
+		t.Fatal("retry read Git sources before the new registration completed")
+	}
+	respondToConfigReverseRequest(t, s, registration, nil, nil)
+	for range 2 {
+		unregistration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
+		respondToConfigReverseRequest(t, s, unregistration, nil, nil)
+	}
+	completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{}})
+	if completed := awaitConfigRefreshResult(t, retry); completed.err != nil {
+		t.Fatal(completed.err)
+	}
+	if s.watchers.Has(activeID) || s.watchers.Has(uncertainID) || !s.watchers.Has(s.gitPolicyWatcherID) {
+		t.Fatal("retry leaked a superseded or uncertain registration")
 	}
 }

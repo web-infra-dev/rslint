@@ -26,7 +26,7 @@ func (fs *canonicalPathVFS) SourceHasBOM(filePath string) bool {
 	return utils.SourceHasBOM(fs.FS, filePath)
 }
 
-func addEquivalentFileContentPaths(fileContents map[string]string, configDirectory string, currentDirectory string, fs vfs.FS) {
+func addEquivalentFileContentPaths(fileContents map[string]string, configDirectory string, currentDirectory string, fs vfs.FS, canonicalPaths map[string]string) {
 	if len(fileContents) == 0 || fs == nil {
 		return
 	}
@@ -66,9 +66,12 @@ func addEquivalentFileContentPaths(fileContents map[string]string, configDirecto
 
 	realConfigDirectory := fs.Realpath(configDirectory)
 	for _, entry := range entries {
-		if realPath := fs.Realpath(entry.path); realPath != "" && realPath != entry.path {
-			addAlias(realPath, entry.content)
-		}
+		// Overlay sources and lint targets share physical ancestry even when
+		// several parent directories have not been created.
+		identity := rslintconfig.FreezeFileIdentity(entry.path, fs)
+		addAlias(tspath.CombinePaths(identity.CanonicalParentPath, tspath.GetBaseFileName(entry.path)), entry.content)
+		addAlias(identity.CanonicalPath, entry.content)
+		addAlias(canonicalPaths[rslintconfig.ExactPathID(entry.path)], entry.content)
 		if realConfigDirectory != "" && tspath.ComparePaths(configDirectory, realConfigDirectory, comparePathOptions) != 0 {
 			addDirectoryAlias(configDirectory, realConfigDirectory, entry.path, entry.content)
 			addDirectoryAlias(realConfigDirectory, configDirectory, entry.path, entry.content)

@@ -29,7 +29,7 @@ func newFileIgnoreMatcher(patterns []IgnorePattern) fileIgnoreMatcher {
 		return matcher
 	}
 	for _, pattern := range patterns {
-		if pattern.GitPattern || pattern.CaseInsensitive || patternHasMatchDirectory(pattern) {
+		if pattern.GitPattern || pattern.CaseInsensitive {
 			return matcher
 		}
 	}

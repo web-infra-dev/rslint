@@ -1,6 +1,8 @@
 package config
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
@@ -21,6 +23,19 @@ type PathIdentity struct {
 type DirectoryIdentity struct {
 	LexicalPath   string
 	CanonicalPath string
+}
+
+// ResolveFileIdentities freezes requested file spellings without changing
+// their order or the distinction between omitted and empty input lists.
+func ResolveFileIdentities(paths []string, fsys vfs.FS) []PathIdentity {
+	if paths == nil {
+		return nil
+	}
+	identities := make([]PathIdentity, len(paths))
+	for index, path := range paths {
+		identities[index] = FreezeFileIdentity(path, fsys)
+	}
+	return identities
 }
 
 // ResolveDirectoryIdentities freezes requested directory spellings without
@@ -46,48 +61,57 @@ func ResolveDirectoryIdentities(directories []string, fsys vfs.FS) []DirectoryId
 	return resolved
 }
 
-// CoalesceDirectoryIdentities returns the smallest independent set covering
-// the requested roots. A nested root is removed only when lexical and physical
-// containment produce the same suffix, preserving distinct symlink scopes and
-// avoiding invalid comparisons across Windows drives or UNC shares.
-func CoalesceDirectoryIdentities(directories []string, fsys vfs.FS) []DirectoryIdentity {
-	resolved := ResolveDirectoryIdentities(directories, fsys)
-	if len(resolved) == 0 {
-		return nil
+// FreezeFileIdentity observes the caller-visible file and its physical parent
+// once at the input boundary. Resolve the leaf from the captured physical
+// parent so a moving directory alias cannot mix two parent generations.
+// Missing parents retain the physical identity of their existing ancestor.
+func FreezeFileIdentity(filePath string, fsys vfs.FS) PathIdentity {
+	filePath = tspath.NormalizePath(filePath)
+	parent := tspath.GetDirectoryPath(filePath)
+	identity := PathIdentity{Path: filePath, CanonicalPath: filePath, CanonicalParentPath: parent}
+	if fsys == nil {
+		return identity
 	}
-	roots := make([]DirectoryIdentity, 0, len(resolved))
-	contains := func(parent DirectoryIdentity, child DirectoryIdentity) bool {
-		lexicalRelative, lexicalWithin := RelativePathWithinConfigRoot(
-			child.LexicalPath,
-			parent.LexicalPath,
-			true,
-		)
-		canonicalRelative, canonicalWithin := RelativePathWithinConfigRoot(
-			child.CanonicalPath,
-			parent.CanonicalPath,
-			true,
-		)
-		return lexicalWithin && canonicalWithin &&
-			ExactPathID(lexicalRelative) == ExactPathID(canonicalRelative)
+	identity.CanonicalParentPath = canonicalDirectoryPathOrSelf(parent, fsys)
+	identity.CanonicalPath = canonicalPathOrSelf(tspath.CombinePaths(identity.CanonicalParentPath, tspath.GetBaseFileName(filePath)), fsys)
+	return identity
+}
+
+func canonicalDirectoryPathOrSelf(directory string, fsys vfs.FS) string {
+	if fsys == nil {
+		return tspath.NormalizePath(directory)
 	}
-	for _, candidate := range resolved {
-		covered := false
-		for _, existing := range roots {
-			if contains(existing, candidate) {
-				covered = true
-				break
-			}
-		}
-		if covered {
-			continue
-		}
-		kept := roots[:0]
-		for _, existing := range roots {
-			if !contains(candidate, existing) {
-				kept = append(kept, existing)
-			}
-		}
-		roots = append(kept, candidate)
+	canonical := canonicalPathOrSelf(directory, fsys)
+	// Overlay directories can satisfy DirectoryExists without a disk entry.
+	if canonical != directory || fsys.Stat(directory) != nil {
+		return canonical
 	}
-	return roots
+	rootLength := tspath.GetRootLength(directory)
+	if strings.HasPrefix(directory, "//") {
+		// A filesystem UNC root includes the share, not just the server.
+		if shareEnd := strings.IndexByte(directory[rootLength:], '/'); shareEnd >= 0 {
+			rootLength += shareEnd
+		} else {
+			rootLength = len(directory)
+		}
+	}
+	for ancestor := tspath.GetDirectoryPath(directory); ancestor != "" && ancestor != directory && len(ancestor) >= rootLength; ancestor = tspath.GetDirectoryPath(ancestor) {
+		canonical = canonicalPathOrSelf(ancestor, fsys)
+		if canonical != ancestor || fsys.Stat(ancestor) != nil {
+			return tspath.CombinePaths(canonical, strings.TrimPrefix(directory[len(ancestor):], "/"))
+		}
+		if len(ancestor) <= rootLength {
+			break
+		}
+	}
+	return directory
+}
+
+func canonicalPathOrSelf(path string, fsys vfs.FS) string {
+	if fsys != nil {
+		if canonical := fsys.Realpath(path); canonical != "" {
+			return tspath.NormalizePath(canonical)
+		}
+	}
+	return tspath.NormalizePath(path)
 }

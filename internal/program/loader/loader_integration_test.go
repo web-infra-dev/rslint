@@ -3,6 +3,7 @@ package loader
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -76,10 +77,10 @@ func TestBuildProjectsOwnsCacheAndPreservesItAcrossBindings(t *testing.T) {
 					}},
 				}}
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-				plan, err := target.Resolve(target.Request{
+				plan, err := target.Resolve(withGitPolicyForTest(target.Request{
 					Config: config, ConfigDirectory: dir, FS: fsys,
-					Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts")},
-				})
+					Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts")}, fsys),
+				}))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -173,7 +174,7 @@ func TestBuildProjectsSeparatesProjectPolicies(t *testing.T) {
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	session := NewSession(fsys)
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{dir + "/a/src/file.ts", dir + "/a/src/disabled.ts", dir + "/b/src/file.ts"}})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{dir + "/a/src/file.ts", dir + "/a/src/disabled.ts", dir + "/b/src/file.ts"}, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +230,7 @@ func TestBuildProjectsKeepsServiceGapsSourceOnly(t *testing.T) {
 			t.Run(strconv.Itoa(int(scope))+"/"+mode, func(t *testing.T) {
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 				session := NewSession(fsys)
-				plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: files})
+				plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities(files, fsys)}))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -304,7 +305,7 @@ func TestBuildProjectsKeepsProgramModesSeparate(t *testing.T) {
 						})
 					}
 					fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-					plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: files})
+					plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities(files, fsys)}))
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -392,7 +393,7 @@ func TestBuildProjectsValidatesServiceSourcesBeforePublishing(t *testing.T) {
 					ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)},
 				}}}
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-				plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{file}})
+				plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{file}, fsys)}))
 				if err != nil || len(plan.Files) != 1 {
 					t.Fatalf("target selection: files=%v, error=%v", plan.Files, err)
 				}
@@ -436,7 +437,7 @@ func TestBuildProjectsScopesInactiveOwners(t *testing.T) {
 		dir + "/b": {{Ignores: []string{"**"}}, {LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"custom.json"}}}}},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	plan, err := target.Resolve(target.Request{ConfigMap: configs, ConfigDirectory: dir, FS: fsys, Files: []string{dir + "/a/src/file.ts"}})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{ConfigMap: configs, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{dir + "/a/src/file.ts"}, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,16 +481,16 @@ func TestBuildProjectsSkipsOwnersWithoutTargets(t *testing.T) {
 				config = append(config, rslintconfig.ConfigWithAuthoredPathBase(override, otherOwner)...)
 				configs := map[string]rslintconfig.RslintConfig{projectOwner: config}
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-				request := target.Request{ConfigMap: configs, ConfigDirectory: dir, FS: fsys, Directories: []string{projectOwner}}
+				request := target.Request{ConfigMap: configs, ConfigDirectory: dir, FS: fsys, Directories: rslintconfig.ResolveDirectoryIdentities([]string{projectOwner}, fsys)}
 				wantPrograms := 0
 				if withActiveOwner {
 					configs[otherOwner] = rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
 						ProjectService: rslintconfig.BoolPtr(true),
 					}}}}
-					request.Files = []string{tspath.ResolvePath(otherOwner, "src/file.ts")}
+					request.Files = rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(otherOwner, "src/file.ts")}, fsys)
 					wantPrograms++
 				}
-				plan, err := target.Resolve(request)
+				plan, err := target.Resolve(withGitPolicyForTest(request))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -523,7 +524,7 @@ func TestBuildProjectsKeepsEffectiveCandidatesSeparateFromTypeCheckScope(t *test
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	files := []string{dir + "/a/src/file.ts", dir + "/b/src/file.ts"}
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: files})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities(files, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -570,10 +571,10 @@ func TestBuildProjectsDeduplicatesExplicitProjectsAcrossOwners(t *testing.T) {
 		tspath.ResolvePath(dir, "service"): {{Files: []string{"**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}}},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	plan, err := target.Resolve(target.Request{
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{
 		ConfigMap: configs, ConfigDirectory: dir, FS: fsys,
-		Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts"), tspath.ResolvePath(dir, "service/file.ts")},
-	})
+		Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts"), tspath.ResolvePath(dir, "service/file.ts")}, fsys),
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -605,15 +606,16 @@ func TestBuildProjectPlanReusesCandidatesAcrossRuleConfigs(t *testing.T) {
 				})
 			}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			plan, err := target.Resolve(target.Request{
+			plan, err := target.Resolve(withGitPolicyForTest(target.Request{
 				Config: config, ConfigDirectory: dir, FS: fsys,
-				Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "a/src/disabled.ts")},
-			})
+				Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "a/src/disabled.ts")}, fsys),
+			}))
 			if err != nil {
 				t.Fatal(err)
 			}
 			resolver := configLint.NewResolver(configLint.ResolverOptions{
-				Config: config, ConfigDirectory: dir, FS: fsys, PathSpaces: plan.PathSpaces(), Catalog: rule.NewCatalog(),
+				Config: config, ConfigDirectory: dir, FS: fsys, PathSpaces: plan.PathSpaces(),
+				GitPolicy: plan.GitPolicy(), Catalog: rule.NewCatalog(),
 			})
 			policies, err := resolver.ProjectPolicies(plan.Files, false)
 			if err != nil {
@@ -714,7 +716,7 @@ func TestBuildProjectsPreservesRawDeclarationsAfterEmptyArray(t *testing.T) {
 		{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{}}}},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{tspath.ResolvePath(dir, "a/src/file.ts")}})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a/src/file.ts")}, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -786,7 +788,7 @@ func TestBuildProjectsPreservesProjectDeclarationOrder(t *testing.T) {
 				wantConfig = "tsconfig.safe.json"
 			}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{file}})
+			plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{file}, fsys)}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -839,7 +841,7 @@ func TestBuildProjectsPreservesRawProjectBases(t *testing.T) {
 			dir := tspath.ResolvePath(archive.Materialize(t, "legacy-policy"), "pkg[1]")
 			config := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(false), Project: rslintconfig.ProjectPaths{pattern}}}}}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{tspath.ResolvePath(dir, "target.ts")}})
+			plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "target.ts")}, fsys)}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -857,7 +859,7 @@ func TestBuildProjectsPreservesRawProjectBases(t *testing.T) {
 		}
 		config = rslintconfig.ConfigWithResolvedBasePaths(config, dir)
 		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-		plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts")}})
+		plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts")}, fsys)}))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -895,7 +897,7 @@ func TestBuildProjectsRootContextsShareExecution(t *testing.T) {
 				}
 				files := []string{tspath.ResolvePath(owner, "x.ts"), tspath.ResolvePath(owner, "y.ts")}
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-				plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: files})
+				plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: rslintconfig.ResolveFileIdentities(files, fsys)}))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -954,7 +956,7 @@ func TestBuildProjectsWithoutEffectiveProjectsKeepTargetsUnbound(t *testing.T) {
 				config := rslintconfig.RslintConfig{{Files: []string{"**/disabled.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &disabled}}}
 				files := []string{tspath.ResolvePath(dir, "src/file.ts"), tspath.ResolvePath(dir, "src/disabled.ts")}
 				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-				plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: files})
+				plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities(files, fsys)}))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1003,7 +1005,7 @@ func TestBuildProjectsAllDeclaredKeepsRootForServiceAndClear(t *testing.T) {
 				config = append(config, rslintconfig.ConfigEntry{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: resetOptions}})
 			}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: []string{tspath.ResolvePath(owner, "x.ts")}})
+			plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(owner, "x.ts")}, fsys)}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1041,7 +1043,7 @@ func TestBuildProjectsAllDeclaredWithoutTargets(t *testing.T) {
 			}
 			config := rslintconfig.RslintConfig{{Ignores: []string{"**"}}, {LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &parsed}}}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Directories: []string{dir}})
+			plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Directories: rslintconfig.ResolveDirectoryIdentities([]string{dir}, fsys)}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1072,7 +1074,7 @@ func TestBuildProjectsRootContextsDeduplicateSharedPath(t *testing.T) {
 		config = append(config, rslintconfig.ConfigEntry{Files: []string{name}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{TsconfigRootDir: &roots[index]}}})
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: []string{tspath.ResolvePath(owner, "x.ts"), tspath.ResolvePath(owner, "y.ts")}})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: owner, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(owner, "x.ts"), tspath.ResolvePath(owner, "y.ts")}, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1098,7 +1100,7 @@ func TestLoadProgramsSingleCandidateRequiresRootMembership(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service_modes.txtar").Materialize(t, ""))
 	config := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}}}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	requestPlan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{tspath.ResolvePath(dir, "a.ts")}})
+	requestPlan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a.ts")}, fsys)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3249,9 +3251,9 @@ func TestLoadProgramsRejectsCaseFoldedSourceWithDifferentCanonicalIdentity(t *te
 }
 
 func TestBuildProjectsRejectsCaseFoldedServiceSourceWithDifferentCanonicalIdentity(t *testing.T) {
-	const configDir = "/repo"
-	const upper = "/repo/Source.ts"
-	const lower = "/repo/source.ts"
+	configDir := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	upper := tspath.ResolvePath(configDir, "Source.ts")
+	lower := tspath.ResolvePath(configDir, "source.ts")
 	fsys := &exactCaseProgramFS{
 		FS: osvfs.FS(),
 		files: map[string]string{
@@ -3263,7 +3265,7 @@ func TestBuildProjectsRejectsCaseFoldedServiceSourceWithDifferentCanonicalIdenti
 	config := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{
 		ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)},
 	}}}
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: configDir, FS: fsys, Files: []string{lower}})
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: configDir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{lower}, fsys)}))
 	if err != nil || len(plan.Files) != 1 || plan.Files[0].CanonicalPath != lower {
 		t.Fatalf("fixture must retain the distinct physical target: files=%v error=%v", plan.Files, err)
 	}
@@ -3306,5 +3308,608 @@ func TestLoadProgramsSplitsCompatibilityProgramsForCaseFoldedPathCollisions(t *t
 	slices.Sort(want)
 	if !slices.Equal(bound, want) {
 		t.Fatalf("compatibility Programs must preserve both exact source identities: got %v want %v", bound, want)
+	}
+}
+
+func TestProgramInputsKeepFrozenDirectoryAcrossGenerations(t *testing.T) {
+	for _, mode := range []string{"explicit", "service", "root override", "source only API", "source only CLI", "type-check-only"} {
+		t.Run(mode, func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			first, replacement := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "replacement")
+			const firstSource = "export const fromFirst: string = 1; debugger;\n"
+			const replacementSource = "export const fromReplacement = 2;\n"
+			for directory, content := range map[string]string{first: firstSource, replacement: replacementSource} {
+				writeProgramTestFiles(t, directory, map[string]string{
+					"tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["source.ts"]}`,
+					"source.ts":     content,
+				})
+			}
+			alias := tspath.ResolvePath(root, "alias")
+			if err := os.Symlink(first, alias); err != nil {
+				t.Skipf("directory symlink unavailable: %v", err)
+			}
+			entry := rslintconfig.ConfigEntry{Rules: rslintconfig.Rules{"no-debugger": "error"}}
+			if !strings.HasPrefix(mode, "source only") {
+				options := &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"tsconfig.json"}}
+				if mode == "service" {
+					options.Project = nil
+					options.ProjectService = rslintconfig.BoolPtr(true)
+				}
+				if mode == "root override" {
+					options.TsconfigRootDir = &alias
+				}
+				entry.LanguageOptions = &rslintconfig.LanguageOptions{ParserOptions: options}
+			}
+			entries := rslintconfig.RslintConfig{entry}
+			configs := map[string]rslintconfig.RslintConfig{alias: entries}
+			fsys := bundled.WrapFS(osvfs.FS())
+			input := rslintconfig.FreezeFileIdentity(tspath.ResolvePath(alias, "source.ts"), fsys)
+			spaces := rslintconfig.NewPathSpaceSnapshot(configs, fsys, rslintconfig.ResolveDirectoryIdentities([]string{alias}, fsys)...)
+			policy := rslintconfig.CollectGitPolicy(entries, alias, fsys, []rslintconfig.PathIdentity{input}, nil)
+			plan, err := target.Resolve(target.Request{ConfigMap: configs, FS: fsys, Files: []rslintconfig.PathIdentity{input}, GitPolicy: policy, PathSpaces: spaces})
+			if err != nil || len(plan.Files) != 1 {
+				t.Fatalf("resolve frozen target: files=%v error=%v", plan.Files, err)
+			}
+			resolver := configLint.NewResolver(configLint.ResolverOptions{ConfigsByOwner: configs, FS: fsys, PathSpaces: plan.PathSpaces(), GitPolicy: plan.GitPolicy(), Catalog: rules.All()})
+			policies, err := resolver.ProjectPolicies(plan.Files, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := ProjectBuildRequest{Configs: configs, Targets: plan, Policies: policies, Scope: Targeted, SingleThreaded: true}
+			frozenFiles := plan.Files
+			if mode == "type-check-only" {
+				request.Scope = AllDeclared
+				request.Targets = target.Plan{}
+				request.Policies = nil
+				frozenFiles = nil
+			}
+			if err := os.Remove(alias); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(replacement, alias); err != nil {
+				t.Fatal(err)
+			}
+			frozen, err := WithFrozenIO(fsys, spaces, frozenFiles)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, directory := range []string{alias, alias + "/"} {
+				if got := frozen.Realpath(directory); got != first {
+					t.Fatalf("directory spelling escaped frozen input: Realpath(%q) = %q, want %q", directory, got, first)
+				}
+			}
+			assertGeneration := func(generationFS vfs.FS, want string) {
+				t.Helper()
+				session := NewSession(generationFS)
+				projects, err := session.BuildProjects(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				programs := projects.Programs()
+				if mode != "type-check-only" {
+					var binding LoadResult
+					if mode == "source only CLI" {
+						binding, err = session.LoadCLI(projects, plan, alias, true)
+					} else {
+						binding, err = session.LoadAPI(projects, plan, alias, true)
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+					programs = binding.Programs
+				}
+				found := false
+				for _, program := range programs {
+					for _, source := range program.SourceFiles() {
+						if tspath.GetBaseFileName(source.FileName()) != "source.ts" {
+							continue
+						}
+						found = true
+						if source.Text() != want || source.FileName() != input.Path {
+							t.Errorf("generation crossed frozen input: source=%q text=%q; want source=%q text=%q", source.FileName(), source.Text(), input.Path, want)
+						}
+					}
+				}
+				if !found {
+					t.Fatal("captured source absent from every Program")
+				}
+			}
+			assertGeneration(frozen, firstSource)
+			for _, text := range []string{utils.BOM + "export const round = 1;\n", "export const round = 2;\n"} {
+				overlay := utils.NewOverlayVFS(frozen, map[string]string{input.Path: text, input.CanonicalPath: text})
+				assertGeneration(overlay, strings.TrimPrefix(text, utils.BOM))
+				for _, path := range []string{input.Path, input.CanonicalPath} {
+					if utils.SourceHasBOM(overlay, path) != strings.HasPrefix(text, utils.BOM) {
+						t.Errorf("generation lost BOM for %q", path)
+					}
+				}
+			}
+			if got, _ := fsys.ReadFile(tspath.ResolvePath(replacement, "source.ts")); got != replacementSource {
+				t.Fatalf("memory generations changed replacement disk source: %q", got)
+			}
+		})
+	}
+}
+
+func TestProgramInputsKeepFrozenLeafAndAuthoredLanguage(t *testing.T) {
+	for _, mode := range []string{"source only API", "source only CLI", "physical project root"} {
+		t.Run(mode, func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			owner, original, replacement := tspath.ResolvePath(root, "owner"), tspath.ResolvePath(root, "original"), tspath.ResolvePath(root, "replacement")
+			const text = "export const value: number = 1;\n"
+			writeProgramTestFiles(t, owner, map[string]string{"tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["source.ts"]}`})
+			writeProgramTestFiles(t, original, map[string]string{"source.txt": text, "sibling.ts": "original sibling"})
+			writeProgramTestFiles(t, replacement, map[string]string{"source.txt": "replacement source", "sibling.ts": "replacement sibling"})
+			alias := tspath.ResolvePath(root, "alias")
+			if err := os.Symlink(owner, alias); err != nil {
+				t.Skipf("directory symlink unavailable: %v", err)
+			}
+			leaf := tspath.ResolvePath(owner, "source.ts")
+			if err := os.Symlink(tspath.ResolvePath(original, "source.txt"), leaf); err != nil {
+				t.Skipf("file symlink unavailable: %v", err)
+			}
+			entries := rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}}
+			if mode == "physical project root" {
+				entries[0].LanguageOptions = &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+					Project: rslintconfig.ProjectPaths{tspath.ResolvePath(owner, "tsconfig.json")},
+				}}
+			}
+			configs := map[string]rslintconfig.RslintConfig{alias: entries}
+			fsys := bundled.WrapFS(osvfs.FS())
+			input := rslintconfig.FreezeFileIdentity(tspath.ResolvePath(alias, "source.ts"), fsys)
+			spaces := rslintconfig.NewPathSpaceSnapshot(configs, fsys)
+			plan, err := target.Resolve(target.Request{ConfigMap: configs, FS: fsys, Files: []rslintconfig.PathIdentity{input}, PathSpaces: spaces,
+				GitPolicy: rslintconfig.CollectGitPolicy(entries, alias, fsys, []rslintconfig.PathIdentity{input}, nil)})
+			if err != nil || len(plan.Files) != 1 {
+				t.Fatalf("resolve frozen target: files=%v error=%v", plan.Files, err)
+			}
+			if err := os.Remove(leaf); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(tspath.ResolvePath(replacement, "source.txt"), leaf); err != nil {
+				t.Fatal(err)
+			}
+			frozen, err := WithFrozenIO(fsys, spaces, plan.Files)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, path := range []string{input.Path, leaf, input.CanonicalPath} {
+				if got, ok := frozen.ReadFile(path); !ok || got != text || frozen.Realpath(path) != input.CanonicalPath {
+					t.Errorf("frozen leaf IO for %q = %q, %v, %q", path, got, ok, frozen.Realpath(path))
+				}
+			}
+			if got, _ := frozen.ReadFile(tspath.ResolvePath(replacement, "sibling.ts")); got != "replacement sibling" {
+				t.Fatalf("canonical file identity leaked into unrelated directory mapping: %q", got)
+			}
+			assertGeneration := func(generationFS vfs.FS, want string) {
+				t.Helper()
+				session := NewSession(generationFS)
+				projects, err := session.buildProjectsWithOptionsForTest(t, configs, plan, Targeted, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var binding LoadResult
+				if mode == "source only CLI" {
+					binding, err = session.LoadCLI(projects, plan, alias, true)
+				} else {
+					binding, err = session.LoadAPI(projects, plan, alias, true)
+				}
+				if err != nil || len(binding.Programs) != 1 {
+					t.Fatalf("bind frozen leaf: programs=%d error=%v", len(binding.Programs), err)
+				}
+				wantName := input.Path
+				if mode == "physical project root" {
+					wantName = leaf
+				}
+				source := binding.Programs[0].GetSourceFile(wantName)
+				if source == nil || source.Text() != strings.TrimPrefix(want, utils.BOM) || source.FileName() != wantName {
+					t.Fatalf("authored .ts root lost its source/name: %v", source)
+				}
+				if diagnostics := binding.Programs[0].SyntacticDiagnostics(context.Background(), source); len(diagnostics) != 0 {
+					t.Fatalf("authored .ts root was parsed using canonical .txt language: %v", diagnostics)
+				}
+				for _, path := range []string{input.Path, leaf, input.CanonicalPath} {
+					if got, ok := session.FS().ReadFile(path); !ok || got != source.Text() || utils.SourceHasBOM(session.FS(), path) != strings.HasPrefix(want, utils.BOM) {
+						t.Errorf("generation lost frozen leaf text/BOM at %q: text=%q readable=%v", path, got, ok)
+					}
+				}
+			}
+			assertGeneration(frozen, text)
+			for _, fixed := range []string{utils.BOM + "export const value: number = 2;\n", "export const value: number = 3;\n"} {
+				// The physical project root uses the third, Git-coordinate spelling.
+				// Its overlay lookup must follow the frozen realpath to these keys.
+				assertGeneration(utils.NewOverlayVFS(frozen, map[string]string{input.Path: fixed, input.CanonicalPath: fixed}), fixed)
+			}
+		})
+	}
+}
+
+func TestProgramInputsPreserveLexicalTsconfigExtendsSibling(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	physical := tspath.ResolvePath(root, "physical/project")
+	lexical := tspath.ResolvePath(root, "lexical/project")
+	writeProgramTestFiles(t, physical, map[string]string{
+		"tsconfig.json": `{"extends":"../outside/base.json","files":["source.ts"]}`,
+		"source.ts":     "export const value = 1;\n",
+	})
+	writeProgramTestFiles(t, tspath.ResolvePath(root, "physical/outside"), map[string]string{"base.json": `{"compilerOptions":{"strict":false,"noLib":true}}`})
+	writeProgramTestFiles(t, tspath.ResolvePath(root, "lexical/outside"), map[string]string{"base.json": `{"compilerOptions":{"strict":true,"noLib":true}}`})
+	if err := os.Symlink(physical, lexical); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	fsys := bundled.WrapFS(osvfs.FS())
+	configs := map[string]rslintconfig.RslintConfig{lexical: projectConfig("tsconfig.json")}
+	frozen, err := WithFrozenIO(fsys, rslintconfig.NewPathSpaceSnapshot(configs, fsys), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects, err := NewSession(frozen).BuildProjects(ProjectBuildRequest{Configs: configs, Scope: AllDeclared, SingleThreaded: true})
+	if err != nil || len(projects.Programs()) != 1 {
+		t.Fatalf("build aliased config: programs=%d error=%v", projects.Len(), err)
+	}
+	program := projects.Programs()[0]
+	if program.Options().Strict != core.TSTrue || program.Options().ConfigFilePath != tspath.ResolvePath(lexical, "tsconfig.json") {
+		t.Fatalf("extends used physical sibling or flattened config name: strict=%v config=%q", program.Options().Strict, program.Options().ConfigFilePath)
+	}
+}
+
+func TestProgramInputsKeepFrozenNativeCaseAliases(t *testing.T) {
+	fsys := bundled.WrapFS(osvfs.FS())
+	if fsys.UseCaseSensitiveFileNames() {
+		t.Skip("filesystem is case-sensitive")
+	}
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	first, second := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "second")
+	writeProgramTestFiles(t, first, map[string]string{"tsconfig.json": "FIRST", "only-first.ts": ""})
+	writeProgramTestFiles(t, second, map[string]string{"tsconfig.json": "SECOND", "source.ts": "SECOND SOURCE", "only-second.ts": ""})
+	original := tspath.ResolvePath(root, "original.txt")
+	if err := os.WriteFile(original, []byte("FIRST SOURCE"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	leaf := tspath.ResolvePath(first, "source.ts")
+	if err := os.Symlink(original, leaf); err != nil {
+		t.Skipf("file symlink unavailable: %v", err)
+	}
+	alias, alternate := tspath.ResolvePath(root, "Alias"), tspath.ResolvePath(root, "alias")
+	if err := os.Symlink(first, alias); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	if got, ok := fsys.ReadFile(tspath.ResolvePath(alias, "tsconfig.json")); !ok || got != "FIRST" {
+		t.Fatalf("initial alias does not read the first directory: %q, %v", got, ok)
+	}
+	if got, ok := fsys.ReadFile(tspath.ResolvePath(alternate, "tsconfig.json")); !ok || got != "FIRST" {
+		t.Skip("filesystem does not resolve the two alias spellings equivalently")
+	}
+	spaces := rslintconfig.NewPathSpaceSnapshot(map[string]rslintconfig.RslintConfig{alias: {{}}}, fsys)
+	input := rslintconfig.FreezeFileIdentity(tspath.ResolvePath(alias, "source.ts"), fsys)
+	withoutTargets, err := WithFrozenIO(fsys, spaces, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withTargets, err := WithFrozenIO(fsys, spaces, []target.File{{PathIdentity: input, ConfigDirectory: alias}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(alias); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(second, alias); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(leaf); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(tspath.ResolvePath(second, "source.ts"), leaf); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{alias, alternate, alias + "/", alternate + "/"} {
+		if got := tspath.NormalizePath(fsys.Realpath(path)); got != second {
+			t.Fatalf("alias did not move to the second directory: %q", got)
+		}
+		if got, ok := fsys.ReadFile(tspath.ResolvePath(path, "tsconfig.json")); !ok || got != "SECOND" {
+			t.Fatalf("unfrozen control did not read the replacement: %q, %v", got, ok)
+		}
+		for _, frozen := range []vfs.FS{withoutTargets, withTargets} {
+			if got, ok := frozen.ReadFile(tspath.ResolvePath(path, "tsconfig.json")); !ok || got != "FIRST" {
+				t.Errorf("case spelling escaped frozen directory: %q = %q, %v", path, got, ok)
+			}
+			entries := frozen.GetAccessibleEntries(path)
+			if !slices.Contains(entries.Files, "only-first.ts") || slices.Contains(entries.Files, "only-second.ts") || frozen.Realpath(path) != first {
+				t.Errorf("case spelling escaped frozen directory metadata: %q entries=%v realpath=%q", path, entries.Files, frozen.Realpath(path))
+			}
+		}
+	}
+	mixedSource := tspath.ResolvePath(alternate, "SOURCE.ts")
+	if got, ok := withTargets.ReadFile(mixedSource); !ok || got != "FIRST SOURCE" || withTargets.Realpath(mixedSource) != input.CanonicalPath {
+		t.Fatalf("case spelling escaped frozen leaf identity: text=%q readable=%v realpath=%q", got, ok, withTargets.Realpath(mixedSource))
+	}
+}
+
+type frozenCaseFlagFS struct {
+	vfs.FS
+	caseSensitive bool
+}
+
+func (fs *frozenCaseFlagFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
+
+func TestProgramInputsOnlyFoldUnambiguousNativeCaseIdentities(t *testing.T) {
+	for _, caseSensitive := range []bool{true, false} {
+		for _, conflicting := range []bool{false, true} {
+			t.Run(fmt.Sprintf("caseSensitive=%v/conflicting=%v", caseSensitive, conflicting), func(t *testing.T) {
+				directories := []rslintconfig.DirectoryIdentity{{LexicalPath: "/input/Anchor", CanonicalPath: "/captured/first"}}
+				files := []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: "/input/File.ts", CanonicalPath: "/captured/first.ts"}}}
+				if conflicting {
+					directories = append(directories, rslintconfig.DirectoryIdentity{LexicalPath: "/input/anchor", CanonicalPath: "/captured/second"})
+					files = append(files, target.File{PathIdentity: rslintconfig.PathIdentity{Path: "/input/file.ts", CanonicalPath: "/captured/second.ts"}})
+				}
+				spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, directories...)
+				values := spaces.DirectoryIdentities()
+				values[0].CanonicalPath = "/unrelated"
+				frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, files)
+				if err != nil {
+					t.Fatal(err)
+				}
+				view := frozen.(*frozenFileSystem)
+				for _, directory := range directories {
+					if got := view.ioPath(directory.LexicalPath + "/source.ts"); got != directory.CanonicalPath+"/source.ts" {
+						t.Errorf("exact directory identity changed: %q", got)
+					}
+				}
+				for _, file := range files {
+					if got := view.ioPath(file.Path); got != file.CanonicalPath {
+						t.Errorf("exact file identity changed: %q", got)
+					}
+				}
+				wantDirectory, wantFile := "/input/aNcHoR/source.ts", "/input/fIlE.ts"
+				if !caseSensitive && !conflicting {
+					wantDirectory, wantFile = "/captured/first/source.ts", "/captured/first.ts"
+				}
+				if got := view.ioPath("/input/aNcHoR/source.ts"); got != wantDirectory {
+					t.Errorf("directory case fallback = %q, want %q", got, wantDirectory)
+				}
+				if got := view.ioPath("/input/fIlE.ts"); got != wantFile {
+					t.Errorf("file case fallback = %q, want %q", got, wantFile)
+				}
+			})
+		}
+	}
+}
+
+func TestProgramInputsPreserveFrozenMappingPrecedence(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		directories []rslintconfig.DirectoryIdentity
+		files       []target.File
+		queries     map[string]string
+	}{
+		{
+			name: "self directory shields descendants from outer alias",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/input", CanonicalPath: "/physical"},
+				{LexicalPath: "/input/nested", CanonicalPath: "/input/nested"},
+			},
+			queries: map[string]string{"/input/nested/dependency.ts": "/input/nested/dependency.ts"},
+		},
+		{
+			name: "canonical file wins over another lexical alias",
+			files: []target.File{
+				{PathIdentity: rslintconfig.PathIdentity{Path: "/input/source.ts", CanonicalPath: "/physical/source.ts"}},
+				{PathIdentity: rslintconfig.PathIdentity{Path: "/physical/source.ts", CanonicalPath: "/other/source.ts"}},
+			},
+			queries: map[string]string{"/physical/source.ts": "/physical/source.ts", "/input/source.ts": "/physical/source.ts"},
+		},
+		{
+			name: "nearest folded directory wins over exact ancestor",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/input", CanonicalPath: "/input"},
+				{LexicalPath: "/input/Alias", CanonicalPath: "/captured"},
+			},
+			queries: map[string]string{"/input/alias/package.json": "/captured/package.json"},
+		},
+		{
+			name: "ambiguous folded directory falls back to ancestor",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/input", CanonicalPath: "/fallback"},
+				{LexicalPath: "/input/Anchor", CanonicalPath: "/input/Anchor"},
+				{LexicalPath: "/input/anchor", CanonicalPath: "/other"},
+			},
+			queries: map[string]string{"/input/Anchor/source.ts": "/input/Anchor/source.ts", "/input/aNcHoR/source.ts": "/fallback/aNcHoR/source.ts"},
+		},
+		{
+			name:        "Unicode folding changes prefix byte length",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "/input/k/Anchor", CanonicalPath: "/captured"}},
+			queries:     map[string]string{"/input/\u212A/anchor/deep/source.ts": "/captured/deep/source.ts"},
+		},
+		{
+			name: "normalize before selecting directory",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/input", CanonicalPath: "/input"},
+				{LexicalPath: "/input/alias", CanonicalPath: "/physical"},
+			},
+			queries: map[string]string{"/input/alias/../outside/base.json": "/input/outside/base.json", "/input/child/": "/input/child"},
+		},
+		{
+			name:        "trailing separator addresses the nearest alias",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "/input/alias", CanonicalPath: "/captured"}},
+			queries:     map[string]string{"/input/alias/": "/captured"},
+		},
+		{
+			name:        "relative directory keeps identity key normalization",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "relative/Src", CanonicalPath: "/captured"}},
+			queries:     map[string]string{"relative/Src/": "/captured", "relative/src/dependency.ts": "/captured/dependency.ts"},
+		},
+		{
+			name:        "drive identity retains directory casing",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "c:/Repo", CanonicalPath: "C:/Repo"}},
+			queries:     map[string]string{`c:\Repo\child.ts`: "C:/Repo/child.ts", "c:/outside/child.ts": "c:/outside/child.ts"},
+		},
+		{
+			name:        "UNC self directory keeps share boundary",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "//server/share", CanonicalPath: "//server/share"}},
+			queries:     map[string]string{"//server/share/child.ts": "//server/share/child.ts", "//server/other/child.ts": "//server/other/child.ts"},
+		},
+		{
+			name:        "filesystem root keeps its separator",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "/", CanonicalPath: "/"}},
+			queries:     map[string]string{"/": "/", "/child/": "/child"},
+		},
+		{
+			name: "compressed suffix does not introduce drive or dynamic roots",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/Users/Dev/C:", CanonicalPath: "/captured/drive"},
+				{LexicalPath: "/Users/Dev/^", CanonicalPath: "/captured/dynamic"},
+			},
+			queries: map[string]string{"/Users/Dev/c:/child.ts": "/captured/drive/child.ts", "/users/dev/^/child.ts": "/captured/dynamic/child.ts"},
+		},
+		{
+			name:        "compressed shortest anchor and trailing separator",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "/Users/Dev/Anchor", CanonicalPath: "/captured"}},
+			queries:     map[string]string{"/Users/Dev/anchor": "/captured", "/Users/Dev/anchor/": "/captured", "/elsewhere/anchor/child.ts": "/elsewhere/anchor/child.ts"},
+		},
+		{
+			name:        "compressed Unicode prefix changes byte length",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "/Users/\u212A/Anchor", CanonicalPath: "/captured"}},
+			queries:     map[string]string{"/Users/k/anchor/child.ts": "/captured/child.ts", "/Users/\u212A/anchor/child.ts": "/captured/child.ts"},
+		},
+		{
+			name: "compressed Unicode suffix changes byte length",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/Users/Dev/k/Anchor", CanonicalPath: "/captured"},
+				{LexicalPath: "/Users/Dev/Other", CanonicalPath: "/other"},
+			},
+			queries: map[string]string{"/Users/Dev/\u212A/anchor/deep/child.ts": "/captured/deep/child.ts"},
+		},
+		{
+			name: "compressed nearest folded anchor precedes exact ancestor",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/Users/Dev/Base", CanonicalPath: "/fallback"},
+				{LexicalPath: "/Users/Dev/Base/Alias", CanonicalPath: "/captured"},
+			},
+			queries: map[string]string{"/Users/Dev/Base/alias/package.json": "/captured/package.json"},
+		},
+		{
+			name: "compressed ambiguous parents retain exact priority and ancestor fallback",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/Users/Dev/Base", CanonicalPath: "/fallback"},
+				{LexicalPath: "/Users/Dev/Base/Anchor", CanonicalPath: "/first"},
+				{LexicalPath: "/Users/Dev/Base/anchor", CanonicalPath: "/second"},
+			},
+			queries: map[string]string{"/Users/Dev/Base/Anchor/child.ts": "/first/child.ts", "/Users/Dev/Base/aNcHoR/child.ts": "/fallback/aNcHoR/child.ts"},
+		},
+		{
+			name: "compressed ambiguous files retain exact priority",
+			files: []target.File{
+				{PathIdentity: rslintconfig.PathIdentity{Path: "/Users/Dev/File.ts", CanonicalPath: "/Users/Dev/first.ts"}},
+				{PathIdentity: rslintconfig.PathIdentity{Path: "/Users/Dev/file.ts", CanonicalPath: "/Users/Dev/second.ts"}},
+			},
+			queries: map[string]string{"/Users/Dev/File.ts": "/Users/Dev/first.ts", "/Users/Dev/fIlE.ts": "/Users/Dev/fIlE.ts", "/Users/Dev/first.ts": "/Users/Dev/first.ts"},
+		},
+		{
+			name: "mixed POSIX and UNC server roots retain full keys",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/Repo", CanonicalPath: "/Repo"},
+				{LexicalPath: "//Server/", CanonicalPath: "/captured"},
+			},
+			queries: map[string]string{"//server/share/child.ts": "/captured/share/child.ts"},
+		},
+		{
+			name: "different UNC server roots retain full keys",
+			directories: []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "//First/", CanonicalPath: "/first"},
+				{LexicalPath: "//Second/", CanonicalPath: "/second"},
+			},
+			queries: map[string]string{"//first/share/child.ts": "/first/share/child.ts", "//second/share/child.ts": "/second/share/child.ts"},
+		},
+		{
+			name:        "drive root retains full keys",
+			directories: []rslintconfig.DirectoryIdentity{{LexicalPath: "C:/", CanonicalPath: "/captured"}},
+			queries:     map[string]string{"c:/child.ts": "/captured/child.ts"},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, test.directories...)
+			frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS()}, spaces, test.files)
+			if err != nil {
+				t.Fatal(err)
+			}
+			view := frozen.(*frozenFileSystem)
+			for path, want := range test.queries {
+				if got := view.ioPath(path); got != want {
+					t.Errorf("ioPath(%q) = %q, want %q", path, got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestProgramInputsKeepSelfFileIdentityForFixOverlay(t *testing.T) {
+	const source, alternate, replacement = "/repo/source.ts", "/repo/SOURCE.ts", "/replacement/source.ts"
+	fsys := &canonicalIdentityTestFS{FS: osvfs.FS(), realPaths: make(map[string]string)}
+	frozen, err := WithFrozenIO(fsys, rslintconfig.NewPathSpaceSnapshot(nil, nil), []target.File{{
+		PathIdentity: rslintconfig.PathIdentity{Path: source, CanonicalPath: source, CanonicalParentPath: "/repo"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fsys.realPaths[source], fsys.realPaths[alternate] = replacement, replacement
+	if fsys.Realpath(alternate) != replacement || frozen.Realpath(alternate) != source {
+		t.Fatal("self file identity was re-observed after the namespace changed")
+	}
+	const fixed = "export const fixed = 1;\n"
+	overlay := utils.NewOverlayVFS(frozen, map[string]string{source: utils.BOM + fixed})
+	if text, ok := overlay.ReadFile(alternate); !ok || text != fixed || !utils.SourceHasBOM(overlay, alternate) {
+		t.Fatalf("case alias lost the frozen fix overlay: text=%q readable=%v", text, ok)
+	}
+}
+
+func TestProgramInputsMapUnchangedPathsWithBoundedAllocations(t *testing.T) {
+	for _, test := range []struct {
+		name, root, path  string
+		foldedAllocations float64
+	}{
+		{"changing suffix", "/Users/Developer/Repo", "/Users/Developer/Repo/node_modules/.pnpm/Package/lib/types.d.ts", 1},
+		{"unchanged suffix", "/Users/Developer/repo", "/Users/Developer/repo/node_modules/.pnpm/package/lib/types.d.ts", 0},
+	} {
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, rslintconfig.DirectoryIdentity{LexicalPath: test.root, CanonicalPath: test.root})
+		for _, caseSensitive := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/caseSensitive=%v", test.name, caseSensitive), func(t *testing.T) {
+				frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				view := frozen.(*frozenFileSystem)
+				if got := view.ioPath(test.path); got != test.path {
+					t.Fatalf("unchanged path = %q, want %q", got, test.path)
+				}
+				limit := 0.0
+				if !caseSensitive {
+					limit = test.foldedAllocations
+				}
+				if allocations := testing.AllocsPerRun(100, func() { view.ioPath(test.path) }); allocations > limit {
+					t.Fatalf("unchanged IO allocated %.0f times, want at most %.0f", allocations, limit)
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkFrozenIOPaths(b *testing.B) {
+	const root = "/Users/Developer/repo"
+	spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, rslintconfig.DirectoryIdentity{LexicalPath: root, CanonicalPath: root})
+	for _, caseSensitive := range []bool{true, false} {
+		for _, path := range []string{root + "/package.json", root + "/node_modules/.pnpm/package/lib/types.d.ts", root + "/node_modules/.pnpm/Package/lib/types.d.ts", "/external/node_modules/Package/lib/types.d.ts"} {
+			b.Run(fmt.Sprintf("caseSensitive=%v/%s", caseSensitive, path), func(b *testing.B) {
+				frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, nil)
+				if err != nil {
+					b.Fatal(err)
+				}
+				view := frozen.(*frozenFileSystem)
+				b.ReportAllocs()
+				b.ResetTimer()
+				for range b.N {
+					view.ioPath(path)
+				}
+			})
+		}
 	}
 }

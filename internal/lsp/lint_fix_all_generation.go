@@ -43,6 +43,9 @@ func acquireSpeculativeGeneration(
 	if err := ctx.Err(); err != nil {
 		return linter.Generation{}, nil, err
 	}
+	if snapshot.unavailable {
+		return emptyLintGeneration(environment.processCwd), nil, nil
+	}
 	if !snapshot.configResolved {
 		snapshot = resolveDocumentLintSnapshotConfig(snapshot, environment.baseFS)
 	}

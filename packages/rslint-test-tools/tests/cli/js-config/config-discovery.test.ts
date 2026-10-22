@@ -547,6 +547,78 @@ describe('CLI config discovery (upward traversal)', () => {
     }
   });
 
+  test.each([false, true])(
+    'directory discovery keeps its frozen tree when loading a config moves the alias (fix: %s)',
+    async (fix) => {
+      const ruleName = fix ? 'no-var' : 'no-debugger';
+      const source = fix ? 'var value = 1;\n' : 'debugger;\n';
+      const tempDir = await createTempDir({
+        'rslint.config.mjs': `
+        import fs from 'node:fs';
+        import { fileURLToPath } from 'node:url';
+        const alias = fileURLToPath(new URL('./alias', import.meta.url));
+        fs.unlinkSync(alias);
+        fs.symlinkSync(fileURLToPath(new URL('./second', import.meta.url)), alias, 'junction');
+        export default [{ rules: { '${ruleName}': 'error' } }];
+      `,
+        'first/scope/rslint.config.mjs': `
+        import { rules } from './rules.mjs';
+        export default [{ files: ['*.js'], rules }];
+      `,
+        'first/scope/rules.mjs': `export const rules = { '${ruleName}': 'error' };`,
+        'first/scope/from-first.js': source,
+        'second/scope/rslint.config.mjs': `throw new Error('loaded moved directory second');`,
+        'second/scope/from-second.js': 'debugger;\n',
+        ...(fix ? { 'second/scope/from-first.js': source } : {}),
+      });
+      try {
+        const alias = path.join(tempDir, 'alias');
+        fs.symlinkSync(path.join(tempDir, 'first'), alias, 'junction');
+        const result = await runRslint(
+          [...(fix ? ['--fix'] : []), '--format', 'jsonline', 'alias'],
+          tempDir,
+        );
+        expect(fs.realpathSync(alias)).toBe(
+          fs.realpathSync(path.join(tempDir, 'second')),
+        );
+        expect(result.stderr).not.toContain('loaded moved directory second');
+        expect(result.stdout).not.toContain('from-second.js');
+        if (fix) {
+          expect(result.exitCode, result.stderr).toBe(0);
+          expect(
+            fs.readFileSync(
+              path.join(tempDir, 'first/scope/from-first.js'),
+              'utf8',
+            ),
+          ).toBe('let value = 1;\n');
+          expect(
+            fs.readFileSync(
+              path.join(tempDir, 'second/scope/from-first.js'),
+              'utf8',
+            ),
+          ).toBe(source);
+          return;
+        }
+        expect(result.exitCode, result.stderr).toBe(1);
+        expect(result.stdout, result.stderr).not.toBe('');
+        const diagnostics = result.stdout
+          .trim()
+          .split('\n')
+          .map(
+            (line) =>
+              JSON.parse(line) as { filePath: string; ruleName: string },
+          );
+        expect(diagnostics).toHaveLength(1);
+        expect(diagnostics[0].ruleName).toBe(ruleName);
+        expect(diagnostics[0].filePath.split(path.sep).join('/')).toMatch(
+          /(^|\/)alias\/scope\/from-first\.js$/,
+        );
+      } finally {
+        await cleanupTempDir(tempDir);
+      }
+    },
+  );
+
   test('explicit directory ownership remains lexical when its physical config is also loaded', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': `export default [{
