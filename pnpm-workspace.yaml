@@ -15,7 +15,7 @@ allowBuilds:
 
 catalog:
   '@microsoft/api-extractor': ^7.58.12
-  '@napi-rs/cli': ^3.8.2
+  '@napi-rs/cli': ^3.10.8
   '@types/picomatch': ^4.0.3
   esbuild: ^0.28.1
   fast-glob: ^3.3.3
