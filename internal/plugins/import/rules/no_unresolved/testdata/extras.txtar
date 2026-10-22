@@ -24,3 +24,23 @@ import 'dependency';
 module.exports = 1;
 -- node_modules/_stream_readable/index.js --
 module.exports = 1;
+-- typescript-fallback/tsconfig.json --
+{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","paths":{"@/*":["./src/*"],"~/*":["./missing/*","./src/*"]}},"include":["src"]}
+-- typescript-fallback/src/style.css --
+.example { color: red; }
+-- typescript-fallback/src/logo.svg --
+<svg xmlns="http://www.w3.org/2000/svg"></svg>
+-- typescript-fallback/src/legacy.js --
+export const value = 1;
+-- typescript-fallback/src/util.ts --
+export const value = 1;
+-- typescript-fallback/node_modules/pkg/package.json --
+{"name":"pkg","main":"index.js"}
+-- typescript-fallback/node_modules/pkg/dist/reset.css --
+.reset { margin: 0; }
+-- typescript-fallback/node_modules/exported/package.json --
+{"name":"exported","exports":{"./style.css":"./dist/style.css"}}
+-- typescript-fallback/node_modules/exported/dist/style.css --
+.style { color: red; }
+-- typescript-fallback/node_modules/exported/private/hidden.css --
+.hidden { color: red; }
