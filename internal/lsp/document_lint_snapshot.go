@@ -342,10 +342,8 @@ func (s *Server) documentWorkspaceDirectory(file target.File, pathSpaces *config
 			roots = []string{*params.RootPath.String}
 		}
 	}
-	useCaseSensitive := true
-	if s.fs != nil {
-		useCaseSensitive = s.fs.UseCaseSensitiveFileNames()
-	}
+	// The global filesystem case policy cannot prove directory identity.
+	// Keep lexical casing exact; actual aliases match in the physical pass.
 	for _, physical := range []bool{false, true} {
 		selected := ""
 		depth := 0
@@ -369,7 +367,7 @@ func (s *Server) documentWorkspaceDirectory(file target.File, pathSpaces *config
 			if directory == "" || path == "" {
 				continue
 			}
-			if _, contains := config.RelativePathWithinConfigRoot(path, directory, useCaseSensitive); contains && len(directory) > depth {
+			if _, contains := config.RelativePathWithinConfigRoot(path, directory, true); contains && len(directory) > depth {
 				selected = root
 				depth = len(directory)
 			}

@@ -1765,6 +1765,67 @@ func TestDocumentServiceBoundaryDistinguishesFileAndDirectoryLinks(t *testing.T)
 	}
 }
 
+func TestDocumentServiceBoundaryVerifiesDirectoryCaseIdentity(t *testing.T) {
+	for _, root := range []string{"/repo", "c:/Repo", "//server/share/Repo"} {
+		for _, sameDirectory := range []bool{false, true} {
+			name := root + "/distinct directories"
+			if sameDirectory {
+				name = root + "/same directory alias"
+			}
+			t.Run(name, func(t *testing.T) {
+				const content = "declare const value: number;\nvar result = value as number;\n"
+				file := root + "/app/pkg/target.ts"
+				fsys := &configBoundaryIdentityFS{FS: &mockFS{}, caseSensitive: false}
+				workspace := root + "/APP/pkg"
+				folders := []*lsproto.WorkspaceFolder{{Uri: lsproto.URI(documentURIFromPath(root))}}
+				if sameDirectory {
+					workspace = root + "/APP"
+					folders = nil
+					fsys.realPaths = map[string]string{workspace: root + "/app"}
+				}
+				folders = append(folders, &lsproto.WorkspaceFolder{Uri: lsproto.URI(documentURIFromPath(workspace))})
+				server := newTestServer()
+				server.cwd = root
+				server.fs = bundled.WrapFS(utils.NewOverlayVFS(fsys, map[string]string{
+					root + "/app/tsconfig.json":     `{"files":["pkg/target.ts"]}`,
+					root + "/app/pkg/tsconfig.json": `{"files":[]}`,
+					root + "/APP/pkg/tsconfig.json": `{"files":[]}`,
+					file:                            content,
+				}))
+				server.initializeParams = &lsproto.InitializeParams{WorkspaceFolders: &lsproto.WorkspaceFoldersOrNull{WorkspaceFolders: &folders}}
+				entries := config.RslintConfig{{
+					Plugins:         []string{"@typescript-eslint"},
+					LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
+					Rules:           config.Rules{"no-var": "error", "@typescript-eslint/no-unnecessary-type-assertion": "error"},
+				}}
+				installJSConfigsForTest(server, map[string]config.RslintConfig{root + "/app": entries})
+				uri := documentURIFromPath(file)
+				snapshot := server.documentLintSnapshot(uri)
+				if snapshot.projectPolicyError != nil {
+					t.Fatal(snapshot.projectPolicyError)
+				}
+				provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+				generation, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				result, err := runLSPGenerationForTest(context.Background(), generation, release, linter.ArtifactDemand{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				var typed bool
+				for _, diagnostic := range result.Observation.Native.Diagnostics {
+					typed = typed || diagnostic.RuleName == "@typescript-eslint/no-unnecessary-type-assertion"
+				}
+				fixed := runSpeculativeFixAllForTest(t, server, context.Background(), uri, content, snapshot)
+				if !typed || strings.Contains(fixed, " as number") || strings.Contains(fixed, "var ") {
+					t.Fatalf("directory identity lost type diagnostics or fixes: typed=%v fixed=%q", typed, fixed)
+				}
+			})
+		}
+	}
+}
+
 func TestDocumentProjectPolicyUsesMatchingEntries(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
 	directory := tspath.NormalizePath(archive.Materialize(t, "nested"))
