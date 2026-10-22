@@ -2406,6 +2406,60 @@ func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *tes
 		}
 	})
 
+	for _, test := range []struct {
+		name                 string
+		broken, withAncestor bool
+	}{
+		{name: "containing directory before leaf destination"},
+		{name: "failed containing config falls back to its ancestor", broken: true, withAncestor: true},
+		{name: "failed containing chain does not switch to leaf destination", broken: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			lexicalRoot, physicalRoot, leafRoot := discoveryTempDir(t), discoveryTempDir(t), discoveryTempDir(t)
+			loader := newFixtureConfigLoader()
+			parentConfig := writeConfigCandidate(t, physicalRoot, "real/rslint.config.js")
+			leafConfig := writeConfigCandidate(t, leafRoot, "rslint.config.js")
+			loader.configs[leafConfig] = namedConfig("leaf")
+			wantOwner := tspath.CombinePaths(physicalRoot, "real")
+			wantRequests := []string{parentConfig}
+			if test.broken {
+				loader.failures[parentConfig] = ConfigModuleError{Code: "ERR_MODULE", Message: "broken parent config"}
+				wantOwner = ""
+			} else {
+				loader.configs[parentConfig] = namedConfig("parent")
+			}
+			if test.withAncestor {
+				ancestor := writeConfigCandidate(t, physicalRoot, "rslint.config.js")
+				loader.configs[ancestor] = namedConfig("ancestor")
+				wantRequests = append(wantRequests, ancestor)
+				wantOwner = physicalRoot
+			}
+			lexicalFile := writeDiscoveryFixture(t, lexicalRoot, "link/leaf.ts", "export {};\n")
+			physicalFile := writeDiscoveryFixture(t, physicalRoot, "real/sub/leaf.ts", "export {};\n")
+			canonicalFile := writeDiscoveryFixture(t, leafRoot, "leaf.ts", "export {};\n")
+			catalog, err := discoverTestAutomatic(context.Background(), discoveryTestFS(), loader, ConfigDiscoveryRequest{
+				CWD: lexicalRoot,
+				Files: []DiscoveryFile{{PathIdentity: rslintconfig.PathIdentity{
+					Path: lexicalFile, CanonicalPath: canonicalFile,
+					CanonicalParentPath: tspath.GetDirectoryPath(physicalFile),
+				}, Explicit: true}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var wantOwners []string
+			if wantOwner != "" {
+				wantOwners = []string{wantOwner}
+			}
+			if !slices.Equal(catalog.ConfigDirectories(), wantOwners) || (test.broken && len(catalog.Failures) != 1) {
+				t.Fatalf("containing owner: catalog=%+v err=%v, want %s", catalog, err, wantOwner)
+			}
+			if got := requestedConfigPaths(loader); !slices.Equal(got, wantRequests) {
+				t.Fatalf("containing ancestry requests = %v, want %v without leaf config", got, wantRequests)
+			}
+		})
+	}
+
 	t.Run("lexical candidate wins", func(t *testing.T) {
 		lexicalRoot := discoveryTempDir(t)
 		physicalRoot := discoveryTempDir(t)

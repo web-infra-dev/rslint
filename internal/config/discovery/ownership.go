@@ -228,10 +228,21 @@ func (coordinator *discoveryCoordinator) resolveSeedOwners(seeds []*discoverySee
 			}
 			candidate, found := coordinator.findCandidateUp(seed.searchDir)
 			if !found {
-				if !seed.usingCanonical && !seed.lexicalCandidate && seed.canonicalSearchDir != "" {
+				if !seed.usingCanonical && !seed.lexicalCandidate {
 					seed.usingCanonical = true
-					seed.searchDir = seed.canonicalSearchDir
-					candidate, found = coordinator.findCandidateUp(seed.searchDir)
+					// A directory alias keeps its containing ancestry ahead of a
+					// leaf symlink's destination. Once a chain has a candidate,
+					// load failures continue on that chain, never another fallback.
+					for _, directory := range []string{seed.physicalDirectory, seed.canonicalSearchDir} {
+						if directory == "" || directory == seed.searchDir {
+							continue
+						}
+						seed.searchDir = directory
+						candidate, found = coordinator.findCandidateUp(directory)
+						if found {
+							break
+						}
+					}
 				}
 			}
 			if !found {

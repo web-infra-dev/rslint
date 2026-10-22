@@ -288,6 +288,11 @@ func resolveConfigPathSpaceWithCanonicalParent(
 	if pathUsesVerifiedConfigAlias(expectedPhysicalFile, physicalAliasAncestors) {
 		return expectedPhysicalFile, physicalConfigDir
 	}
+	// A directory alias can enter the config tree even when the leaf symlink
+	// points out of it. Keep that containing coordinate and lexical basename.
+	if relative, ok := RelativePathWithinConfigRoot(expectedPhysicalFile, physicalConfigDir, true); ok {
+		return tspath.ResolvePath(physicalConfigDir, relative), physicalConfigDir
+	}
 	if !targetHasDistinctLeafIdentity {
 		if relative, ok := RelativePathWithinConfigRoot(physicalFilePath, physicalConfigDir, true); ok {
 			return tspath.ResolvePath(physicalConfigDir, relative), physicalConfigDir
