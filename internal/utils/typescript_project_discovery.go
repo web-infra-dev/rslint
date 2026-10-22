@@ -143,12 +143,25 @@ func (q *typeScriptProjectSearch) references(parsed *tsoptions.ParsedCommandLine
 // Find returns a config whose files/include roots contain fileName, or nil
 // when the target must use gap linting. rootDirectory bounds ancestor search;
 // extends and explicit references can still point outside that directory.
+// As in TypeScript's project service, a target outside the root searches its
+// own ancestor tree. Directory aliases into the root retain the equivalent
+// boundary in the target's lexical path.
 func (d *TypeScriptProjectDiscovery) Find(fileName, rootDirectory string) (*tsoptions.ParsedCommandLine, error) {
+	fileName = tspath.NormalizePath(fileName)
 	query := typeScriptProjectSearch{
-		discovery: d, file: d.path(tspath.NormalizePath(fileName)), seen: make(map[tspath.Path]bool),
+		discovery: d, file: d.path(fileName), seen: make(map[tspath.Path]bool),
 	}
-	root := d.path(tspath.GetNormalizedAbsolutePath(rootDirectory, ""))
-	for directory := tspath.GetDirectoryPath(fileName); ; directory = tspath.GetDirectoryPath(directory) {
+	directory := tspath.GetDirectoryPath(fileName)
+	boundary, contains := DirectorySearchBoundary(
+		DirectoryIdentity{LexicalPath: directory},
+		DirectoryIdentity{LexicalPath: tspath.GetNormalizedAbsolutePath(rootDirectory, "")},
+		d.fs,
+	)
+	if !contains {
+		// External targets retain TypeScript's own-ancestor search behavior.
+		boundary = tspath.GetPathComponents(directory, "")[0]
+	}
+	for ; ; directory = tspath.GetDirectoryPath(directory) {
 		for _, name := range []string{"tsconfig.json", "jsconfig.json"} {
 			parsed, err := d.config(tspath.ResolvePath(directory, name))
 			if err != nil {
@@ -168,7 +181,7 @@ func (d *TypeScriptProjectDiscovery) Find(fileName, rootDirectory string) (*tsop
 				return query.fallback, nil
 			}
 		}
-		if d.path(directory) == root || tspath.GetBaseFileName(string(d.path(directory))) == "node_modules" ||
+		if ExactPathID(directory) == ExactPathID(boundary) || tspath.GetBaseFileName(string(d.path(directory))) == "node_modules" ||
 			tspath.GetDirectoryPath(directory) == directory {
 			return query.fallback, nil
 		}

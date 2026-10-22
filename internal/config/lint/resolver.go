@@ -36,10 +36,8 @@ type ResolverOptions struct {
 	ConfigsByOwner  map[string]config.RslintConfig
 	Config          config.RslintConfig
 	ConfigDirectory string
-	// DefaultRootDirectory is the loaded config module directory, or the
-	// invocation cwd for an inline-only Config. It must not be inferred from
+	// DefaultRootDirectory is the invocation cwd. It must not be inferred from
 	// ConfigDirectory, which may instead be a synthetic matching/path base.
-	// ConfigsByOwner supplies each module's own directory and ignores this field.
 	DefaultRootDirectory string
 	Catalog              *rule.Catalog
 	TargetsBySourcePath  map[string]target.File
@@ -142,10 +140,6 @@ func (resolver *Resolver) ResolveTarget(file target.File) (config.ResolvedFileCo
 // resolved concurrently unless singleThreaded is set; policy projection and
 // errors retain the input order.
 func (resolver *Resolver) ProjectPolicies(files []target.File, singleThreaded bool) (map[target.File]config.ProjectPolicy, error) {
-	ownerRoots := make(map[*config.FileConfigResolver]string, len(resolver.configsByOwner))
-	for owner := range resolver.configsByOwner {
-		ownerRoots[resolver.resolversByOwnerPath[config.ExactPathID(owner)]] = owner
-	}
 	policies := make(map[target.File]config.ProjectPolicy, len(files))
 	resolvedPolicies := make(map[*config.MergedConfig]config.ProjectPolicy)
 	var configs []projectTargetConfig
@@ -153,10 +147,6 @@ func (resolver *Resolver) ProjectPolicies(files []target.File, singleThreaded bo
 		configs = resolver.resolveProjectTargetConfigs(files, workers)
 	}
 	for index, file := range files {
-		defaultRootDirectory := resolver.defaultRootDirectory
-		if resolver.configsByOwner != nil {
-			defaultRootDirectory = ownerRoots[resolver.resolversByOwnerPath[config.ExactPathID(file.ConfigDirectory)]]
-		}
 		var resolved config.ResolvedFileConfig
 		var ok bool
 		if configs == nil {
@@ -173,7 +163,7 @@ func (resolver *Resolver) ProjectPolicies(files []target.File, singleThreaded bo
 		policy, cached := resolvedPolicies[resolved.MergedConfig]
 		if !cached {
 			var err error
-			policy, err = config.ResolveProjectPolicy(resolved, defaultRootDirectory)
+			policy, err = config.ResolveProjectPolicy(resolved, resolver.defaultRootDirectory)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", file.Path, err)
 			}

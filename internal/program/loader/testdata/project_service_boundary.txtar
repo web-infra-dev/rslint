@@ -1,0 +1,16 @@
+-- tsconfig.json --
+{"$schema":"https://json.schemastore.org/tsconfig"}
+-- packages/pkg/tsconfig.json --
+{"include":["src"],"exclude":["src/**/__tests__/**"]}
+-- packages/pkg/src/main.ts --
+export const main = 1;
+-- packages/pkg/src/__tests__/main.test.ts --
+export const test = 2;
+-- packages/pkg/.storybook/main.ts --
+export const story = 3;
+-- packages/other/src/a.ts --
+export const a = 4;
+-- packages/other/src/b.ts --
+export const b = 5;
+-- packages/other/src/deep/c.ts --
+export const c = 6;

@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // documentLintSnapshot freezes every config-sensitive fact for one editor
@@ -29,6 +30,7 @@ type documentLintSnapshot struct {
 	configResolved        bool
 	projectPolicy         config.ProjectPolicy
 	projectPolicyError    error
+	defaultRootDirectory  string
 	typeScriptConfigPaths []string
 	configKey             string
 	pluginGeneration      string
@@ -72,7 +74,7 @@ func resolveDocumentLintSnapshotProjects(
 	snapshot documentLintSnapshot,
 	fs vfs.FS,
 ) documentLintSnapshot {
-	snapshot.projectPolicy, snapshot.projectPolicyError = config.ResolveProjectPolicy(snapshot.resolvedConfig, snapshot.target.ConfigDirectory)
+	snapshot.projectPolicy, snapshot.projectPolicyError = config.ResolveProjectPolicy(snapshot.resolvedConfig, snapshot.defaultRootDirectory)
 	snapshot.typeScriptConfigPaths = nil
 	if snapshot.projectPolicyError != nil {
 		return snapshot
@@ -304,21 +306,68 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 	target.ConfigDirectory = selection.directory
 	_, unavailable := s.jsUnavailableConfigs[selection.configKey]
 	snapshot := documentLintSnapshot{
-		target:           target,
-		config:           selection.entries,
-		resolvedConfig:   selection.resolved,
-		pathSpaces:       selection.pathSpaces,
-		gitPolicy:        selection.gitPolicy,
-		ruleCatalog:      selection.ruleCatalog,
-		configResolved:   !selection.configMissing,
-		configKey:        selection.configKey,
-		pluginGeneration: s.eslintPluginConfigGeneration,
-		unavailable:      selection.unavailable || selection.configKey != "" && unavailable,
+		target:               target,
+		config:               selection.entries,
+		resolvedConfig:       selection.resolved,
+		pathSpaces:           selection.pathSpaces,
+		gitPolicy:            selection.gitPolicy,
+		ruleCatalog:          selection.ruleCatalog,
+		configResolved:       !selection.configMissing,
+		configKey:            selection.configKey,
+		pluginGeneration:     s.eslintPluginConfigGeneration,
+		defaultRootDirectory: s.documentWorkspaceDirectory(target, selection.pathSpaces),
+		unavailable:          selection.unavailable || selection.configKey != "" && unavailable,
 	}
 	if snapshot.configResolved {
 		snapshot = resolveDocumentLintSnapshotProjects(snapshot, s.fs)
 	}
 	return snapshot
+}
+
+// documentWorkspaceDirectory freezes the nearest workspace's equivalent search
+// boundary in the document's lexical tree. Later lint and fix operations never
+// need to resolve the workspace alias again. Config ownership is independent.
+//
+//nolint:staticcheck // Older LSP clients supply rootUri/rootPath instead of workspaceFolders.
+func (s *Server) documentWorkspaceDirectory(file target.File, pathSpaces *config.PathSpaceSnapshot) string {
+	roots := []string{s.cwd}
+	if params := s.initializeParams; params != nil {
+		if params.WorkspaceFolders != nil && params.WorkspaceFolders.WorkspaceFolders != nil {
+			roots = nil
+			for _, folder := range *params.WorkspaceFolders.WorkspaceFolders {
+				roots = append(roots, uriToPath(lsproto.DocumentUri(folder.Uri)))
+			}
+		} else if params.RootUri.DocumentUri != nil {
+			roots = []string{uriToPath(*params.RootUri.DocumentUri)}
+		} else if params.RootPath != nil && params.RootPath.String != nil {
+			roots = []string{*params.RootPath.String}
+		}
+	}
+	// Share directory observations across candidates for this operation only.
+	fs := s.fs
+	if fs != nil {
+		fs = cachedvfs.From(fs)
+	}
+	directory := utils.DirectoryIdentity{LexicalPath: tspath.GetDirectoryPath(file.Path), CanonicalPath: file.CanonicalParentPath}
+	selected, depth := "", 0
+	for _, root := range roots {
+		root = tspath.NormalizePath(root)
+		if root == "" {
+			continue
+		}
+		physical, _ := pathSpaces.PhysicalDirectory(root)
+		boundary, contains := utils.DirectorySearchBoundary(directory, utils.DirectoryIdentity{LexicalPath: root, CanonicalPath: physical}, fs)
+		if !contains {
+			continue
+		}
+		if candidateDepth := len(tspath.GetPathComponents(boundary, "")); candidateDepth > depth {
+			selected, depth = boundary, candidateDepth
+		}
+	}
+	if selected != "" {
+		return selected
+	}
+	return directory.LexicalPath
 }
 
 // getConfigForURI is retained for package-level helpers and tests. Production

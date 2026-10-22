@@ -54,7 +54,8 @@ func (s *Session) buildProjectsForTest(t *testing.T, request ProjectBuildRequest
 			pathSpaces = rslintconfig.NewPathSpaceSnapshot(request.Configs, s.FS())
 		}
 		resolver := configLint.NewResolver(configLint.ResolverOptions{
-			ConfigsByOwner: request.Configs, FS: s.FS(), PathSpaces: pathSpaces, Catalog: rule.NewCatalog(),
+			ConfigsByOwner: request.Configs, DefaultRootDirectory: request.Targets.Files[0].ConfigDirectory,
+			FS: s.FS(), PathSpaces: pathSpaces, Catalog: rule.NewCatalog(),
 		})
 		var err error
 		request.Policies, err = resolver.ProjectPolicies(request.Targets.Files, request.SingleThreaded)
@@ -325,6 +326,106 @@ func TestBuildProjectsKeepsServiceGapsSourceOnly(t *testing.T) {
 				for _, file := range files {
 					if seen[file] != 1 {
 						t.Fatalf("%s linted %d times", file, seen[file])
+					}
+				}
+			})
+		}
+	}
+}
+
+type serviceBoundaryFS struct {
+	vfs.FS
+	mu    sync.Mutex
+	reads map[string]int
+	dirs  map[string]int
+}
+
+func (fsys *serviceBoundaryFS) ReadFile(path string) (string, bool) {
+	fsys.mu.Lock()
+	fsys.reads[path]++
+	fsys.mu.Unlock()
+	return fsys.FS.ReadFile(path)
+}
+
+func (fsys *serviceBoundaryFS) GetAccessibleEntries(path string) vfs.Entries {
+	fsys.mu.Lock()
+	fsys.dirs[path]++
+	fsys.mu.Unlock()
+	return fsys.FS.GetAccessibleEntries(path)
+}
+
+func TestBuildProjectsServiceInvocationBoundary(t *testing.T) {
+	for _, scope := range []ProjectScope{ActiveOwners, Targeted, AllDeclared} {
+		for _, explicitRoot := range []bool{false, true} {
+			t.Run(fmt.Sprintf("scope=%d/explicitRoot=%v", scope, explicitRoot), func(t *testing.T) {
+				root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service_boundary.txtar").Materialize(t, ""))
+				cwd := tspath.ResolvePath(root, "packages/pkg")
+				options := &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}
+				if explicitRoot {
+					options.TsconfigRootDir = &root
+				}
+				entries := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: options}}}
+				fsys := &serviceBoundaryFS{FS: bundled.WrapFS(osvfs.FS()), reads: make(map[string]int), dirs: make(map[string]int)}
+				files := []string{cwd + "/src/main.ts", cwd + "/src/__tests__/main.test.ts", cwd + "/.storybook/main.ts"}
+				plan, err := target.Resolve(withGitPolicyForTest(target.Request{
+					Config: entries, ConfigDirectory: root, ScanRoot: cwd, FS: fsys,
+					Files: rslintconfig.ResolveFileIdentities(files, fsys),
+				}))
+				if err != nil || len(plan.Files) != len(files) {
+					t.Fatalf("targets=%v error=%v", plan.Files, err)
+				}
+				resolver := configLint.NewResolver(configLint.ResolverOptions{
+					Config: entries, ConfigDirectory: root, DefaultRootDirectory: cwd,
+					FS: fsys, PathSpaces: plan.PathSpaces(), GitPolicy: plan.GitPolicy(), Catalog: rule.NewCatalog(),
+				})
+				policies, err := resolver.ProjectPolicies(plan.Files, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				session := NewSession(fsys)
+				projects, err := session.BuildProjects(ProjectBuildRequest{
+					Configs: map[string]rslintconfig.RslintConfig{root: entries}, Targets: plan,
+					Policies: policies, Scope: scope, SingleThreaded: true,
+				})
+				wantPrograms := 1
+				if explicitRoot {
+					wantPrograms = 2
+				}
+				if err != nil || projects.Len() != wantPrograms {
+					t.Fatalf("Programs=%d want=%d error=%v", projects.Len(), wantPrograms, err)
+				}
+				for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadCLI, session.LoadAPI} {
+					binding, err := load(projects, plan, root, true)
+					if err != nil {
+						t.Fatal(err)
+					}
+					seen := make(map[string]int)
+					for index, sources := range binding.TargetsByProgram {
+						program := binding.Programs[index]
+						for _, path := range sources {
+							seen[path]++
+							wantTypes := path == files[0] || explicitRoot && path == files[1]
+							if file := program.GetSourceFile(path); file == nil || program.CanProvideTypeChecker(file) != wantTypes {
+								t.Fatalf("%s: expected types=%v", path, wantTypes)
+							}
+						}
+					}
+					for _, file := range files {
+						if seen[file] != 1 {
+							t.Fatalf("target %s bound %d times", file, seen[file])
+						}
+					}
+				}
+				if !explicitRoot {
+					if fsys.reads[root+"/tsconfig.json"] != 0 {
+						t.Fatal("invocation boundary parsed the ancestor tsconfig")
+					}
+					for _, counts := range []map[string]int{fsys.reads, fsys.dirs} {
+						for path, count := range counts {
+							if count > 0 && strings.HasPrefix(path, root+"/packages/other") {
+								t.Fatalf("invocation boundary read unrelated input %s", path)
+							}
+						}
 					}
 				}
 			})
@@ -3402,7 +3503,7 @@ func TestProgramInputsKeepFrozenDirectoryAcrossGenerations(t *testing.T) {
 			if err != nil || len(plan.Files) != 1 {
 				t.Fatalf("resolve frozen target: files=%v error=%v", plan.Files, err)
 			}
-			resolver := configLint.NewResolver(configLint.ResolverOptions{ConfigsByOwner: configs, FS: fsys, PathSpaces: plan.PathSpaces(), GitPolicy: plan.GitPolicy(), Catalog: rules.All()})
+			resolver := configLint.NewResolver(configLint.ResolverOptions{ConfigsByOwner: configs, DefaultRootDirectory: alias, FS: fsys, PathSpaces: plan.PathSpaces(), GitPolicy: plan.GitPolicy(), Catalog: rules.All()})
 			policies, err := resolver.ProjectPolicies(plan.Files, true)
 			if err != nil {
 				t.Fatal(err)

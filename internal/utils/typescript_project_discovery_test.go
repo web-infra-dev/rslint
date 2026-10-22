@@ -321,6 +321,90 @@ func TestTypeScriptProjectDiscoveryPropagatesParseFailure(t *testing.T) {
 
 func TestSelectionKeepsLexicalConfigIdentity(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/typescript_project_discovery.txtar")
+	t.Run("directory-root-projection", func(t *testing.T) {
+		for _, test := range []struct {
+			root, directory, boundary string
+		}{
+			{root: "/repo/", directory: "/repo/pkg/", boundary: "/repo"},
+			{root: "/", directory: "//server/share/pkg"},
+		} {
+			boundary, within := utils.DirectorySearchBoundary(utils.DirectoryIdentity{LexicalPath: test.directory}, utils.DirectoryIdentity{LexicalPath: test.root}, nil)
+			if boundary != test.boundary || within != (test.boundary != "") {
+				t.Fatalf("root=%q directory=%q: boundary=%q within=%v", test.root, test.directory, boundary, within)
+			}
+		}
+	})
+	t.Run("directory-alias-boundary", func(t *testing.T) {
+		root := tspath.NormalizePath(archive.Materialize(t, "nearest-excludes-parent-includes"))
+		pkg, alias := tspath.ResolvePath(root, "pkg"), tspath.ResolvePath(root, "alias")
+		if err := os.Symlink(pkg, alias); err != nil {
+			t.Skipf("directory symlink unavailable: %v", err)
+		}
+		for _, paths := range [][2]string{{alias, pkg}, {pkg, alias}} {
+			host := newRecordingHost(bundled.WrapFS(osvfs.FS()))
+			selected, err := utils.NewTypeScriptProjectDiscovery(host.fs, host.host().ParseConfig).Find(paths[0]+"/src/file.ts", paths[1])
+			if err != nil || selected != nil || host.parsed[root+"/tsconfig.json"] != 0 {
+				t.Fatalf("directory alias escaped its boundary: selected=%s parsed=%v error=%v", selected.ConfigName(), host.parsed, err)
+			}
+		}
+	})
+	t.Run("nested-directory-alias-boundary", func(t *testing.T) {
+		root := tspath.NormalizePath(t.TempDir())
+		realDir, alias := tspath.ResolvePath(root, "real"), tspath.ResolvePath(root, "alias")
+		for _, directory := range []string{realDir + "/src", realDir + "/group"} {
+			if err := os.MkdirAll(directory, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.WriteFile(realDir+"/src/file.ts", []byte("export const value = 1;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(realDir+"/tsconfig.json", []byte(`{"files":["group/link/file.ts"],"compilerOptions":{"noLib":true}}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		for _, link := range [][2]string{{realDir + "/src", realDir + "/group/link"}, {realDir, alias}} {
+			if err := os.Symlink(link[0], link[1]); err != nil {
+				t.Skipf("directory symlink unavailable: %v", err)
+			}
+		}
+		host := newRecordingHost(bundled.WrapFS(osvfs.FS()))
+		selected, err := utils.NewTypeScriptProjectDiscovery(host.fs, host.host().ParseConfig).Find(alias+"/group/link/file.ts", realDir)
+		if err != nil || selected == nil || selected.ConfigName() != alias+"/tsconfig.json" {
+			t.Fatalf("nested directory alias lost its project: selected=%s parsed=%v error=%v", selected.ConfigName(), host.parsed, err)
+		}
+	})
+	t.Run("directory-alias-into-subdirectory", func(t *testing.T) {
+		root := tspath.NormalizePath(archive.Materialize(t, "nearest-excludes-parent-includes"))
+		pkg, alias := tspath.ResolvePath(root, "pkg"), tspath.ResolvePath(root, "alias")
+		if err := os.Symlink(pkg+"/src", alias); err != nil {
+			t.Skipf("directory symlink unavailable: %v", err)
+		}
+		host := newRecordingHost(bundled.WrapFS(osvfs.FS()))
+		selected, err := utils.NewTypeScriptProjectDiscovery(host.fs, host.host().ParseConfig).Find(alias+"/file.ts", pkg)
+		if err != nil || selected != nil || host.parsed[root+"/tsconfig.json"] != 0 {
+			t.Fatalf("directory alias escaped its boundary: selected=%s parsed=%v error=%v", selected.ConfigName(), host.parsed, err)
+		}
+	})
+	t.Run("native-alias-boundary", func(t *testing.T) {
+		root := tspath.NormalizePath(archive.Materialize(t, "nearest-excludes-parent-includes"))
+		pkg, alias := root+"/pkg", root+"/PKG"
+		actual, err := os.Stat(pkg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		aliased, err := os.Stat(alias)
+		if err != nil || !os.SameFile(actual, aliased) {
+			t.Skip("native directory case aliases unavailable")
+		}
+		for _, caseSensitive := range []bool{false, true} {
+			fsys := &caseSensitivityFS{FS: bundled.WrapFS(osvfs.FS()), caseSensitive: caseSensitive}
+			host := newRecordingHost(fsys)
+			selected, err := utils.NewTypeScriptProjectDiscovery(fsys, host.host().ParseConfig).Find(pkg+"/src/file.ts", alias)
+			if err != nil || selected != nil || host.parsed[root+"/tsconfig.json"] != 0 {
+				t.Fatalf("caseSensitive=%v: native alias escaped its boundary: selected=%s parsed=%v error=%v", caseSensitive, selected.ConfigName(), host.parsed, err)
+			}
+		}
+	})
 	for _, caseSensitive := range []bool{false, true} {
 		name := "case-insensitive-node-modules"
 		if caseSensitive {

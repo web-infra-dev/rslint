@@ -554,8 +554,8 @@ describe('CLI lint target contracts', () => {
   );
 
   test.each([
-    ['config directory without presets', false, false, true],
-    ['config directory with presets', true, false, true],
+    ['invocation directory without presets', false, false, false],
+    ['invocation directory with presets', true, false, false],
     ['explicit config directory', false, true, true],
   ])(
     'projectService CLI root uses %s',

@@ -78,23 +78,25 @@ In tsconfig, `disableReferencedProjectLoad` prevents discovery through project r
 ## languageOptions.parserOptions.tsconfigRootDir
 
 - **Type:** `string`
-- **Default:** the directory containing the Rslint config file; API `cwd` for inline-only configuration
+- **Default:** invocation cwd for CLI and API; the document's workspace folder for LSP
 
 Sets the directory where `projectService` stops searching parent directories. It must be an absolute path. It also sets the base directory for relative [`project`](#languageoptionsparseroptionsproject) paths.
 
 This option does not select a tsconfig by itself or limit which files a project can import. Project references and `extends` can point outside this directory. Files outside this directory can still find projects in their own parent directories.
 
-The default comes from the Rslint config used for the file, including a custom config selected with `--config` or API `overrideConfigFile`. Imported presets and `basePath` do not change that default.
+The default follows the invocation context, including when using a config from a parent directory or selecting one with `--config` or API `overrideConfigFile`. Config ownership, imported presets, inline overrides and `basePath` do not change it.
 
-| Configuration                              | Default discovery boundary       |
-| ------------------------------------------ | -------------------------------- |
-| Root config used from a package directory  | Root config directory            |
-| Nested config used for the file            | Nested config directory          |
-| Explicit `--config` / `overrideConfigFile` | Selected config file's directory |
-| Inline-only API config                     | API `cwd`                        |
-| Loaded config plus inline overrides        | Loaded config file's directory   |
+This default only bounds `projectService` discovery. Relative `project` paths retain their authored config or `basePath` directory unless `tsconfigRootDir` is set explicitly.
 
-Set an explicit package directory if discovery should stop there instead of continuing to the repository's root tsconfig.
+| Invocation                                        | Default discovery boundary          |
+| ------------------------------------------------- | ----------------------------------- |
+| CLI from a package directory                      | Package cwd                         |
+| API with loaded or inline configuration           | API `cwd`                           |
+| LSP document inside one or more workspace folders | Nearest containing workspace folder |
+
+LSP falls back to the initialization root, then the server cwd when no workspace context was supplied. A document outside the supplied workspaces uses its own directory. Directory symlinks into a workspace retain that workspace's search boundary.
+
+Set an explicit repository root to allow a package invocation to search ancestor projects above its cwd. Starting the CLI at the repository root already uses that root. Files excluded from the package project remain source-only when no project within the boundary includes them.
 
 JavaScript configurations also accept `null` to reset an inherited value to the default, although the public TypeScript type is `string`. This also restores the usual base for relative `project` paths, including any `basePath`. A later `undefined` leaves the inherited value unchanged.
 

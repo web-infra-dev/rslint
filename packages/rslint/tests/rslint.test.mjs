@@ -3146,23 +3146,23 @@ module.exports = config;`
         `${preset} / ${boundary}`,
         preset,
         boundary,
-        !['cwd', 'undefined'].includes(boundary),
+        boundary === 'root',
       ]),
     ),
     ...['js', 'ts', 'mts', 'cjs', 'cts'].map((extension) => [
       `direct ${extension}`,
       'direct',
       'omitted',
-      true,
+      false,
       extension,
     ]),
-    ['object spread', 'object', 'omitted', true],
-    ['JSON copy', 'json', 'omitted', true],
-    ['imported config', 'shared', 'omitted', true],
-    ['imported config plus direct preset', 'shared-direct', 'omitted', true],
-    ['custom config filename', 'none', 'omitted', true, 'mjs', 'custom.mjs'],
+    ['object spread', 'object', 'omitted', false],
+    ['JSON copy', 'json', 'omitted', false],
+    ['imported config', 'shared', 'omitted', false],
+    ['imported config plus direct preset', 'shared-direct', 'omitted', false],
+    ['custom config filename', 'none', 'omitted', false, 'mjs', 'custom.mjs'],
   ])(
-    'projectService config directory default: %s',
+    'projectService invocation directory default: %s',
     async (_name, preset, boundary, typed, extension = 'mjs', customName) => {
       const tmp = await mkdtemp(
         path.join(os.tmpdir(), 'rslint-root-inference-'),
@@ -3244,16 +3244,16 @@ module.exports = config;`
   );
 
   test.each([
-    ['automatic parent config', false, 'auto', true],
-    ['automatic nested config', true, 'auto', false],
-    ['explicit parent config', true, 'parent', true],
-    ['explicit nested config', true, 'nested', false],
-    ['explicit external config', true, 'external', true],
-    ['inline only', true, 'inline', undefined],
-    ['parent config with inline basePath suffix', false, 'suffix', true],
+    ['automatic parent config', false, 'auto'],
+    ['automatic nested config', true, 'auto'],
+    ['explicit parent config', true, 'parent'],
+    ['explicit nested config', true, 'nested'],
+    ['explicit external config', true, 'external'],
+    ['inline only', true, 'inline'],
+    ['parent config with inline basePath suffix', false, 'suffix'],
   ])(
     'projectService config owner and cwd: %s',
-    async (_name, nestedConfig, mode, ownerTyped) => {
+    async (_name, nestedConfig, mode) => {
       const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-owner-root-'));
       const pkg = path.join(tmp, 'pkg');
       const source =
@@ -3336,7 +3336,7 @@ module.exports = config;`
               const ids = results[0].messages.map(({ ruleId }) => ruleId);
               expect(ids).toContain('no-debugger');
               expect(ids.includes('@typescript-eslint/no-for-in-array')).toBe(
-                ownerTyped ?? cwd === tmp,
+                cwd === tmp,
               );
             }
           } finally {
@@ -3459,20 +3459,17 @@ module.exports = config;`
         Promise.all(
           instances.map((instance) => instance.lintFiles(['tool.ts'])),
         );
-      for (const result of await run())
-        expect(result[0].messages.map((message) => message.ruleId)).toEqual([
-          '@typescript-eslint/no-for-in-array',
-        ]);
-      // A now narrows its root explicitly; B retains its own config default.
+      for (const result of await run()) expect(result[0].messages).toEqual([]);
+      // A now widens its root explicitly; B retains its invocation default.
       await writeFile(
         path.join(tmp, 'a/rslint.config.mjs'),
-        `export default [{plugins:['@typescript-eslint'],languageOptions:{parserOptions:{projectService:true,tsconfigRootDir:${JSON.stringify(path.join(tmp, 'a/pkg'))}}},rules:{'@typescript-eslint/no-for-in-array':'error'}}];`,
+        `export default [{plugins:['@typescript-eslint'],languageOptions:{parserOptions:{projectService:true,tsconfigRootDir:${JSON.stringify(path.join(tmp, 'a'))}}},rules:{'@typescript-eslint/no-for-in-array':'error'}}];`,
       );
       const [a, b] = await run();
-      expect(a[0].messages).toEqual([]);
-      expect(b[0].messages.map((message) => message.ruleId)).toEqual([
+      expect(a[0].messages.map((message) => message.ruleId)).toEqual([
         '@typescript-eslint/no-for-in-array',
       ]);
+      expect(b[0].messages).toEqual([]);
     } finally {
       await Promise.all(instances.map((instance) => instance.close()));
       await cleanupTempDir(tmp);
