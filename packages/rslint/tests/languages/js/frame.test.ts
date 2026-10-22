@@ -833,7 +833,7 @@ describe('decoded data ownership', () => {
       };
       const old = Object.getOwnPropertyDescriptor(Array.prototype, '1');
       let calls = 0;
-      let decodeCalls = -1;
+      let decodeCalls: number;
       let decoded!: ReturnType<typeof decodeFrame>;
       let result!: ReturnType<typeof lintFrame>;
       Object.defineProperty(Array.prototype, '1', {
