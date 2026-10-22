@@ -143,12 +143,34 @@ func (q *typeScriptProjectSearch) references(parsed *tsoptions.ParsedCommandLine
 // Find returns a config whose files/include roots contain fileName, or nil
 // when the target must use gap linting. rootDirectory bounds ancestor search;
 // extends and explicit references can still point outside that directory.
+// As in TypeScript's project service, a target outside the root searches its
+// own ancestor tree. Directory aliases into the root retain the equivalent
+// boundary in the target's lexical path.
 func (d *TypeScriptProjectDiscovery) Find(fileName, rootDirectory string) (*tsoptions.ParsedCommandLine, error) {
+	fileName = tspath.NormalizePath(fileName)
 	query := typeScriptProjectSearch{
-		discovery: d, file: d.path(tspath.NormalizePath(fileName)), seen: make(map[tspath.Path]bool),
+		discovery: d, file: d.path(fileName), seen: make(map[tspath.Path]bool),
 	}
 	root := d.path(tspath.GetNormalizedAbsolutePath(rootDirectory, ""))
-	for directory := tspath.GetDirectoryPath(fileName); ; directory = tspath.GetDirectoryPath(directory) {
+	directory := tspath.GetDirectoryPath(fileName)
+	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: d.fs.UseCaseSensitiveFileNames()}
+	if !tspath.ContainsPath(string(root), directory, options) {
+		// A non-ancestor boundary can never be reached by walking parents.
+		// Translate a physical alias if possible. Truly external targets use
+		// their filesystem root, preserving TypeScript's outside-root behavior.
+		boundary := tspath.GetPathComponents(directory, "")[0]
+		physicalRoot := d.fs.Realpath(rootDirectory)
+		physical := d.fs.Realpath(directory)
+		if physicalRoot != "" && physical != "" && tspath.ContainsPath(physicalRoot, physical, options) {
+			boundary = directory
+			for d.path(physical) != d.path(physicalRoot) {
+				physical = tspath.GetDirectoryPath(physical)
+				boundary = tspath.GetDirectoryPath(boundary)
+			}
+		}
+		root = d.path(boundary)
+	}
+	for ; ; directory = tspath.GetDirectoryPath(directory) {
 		for _, name := range []string{"tsconfig.json", "jsconfig.json"} {
 			parsed, err := d.config(tspath.ResolvePath(directory, name))
 			if err != nil {

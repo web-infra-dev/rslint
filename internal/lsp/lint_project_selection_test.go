@@ -952,14 +952,13 @@ func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
 		owner        string
 		explicitRoot string
 		resetRoot    bool
-		wantTyped    bool
 	}{
-		{name: "parent owner admits ancestor", owner: ".", wantTyped: true},
+		{name: "parent owner uses workspace", owner: "."},
 		{name: "explicit root narrows parent owner", owner: ".", explicitRoot: "pkg"},
-		{name: "null restores parent owner", owner: ".", explicitRoot: "pkg", resetRoot: true, wantTyped: true},
-		{name: "nested owner excludes ancestor", owner: "pkg"},
-		{name: "explicit root expands nested owner", owner: "pkg", explicitRoot: ".", wantTyped: true},
-		{name: "null restores nested owner", owner: "pkg", explicitRoot: ".", resetRoot: true},
+		{name: "null restores workspace with parent owner", owner: ".", explicitRoot: "pkg", resetRoot: true},
+		{name: "nested owner uses workspace", owner: "pkg"},
+		{name: "explicit root expands nested owner", owner: "pkg", explicitRoot: "."},
+		{name: "null restores workspace with nested owner", owner: "pkg", explicitRoot: ".", resetRoot: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			directory := tspath.NormalizePath(archive.Materialize(t, "ancestor"))
@@ -968,6 +967,11 @@ func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
 			owner := tspath.ResolvePath(directory, test.owner)
 			for _, cwdName := range []string{".", "pkg"} {
 				t.Run("cwd="+cwdName, func(t *testing.T) {
+					boundary := cwdName
+					if test.explicitRoot != "" && !test.resetRoot {
+						boundary = test.explicitRoot
+					}
+					wantTyped := boundary == "."
 					server := newTestServer()
 					server.cwd = tspath.ResolvePath(directory, cwdName)
 					server.fs = bundled.WrapFS(osvfs.FS())
@@ -1002,8 +1006,8 @@ func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
 					}
 					environment := server.freezeSpeculativeLintEnvironment(uri, snapshot.target)
 
-					// The same owner is independent of workspace cwd. A later owner
-					// refresh must also leave this operation's target/policy frozen.
+					// Later workspace and owner changes leave this operation's
+					// target and effective project policy frozen.
 					changedOwner := directory
 					if owner == directory {
 						changedOwner = workspace
@@ -1034,7 +1038,7 @@ func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
 						}
 						program := generation.Native.Programs[0]
 						wantConfig := ""
-						if test.wantTyped {
+						if wantTyped {
 							wantConfig = tspath.ResolvePath(directory, "tsconfig.json")
 						}
 						if lintProgramLexicalPathID(program.Options().ConfigFilePath, server.fs) != lintProgramLexicalPathID(wantConfig, server.fs) {
@@ -1049,8 +1053,8 @@ func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
 							foundSyntax = foundSyntax || configured.Name == "no-debugger"
 							foundTyped = foundTyped || configured.RequiresTypeInfo
 						}
-						if !foundSyntax || foundTyped != test.wantTyped {
-							t.Fatalf("speculative=%v: syntax=%v typed=%v, want typed=%v", speculative, foundSyntax, foundTyped, test.wantTyped)
+						if !foundSyntax || foundTyped != wantTyped {
+							t.Fatalf("speculative=%v: syntax=%v typed=%v, want typed=%v", speculative, foundSyntax, foundTyped, wantTyped)
 						}
 					}
 					if server.documents[uri] != editorText {
@@ -1631,6 +1635,64 @@ func TestProjectServiceLSPUsesReferencedEditorSources(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDocumentServiceBoundaryUsesWorkspaceForDiagnosticsAndFixes(t *testing.T) {
+	root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "workspace-boundary"))
+	server := newTestServer()
+	server.cwd = "/unrelated-server-directory"
+	server.fs = bundled.WrapFS(osvfs.FS())
+	folders := []*lsproto.WorkspaceFolder{
+		{Uri: lsproto.URI(documentURIFromPath(root))},
+		{Uri: lsproto.URI(documentURIFromPath(root + "/other"))},
+		{Uri: lsproto.URI(documentURIFromPath(root + "/pkg"))},
+	}
+	server.initializeParams = &lsproto.InitializeParams{WorkspaceFolders: &lsproto.WorkspaceFoldersOrNull{WorkspaceFolders: &folders}}
+	for _, phase := range []string{"default", "explicit", "reset"} {
+		options := &config.ParserOptions{ProjectService: config.BoolPtr(true)}
+		entries := config.RslintConfig{{
+			Plugins: []string{"@typescript-eslint"}, LanguageOptions: &config.LanguageOptions{ParserOptions: options},
+			Rules: config.Rules{"no-var": "error", "no-debugger": "error", "@typescript-eslint/no-unnecessary-type-assertion": "error"},
+		}}
+		if phase != "default" {
+			options.TsconfigRootDir = &root
+		}
+		if phase == "reset" {
+			var reset config.RslintConfig
+			if err := json.Unmarshal([]byte(`[{"languageOptions":{"parserOptions":{"tsconfigRootDir":null}}}]`), &reset); err != nil {
+				t.Fatal(err)
+			}
+			entries = append(entries, reset...)
+		}
+		installJSConfigsForTest(server, map[string]config.RslintConfig{root: entries})
+		for _, pkg := range []string{"pkg", "other"} {
+			path := root + "/" + pkg + "/target.ts"
+			uri := documentURIFromPath(path)
+			content, ok := server.fs.ReadFile(path)
+			if !ok {
+				t.Fatal("missing fixture source")
+			}
+			snapshot := server.documentLintSnapshot(uri)
+			wantTypes := pkg == "other" || phase == "explicit"
+			provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+			generation, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := runLSPGenerationForTest(context.Background(), generation, release, linter.ArtifactDemand{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var typed bool
+			for _, diagnostic := range result.Observation.Native.Diagnostics {
+				typed = typed || diagnostic.RuleName == "@typescript-eslint/no-unnecessary-type-assertion"
+			}
+			fixed := runSpeculativeFixAllForTest(t, server, context.Background(), uri, content, snapshot)
+			if typed != wantTypes || strings.Contains(fixed, " as number") == wantTypes || strings.Contains(fixed, "var ") {
+				t.Fatalf("%s/%s: typed=%v want=%v fixed=%q", phase, pkg, typed, wantTypes, fixed)
+			}
+		}
 	}
 }
 

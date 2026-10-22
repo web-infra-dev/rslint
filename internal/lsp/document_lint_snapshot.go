@@ -29,6 +29,7 @@ type documentLintSnapshot struct {
 	configResolved        bool
 	projectPolicy         config.ProjectPolicy
 	projectPolicyError    error
+	defaultRootDirectory  string
 	typeScriptConfigPaths []string
 	configKey             string
 	pluginGeneration      string
@@ -72,7 +73,7 @@ func resolveDocumentLintSnapshotProjects(
 	snapshot documentLintSnapshot,
 	fs vfs.FS,
 ) documentLintSnapshot {
-	snapshot.projectPolicy, snapshot.projectPolicyError = config.ResolveProjectPolicy(snapshot.resolvedConfig, snapshot.target.ConfigDirectory)
+	snapshot.projectPolicy, snapshot.projectPolicyError = config.ResolveProjectPolicy(snapshot.resolvedConfig, snapshot.defaultRootDirectory)
 	snapshot.typeScriptConfigPaths = nil
 	if snapshot.projectPolicyError != nil {
 		return snapshot
@@ -304,21 +305,80 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 	target.ConfigDirectory = selection.directory
 	_, unavailable := s.jsUnavailableConfigs[selection.configKey]
 	snapshot := documentLintSnapshot{
-		target:           target,
-		config:           selection.entries,
-		resolvedConfig:   selection.resolved,
-		pathSpaces:       selection.pathSpaces,
-		gitPolicy:        selection.gitPolicy,
-		ruleCatalog:      selection.ruleCatalog,
-		configResolved:   !selection.configMissing,
-		configKey:        selection.configKey,
-		pluginGeneration: s.eslintPluginConfigGeneration,
-		unavailable:      selection.unavailable || selection.configKey != "" && unavailable,
+		target:               target,
+		config:               selection.entries,
+		resolvedConfig:       selection.resolved,
+		pathSpaces:           selection.pathSpaces,
+		gitPolicy:            selection.gitPolicy,
+		ruleCatalog:          selection.ruleCatalog,
+		configResolved:       !selection.configMissing,
+		configKey:            selection.configKey,
+		pluginGeneration:     s.eslintPluginConfigGeneration,
+		defaultRootDirectory: s.documentWorkspaceDirectory(target, selection.pathSpaces),
+		unavailable:          selection.unavailable || selection.configKey != "" && unavailable,
 	}
 	if snapshot.configResolved {
 		snapshot = resolveDocumentLintSnapshotProjects(snapshot, s.fs)
 	}
 	return snapshot
+}
+
+// documentWorkspaceDirectory chooses the nearest containing workspace, first
+// by lexical path and then by physical directory identity. Config ownership
+// remains independent. Documents outside every workspace use their own folder.
+//
+//nolint:staticcheck // Older LSP clients supply rootUri/rootPath instead of workspaceFolders.
+func (s *Server) documentWorkspaceDirectory(file target.File, pathSpaces *config.PathSpaceSnapshot) string {
+	roots := []string{s.cwd}
+	if params := s.initializeParams; params != nil {
+		if params.WorkspaceFolders != nil && params.WorkspaceFolders.WorkspaceFolders != nil {
+			roots = nil
+			for _, folder := range *params.WorkspaceFolders.WorkspaceFolders {
+				roots = append(roots, uriToPath(lsproto.DocumentUri(folder.Uri)))
+			}
+		} else if params.RootUri.DocumentUri != nil {
+			roots = []string{uriToPath(*params.RootUri.DocumentUri)}
+		} else if params.RootPath != nil && params.RootPath.String != nil {
+			roots = []string{*params.RootPath.String}
+		}
+	}
+	useCaseSensitive := true
+	if s.fs != nil {
+		useCaseSensitive = s.fs.UseCaseSensitiveFileNames()
+	}
+	for _, physical := range []bool{false, true} {
+		selected := ""
+		depth := 0
+		for _, root := range roots {
+			root = tspath.NormalizePath(root)
+			if root == "" {
+				continue
+			}
+			path, directory := file.Path, root
+			if physical {
+				if s.fs == nil {
+					continue
+				}
+				path = file.CanonicalPath
+				var frozen bool
+				directory, frozen = pathSpaces.PhysicalDirectory(root)
+				if !frozen {
+					directory = s.fs.Realpath(root)
+				}
+			}
+			if directory == "" || path == "" {
+				continue
+			}
+			if _, contains := config.RelativePathWithinConfigRoot(path, directory, useCaseSensitive); contains && len(directory) > depth {
+				selected = root
+				depth = len(directory)
+			}
+		}
+		if selected != "" {
+			return selected
+		}
+	}
+	return tspath.GetDirectoryPath(file.Path)
 }
 
 // getConfigForURI is retained for package-level helpers and tests. Production

@@ -50,9 +50,9 @@ func HasProjectOptions(entries RslintConfig) bool {
 }
 
 // ResolveProjectPolicy projects the same effective config used for rules and
-// plugins. defaultRootDirectory is the loaded config module's directory, or
-// the invocation cwd when no config file exists. It is independent of an
-// entry's matching base and is resolved here before service consumers run.
+// plugins. defaultRootDirectory is the invocation cwd, or the document's
+// workspace context in LSP. It is independent of config location and matching
+// bases and is resolved here before service consumers run.
 func ResolveProjectPolicy(resolved ResolvedFileConfig, defaultRootDirectory string) (ProjectPolicy, error) {
 	merged := resolved.MergedConfig
 	if merged == nil || merged.LanguageOptions == nil || merged.LanguageOptions.ParserOptions == nil {
@@ -82,7 +82,7 @@ func ResolveProjectPolicy(resolved ResolvedFileConfig, defaultRootDirectory stri
 		policy.ServiceRootDirectory = policy.TSConfigRootDirOverride
 		if policy.ServiceRootDirectory == "" {
 			if defaultRootDirectory == "" {
-				return ProjectPolicy{}, errors.New("project service requires its configuration's default root directory")
+				return ProjectPolicy{}, errors.New("project service requires a default root directory")
 			}
 			policy.ServiceRootDirectory = tspath.NormalizePath(defaultRootDirectory)
 		}

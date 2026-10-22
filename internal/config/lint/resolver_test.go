@@ -256,7 +256,8 @@ func TestResolverLiteralOwnerWinsCanonicalAlias(t *testing.T) {
 						ParserOptions: &config.ParserOptions{ProjectService: &service},
 					}}},
 				},
-				FS: &ownerAliasResolverFS{FS: osvfs.FS(), root: root},
+				DefaultRootDirectory: root + "/invocation",
+				FS:                   &ownerAliasResolverFS{FS: osvfs.FS(), root: root},
 			})
 			realTarget := targetForTest(root+"/real/file.ts", strings.ToLower(root)+"/real")
 			aliasTarget := targetForTest(root+"/symlink/file.ts", root+"/symlink")
@@ -267,7 +268,7 @@ func TestResolverLiteralOwnerWinsCanonicalAlias(t *testing.T) {
 				t.Fatalf("canonical alias changed literal owner: real=%v alias=%v", configuredRuleNameSet(realResolved.EnabledRules), configuredRuleNameSet(alias.EnabledRules))
 			}
 			policies, err := resolver.ProjectPolicies([]target.File{realTarget, aliasTarget}, false)
-			if err != nil || len(policies) != 2 || policies[realTarget] != (config.ProjectPolicy{}) || policies[aliasTarget].ServiceRootDirectory != root+"/symlink" {
+			if err != nil || len(policies) != 2 || policies[realTarget] != (config.ProjectPolicy{}) || policies[aliasTarget].ServiceRootDirectory != root+"/invocation" {
 				t.Fatalf("policy gate used an alias instead of its literal owner: %v, %v", policies, err)
 			}
 		})
@@ -294,7 +295,7 @@ func TestResolverProjectPoliciesUsesEffectiveConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 			file := targetForTest("/repo/target.ts", "/repo")
-			resolver := newBaseResolver(ResolverOptions{ConfigsByOwner: map[string]config.RslintConfig{"/repo": entries}})
+			resolver := newBaseResolver(ResolverOptions{ConfigsByOwner: map[string]config.RslintConfig{"/repo": entries}, DefaultRootDirectory: "/repo"})
 			policies, err := resolver.ProjectPolicies([]target.File{file}, false)
 			if test.error != "" {
 				if err == nil || !strings.Contains(err.Error(), file.Path) || !strings.Contains(err.Error(), test.error) {
@@ -369,12 +370,12 @@ func TestResolverProjectPoliciesKeepsComposedOrigins(t *testing.T) {
 	}
 }
 
-func TestResolverServiceRootUsesConfigSource(t *testing.T) {
+func TestResolverServiceRootUsesInvocation(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	for _, test := range []struct {
 		name, matchingDirectory, defaultRootDirectory string
 	}{
-		{name: "loaded module", matchingDirectory: root + "/config", defaultRootDirectory: root + "/config"},
+		{name: "loaded module", matchingDirectory: root + "/config", defaultRootDirectory: root + "/invocation"},
 		{name: "inline API uses invocation cwd", matchingDirectory: root + "/synthetic-owner", defaultRootDirectory: root + "/invocation"},
 	} {
 		for _, reset := range []bool{false, true} {
@@ -406,7 +407,7 @@ func TestResolverServiceRootUsesConfigSource(t *testing.T) {
 	}
 }
 
-func TestResolverServiceRootUsesEachModuleOwner(t *testing.T) {
+func TestResolverServiceRootIsIndependentOfModuleOwner(t *testing.T) {
 	service := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}}}}
 	resolver := newBaseResolver(ResolverOptions{
 		ConfigsByOwner:       map[string]config.RslintConfig{"/repo": service, "/repo/pkg": service},
@@ -418,22 +419,23 @@ func TestResolverServiceRootUsesEachModuleOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, file := range files {
-		if policies[file].ServiceRootDirectory != file.ConfigDirectory {
-			t.Fatalf("nested owner used another module's default root: %v", policies)
+		if policies[file].ServiceRootDirectory != "/unrelated-invocation" {
+			t.Fatalf("config owner replaced the invocation root: %v", policies)
 		}
 	}
 }
 
-func TestResolverServiceRootKeepsModuleOriginForCanonicalAlias(t *testing.T) {
+func TestResolverServiceRootKeepsInvocationForCanonicalAlias(t *testing.T) {
 	service := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}}}}
 	resolver := newBaseResolver(ResolverOptions{
-		ConfigsByOwner: map[string]config.RslintConfig{"/symlink": service},
-		FS:             &ownerAliasResolverFS{FS: osvfs.FS()},
+		ConfigsByOwner:       map[string]config.RslintConfig{"/symlink": service},
+		DefaultRootDirectory: "/invocation",
+		FS:                   &ownerAliasResolverFS{FS: osvfs.FS()},
 	})
 	file := targetForTest("/real/file.ts", "/real")
 	policies, err := resolver.ProjectPolicies([]target.File{file}, false)
-	if err != nil || policies[file].ServiceRootDirectory != "/symlink" {
-		t.Fatalf("canonical lookup replaced the loaded module's origin: %v, %v", policies, err)
+	if err != nil || policies[file].ServiceRootDirectory != "/invocation" {
+		t.Fatalf("canonical owner lookup replaced the invocation root: %v, %v", policies, err)
 	}
 }
 
@@ -513,12 +515,12 @@ func TestResolverProjectPoliciesParallelProjection(t *testing.T) {
 	want := map[target.File]config.ProjectPolicy{
 		files[0]: {ExplicitProject: declaration}, files[1]: {ExplicitProject: declaration},
 		files[2]: {ProjectDisabled: true}, files[3]: {},
-		files[4]: {ServiceRootDirectory: serviceOwner}, files[5]: {},
+		files[4]: {ServiceRootDirectory: root}, files[5]: {},
 	}
 	for _, singleThreaded := range []bool{false, true} {
 		t.Run("singleThreaded="+strconv.FormatBool(singleThreaded), func(t *testing.T) {
 			fsys := &projectPolicyResolverFS{FS: osvfs.FS()}
-			resolver := newBaseResolver(ResolverOptions{ConfigsByOwner: configs, FS: fsys})
+			resolver := newBaseResolver(ResolverOptions{ConfigsByOwner: configs, DefaultRootDirectory: root, FS: fsys})
 			fsys.realpath = func(string) string { panic("frozen target required another Realpath") }
 			got, err := resolver.ProjectPolicies(files, singleThreaded)
 			if err != nil || !reflect.DeepEqual(got, want) {

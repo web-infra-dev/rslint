@@ -126,7 +126,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	configDirectory = tspath.NormalizePath(configDirectory)
 	// Inline API config has no module directory. Its matching/path base can
 	// differ from the invocation cwd and must not become the discovery root.
-	defaultRootDirectory := currentDirectory
 	if len(rslintConfig) > 0 {
 		rslintConfig = rslintconfig.ConfigWithResolvedBasePaths(
 			rslintConfig,
@@ -305,7 +304,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				// incorrectly drop it, even though explicit flat-config semantics say
 				// the selected module governs the complete supplied target set.
 				configDirectory = configDirectories[0]
-				defaultRootDirectory = configDirectory
 				rslintConfig = append(rslintconfig.RslintConfig(nil), configCatalog.Configs[configDirectory]...)
 				pluginConfigKeyByOwner = map[string]string{configDirectory: configDirectory}
 			} else {
@@ -405,7 +403,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		ConfigsByOwner:       configMap,
 		Config:               rslintConfig,
 		ConfigDirectory:      configDirectory,
-		DefaultRootDirectory: defaultRootDirectory,
+		DefaultRootDirectory: currentDirectory,
 		Catalog:              ruleCatalog,
 		PathSpaces:           targetPlan.PathSpaces(),
 		GitPolicy:            targetPlan.GitPolicy(),

@@ -208,18 +208,18 @@ func TestProjectPolicyUsesMatchingBasePathOrigin(t *testing.T) {
 func TestProjectPolicyServiceRootDefaults(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	matchingDirectory := root + "/matching"
-	defaultRootDirectory := root + "/config-module"
+	defaultRootDirectory := root + "/invocation"
 	explicitRootDirectory := root + "/explicit"
 	for _, test := range []struct {
 		name, options string
 		want          ProjectPolicy
 	}{
 		{
-			name: "omitted uses supplied config origin", options: `[{"projectService":true}]`,
+			name: "omitted uses supplied invocation", options: `[{"projectService":true}]`,
 			want: ProjectPolicy{ServiceRootDirectory: defaultRootDirectory},
 		},
 		{
-			name:    "null resets to the same config origin",
+			name:    "null resets to the invocation",
 			options: fmt.Sprintf(`[{"projectService":true,"tsconfigRootDir":%q},{"tsconfigRootDir":null}]`, explicitRootDirectory),
 			want:    ProjectPolicy{ServiceRootDirectory: defaultRootDirectory},
 		},

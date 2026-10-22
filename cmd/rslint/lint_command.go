@@ -364,7 +364,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			ConfigsByOwner:       configMap,
 			Config:               rslintConfig,
 			ConfigDirectory:      currentDirectory,
-			DefaultRootDirectory: currentDirectory,
+			DefaultRootDirectory: workingDirectory,
 			Catalog:              ruleCatalog,
 			PathSpaces:           targetPlan.PathSpaces(),
 			GitPolicy:            targetPlan.GitPolicy(),

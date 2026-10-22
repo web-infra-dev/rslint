@@ -183,6 +183,7 @@ func documentLintSnapshotForTest(
 		gitPolicy:        gitPolicy,
 		pluginGeneration: s.eslintPluginConfigGeneration,
 	}
+	snapshot.defaultRootDirectory = s.documentWorkspaceDirectory(target, snapshot.pathSpaces)
 	if usesConfigCatalog {
 		snapshot.configKey = target.ConfigDirectory
 	}

@@ -181,3 +181,17 @@ export const value = payload;
 export declare const value: any;
 -- snapshot-references/lib/safe.d.ts --
 export declare const value: { member: number };
+-- workspace-boundary/tsconfig.json --
+{}
+-- workspace-boundary/pkg/tsconfig.json --
+{"files":[]}
+-- workspace-boundary/pkg/target.ts --
+declare const value: number;
+var result = value as number;
+debugger;
+-- workspace-boundary/other/tsconfig.json --
+{"include":["*.ts"]}
+-- workspace-boundary/other/target.ts --
+declare const value: number;
+var result = value as number;
+debugger;

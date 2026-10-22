@@ -321,6 +321,20 @@ func TestTypeScriptProjectDiscoveryPropagatesParseFailure(t *testing.T) {
 
 func TestSelectionKeepsLexicalConfigIdentity(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/typescript_project_discovery.txtar")
+	t.Run("directory-alias-boundary", func(t *testing.T) {
+		root := tspath.NormalizePath(archive.Materialize(t, "nearest-excludes-parent-includes"))
+		pkg, alias := tspath.ResolvePath(root, "pkg"), tspath.ResolvePath(root, "alias")
+		if err := os.Symlink(pkg, alias); err != nil {
+			t.Skipf("directory symlink unavailable: %v", err)
+		}
+		for _, paths := range [][2]string{{alias, pkg}, {pkg, alias}} {
+			host := newRecordingHost(bundled.WrapFS(osvfs.FS()))
+			selected, err := utils.NewTypeScriptProjectDiscovery(host.fs, host.host().ParseConfig).Find(paths[0]+"/src/file.ts", paths[1])
+			if err != nil || selected != nil || host.parsed[root+"/tsconfig.json"] != 0 {
+				t.Fatalf("directory alias escaped its boundary: selected=%s parsed=%v error=%v", selected.ConfigName(), host.parsed, err)
+			}
+		}
+	})
 	for _, caseSensitive := range []bool{false, true} {
 		name := "case-insensitive-node-modules"
 		if caseSensitive {
