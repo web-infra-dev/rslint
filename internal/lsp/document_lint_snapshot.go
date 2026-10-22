@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // documentLintSnapshot freezes every config-sensitive fact for one editor
@@ -323,9 +324,9 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 	return snapshot
 }
 
-// documentWorkspaceDirectory chooses the nearest containing workspace, first
-// by lexical path and then by physical directory identity. Config ownership
-// remains independent. Documents outside every workspace use their own folder.
+// documentWorkspaceDirectory freezes the nearest workspace's equivalent search
+// boundary in the document's lexical tree. Later lint and fix operations never
+// need to resolve the workspace alias again. Config ownership is independent.
 //
 //nolint:staticcheck // Older LSP clients supply rootUri/rootPath instead of workspaceFolders.
 func (s *Server) documentWorkspaceDirectory(file target.File, pathSpaces *config.PathSpaceSnapshot) string {
@@ -342,41 +343,31 @@ func (s *Server) documentWorkspaceDirectory(file target.File, pathSpaces *config
 			roots = []string{*params.RootPath.String}
 		}
 	}
-	// The global filesystem case policy cannot prove directory identity.
-	// Keep lexical casing exact; actual aliases match in the physical pass.
-	for _, physical := range []bool{false, true} {
-		selected := ""
-		depth := 0
-		for _, root := range roots {
-			root = tspath.NormalizePath(root)
-			if root == "" {
-				continue
-			}
-			path, directory := file.Path, root
-			if physical {
-				if s.fs == nil {
-					continue
-				}
-				path = file.CanonicalParentPath
-				var frozen bool
-				directory, frozen = pathSpaces.PhysicalDirectory(root)
-				if !frozen {
-					directory = s.fs.Realpath(root)
-				}
-			}
-			if directory == "" || path == "" {
-				continue
-			}
-			if _, contains := config.RelativePathWithinConfigRoot(path, directory, true); contains && len(directory) > depth {
-				selected = root
-				depth = len(directory)
-			}
+	// Share directory observations across candidates for this operation only.
+	fs := s.fs
+	if fs != nil {
+		fs = cachedvfs.From(fs)
+	}
+	directory := utils.DirectoryIdentity{LexicalPath: tspath.GetDirectoryPath(file.Path), CanonicalPath: file.CanonicalParentPath}
+	selected, depth := "", 0
+	for _, root := range roots {
+		root = tspath.NormalizePath(root)
+		if root == "" {
+			continue
 		}
-		if selected != "" {
-			return selected
+		physical, _ := pathSpaces.PhysicalDirectory(root)
+		boundary, contains := utils.DirectorySearchBoundary(directory, utils.DirectoryIdentity{LexicalPath: root, CanonicalPath: physical}, fs)
+		if !contains {
+			continue
+		}
+		if candidateDepth := len(tspath.GetPathComponents(boundary, "")); candidateDepth > depth {
+			selected, depth = boundary, candidateDepth
 		}
 	}
-	return tspath.GetDirectoryPath(file.Path)
+	if selected != "" {
+		return selected
+	}
+	return directory.LexicalPath
 }
 
 // getConfigForURI is retained for package-level helpers and tests. Production

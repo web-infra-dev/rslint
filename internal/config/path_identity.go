@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // PathIdentity keeps the caller-visible path together with the physical file
@@ -20,10 +21,7 @@ type PathIdentity struct {
 // DirectoryIdentity is the lexical and physical identity of one directory.
 // It is a low-level path value shared by lint-target and Git-ignore scope
 // planning; neither consumer owns the other's policy.
-type DirectoryIdentity struct {
-	LexicalPath   string
-	CanonicalPath string
-}
+type DirectoryIdentity = utils.DirectoryIdentity
 
 // ResolveFileIdentities freezes requested file spellings without changing
 // their order or the distinction between omitted and empty input lists.

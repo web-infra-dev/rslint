@@ -321,6 +321,19 @@ func TestTypeScriptProjectDiscoveryPropagatesParseFailure(t *testing.T) {
 
 func TestSelectionKeepsLexicalConfigIdentity(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/typescript_project_discovery.txtar")
+	t.Run("directory-root-projection", func(t *testing.T) {
+		for _, test := range []struct {
+			root, directory, boundary string
+		}{
+			{root: "/repo/", directory: "/repo/pkg/", boundary: "/repo"},
+			{root: "/", directory: "//server/share/pkg"},
+		} {
+			boundary, within := utils.DirectorySearchBoundary(utils.DirectoryIdentity{LexicalPath: test.directory}, utils.DirectoryIdentity{LexicalPath: test.root}, nil)
+			if boundary != test.boundary || within != (test.boundary != "") {
+				t.Fatalf("root=%q directory=%q: boundary=%q within=%v", test.root, test.directory, boundary, within)
+			}
+		}
+	})
 	t.Run("directory-alias-boundary", func(t *testing.T) {
 		root := tspath.NormalizePath(archive.Materialize(t, "nearest-excludes-parent-includes"))
 		pkg, alias := tspath.ResolvePath(root, "pkg"), tspath.ResolvePath(root, "alias")
@@ -370,6 +383,26 @@ func TestSelectionKeepsLexicalConfigIdentity(t *testing.T) {
 		selected, err := utils.NewTypeScriptProjectDiscovery(host.fs, host.host().ParseConfig).Find(alias+"/file.ts", pkg)
 		if err != nil || selected != nil || host.parsed[root+"/tsconfig.json"] != 0 {
 			t.Fatalf("directory alias escaped its boundary: selected=%s parsed=%v error=%v", selected.ConfigName(), host.parsed, err)
+		}
+	})
+	t.Run("native-alias-boundary", func(t *testing.T) {
+		root := tspath.NormalizePath(archive.Materialize(t, "nearest-excludes-parent-includes"))
+		pkg, alias := root+"/pkg", root+"/PKG"
+		actual, err := os.Stat(pkg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		aliased, err := os.Stat(alias)
+		if err != nil || !os.SameFile(actual, aliased) {
+			t.Skip("native directory case aliases unavailable")
+		}
+		for _, caseSensitive := range []bool{false, true} {
+			fsys := &caseSensitivityFS{FS: bundled.WrapFS(osvfs.FS()), caseSensitive: caseSensitive}
+			host := newRecordingHost(fsys)
+			selected, err := utils.NewTypeScriptProjectDiscovery(fsys, host.host().ParseConfig).Find(pkg+"/src/file.ts", alias)
+			if err != nil || selected != nil || host.parsed[root+"/tsconfig.json"] != 0 {
+				t.Fatalf("caseSensitive=%v: native alias escaped its boundary: selected=%s parsed=%v error=%v", caseSensitive, selected.ConfigName(), host.parsed, err)
+			}
 		}
 	})
 	for _, caseSensitive := range []bool{false, true} {

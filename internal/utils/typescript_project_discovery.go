@@ -151,34 +151,15 @@ func (d *TypeScriptProjectDiscovery) Find(fileName, rootDirectory string) (*tsop
 	query := typeScriptProjectSearch{
 		discovery: d, file: d.path(fileName), seen: make(map[tspath.Path]bool),
 	}
-	root := d.path(tspath.GetNormalizedAbsolutePath(rootDirectory, ""))
 	directory := tspath.GetDirectoryPath(fileName)
-	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: d.fs.UseCaseSensitiveFileNames()}
-	if !tspath.ContainsPath(string(root), directory, options) {
-		// A non-ancestor boundary can never be reached by walking parents.
-		// Translate a physical alias if possible. Truly external targets use
-		// their filesystem root, preserving TypeScript's outside-root behavior.
-		boundary := tspath.GetPathComponents(directory, "")[0]
-		physicalRoot := d.fs.Realpath(rootDirectory)
-		physical := d.fs.Realpath(directory)
-		if physicalRoot != "" && physical != "" && tspath.ContainsPath(physicalRoot, physical, options) {
-			boundary = directory
-			// Nested directory links can change the number of physical parents.
-			// Resolve lexical ancestors instead. If a link skips the root itself,
-			// retain the outermost ancestor still physically within that root.
-			for ancestor := directory; ; ancestor = tspath.GetDirectoryPath(ancestor) {
-				if physical := d.fs.Realpath(ancestor); physical != "" && tspath.ContainsPath(physicalRoot, physical, options) {
-					boundary = ancestor
-					if d.path(physical) == d.path(physicalRoot) {
-						break
-					}
-				}
-				if tspath.GetDirectoryPath(ancestor) == ancestor {
-					break
-				}
-			}
-		}
-		root = d.path(boundary)
+	boundary, contains := DirectorySearchBoundary(
+		DirectoryIdentity{LexicalPath: directory},
+		DirectoryIdentity{LexicalPath: tspath.GetNormalizedAbsolutePath(rootDirectory, "")},
+		d.fs,
+	)
+	if !contains {
+		// External targets retain TypeScript's own-ancestor search behavior.
+		boundary = tspath.GetPathComponents(directory, "")[0]
 	}
 	for ; ; directory = tspath.GetDirectoryPath(directory) {
 		for _, name := range []string{"tsconfig.json", "jsconfig.json"} {
@@ -200,7 +181,7 @@ func (d *TypeScriptProjectDiscovery) Find(fileName, rootDirectory string) (*tsop
 				return query.fallback, nil
 			}
 		}
-		if d.path(directory) == root || tspath.GetBaseFileName(string(d.path(directory))) == "node_modules" ||
+		if ExactPathID(directory) == ExactPathID(boundary) || tspath.GetBaseFileName(string(d.path(directory))) == "node_modules" ||
 			tspath.GetDirectoryPath(directory) == directory {
 			return query.fallback, nil
 		}
