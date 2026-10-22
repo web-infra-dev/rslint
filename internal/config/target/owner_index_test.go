@@ -326,6 +326,24 @@ func TestOwnerIndexKeepsLexicalOwnerAcrossUnrelatedRealpathTree(t *testing.T) {
 	}
 }
 
+func TestOwnerIndexPrefersContainingDirectoryBeforeLeafFallback(t *testing.T) {
+	for _, parentOwner := range []bool{true, false} {
+		entries := map[string]rslintconfig.RslintConfig{"/leaf": {{}}}
+		want := "/leaf"
+		if parentOwner {
+			entries["/real"] = rslintconfig.RslintConfig{{}}
+			want = "/real"
+		}
+		index := NewOwnerIndex(entries, nil)
+		owner, found := index.Resolve(rslintconfig.PathIdentity{
+			Path: "/alias/leaf.ts", CanonicalPath: "/leaf/file.ts", CanonicalParentPath: "/real/sub",
+		})
+		if !found || owner != want {
+			t.Fatalf("parent owner present=%t: got (%s, %t), want %s", parentOwner, owner, found, want)
+		}
+	}
+}
+
 func TestOwnerIndex_DirectMatch(t *testing.T) {
 	configMap := map[string]rslintconfig.RslintConfig{
 		"/project": {{Rules: rslintconfig.Rules{"no-console": "error"}}},

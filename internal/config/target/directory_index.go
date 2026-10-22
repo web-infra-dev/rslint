@@ -121,8 +121,8 @@ func (index *configDirectoryIndex) childConfigDirs(configKey string) []string {
 // filesystem. Construction is the only phase that receives one. Exact lexical
 // ancestry wins first. A native-case spelling is accepted only when the
 // target's frozen physical parent reaches the candidate's frozen physical
-// directory at the same ancestor depth; otherwise physical file ancestry is
-// the final fallback.
+// directory at the same ancestor depth. Physical containing-directory ancestry
+// precedes the final fallback to the leaf file's destination.
 func (index *configDirectoryIndex) nearestConfigForIdentity(
 	identity rslintconfig.PathIdentity,
 ) (string, bool) {
@@ -162,12 +162,14 @@ func (index *configDirectoryIndex) nearestConfigForIdentity(
 			}
 		}
 	}
-	if identity.CanonicalPath == "" {
-		return "", false
+	canonicalDirectory := tspath.GetDirectoryPath(tspath.NormalizePath(identity.CanonicalPath))
+	if directory := tspath.NormalizePath(identity.CanonicalParentPath); directory != "" && directory != canonicalDirectory {
+		if configKey, found := index.nearestConfigInPathSpace(directory, index.canonicalConfigKeyByPath); found {
+			return configKey, true
+		}
 	}
-	canonicalPath := tspath.NormalizePath(identity.CanonicalPath)
 	return index.nearestConfigInPathSpace(
-		canonicalPath,
+		canonicalDirectory,
 		index.canonicalConfigKeyByPath,
 	)
 }
@@ -203,10 +205,10 @@ func (index *configDirectoryIndex) configKeyForLexicalDirectory(
 }
 
 func (index *configDirectoryIndex) nearestConfigInPathSpace(
-	filePath string,
+	directory string,
 	configKeyByPath map[string]string,
 ) (string, bool) {
-	current := tspath.GetDirectoryPath(filePath)
+	current := directory
 	for current != "" {
 		if configKey, ok := configKeyByPath[rslintconfig.ExactPathID(current)]; ok {
 			return configKey, true

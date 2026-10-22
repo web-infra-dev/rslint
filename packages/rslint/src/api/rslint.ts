@@ -209,15 +209,18 @@ function staticGlobRoot(pattern: string, cwd: string): string | undefined {
   );
 }
 
-function normalizeGlobPatternForCwd(pattern: string, cwd: string): string {
+function normalizeGlobPattern(pattern: string): string {
   let normalized = pattern;
-  if (normalized.endsWith('/') || normalized.endsWith('\\')) {
+  if (normalized.endsWith('/') && normalized !== '/') {
     normalized = normalized.slice(0, -1);
   }
-  if (path.isAbsolute(normalized)) {
-    normalized = path.relative(cwd, normalized);
+  if (path.sep === '\\') {
+    // Windows volumes are case insensitive; directory and file globs are not.
+    normalized = normalized.replace(
+      /^(?:[a-z]:|\/\/[^/]+\/[^/]+)(?=\/|$)/i,
+      (volume) => volume.toLowerCase(),
+    );
   }
-  normalized = normalized.split(path.sep).join('/');
   return path.posix.normalize(normalized);
 }
 
@@ -226,7 +229,10 @@ function matchesExcludedLiteral(
   patterns: readonly string[],
   cwd: string,
 ): boolean {
-  const candidate = path.relative(cwd, filePath).split(path.sep).join('/');
+  const relativeCandidate = path
+    .relative(cwd, filePath)
+    .split(path.sep)
+    .join('/');
   for (const rawPattern of patterns) {
     let pattern = rawPattern;
     if (pattern.startsWith('!')) {
@@ -234,10 +240,15 @@ function matchesExcludedLiteral(
       if (pattern[1] === '!' && pattern[2] !== '(') continue;
       pattern = pattern.slice(1);
     }
-    pattern = normalizeGlobPatternForCwd(pattern, cwd);
+    // Match absolute patterns directly, preserving their glob escapes instead
+    // of passing them through filesystem path operations.
+    const candidate = path.isAbsolute(pattern)
+      ? normalizeGlobPattern(filePath.split(path.sep).join('/'))
+      : relativeCandidate;
+    pattern = normalizeGlobPattern(pattern);
     const expandedPatterns = pattern.endsWith('*')
       ? [pattern]
-      : [pattern, `${pattern}/**`];
+      : [pattern, path.posix.join(pattern, '**')];
     if (picomatch(expandedPatterns, { dot: true, nocase: false })(candidate)) {
       return true;
     }

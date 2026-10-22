@@ -965,8 +965,10 @@ Automatic discovery uses these rules:
    the next frontier begins only after that result is merged in lexical order.
 3. A literal file is the sole authored-global-ignore ownership exception: it searches
    nearest-first and falls back to a loadable ancestor when a nearer candidate
-   fails. Lexical ancestry is authoritative; canonical ancestry is consulted
-   only when the complete lexical ancestry has no candidate. A default-excluded
+   fails. Lexical ancestry is authoritative; when it has no candidate, the
+   frozen physical parent's ancestry is tried before a leaf symlink's destination.
+   A chain with a candidate retains its ancestor fallback even if loading fails;
+   it does not switch to the leaf destination. A default-excluded
    literal file is not lintable and cannot escape through canonical fallback.
    Git is not used to choose that literal's owner; `.gitignore` is applied after
    ownership is known. A config reached only
@@ -1287,6 +1289,8 @@ proof of the target's complete ancestor chain. If parent directories have not
 been created, identity capture resolves the nearest existing ancestor and
 appends the missing suffix; an existing leaf symlink retains its own resolved
 file identity and its containing directory's separate Git coordinate.
+When the physical parent is inside the selected config tree, selectors use that
+parent plus the lexical basename even if the leaf symlink points outside it.
 Leaf resolution starts in the captured physical parent, so a directory alias
 cannot switch the file into another parent generation. API canonical-file hints
 override only the file identity at the request boundary.
@@ -1800,12 +1804,14 @@ Other invariants:
 - Go applies the same strict lexical-first ordering to the already-loaded config
   catalog. A physically deeper config loaded for another target cannot replace
   an existing lexical owner; physical ancestry is only a fallback for paths
-  with no lexical config.
+  with no lexical config. Frozen physical parent ancestry takes precedence over
+  the leaf file's destination, matching staged discovery without filesystem reads.
 - `Rslint.lintFiles()` applies the same rule before creating a third-party
   plugin host or sending API requests. Its realpath memo is bounded to one API
   call and is not a persistent cache. Canonical target paths resolved during
   that plan are sent with the request so Go does not repeat the same realpath
-  work.
+  work. Literal exclusions preserve glob escapes and match absolute patterns
+  against absolute candidates; this filtering does not select config owners.
 - LSP uses a different orchestration model and keeps session access on its main
   dispatch loop. Its Program-source lookup follows the same exact lexical and
   canonical filesystem identity rules as CLI/API binding, including

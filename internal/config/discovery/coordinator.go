@@ -195,6 +195,7 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 			// ancestry to explain the ignored result. A realpath fallback could
 			// escape the ignored subtree and execute an unrelated physical config
 			// even though the target can never enter the lint scope.
+			seed.physicalDirectory = file.CanonicalParentPath
 			coordinator.addCanonicalSeedFallback(seed, file.CanonicalPath, false)
 		}
 		seeds = append(seeds, seed)

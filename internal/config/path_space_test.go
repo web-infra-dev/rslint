@@ -190,6 +190,18 @@ func TestResolveConfigFilePathSpace(t *testing.T) {
 		}
 	})
 
+	t.Run("directory alias preserves a leaf symlink's containing selector", func(t *testing.T) {
+		fs := &pathSpaceTestFS{caseSensitive: true}
+		identity := PathIdentity{
+			Path: "/link/leaf.ts", CanonicalPath: "/outside/source.ts", CanonicalParentPath: "/real/sub",
+		}
+		entries := RslintConfig{{Files: []string{"sub/leaf.ts"}, Rules: Rules{"rule": "error"}}}
+		resolved := NewFileConfigResolverWithFS(entries, "/real", fs, rules.All()).ResolveTarget(identity)
+		if resolved.MergedConfig == nil || resolved.MergedConfig.Rules["rule"] == nil {
+			t.Fatalf("containing selector lost to leaf destination: %#v", resolved)
+		}
+	})
+
 	t.Run("realpath-normalized casing retains one matching space", func(t *testing.T) {
 		fs := &pathSpaceTestFS{
 			caseSensitive: false,

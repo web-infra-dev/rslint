@@ -518,6 +518,7 @@ describe('Rslint class', () => {
             ['comma,dir/**/*.ts', ['comma,dir/one.ts']],
             ['comma,dir/one.ts', ['comma,dir/one.ts']],
             ['src/**/*.ts', ['src/control.ts']],
+            [['src/control.ts', `!${absolutePattern}/src/*.ts`], []],
             ['', []],
             [['', 'src/*.ts'], ['src/control.ts']],
             ['./!src', ['control.ts']],
@@ -2016,6 +2017,65 @@ module.exports = config;`
     }
   });
 
+  test('lintFiles prefers the containing config through a directory alias and leaf symlink', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-parent-owner-'),
+    );
+    try {
+      const parent = path.join(tmp, 'real');
+      const contained = path.join(parent, 'sub');
+      const outside = path.join(tmp, 'outside');
+      const alias = path.join(tmp, 'link');
+      const marker = path.join(outside, 'loaded.marker');
+      await mkdir(contained, { recursive: true });
+      await mkdir(outside);
+      await writeFile(
+        path.join(outside, 'leaf.ts'),
+        'debugger;console.log("leaf");\n',
+      );
+      await writeFile(
+        path.join(parent, 'rslint.config.mjs'),
+        "export default [{ files: ['sub/*.ts'], rules: { 'no-debugger': 'error' } }];\n",
+      );
+      await writeFile(
+        path.join(outside, 'rslint.config.mjs'),
+        `import { writeFileSync } from 'node:fs';
+         writeFileSync(new URL('./loaded.marker', import.meta.url), 'loaded');
+         export default [{ rules: { 'no-console': 'error' } }];\n`,
+      );
+      try {
+        await symlink(
+          path.join(outside, 'leaf.ts'),
+          path.join(contained, 'leaf.ts'),
+          'file',
+        );
+        await symlink(
+          contained,
+          alias,
+          process.platform === 'win32' ? 'junction' : 'dir',
+        );
+      } catch {
+        return;
+      }
+      const rslint = new Rslint({ cwd: tmp });
+      try {
+        const results = await rslint.lintFiles('link/leaf.ts');
+        expect(results).toHaveLength(1);
+        expect(results[0].filePath).toBe(path.join(alias, 'leaf.ts'));
+        expect(results[0].messages.map((message) => message.ruleId)).toEqual([
+          'no-debugger',
+        ]);
+        await expect(readFile(marker)).rejects.toMatchObject({
+          code: 'ENOENT',
+        });
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await cleanupTempDir(tmp);
+    }
+  });
+
   test('lintFiles keeps lexical files matching when a symlink target belongs to the Program', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-program-symlink-selector-'),
@@ -2137,9 +2197,9 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles excludes a literal file symlink matched by a negative pattern', async () => {
+  test('lintFiles excludes a literal file symlink with relative and absolute negative patterns', async () => {
     const tmp = await mkdtemp(
-      path.join(os.tmpdir(), 'rslint-api-literal-negative-'),
+      path.join(os.tmpdir(), 'rslint-api-literal-negative-[cwd]-'),
     );
     try {
       const target = path.join(tmp, 'target.ts');
@@ -2157,7 +2217,25 @@ module.exports = config;`
         overrideConfig: [{ rules: { 'no-debugger': 'error' } }],
       });
       try {
-        expect(await rslint.lintFiles(['link.ts', '!link.ts'])).toHaveLength(0);
+        expect(await rslint.lintFiles('link.ts')).toHaveLength(1);
+        for (const negative of [
+          '!link.ts',
+          `!${convertPathToPattern(tmp)}/*.ts`,
+        ]) {
+          expect(await rslint.lintFiles(['link.ts', negative])).toHaveLength(0);
+        }
+        if (process.platform === 'win32') {
+          const alternateDrive = convertPathToPattern(link).replace(
+            /^[a-z]:/i,
+            (drive) =>
+              drive === drive.toLowerCase()
+                ? drive.toUpperCase()
+                : drive.toLowerCase(),
+          );
+          expect(
+            await rslint.lintFiles(['link.ts', `!${alternateDrive}`]),
+          ).toHaveLength(0);
+        }
       } finally {
         await rslint.close();
       }
