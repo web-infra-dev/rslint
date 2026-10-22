@@ -2,12 +2,9 @@
 
 ## Rule Details
 
-Disallow imports whose resolved file is in a parent directory. The rule checks
-static imports, re-exports and dynamic `import()` calls, including type-only
-imports and exports. Unresolved paths and external packages are ignored.
+Disallow imports whose resolved file is in a parent directory. The rule checks static imports, re-exports and dynamic `import()` calls, including type-only imports and exports. Unresolved paths and external packages are ignored.
 
-Paths are checked after resolution, so `./../main.js` and aliases that resolve
-to a parent file can also be reported.
+Paths are checked after resolution, so `./../main.js` and aliases that resolve to a parent file can also be reported.
 
 Examples of **incorrect** code for this rule in `lib/example.js`:
 
@@ -25,8 +22,7 @@ import child from './child/index.js';
 import dependency from 'dependency';
 ```
 
-Move the importing file, pass the dependency as a function argument, or expose
-it as a package. The rule does not provide automatic fixes or suggestions.
+Move the importing file, pass the dependency as a function argument, or expose it as a package. The rule does not provide automatic fixes or suggestions.
 
 ## Options
 
@@ -37,12 +33,9 @@ it as a package. The rule does not provide automatic fixes or suggestions.
 | `esmodule` | `true` | Check ES imports, re-exports and dynamic imports. |
 | `ignore` | None | Skip module paths matching any JavaScript regular expression in this list. |
 
-If provided, `ignore` must contain at least one pattern, with no duplicates.
-It is separate from `settings['import/ignore']`, which does not exempt imports
-from this rule.
+If provided, `ignore` must contain at least one pattern, with no duplicates. It is separate from `settings['import/ignore']`, which does not exempt imports from this rule.
 
-This configuration also checks CommonJS imports and allows parent imports from
-`generated`:
+This configuration also checks CommonJS imports and allows parent imports from `generated`:
 
 ```javascript
 export default [
@@ -60,31 +53,15 @@ export default [
 
 ## Resolution settings
 
-Set `import/resolver` to `node` or `typescript`. Their full names,
-`eslint-import-resolver-node` and `eslint-import-resolver-typescript`, are also
-accepted. The default Node resolver supports JavaScript and JSON paths; use
-`typescript` for TypeScript paths and aliases. `import/core-modules`,
-`import/internal-regex` and `import/external-module-folders` also affect which
-imports are reported.
+Set `import/resolver` to `node` or `typescript`. Their full names, `eslint-import-resolver-node` and `eslint-import-resolver-typescript`, are also accepted. Without resolver settings, imports are resolved as with `['node', 'typescript']`, so TypeScript paths and aliases resolve. The `node` resolver alone supports JavaScript and JSON paths. `import/core-modules`, `import/internal-regex` and `import/external-module-folders` also affect which imports are reported.
 
 ## Differences from upstream
 
-- If your ESLint configuration uses `webpack` or another custom resolver,
-  rslint reports a resolver error for imports checked by this rule. Use `node`,
-  or use `typescript` with matching `paths` in `tsconfig.json` for aliases.
-  The rule's `ignore` option can exclude imports you do not want to check.
-- To select a TypeScript project, use `languageOptions.parserOptions.project`.
-  Setting `import/resolver` to
-  `{ typescript: { project: 'tsconfig.app.json' } }` does not select that project
-  in rslint. Other TypeScript resolver options, including `alwaysTryTypes`, also
-  have no effect, so imports may resolve differently from ESLint.
-- When configuring multiple resolvers, use an array such as
-  `['typescript', 'node']` to set their priority. Object configurations are tried
-  alphabetically in rslint: `{ typescript: {}, node: {} }` tries `node` first,
-  whereas ESLint tries `typescript` first. This can change the resolved file
-  and whether the import is reported.
-- Babel's experimental `export value from './module'` syntax is not supported.
-  Use `export { default as value } from './module'` instead.
+- Without resolver settings, upstream uses only the `node` resolver. Set `'import/resolver': 'node'` to keep that behavior.
+- If your ESLint configuration uses `webpack` or another custom resolver, rslint reports a resolver error for imports checked by this rule. Use `node`, or use `typescript` with matching `paths` in `tsconfig.json` for aliases. The rule's `ignore` option can exclude imports you do not want to check.
+- To select a TypeScript project, use `languageOptions.parserOptions.project`. Setting `import/resolver` to `{ typescript: { project: 'tsconfig.app.json' } }` does not select that project in rslint. Other TypeScript resolver options, including `alwaysTryTypes`, also have no effect, so imports may resolve differently from ESLint.
+- When configuring multiple resolvers, use an array such as `['typescript', 'node']` to set their priority. Object configurations are tried alphabetically in rslint: `{ typescript: {}, node: {} }` tries `node` first, whereas ESLint tries `typescript` first. This can change the resolved file and whether the import is reported.
+- Babel's experimental `export value from './module'` syntax is not supported. Use `export { default as value } from './module'` instead.
 
 ## Original Documentation
 

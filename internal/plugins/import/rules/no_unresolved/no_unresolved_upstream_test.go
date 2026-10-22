@@ -206,7 +206,7 @@ func TestNoUnresolvedUpstream(t *testing.T) {
 				{Code: "import * as foo from \"jsx-module/foo\"", Settings: map[string]any{"import/resolve": map[string]any{"extensions": []any{".jsx"}}}},
 			},
 			[]rule_tester.InvalidTestCase{
-				{Code: "import * as foo from \"jsx-module/foo\"", Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module 'jsx-module/foo'.", Line: 1, Column: 22, EndLine: 1, EndColumn: 38}}},
+				{Code: "import * as foo from \"jsx-module/foo\"", Settings: map[string]any{"import/resolver": "node"}, Errors: []rule_tester.InvalidTestCaseError{{Message: "Unable to resolve path to module 'jsx-module/foo'.", Line: 1, Column: 22, EndLine: 1, EndColumn: 38}}},
 			})
 	})
 	t.Run("no-unresolved (webpack-specific)", func(t *testing.T) {
