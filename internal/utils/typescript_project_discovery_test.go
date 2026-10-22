@@ -335,6 +335,43 @@ func TestSelectionKeepsLexicalConfigIdentity(t *testing.T) {
 			}
 		}
 	})
+	t.Run("nested-directory-alias-boundary", func(t *testing.T) {
+		root := tspath.NormalizePath(t.TempDir())
+		realDir, alias := tspath.ResolvePath(root, "real"), tspath.ResolvePath(root, "alias")
+		for _, directory := range []string{realDir + "/src", realDir + "/group"} {
+			if err := os.MkdirAll(directory, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.WriteFile(realDir+"/src/file.ts", []byte("export const value = 1;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(realDir+"/tsconfig.json", []byte(`{"files":["group/link/file.ts"],"compilerOptions":{"noLib":true}}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		for _, link := range [][2]string{{realDir + "/src", realDir + "/group/link"}, {realDir, alias}} {
+			if err := os.Symlink(link[0], link[1]); err != nil {
+				t.Skipf("directory symlink unavailable: %v", err)
+			}
+		}
+		host := newRecordingHost(bundled.WrapFS(osvfs.FS()))
+		selected, err := utils.NewTypeScriptProjectDiscovery(host.fs, host.host().ParseConfig).Find(alias+"/group/link/file.ts", realDir)
+		if err != nil || selected == nil || selected.ConfigName() != alias+"/tsconfig.json" {
+			t.Fatalf("nested directory alias lost its project: selected=%s parsed=%v error=%v", selected.ConfigName(), host.parsed, err)
+		}
+	})
+	t.Run("directory-alias-into-subdirectory", func(t *testing.T) {
+		root := tspath.NormalizePath(archive.Materialize(t, "nearest-excludes-parent-includes"))
+		pkg, alias := tspath.ResolvePath(root, "pkg"), tspath.ResolvePath(root, "alias")
+		if err := os.Symlink(pkg+"/src", alias); err != nil {
+			t.Skipf("directory symlink unavailable: %v", err)
+		}
+		host := newRecordingHost(bundled.WrapFS(osvfs.FS()))
+		selected, err := utils.NewTypeScriptProjectDiscovery(host.fs, host.host().ParseConfig).Find(alias+"/file.ts", pkg)
+		if err != nil || selected != nil || host.parsed[root+"/tsconfig.json"] != 0 {
+			t.Fatalf("directory alias escaped its boundary: selected=%s parsed=%v error=%v", selected.ConfigName(), host.parsed, err)
+		}
+	})
 	for _, caseSensitive := range []bool{false, true} {
 		name := "case-insensitive-node-modules"
 		if caseSensitive {

@@ -1696,6 +1696,75 @@ func TestDocumentServiceBoundaryUsesWorkspaceForDiagnosticsAndFixes(t *testing.T
 	}
 }
 
+func TestDocumentServiceBoundaryDistinguishesFileAndDirectoryLinks(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		link      string
+		linkTo    string
+		workspace string
+		file      string
+		wantRoot  string
+		wantTyped bool
+	}{
+		{name: "file link outside workspace", link: "pkg/target.ts", linkTo: "other/target.ts", workspace: "other", file: "pkg/target.ts", wantRoot: "pkg"},
+		{name: "directory workspace alias", link: "workspace", linkTo: "other", workspace: "workspace", file: "other/target.ts", wantRoot: "workspace", wantTyped: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "workspace-boundary"))
+			link := tspath.ResolvePath(root, test.link)
+			if test.link == test.file {
+				if err := os.Remove(link); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.Symlink(tspath.ResolvePath(root, test.linkTo), link); err != nil {
+				t.Skipf("symlink unavailable: %v", err)
+			}
+			server := newTestServer()
+			server.cwd = "/unrelated-server-directory"
+			server.fs = bundled.WrapFS(osvfs.FS())
+			folders := []*lsproto.WorkspaceFolder{{Uri: lsproto.URI(documentURIFromPath(tspath.ResolvePath(root, test.workspace)))}}
+			server.initializeParams = &lsproto.InitializeParams{WorkspaceFolders: &lsproto.WorkspaceFoldersOrNull{WorkspaceFolders: &folders}}
+			entries := config.RslintConfig{{
+				Plugins:         []string{"@typescript-eslint"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
+				Rules:           config.Rules{"no-var": "error", "@typescript-eslint/no-unnecessary-type-assertion": "error"},
+			}}
+			path := tspath.ResolvePath(root, test.file)
+			installJSConfigsForTest(server, map[string]config.RslintConfig{tspath.GetDirectoryPath(path): entries})
+			uri := documentURIFromPath(path)
+			content, ok := server.fs.ReadFile(path)
+			if !ok {
+				t.Fatal("missing fixture source")
+			}
+			snapshot := server.documentLintSnapshot(uri)
+			if snapshot.projectPolicyError != nil {
+				t.Fatal(snapshot.projectPolicyError)
+			}
+			if want := tspath.ResolvePath(root, test.wantRoot); snapshot.projectPolicy.ServiceRootDirectory != want {
+				t.Errorf("service root = %q, want %q", snapshot.projectPolicy.ServiceRootDirectory, want)
+			}
+			provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+			generation, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := runLSPGenerationForTest(context.Background(), generation, release, linter.ArtifactDemand{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var typed bool
+			for _, diagnostic := range result.Observation.Native.Diagnostics {
+				typed = typed || diagnostic.RuleName == "@typescript-eslint/no-unnecessary-type-assertion"
+			}
+			fixed := runSpeculativeFixAllForTest(t, server, context.Background(), uri, content, snapshot)
+			if typed != test.wantTyped || strings.Contains(fixed, " as number") == test.wantTyped || strings.Contains(fixed, "var ") {
+				t.Fatalf("typed=%v want=%v fixed=%q", typed, test.wantTyped, fixed)
+			}
+		})
+	}
+}
+
 func TestDocumentProjectPolicyUsesMatchingEntries(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
 	directory := tspath.NormalizePath(archive.Materialize(t, "nested"))

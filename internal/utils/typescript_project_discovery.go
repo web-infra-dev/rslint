@@ -163,9 +163,19 @@ func (d *TypeScriptProjectDiscovery) Find(fileName, rootDirectory string) (*tsop
 		physical := d.fs.Realpath(directory)
 		if physicalRoot != "" && physical != "" && tspath.ContainsPath(physicalRoot, physical, options) {
 			boundary = directory
-			for d.path(physical) != d.path(physicalRoot) {
-				physical = tspath.GetDirectoryPath(physical)
-				boundary = tspath.GetDirectoryPath(boundary)
+			// Nested directory links can change the number of physical parents.
+			// Resolve lexical ancestors instead. If a link skips the root itself,
+			// retain the outermost ancestor still physically within that root.
+			for ancestor := directory; ; ancestor = tspath.GetDirectoryPath(ancestor) {
+				if physical := d.fs.Realpath(ancestor); physical != "" && tspath.ContainsPath(physicalRoot, physical, options) {
+					boundary = ancestor
+					if d.path(physical) == d.path(physicalRoot) {
+						break
+					}
+				}
+				if tspath.GetDirectoryPath(ancestor) == ancestor {
+					break
+				}
 			}
 		}
 		root = d.path(boundary)

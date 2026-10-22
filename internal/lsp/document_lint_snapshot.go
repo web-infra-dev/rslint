@@ -359,7 +359,7 @@ func (s *Server) documentWorkspaceDirectory(file target.File, pathSpaces *config
 				if s.fs == nil {
 					continue
 				}
-				path = file.CanonicalPath
+				path = file.CanonicalParentPath
 				var frozen bool
 				directory, frozen = pathSpaces.PhysicalDirectory(root)
 				if !frozen {
