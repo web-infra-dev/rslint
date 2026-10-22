@@ -572,8 +572,12 @@ describe('Rslint class', () => {
     }
   });
 
-  test('lintFiles exclusions preserve Windows volume roots and glob escapes', () => {
+  test('lintFiles exclusions preserve platform path and glob semantics', () => {
     for (const [cwd, pattern, file, excluded] of [
+      ['C:/Project', 'a.ts', 'C:/PROJECT/a.ts', true],
+      ['//server/share/Project', 'a.ts', '//SERVER/SHARE/PROJECT/a.ts', true],
+      ['C:/Project', 'src/*.ts', 'C:/PROJECT/SRC/a.ts', false],
+      ['C:/Project', 'a.ts', 'C:/PROJECT/A.ts', false],
       ['C:/project', 'C:/../project/*.ts', 'C:/project/a.ts', true],
       [
         '//server/share/project',
@@ -599,6 +603,11 @@ describe('Rslint class', () => {
       const exclusions = compileGlobExclusions([pattern], cwd, path.win32);
       expect(exclusions.matches(file)).toBe(excluded);
     }
+    expect(
+      compileGlobExclusions(['a.ts'], '/Project', path.posix).matches(
+        '/PROJECT/a.ts',
+      ),
+    ).toBe(false);
   });
 
   test('outputFixes writes output to absolute paths, skips no-output/relative', async () => {

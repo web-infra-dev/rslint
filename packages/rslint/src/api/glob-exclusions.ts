@@ -6,7 +6,7 @@ import picomatch from 'picomatch';
 export function compileGlobExclusions(
   patterns: readonly string[],
   cwd: string,
-  paths: Pick<typeof path, 'sep' | 'isAbsolute'> = path,
+  paths: Pick<typeof path, 'sep' | 'isAbsolute' | 'relative'> = path,
 ): { ignore: string[]; matches(filePath: string): boolean } {
   const windowsVolume = /^(?:[a-z]:|\/\/[^/]+\/[^/]+)(?=\/|$)/i;
   const normalize = (pattern: string): string => {
@@ -81,10 +81,12 @@ export function compileGlobExclusions(
     ignore,
     matches(filePath) {
       const absolute = normalize(filePath.split(paths.sep).join('/'));
-      return (
-        relativeMatcher(path.posix.relative(normalizedCwd, absolute) || '.') ||
-        absoluteMatcher(absolute)
-      );
+      // Native relative paths accept Windows cwd case differences while
+      // retaining the suffix's spelling for case-sensitive glob matching.
+      const relative =
+        paths.relative(normalizedCwd, absolute).split(paths.sep).join('/') ||
+        '.';
+      return relativeMatcher(relative) || absoluteMatcher(absolute);
     },
   };
 }
