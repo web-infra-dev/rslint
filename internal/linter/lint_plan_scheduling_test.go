@@ -53,7 +53,6 @@ func TestCompleteProgramsJoinsBorrowersBeforeRethrowing(t *testing.T) {
 			unblock := func() { resumeOnce.Do(func() { close(resume) }) }
 			defer unblock()
 			marker := new(int)
-			var extraTask atomic.Bool
 			done := make(chan any, 1)
 			go func() {
 				defer func() { done <- recover() }()
@@ -72,11 +71,11 @@ func TestCompleteProgramsJoinsBorrowersBeforeRethrowing(t *testing.T) {
 							runtime.Goexit()
 						}
 						panic(marker)
-					default:
-						extraTask.Store(true)
 					}
 				})
 			}()
+			// The signal precedes admission observing the worker's exit, so
+			// another task may start before the failure is recorded.
 			<-failed
 			select {
 			case <-done:
@@ -85,8 +84,8 @@ func TestCompleteProgramsJoinsBorrowersBeforeRethrowing(t *testing.T) {
 			}
 			unblock()
 			value := <-done
-			if value == nil || (!abnormalExit && value != marker) || extraTask.Load() {
-				t.Fatalf("panic/extra task = %v/%t", value, extraTask.Load())
+			if value == nil || (!abnormalExit && value != marker) {
+				t.Fatalf("panic = %v, want original panic or abnormal-worker panic", value)
 			}
 		})
 	}
