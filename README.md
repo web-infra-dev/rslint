@@ -12,24 +12,24 @@
   <a href="https://codspeed.io/web-infra-dev/rslint?utm_source=badge"><img src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" alt="CodSpeed"/></a>
 </p>
 
-Rslint is a high-performance, ESLint-compatible linter for JavaScript and TypeScript.
+Rslint is an ESLint-compatible linter for JavaScript and TypeScript.
 
-Powered by [TypeScript's native compiler](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/), it delivers a faster drop-in experience with type-aware rules and optional type checking in the same run.
+Powered by the pinned [tsrs compiler](https://github.com/oxc-project/tsrs), the current migration executes lint rules, parsing and type analysis in Rust through a direct Node.js binding. Its acceptance scope is the 129 rules used by the frozen Rsbuild workload; see the [migration report](docs/tsrs-migration/REPORT.zh-CN.md) for validation and limitations.
 
 ## ✨ Goals
 
-- 🚀 **Lightning Fast**: Powered by TypeScript's native compiler, delivering 20-40x faster linting performance compared to traditional ESLint setups.
+- 🚀 **Performance**: Measure complete lint time and memory use, including Node/native startup, binding costs and shutdown; report regressions as well as improvements.
 - ⚡ **Minimal Configuration**: Typed linting enabled by default with minimal setup required — no complex configuration needed.
 - 📦 **Best Effort ESLint Compatible**: Compatible with most ESLint and TypeScript-ESLint configurations, significantly reducing migration costs.
-- 🎯 **TypeScript First**: Uses TypeScript Compiler semantics as the single source of truth, ensuring 100% consistency and eliminating edge-case bugs.
+- 🎯 **TypeScript First**: Uses compiler semantics for type-aware rules, with compatibility checked through rule and integration tests.
 - 🛠️ **Project-Level Analysis**: Performs cross-module analysis by default, enabling more powerful semantic analysis than file-level linting.
 - 🏢 **Monorepo Ready**: First-class support for large-scale monorepos with TypeScript project references and workspace configurations.
-- 📋 **Batteries Included**: Ships with all existing typescript-eslint rules and ESLint rules out of the box.
-- 🔧 **Extensible**: Exposes AST, type information, and global checker data for writing custom rules with complex cross-module analysis.
+- 📋 **Batteries Included**: The experimental Rust path covers the 129 rules enabled by the frozen Rsbuild workload.
+- 🔧 **Extensible**: Provides direct JavaScript CLI/API access to the Rust engine; external plugin and service APIs remain unsupported.
 
 ## ✅ Current Status
 
-Rslint provides built-in support for 600+ high-performance rules, all implemented natively, including all [typescript-eslint](https://typescript-eslint.io/) rules and all rules from [`@eslint/js`](https://www.npmjs.com/package/@eslint/js). It is also compatible with ESLint flat config and most ESLint plugins, making it easier to adopt in existing ESLint projects.
+This branch is an experimental Rust/JavaScript migration scoped to Rsbuild’s 129 enabled rules. The fixed whole-repository workload and CLI/API results match the original backend in the recorded checks. Its measured single-threaded full-lint median is 13.11 s versus 4.89 s for the original, with higher sampled process-tree RSS. Unsupported rules and plugin/service/LSP/WASM entrypoints fail explicitly. See the [report](docs/tsrs-migration/REPORT.zh-CN.md) for exact evidence and remaining limitations.
 
 ## 🚀 Getting Started
 
@@ -75,7 +75,7 @@ Rslint has been inspired by several outstanding projects in the community:
 - The [typescript-eslint](https://github.com/typescript-eslint) team - Rslint's configuration design and test cases have been significantly influenced by and adapted from typescript-eslint's excellent implementation.
 - The [ESLint](https://github.com/eslint/eslint) team - Rslint builds upon the foundational work of ESLint, the pioneering JavaScript linter that established the standards and patterns for static code analysis in the JavaScript ecosystem.
 - The [Rust Clippy](https://github.com/rust-lang/rust-clippy) team - Rslint draws inspiration from Clippy's approach to compiler-integrated linting, bringing similar TypeScript-native analysis to the JavaScript ecosystem.
-- The [TypeScript](https://github.com/microsoft/TypeScript) project - Powers Rslint's high-performance TypeScript parsing and semantic analysis capabilities through its Go compiler.
+- The [TypeScript](https://github.com/microsoft/TypeScript) and [tsrs](https://github.com/oxc-project/tsrs) projects - Provide the compiler semantics, Rust implementation, and upstream data models used by Rslint.
 
 ## 📖 License
 

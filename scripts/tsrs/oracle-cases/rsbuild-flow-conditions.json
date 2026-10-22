@@ -1,0 +1,4786 @@
+[
+  {
+    "rule": "no-constant-binary-expression",
+    "provenance": {
+      "repository": "web-infra-dev/rslint",
+      "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "sources": [
+        {
+          "path": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_ecma_version_test.go",
+          "sha256": "722cebf871f451ae2d2aeca9a6fd00150162a786239985cd66df740cf8e329d6"
+        },
+        {
+          "path": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go",
+          "sha256": "70c057c10677259c5ace7d5726ed7bd8e143a0f643d2dbd9e699cfdfb8d81ab0"
+        }
+      ]
+    },
+    "exactCompilerOptions": true,
+    "compilerOptions": {
+      "jsx": "preserve",
+      "target": "esnext",
+      "module": "commonjs",
+      "strict": true,
+      "strictNullChecks": true,
+      "esModuleInterop": true,
+      "lib": [
+        "es2015",
+        "es2017",
+        "esnext",
+        "DOM"
+      ],
+      "experimentalDecorators": true,
+      "types": []
+    },
+    "valid": [
+      {
+        "text": "function f(undefined) { return undefined === \"x\"; }",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_ecma_version_test.go:21"
+      },
+      {
+        "text": "bar && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:21"
+      },
+      {
+        "text": "bar || foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:22"
+      },
+      {
+        "text": "bar ?? foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:23"
+      },
+      {
+        "text": "foo == true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:24"
+      },
+      {
+        "text": "foo === true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:25"
+      },
+      {
+        "text": "true ? foo : bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:26"
+      },
+      {
+        "text": "foo() && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:29"
+      },
+      {
+        "text": "foo() || bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:30"
+      },
+      {
+        "text": "foo() ?? bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:31"
+      },
+      {
+        "text": "foo[0] && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:34"
+      },
+      {
+        "text": "foo.bar && baz",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:35"
+      },
+      {
+        "text": "var a = `${bar}` && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:38"
+      },
+      {
+        "text": "(x += 1) && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:41"
+      },
+      {
+        "text": "(x -= 1) || bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:42"
+      },
+      {
+        "text": "delete bar.baz && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:45"
+      },
+      {
+        "text": "foo ?? null ?? bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:48"
+      },
+      {
+        "text": "(a || b || c) ?? fallback",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:55"
+      },
+      {
+        "text": "(a && b) ?? fallback",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:56"
+      },
+      {
+        "text": "(a && b.x) ?? fallback",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:57"
+      },
+      {
+        "text": "((a || b) && (c || d)) ?? fallback",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:58"
+      },
+      {
+        "text": "(a || b || \"literal\") ?? fallback",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:59"
+      },
+      {
+        "text": "(String(x) && Number(x)) ?? fallback",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:60"
+      },
+      {
+        "text": "function Boolean(n: any) { return n; } Boolean(x) ?? foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:63"
+      },
+      {
+        "text": "function Boolean(n: any) { return n; } Boolean(x) && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:64"
+      },
+      {
+        "text": "var Boolean = (n: any) => n; Boolean(x) ?? foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:65"
+      },
+      {
+        "text": "x === null",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:68"
+      },
+      {
+        "text": "null === x",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:69"
+      },
+      {
+        "text": "x == null",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:70"
+      },
+      {
+        "text": "x == undefined",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:71"
+      },
+      {
+        "text": "x !== null",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:72"
+      },
+      {
+        "text": "x != undefined",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:73"
+      },
+      {
+        "text": "!foo && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:76"
+      },
+      {
+        "text": "!foo || bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:77"
+      },
+      {
+        "text": "!module || !module[pluginName]",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:78"
+      },
+      {
+        "text": "!!foo && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:79"
+      },
+      {
+        "text": "x == /[a-z]/",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:82"
+      },
+      {
+        "text": "x == []",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:83"
+      },
+      {
+        "text": "new Foo() == true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:86"
+      },
+      {
+        "text": "x++ && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:89"
+      },
+      {
+        "text": "x-- || bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:90"
+      },
+      {
+        "text": "++x && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:93"
+      },
+      {
+        "text": "Boolean(foo) && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:96"
+      },
+      {
+        "text": "delete bar.baz && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:99"
+      },
+      {
+        "text": "+foo && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:102"
+      },
+      {
+        "text": "-foo || bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:103"
+      },
+      {
+        "text": "(1, x) && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:106"
+      },
+      {
+        "text": "(x ||= foo) && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:109"
+      },
+      {
+        "text": "(x &&= foo) || bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:110"
+      },
+      {
+        "text": "[x] == true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:113"
+      },
+      {
+        "text": "new Foo() === x",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:116"
+      },
+      {
+        "text": "delete x.y === true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:119"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "undefined === \"x\"",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_ecma_version_test.go:36",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand"
+          }
+        ]
+      },
+      {
+        "text": "\"ab\" && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:129",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[] && greeting",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:135",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "true && hello",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:141",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "'' && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:147",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "100 && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:153",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "/[a-z]/ && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:159",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "Boolean([]) && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:165",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:171",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(() => {}) && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:177",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "new Foo() && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:183",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "undefined && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:189",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "!true && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:196",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "!undefined && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:202",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "![] && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:208",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "void 0 && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:215",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "typeof foo && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:222",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(1 + 2) && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:229",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(x = true) && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:236",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "null && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:243",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(class {}) && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:250",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[] || greeting",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:260",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "true || hello",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:266",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "0 || foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:272",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "'' || foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:278",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "!true || bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:284",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) ?? foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:294",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "1 ?? foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:300",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "null ?? foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:306",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "undefined ?? foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:312",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(x > 0) ?? fallback",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:319",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(x === y) ?? fallback",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:325",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "!foo ?? bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:332",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "typeof foo ?? bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:338",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "String(x) ?? foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:345",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "Number(x) ?? foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:351",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[] == true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:361",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "true == []",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:367",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) == true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:373",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) == null",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:379",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) == undefined",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:385",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "undefined == true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:391",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "true == true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:397",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "\"\" == true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:404",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "\"hello\" == false",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:410",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "0 == true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:416",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "1 == false",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:422",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) != true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:432",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[] != null",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:438",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "true === true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:448",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[] === null",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:454",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "null === null",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:460",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) === undefined",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:466",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) === null",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:472",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "true === false",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:478",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "\"\" === true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:484",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "42 === true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:490",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[] !== null",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:500",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) !== undefined",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:506",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[a] == [a]",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:516",
+        "expected": [
+          {
+            "messageId": "bothAlwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) == []",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:522",
+        "expected": [
+          {
+            "messageId": "bothAlwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[] === []",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:532",
+        "expected": [
+          {
+            "messageId": "alwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) === ({})",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:538",
+        "expected": [
+          {
+            "messageId": "alwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === {}",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:544",
+        "expected": [
+          {
+            "messageId": "alwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === []",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:550",
+        "expected": [
+          {
+            "messageId": "alwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === (() => {})",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:556",
+        "expected": [
+          {
+            "messageId": "alwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === /[a-z]/",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:562",
+        "expected": [
+          {
+            "messageId": "alwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "({}) === x",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:568",
+        "expected": [
+          {
+            "messageId": "alwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "/[a-z]/ === x",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:574",
+        "expected": [
+          {
+            "messageId": "alwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "Boolean(true) && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:584",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "Boolean(false) || foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:590",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(!true) && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:600",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(null) ?? bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:606",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "typeof x === true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:617",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "void 0 == undefined",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:624",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "void 0 ?? bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:631",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(x ||= 1) && foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:641",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(x &&= 0) || bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:647",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(1, 2) && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:657",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(x = []) && bar",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:667",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === (true ? [] : {})",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:677",
+        "expected": [
+          {
+            "messageId": "alwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "Boolean(x) ?? foo",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:687",
+        "expected": [
+          {
+            "messageId": "constantShortCircuit",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "!true == 42",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:697",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[1, 2] == true",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:707",
+        "expected": [
+          {
+            "messageId": "constantBinaryOperand",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(class {}) === x",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_test.go:717",
+        "expected": [
+          {
+            "messageId": "alwaysNew",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      }
+    ],
+    "excluded": [
+      {
+        "text": "new Promise(function() {}) === value",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_ecma_version_test.go:18",
+        "languageOptions": {
+          "ECMAVersion": 5
+        },
+        "category": "valid",
+        "reason": "Non-default language options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "new Promise(function() {}) === value",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_ecma_version_test.go:19",
+        "languageOptions": {
+          "ECMAVersion": 2015
+        },
+        "globals": {
+          "Promise": "off"
+        },
+        "category": "valid",
+        "reason": "Non-default language options not enabled by frozen Rsbuild. Non-default globals not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "new Image() === value",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_ecma_version_test.go:20",
+        "globals": {
+          "Image": "readonly"
+        },
+        "category": "valid",
+        "reason": "Non-default globals not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "undefined ?? value",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_ecma_version_test.go:22",
+        "globals": {
+          "undefined": "off"
+        },
+        "category": "valid",
+        "reason": "Non-default globals not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "new Promise(function() {}) === value",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_ecma_version_test.go:25",
+        "expected": [
+          {
+            "messageId": "alwaysNew"
+          }
+        ],
+        "languageOptions": {
+          "ECMAVersion": 5
+        },
+        "globals": {
+          "Promise": "readonly"
+        },
+        "category": "invalid",
+        "reason": "Non-default language options not enabled by frozen Rsbuild. Non-default globals not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "new Promise(function() {}) === value",
+        "origin": "internal/rules/no_constant_binary_expression/no_constant_binary_expression_ecma_version_test.go:31",
+        "expected": [
+          {
+            "messageId": "alwaysNew"
+          }
+        ],
+        "languageOptions": {
+          "ECMAVersion": 2015
+        },
+        "category": "invalid",
+        "reason": "Non-default language options not enabled by frozen Rsbuild."
+      }
+    ]
+  },
+  {
+    "rule": "no-constant-condition",
+    "provenance": {
+      "repository": "web-infra-dev/rslint",
+      "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "sources": [
+        {
+          "path": "internal/rules/no_constant_condition/no_constant_condition_test.go",
+          "sha256": "05e3841a4728ccc799c0760be4399301d9949eb41dc9334eeca418a4c6fd7a8e"
+        }
+      ]
+    },
+    "exactCompilerOptions": true,
+    "compilerOptions": {
+      "jsx": "preserve",
+      "target": "esnext",
+      "module": "commonjs",
+      "strict": true,
+      "strictNullChecks": true,
+      "esModuleInterop": true,
+      "lib": [
+        "es2015",
+        "es2017",
+        "esnext",
+        "DOM"
+      ],
+      "experimentalDecorators": true,
+      "types": []
+    },
+    "valid": [
+      {
+        "text": "if(a);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:19"
+      },
+      {
+        "text": "if(a == 0);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:20"
+      },
+      {
+        "text": "if(a = f());",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:21"
+      },
+      {
+        "text": "if(a += 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:24"
+      },
+      {
+        "text": "if(a |= 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:25"
+      },
+      {
+        "text": "if(a |= true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:26"
+      },
+      {
+        "text": "if(a |= false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:27"
+      },
+      {
+        "text": "if(a &= 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:28"
+      },
+      {
+        "text": "if(a &= true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:29"
+      },
+      {
+        "text": "if(a &= false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:30"
+      },
+      {
+        "text": "if(a >>= 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:31"
+      },
+      {
+        "text": "if(a >>= true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:32"
+      },
+      {
+        "text": "if(a >>= false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:33"
+      },
+      {
+        "text": "if(a >>>= 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:34"
+      },
+      {
+        "text": "if(a ??= 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:35"
+      },
+      {
+        "text": "if(a ??= true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:36"
+      },
+      {
+        "text": "if(a ??= false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:37"
+      },
+      {
+        "text": "if(a ||= b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:40"
+      },
+      {
+        "text": "if(a ||= false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:41"
+      },
+      {
+        "text": "if(a ||= 0);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:42"
+      },
+      {
+        "text": "if(a ||= void 0);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:43"
+      },
+      {
+        "text": "if(+(a ||= 1));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:44"
+      },
+      {
+        "text": "if(f(a ||= true));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:45"
+      },
+      {
+        "text": "if((a ||= 1) + 2);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:46"
+      },
+      {
+        "text": "if(1 + (a ||= true));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:47"
+      },
+      {
+        "text": "if(a ||= '' || false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:48"
+      },
+      {
+        "text": "if(a ||= void 0 || null);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:49"
+      },
+      {
+        "text": "if((a ||= false) || b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:50"
+      },
+      {
+        "text": "if(a || (b ||= false));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:51"
+      },
+      {
+        "text": "if((a ||= true) && b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:52"
+      },
+      {
+        "text": "if(a && (b ||= true));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:53"
+      },
+      {
+        "text": "if(a &&= b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:54"
+      },
+      {
+        "text": "if(a &&= true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:55"
+      },
+      {
+        "text": "if(a &&= 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:56"
+      },
+      {
+        "text": "if(a &&= 'foo');",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:57"
+      },
+      {
+        "text": "if((a &&= '') + false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:58"
+      },
+      {
+        "text": "if('' + (a &&= null));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:59"
+      },
+      {
+        "text": "if(a &&= 1 && 2);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:60"
+      },
+      {
+        "text": "if((a &&= true) && b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:61"
+      },
+      {
+        "text": "if(a && (b &&= true));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:62"
+      },
+      {
+        "text": "if((a &&= false) || b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:63"
+      },
+      {
+        "text": "if(a || (b &&= false));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:64"
+      },
+      {
+        "text": "if(a ||= b ||= false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:65"
+      },
+      {
+        "text": "if(a &&= b &&= true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:66"
+      },
+      {
+        "text": "if(a ||= b &&= false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:67"
+      },
+      {
+        "text": "if(a ||= b &&= true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:68"
+      },
+      {
+        "text": "if(a &&= b ||= false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:69"
+      },
+      {
+        "text": "if(a &&= b ||= true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:70"
+      },
+      {
+        "text": "if(1, a);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:73"
+      },
+      {
+        "text": "if ('every' in []);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:76"
+      },
+      {
+        "text": "if (`${a}`) {};",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:79"
+      },
+      {
+        "text": "if (`${foo()}`) {};",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:80"
+      },
+      {
+        "text": "if (`${a === 'b' && b==='a'}`) {};",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:81"
+      },
+      {
+        "text": "if (`app${le}` === 'apple');",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:82"
+      },
+      {
+        "text": "if (+(a || true));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:85"
+      },
+      {
+        "text": "if (-(a || true));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:86"
+      },
+      {
+        "text": "if (~(a || 1));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:87"
+      },
+      {
+        "text": "if (+(a && 0) === +(b && 0));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:88"
+      },
+      {
+        "text": "while(~!a);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:91"
+      },
+      {
+        "text": "while(a = b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:92"
+      },
+      {
+        "text": "while(`${a}`) {};",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:93"
+      },
+      {
+        "text": "while(x += 3) {};",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:94"
+      },
+      {
+        "text": "for(;x < 10;);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:97"
+      },
+      {
+        "text": "for(;;);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:98"
+      },
+      {
+        "text": "for(;`${a}`;);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:99"
+      },
+      {
+        "text": "do{ }while(x)",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:102"
+      },
+      {
+        "text": "q > 0 ? 1 : 2;",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:105"
+      },
+      {
+        "text": "(`${a}` === a ? 1 : 2);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:106"
+      },
+      {
+        "text": "(`foo${a}` === a ? 1 : 2);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:107"
+      },
+      {
+        "text": "if(typeof x === 'undefined'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:110"
+      },
+      {
+        "text": "if(`${typeof x}` === 'undefined'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:111"
+      },
+      {
+        "text": "if(a === 'str' && typeof b){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:112"
+      },
+      {
+        "text": "typeof a == typeof b",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:113"
+      },
+      {
+        "text": "typeof 'a' === 'string'|| typeof b === 'string'",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:114"
+      },
+      {
+        "text": "(`${typeof 'a'}` === 'string'|| `${typeof b}` === 'string');",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:115"
+      },
+      {
+        "text": "if (void a || a);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:118"
+      },
+      {
+        "text": "if (a || void a);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:119"
+      },
+      {
+        "text": "if(xyz === 'str1' && abc==='str2'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:122"
+      },
+      {
+        "text": "if(xyz === 'str1' || abc==='str2'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:123"
+      },
+      {
+        "text": "if(xyz === 'str1' || abc==='str2' && pqr === 5){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:124"
+      },
+      {
+        "text": "if(typeof abc === 'string' && abc==='str2'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:125"
+      },
+      {
+        "text": "if(false || abc==='str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:126"
+      },
+      {
+        "text": "if(true && abc==='str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:127"
+      },
+      {
+        "text": "if(typeof 'str' && abc==='str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:128"
+      },
+      {
+        "text": "if(abc==='str' || false || def ==='str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:129"
+      },
+      {
+        "text": "if(true && abc==='str' || def ==='str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:130"
+      },
+      {
+        "text": "if(true && typeof abc==='string'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:131"
+      },
+      {
+        "text": "if('str1' && a){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:132"
+      },
+      {
+        "text": "if(a && 'str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:133"
+      },
+      {
+        "text": "if ((foo || true) === 'baz') {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:136"
+      },
+      {
+        "text": "if ((foo || 'bar') === 'baz') {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:137"
+      },
+      {
+        "text": "if ((foo || 'bar') !== 'baz') {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:138"
+      },
+      {
+        "text": "if ((foo || 'bar') == 'baz') {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:139"
+      },
+      {
+        "text": "if ((foo || 'bar') != 'baz') {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:140"
+      },
+      {
+        "text": "if ((foo || 233) > 666) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:141"
+      },
+      {
+        "text": "if ((foo || 233) < 666) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:142"
+      },
+      {
+        "text": "if ((foo || 233) >= 666) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:143"
+      },
+      {
+        "text": "if ((foo || 233) <= 666) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:144"
+      },
+      {
+        "text": "if ((key || 'k') in obj) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:145"
+      },
+      {
+        "text": "if ((foo || {}) instanceof obj) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:146"
+      },
+      {
+        "text": "if ((foo || 'bar' || 'bar') === 'bar');",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:147"
+      },
+      {
+        "text": "if ((foo || 1n) === 'baz') {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:150"
+      },
+      {
+        "text": "if (a && 0n || b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:151"
+      },
+      {
+        "text": "if(1n && a){};",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:152"
+      },
+      {
+        "text": "if ('' + [y] === '' + [ty]) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:155"
+      },
+      {
+        "text": "if ('a' === '' + [ty]) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:156"
+      },
+      {
+        "text": "if ('' + [y, m, d] === 'a') {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:157"
+      },
+      {
+        "text": "if ('' + [y, 'm'] === '' + [ty, 'tm']) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:158"
+      },
+      {
+        "text": "if ('' + [y, 'm'] === '' + ['ty']) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:159"
+      },
+      {
+        "text": "if ([,] in ($2)) ; else ;",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:160"
+      },
+      {
+        "text": "if ([...x]+'' === 'y'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:161"
+      },
+      {
+        "text": "while(true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:174",
+        "originalOptions": [
+          {
+            "checkLoops": "allExceptWhileTrue"
+          }
+        ],
+        "contextAdaptation": "Explicit checkLoops matches the frozen default; no options changes are required."
+      },
+      {
+        "text": "while(true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:175"
+      },
+      {
+        "text": "function* foo(){while(true){yield 'foo';}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:183"
+      },
+      {
+        "text": "function* foo(){for(;true;){yield 'foo';}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:184"
+      },
+      {
+        "text": "function* foo(){do{yield 'foo';}while(true)}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:185"
+      },
+      {
+        "text": "function* foo(){while (true) { while(true) {yield;}}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:186"
+      },
+      {
+        "text": "function* foo() {for (; yield; ) {}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:187"
+      },
+      {
+        "text": "function* foo() {for (; ; yield) {}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:188"
+      },
+      {
+        "text": "function* foo() {while (true) {function* foo() {yield;}yield;}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:189"
+      },
+      {
+        "text": "function* foo() { for (let x = yield; x < 10; x++) {yield;}yield;}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:190"
+      },
+      {
+        "text": "function* foo() { for (let x = yield; ; x++) { yield; }}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:191"
+      },
+      {
+        "text": "if (new Number(x) + 1 === 2) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:194"
+      },
+      {
+        "text": "if([a]==[b]) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:197"
+      },
+      {
+        "text": "if (+[...a]) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:198"
+      },
+      {
+        "text": "if (+[...[...a]]) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:199"
+      },
+      {
+        "text": "if (`${[...a]}`) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:200"
+      },
+      {
+        "text": "if (`${[a]}`) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:201"
+      },
+      {
+        "text": "if (+[a]) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:202"
+      },
+      {
+        "text": "if (0 - [a]) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:203"
+      },
+      {
+        "text": "if (1 * [a]) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:204"
+      },
+      {
+        "text": "if (Boolean(a)) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:207"
+      },
+      {
+        "text": "if (Boolean(...args)) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:208"
+      },
+      {
+        "text": "if (foo.Boolean(1)) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:209"
+      },
+      {
+        "text": "function foo(Boolean) { if (Boolean(1)) {} }",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:210"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "for(;true;);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:217",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "for(;``;);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:223",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "for(;`foo`;);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:229",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "for(;`foo${bar}`;);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:235",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "do{}while(true)",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:243",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "do{}while('1')",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:249",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "do{}while(0)",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:255",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "do{}while(t = -2)",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:261",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "do{}while(``)",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:267",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "do{}while(`foo`)",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:273",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "do{}while(`foo${bar}`)",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:279",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "true ? 1 : 2;",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:287",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "1 ? 1 : 2;",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:293",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "q = 0 ? 1 : 2;",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:299",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "(q = 0) ? 1 : 2;",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:305",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "`` ? 1 : 2;",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:311",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "`foo` ? 1 : 2;",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:317",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "`foo${bar}` ? 1 : 2;",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:323",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(-2);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:331",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:337",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:343",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if({});",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:349",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(0 < 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:355",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(0 || 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:361",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a, 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:367",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(`foo`);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:373",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(``);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:379",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(`${'bar'}`);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:385",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(`${'bar' + `foo`}`);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:391",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(`foo${false || true}`);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:397",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(`foo${0 || 1}`);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:403",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(`foo${bar}`);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:409",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(`${bar}foo`);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:415",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(!(true || a));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:421",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(!(a && void b && c));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:427",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(0 || !(a && null));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:433",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(1 + !(a || true));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:439",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(!(null && a) > 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:445",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(+(!(a && 0)));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:451",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(!typeof a === 'string');",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:457",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(-('foo' || a));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:463",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(+(void a && b) === ~(1 || c));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:469",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a ||= true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:477",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a ||= 5);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:483",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a ||= 'foo' || b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:489",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a ||= b || /regex/);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:495",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a ||= b ||= true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:501",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a ||= b ||= c || 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:507",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(!(a ||= true));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:513",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(!(a ||= 'foo') === true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:519",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(!(a ||= 'foo') === false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:525",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a || (b ||= true));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:531",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if((a ||= 1) || b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:537",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if((a ||= true) && true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:543",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(true && (a ||= true));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:549",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a &&= false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:555",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a &&= null);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:561",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a &&= void b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:567",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a &&= 0 && b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:573",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a &&= b && '');",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:579",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a &&= b &&= false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:585",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a &&= b &&= c && false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:591",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(!(a &&= false));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:597",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(!(a &&= 0) + 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:603",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a && (b &&= false));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:609",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if((a &&= null) && b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:615",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(false || (a &&= false));",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:621",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if((a &&= false) || false);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:627",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "while([]);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:635",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "while(~!0);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:641",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "while(x = 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:647",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "while(function(){});",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:653",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "while(1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:666",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "while(() => {});",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:672",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "while(`foo`);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:678",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "while(``);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:684",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "while(`${'foo'}`);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:690",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "while(`${'foo' + 'bar'}`);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:696",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(typeof x){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:704",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(typeof 'abc' === 'string'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:710",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a = typeof b){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:716",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a, typeof b){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:722",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(typeof 'a' == 'string' || typeof 'b' == 'string'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:728",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "while(typeof x){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:734",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(1 || void x);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:742",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(void x);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:748",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(y = void x);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:754",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(x, void x);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:760",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(void x === void y);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:766",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(void x && a);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:772",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a && void x);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:778",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(false && abc==='str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:786",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(true || abc==='str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:792",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(1 || abc==='str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:798",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(abc==='str' || true){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:804",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(abc==='str' || true || def ==='str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:810",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(false || true){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:816",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(typeof abc==='str' || true){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:822",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if('str' || a){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:828",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if('str' || abc==='str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:834",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if('str1' || 'str2'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:840",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if('str1' && 'str2'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:846",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(abc==='str' || 'str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:852",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(a || 'str'){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:858",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "function* foo(){if (true) {yield 'foo';}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:959",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "function* foo() {for (let foo = yield; true;) {}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:965",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "function* foo() {for (foo = yield; true;) {}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:971",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "function* foo() { for (let foo = 1 + 2 + 3 + (yield); true; baz) {}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:991",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if([a]) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:999",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if([]) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1005",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(''+['a']) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1011",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(''+[]) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1017",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(+1) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1023",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if ([,] + ''){}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1029",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(0n);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1037",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(0b0n);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1043",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(0o0n);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1049",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(0x0n);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1055",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(0b1n);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1061",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(0o1n);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1067",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(0x1n);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1073",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(0x1n || foo);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1079",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(class {}) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1087",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(new Foo()) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1093",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(new Boolean(foo)) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1101",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(new String(foo)) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1107",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(new Number(foo)) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1113",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if(`${[...['a']]}`) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1121",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if (undefined) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1129",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if (Boolean(1)) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1135",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if (Boolean()) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1141",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if (Boolean([a])) {}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1147",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      },
+      {
+        "text": "if (Boolean(1)) { function Boolean() {}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:1153",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ]
+      }
+    ],
+    "excluded": [
+      {
+        "text": "while(true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:164",
+        "originalOptions": [
+          {
+            "checkLoops": false
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "for(;true;);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:165",
+        "originalOptions": [
+          {
+            "checkLoops": false
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "do{}while(true)",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:166",
+        "originalOptions": [
+          {
+            "checkLoops": false
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "while(true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:169",
+        "originalOptions": [
+          {
+            "checkLoops": "none"
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "for(;true;);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:170",
+        "originalOptions": [
+          {
+            "checkLoops": "none"
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "do{}while(true)",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:171",
+        "originalOptions": [
+          {
+            "checkLoops": "none"
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "while(a == b);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:178",
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "do{ }while(x);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:179",
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "for (let x = 0; x <= 10; x++) {};",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:180",
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "while(true);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:659",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "while(x = 1);",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:866",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "do{ }while(x = 1)",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:873",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "for (;true;) {};",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:880",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "function* foo(){while(true){} yield 'foo';}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:889",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "function* foo(){while(true){} yield 'foo';}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:896",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": true
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "function* foo(){while(true){if (true) {yield 'foo';}}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:903",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "function* foo(){while(true){if (true) {yield 'foo';}}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:910",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": true
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "function* foo(){while(true){yield 'foo';} while(true) {}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:917",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "function* foo(){while(true){yield 'foo';} while(true) {}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:924",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": true
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "var a = function* foo(){while(true){} yield 'foo';}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:931",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "var a = function* foo(){while(true){} yield 'foo';}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:938",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": true
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "while (true) { function* foo() {yield;}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:945",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "while (true) { function* foo() {yield;}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:952",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": true
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "function foo() {while (true) {function* bar() {while (true) {yield;}}}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:977",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "function foo() {while (true) {const bar = function*() {while (true) {yield;}}}}",
+        "origin": "internal/rules/no_constant_condition/no_constant_condition_test.go:984",
+        "expected": [
+          {
+            "messageId": "unexpected"
+          }
+        ],
+        "originalOptions": [
+          {
+            "checkLoops": "all"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      }
+    ]
+  },
+  {
+    "rule": "no-dupe-else-if",
+    "provenance": {
+      "repository": "web-infra-dev/rslint",
+      "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "sources": [
+        {
+          "path": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go",
+          "sha256": "dbae2810d8d27f536a436a697b5b751aef69d7c367beeaa4bd7deb183229bb2f"
+        }
+      ]
+    },
+    "exactCompilerOptions": true,
+    "compilerOptions": {
+      "jsx": "preserve",
+      "target": "esnext",
+      "module": "commonjs",
+      "strict": true,
+      "strictNullChecks": true,
+      "esModuleInterop": true,
+      "lib": [
+        "es2015",
+        "es2017",
+        "esnext",
+        "DOM"
+      ],
+      "experimentalDecorators": true,
+      "types": []
+    },
+    "valid": [
+      {
+        "text": "if (a) {} else if (b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:18"
+      },
+      {
+        "text": "if (a); else if (b); else if (c);",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:19"
+      },
+      {
+        "text": "if (true) {} else if (false) {} else {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:20"
+      },
+      {
+        "text": "if (1) {} else if (2) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:21"
+      },
+      {
+        "text": "if (f) {} else if (f()) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:22"
+      },
+      {
+        "text": "if (f(a)) {} else if (g(a)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:23"
+      },
+      {
+        "text": "if (f(a)) {} else if (f(b)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:24"
+      },
+      {
+        "text": "if (a === 1) {} else if (a === 2) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:25"
+      },
+      {
+        "text": "if (a === 1) {} else if (b === 1) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:26"
+      },
+      {
+        "text": "if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:29"
+      },
+      {
+        "text": "if (a);",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:30"
+      },
+      {
+        "text": "if (a) {} else {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:31"
+      },
+      {
+        "text": "if (a) if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:32"
+      },
+      {
+        "text": "if (a) if (a);",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:33"
+      },
+      {
+        "text": "if (a) { if (a) {} }",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:34"
+      },
+      {
+        "text": "if (a) {} else { if (a) {} }",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:35"
+      },
+      {
+        "text": "if (a) {} if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:36"
+      },
+      {
+        "text": "if (a); if (a);",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:37"
+      },
+      {
+        "text": "while (a) if (a);",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:38"
+      },
+      {
+        "text": "if (a); else a ? a : a;",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:39"
+      },
+      {
+        "text": "if (a) { if (b) {} } else if (b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:42"
+      },
+      {
+        "text": "if (a) if (b); else if (a);",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:43"
+      },
+      {
+        "text": "if (a) {} else if (!!a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:46"
+      },
+      {
+        "text": "if (a === 1) {} else if (a === (1)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:47"
+      },
+      {
+        "text": "if (a || b) {} else if (c || d) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:50"
+      },
+      {
+        "text": "if (a || b) {} else if (a || c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:51"
+      },
+      {
+        "text": "if (a) {} else if (a || b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:52"
+      },
+      {
+        "text": "if (a) {} else if (b) {} else if (a || b || c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:53"
+      },
+      {
+        "text": "if (a && b) {} else if (a) {} else if (b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:54"
+      },
+      {
+        "text": "if (a && b) {} else if (b && c) {} else if (a && c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:55"
+      },
+      {
+        "text": "if (a && b) {} else if (b || c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:56"
+      },
+      {
+        "text": "if (a) {} else if (b && (a || c)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:57"
+      },
+      {
+        "text": "if (a) {} else if (b && (c || d && a)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:58"
+      },
+      {
+        "text": "if (a && b && c) {} else if (a && b && (c || d)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:59"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "if (a) {} else if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:63",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "if (a); else if (a);",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:69",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (a) {} else {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:75",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b) {} else if (a) {} else if (c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:81",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b) {} else if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:87",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b) {} else if (c) {} else if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:93",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 50
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b) {} else if (b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:99",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (a) {} else if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:107",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 20
+          },
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b) {} else if (a) {} else if (b) {} else if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:114",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 35
+          },
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 50
+          },
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 65
+          }
+        ]
+      },
+      {
+        "text": "if (a) { if (b) {} } else if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:124",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 31
+          }
+        ]
+      },
+      {
+        "text": "if (a === 1) {} else if (a === 1) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:132",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "if (1 < a) {} else if (1 < a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:138",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "text": "if (true) {} else if (true) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:144",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "if (a && b) {} else if (a && b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:150",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "if (a && b || c)  {} else if (a && b || c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:156",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 31
+          }
+        ]
+      },
+      {
+        "text": "if (f(a)) {} else if (f(a)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:162",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "if (a === 1) {} else if (a===1) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:170",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "if (a === 1) {} else if (a === /* comment */ 1) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:176",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "if (a === 1) {} else if ((a === 1)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:184",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "text": "if (a || b) {} else if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:192",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "if (a || b) {} else if (a) {} else if (b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:198",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          },
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 40
+          }
+        ]
+      },
+      {
+        "text": "if (a || b) {} else if (b || a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:205",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b) {} else if (a || b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:211",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "if (a || b) {} else if (c || d) {} else if (a || d) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:217",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 45
+          }
+        ]
+      },
+      {
+        "text": "if ((a === b && fn(c)) || d) {} else if (fn(c) && a === b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:223",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 42
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (a && b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:229",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "if (a && b) {} else if (b && a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:235",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "if (a && b) {} else if (a && b && c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:241",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "if (a || c) {} else if (a && b || c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:247",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b) {} else if (c && a || b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:253",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b) {} else if (c && (a || b)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:259",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b && c) {} else if (d && (a || e && c && b)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:265",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 40
+          }
+        ]
+      },
+      {
+        "text": "if (a || b && c) {} else if (b && c && d) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:271",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "if (a || b) {} else if (b && c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:277",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b) {} else if ((a || b) && c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:283",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "if ((a && (b || c)) || d) {} else if ((c || b) && e && a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:289",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 39
+          }
+        ]
+      },
+      {
+        "text": "if (a && b || b && c) {} else if (a && b && c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:295",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b && c) {} else if (d && (c && e && b || a)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:301",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 40
+          }
+        ]
+      },
+      {
+        "text": "if (a || (b && (c || d))) {} else if ((d || c) && b) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:307",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 39
+          }
+        ]
+      },
+      {
+        "text": "if (a || b) {} else if ((b || a) && c) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:313",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "if (a || b) {} else if (c) {} else if (d) {} else if (b && (a || c)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:319",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 55
+          }
+        ]
+      },
+      {
+        "text": "if (a || b || c) {} else if (a || (b && d) || (c && e)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:325",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "if (a || (b || c)) {} else if (a || (b && c)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:331",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 32
+          }
+        ]
+      },
+      {
+        "text": "if (a || b) {} else if (c) {} else if (d) {} else if ((a || c) && (b || d)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:337",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 55
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (b) {} else if (c && (a || d && b)) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:343",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (a || a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:349",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "if (a || a) {} else if (a || a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:355",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "if (a || a) {} else if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:361",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "if (a) {} else if (a && a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:367",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "if (a && a) {} else if (a && a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:373",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "if (a && a) {} else if (a) {}",
+        "origin": "internal/rules/no_dupe_else_if/no_dupe_else_if_test.go:379",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      }
+    ],
+    "excluded": []
+  },
+  {
+    "rule": "no-fallthrough",
+    "provenance": {
+      "repository": "web-infra-dev/rslint",
+      "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "sources": [
+        {
+          "path": "internal/rules/no_fallthrough/no_fallthrough_test.go",
+          "sha256": "ded1e0b92f13e91a399b22a9fbe1fdfe0a1bb2d934a67fe40bcdc3bc6c37da3a"
+        }
+      ]
+    },
+    "exactCompilerOptions": true,
+    "compilerOptions": {
+      "jsx": "preserve",
+      "target": "esnext",
+      "module": "commonjs",
+      "strict": true,
+      "strictNullChecks": true,
+      "esModuleInterop": true,
+      "lib": [
+        "es2015",
+        "es2017",
+        "esnext",
+        "DOM"
+      ],
+      "experimentalDecorators": true,
+      "types": []
+    },
+    "valid": [
+      {
+        "text": "switch(foo) { case 0: a(); break; case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:19"
+      },
+      {
+        "text": "switch(foo) { case 0: case 1: a(); break; }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:21"
+      },
+      {
+        "text": "switch(foo) { case 0: a(); /* falls through */ case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:23"
+      },
+      {
+        "text": "switch(foo) { case 0: a(); /* fall through */ case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:24"
+      },
+      {
+        "text": "switch(foo) { case 0: a(); /* fallsthrough */ case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:25"
+      },
+      {
+        "text": "function foo() { switch(bar) { case 0: a(); return; case 1: b(); } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:27"
+      },
+      {
+        "text": "switch(foo) { case 0: a(); throw e; case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:29"
+      },
+      {
+        "text": "while(a) { switch(foo) { case 0: a(); continue; case 1: b(); } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:31"
+      },
+      {
+        "text": "switch(foo) { case 0: a(); // Fall Through\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:33"
+      },
+      {
+        "text": "switch(foo) { case 0: a(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:35"
+      },
+      {
+        "text": "switch(foo) { case 0: case 1: case 2: a(); break; }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:37"
+      },
+      {
+        "text": "switch(foo) { case 0: if (a) { break; } else { break; } case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:39"
+      },
+      {
+        "text": "switch(foo) { case 0: { a(); break; } case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:41"
+      },
+      {
+        "text": "switch(foo) { case 0: a(); break; default: b(); break; case 1: c(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:43"
+      },
+      {
+        "text": "switch(foo) { case 0: try { break; } catch(e) { break; } case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:45"
+      },
+      {
+        "text": "switch(foo) { case 0: switch(bar) { case 1: break; } break; case 2: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:47"
+      },
+      {
+        "text": "switch(foo) { case 0: a(); /* FALLS THROUGH */ case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:49"
+      },
+      {
+        "text": "switch(foo) { case 0: try { a(); } finally { break; } case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:51"
+      },
+      {
+        "text": "function f1() { switch(foo) { case 0: try { a(); } finally { return; } case 1: b(); } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:53"
+      },
+      {
+        "text": "switch(foo) { case 0: try { a(); } catch(e) { b(); } finally { break; } case 1: c(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:55"
+      },
+      {
+        "text": "switch(foo) { case 0: label1: break; case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:57"
+      },
+      {
+        "text": "switch(foo) { case 0: if(a) { break; } else if(b) { break; } else { break; } case 1: c(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:59"
+      },
+      {
+        "text": "switch(foo) { case 0: if(a) { if(b) { break; } else { break; } } else { break; } case 1: c(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:61"
+      },
+      {
+        "text": "switch(foo) { default: a(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:63"
+      },
+      {
+        "text": "switch(foo) { case 0: a(); break; case 1: b(); break; default: c(); break; }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:65"
+      },
+      {
+        "text": "switch(foo) { case 0: a();\n/* This falls through intentionally */\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:67"
+      },
+      {
+        "text": "switch(foo) { case 0: while(true) {} case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:85"
+      },
+      {
+        "text": "switch(foo) { case 0: while(\"x\") {} case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:86"
+      },
+      {
+        "text": "switch(foo) { case 0: for(;;) {} case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:88"
+      },
+      {
+        "text": "switch(foo) { case 0: do {} while(true); case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:90"
+      },
+      {
+        "text": "switch(foo) { case 0: try { try { a(); } finally { break; } } catch(e) { b(); } case 1: c(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:92"
+      },
+      {
+        "text": "switch(foo) { case 0: try { break; } catch(e) { a(); } case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:94"
+      },
+      {
+        "text": "while(a) { switch(foo) { case 0: try { continue; } catch(e) { a(); } case 1: b(); } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:96"
+      },
+      {
+        "text": "function f2() { switch(foo) { case 0: try { return; } catch(e) { a(); } case 1: b(); } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:98"
+      },
+      {
+        "text": "switch(foo) { case 0: while(true) { switch(bar) { case 1: break; } } case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:100"
+      },
+      {
+        "text": "switch(foo) { case 0: while(true) { continue; } case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:102"
+      },
+      {
+        "text": "switch(foo) { case 0: while(true) { for(var j=0;j<1;j++) { break; } } case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:104"
+      },
+      {
+        "text": "switch(foo) { case 0: try { break; } catch(e) { throw e; } case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:106"
+      },
+      {
+        "text": "switch(foo) { case 0: { { { break; } } } case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:108"
+      },
+      {
+        "text": "outer3: switch(foo) { case 0: a(); break outer3; case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:110"
+      },
+      {
+        "text": "function f3() { switch(a) { case 0: switch(b) { case 1: return; default: throw e; }\ndefault: throw e; } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:112"
+      },
+      {
+        "text": "function f6() { switch(a) { case 0: return; a(); case 1: x(); } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:114"
+      },
+      {
+        "text": "switch(a) { case 0: break; a(); case 1: x(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:116"
+      },
+      {
+        "text": "function f7() { switch(a) { case 0: if(x) { return; a(); } else { return; } case 1: x(); } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:118"
+      },
+      {
+        "text": "switch(a) { case 0: while(true) { inner: { break inner; } } case 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:120"
+      },
+      {
+        "text": "switch(a) { case 0: switch(b) { case 1: break; default: break; } break; case 1: x(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:122"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "switch(foo) { case 0: a();\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:126",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: a();\ndefault: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:133",
+        "expected": [
+          {
+            "messageId": "default",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0:\n  a();\ncase 1:\n  b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:140",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 3,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: switch(bar) { case 1: break; }\ncase 2: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:147",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: if (a) { break; }\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:154",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: if (a) { break; } else { c(); }\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:161",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: { }\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:168",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: break; default: a();\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:175",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: a();\n/* intentional */\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:182",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 3,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: if(a) { break; } else if(b) { break; }\ncase 1: c(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:189",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: label1: a();\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:196",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: for(var x in obj) { break; }\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:203",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: for(var x of arr) { break; }\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:210",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: while(a) { break; }\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:217",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: try { foo(); break; } catch(e) { a(); }\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:224",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "function f3() { switch(foo) { case 0: try { return foo(); } catch(e) { a(); }\ncase 1: b(); } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:231",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: try { a(); } finally { b(); }\ncase 1: c(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:238",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: while(true) { if(x) break; }\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:245",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: inner1: { break inner1; }\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:252",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: if(a) { if(b) { break; } } else { break; }\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:259",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: var y = 1;\ncase 1: x(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:266",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: a();\ncase 1: b();\ncase 2: c(); break; }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:273",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          },
+          {
+            "messageId": "case",
+            "line": 3,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(a) { case 0: outer: inner: while(true) { break outer; }\ncase 1: x(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:281",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "function t1() { switch(a) { case 0: label: while(true) { break label; }\ncase 1: x(); } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:288",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case 0: while(0x00) {}\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:295",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "function f5() { switch(a) { case 0: switch(b) { case 1: return; default: }\ncase 1: x(); } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:302",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(a) { case 0: switch(b) { case 1: break; default: break; }\ncase 1: x(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:309",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "function f4() { switch(a) { case 0: switch(b) { case 1: return; case 2: return; }\ncase 1: x(); } }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:316",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(a) { case 0: switch(b) { case 1: x(); default: break; }\ncase 1: x(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:324",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          },
+          {
+            "messageId": "default",
+            "line": 1,
+            "column": 46
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { default: a();\ncase 0: b(); break; }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:332",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      }
+    ],
+    "excluded": [
+      {
+        "text": "switch(foo) { case 0: a();\n/* break omitted */\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:69",
+        "originalOptions": [
+          {
+            "commentPattern": "break[\\s\\w]*omitted"
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "switch(foo) { case 0: a();\n/* skip fallthrough */\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:75",
+        "originalOptions": [
+          {
+            "commentPattern": "(?<=skip )fallthrough"
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "switch(foo) { case 0: ; case 1: a(); break; }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:80",
+        "originalOptions": [
+          {
+            "allowEmptyCase": true
+          }
+        ],
+        "category": "valid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "switch(foo) { case 0: a(); /* falls through */\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:339",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 2,
+            "column": 1
+          }
+        ],
+        "originalOptions": [
+          {
+            "commentPattern": "break[\\s\\w]*omitted"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "switch(foo) { case 0: a();\n/* break omitted */\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:349",
+        "expected": [
+          {
+            "messageId": "case",
+            "line": 3,
+            "column": 1
+          }
+        ],
+        "originalOptions": [
+          {
+            "commentPattern": "BREAK[\\s\\w]*OMITTED"
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      },
+      {
+        "text": "switch(foo) { case 0: a(); break; /* falls through */\ncase 1: b(); }",
+        "origin": "internal/rules/no_fallthrough/no_fallthrough_test.go:357",
+        "expected": [
+          {
+            "messageId": "unusedFallthroughComment",
+            "line": 2,
+            "column": 1
+          }
+        ],
+        "originalOptions": [
+          {
+            "reportUnusedFallthroughComment": true
+          }
+        ],
+        "category": "invalid",
+        "reason": "Non-default options not enabled by frozen Rsbuild."
+      }
+    ]
+  }
+]

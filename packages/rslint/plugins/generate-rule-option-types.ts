@@ -1,26 +1,20 @@
-// packages/rslint/generate-rule-option-types.ts
-//
-// rslib plugin: splices typed rule options into `dist/index.d.ts` once the
-// whole (multi-`lib`-entry) build finishes — `onAfterBuild` fires once for
-// the entire rslib build, so by the time it runs the library surface's
-// `dist/index.d.ts` already exists (see rstack.config.ts).
-//
-// Reads every Go rule's options JSON Schema from `rule-schemas.json` — a
-// `{name, schema}[]` dump produced by `tools/dump_rule_schemas` from the shared
-// immutable rule catalog.
-// That dump isn't produced automatically, so a missing one just skips with a
-// warning rather than failing the build. Rules that haven't declared a
-// schema yet (internal/rule.Rule.Schema == nil) are omitted by the Go side
-// and keep falling back to `RulesRecord`'s untyped index signature (see
-// packages/rslint/src/config/define-config.ts).
+// Adds typed options for the frozen rsbuild rule set to dist/index.d.ts.
+// The committed JSON preserves schema metadata from the original rslint
+// baseline. Its provenance records the source commit and content hashes;
+// normal builds need neither the old schema dumper nor a compiler service.
 import type { RsbuildPlugin } from 'rstack/lib';
 import { compile } from 'json-schema-to-typescript';
 import fs from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PACKAGE_ROOT = path.join(fileURLToPath(import.meta.url), '..', '..');
-const SCHEMAS_PATH = path.join(PACKAGE_ROOT, 'rule-schemas.json');
+const SCHEMAS_PATH = path.join(PACKAGE_ROOT, 'rust-rule-schemas.json');
+const PROVENANCE_PATH = path.join(
+  PACKAGE_ROOT,
+  'rust-rule-schemas.provenance.json',
+);
 const DIST_INDEX_DTS = path.join(PACKAGE_ROOT, 'dist/index.d.ts');
 
 interface RuleSchemaEntry {
@@ -29,21 +23,35 @@ interface RuleSchemaEntry {
   schema: any;
 }
 
-/**
- * Reads the `{name, schema}[]` dump written by `tools/dump_rule_schemas` —
- * including rules that only reference the shared `rule.EmptyArraySchema`
- * (no options, no on-disk `.schema.json` file), which a filesystem scan of
- * `*.schema.json` alone can't see. Returns null if the dump hasn't been
- * produced — it isn't generated automatically, so a missing one just means
- * typed rule options get skipped for this build.
- */
-async function collectRuleSchemas(): Promise<RuleSchemaEntry[] | null> {
-  try {
-    return JSON.parse(await fs.readFile(SCHEMAS_PATH, 'utf-8'));
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw err;
+/** Read and verify the committed scoped schemas; a missing input fails builds. */
+export async function collectRuleSchemas(
+  schemasPath = SCHEMAS_PATH,
+  provenancePath = PROVENANCE_PATH,
+): Promise<RuleSchemaEntry[]> {
+  const [bytes, provenanceText] = await Promise.all([
+    fs.readFile(schemasPath),
+    fs.readFile(provenancePath, 'utf8'),
+  ]);
+  const provenance = JSON.parse(provenanceText);
+  const rules = JSON.parse(bytes.toString('utf8')) as RuleSchemaEntry[];
+  const digest = createHash('sha256').update(bytes).digest('hex');
+  if (
+    !Array.isArray(rules) ||
+    rules.length === 0 ||
+    rules.length !== provenance.schemas?.count ||
+    digest !== provenance.schemas?.sha256 ||
+    bytes.length !== provenance.schemas?.bytes ||
+    rules.some(
+      (rule) =>
+        !rule || typeof rule.name !== 'string' || !rule.name || !rule.schema,
+    ) ||
+    new Set(rules.map((rule) => rule.name)).size !== rules.length
+  ) {
+    throw new Error(
+      'Committed Rust rule option schemas do not match their provenance',
+    );
   }
+  return rules;
 }
 
 /**
@@ -61,8 +69,8 @@ function ruleIdToTypeName(ruleId: string): string {
 }
 
 /**
- * True for the shared `rule.EmptyArraySchema` (internal/rule/schema.go) that
- * no-options rules like `no-debugger` reference directly. Special-cased so
+ * True for the baseline's shared empty-array schema used by no-options rules
+ * such as `no-debugger`. Special-cased so
  * it maps straight to `RuleEntry<[]>` instead of round-tripping through
  * json-schema-to-typescript for a named `FooOptions = []` type nothing else
  * needs.
@@ -279,14 +287,6 @@ export function generateRuleOptionTypesPlugin(): RsbuildPlugin {
     setup(api) {
       api.onAfterBuild(async () => {
         const rules = await collectRuleSchemas();
-        if (!rules) {
-          api.logger.warn(
-            'generate-rule-option-types: skipped — rule schemas dump not ' +
-              `found at ${SCHEMAS_PATH} (run \`go run ./tools/dump_rule_schemas > ` +
-              'packages/rslint/rule-schemas.json` first)',
-          );
-          return;
-        }
 
         const generated = await compileRuleOptionTypes(rules);
         const dts = await fs.readFile(DIST_INDEX_DTS, 'utf-8');

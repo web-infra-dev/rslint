@@ -1,72 +1,32 @@
-#!/usr/bin/env zx
-import fs from 'fs';
-import { $, argv } from 'zx';
+#!/usr/bin/env node
+/** Build native npm artifacts exclusively through the Rust addon pipeline. */
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { main as buildRust } from './tsrs/build-rust.mjs';
 
-$.verbose = true;
-
-// build binary for following platforms
-// #   darwin/amd64
-// #   darwin/arm64
-// #   linux/amd64
-// #   linux/arm64
-// #   windows/amd64
-// #   windows/arm64
-
-const platforms = [
-  { os: 'darwin', arch: 'amd64', 'node-arch': 'x64' },
-  { os: 'darwin', arch: 'arm64', 'node-arch': 'arm64' },
-  { os: 'linux', arch: 'amd64', 'node-arch': 'x64' },
-  { os: 'linux', arch: 'arm64', 'node-arch': 'arm64' },
-  { os: 'windows', arch: 'amd64', 'node-arch': 'x64', 'node-os': 'win32' },
-  { os: 'windows', arch: 'arm64', 'node-arch': 'arm64', 'node-os': 'win32' },
-];
-
-// The rslint Go binary ships inside each napi-tuple subpackage (next to the
-// parser `.node`). One row per subpackage dir; linux gnu/musl reuse the same
-// GOOS/GOARCH with cgo disabled and rely on the Go build cache.
-const rslintTargets = [
-  { goos: 'darwin', goarch: 'amd64', dir: 'darwin-x64' },
-  { goos: 'darwin', goarch: 'arm64', dir: 'darwin-arm64' },
-  { goos: 'linux', goarch: 'amd64', dir: 'linux-x64-gnu' },
-  { goos: 'linux', goarch: 'amd64', dir: 'linux-x64-musl' },
-  { goos: 'linux', goarch: 'arm64', dir: 'linux-arm64-gnu' },
-  { goos: 'linux', goarch: 'arm64', dir: 'linux-arm64-musl' },
-  { goos: 'windows', goarch: 'amd64', dir: 'win32-x64-msvc' },
-  { goos: 'windows', goarch: 'arm64', dir: 'win32-arm64-msvc' },
-];
-
-async function build_rslint() {
-  for (const { goos, goarch, dir } of rslintTargets) {
-    const ext = goos === 'windows' ? '.exe' : '';
-    const buildEnvironment =
-      goos === 'linux' ? { ...process.env, CGO_ENABLED: '0' } : process.env;
-    fs.mkdirSync(`npm/rslint/${dir}`, { recursive: true });
-    await $({
-      env: buildEnvironment,
-    })`GOOS=${goos} GOARCH=${goarch} go build -o npm/rslint/${dir}/rslint${ext} ./cmd/rslint`;
+export function main(args = process.argv.slice(2)) {
+  const [product, ...options] = args;
+  if (product !== 'rslint') {
+    throw new Error(
+      product === 'tsgo' || product === 'tsgo-server'
+        ? 'The standalone semantic server is not supported by the Rust+JS rsbuild migration. No Go server or compiler-service artifact is available.'
+        : 'Usage: node scripts/build-npm.mjs rslint [--platform TUPLE] [--debug] [--plan]',
+    );
+  }
+  // The default is the current host. Release matrices must select their target
+  // explicitly; no unrelated platform artifacts are reused or synthesized.
+  buildRust(options);
+}
+if (
+  process.argv[1] &&
+  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url
+) {
+  try {
+    main();
+  } catch (error) {
+    process.stderr.write(
+      `Native npm build failed: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exitCode = 1;
   }
 }
-
-async function build_tsgo_server() {
-  for (const platform of platforms) {
-    const nodeOs = platform['node-os'] || platform.os;
-    const nodeArch = platform['node-arch'];
-    const outputDir = `npm/tsgo/${nodeOs}-${nodeArch}/lib`;
-    const ext = platform.os === 'windows' ? '.exe' : '';
-    fs.mkdirSync(outputDir, { recursive: true });
-    await $`GOOS=${platform.os} GOARCH=${platform.arch} go build -o ${outputDir}/tsgo${ext} ./cmd/tsgo`;
-  }
-}
-
-async function main() {
-  const target = argv._[0];
-  if (target === 'rslint') {
-    await build_rslint();
-  } else if (target === 'tsgo-server' || target === 'tsgo') {
-    await build_tsgo_server();
-  } else {
-    throw new Error('Usage: zx scripts/build-npm.mjs <rslint|tsgo-server>');
-  }
-}
-
-main();

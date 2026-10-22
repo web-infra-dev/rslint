@@ -1,0 +1,3407 @@
+[
+  {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "options": [],
+    "valid": [
+      {
+        "text": "function outer(\n  first: number,\n  interrupt = ((innerFirst: number, innerLast: number) => innerLast)(1, 2),\n  resumed: number,\n  finalUsed: number,\n) {\n  return finalUsed;\n}\nconsole.log(outer);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_adversarial_test.go:230"
+      },
+      {
+        "text": "let a: any, b: any; [a, b] = [1, 2]; console.log(a, b);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:13"
+      },
+      {
+        "text": "let a: any; ({ a } = { a: 1 }); console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:14"
+      },
+      {
+        "text": "let rest: any; [, ...rest] = [1, 2, 3]; console.log(rest);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:16"
+      },
+      {
+        "text": "let rest: any; ({ ...rest } = { a: 1, b: 2 } as any); console.log(rest);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:18"
+      },
+      {
+        "text": "let a: any; [{ a }] = [{ a: 1 }] as any; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:20"
+      },
+      {
+        "text": "let b: any; ({ x: [b] } = { x: [1] } as any); console.log(b);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:22"
+      },
+      {
+        "text": "let b: any; ({ a: b } = { a: 1 } as any); console.log(b);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:24"
+      },
+      {
+        "text": "let x: any; for (x of [1, 2]) { console.log(x); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:26"
+      },
+      {
+        "text": "let a: any, b: any; for ([a, b] of [[1, 2]] as any) { console.log(a, b); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:28"
+      },
+      {
+        "text": "let k: any; for (k in { a: 1 }) { console.log(k); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:30"
+      },
+      {
+        "text": "let a: any; for ({ a } of [{ a: 1 }] as any) { console.log(a); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:32"
+      },
+      {
+        "text": "let a: any; [[[[a]]]] = [[[[1]]]] as any; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:34"
+      },
+      {
+        "text": "let a: any; [{ x: [{ a }] }] = [{ x: [{ a: 1 }] }] as any; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:36"
+      },
+      {
+        "text": "let a: any; [a = 5] = [] as any; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:38"
+      },
+      {
+        "text": "const key = \"x\"; let val: any; ({ [key]: val } = { x: 1 } as any); console.log(val);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:40"
+      },
+      {
+        "text": "const obj = { b: 0 }; obj.b = 1; console.log(obj);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:42"
+      },
+      {
+        "text": "const arr = [0]; arr[0] = 1; console.log(arr);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:44"
+      },
+      {
+        "text": "let a: any, b: any; const c = 1; a = b = c; console.log(a, b);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:46"
+      },
+      {
+        "text": "let a: any; [,, a] = [1, 2, 3] as any; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:48"
+      },
+      {
+        "text": "let b: any; ({ a: b = 5 } = {} as any); console.log(b);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:50"
+      },
+      {
+        "text": "let a: any; [(a)] = [1] as any; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:52"
+      },
+      {
+        "text": "let b: any; ({a: (b)} = {a: 1} as any); console.log(b);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:54"
+      },
+      {
+        "text": "let a = 0; a = a + 1; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:57"
+      },
+      {
+        "text": "let a = 0; a++; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:58"
+      },
+      {
+        "text": "let a = 0; const b = (a = a + 1); console.log(b);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:59"
+      },
+      {
+        "text": "\nconst box: any = { a: 2 };\nfor (const prop in box) {\n  box[prop] = parseInt(box[prop]);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:62"
+      },
+      {
+        "text": "\nconst box: any = { a: 2 };\nfor (var prop in box) {\n  box[prop] = parseInt(box[prop]);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:69"
+      },
+      {
+        "text": "for (const item of [1, 2, 3]) { console.log(item); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:76"
+      },
+      {
+        "text": "for (let item of [1, 2, 3]) { console.log(item); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:78"
+      },
+      {
+        "text": "for (const key in { a: 1 }) { console.log(key); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:80"
+      },
+      {
+        "text": "export function hasKey(obj: object) {\n  for (const key in obj) { return true; }\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:82"
+      },
+      {
+        "text": "export function hasKey(obj: object) {\n  let key: string;\n  for (key in obj) { return true; }\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:85"
+      },
+      {
+        "text": "export {}; let value = 1; +value;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:90"
+      },
+      {
+        "text": "let x = 0; x++, console.log(x);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:93"
+      },
+      {
+        "text": "let x = 0; const y = (x++, x); console.log(y);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:95"
+      },
+      {
+        "text": "let a: any = null; a ??= 1; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:98"
+      },
+      {
+        "text": "let a: any = \"\"; a ||= \"default\"; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:99"
+      },
+      {
+        "text": "let a: any = true; a &&= false; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:100"
+      },
+      {
+        "text": "\nlet x: any = 0;\nfor (let i = 0; i < 10; i++) {\n  x = foo(x);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:104"
+      },
+      {
+        "text": "\nlet x: any = 0;\nfor (const item of [1, 2, 3]) {\n  x = foo(x, item);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:110"
+      },
+      {
+        "text": "\nexport {};\nlet x: any = 0;\nfor (let i = 0; i < 10; i++) {\n  x = foo(x);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:117"
+      },
+      {
+        "text": "\nlet x: any = 0;\nfunction run() {\n  x = foo(x);\n}\nrun();\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:128"
+      },
+      {
+        "text": "\nlet found: any = false;\ndeclare function forEachItem(cb: (item: any) => void): void;\nforEachItem(item => {\n  found = found || item;\n});\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:135"
+      },
+      {
+        "text": "const functionTypeParameter = 'key';\nexport type FunctionType = (value: typeof functionTypeParameter) => void;\n\nconst constructorTypeParameter = 'key';\nexport type ConstructorType = new (value: typeof constructorTypeParameter) => object;\n\nconst callSignatureParameter = 'key';\nexport interface CallSignature { (value: typeof callSignatureParameter): void; }\n\nconst constructSignatureParameter = 'key';\nexport interface ConstructSignature { new (value: typeof constructSignatureParameter): object; }\n\nconst methodSignatureParameter = 'key';\nexport interface MethodSignature { method(value: typeof methodSignatureParameter): void; }\n\nconst declaredFunctionParameter = 'key';\ndeclare function declaredFunction(value: typeof declaredFunctionParameter): void;\nexport { declaredFunction };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:239"
+      },
+      {
+        "text": "const MOBILE_AUTH_FACE_NOT_SUPPORT_TIP_KEY = 'mobile_auth_face_not_support_tip';\nexport const getMobileAuthFaceNotSupportTip = (\n  t: (key: typeof MOBILE_AUTH_FACE_NOT_SUPPORT_TIP_KEY) => string,\n) => t('mobile_auth_face_not_support_tip');",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:259"
+      },
+      {
+        "text": "export type Result<T> = T extends (...args: infer _Args) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:295"
+      },
+      {
+        "text": "export type Result<T> = T extends (...args: infer Args) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:296"
+      },
+      {
+        "text": "export type Result<T> = T extends (value: infer Args) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:297"
+      },
+      {
+        "text": "export type Result<T> = T extends (value?: infer Args) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:298"
+      },
+      {
+        "text": "export type Result<T> = T extends (...args: [infer Args]) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:299"
+      },
+      {
+        "text": "export type Result<T> = T extends (value: Array<infer Args>) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:300"
+      },
+      {
+        "text": "export type Result<T> = T extends (...args: infer Args extends unknown[]) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:301"
+      },
+      {
+        "text": "export type Result<T> = T extends new (...args: infer Args) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:302"
+      },
+      {
+        "text": "export type Result<T> = T extends abstract new (...args: infer Args) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:303"
+      },
+      {
+        "text": "export type Result<T> = T extends { (...args: infer Args): infer R } ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:304"
+      },
+      {
+        "text": "export type Result<T> = T extends { new (...args: infer Args): infer R } ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:305"
+      },
+      {
+        "text": "export type Result<T> = T extends { method(...args: infer Args): infer R } ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:306"
+      },
+      {
+        "text": "export type Result<T> = T extends (callback: () => infer Args) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:308"
+      },
+      {
+        "text": "export type Result<T> = T extends (callback: (value: infer Args) => void) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:309"
+      },
+      {
+        "text": "export type Result<T> = T extends (value: { property: infer Args }) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:310"
+      },
+      {
+        "text": "export type Result<T> = T extends (value: (unknown extends infer Args ? unknown : never)) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:311"
+      },
+      {
+        "text": "export type Result<T> = T extends { (): infer Args; (...args: infer Args): infer R } ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:313"
+      },
+      {
+        "text": "export type Result<T> = T extends (one: infer Args, two: infer Args) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:314"
+      },
+      {
+        "text": "export type Result = (callback: <Unused>() => void) => void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:315"
+      },
+      {
+        "text": "export declare function run<T>(value: T extends infer U ? unknown : never): void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:316"
+      },
+      {
+        "text": "export abstract class A<T> { abstract run(value: T extends infer U ? unknown : never): void; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:317"
+      },
+      {
+        "text": "export class A<T> { run(value: T extends infer U ? unknown : never): void; run(value: unknown): void { console.log(value); } }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:318"
+      },
+      {
+        "text": "export class A<T> { constructor(value: T extends infer U ? unknown : never); constructor(value: unknown) { console.log(value); } }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:319"
+      },
+      {
+        "text": "export class A<T> { set value(value: T extends infer U ? unknown : never) {} }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:320"
+      },
+      {
+        "text": "export type Result<T> = (value: { [key: string]: T extends infer U ? unknown : never }) => void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:321"
+      },
+      {
+        "text": "export type Result<T> = ({ value }: { value: T extends infer U ? unknown : never }) => void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:322"
+      },
+      {
+        "text": "export type Result<T> = (value: T extends infer U ? unknown : never) => value is never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:323"
+      },
+      {
+        "text": "export type Result<T> = T extends (arg: { U: unknown }) => infer U ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:325"
+      },
+      {
+        "text": "export type Result<T> = T extends (...arg: [U: unknown]) => infer U ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:326"
+      },
+      {
+        "text": "export type Result<U> = (arg: { U: unknown }) => void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:327"
+      },
+      {
+        "text": "export type Result<U> = (...arg: [U: unknown]) => void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:328"
+      },
+      {
+        "text": "export type Result<T> = T extends (arg: { [K in string]: infer U }) => void ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:329"
+      },
+      {
+        "text": "export type Result<T> = T extends (arg: (unknown extends string ? never : infer U)) => void ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:330"
+      },
+      {
+        "text": "export type Result<T> = T extends (arg: (unknown extends infer U ? U : never)) => void ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:331"
+      },
+      {
+        "text": "export type Result<T> = T extends (arg: { [U: string]: infer U }) => void ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:332"
+      },
+      {
+        "text": "export type Result<T> = T extends { (): infer U; <U>(arg: infer U): void; (arg: infer U): void } ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:333"
+      },
+      {
+        "text": "export type Result<T> = (arg: <U extends T>() => void) => void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:334"
+      },
+      {
+        "text": "export type Result<T> = (arg: () => (T extends infer U ? unknown : never)) => void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:335"
+      },
+      {
+        "text": "export function run<T>(): (arg: T extends infer U ? unknown : never) => void { return () => {}; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:336"
+      },
+      {
+        "text": "const value = 1; export abstract class A { abstract run(arg: typeof value): void; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:337"
+      },
+      {
+        "text": "const value = 1; export class A { constructor(arg: typeof value); constructor(arg: number) { console.log(arg); } }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:338"
+      },
+      {
+        "text": "const value = 1; export class A { set value(arg: typeof value) {} }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:339"
+      },
+      {
+        "text": "const value = 1; export type Result = (arg: { [key: string]: typeof value }) => void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:340"
+      },
+      {
+        "text": "export interface Used<T> { consume(value: T): T; }\nexport type Result<T> = T extends (...args: infer Args) => infer R ? R : never;\nexport type PropertyName<U> = (value: { U: unknown }) => void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:342"
+      },
+      {
+        "text": "// eslint-disable-next-line @typescript-eslint/no-unused-vars\nlet pendingShareInfo: unknown;\nexport function update(value: unknown) {\n  pendingShareInfo = value;\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:498",
+        "originalSource": "// eslint-disable-next-line test\nlet pendingShareInfo: unknown;\nexport function update(value: unknown) {\n  pendingShareInfo = value;\n}",
+        "adaptation": "The original RuleTester registers this rule under the test alias. The public-entry oracle uses its canonical name; only the directive rule name is mapped."
+      },
+      {
+        "text": "import type { Foo } from \"./foo\"; const bar: Foo = {} as any; console.log(bar);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:21"
+      },
+      {
+        "text": "import * as path from \"path\"; console.log(path.join(\"a\", \"b\"));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:23"
+      },
+      {
+        "text": "import path = require(\"path\"); console.log(path.join(\"a\", \"b\"));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:25"
+      },
+      {
+        "text": "import \"path\";",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:27"
+      },
+      {
+        "text": "import { join } from \"path\"; export { join };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:29"
+      },
+      {
+        "text": "import { join } from \"path\"; export { join as myJoin };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:31"
+      },
+      {
+        "text": "import * as path from \"path\"; export { path };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:33"
+      },
+      {
+        "text": "import { join } from \"path\"; export default join;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:35"
+      },
+      {
+        "text": "export { join } from \"path\";",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:37"
+      },
+      {
+        "text": "import { join, resolve } from \"path\"; console.log(join(\"a\"), resolve(\"b\"));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:39"
+      },
+      {
+        "text": "import Def, { join } from \"path\"; console.log(Def, join(\"a\"));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:41"
+      },
+      {
+        "text": "import React from 'react';\nexport const A = () => <div />;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_jsx_test.go:45",
+        "extension": ".tsx"
+      },
+      {
+        "text": "const { foo, ...rest } = { foo: 1, bar: 2 }; console.log(foo, rest);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:82"
+      },
+      {
+        "text": "export {};\nconst value = 1;\nfunction consume(value: number) { return value; }\nconsole.log(value, consume(2));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:14"
+      },
+      {
+        "text": "export namespace Outer {\n  const value = 1;\n  export { value };\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:20"
+      },
+      {
+        "text": "interface Model { value: number }\nconst Model = { value: 1 };\nexport { Model };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:26"
+      },
+      {
+        "text": "namespace Empty {}\nexport const value = Empty;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:31"
+      },
+      {
+        "text": "namespace EmptyA {}\nnamespace EmptyB {}\nexport const values = [EmptyA, EmptyB];",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:35"
+      },
+      {
+        "text": "import { join as localJoin } from \"path\";\nexport const joined = localJoin(\"a\", \"b\");",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:40"
+      },
+      {
+        "text": "interface Foo {\n  bar: string;\n}\nexport = Foo;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:44"
+      },
+      {
+        "text": "import React from \"react\";\nexport const node = <div />;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:50",
+        "extension": ".tsx"
+      },
+      {
+        "text": "export class Example {\n  constructor(value: string, private name: string) {\n    name = \"\";\n    console.log(this.name);\n  }\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:55"
+      },
+      {
+        "text": "type T = {}; export type { T };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:182"
+      },
+      {
+        "text": "interface M {} const M = 1; export type { M };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:183"
+      },
+      {
+        "text": "import { V } from \"./foo\"; export type { V };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:184"
+      },
+      {
+        "text": "const value = 1; export namespace N { export { value }; } consume(N);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:185"
+      },
+      {
+        "text": "const foo = 5; console.log(foo);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:13"
+      },
+      {
+        "text": "function test(stats: string) { console.log({ stats }); } test(\"ok\");",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:15"
+      },
+      {
+        "text": "function foo() {} foo();",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:16"
+      },
+      {
+        "text": "function foo(bar) { console.log(bar); } foo(1);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:17"
+      },
+      {
+        "text": "try {} catch (e) { console.log(e); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:18"
+      },
+      {
+        "text": "export const foo = 1;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:19"
+      },
+      {
+        "text": "export const { foo } = { foo: 1 };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:20"
+      },
+      {
+        "text": "const bar: number = 1; console.log(bar);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:22"
+      },
+      {
+        "text": "class Foo {} new Foo();",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:25"
+      },
+      {
+        "text": "export class Foo {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:26"
+      },
+      {
+        "text": "export interface Bar { x: number; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:27"
+      },
+      {
+        "text": "export type Str = string;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:28"
+      },
+      {
+        "text": "enum Color { Red, Blue } console.log(Color.Red);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:29"
+      },
+      {
+        "text": "export enum Color { Red, Blue }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:30"
+      },
+      {
+        "text": "export function bar(x: number) { return x; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:33"
+      },
+      {
+        "text": "\nexport class Baz {\n  value: number;\n  constructor(a: number) { this.value = a; }\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:34"
+      },
+      {
+        "text": "\nconst x = 1;\nfunction foo(x: number) { return x; }\nconsole.log(x);\nfoo(2);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:42"
+      },
+      {
+        "text": "const { a } = { a: 1 }; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:50"
+      },
+      {
+        "text": "const [p] = [1]; console.log(p);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:51"
+      },
+      {
+        "text": "function foo({ a }: { a: number }) { console.log(a); } foo({ a: 1 });",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:53"
+      },
+      {
+        "text": "function foo() {} export { foo };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:55"
+      },
+      {
+        "text": "(function() { return 1; })();",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:58"
+      },
+      {
+        "text": "(function foo() { return foo(); })();",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:59"
+      },
+      {
+        "text": "const foo = function bar() { return bar(); }; foo();",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:61"
+      },
+      {
+        "text": "function foo() { return foo(); } foo();",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:64"
+      },
+      {
+        "text": "function foo(n: number): number { return n <= 1 ? 1 : n * foo(n - 1); } foo(5);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:65"
+      },
+      {
+        "text": "\nfunction isEven(n: number): boolean { return n === 0 ? true : isOdd(n - 1); }\nfunction isOdd(n: number): boolean { return n === 0 ? false : isEven(n - 1); }\nconsole.log(isEven(4));\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:67"
+      },
+      {
+        "text": "\nvar foo = 5;\nlabel: while (true) {\n  console.log(foo);\n  break label;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:74"
+      },
+      {
+        "text": "declare function myFunc(x: any): void; myFunc(function foo() {}.bind(undefined));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:83"
+      },
+      {
+        "text": "declare function myFunc(x: any): void; myFunc(function foo() {}.toString());",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:84"
+      },
+      {
+        "text": "declare function doSomething(options: { a: string }): void; export { doSomething };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:14"
+      },
+      {
+        "text": "declare function foo(): void; foo();",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:15"
+      },
+      {
+        "text": "\ndeclare function getNormalizedConfig(): string;\ndeclare function getNormalizedConfig(options: { env: string }): string;\ngetNormalizedConfig();\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:16"
+      },
+      {
+        "text": "\ndeclare function getNormalizedConfig(): string;\ndeclare function getNormalizedConfig(options: { env: string }): string;\nexport { getNormalizedConfig };\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:21"
+      },
+      {
+        "text": "declare function withRest(...args: any[]): void; export { withRest };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:26"
+      },
+      {
+        "text": "declare function multi(a: string, b: number): void; export { multi };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:27"
+      },
+      {
+        "text": "export declare function exportDeclare(x: number): void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:28"
+      },
+      {
+        "text": "\ndeclare function genericFunc<T>(input: T): T;\nexport { genericFunc };\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:29"
+      },
+      {
+        "text": "\nexport function foo(a: number): number;\nexport function foo(a: string): string;\nexport function foo(a: number | string): number | string {\n  return a;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:35"
+      },
+      {
+        "text": "\nfunction foo(): void;\nfunction foo(): void {}\nfoo();\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:42"
+      },
+      {
+        "text": "\ndeclare namespace MyNS {\n  function nsFunc(param: string): void;\n  var nsVar: string;\n}\nconsole.log(MyNS);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:49"
+      },
+      {
+        "text": "export namespace ExportedNS { export const x = 1; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:56"
+      },
+      {
+        "text": "\ndeclare module 'some-module' {\n  function moduleFunc(arg: string): void;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:57"
+      },
+      {
+        "text": "\nexport class MyClass {\n  constructor(a: number);\n  constructor(a: string);\n  constructor(a: number | string) { console.log(a); }\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:64"
+      },
+      {
+        "text": "\nabstract class AbstractBase {\n  abstract doSomething(input: string): void;\n}\nexport { AbstractBase };\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:73"
+      },
+      {
+        "text": "\nclass MyClass {\n  method(a: number): number;\n  method(a: string): string;\n  method(a: number | string): number | string {\n    return a;\n  }\n}\nexport { MyClass };\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:79"
+      },
+      {
+        "text": "\nexport interface IProcessor {\n  process(input: string, options: { debug: boolean }): void;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:89"
+      },
+      {
+        "text": "\nexport interface Hot {\n  on: <Data = any>(event: string, cb: (data: Data) => void) => void;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:96"
+      },
+      {
+        "text": "\nexport interface Callable {\n  (x: number, y: string): boolean;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:102"
+      },
+      {
+        "text": "\nexport interface Constructable {\n  new (name: string): object;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:108"
+      },
+      {
+        "text": "\nexport type Handler = (event: string, data: unknown) => void;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:114"
+      },
+      {
+        "text": "export interface Dict { [key: string]: unknown; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:118"
+      },
+      {
+        "text": "\ndeclare const registeredServiceBrand: unique symbol;\n\nexport interface RegisteredService {\n  [registeredServiceBrand]: string;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:120"
+      },
+      {
+        "text": "\ndeclare const brand: unique symbol;\nexport type Branded = { [brand]: string };\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:127"
+      },
+      {
+        "text": "declare global { const BUILD_HASH: string; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:132"
+      },
+      {
+        "text": "\ndeclare global {\n  namespace jest {\n    interface Matchers<R> {\n      toBeSeven: () => R;\n    }\n  }\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:134"
+      },
+      {
+        "text": "export default function webpackLoader(this: any) {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:144"
+      },
+      {
+        "text": "\nexport class Foo {\n  constructor(private readonly name: string) {}\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:146"
+      },
+      {
+        "text": "\nexport class Foo {\n  constructor(value: string, private readonly name: string) {\n    console.log(this.name);\n  }\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:152"
+      },
+      {
+        "text": "\ndeclare function Component(opts: any): any;\ndeclare class Vue {}\ndeclare const HelloWorld: any;\n\n@Component({\n  components: {\n    HelloWorld,\n  },\n})\nexport default class App extends Vue {}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:161"
+      },
+      {
+        "text": "\nexport const obj = {\n  set foo(a: number) {}\n};\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:175"
+      },
+      {
+        "text": "\nexport class Foo {\n  set bar(value: string) {}\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:181"
+      },
+      {
+        "text": "export type Test<U> = U extends (k: infer I) => void ? I : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:194"
+      },
+      {
+        "text": "export type Test<U> = U extends { [k: string]: infer I } ? I : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:195"
+      },
+      {
+        "text": "\nenum FormFieldIds {\n  PHONE = 'phone',\n  EMAIL = 'email',\n}\nexport interface IFoo {\n  fieldName: FormFieldIds.EMAIL;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:198"
+      },
+      {
+        "text": "\nexport enum Foo {\n  A = 1,\n  B = Foo.A,\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:208"
+      },
+      {
+        "text": "namespace Foo { export const Bar = 1; } console.log(Foo.Bar);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:216"
+      },
+      {
+        "text": "\ntype Foo = 'a' | 'b';\ntype Bar = number;\nexport const map: { [name in Foo]: Bar } = { a: 1, b: 2 };\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:219"
+      },
+      {
+        "text": "\nnamespace FooNS {\n  export const fooVal = 1;\n}\nexport namespace BarNS {\n  export import TheFoo = FooNS;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:233"
+      },
+      {
+        "text": "export function fn<T>(x: T): T { return x; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:363"
+      },
+      {
+        "text": "export function fn<T>(x: T): void { console.log(x); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:365"
+      },
+      {
+        "text": "export interface I<T> { value: T; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:367"
+      },
+      {
+        "text": "export type A<T> = T[];",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:369"
+      },
+      {
+        "text": "export class C<T> { x!: T; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:371"
+      },
+      {
+        "text": "export function fn<T, U extends T>(x: T, y: U): void { console.log(x, y); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:373"
+      },
+      {
+        "text": "export interface I<T, U = T> { x?: U; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:375"
+      },
+      {
+        "text": "export type IsString<T> = T extends string ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:377"
+      },
+      {
+        "text": "export type MyRecord<K extends string> = { [P in K]: number };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:381"
+      },
+      {
+        "text": "export type ElementOf<T> = T extends (infer U)[] ? U : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:383"
+      },
+      {
+        "text": "export const fn = <T,>(x: T): T => x;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:385"
+      },
+      {
+        "text": "\nexport class C {\n  fn<T>(x: T): T { return x; }\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:387"
+      },
+      {
+        "text": "\nexport interface Factory {\n  <T>(x: T): T;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:398"
+      },
+      {
+        "text": "\nexport interface Constructable {\n  new <T>(x: T): T;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:404"
+      },
+      {
+        "text": "\nexport function foo<T>(a: number): T;\nexport function foo<T>(a: string): T;\nexport function foo<T>(a: number | string): T { return a as unknown as T; }\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:410"
+      },
+      {
+        "text": "declare function fn<T>(x: T): T; export { fn };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:416"
+      },
+      {
+        "text": "\ndeclare module 'foo' {\n  function bar<T>(x: T): T;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:418"
+      },
+      {
+        "text": "\nexport function foo<T>(value: T): T { return value; }\nexport type Foo<T> = typeof foo<T>;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:424"
+      },
+      {
+        "text": "export type Fn<A extends unknown[]> = (...a: A) => unknown;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:429"
+      },
+      {
+        "text": "export type Wrapper<T> = Promise<Array<T>>;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:431"
+      },
+      {
+        "text": "class Cls { static method() {} } export interface I extends Cls.method {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:570"
+      },
+      {
+        "text": "class Cls { static method() {} } export class C implements Cls.method {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:571"
+      },
+      {
+        "text": "interface Obj { method(): void } export interface I extends Obj.method {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:572"
+      },
+      {
+        "text": "type Obj = { method(): void }; export class C implements Obj.method {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:573"
+      },
+      {
+        "text": "class Cls {} export interface I extends Cls.nested.member {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:574"
+      },
+      {
+        "text": "namespace NS { export interface Base {} } export interface I extends NS.Base {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:575"
+      },
+      {
+        "text": "class Cls {} namespace Cls { export interface Base {} } export interface I extends Cls.Base {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:576"
+      },
+      {
+        "text": "interface Base<T> { value: T } class Cls {} export interface I extends Base<Cls> {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:577"
+      },
+      {
+        "text": "declare const obj: { Base: new () => object }; export class C extends obj.Base {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:578"
+      },
+      {
+        "text": "import type * as NS from 'missing'; export interface I extends NS.Base {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:579"
+      },
+      {
+        "text": "declare const ambient: number; interface Public { value: number }",
+        "extension": ".d.ts",
+        "origin": "Ambient boundary regression"
+      },
+      {
+        "text": "declare namespace Public { const value: number; type Name = string; }",
+        "extension": ".d.ts",
+        "origin": "Ambient boundary regression"
+      },
+      {
+        "text": "export {}; declare global { const BUILD_HASH: string; namespace GlobalNested { interface Value<T> { value: T } } }",
+        "extension": ".ts",
+        "origin": "Ambient boundary regression"
+      },
+      {
+        "text": "const Component = () => null; export const view = <Component/>;",
+        "extension": ".tsx",
+        "origin": "JSX binding scope regression"
+      },
+      {
+        "text": "const 𐐨 = () => null; export const view = <𐐨/>;",
+        "extension": ".tsx",
+        "origin": "JSX binding scope regression"
+      },
+      {
+        "text": "const 中 = () => null; export const view = <中/>;",
+        "extension": ".tsx",
+        "origin": "JSX binding scope regression"
+      },
+      {
+        "text": "const x = 1; console.log(x);",
+        "extension": ".js",
+        "origin": "Authored JavaScript binding regression"
+      },
+      {
+        "text": "/** @typedef {string} T */ export {};",
+        "extension": ".js",
+        "origin": "Authored JavaScript binding regression"
+      },
+      {
+        "text": "/** @type {string} */ let x = \"\"; export {x};",
+        "extension": ".js",
+        "origin": "Authored JavaScript binding regression"
+      },
+      {
+        "text": "const x = 1; export function run(x) { return x; } console.log(x);",
+        "extension": ".js",
+        "origin": "Authored JavaScript binding regression"
+      },
+      {
+        "text": "function foo(): number {\n  const name = 1;\n  return name;\n}\nconst name = 1;\nexport { name };\nexport { foo };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:575",
+        "expected": [],
+        "originalCategory": "invalid",
+        "originalExpectation": [],
+        "adaptation": "The frozen suite stores this intentional zero-diagnostic case in InvalidTestCase with Errors: []rule_tester.InvalidTestCaseError{}. Its original assertion is zero diagnostics, so this oracle categorizes it as valid; source and expectation are unchanged."
+      }
+    ],
+    "invalid": [
+      {
+        "text": "\nlet a: any, b: any;\n({ a, b } = { a: 1, b: 2 });\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:159",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 5
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "\nlet a: any;\n[[a]] = [[1]];\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:170",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "\nlet rest: any;\n[, ...rest] = [1, 2, 3];\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:180",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "\nlet a: any, b: any;\n[a, b] = [1, 2];\nconsole.log(a);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:190",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "\nlet rest: any;\n({ ...rest } = { a: 1 } as any);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:201",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "\nlet b: any;\n({ a: b } = { a: 1 } as any);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:211",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "\nlet a: any;\n[{ a }] = [{ a: 1 }] as any;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:221",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "\nlet b: any;\n({ x: [b] } = { x: [1] } as any);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:231",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "\nlet x: any;\nfor (x of [1, 2]) {}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:241",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "\nlet a: any, b: any;\nfor ([a, b] of [[1, 2]] as any) {}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:251",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "\nlet k: any;\nfor (k in { a: 1 }) {}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:262",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "\nlet a: any;\nfor ({ a } of [{ a: 1 }] as any) {}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:272",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "\nlet a: any;\n[[[[a]]]] = [[[[1]]]] as any;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:282",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "\nlet a: any;\n[{ x: [{ a }] }] = [{ x: [{ a: 1 }] }] as any;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:292",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "\nlet a: any;\n[a = 5] = [] as any;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:302",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 2
+          }
+        ]
+      },
+      {
+        "text": "\nlet a: any;\n[(a)] = [1] as any;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:312",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "\nlet b: any;\n({a: (b)} = {a: 1} as any);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:322",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "\nlet b: any;\n({ a: b = 5 } = {} as any);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:332",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "\nlet a: any;\n[,, a] = [1, 2, 3] as any;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:342",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "\nlet a: any, b: any;\na = b = 1;\nconsole.log(a);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:352",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "var a = 0; a = a + 1;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:364",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "var a = 0; a = a + a;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:368",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "var a = 0; a += a + 1;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:372",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "var a = 0; a++;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:376",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "function foo(a: number) { a = a + 1; } foo(1);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:380",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "text": "function foo(a: number) { a++; } foo(1);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:384",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "text": "export {};\nlet a = 0;\na = a + 1;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:388",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "export {};\nfunction foo(a: number) { a = a + 1; }\nfoo(1);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:394",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "text": "export {};\nlet a = 0;\n(a) += 1;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:400",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 2
+          }
+        ]
+      },
+      {
+        "text": "export {};\nlet a = 0;\n(a)++;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:406",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 2
+          }
+        ]
+      },
+      {
+        "text": "export function first(values: number[][]) {\n  for (const [item] of values) { return; }\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:412",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "export function first(values: number[][]) {\n  let item: number;\n  for ([item] of values) { return; }\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:418",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "var a = 3; a = a * 5 + 6;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:425",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "var a = 0; --a;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:430",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "\nlet x = null;\nx = foo(x);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:435",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "\nlet x: any = false;\nx = x || true;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:443",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "\nfunction run() {\n  let x: any = 0;\n  x = foo(x);\n}\nrun();\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:451",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 4,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "\nlet x = 0;\nx++, (x = 0);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:463",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "\nlet b = 0;\n0, b++;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:470",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 4
+          }
+        ]
+      },
+      {
+        "text": "\nlet c = 0;\n(c += 1), 0;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:477",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 2
+          }
+        ]
+      },
+      {
+        "text": "\nlet x = 0;\n0, (1, x++);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:485",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "\nlet z = 0;\n(z = z + 1), (z = 2);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:493",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "\nlet x = 0;\n0, (x += 1);\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_assignments_test.go:501",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "/* exported T */\ntype T = string;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_exported_scope_test.go:159",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 6
+          }
+        ],
+        "expectationExtraction": "Expanded frozen unusedT(2, 6) helper; original helper returns messageId/line/column."
+      },
+      {
+        "text": "type A<U> = U extends infer T ? U : never;\nconsume(null as A<number>);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_exported_scope_test.go:184",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 29
+          }
+        ],
+        "expectationExtraction": "Expanded frozen unusedT(1, 29) helper; original helper returns messageId/line/column."
+      },
+      {
+        "text": "const functionTypeReturn = 'key';\nexport type FunctionType = () => typeof functionTypeReturn;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:267",
+        "expected": [
+          {
+            "messageId": "usedOnlyAsType",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "const methodSignatureReturn = 'key';\nexport interface MethodSignature { method(): typeof methodSignatureReturn; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:276",
+        "expected": [
+          {
+            "messageId": "usedOnlyAsType",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends (...args: infer Args) => infer R ? Args : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:353",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 66
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends Array<infer U> ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:357",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 47
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends [infer U] ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:361",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 42
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends { value: infer U } ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:365",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 50
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends { [key: string]: infer U } ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:369",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 58
+          }
+        ]
+      },
+      {
+        "text": "const _Unused = 1; export {};",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:373",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "export type Result = <Unused>() => void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:377",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "export type Result<Unused> = (callback: <Unused>() => void) => void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:382",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T, Args> = T extends (...args: infer Args) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:386",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = [T extends (...args: infer U) => infer R ? R : never, T extends Array<infer U> ? true : false];",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:390",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 101
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends (arg: <U>(x: U) => infer U) => infer R ? R : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:394",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 60
+          }
+        ]
+      },
+      {
+        "text": "export declare function run<T>(value: T): T extends infer U ? unknown : never;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:398",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 59
+          }
+        ]
+      },
+      {
+        "text": "export function run<T>(value: T extends infer U ? unknown : never): void { console.log(value); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:402",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 47
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends <U>(arg: infer U) => void ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:406",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 50
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends (U: infer U) => void ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:410",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 45
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends (...Args: infer Args) => void ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:414",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 51
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends (U: unknown) => infer U ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:418",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 57
+          }
+        ]
+      },
+      {
+        "text": "export type Result<U> = () => { U: unknown };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:422",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "export type Result<U> = () => [U: unknown];",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:426",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends { (): infer U; <U>(arg: infer U): void } ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:430",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 47
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends (arg: { [U in string]: infer U }) => void ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:434",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 64
+          }
+        ]
+      },
+      {
+        "text": "export type Result<T> = T extends (arg: { [U in string]: <U>() => infer U }) => void ? true : false;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:438",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 73
+          }
+        ]
+      },
+      {
+        "text": "export type Unused<T> = number;\nexport type Result<T> = T extends (...args: infer Args) => infer R ? R : never;\nexport type UnusedAgain<T> = number;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:456",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 20
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "let pendingShareInfo: unknown;\nexport function update(value: unknown) {\n  // eslint-disable-next-line test\n  pendingShareInfo = value;\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:519",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "let pendingShareInfo: unknown;\npendingShareInfo = \"same scope\";\nexport function update(value: unknown) {\n  pendingShareInfo = value;\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:531",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "import { Foo } from \"./foo\";",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:47",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "import * as ns from \"./foo\";",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:58",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "import path = require(\"path\");",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:69",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "import type { Foo } from \"./foo\";",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:80",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "import Foo from \"./foo\";",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:91",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "import { resolve as r } from \"path\";",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:102",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "import { join } from \"path\"; export * as pathNs from \"path\";",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:113",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "import { resolve, join } from \"path\"; console.log(join(\"a\", \"b\"));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:160",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "import { join, resolve } from \"path\"; console.log(join(\"a\", \"b\"));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:171",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "import { join, resolve, basename } from \"path\"; console.log(join(\"a\", \"b\"), basename(\"c\"));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:189",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "import { join, resolve as r } from \"path\"; console.log(join(\"a\", \"b\"));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:200",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "text": "import { join, resolve } from \"path\"; export { join };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:211",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "import {\n  join,\n  resolve\n} from \"path\";\nconsole.log(join(\"a\", \"b\"));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:222",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "import { join, resolve, basename } from \"path\"; console.log(resolve(\"/\"));",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:240",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 10
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "import { a, b, c, d } from \"./foo\"; console.log(b);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_imports_test.go:258",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 10
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 16
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "class Foo { static { console.log(\"init\"); } }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:340",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "using resource = {} as any;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:373",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "await using resource = {} as any;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:378",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "const { foo, ...rest } = { foo: 1, bar: 2 }; console.log(rest);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:402",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "import { name as alias } from './does-not-exist';\nfunction foo(): number {\n  const name = 1;\n  return alias as unknown as number;\n}\nexport { foo };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:530",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "export { name as renamed } from './does-not-exist';\nfunction foo(): number {\n  const name = 1;\n  return 0;\n}\nexport { foo };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:544",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "export { name } from './does-not-exist';\nfunction foo(): number {\n  const name = 1;\n  return 0;\n}\nexport { foo };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:560",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "export type { name } from './does-not-exist';\nfunction foo(): number {\n  const name = 1;\n  return 0;\n}\nexport { foo };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:589",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "export * as renamed from './does-not-exist';\nfunction foo(): number {\n  const renamed = 1;\n  return 0;\n}\nexport { foo };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:604",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "export enum E { name = 1 }\nfunction foo(): number {\n  const name = 1;\n  return E.name;\n}\nexport { foo };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:619",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "export function Foo() {\n  const xml = 1;\n  const lang = 2;\n  return <svg xml:lang=\"en\" />;\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:635",
+        "extension": ".tsx",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 9
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "import './does-not-exist' with { type: 'json' };\nfunction foo(): number {\n  const type = 1;\n  return 0;\n}\nexport { foo };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:651",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "type T = { name: string; age: number };\nfunction foo(t: T): number {\n  const name = 1;\n  return t.age;\n}\nexport { foo };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:666",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "interface I { foo: string; bar: number }\nfunction use(i: I): number {\n  const foo = 1;\n  return i.bar;\n}\nexport { use };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:679",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "class C {\n  name: string = 'x';\n  method(): number { return 1; }\n}\nconst name = 1;\nconst method = 2;\nnew C();\nexport { C };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:693",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 5,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 6,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "class C {\n  get name(): string { return 'x'; }\n  set name(v: string) {}\n}\nconst name = 1;\nnew C();\nexport { C };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:709",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 5,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "declare const Decor: any;\nconst bar = 1;\nclass C {\n  @Decor.bar\n  prop!: string;\n}\nnew C();\nexport { C };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:724",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "declare const Foo: any;\nconst Bar = 1;\nexport const X = <Foo.Bar />;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:741",
+        "extension": ".tsx",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "declare const a: any;\nconst b = 1;\nconst c = 2;\nconst d = 3;\nexport const x = a.b.c.d;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:753",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 4,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "const x = 1;\nconst y = 2;\nconst z = 3;\ndeclare const inp: any;\nconst o = { x: inp.x, y: inp.y, z: inp.z };\nexport { o };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:769",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "declare const obj: any;\nconst a = 1;\nconst b = 2;\nfunction f(): number {\n  const { a: { b: alias } = {} } = obj;\n  return alias as unknown as number;\n}\nexport { f };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:786",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "declare const A: any;\nconst B = 1;\nconst C = 2;\nexport const X = <A.B.C />;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:803",
+        "extension": ".tsx",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "declare function getObj(): any;\nconst obj = getObj();\nconst x = 1;\ntype T = typeof obj.x;\nconst v: T = 1 as any;\nexport { v };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:820",
+        "expected": [
+          {
+            "messageId": "usedOnlyAsType",
+            "line": 2,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "declare const a: any;\nconst b = 1;\nconst c = 2;\nconst d = 3;\nconst e = 4;\nconsole.log(a.b.c.d.e);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:838",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 4,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 5,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "declare const obj: any;\nconst x = 1;\nconst y = 2;\nconsole.log(obj?.x?.y);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:855",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "export {};\nconst value = 1;\nfunction consume(value: number) { return value; }\nconsume(2);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:66",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "export {};\nconst value = 1;\nfunction consume(value: number) { return 0; }\nconsole.log(value);\nconsume(2);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:75",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "export class Example {\n  constructor(value: string, private readonly name: string) {}\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:85",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "export {};\nconst prop = 1;\nconst label = 2;\ndeclare const obj: any;\nlabel: for (;;) { obj.prop; break label; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:93",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 7
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "namespace Empty {}\nfunction consume(Empty: number) { return Empty; }\nexport { consume };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:104",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "const value = 0;\nexport namespace Container {\n  const value = 1;\n  export { value };\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:112",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "interface Foo {\n  bar: string;\n}\ntype Bar = 1;\nexport = Foo;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:122",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 4,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "export {};\nconst attr = 1;\ndeclare const Component: any;\nconst rendered = <Component attr=\"value\" />;\nconsole.log(rendered);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:132",
+        "extension": ".tsx",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "export declare namespace A {\n  const ambientMember: number;\n}\nexport declare namespace B {\n  const privateMember: number;\n  export {};\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:143",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 5,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "const value = 1; export type { value };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:189",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "function f() {}\nexport { type f as F };",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:193",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "type Token = {};\nnamespace Box {\n  const Token = 1;\n  export type { Token };\n}\nconsume(Box);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:197",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "let assigned;\nexport type { assigned };\nassigned = 1;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:203",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "const foo = 5;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:90",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "function foo() {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:95",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "function unused(a: number, b: string) {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:100",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 10
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 17
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 28
+          }
+        ]
+      },
+      {
+        "text": "try {} catch (e) {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:109",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "let foo = 5; foo = 10;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:114",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const bar: number = 1;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:119",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "class UnusedClass {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:124",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "interface UnusedInterface { x: number; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:128",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "type UnusedType = string;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:132",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "enum UnusedEnum { A, B }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:136",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "export function bar(x: number) {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:141",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "\nexport class UnusedCtorParam {\n  constructor(a: number) {}\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:146",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "\ndeclare function other(x: number): void;\nexport { other };\nexport function bar(x: number) {}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:155",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 4,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "\nexport function foo(used: number, unused1: string, unused2: boolean) {\n  return used;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:164",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 35
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 52
+          }
+        ]
+      },
+      {
+        "text": "\nexport function qux(a: number, b: string, c: boolean) {\n  console.log(b);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:176",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 43
+          }
+        ]
+      },
+      {
+        "text": "export function bar(a: number, b: string, c: boolean) {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:187",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 21
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 32
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 43
+          }
+        ]
+      },
+      {
+        "text": "export const fn = (_a: string, _b: number, _c = {}) => {};",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:209",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 44
+          }
+        ]
+      },
+      {
+        "text": "const { a, b } = { a: 1, b: 2 }; console.log(a);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:214",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "const [p, q] = [1, 2]; console.log(p);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:218",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "\nfunction foo({ a, b }: { a: number; b: string }) { console.log(a); }\nfoo({ a: 1, b: \"x\" });\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:223",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "\nfunction foox() {\n  return foox();\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:237",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "\n(function () {\n  function foox() {\n    if (true) {\n      return foox();\n    }\n  }\n})();\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_test.go:246",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "declare function unusedFunc(): void;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:246",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "\ndeclare function unusedOverload(): void;\ndeclare function unusedOverload(x: number): void;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:250",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "\ndeclare function typedFunc(): void;\ntype FuncType = typeof typedFunc;\nexport type { FuncType };\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:257",
+        "expected": [
+          {
+            "messageId": "usedOnlyAsType",
+            "line": 2,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "export function isString(value: unknown): value is string { return true; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:266",
+        "expected": [
+          {
+            "messageId": "usedOnlyAsType",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "declare namespace UnusedNS { export function inner(): void; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:271",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "declare namespace Rspack {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:276",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "namespace Rspack2 {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:281",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "\nnamespace Foo {\n  export const Bar = 1;\n  console.log(Foo.Bar);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:286",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "\nexport namespace Foo {\n  namespace Bar {\n    namespace Baz {\n      namespace Bam {\n        const x = 1;\n      }\n    }\n  }\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:296",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 13
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 4,
+            "column": 15
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 5,
+            "column": 17
+          },
+          {
+            "messageId": "unusedVar",
+            "line": 6,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "\ndeclare module 'foo' {\n  type Test = any;\n  const x = 1;\n  export = x;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:316",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "\ninterface Foo {\n  a: string;\n}\ninterface Foo {\n  b: Foo;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:327",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "\nconst fooObj = {\n  bar: { baz: 123 },\n};\nexport type BarType = typeof fooObj.bar;\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:339",
+        "expected": [
+          {
+            "messageId": "usedOnlyAsType",
+            "line": 2,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "\nconst fooObj2 = { x: 1 };\nexport type X = (typeof fooObj2)['x'];\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:349",
+        "expected": [
+          {
+            "messageId": "usedOnlyAsType",
+            "line": 2,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "export interface I<T> { x?: number; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:437",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "export interface I<T = unknown> { x?: number; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:442",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "export interface I<T extends string> { x?: number; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:447",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "export type A<T> = string;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:452",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "export type A<T = unknown> = string;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:457",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "export function fn<T>(): void {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:462",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "export class C<T> {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:467",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "export class C<T = unknown> {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:472",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "export interface I<T, U> { x: T; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:477",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "export interface I<T, U extends T> {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:482",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "export const fn = <T,>(): void => {};",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:487",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "\nexport class C {\n  fn<T>(): void {}\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:492",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "\nexport interface Factory {\n  <T>(): void;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:501",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 4
+          }
+        ]
+      },
+      {
+        "text": "\nexport interface Constructable {\n  new <T>(): void;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:510",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 3,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "/* exported moduleValue */ var moduleValue = 1;\nexport {};",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:557",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 32
+          }
+        ]
+      },
+      {
+        "text": "declare const obj: { m(): void }; export interface I extends obj.m {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:582",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "namespace NS { export interface Base {} } export function f() { let NS = 0; class C implements NS.Base {} return C; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:586",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "namespace NS { export interface Base {} } export function f() { class NS {} class C implements NS.Base {} return C; }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:590",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 11,
+            "endLine": 1,
+            "endColumn": 13
+          }
+        ]
+      },
+      {
+        "text": "const obj = { m() {} }; export type T = typeof obj.m;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:594",
+        "expected": [
+          {
+            "messageId": "usedOnlyAsType"
+          }
+        ]
+      },
+      {
+        "text": "declare const publicValue: number;\ndeclare const privateValue: number;\nexport { publicValue };",
+        "extension": ".d.ts",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_ref_store_test.go:155",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 2,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "const div = 1; export const view = <div/>;",
+        "extension": ".tsx",
+        "origin": "JSX intrinsic and import type syntax regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "const é = 1; export const view = <é/>;",
+        "extension": ".tsx",
+        "origin": "JSX intrinsic and import type syntax regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "const ß = 1; export const view = <ß/>;",
+        "extension": ".tsx",
+        "origin": "JSX intrinsic and import type syntax regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "const ǅ = 1; export const view = <ǅ/>;",
+        "extension": ".tsx",
+        "origin": "JSX intrinsic and import type syntax regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "const Named = 1; export type T = import(\"module\").Named;",
+        "extension": ".tsx",
+        "origin": "JSX intrinsic and import type syntax regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "const T = 1; /** @type {T} */ const value = null; export {value};",
+        "extension": ".js",
+        "origin": "Authored JavaScript binding regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "import { Value } from \"missing\"; /** @type {Value} */ const value = null; export {value};",
+        "extension": ".js",
+        "origin": "Authored JavaScript binding regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "import { x } from \"missing\"; export function run(a = x) { const x = 1; return a; }",
+        "extension": ".js",
+        "origin": "Authored JavaScript binding regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "options": [
+      {
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "valid": [
+      {
+        "text": "const _foo = 1;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:13"
+      },
+      {
+        "text": "const _a = 1; const b = 2; console.log(b);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:19"
+      },
+      {
+        "text": "class _Foo { static { console.log(\"init\"); } }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:21"
+      },
+      {
+        "text": "using _resource = {} as any;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:22"
+      },
+      {
+        "text": "const [_a] = [1];",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:64"
+      },
+      {
+        "text": "export interface I<_T> {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_typescript_test.go:394"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "let pendingShareInfo: unknown;\nexport function update(value: unknown) {\n  pendingShareInfo = value;\n}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_extras_test.go:506",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "const foo = 1;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:104",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "function foo(_x: number) {} foo(1);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:152",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "try {} catch (_e) {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:158",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "const _x = 1; try {} catch (_e) {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:200",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "const _a = 1; const b = 2;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:212",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "options": [
+      {
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "valid": [
+      {
+        "text": "function foo(_bar) {} foo(1);",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:25"
+      },
+      {
+        "text": "function foo({ _a, b }: { _a: number; b: number }) { console.log(b); } foo({ _a: 1, b: 2 });",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:27"
+      },
+      {
+        "text": "export function foo(b: string, _a: number) { console.log(b); }",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:54"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "const _x = 1;",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:164",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "try {} catch (_e) {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:170",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "export function foo(bar: number) {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:188",
+        "expected": [
+          {
+            "messageId": "unusedVar",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "options": [
+      {
+        "varsIgnorePattern": "^_",
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "valid": [
+      {
+        "text": "const _x = 1; export function foo(_a: number) {}",
+        "origin": "internal/plugins/typescript/rules/no_unused_vars/no_unused_vars_patterns_test.go:49"
+      },
+      {
+        "text": "const _unused = 1; export function run(_arg: number) {}",
+        "origin": "Rsbuild configured options regression"
+      },
+      {
+        "text": "export function run(unused: number, used: number) { return used; }",
+        "origin": "Rsbuild configured options regression"
+      },
+      {
+        "text": "const { value: _value } = {value:1};",
+        "origin": "Rsbuild configured options regression"
+      },
+      {
+        "text": "export function run({value: _value}: {value:number}) {}",
+        "origin": "Rsbuild configured options regression"
+      },
+      {
+        "text": "import { _Unused } from \"missing\";",
+        "origin": "Rsbuild configured options regression"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "const unused = 1;",
+        "origin": "Rsbuild configured options regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "export function run(arg: unknown) {}",
+        "origin": "Rsbuild configured options regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "try {} catch (_error) {}",
+        "origin": "Rsbuild configured options regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "let unused = 0; unused++;",
+        "origin": "Rsbuild configured options regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "const used = 1; export type Value = typeof used;",
+        "origin": "Rsbuild configured options regression",
+        "expected": [
+          {
+            "messageId": "usedOnlyAsType"
+          }
+        ]
+      },
+      {
+        "text": "export function run({unused}: {unused:number}, used:number) { return used; }",
+        "origin": "Rsbuild configured options regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "import { unused } from \"missing\";",
+        "origin": "Rsbuild configured options regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      },
+      {
+        "text": "export type Factory<Unused> = () => void;",
+        "origin": "Rsbuild configured options regression",
+        "expected": [
+          {
+            "messageId": "unusedVar"
+          }
+        ]
+      }
+    ]
+  }
+]

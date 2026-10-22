@@ -2,7 +2,7 @@
   "name": "@rslint/native-linux-x64-gnu",
   "version": "0.9.5",
   "license": "MIT",
-  "description": "rslint native binaries for linux-x64-gnu",
+  "description": "Rust lint addon for linux-x64-gnu",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {
     "type": "git",
@@ -10,18 +10,13 @@
   },
   "exports": {
     ".": "./rslint.linux-x64-gnu.node",
-    "./bin": "./rslint",
     "./package.json": "./package.json"
   },
   "files": [
-    "rslint.linux-x64-gnu.node",
-    "rslint"
+    "rslint.linux-x64-gnu.node"
   ],
   "publishConfig": {
-    "access": "public",
-    "executableFiles": [
-      "./rslint"
-    ]
+    "access": "public"
   },
   "os": [
     "linux"

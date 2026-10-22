@@ -1,0 +1,164 @@
+[
+  {
+    "rule": "@typescript-eslint/no-unsafe-call",
+    "valid": [
+      "function f(x: () => void) { x(); }",
+      "function f(x?: { a: () => void }) { x?.a(); }",
+      "function f(x: { a?: () => void }) { x.a?.(); }",
+      "new Map(); String.raw`text`;",
+      "const x = import('./missing');",
+      "let x: any = 23; String(x);",
+      "function f<T extends any>(x: T) { x(); }",
+      "function f<T>(x: T) { x(); }",
+      "{ type Function = () => void; const f: Function = () => {}; f(); }",
+      "interface Good extends Function { (): string; } declare const f: Good; f(); new f(); f`text`;",
+      "interface CallOnly extends Function { (): void; } declare const f: CallOnly; f(); f`text`;",
+      "interface Construct extends Function { new(): Construct; } declare const f: Construct; new f(); f(); f`text`;",
+      "interface Overload extends Function { (): void; (x: string): string; } declare const f: Overload; new f();",
+      "new Function('return 1'); Function('return 1');",
+      "declare const f: unknown; f();",
+      "declare const f: never; f();",
+      "const obj = { f() { return this.g(); }, g() { return 1; } };",
+      "function f(this: { method(): number }) { this.method(); }",
+      "{ interface Function { (): void; } declare const f: Function; f(); }",
+      "declare const f: ((x: number) => void) & { tag: true }; f(1);",
+      "declare const f: Function | (() => void); f();"
+    ],
+    "invalid": [
+      "function f(x: any) { x(); }",
+      "function f(x: any) { x?.(); }",
+      "function f(x: any) { x.a.b.c.d.e.f.g(); }",
+      "function f(x: any) { x.a.b.c.d.e.f.g?.(); }",
+      "function f(x: { a: any }) { x.a(); x?.a(); x.a?.(); }",
+      "function f(x: any) { new x(); }",
+      "function f(x: { a: any }) { new x.a(); }",
+      "function f(x: any) { x`text`; }",
+      "function f(x: { tag: any }) { x.tag`text`; }",
+      "declare const value: NotKnown; value(); new value(); value`text`;",
+      "unknownCallee(); new unknownConstructor(); unknownTag`text`;",
+      "declare const f: Function; f(); new f(); f`text`;",
+      "declare const f: unknown; if (typeof f === 'function') { f(); }",
+      "interface Unsafe extends Function {} declare const f: Unsafe; f(); new f(); f`text`;",
+      "interface Unsafe extends Function { (): void; } declare const f: Unsafe; new f();",
+      "interface Unsafe extends Function { property: string; } declare const f: Unsafe; f();",
+      "function f<T extends Function>(x: T) { x(); }",
+      "declare const f: Function & { property: string }; f();",
+      "interface First extends Function {} interface Second extends First {} declare const f: Second; f();",
+      "function f(this: any) { this(); this.method(); this?.method(); new this.C(); this.tag`text`; }",
+      "function f(this: NotKnown) { this(); this.method(); new this.C(); this.tag`text`; }",
+      "function f(this: any) { ((this)).method(); (this.method)(); }",
+      "declare const obj: { f: any }; (obj.f)(); obj['f']();",
+      "declare const obj: any; obj /* receiver */ . /* \ud83d\ude00 */ method(1);",
+      {
+        "text": "function read(this: any) { this.property(); }",
+        "compilerOptions": {
+          "strict": true,
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "function read(this: NotKnown) { this.property(); }",
+        "compilerOptions": {
+          "strict": true,
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "function read() { return this.property(); }",
+        "compilerOptions": {
+          "strict": false,
+          "noImplicitThis": false
+        }
+      }
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-unsafe-member-access",
+    "valid": [
+      "declare const value: { a: number }; value.a; value?.a; value['a']; ((value)).a; value!.a;",
+      "function f<T>(value: T) { value.property; }",
+      "function f<T extends any>(value: T) { value.property; }",
+      "declare const value: unknown; value.property;",
+      "declare const value: never; value.property;",
+      "declare const value: { [key: string]: unknown }; declare let anyValue: any; value[0]; value['key']; value[`template`]; value[true]; value[false]; value[null]; value[anyValue++]; value[++anyValue]; value[anyValue--]; value[--anyValue];",
+      "declare namespace XXX { namespace WWW { interface Temp { foo: 'bar'; } } } interface A extends XXX.WWW.Temp {} class B implements XXX.WWW.Temp { foo = 'bar' as const; }",
+      "declare const unsafeBase: any; interface A extends unsafeBase.Base {} class B implements unsafeBase.Base {}",
+      {
+        "text": "declare const Context: any; const v = <Context.Provider></Context.Provider>;",
+        "extension": ".tsx"
+      },
+      {
+        "text": "declare const Context: any; const v = <Context.A.B.C><Context.D.E /></Context.A.B.C>;",
+        "extension": ".tsx"
+      },
+      {
+        "text": "declare const Typed: { Provider: any }; const v = <Typed.Provider.Nested />;",
+        "extension": ".tsx"
+      },
+      "declare const safe: { value: number }; const obj = { ...safe, value: safe.value }; const { value, ...rest } = obj;",
+      "function f(this: { a: number }) { return this.a; }",
+      "declare const obj: { key: number }; const key = 'key'; obj[key];"
+    ],
+    "invalid": [
+      "declare const value: any; value.property;",
+      "declare const value: NotKnown; value.property;",
+      "missing.property;",
+      "declare const safe: { value: number }; declare const key: any; safe[key];",
+      "declare const safe: { value: number }; declare const key: NotKnown; safe[key];",
+      "declare const value: any; value.a.b.c; (value.a).b; ((value)).outer;",
+      "declare const value: any; value.method().result;",
+      "declare const value: any; value?.a.b; (value?.a).b; ((value?.a)).b;",
+      "declare const value: any; value?.[0]; value[0]; value['x']; value[`x`];",
+      "declare const value: any; declare const key: any; value[key]; value.a[key];",
+      "declare const value: unknown; (value as any).property; (value satisfies unknown as any).other;",
+      "function read(this: any) { return this.property; }",
+      "function read(this: NotKnown) { return this.property; }",
+      "declare const unsafeBase: any; class Derived extends unsafeBase.Base {}",
+      "declare const value: any; if ('key' in value) { value.key; }",
+      "interface Parsed { path: string; } declare function parse(value: string): Parsed; declare const value: any; const parsed = value && parse(value); parsed.path;",
+      "declare const safe: { value: number }; safe[missing];",
+      "declare const safe: { value: number }; declare const key: any; safe[(( /* \ud83d\ude00 */ key ))];",
+      "declare const value: any; value[('property')]; value[(true)];",
+      "declare const value: any; declare const key: any; value[key.field];",
+      "declare const value: { a: any }; value.a.b.c;",
+      "declare const value: any; value!.property; (value.a!).b;",
+      {
+        "text": "declare const Context: any; Context.before; const v = <Context.Provider prop={Context.inside}>{Context.child}</Context.Provider>; Context.after;",
+        "extension": ".tsx"
+      },
+      {
+        "text": "declare const Context: any; declare const key: any; declare const safe: { [key: string]: unknown }; const v = <Context.Provider prop={Context.field} keyValue={safe[key]} {...Context.props} />;",
+        "extension": ".tsx"
+      },
+      {
+        "text": "declare const Context: any; const v = <Context.Provider prop={<Context.Inner prop={Context.field} />}>{Context.child}</Context.Provider>;",
+        "extension": ".tsx"
+      },
+      {
+        "text": "function render(this: any) { return <this.Provider.Inner prop={this.field}>{this.child}</this.Provider.Inner>; }",
+        "extension": ".tsx"
+      },
+      {
+        "text": "function read(this: any) { this.property(); }",
+        "compilerOptions": {
+          "strict": true,
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "function read(this: NotKnown) { this.property(); }",
+        "compilerOptions": {
+          "strict": true,
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "function read() { return this.property(); }",
+        "compilerOptions": {
+          "strict": false,
+          "noImplicitThis": false
+        }
+      }
+    ]
+  }
+]

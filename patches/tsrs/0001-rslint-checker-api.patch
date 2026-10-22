@@ -1,0 +1,1084 @@
+diff --git a/crates/tsrs_api/src/checker.rs b/crates/tsrs_api/src/checker.rs
+index 65cfc826..10909762 100644
+--- a/crates/tsrs_api/src/checker.rs
++++ b/crates/tsrs_api/src/checker.rs
+@@ -16,6 +16,7 @@ mod json;
+ mod lease;
+ mod params;
+ pub mod registry;
++mod rslint;
+ mod setup;
+ mod symbol_index;
+ 
+@@ -77,6 +78,45 @@ pub(crate) fn handle(
+     }))
+ }
+ 
++pub(crate) fn handle_rslint(
++    session: &Session,
++    method: &str,
++    params: &Value,
++) -> ApiResult<Response> {
++    let host = SessionHost { session };
++    let value = rslint::handle(&host, method, params).map_err(to_api_error)?;
++    json_response(&value)
++}
++
++impl Session {
++    /// Serialize/register a binder-owned symbol without initializing a type checker.
++    /// The caller must keep the symbol's allocation owner alive for the snapshot lifetime.
++    pub fn rslint_symbol_response(
++        &self,
++        snapshot: u64,
++        project: &str,
++        symbol: tsrs_core::P<tsrs_ast::Symbol>,
++    ) -> ApiResult<tsrs_core::json::Value> {
++        let host = SessionHost { session: self };
++        let context = setup::SnapshotCtx::new(&host, snapshot, project).map_err(to_api_error)?;
++        context.program().map_err(to_api_error)?;
++        context.symbol_response(symbol, project).map_err(to_api_error)
++    }
++
++    /// Resolve against the API's cached node table. The caller must retain SnapshotData
++    /// while the returned pointer is used; this does not transfer allocation ownership.
++    pub fn rslint_resolve_node(
++        &self,
++        snapshot: u64,
++        project: &str,
++        handle: &str,
++    ) -> ApiResult<tsrs_core::P<tsrs_ast::Node>> {
++        let data = self.snapshot_data(snapshot)?;
++        let program = data.get_program(&tsrs_project::ID(project.to_string()))?;
++        self.resolve_node_handle(program, handle)
++    }
++}
++
+ fn to_api_error(e: CheckerError) -> ApiError {
+     match e.kind {
+         CheckerErrorKind::InvalidRequest => ApiError::invalid_request(e.message),
+diff --git a/crates/tsrs_api/src/checker/rslint.rs b/crates/tsrs_api/src/checker/rslint.rs
+new file mode 100644
+index 00000000..303c51e4
+--- /dev/null
++++ b/crates/tsrs_api/src/checker/rslint.rs
+@@ -0,0 +1,271 @@
++//! Additional compiler queries required by rslint. They share the API checker lease and registries.
++
++use rustc_hash::FxHashSet;
++use tsrs_ast::{Node, Symbol, SymbolFlags, SymbolTable};
++use tsrs_checker::{
++    CheckMode, Checker, ContextFlags, IterationTypeKind, IterationUse, TypeFlags, TypeFormatFlags,
++};
++use tsrs_core::{P, collections::OrderedMap, json::Value};
++
++use super::host::{CheckerError, CheckerHost, CheckerResult};
++use super::params::Params;
++use super::setup::Setup;
++
++pub(super) fn handle(host: &dyn CheckerHost, method: &str, params: &Value) -> CheckerResult<Value> {
++    let p = Params::new(params, method)?;
++    if method == "rslint/checkerInfo" {
++        return Ok(object([
++            ("version", Value::Number(1.0)),
++            ("programCreationOptions", Value::Number(2.0)),
++            ("noEmitDiagnostics", Value::Number(1.0)),
++        ]));
++    }
++    let mut s = Setup::new(host, p.u64("snapshot")?, p.project()?)?;
++    match method {
++        "rslint/getErrorType" => {
++            let t = s.c().get_error_type();
++            s.type_response(t)
++        }
++        "rslint/getIndexTypeOfType" => {
++            let t = s.resolve_type(p.u32("type")?)?;
++            let key = s.resolve_type(p.u32("keyType")?)?;
++            let result = s.c().get_index_type_of_type(t, key);
++            result.map_or(Ok(Value::Null), |t| s.type_response(t))
++        }
++        "rslint/getContextualType" => {
++            let node = s.resolve_node(p.string("location")?)?;
++            let flags = ContextFlags::from_bits_retain(p.u32("flags")?);
++            let result = s.c().get_contextual_type(node, flags);
++            result.map_or(Ok(Value::Null), |t| s.type_response(t))
++        }
++        "rslint/typeToString" => {
++            let t = s.resolve_type(p.u32("type")?)?;
++            let node = optional_node(&s, p.string("location")?)?;
++            let flags = TypeFormatFlags::from_bits_retain(p.u32("flags")?);
++            if p.raw("verbosity").is_some() {
++                return Err(CheckerError::unsupported("rslint/typeToString verbosity context"));
++            }
++            Ok(Value::String(s.c().type_to_string_ex_exported(t, node, flags, None)))
++        }
++        "rslint/getPromisedTypeOfPromise" => {
++            let t = s.resolve_type(p.u32("type")?)?;
++            let result = s.c().get_promised_type_of_promise(t);
++            result.map_or(Ok(Value::Null), |t| s.type_response(t))
++        }
++        "rslint/isNonDeferredTypeReference" => {
++            let t = s.resolve_type(p.u32("type")?)?;
++            Ok(Value::Bool(tsrs_checker::is_non_deferred_type_reference(t)))
++        }
++        "rslint/getPropertyNameFromType" => {
++            let t = s.resolve_type(p.u32("type")?)?;
++            Ok(Value::String(tsrs_checker::get_property_name_from_type_exported(t).into_owned()))
++        }
++        "rslint/getSymbolFlags" => {
++            let symbol = s.resolve_symbol(&p.symbol_ref("symbol")?)?;
++            Ok(Value::Number(s.c().get_symbol_flags_exported(symbol).bits() as f64))
++        }
++        "rslint/getResolvedSignature" => {
++            let node = s.resolve_node(p.string("location")?)?;
++            let mode = CheckMode::from_bits_retain(p.u32("checkMode")?);
++            let mut candidates = Vec::new();
++            let out = p.bool("collectCandidates")?.then_some(&mut candidates);
++            let signature = s.c().get_resolved_signature(node, out, mode);
++            let result = s.signature_response(signature)?;
++            let candidates = candidates
++                .into_iter()
++                .map(|signature| s.signature_response(signature))
++                .collect::<CheckerResult<Vec<_>>>()?;
++            Ok(object([("signature", result), ("candidates", Value::Array(candidates))]))
++        }
++        "rslint/getRootSymbols" => {
++            let symbol = s.resolve_symbol(&p.symbol_ref("symbol")?)?;
++            let symbols = s.c().get_root_symbols(symbol);
++            s.symbols_response(&symbols)
++        }
++        "rslint/getTypeOnlyAliasDeclaration" => {
++            let symbol = s.resolve_symbol(&p.symbol_ref("symbol")?)?;
++            let node = s.c().get_type_only_alias_declaration_exported(symbol);
++            node.map_or(Ok(Value::Null), |node| host.node_handle(node).map(Value::String))
++        }
++        "rslint/getSymbolsOfParameterPropertyDeclaration" => {
++            let node = s.resolve_node(p.string("location")?)?;
++            let (parameter, property) =
++                s.c().get_symbols_of_parameter_property_declaration(node, p.string("name")?);
++            Ok(object([
++                ("parameter", s.symbol_response(parameter)?),
++                ("property", s.symbol_response(property)?),
++            ]))
++        }
++        "rslint/isDeprecatedDeclaration" => {
++            let node = s.resolve_node(p.string("location")?)?;
++            Ok(Value::Bool(s.c().is_deprecated_declaration(node)))
++        }
++        "rslint/isUnknownSymbol" => {
++            let symbol = s.resolve_symbol(&p.symbol_ref("symbol")?)?;
++            Ok(Value::Bool(s.c().is_unknown_symbol(symbol)))
++        }
++        "rslint/getSuggestionDiagnostics" => {
++            let file = s.source_file(&p.document("file")?)?;
++            let context = host.context();
++            let diagnostics = s.c().get_suggestion_diagnostics(&context, file);
++            Ok(crate::diagnostics::diagnostic_responses(&diagnostics))
++        }
++        "rslint/getMinArgumentCount" => {
++            let signature = s.resolve_signature(p.u64("signature")?)?;
++            Ok(Value::Number(s.c().rslint_min_argument_count(signature) as f64))
++        }
++        "rslint/getSignatureMinArgumentCount" => {
++            let signature = s.resolve_signature(p.u64("signature")?)?;
++            Ok(Value::Number(signature.min_argument_count() as f64))
++        }
++        "rslint/getMinTypeArgumentCount" => {
++            let types = p
++                .u32_array("types")?
++                .into_iter()
++                .map(|id| s.resolve_type(id))
++                .collect::<CheckerResult<Vec<_>>>()?;
++            Ok(Value::Number(Checker::get_min_type_argument_count(&types) as f64))
++        }
++        "rslint/getConditionalRootNode" => {
++            let t = s.resolve_type(p.u32("type")?)?;
++            if !t.flags().intersects(TypeFlags::Conditional) {
++                return Err(CheckerError::client("expected conditional type"));
++            }
++            let node = t.as_conditional_type().root.get().and_then(|root| root.node.get());
++            node.map_or(Ok(Value::Null), |node| host.node_handle(node).map(Value::String))
++        }
++        "rslint/getIterationTypeOfIterable" => {
++            let t = s.resolve_type(p.u32("type")?)?;
++            let use_ = IterationUse::from_bits_retain(p.u32("use")?);
++            let kind = match p.u32("typeKind")? {
++                0 => IterationTypeKind::Yield,
++                1 => IterationTypeKind::Return,
++                2 => IterationTypeKind::Next,
++                _ => return Err(CheckerError::invalid("invalid iteration type kind")),
++            };
++            let error_node = optional_node(&s, p.string("errorNode")?)?;
++            let result = s.c().rslint_iteration_type(use_, kind, t, error_node);
++            result.map_or(Ok(Value::Null), |t| s.type_response(t))
++        }
++        "rslint/isTypeStrictSubtypeOf" => {
++            let source = s.resolve_type(p.u32("source")?)?;
++            let target = s.resolve_type(p.u32("target")?)?;
++            Ok(Value::Bool(s.c().rslint_strict_subtype(source, target)))
++        }
++        "rslint/getGlobalSymbol" => {
++            if p.raw("diagnostic").is_some() {
++                return Err(CheckerError::unsupported(
++                    "rslint/getGlobalSymbol diagnostic argument",
++                ));
++            }
++            let symbol = s.c().get_global_symbol_exported(
++                p.string("name")?,
++                SymbolFlags::from_bits_retain(p.u32("meaning")?),
++                None,
++            );
++            s.opt_symbol_response(symbol)
++        }
++        "rslint/getMergedSymbol" | "rslint/skipAlias" | "rslint/resolveAlias" => {
++            let symbol = if p.raw("symbol").is_some() {
++                Some(s.resolve_symbol(&p.symbol_ref("symbol")?)?)
++            } else {
++                None
++            };
++            if method == "rslint/resolveAlias" {
++                let (resolved, ok) = s.c().resolve_alias_exported(symbol);
++                return Ok(object([
++                    ("symbol", s.opt_symbol_response(resolved)?),
++                    ("ok", Value::Bool(ok)),
++                ]));
++            }
++            let symbol = symbol.ok_or_else(|| CheckerError::client("symbol is required"))?;
++            let result = if method == "rslint/skipAlias" {
++                s.c().skip_alias(symbol)
++            } else {
++                s.c().get_merged_symbol_exported(symbol)
++            };
++            s.symbol_response(result)
++        }
++        "rslint/getAccessedPropertyName" => {
++            let node = s.resolve_node(p.string("location")?)?;
++            let (name, ok) = s.c().get_accessed_property_name(node);
++            Ok(object([("name", Value::String(name.into_owned())), ("ok", Value::Bool(ok))]))
++        }
++        "rslint/getPropertyNameForKnownSymbolName" => {
++            Ok(Value::String(s.c().get_property_name_for_known_symbol_name(p.string("name")?)))
++        }
++        "rslint/symbolGraph" => {
++            let root = s.resolve_symbol(&p.symbol_ref("symbol")?)?;
++            symbol_graph(&s, root)
++        }
++        _ => Err(CheckerError::unsupported(format!("unknown rslint checker method {method}"))),
++    }
++}
++
++fn optional_node(s: &Setup<'_>, handle: &str) -> CheckerResult<Option<P<Node>>> {
++    if handle.is_empty() { Ok(None) } else { s.resolve_node(handle).map(Some) }
++}
++
++fn object<const N: usize>(entries: [(&str, Value); N]) -> Value {
++    Value::Object(entries.into_iter().map(|(key, value)| (key.to_string(), value)).collect())
++}
++
++fn symbol_id(symbol: P<Symbol>, queue: &mut Vec<P<Symbol>>, seen: &mut FxHashSet<u64>) -> Value {
++    let id = tsrs_ast::get_symbol_id(symbol).0;
++    if seen.insert(id) {
++        queue.push(symbol);
++    }
++    Value::String(id.to_string())
++}
++
++fn symbol_table(
++    table: P<SymbolTable>,
++    queue: &mut Vec<P<Symbol>>,
++    seen: &mut FxHashSet<u64>,
++) -> Value {
++    Value::Object(
++        table
++            .entries()
++            .into_iter()
++            .map(|(name, symbol)| (name.to_string(), symbol_id(symbol, queue, seen)))
++            .collect(),
++    )
++}
++
++fn symbol_graph(s: &Setup<'_>, root: P<Symbol>) -> CheckerResult<Value> {
++    let mut queue = Vec::new();
++    let mut seen = FxHashSet::default();
++    let root_id = symbol_id(root, &mut queue, &mut seen);
++    let mut symbols = OrderedMap::default();
++    let mut index = 0;
++    while index < queue.len() {
++        let symbol = queue[index];
++        let Value::Object(mut row) = s.symbol_response(symbol)? else { unreachable!() };
++        let id = tsrs_ast::get_symbol_id(symbol).0.to_string();
++        row.insert("id".into(), Value::String(id.clone()));
++        row.insert("name".into(), Value::String(symbol.name().to_string()));
++        row.insert("apiName".into(), Value::String(tsrs_ast::escape_symbol_name(symbol.name())));
++        // Keep the binder schema's required empty declarations array as well as exact table presence.
++        row.entry("declarations".into()).or_insert_with(|| Value::Array(Vec::new()));
++        if let Some(parent) = symbol.parent() {
++            row.insert("parent".into(), symbol_id(parent, &mut queue, &mut seen));
++        }
++        if let Some(export) = symbol.export_symbol() {
++            row.insert("exportSymbol".into(), symbol_id(export, &mut queue, &mut seen));
++        }
++        if let Some(members) = symbol.members() {
++            row.insert("members".into(), symbol_table(members, &mut queue, &mut seen));
++        }
++        if let Some(exports) = symbol.exports() {
++            row.insert("exports".into(), symbol_table(exports, &mut queue, &mut seen));
++        }
++        symbols.insert(id, Value::Object(row));
++        index += 1;
++    }
++    Ok(object([
++        ("snapshot", Value::Number(s.sd.scope.handle as f64)),
++        ("project", Value::String(s.sd.project.clone())),
++        ("root", root_id),
++        ("symbols", Value::Object(symbols)),
++    ]))
++}
+diff --git a/crates/tsrs_api/src/paramfields.rs b/crates/tsrs_api/src/paramfields.rs
+index 32324028..77b2150e 100644
+--- a/crates/tsrs_api/src/paramfields.rs
++++ b/crates/tsrs_api/src/paramfields.rs
+@@ -3922,6 +3922,34 @@ pub fn struct_fields(name: &str) -> &'static [FieldSpec] {
+             },
+         ],
+         "CreateProgramOptions" => &[
++            FieldSpec {
++                name: "configFileName",
++                go_type: "DocumentIdentifier",
++                kind: FieldKind::Doc,
++                nullable: false,
++                elem: None,
++            },
++            FieldSpec {
++                name: "currentDirectory",
++                go_type: "string",
++                kind: FieldKind::Str,
++                nullable: false,
++                elem: None,
++            },
++            FieldSpec {
++                name: "useSourceOfProjectReference",
++                go_type: "bool",
++                kind: FieldKind::Bool,
++                nullable: false,
++                elem: None,
++            },
++            FieldSpec {
++                name: "singleThreaded",
++                go_type: "bool",
++                kind: FieldKind::Bool,
++                nullable: false,
++                elem: None,
++            },
+             FieldSpec {
+                 name: "projectReferences",
+                 go_type: "[]*core.ProjectReference",
+diff --git a/crates/tsrs_api/src/session.rs b/crates/tsrs_api/src/session.rs
+index b48d8104..0fdd1c12 100644
+--- a/crates/tsrs_api/src/session.rs
++++ b/crates/tsrs_api/src/session.rs
+@@ -328,6 +328,15 @@ impl Session {
+             "ping" => return Ok(Response::Json("\"pong\"".to_string())),
+             _ => {}
+         }
++        if method.starts_with("rslint/") {
++            if *self.closed.lock().unwrap() {
++                return Err(ApiError::client("session is closed"));
++            }
++            tsrs_api_transport::strictjson::validate(params)
++                .map_err(|e| ApiError::invalid_request(e.to_string()))?;
++            let params = parse_params(params)?;
++            return checker::handle_rslint(self, method, &params);
++        }
+         let info = method_info(method)
+             .ok_or_else(|| ApiError::invalid_request(format!("unknown API method {method:?}")))?;
+         let raw_params = params;
+diff --git a/crates/tsrs_api/src/snapshots.rs b/crates/tsrs_api/src/snapshots.rs
+index 741bca36..29c1d843 100644
+--- a/crates/tsrs_api/src/snapshots.rs
++++ b/crates/tsrs_api/src/snapshots.rs
+@@ -156,7 +156,18 @@ impl Session {
+         }
+         let p = Params(item);
+         p.object()?;
+-        let cwd = self.current_directory();
++        let opts = Params(p.get("options"));
++        let supplied_directory = opts.str("currentDirectory")?;
++        if !supplied_directory.is_empty()
++            && !tsrs_core::tspath::is_rooted_disk_path(supplied_directory)
++        {
++            return Err(ApiError::client("options.currentDirectory must be an absolute path"));
++        }
++        let cwd = if supplied_directory.is_empty() {
++            self.current_directory()
++        } else {
++            supplied_directory
++        };
+         let root_file_names = DocumentIdentifier::parse_list(p.array("rootFiles")?, "rootFiles")?
+             .iter()
+             .map(|d| d.to_absolute_file_name(cwd))
+@@ -171,8 +182,27 @@ impl Session {
+             config_file_parsing_diagnostics: Vec::new(),
+             module_resolver_factory: None,
+             module_resolver_id: 0,
++            current_directory: cwd.to_string(),
++            config_file_name: if opts.has("configFileName") {
++                opts.document("configFileName")?.to_absolute_file_name(cwd)
++            } else {
++                String::new()
++            },
++            use_source_of_project_reference: if opts.has("useSourceOfProjectReference") {
++                opts.bool("useSourceOfProjectReference")?
++            } else {
++                true
++            },
++            single_threaded: if opts.has("singleThreaded") {
++                if opts.bool("singleThreaded")? {
++                    tsrs_core::Tristate::True
++                } else {
++                    tsrs_core::Tristate::False
++                }
++            } else {
++                tsrs_core::Tristate::Unknown
++            },
+         };
+-        let opts = Params(p.get("options"));
+         if opts.has("projectReferences") {
+             request.project_references = opts
+                 .array("projectReferences")?
+diff --git a/crates/tsrs_api/src/sourcefiles.rs b/crates/tsrs_api/src/sourcefiles.rs
+index 2e45281c..241ac569 100644
+--- a/crates/tsrs_api/src/sourcefiles.rs
++++ b/crates/tsrs_api/src/sourcefiles.rs
+@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
+ 
+ use rustc_hash::FxHashMap;
+ use tsrs_api_codec::{self as codec, NodeIndexTable};
+-use tsrs_ast::{Node, SourceFile, SourceFileParseOptions};
++use tsrs_ast::{Kind, Node, NodeFlags, SourceFile, SourceFileParseOptions};
+ use tsrs_compiler::Program;
+ use tsrs_core::json::Value;
+ use tsrs_core::{P, ScriptKind, tspath};
+@@ -196,28 +196,118 @@ impl Session {
+         }
+     }
+ 
+-    /// Go `nodeHandleFrom`.
++    /// Serialize a real node while the caller retains its allocation owner. Cached scanner
++    /// tokens are absent from the structural codec and use the token extension handle.
++    pub fn rslint_node_handle(&self, node: P<Node>) -> ApiResult<String> {
++        self.node_handle_from(node)
++    }
++
++    /// Go `nodeHandleFrom`, extended for SourceFile::get_or_create_token identities.
+     pub(crate) fn node_handle_from(&self, node: P<Node>) -> ApiResult<String> {
+         let file = tsrs_ast::get_source_file_of_node(node)
+             .ok_or_else(|| ApiError::internal("node has no source file"))?;
+         let table = self.node_index_table(file);
+-        Ok(codec::node_handle(&table, &file, node))
++        if table.get_index(node) != 0 {
++            return Ok(codec::node_handle(&table, &file, node));
++        }
++        let parent =
++            node.parent().ok_or_else(|| ApiError::internal("unindexed node has no parent"))?;
++        if node.kind() > Kind::LastToken || table.get_index(parent) == 0 {
++            return Err(ApiError::internal("unindexed node is not a cached scanner token"));
++        }
++        let pos = node
++            .pos()
++            .source_offset()
++            .ok_or_else(|| ApiError::internal("synthetic token position"))?;
++        let end =
++            node.end().source_offset().ok_or_else(|| ApiError::internal("synthetic token end"))?;
++        let scanner = Self::rslint_validate_token(file, parent, node.kind() as u32, pos, end)?;
++        if file.get_or_create_token(scanner.token(), pos, end, parent, scanner.token_flags())
++            != node
++        {
++            return Err(ApiError::internal(
++                "unindexed node does not belong to the source token cache",
++            ));
++        }
++        Ok(format!(
++            "t.{}.{}.{}.{}",
++            node.kind() as u32,
++            pos,
++            end,
++            codec::node_handle(&table, &file, parent)
++        ))
+     }
+ 
+-    /// Go `snapshotData.resolveNodeHandle`.
++    fn rslint_validate_token(
++        file: P<SourceFile>,
++        parent: P<Node>,
++        kind: u32,
++        pos: u32,
++        end: u32,
++    ) -> ApiResult<tsrs_scanner::Scanner> {
++        if parent.flags().intersects(NodeFlags::Reparsed)
++            || pos > end
++            || end as usize > file.text().len()
++            || !file.text().is_char_boundary(pos as usize)
++            || !file.text().is_char_boundary(end as usize)
++            || parent.pos().source_offset().is_none_or(|start| pos < start)
++            || parent.end().source_offset().is_none_or(|stop| end > stop)
++        {
++            return Err(ApiError::client("invalid cached token range or parent"));
++        }
++        let scanner = tsrs_scanner::get_scanner_for_source_file(file, pos);
++        if scanner.token() as u32 != kind
++            || scanner.token_full_start() != pos
++            || scanner.token_end() != end
++        {
++            return Err(ApiError::client("cached token handle does not match the source scanner"));
++        }
++        Ok(scanner)
++    }
++
++    /// Go `snapshotData.resolveNodeHandle`, plus validated cached scanner token handles.
+     pub(crate) fn resolve_node_handle(
+         &self,
+         program: &'static Program,
+         handle: &str,
+     ) -> ApiResult<P<Node>> {
+-        let parsed = codec::parse_node_handle(handle)
++        let token = if let Some(rest) = handle.strip_prefix("t.") {
++            let mut parts = rest.splitn(4, '.');
++            let mut number = || {
++                parts
++                    .next()
++                    .and_then(|part| part.parse::<u32>().ok())
++                    .ok_or_else(|| ApiError::client("invalid cached token handle"))
++            };
++            let kind = number()?;
++            let pos = number()?;
++            let end = number()?;
++            let parent =
++                parts.next().ok_or_else(|| ApiError::client("missing cached token parent"))?;
++            Some((kind, pos, end, parent))
++        } else {
++            None
++        };
++        let regular = token.map_or(handle, |(_, _, _, parent)| parent);
++        let parsed = codec::parse_node_handle(regular)
+             .ok_or_else(|| ApiError::client(format!("invalid node handle {handle:?}")))?;
+         let file = program
+             .get_source_file_by_path(&tspath::Path::new(parsed.path))
+             .ok_or_else(|| ApiError::client(format!("node handle {handle:?} could not be resolved (file may not be loaded or handle may be stale)")))?;
+         let table = self.node_index_table(file);
+-        codec::resolve_node_index(&table, parsed.index)
+-            .ok_or_else(|| ApiError::client(format!("node handle {handle:?} could not be resolved (file may not be loaded or handle may be stale)")))
++        let node = codec::resolve_node_index(&table, parsed.index)
++            .ok_or_else(|| ApiError::client(format!("node handle {handle:?} could not be resolved (file may not be loaded or handle may be stale)")))?;
++        if let Some((kind, pos, end, _)) = token {
++            let scanner = Self::rslint_validate_token(file, node, kind, pos, end)?;
++            return Ok(file.get_or_create_token(
++                scanner.token(),
++                pos,
++                end,
++                node,
++                scanner.token_flags(),
++            ));
++        }
++        Ok(node)
+     }
+ 
+     /// Go `encoder.EncodeNode(node, nil)`.
+diff --git a/crates/tsrs_checker/src/lib.rs b/crates/tsrs_checker/src/lib.rs
+index 86cf6727..3a651bf1 100644
+--- a/crates/tsrs_checker/src/lib.rs
++++ b/crates/tsrs_checker/src/lib.rs
+@@ -193,3 +193,5 @@ pub use utilities::{
+     is_external_module_symbol, is_in_type_query, is_known_symbol, is_private_identifier_symbol,
+     is_type_any, new_diagnostic_chain_for_node, skip_alias, value_to_string,
+ };
++
++mod rslint;
+diff --git a/crates/tsrs_checker/src/rslint.rs b/crates/tsrs_checker/src/rslint.rs
+new file mode 100644
+index 00000000..656c4860
+--- /dev/null
++++ b/crates/tsrs_checker/src/rslint.rs
+@@ -0,0 +1,23 @@
++//! Narrow exports needed by the rslint API extension. No independent caches or checker instances.
++
++use crate::*;
++
++impl Checker {
++    pub fn rslint_iteration_type(
++        &mut self,
++        use_: IterationUse,
++        type_kind: IterationTypeKind,
++        input: P<Type>,
++        error_node: Option<P<Node>>,
++    ) -> Option<P<Type>> {
++        self.get_iteration_type_of_iterable(use_, type_kind, input, error_node)
++    }
++
++    pub fn rslint_strict_subtype(&mut self, source: P<Type>, target: P<Type>) -> bool {
++        self.is_type_strict_subtype_of(source, target)
++    }
++
++    pub fn rslint_min_argument_count(&mut self, signature: P<Signature>) -> usize {
++        self.get_min_argument_count(signature)
++    }
++}
+diff --git a/crates/tsrs_compiler/src/lib.rs b/crates/tsrs_compiler/src/lib.rs
+index 39af1572..ef55f888 100644
+--- a/crates/tsrs_compiler/src/lib.rs
++++ b/crates/tsrs_compiler/src/lib.rs
+@@ -50,8 +50,8 @@ pub use host::{
+ pub use program::{
+     CreateCheckerPool, CreateModuleResolver, Program, ProgramConfig, ProgramOptions,
+     SharedProgramData, filter_no_emit_semantic_diagnostics, free_program, free_unshared_program,
+-    get_diagnostics_of_any_program, new_program, shared_program_data,
+-    sort_and_deduplicate_diagnostics, worker_pool,
++    get_diagnostics_of_any_program, get_diagnostics_of_any_program_with_globals, new_program,
++    shared_program_data, sort_and_deduplicate_diagnostics, worker_pool,
+ };
+ pub use program_emit::{
+     EmitOptions, EmitResult, SourceMapEmitResult, WriteFile, WriteFileData, combine_emit_results,
+diff --git a/crates/tsrs_compiler/src/program.rs b/crates/tsrs_compiler/src/program.rs
+index 6a72b248..1ad25ba3 100644
+--- a/crates/tsrs_compiler/src/program.rs
++++ b/crates/tsrs_compiler/src/program.rs
+@@ -3747,6 +3747,28 @@ pub fn get_diagnostics_of_any_program(
+     skip_no_emit_check_for_dts_diagnostics: bool,
+     get_bind_diagnostics: &mut dyn FnMut(&Context, Option<P<SourceFile>>) -> Vec<P<Diagnostic>>,
+     get_semantic_diagnostics: &mut dyn FnMut(&Context, Option<P<SourceFile>>) -> Vec<P<Diagnostic>>,
++) -> Vec<P<Diagnostic>> {
++    get_diagnostics_of_any_program_with_globals(
++        ctx,
++        program,
++        files,
++        skip_no_emit_check_for_dts_diagnostics,
++        get_bind_diagnostics,
++        get_semantic_diagnostics,
++        &mut |ctx| program.get_global_diagnostics(ctx),
++    )
++}
++
++/// The standard collector with the global-diagnostic owner supplied by an external
++/// project checker pool. All phase ordering and declaration/noEmit policy is unchanged.
++pub fn get_diagnostics_of_any_program_with_globals(
++    ctx: &Context,
++    program: &'static Program,
++    files: Option<&[P<SourceFile>]>,
++    skip_no_emit_check_for_dts_diagnostics: bool,
++    get_bind_diagnostics: &mut dyn FnMut(&Context, Option<P<SourceFile>>) -> Vec<P<Diagnostic>>,
++    get_semantic_diagnostics: &mut dyn FnMut(&Context, Option<P<SourceFile>>) -> Vec<P<Diagnostic>>,
++    get_global_diagnostics: &mut dyn FnMut(&Context) -> Vec<P<Diagnostic>>,
+ ) -> Vec<P<Diagnostic>> {
+     let mut all_diagnostics = program.get_config_file_parsing_diagnostics();
+     let config_file_parsing_diagnostics_length = all_diagnostics.len();
+@@ -3793,7 +3815,7 @@ pub fn get_diagnostics_of_any_program(
+             all_diagnostics.extend(tsrs_core::phases::time(
+                 program.options().diagnostics_enabled(),
+                 "Diagnostics: global (first)",
+-                || program.get_global_diagnostics(ctx),
++                || get_global_diagnostics(ctx),
+             ));
+ 
+             if all_diagnostics.len() == config_file_parsing_diagnostics_length {
+@@ -3803,7 +3825,7 @@ pub fn get_diagnostics_of_any_program(
+                 all_diagnostics.extend(tsrs_core::phases::time(
+                     program.options().diagnostics_enabled(),
+                     "Diagnostics: global (after)",
+-                    || program.get_global_diagnostics(ctx),
++                    || get_global_diagnostics(ctx),
+                 ));
+                 crate::checkerpool::write_file_times(program);
+             }
+diff --git a/crates/tsrs_project/src/checkerpool.rs b/crates/tsrs_project/src/checkerpool.rs
+index e85847c4..92ad34e1 100644
+--- a/crates/tsrs_project/src/checkerpool.rs
++++ b/crates/tsrs_project/src/checkerpool.rs
+@@ -400,6 +400,12 @@ impl checkerPool {
+     // checkerpool.go:123
+     pub fn get_checker(&self, ctx: &Context, file: Option<P<SourceFile>>) -> CheckerHandle {
+         drop(self.live_owner());
++        // Threadless WASI cannot schedule the background timer. Reclaim expired
++        // idle slots cooperatively before acquisition, using the same owner,
++        // held-checker and data-lease safeguards as timer-driven cleanup.
++        if tsrs_core::NO_THREADS {
++            self.cleanup_idle_checkers();
++        }
+         let lifetime = get_checker_lifetime(ctx);
+         let mut request_id = get_request_id(ctx).to_string();
+ 
+@@ -700,6 +706,11 @@ impl checkerPool {
+     // unheld checkers.
+     // Must be called with p.mu held. Must NOT be called on discarded pools.
+     fn schedule_cleanup_locked(&self, st: &mut checkerPoolState) {
++        if tsrs_core::NO_THREADS {
++            // get_checker performs cooperative cleanup. The pool still owns
++            // idle slots between requests and frees every slot with its program.
++            return;
++        }
+         let mut earliest_deadline: Option<Instant> = None;
+         for i in 0..st.checkers.len() {
+             let Some(last_released) = st.last_released[i] else {
+diff --git a/crates/tsrs_project/src/checkerpool_test.rs b/crates/tsrs_project/src/checkerpool_test.rs
+index 5bca64fd..ab88a2ae 100644
+--- a/crates/tsrs_project/src/checkerpool_test.rs
++++ b/crates/tsrs_project/src/checkerpool_test.rs
+@@ -858,3 +858,54 @@ fn waiting_for_a_checker_gives_back_the_run_slot() {
+     });
+     cancel.call();
+ }
++
++// Cooperative cleanup uses the same lease safety as the native timer, without
++// sleeping or letting the timer choose the test's scheduling order.
++#[test]
++fn checker_pool_cooperative_cleanup_retains_live_results() {
++    let (session, _) =
++        setup_checker_pool_session(CheckerPoolOptions { max_checkers: 3, idle_timeout: secs(30) });
++    let pool = new_test_checker_pool(
++        program_of(&session),
++        CheckerPoolOptions { max_checkers: 3, idle_timeout: secs(30) },
++    );
++    let diagnostics = pool.get_checker(&ctx_with("held-diag", CheckerLifetime::Diagnostics), None);
++    let diagnostic_ptr = ptr(&diagnostics);
++    let api = pool.get_checker(&ctx_with("api", CheckerLifetime::API), None);
++    let api_ptr = ptr(&api);
++    drop(api);
++    let lease = with_checker_data_lease(&ctx_with("leased-query", CheckerLifetime::Temporary));
++    drop(pool.get_checker(&lease, None));
++    {
++        let mut state = pool.mu.lock().unwrap();
++        if let Some(timer) = state.cleanup_timer.take() {
++            timer.stop();
++        }
++        // Expire the idle query deterministically. The held diagnostics checker
++        // remains exempt even if its last-release timestamp is old.
++        let expired = Instant::now() - secs(60);
++        for released in &mut state.last_released {
++            *released = Some(expired);
++        }
++    }
++    pool.cleanup_idle_checkers();
++    pool.test_state(|state| {
++        assert!(state.checkers[0], "held diagnostic checker must survive cleanup");
++        assert!(!state.checkers[1], "expired query slot must be reclaimed");
++        assert!(state.persistent, "API checker identity must survive cleanup");
++        assert!(!state.has_cleanup_timer, "no idle slot requires a timer");
++    });
++    assert_eq!(pool.checker_ptr(0), Some(diagnostic_ptr));
++    assert_eq!(pool.persistent_ptr(), Some(api_ptr));
++    assert_eq!(
++        pool.region_counts(),
++        (3, 1, 0),
++        "live result lease retains the retired query region"
++    );
++    drop(lease);
++    assert_eq!(pool.region_counts(), (2, 0, 0), "last result lease frees the retired region");
++    pool.discard();
++    drop(diagnostics);
++    pool.free_checkers();
++    assert_eq!(pool.region_counts(), (0, 0, 0), "program disposal frees all remaining regions");
++}
+diff --git a/crates/tsrs_project/src/project.rs b/crates/tsrs_project/src/project.rs
+index d164b581..82862adb 100644
+--- a/crates/tsrs_project/src/project.rs
++++ b/crates/tsrs_project/src/project.rs
+@@ -220,6 +220,8 @@ pub struct Project {
+ 
+     pub(crate) module_resolver_factory: Option<Arc<dyn ModuleResolverFactory>>,
+     pub(crate) module_resolver_id: u64,
++    pub(crate) use_source_of_project_reference: bool,
++    pub(crate) program_single_threaded: Tristate,
+ 
+     // installedTypingsInfo is the value of `project.ComputeTypingsInfo()` that was
+     // used during the most recently completed typings installation.
+@@ -420,6 +422,8 @@ pub fn new_project(
+         program_owner: None,
+         module_resolver_factory: None,
+         module_resolver_id: 0,
++        use_source_of_project_reference: true,
++        program_single_threaded: Tristate::Unknown,
+         installed_typings_info: None,
+         typings_files: Vec::new(),
+     }
+@@ -513,6 +517,27 @@ impl Project {
+         sort_and_deduplicate_diagnostics(&all)
+     }
+ 
++    /// rslint's no-emit diagnostic collector needs only globals, without mixing in option
++    /// diagnostics or forcing a semantic pass. Initialize the dedicated diagnostics checker,
++    /// release its lease, then return the pool's accumulated globals (including retired instances).
++    pub fn rslint_global_diagnostics(&self, ctx: &Context) -> Vec<P<Diagnostic>> {
++        let program = self.program.unwrap();
++        if program.get_source_files().is_empty() {
++            return Vec::new();
++        }
++        let ctx = tsrs_core::context::with_checker_lifetime(
++            ctx,
++            tsrs_core::context::CheckerLifetime::Diagnostics,
++        );
++        let mut checker = program.get_type_checker(&ctx);
++        checker.get_global_diagnostics();
++        drop(checker);
++        match &self.checker_pool {
++            Some(pool) => pool.get_global_diagnostics(),
++            None => program.get_global_diagnostics(&ctx),
++        }
++    }
++
+     // project.go:380
+     pub fn has_file(&self, file_name: &str) -> bool {
+         self.contains_file(&self.to_path(file_name))
+@@ -684,7 +709,8 @@ impl Project {
+                 typings_location.clone_from(&host.session_options.typings_location);
+             }
+             let mut opts = ProgramOptions::new(command_line.unwrap(), host);
+-            opts.use_source_of_project_reference = true;
++            opts.use_source_of_project_reference = self.use_source_of_project_reference;
++            opts.single_threaded = self.program_single_threaded;
+             opts.typings_location = typings_location;
+             opts.create_checker_pool = Some(create_checker_pool);
+             opts.create_module_resolver = Some(create_module_resolver);
+@@ -878,6 +904,8 @@ impl Cloneable for Project {
+ 
+             module_resolver_factory: self.module_resolver_factory.clone(),
+             module_resolver_id: self.module_resolver_id,
++            use_source_of_project_reference: self.use_source_of_project_reference,
++            program_single_threaded: self.program_single_threaded,
+ 
+             installed_typings_info: self.installed_typings_info.clone(),
+             typings_files: self.typings_files.clone(),
+diff --git a/crates/tsrs_project/src/projectcollectionbuilder.rs b/crates/tsrs_project/src/projectcollectionbuilder.rs
+index 8c4772e6..cead336b 100644
+--- a/crates/tsrs_project/src/projectcollectionbuilder.rs
++++ b/crates/tsrs_project/src/projectcollectionbuilder.rs
+@@ -490,33 +490,46 @@ impl ProjectCollectionBuilder {
+             }
+         }
+         let mut created_entries = Vec::with_capacity(api_request.create_programs.len());
+-        created_entries.extend(api_request.create_programs.iter().map(|request| {
+-            self.update_or_create_synthetic_project(
+-                self.next_synthetic_project_id(),
++        for request in &api_request.create_programs {
++            let id = self.next_synthetic_project_id();
++            let parsed_config = self.rslint_config_for_program(request, &id, logger)?;
++            created_entries.push(self.update_or_create_synthetic_project(
++                id,
+                 request.root_file_names.clone(),
+                 request.compiler_options,
+                 request.project_references.clone(),
+                 request.config_file_parsing_diagnostics.clone(),
+                 request.module_resolver_factory.clone(),
+                 request.module_resolver_id,
++                request.current_directory.clone(),
++                request.use_source_of_project_reference,
++                request.single_threaded,
++                parsed_config,
+                 self.inferred_content_mappers.clone(),
+                 logger,
+-            )
+-        }));
++            ));
++        }
+         let mut reconfigured_entries = Vec::with_capacity(api_request.reconfigure_programs.len());
+-        reconfigured_entries.extend(api_request.reconfigure_programs.iter().map(|request| {
+-            self.update_or_create_synthetic_project(
+-                request.program_id.clone(),
+-                request.request.root_file_names.clone(),
+-                request.request.compiler_options,
+-                request.request.project_references.clone(),
+-                request.request.config_file_parsing_diagnostics.clone(),
+-                request.request.module_resolver_factory.clone(),
+-                request.request.module_resolver_id,
++        for reconfigure in &api_request.reconfigure_programs {
++            let request = &reconfigure.request;
++            let parsed_config =
++                self.rslint_config_for_program(request, &reconfigure.program_id, logger)?;
++            reconfigured_entries.push(self.update_or_create_synthetic_project(
++                reconfigure.program_id.clone(),
++                request.root_file_names.clone(),
++                request.compiler_options,
++                request.project_references.clone(),
++                request.config_file_parsing_diagnostics.clone(),
++                request.module_resolver_factory.clone(),
++                request.module_resolver_id,
++                request.current_directory.clone(),
++                request.use_source_of_project_reference,
++                request.single_threaded,
++                parsed_config,
+                 self.inferred_content_mappers.clone(),
+                 logger,
+-            )
+-        }));
++            ));
++        }
+         // Go updates these programs in parallel goroutines; here they run one after another.
+         let mut created_programs = Vec::with_capacity(created_entries.len());
+         created_programs.extend(created_entries.iter().map(|entry| {
+@@ -1717,6 +1730,37 @@ impl ProjectCollectionBuilder {
+         )
+     }
+ 
++    // Preserve the parsed config and its diagnostic source nodes on API-created programs.
++    fn rslint_config_for_program(
++        &self,
++        request: &crate::snapshot::APICreateProgramRequest,
++        id: &SyntheticProjectID,
++        logger: &LogTree,
++    ) -> Result<Option<P<ParsedCommandLine>>, lsproto::Error> {
++        if request.config_file_name.is_empty() {
++            return Ok(None);
++        }
++        let path = (self.to_path)(&request.config_file_name);
++        let parsed = self
++            .config_file_registry_builder
++            .acquire_config_for_project(&request.config_file_name, &path, &id.as_id(), logger)
++            .ok_or_else(|| {
++                lsproto::Error::new(format!("could not read config {:?}", request.config_file_name))
++            })?;
++        let mut command_line = parsed.rslint_with_file_names_and_directory(
++            request.root_file_names.clone(),
++            &request.current_directory,
++        );
++        command_line.parsed_config.compiler_options = request.compiler_options;
++        command_line.parsed_config.project_references = request.project_references.clone();
++        if !project_references_equal(parsed.project_references(), &request.project_references) {
++            command_line.parsed_config.project_references_is_nil =
++                request.project_references.is_empty();
++        }
++        command_line.errors.extend_from_slice(&request.config_file_parsing_diagnostics);
++        Ok(Some(P::new(command_line)))
++    }
++
+     // projectcollectionbuilder.go:1286
+     fn update_or_create_synthetic_project(
+         &self,
+@@ -1727,13 +1771,17 @@ impl ProjectCollectionBuilder {
+         config_file_parsing_diagnostics: Vec<P<Diagnostic>>,
+         module_resolver_factory: ModuleResolverFactoryRef,
+         module_resolver_id: u64,
++        current_directory: String,
++        use_source_of_project_reference: bool,
++        single_threaded: Tristate,
++        parsed_config: Option<P<ParsedCommandLine>>,
+         content_mappers: Vec<Mapper>,
+         logger: &LogTree,
+     ) -> Arc<SyncMapEntry<SyntheticProjectID, Project>> {
+         let Some(project) = self.synthetic_projects.load(&project_id) else {
+             let mut synthetic_project = new_synthetic_project(
+                 &project_id,
+-                &self.session_options.current_directory,
++                &current_directory,
+                 compiler_options.unwrap(),
+                 root_file_names,
+                 project_references,
+@@ -1744,6 +1792,13 @@ impl ProjectCollectionBuilder {
+             );
+             synthetic_project.module_resolver_factory = module_resolver_factory;
+             synthetic_project.module_resolver_id = module_resolver_id;
++            synthetic_project.use_source_of_project_reference = use_source_of_project_reference;
++            synthetic_project.program_single_threaded = single_threaded;
++            if let Some(command_line) = parsed_config {
++                synthetic_project.config_file_name = command_line.config_name().to_string();
++                synthetic_project.config_file_path = (self.to_path)(command_line.config_name());
++                synthetic_project.set_command_line(Some(command_line));
++            }
+             let (project, _) =
+                 self.synthetic_projects.load_or_store(project_id, Shared::new(synthetic_project));
+             return project.unwrap();
+@@ -1759,14 +1814,24 @@ impl ProjectCollectionBuilder {
+             content_mappers,
+             ComparePathsOptions {
+                 use_case_sensitive_file_names: self.fs.fs.use_case_sensitive_file_names(),
+-                current_directory: current_project.current_directory.clone(),
++                current_directory: current_directory.clone(),
+             },
+             config_file_parsing_diagnostics.clone(),
+         );
++        let new_command_line = parsed_config.unwrap_or(new_command_line);
++        if current_project.config_file_name != new_command_line.config_name()
++            && !current_project.config_file_path.0.is_empty()
++        {
++            self.config_file_registry_builder.release_config_for_project(
++                &current_project.config_file_path,
++                &current_project.id(),
++            );
++        }
+         project.change_if(
+             |p| {
+                 let command_line = p.command_line.unwrap();
+-                command_line.file_names() != new_command_line.file_names()
++                command_line.config_file != new_command_line.config_file
++                    || command_line.file_names() != new_command_line.file_names()
+                     || !compiler_options_deep_equal(
+                         command_line.compiler_options(),
+                         Some(compiler_options),
+@@ -1778,6 +1843,9 @@ impl ProjectCollectionBuilder {
+                     || !diagnostics_equal(&command_line.errors, &config_file_parsing_diagnostics)
+                     || command_line.content_mappers() != new_command_line.content_mappers()
+                     || p.module_resolver_id != module_resolver_id
++                    || p.current_directory != current_directory
++                    || p.use_source_of_project_reference != use_source_of_project_reference
++                    || p.program_single_threaded != single_threaded
+             },
+             |p| {
+                 if !logger.is_nil() {
+@@ -1789,6 +1857,15 @@ impl ProjectCollectionBuilder {
+                 p.set_command_line(Some(new_command_line));
+                 p.module_resolver_factory.clone_from(&module_resolver_factory);
+                 p.module_resolver_id = module_resolver_id;
++                p.current_directory.clone_from(&current_directory);
++                p.use_source_of_project_reference = use_source_of_project_reference;
++                p.program_single_threaded = single_threaded;
++                p.config_file_name = new_command_line.config_name().to_string();
++                p.config_file_path = if p.config_file_name.is_empty() {
++                    Path::default()
++                } else {
++                    (self.to_path)(&p.config_file_name)
++                };
+             },
+         );
+         project
+@@ -2163,7 +2240,7 @@ impl ProjectCollectionBuilder {
+                 true
+             });
+         }
+-        if value.kind == Kind::Configured {
++        if !value.config_file_path.0.is_empty() {
+             self.config_file_registry_builder
+                 .release_config_for_project(value.config_file_path(), &project_id);
+         }
+diff --git a/crates/tsrs_project/src/snapshot.rs b/crates/tsrs_project/src/snapshot.rs
+index cb10c77f..afa67430 100644
+--- a/crates/tsrs_project/src/snapshot.rs
++++ b/crates/tsrs_project/src/snapshot.rs
+@@ -167,6 +167,10 @@ pub struct APICreateProgramRequest {
+     pub config_file_parsing_diagnostics: Vec<P<Diagnostic>>,
+     pub module_resolver_factory: Option<Arc<dyn ModuleResolverFactory>>,
+     pub module_resolver_id: u64,
++    pub current_directory: String,
++    pub config_file_name: String,
++    pub use_source_of_project_reference: bool,
++    pub single_threaded: tsrs_core::Tristate,
+ }
+ 
+ pub struct APIReconfigureProgramRequest {
+diff --git a/crates/tsrs_tsoptions/src/parsedcommandline.rs b/crates/tsrs_tsoptions/src/parsedcommandline.rs
+index 00fc4d43..2c34e2d1 100644
+--- a/crates/tsrs_tsoptions/src/parsedcommandline.rs
++++ b/crates/tsrs_tsoptions/src/parsedcommandline.rs
+@@ -135,6 +135,17 @@ impl ParsedCommandLine {
+         }
+     }
+ 
++    /// Clone a parsed config for an API program while retaining its actual config source.
++    pub fn rslint_with_file_names_and_directory(
++        &self,
++        file_names: Vec<String>,
++        current_directory: &str,
++    ) -> ParsedCommandLine {
++        let mut result = self.with_file_names(file_names);
++        result.compare_paths_options.current_directory = current_directory.to_string();
++        result
++    }
++
+     pub fn config_name(&self) -> &str {
+         match self.config_file {
+             None => "",

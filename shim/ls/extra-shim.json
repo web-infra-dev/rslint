@@ -1,7 +1,0 @@
-{
-  "IgnoreFunctions": [
-    "DeprecateSortText",
-    "GetCompletionItemData",
-    "NewSymbolAndEntries"
-  ]
-}

@@ -1,155 +1,113 @@
 # Rslint contribution guide
 
-Thank you for your interest in contributing to Rslint! Before you start your contribution, please take a moment to read the following guidelines.
+This branch migrates the actual Rsbuild lint workload to Rust/tsrs and a direct
+JavaScript binding. The acceptance set is its 129 enabled rules, not the historical
+813-rule catalog. See [the migration report](docs/tsrs-migration/REPORT.zh-CN.md)
+for passed checks, compatibility failures and unsupported entrypoints.
 
 ## Setup the environment
 
-Install [Node.js](https://nodejs.org/) and [Go](https://go.dev/) first.
+Use Node.js 24, the pnpm version in `packageManager`, Rust 1.99.1 and a native
+linker. Python 3.9+ is used by the optional comparison and machine-lock tools.
+The product build does not require a Go SDK, compiler checkout or Go runtime.
 
-## Build locally
-
-For a targeted change, start with [Verify a change](#verify-a-change) and prepare only the dependencies and artifacts it needs. For a complete local build:
-
-```bash
-# Initialize the TypeScript repository (kept at the typescript-go/ path).
-git submodule sync -- typescript-go
-git submodule update --init --depth 1
-pnpm install
-go run ./tools/dump_rule_schemas > packages/rslint/rule-schemas.json
+```sh
+pnpm install --frozen-lockfile --ignore-scripts
+rustup toolchain install 1.99.1
 pnpm build
 ```
 
+The default build produces the Rust addon, API JavaScript and core JavaScript.
+Declaration generation uses pinned JavaScript TypeScript, explicitly disabling
+the native TypeScript executable. Option schemas for the 129-rule scope are
+checked-in data with original-source provenance; missing or changed schema data
+fails instead of requesting a source generator.
+
 ## Verify a change
 
-Inspect `git status --short --branch` and the branch diff, including staged, unstaged and untracked work. Identify the changed packages and the callers affected by shared API changes, then select the relevant existing commands. The examples below are a menu; run only those needed for the change.
+Inspect `git status --short --branch` and the branch diff, including staged,
+unstaged and untracked changes. Identify owning packages and affected callers
+before selecting checks. The commands below are a menu, not a full-suite request.
 
-| Check                         | Existing command with explicit scope                                                                   |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
-| One Go rule package           | `go test ./internal/rules/max_params`                                                                  |
-| Related Go packages           | `go test <changed-package-dir> <affected-consumer-dirs>`                                               |
-| Catalog registration only     | `go test ./internal/rules -run '^TestAllContainsEveryGoRuleExactlyOnce$'`                              |
-| One JS integration file       | `CI=true pnpm --dir packages/rslint-test-tools exec rs test run tests/eslint/rules/max-params.test.ts` |
-| One Rust crate                | `cargo test -p tsgo-client`                                                                            |
-| Go lint for a changed package | `golangci-lint run --new-from-merge-base=origin/main ./internal/rules/max_params`                      |
-| Format changed JS/TS/docs     | `pnpm exec rs fmt <changed-files>`                                                                     |
-| Format changed Go files       | `gofmt -w <changed-go-files>`                                                                          |
-| Spell-check changed text      | `pnpm run check-spell <changed-text-files>`                                                            |
+Prepare the exact Rust dependency graph before running Cargo directly:
 
-An aggregate package can run more than its name suggests: unfiltered `go test ./internal/rules` also runs all-rule compiler compatibility and heritage suites. For registration-only changes, keep the named test selection above; select other tests only when their behavior is affected.
-
-Explicit `rs fmt` paths still obey `rstack.config.mts` exclusions, including rule Markdown under `internal/**/rules/**/*.md`. Select supported, non-ignored changed files and skip the command when none remain; an ignored-only selection fails instead of formatting those files.
-
-Run Rstest verification with `CI=true` so missing snapshots fail instead of being created automatically. The example uses POSIX shell syntax; set the equivalent environment variable in other shells. Use `-u` only for intentional snapshot generation and review the result against the expected behavior.
-
-Before JS integration tests exercise changed Go code, run `pnpm --filter @rslint/core build:bin`. Build affected JS artifacts with the workspace's existing build command when its source changed or the required output is missing. Go test-only changes need the owning package's tests. Shared helpers need their affected consumers; package imports are a starting point for tracing the changed API, not a reason to run every rule in a plugin.
-
-Root `test:go` and `lint:go` already include `./cmd/... ./internal/...`; appending another directory adds to that scope. Use `go test` and `golangci-lint run` directly for selected packages. Root `pnpm test` also runs multiple workspaces. Full-suite verification follows an explicit user/reviewer request; CI's command list is not a local checklist.
-
-Keep the passing commands/results in the task's existing progress record. Reuse them while their relevant inputs remain unchanged. Report platform, generated-content or cross-language gaps with the additional targeted checks they need. Documentation-only changes require no language tests unless executable examples, generated content, builds or runtime behavior are affected.
-
-Branch naming and test organization follow [AGENTS.md](./AGENTS.md). Before delivery, check the current branch with `git branch --show-current`, review the upstream/extras split and verify new JS integration files are included in `packages/rslint-test-tools/rstack.config.mts`. Before committing, ensure `pnpm run check-spell <changed-text-files>` and `pnpm run format:check` have passed after the final relevant edit, reusing valid results. Spell-check file arguments also cover changed hidden paths such as `.agents/`; the default globs omit hidden directories.
-
-The existing pre-commit hook runs `rs staged`. Install it through `pnpm run prepare`; `git config --get core.hooksPath` should point to `.rstack/hooks/_`. If a checkout still points to old Husky hooks, inspect them before migrating once with `pnpm exec rs hooks --force`. Keep ordinary `prepare` non-forcing.
-
-## Ecosystem CI
-
-[Ecosystem CI](https://github.com/rstackjs/rstack-ecosystem-ci) tests Rslint against Rsbuild, Rslib, and Rstest for source or build changes on `main` and same-repository `chore/release-*` PRs. To test another PR, run **Ecosystem CI** from `main` in GitHub Actions, enter the PR number, and select a suite or `-` for all three. Results are posted to the PR.
-
-## TypeScript compiler dependency
-
-The `typescript-go/` submodule tracks [microsoft/TypeScript](https://github.com/microsoft/TypeScript). The Go compiler lives under `typescript-go/tsc/`, and its JS AST API lives under `typescript-go/packages/typescript/`. Existing checkouts must run `git submodule sync -- typescript-go` before updating the submodule to pick up the new remote URL.
-
-The migration pins the latest main-branch commit checked on **2026-09-05**:
-
-| Reference                       | Commit                                                                                                                                |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Selected TypeScript main        | [`1f70213d4922b434345f639b441681e470c7cfc1`](https://github.com/microsoft/TypeScript/commit/1f70213d4922b434345f639b441681e470c7cfc1) |
-| Latest stable release, `v7.0.2` | [`1e4744d68260a7cb91b62b12edc3f6a2187faaf1`](https://github.com/microsoft/TypeScript/releases/tag/v7.0.2)                             |
-| Previous standalone compiler    | `01cbcdd8643cfa17cc8156b60849559c56324601`                                                                                            |
-| Corresponding imported history  | [`3e5f89624cdd03a69d6c5bb92d3a352195ad3a41`](https://github.com/microsoft/TypeScript/commit/3e5f89624cdd03a69d6c5bb92d3a352195ad3a41) |
-
-The old commit hash is absent from the new repository because its history was rewritten. Its root tree exactly matches the imported commit's `tsc/` tree (`23a5bf0c01e3f6dc1d4c0caf7aaef69ba9d9de64`). However, that historical commit retains `tsc/_submodules/TypeScript` without a root `.gitmodules` mapping. Recursive Git operations, including the authentication setup in our `actions/checkout` version, fail on it. The stable tag also predates the final repository layout. The selected main commit has the completed layout and removes this obsolete nested submodule.
-
-The Go compiler module and all shim module/import/linkname paths use `github.com/microsoft/TypeScript/tsc`. `go.work` resolves the compiler to `typescript-go/tsc`. Both `@rslint/api` and the Go encoder use this same pinned checkout so that AST layouts and enum values stay aligned.
-
-The JS declaration build uses TypeScript `6.0.3`, matching upstream's build dependency. TypeScript `5.9.3` rejects the new generator-backed API method types. The AST declarations now reference both the synchronous and asynchronous APIs, which are included in `packages/rslint-api/tsconfig.build.json`.
-
-Compiler compatibility changes include the lazy `SourceFile.HasIdentifier` cache, type-reference nodes for interface `extends` and class `implements`, and new compiler-host, resolver, and LSP client interfaces. Rules retain their existing ESLint diagnostics and fix boundaries despite the new node kinds. On macOS, upstream's `Realpath` now preserves path casing; config discovery verifies filesystem identity before coalescing native case aliases. The shim generator also mirrors private generic checker stores and validates their memory layout.
-
-To select a future upstream revision and refresh its integration:
-
-```bash
-git submodule sync -- typescript-go
-git -C typescript-go fetch --depth 1 origin <commit-or-tag>
-git -C typescript-go checkout --detach FETCH_HEAD
-bash tools/update-typescript-go.sh
+```sh
+node scripts/tsrs/prepare-rust-compiler.mjs \
+  --config-out node_modules/.cache/rslint-rust-compiler/cargo-config.toml
 ```
 
-The helper resolves the exact submodule commit to a Go pseudo-version, updates the root and shim module requirements, regenerates shims from the local checkout, tidies those modules, builds both Go entrypoints, and checks the unsafe checker mirror's field layout. Review the resulting changes and run the Go and JS tests before committing the new submodule revision. Compiler API changes may require adapting the shim declarations and their consumers.
+| Scope                               | Command                                                                                                                                   |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| One core rule suite                 | `cargo --config node_modules/.cache/rslint-rust-compiler/cargo-config.toml test --locked -p rslint-core --test rsbuild_flow_checks_rules` |
+| One core module                     | `cargo --config node_modules/.cache/rslint-rust-compiler/cargo-config.toml test --locked -p rslint-core --lib directives::tests`          |
+| Rust boundary                       | `cargo --config node_modules/.cache/rslint-rust-compiler/cargo-config.toml test --locked -p rslint-native`                                |
+| Build current native code           | `pnpm --filter @rslint/core build:bin`                                                                                                    |
+| One JS integration file             | `CI=true pnpm --dir packages/rslint exec rs test run tests/rust-cli.test.ts`                                                              |
+| Build JS after entry/config changes | `pnpm --filter @rslint/api build && pnpm --filter @rslint/core build:js`                                                                  |
+| Addon build/packaging helpers       | `node --test scripts/tsrs/build-rust.test.mjs scripts/ci-delivery.test.mjs`                                                               |
+| Format changed JS/TS/docs           | `pnpm exec rs fmt <changed-files>`                                                                                                        |
+| Spell-check changed text            | `pnpm run check-spell <changed-text-files>`                                                                                               |
 
-## Sync release information
+Rebuild the addon before JS tests exercise changed Rust code. Select the host
+`.node` path when running `crates/rslint-native/tests/rust-lint.test.mjs` and set
+`RSLINT_NATIVE_BINDING` to its absolute path. Tests can disable subprocess APIs
+using `--test-isolation=none --import ./scripts/tsrs/rust-no-child-process.mjs`.
+Use `CI=true` with Rstest so missing snapshots fail. Review deliberate snapshot
+updates; do not weaken oracle assertions to accept a port difference.
 
-After bumping to a new stable version and before publishing, run the release sync
-command separately:
+Reuse passing results while their relevant inputs remain unchanged. Shared
+helpers require their affected consumers, not every rule in every plugin.
+Full repository and whole-plugin tests need an explicit user/reviewer request;
+a CI command list is not authorization for unrelated local suites.
 
-```bash
-git fetch origin --tags
-pnpm sync:version-info
-```
+Branch and test organization rules are in [AGENTS.md](AGENTS.md). Continue the
+existing task branch, preserve unrelated work, and use Conventional Commits.
+Before committing, pass `pnpm run check-spell <changed-text-files>` and
+`pnpm run format:check`; explicit spell paths include changed hidden files.
+The `rs staged` hook can be installed with `pnpm run prepare`.
 
-This replaces `pnpm sync:rule-releases`. It updates `website/releases.json` with
-new rules and the pinned TypeScript commit for the new stable release. If the
-package version matches the latest stable tag, the command skips it to preserve
-the published record. Stage any submodule revision change first. An exact upstream release tag supplies
-`typescript.releaseVersion`; otherwise the value is `null`. A failed upstream
-lookup stops the command without writing the file.
+## Compiler and source ownership
 
-Commit the generated JSON with the release changes. The website uses it for rule
-version badges and the TypeScript compiler version table. The table tracks releases
-from `0.9.2` onward; earlier versions retain only their existing rule history.
+`scripts/tsrs/prepare-rust-compiler.mjs` fetches committed objects at the exact
+pin, applies tracked Rust patches and verifies the resulting source cache outside
+this repository. An optional `--mirror` supplies committed objects only. It never
+reads uncommitted compiler changes or overwrites `.cargo/config.toml`.
 
-`pnpm sync:version-info full` rebuilds rule history from stable tags while preserving
-recorded compiler bindings. Fetch all tags before running it.
+The tracked declaration resources, ordered library aliases and target behavior
+are aligned to the frozen original engine. The compiler remains Rust; version
+and semantic differences must be disclosed. See
+[compiler compatibility](docs/tsrs-migration/compiler-compatibility.json).
 
-The scripts live in `scripts/sync-version-info/`: `index.js` is the entry point,
-`release.js` maintains rule release history, and `version.js` resolves the
-TypeScript commit and release version.
+`scripts/tsrs/build-rust.mjs` always passes `--locked`, validates target/addon
+format, and atomically replaces only a successful artifact. Cross compilation
+needs the selected Rust target and linker. A failed build does not reuse an old
+artifact as a successful result.
 
-## Test the CLI
+## Correctness and performance comparisons
 
-After building, you can test the rslint CLI:
+Keep the original engine in an immutable checkout outside the candidate tree.
+Use the fixed commits and real configuration in
+[the workload manifest](docs/tsrs-migration/rsbuild-workload.json). Preserve all
+files, options, severities, type capability and complete diagnostic/fix payloads.
+A source registry, project planner or zero-diagnostic project alone is not a
+complete semantic oracle; rules also need positive and negative inputs.
 
-```bash
-# Test the binary
-./packages/rslint/bin/rslint.js --help
+The current drivers are `scripts/tsrs/rust-rule-oracle.mjs`,
+`rust-cli-oracle.py`, `rust-program-universe-oracle.mjs` and
+`rust-rsbuild-benchmark.py`. The benchmark requires a successful complete-workload
+proof plus hash-bound build and correctness evidence before measurement. It
+records the full command and rslint stage separately, whole-process-tree RSS,
+startup/shutdown, all repetitions and sleep/thermal contamination.
 
+On the shared machine, run heavy builds and complete measurement batches through
+`scripts/tsrs/with-machine-lock.py --lock "$RSLINT_MACHINE_LOCK" --log LOG -- COMMAND`,
+using the same cooperating lock. The benchmark driver takes `--lock` directly;
+do not wrap it in a second lock. Keep build parallelism bounded.
 
-# Lint the project itself
-./packages/rslint/bin/rslint.js
-```
+## Delivery boundaries
 
-## Debugging VSCode Extension
-
-To Debug the VSCode Extension:
-
-1. **Setup launch configuration**
-
-```bash
-cp .vscode/launch.template.json .vscode/launch.json
-```
-
-2. **Start debugging**
-
-- Open the Command Palette (`Cmd+Shift+P`)
-- Run `Debug: Start Debugging` or press `F5`
-- Alternatively, go to the `Run and Debug` sidebar and select `Run Extension`
-
-## Experimental Rust lint engine
-
-The direct tsrs migration is incomplete and does not replace the default
-public engine yet. For changes in `crates/rslint-core`, run
-`cargo test --locked -p rslint-core`; for the direct Node boundary, rebuild
-`pnpm --filter @rslint/native build` and run the targeted native and JS tests
-listed in [the migration guide](docs/tsrs-migration/README.md). These commands
-do not build Go. Existing public entry points still require the original
-toolchain until their migration passes compatibility checks.
+CI verifies Rust/JS on its declared targets; local static workflow checks do not
+prove remote CI passed. Current ecosystem acceptance is Rsbuild. Browser WASM,
+LSP, external JS rule plugins and legacy compiler-service subpaths are explicitly
+unsupported in this scoped migration. Historical release-info generation is not
+a valid release gate. Do not claim those paths were migrated or published.

@@ -1,9 +1,0 @@
-name: Move tsgo server artifacts
-description: Assemble @rslint/tsgo-server platform packages from release artifacts
-runs:
-  using: composite
-
-  steps:
-    - name: Move tsgo server artifacts
-      shell: bash
-      run: node .github/actions/move-tsgo-server-artifacts/move-artifacts.js

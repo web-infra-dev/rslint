@@ -3,64 +3,13 @@
 //! ported from ts-api-utils `comments.ts` at
 //! 491c0374725a5dd64632405efea101f20ed5451f (MIT).
 //!
-//! This temporary guard rejects directives until their configuration and
-//! suppression semantics have been ported. Ordinary comments remain supported.
+//! Comment consumers interpret directives after this lexical traversal.
 
 use tsrs_ast::{self as ast, CommentRange, Kind, Node, NodeFlags, SourceFile};
 use tsrs_core::{LanguageVariant, P};
 use tsrs_scanner::{self as scanner, Scanner};
 
-pub(crate) fn ensure_supported(file: P<SourceFile>) -> Result<(), String> {
-    for_each_comment(file, |comment| {
-        let text = file.text();
-        let start = comment.pos() as usize;
-        let mut end = comment.end() as usize;
-        if comment.kind == Kind::MultiLineCommentTrivia && text[start..end].ends_with("*/") {
-            end -= 2;
-        }
-        let value = text[start + 2..end].trim_matches(is_js_whitespace);
-        if is_directive(comment.kind, value) {
-            return Err(format!(
-                "unsupported lint directive in {} at byte {}: {}",
-                file.file_name(),
-                start,
-                value.split_whitespace().next().unwrap_or(value)
-            ));
-        }
-        Ok(())
-    })
-}
-
-// Mirrors utils.IsDirectiveComment: global/exported and the space form of
-// eslint are block-only. Do not use Rust's Unicode whitespace classification:
-// e.g. U+0085 is not ECMAScript whitespace, while U+FEFF is.
-fn is_directive(kind: Kind, value: &str) -> bool {
-    value.starts_with("eslint-")
-        || value.starts_with("rslint-")
-        || (kind == Kind::MultiLineCommentTrivia
-            && ["eslint ", "global ", "globals ", "exported "]
-                .iter()
-                .any(|prefix| value.starts_with(prefix)))
-}
-
-fn is_js_whitespace(character: char) -> bool {
-    matches!(
-        character,
-        '\u{0009}'..='\u{000d}'
-            | '\u{0020}'
-            | '\u{00a0}'
-            | '\u{1680}'
-            | '\u{2000}'..='\u{200a}'
-            | '\u{2028}'
-            | '\u{2029}'
-            | '\u{202f}'
-            | '\u{205f}'
-            | '\u{3000}'
-            | '\u{feff}'
-    )
-}
-
-fn for_each_comment(
+pub(crate) fn for_each_comment(
     file: P<SourceFile>,
     mut callback: impl FnMut(CommentRange) -> Result<(), String>,
 ) -> Result<(), String> {
@@ -178,7 +127,7 @@ fn scan_gap(
     Ok(())
 }
 
-fn for_each_token_range(
+pub(crate) fn for_each_token_range(
     file: P<SourceFile>,
     mut callback: impl FnMut(Kind, u32, u32, Option<P<Node>>) -> Result<(), String>,
 ) -> Result<(), String> {

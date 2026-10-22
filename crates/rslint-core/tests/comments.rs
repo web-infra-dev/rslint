@@ -1,5 +1,5 @@
-//! The direct engine must reject unsupported directives without mistaking
-//! strings, regular expressions, template text, or JSX text for comments.
+//! Suppression and explicit unsupported-directive handling use real comments,
+//! never strings, regular expressions, template text, or JSX text.
 
 use rslint_core::lint_json;
 use serde_json::{Value, json};
@@ -26,16 +26,15 @@ fn supported(files: &[(&str, &str)]) {
     }
 }
 
-fn rejected(path: &str, source: &str, marker: &str) {
+fn rejected(path: &str, source: &str, marker: &str, kind: &str, content: &str) {
     let error = lint_json(&request(&[(path, source)])).unwrap_err();
-    assert!(
-        error.starts_with("unsupported lint directive in "),
-        "{source:?}: {error}"
-    );
     let offset = source.find(marker).unwrap();
-    assert!(
-        error.contains(&format!("/rslint-comment-tests/{path} at byte {offset}:")),
-        "{source:?}: {error}"
+    assert_eq!(
+        error,
+        format!(
+            "unsupported {kind} lint directive at byte {offset}: {content} in /rslint-comment-tests/{path}"
+        ),
+        "{source:?}"
     );
 }
 
@@ -99,53 +98,171 @@ fn directive_like_string_regex_template_and_jsx_contents_are_not_comments() {
 }
 
 #[test]
-fn all_directive_forms_are_explicitly_rejected_in_real_comments() {
-    for (source, marker) in [
-        ("// eslint-disable-next-line no-debugger\ndebugger;", "//"),
-        ("debugger; // rslint-disable-line no-debugger", "//"),
-        ("/* eslint-disable */ debugger;", "/*"),
-        ("/* rslint-enable */ const value = 1;", "/*"),
-        ("/*eslint no-debugger: off*/ debugger;", "/*"),
-        ("/*global external:readonly*/ external;", "/*"),
-        ("/*globals external:false*/ external;", "/*"),
-        ("/*exported value*/ var value=1;", "/*"),
-        ("#!/usr/bin/env node\n// rslint-disable", "//"),
-        ("/* ordinary */\n// eslint-disable", "//"),
-        ("/*\u{feff}\u{00a0}eslint-disable */", "/*"),
+fn disable_and_enable_comments_are_accepted_without_skipping_file_admission() {
+    supported(&[
+        (
+            "next-line.ts",
+            "// eslint-disable-next-line no-debugger\ndebugger;",
+        ),
+        (
+            "same-line.ts",
+            "debugger; // rslint-disable-line no-debugger",
+        ),
+        ("all.ts", "/* eslint-disable */ debugger;"),
+        ("enable.ts", "/* rslint-enable */ const value = 1;"),
+        (
+            "shebang.ts",
+            "#!/usr/bin/env node\n// rslint-disable\ndebugger;",
+        ),
+        (
+            "ordinary.ts",
+            "/* ordinary */\n// eslint-disable\ndebugger;",
+        ),
+    ]);
+}
+
+#[test]
+fn auxiliary_directive_forms_remain_explicitly_rejected_in_real_comments() {
+    for (source, marker, kind, content) in [
+        (
+            "/*eslint no-debugger: off*/ debugger;",
+            "/*",
+            "InlineConfig",
+            "eslint no-debugger: off",
+        ),
+        (
+            "/*global external:readonly*/ external;",
+            "/*",
+            "Globals",
+            "global external:readonly",
+        ),
+        (
+            "/*globals external:false*/ external;",
+            "/*",
+            "Globals",
+            "globals external:false",
+        ),
+        ("// eslint-unknown", "//", "Unknown", "eslint-unknown"),
+        (
+            "/*\u{feff}\u{00a0}eslint-disable */",
+            "/*",
+            "Unknown",
+            "eslint-disable",
+        ),
     ] {
-        rejected("directive.ts", source, marker);
+        rejected("directive.ts", source, marker, kind, content);
     }
+}
+
+#[test]
+fn only_matching_report_ranges_are_suppressed_and_enables_restore_reports() {
+    let source = "debugger;\n/* eslint-disable no-debugger */\ndebugger;\n/* rslint-enable no-debugger */\ndebugger;\n// eslint-disable-next-line no-console\ndebugger;";
+    let output: Value =
+        serde_json::from_str(&lint_json(&request(&[("transitions.ts", source)])).unwrap()).unwrap();
+    let files = output["files"].as_array().unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0]["appliedRules"], json!(["no-debugger"]));
+    let messages = files[0]["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 3);
+    for (message, line) in messages.iter().zip([1, 5, 7]) {
+        let start = source
+            .split_inclusive('\n')
+            .take(line - 1)
+            .map(str::len)
+            .sum::<usize>();
+        assert_eq!(
+            message,
+            &json!({
+                "ruleId":"no-debugger", "messageId":"no-debugger",
+                "message":"Unexpected 'debugger' statement.", "severity":2,
+                "line":line, "column":1, "endLine":line, "endColumn":10,
+                "range":[start,start+9]
+            })
+        );
+    }
+}
+
+#[test]
+fn automatic_fix_preserves_disabled_occurrences_and_fixes_enabled_occurrences() {
+    let source = "let value: string | null = null;\n// rslint-disable-next-line @typescript-eslint/no-extra-non-null-assertion\nvalue!!;\nvalue!!;";
+    let mut input: Value = serde_json::from_str(&request(&[("fix.ts", source)])).unwrap();
+    input["rules"] = json!([{"name":"@typescript-eslint/no-extra-non-null-assertion"}]);
+    let observed: Value = serde_json::from_str(&lint_json(&input.to_string()).unwrap()).unwrap();
+    let messages = observed["files"][0]["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["line"], 4);
+    assert_eq!(
+        messages[0]["ruleId"],
+        "@typescript-eslint/no-extra-non-null-assertion"
+    );
+    assert!(messages[0]["fix"].is_object());
+    input["fix"] = json!(true);
+    let fixed: Value = serde_json::from_str(&lint_json(&input.to_string()).unwrap()).unwrap();
+    assert_eq!(fixed["files"][0]["messages"], json!([]));
+    assert_eq!(
+        fixed["files"][0]["output"],
+        source.replacen("value!!;\nvalue!!;", "value!!;\nvalue!;", 1)
+    );
+    assert_eq!(
+        fixed["files"][0]["appliedRules"],
+        json!(["@typescript-eslint/no-extra-non-null-assertion"])
+    );
+    input["files"][0]["text"] = json!("/* eslint-disable */ value!!;");
+    let suppressed: Value = serde_json::from_str(&lint_json(&input.to_string()).unwrap()).unwrap();
+    assert_eq!(suppressed["files"][0]["messages"], json!([]));
+    assert!(suppressed["files"][0].get("output").is_none());
 }
 
 #[test]
 fn comments_between_tokens_and_inside_template_expressions_are_seen() {
     for source in [
-        "const /* eslint-disable */ value = 1;",
-        "const value = /* rslint-disable */ 1;",
-        "const value = (1 /* eslint-disable */ + 2);",
-        "const value = `raw ${1 /* eslint-disable */ + 2} tail`;",
-        "const value = /[/*]/; /* eslint-disable */ value.test('x');",
-        "const value = 1;\u{2028}/* eslint-disable */\u{2029}",
-        "const value = 1;          /* eslint-disable */",
+        "const /* eslint no-debugger: off */ value = 1;",
+        "const value = /* eslint no-debugger: off */ 1;",
+        "const value = (1 /* eslint no-debugger: off */ + 2);",
+        "const value = `raw ${1 /* eslint no-debugger: off */ + 2} tail`;",
+        "const value = /[/*]/; /* eslint no-debugger: off */ value.test('x');",
+        "const value = 1;\u{2028}/* eslint no-debugger: off */\u{2029}",
+        "const value = 1;          /* eslint no-debugger: off */",
     ] {
-        let marker = if source.contains("/* rslint-disable") {
-            "/* rslint-disable"
-        } else {
-            "/* eslint-disable"
-        };
-        rejected("tokens.ts", source, marker);
+        rejected(
+            "tokens.ts",
+            source,
+            "/* eslint no-debugger: off",
+            "InlineConfig",
+            "eslint no-debugger: off",
+        );
     }
 }
 
 #[test]
 fn jsx_expression_attribute_type_argument_and_outer_trailing_comments_are_seen() {
     for source in [
-        "const value = <>{/* eslint-disable */ 1}</>;",
-        "const value = <A prop={1 /* eslint-disable */}>text</A>;",
-        "const value = <A<T /* eslint-disable */> prop={1}>text</A>;",
-        "const value = <><A /></>; /* eslint-disable */",
-        "const value = <A></A>; /* eslint-disable */",
+        "const value = <>{/* eslint no-debugger: off */ 1}</>;",
+        "const value = <A prop={1 /* eslint no-debugger: off */}>text</A>;",
+        "const value = <A<T /* eslint no-debugger: off */> prop={1}>text</A>;",
+        "const value = <><A /></>; /* eslint no-debugger: off */",
+        "const value = <A></A>; /* eslint no-debugger: off */",
     ] {
-        rejected("jsx.tsx", source, "/* eslint-disable");
+        rejected(
+            "jsx.tsx",
+            source,
+            "/* eslint no-debugger: off",
+            "InlineConfig",
+            "eslint no-debugger: off",
+        );
     }
+}
+
+#[test]
+fn exported_globals_do_not_change_default_module_diagnostics() {
+    let result: Value = serde_json::from_str(
+        &lint_json(&request(&[(
+            "module.ts",
+            "/*exported value*/ var value=1; debugger;",
+        )]))
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(result["files"][0]["messages"].as_array().unwrap().len(), 1);
+    assert_eq!(result["files"][0]["messages"][0]["ruleId"], "no-debugger");
 }

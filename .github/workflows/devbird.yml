@@ -76,14 +76,12 @@ jobs:
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
-      - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version: 1.27.0
       - name: Install pnpm
         run: corepack enable
       - name: Install JavaScript dependencies
         run: pnpm install
+      - name: Setup Rust compiler
+        uses: ./.github/actions/setup-rust
       - name: Run DevBird
         uses: delinoio/devbird-action@1a00faaf30734c914c4066d64d86527edc6bcd85 # main
         with:

@@ -1,97 +1,22 @@
-import path from 'node:path';
-import fs from 'node:fs';
-import {
-  OUTPUT_FORMATS,
-  parseArgs,
-  isJSConfigFile,
-  isOutputFormat,
-} from '../utils/args.js';
-import { resolveRslintBinary } from '../internal/resolve-binary.js';
+import { runRustCLI } from '../rust/cli.js';
 
 export type RunCLIOptions = {
-  /**
-   * The command-line arguments to parse, matching the shape of Node.js `process.argv`
-   * @default process.argv
-   */
+  /** Arguments in the shape of Node.js process.argv. */
   argv?: string[];
 };
 
+/** Retains the historical wrapper signature; execution is in the Rust addon. */
 export async function run(
-  binPath: string,
+  _binPath: string,
   argv: string[],
   startTime: number,
 ): Promise<number> {
-  const cwd = process.cwd();
-  const args = parseArgs(argv);
-
-  // --init: pass through to Go (no config payload — Go writes the default
-  // config to disk and prints the "Created …" line, forwarded via `output`).
-  // It intentionally takes priority over unrelated lint flags, matching the
-  // existing fast-path contract.
-  if (args.init) {
-    const { runEngine } = await import('./engine.js');
-    return runEngine({ binPath, goArgs: ['--init'], cwd });
-  }
-
-  // Reject an invalid stdout protocol before config discovery/evaluation.
-  // Help retains its existing priority and is forwarded to Go, which owns the
-  // usage text. Go validates format again after the IPC init payload is merged
-  // so every CLI entry path receives the same single-error behavior.
-  if (!args.help && args.format !== null && !isOutputFormat(args.format)) {
-    process.stderr.write(
-      `error: invalid output format ${JSON.stringify(args.format)} (expected ${OUTPUT_FORMATS.slice(0, -1).join(', ')}, or ${OUTPUT_FORMATS.at(-1)})\n`,
-    );
-    return 2;
-  }
-
-  // Validate explicit --config flag
-  if (args.config) {
-    const configPath = path.resolve(cwd, args.config);
-    if (!fs.existsSync(configPath)) {
-      process.stderr.write(`Error: config file not found: ${configPath}\n`);
-      return 1;
-    }
-    if (!isJSConfigFile(configPath)) {
-      const migrationHint = /\.jsonc?$/.test(configPath)
-        ? ' Run `rslint --init` to migrate a legacy JSON config.'
-        : '';
-      process.stderr.write(
-        `Error: unsupported config file: ${configPath}\n` +
-          `Rslint configs must be JavaScript or TypeScript modules.${migrationHint}\n`,
-      );
-      return 1;
-    }
-  }
-
-  // Build Go args: start-time flag BEFORE positional args, because Go's
-  // flag.Parse stops at the first positional argument.
-  const goArgs = [`--start-time=${startTime}`, ...args.rest];
-
-  // Configuration discovery is initiated by Go after the IPC channel is
-  // live; Node only evaluates the exact frontier candidates Go sends back
-  // through reverse RPC.
-  const explicitConfigPath = args.config
-    ? path.resolve(cwd, args.config)
-    : null;
-  const { runEngine } = await import('./engine.js');
-  return runEngine({
-    binPath,
-    goArgs,
-    cwd,
-    runtime: { singleThreaded: args.singleThreaded },
-    extraInit: {
-      configDiscovery: {
-        explicitConfigPath: explicitConfigPath ?? undefined,
-      },
-    },
-  });
+  return runRustCLI(argv, { startTime });
 }
 
 export async function runCLI({
   argv = process.argv,
 }: RunCLIOptions = {}): Promise<void> {
   const startTime = Date.now();
-  const exitCode = await run(resolveRslintBinary(), argv.slice(2), startTime);
-  // Let stdout/stderr flush naturally instead of terminating the process.
-  process.exitCode = exitCode;
+  process.exitCode = await runRustCLI(argv.slice(2), { startTime });
 }

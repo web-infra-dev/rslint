@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "scope": "Exactly the 129 rules enabled by the frozen rsbuild workload; other implemented rules retain the untyped index signature.",
+  "license": "MIT; schema metadata originates in the rslint repository, whose root LICENSE is preserved.",
+  "baseline": {
+    "repository": "https://github.com/web-infra-dev/rslint.git",
+    "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+    "tree": "42b5ab9c6b00dac58ad1ada5d90147aa0542d872"
+  },
+  "historicalDump": {
+    "path": "packages/rslint/rule-schemas.json",
+    "sha256": "5e99b31749c0fdc30d5cc3eb81890b009da8064cf78fcdb7180c999873cc3c0e",
+    "entries": 813,
+    "checkedIn": false,
+    "note": "The original local dump creation command was not retained. Every selected schema was independently compared with metadata resolved from committed baseline Git objects without executing Go."
+  },
+  "workload": {
+    "path": "docs/tsrs-migration/rsbuild-workload.json",
+    "sha256": "c09ae5c1d3a77875817f3f1e8dfd35fc788f9921f324699240476f73c9d697f6",
+    "rules": 129
+  },
+  "schemas": {
+    "path": "rust-rule-schemas.json",
+    "sha256": "f7d44235c7102f682951525f96ea94d01585104b1a4b80ca91f80e3785fb4479",
+    "count": 129,
+    "bytes": 61334
+  },
+  "verification": {
+    "committedBaselineMetadataReader": "scripts/tsrs/rust-migration-inventory.py",
+    "metadataReaderSha256": "b1029861412580db37f4f9a26e3c6543adb24516f4a98cced99beb06395229fe",
+    "allSelectedSchemasEqualCommittedBaselineMetadata": true,
+    "uniqueRuleNames": true,
+    "missingRules": [],
+    "doesNotRequireGoToolchain": true
+  },
+  "baselineWorkloadProof": {
+    "traceSHA256": "8c5d340ed498ce26afd52688eed3f83b5355e0b555b1aa64889682167ed8f5cb",
+    "summarySHA256": "e3ac37585c7f37bd7b9ce27e5ca85bc403f9c0ed8ce7ea664302d1661070fc62",
+    "commandRecordSHA256": "f77f279a847d53c83091e163c38b2f0f76cb92becdbe03f33624709787d08bda",
+    "sourceRecordSHA256": "af66113919a5be8d01cbb0ebfd3bc204fa1e5ca485a49fbdbd7fde332253e40a",
+    "note": "Hashes of the external original admission proof are pinned by the checked-in workload manifest. They do not replace behavioral rule tests."
+  },
+  "baselineMetadataCatalog": {
+    "path": "scripts/tsrs/rust-migration-catalog.json",
+    "sha256": "5b2d048f893804844e623d62eca1ab39e1564ba754f901e8a59c536aaed5d4be"
+  },
+  "retainedUntypedRules": [
+    "@typescript-eslint/no-mixed-enums",
+    "@typescript-eslint/related-getter-setter-pairs",
+    "no-await-in-loop",
+    "no-caller",
+    "no-constructor-return",
+    "no-continue",
+    "no-negated-condition",
+    "no-nested-ternary",
+    "no-template-curly-in-string",
+    "no-ternary"
+  ]
+}

@@ -5,27 +5,20 @@ on:
   push:
     branches: [main]
     paths:
-      - 'cmd/**'
-      - 'internal/**'
-      - 'shim/**'
       - 'crates/**'
       - 'packages/**'
       - 'npm/rslint/**'
-      - 'typescript-go'
-      - 'scripts/place-host-build.mjs'
-      - 'tools/dump_rule_schemas/**'
+      - 'scripts/tsrs/**'
+      - 'vendor/typescript-libs/**'
       - 'package.json'
       - 'pnpm-*.yaml'
-      - 'go.*'
       - 'Cargo.*'
       - 'tsconfig.json'
       - 'tsconfig.base.json'
       - 'tsconfig.build.json'
-      - '.gitmodules'
       - '.github/workflows/ecosystem-ci.yml'
       - '!**/*.md'
       - '!**/*.mdx'
-      - '!**/*_test.go'
       - '!**/tests/**'
   pull_request:
     branches: [main]
@@ -37,14 +30,11 @@ on:
         required: true
         type: string
       suite:
-        description: Consumer suite (- runs all suites)
+        description: Frozen migration scope; other ecosystem suites are not accepted yet
         type: choice
-        default: '-'
+        default: rsbuild
         options:
-          - '-'
           - rsbuild
-          - rslib
-          - rstest
 
 permissions: {}
 
@@ -63,7 +53,7 @@ jobs:
           ecosystem-repo: rslint
           workflow-file: rslint-ecosystem-ci-from-commit.yml
           client-payload: >-
-            {"commitSHA":"${{ github.sha }}","repo":"web-infra-dev/rslint","suite":"-","suiteRefType":"precoded","suiteRef":"precoded"}
+            {"commitSHA":"${{ github.sha }}","repo":"web-infra-dev/rslint","suite":"rsbuild","suiteRefType":"precoded","suiteRef":"precoded"}
 
   from-pr:
     if: >-
@@ -82,7 +72,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr-number }}
-          SUITE: ${{ inputs.suite || '-' }}
+          SUITE: ${{ inputs.suite || 'rsbuild' }}
         with:
           script: |
             const rawNumber = process.env.PR_NUMBER;
@@ -91,7 +81,7 @@ jobs:
               throw new Error('pr-number must be a positive integer');
             }
             const suite = process.env.SUITE;
-            if (!['-', 'rsbuild', 'rslib', 'rstest'].includes(suite)) {
+            if (suite !== 'rsbuild') {
               throw new Error(`Invalid consumer suite: ${suite}`);
             }
             const pr = context.payload.pull_request ??

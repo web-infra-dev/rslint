@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "imports": {
+    "#enums/*": {
+      "types": "./enums/*.enum.ts",
+      "default": "./enums/*.ts"
+    }
+  }
+}

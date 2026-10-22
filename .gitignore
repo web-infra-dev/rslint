@@ -163,6 +163,8 @@ crates/rslint-native/*.node
 npm/rslint/*/*.node
 npm/rslint/*/rslint
 npm/rslint/*/rslint.exe
+npm/rslint/*/rslint-tsrs-service
+npm/rslint/*/rslint-tsrs-service.exe
 
 # rule options JSON Schema dump (tools/dump_rule_schemas), consumed by the
 # generate-rule-option-types rslib plugin at build:js time; never committed
@@ -185,3 +187,7 @@ target/
 
 # generated rule manifest
 website/generated/
+
+# Generated local paths for the pinned, patched compiler graph.
+/.cargo/config.toml
+/scripts/tsrs/__pycache__/

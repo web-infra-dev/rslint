@@ -1,0 +1,4527 @@
+[
+  {
+    "rule": "@typescript-eslint/no-unsafe-argument",
+    "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+    "sources": [
+      "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go",
+      "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go"
+    ],
+    "valid": [
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\n\nfunction forward<T extends readonly any[]>(values: T): void {\n  acceptStrings(...values);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:146",
+        "compilerOptions": {
+          "lib": [
+            "es5"
+          ],
+          "module": "commonjs",
+          "strict": true,
+          "target": "es5",
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\ndeclare const values: string[] | any[];\n\nacceptStrings(...values);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:156",
+        "compilerOptions": {
+          "lib": [
+            "es5"
+          ],
+          "module": "commonjs",
+          "strict": true,
+          "target": "es5",
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\n\nfunction forward<T extends string[] | any[]>(values: T): void {\n  acceptStrings(...values);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:165",
+        "compilerOptions": {
+          "lib": [
+            "es5"
+          ],
+          "module": "commonjs",
+          "strict": true,
+          "target": "es5",
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptBoolean(value: boolean): void;\ndeclare const anyValue: any;\nconst value = anyValue && true;\nacceptBoolean(value);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:188",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": false,
+          "strictNullChecks": false,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptBoolean(value: boolean): void;\ndeclare const anyValue: any;\n\nacceptBoolean(anyValue && true);\nacceptBoolean((anyValue && true));\nacceptBoolean(anyValue && anyValue && true);\nacceptBoolean((anyValue && true) || false);\n\nlet letValue = anyValue && true;\nvar varValue = anyValue && true;\nconst alias = letValue;\nconst objectValue = { value: anyValue && true };\nfunction getValue() { return anyValue && true; }\n\nacceptBoolean(letValue);\nacceptBoolean(varValue);\nacceptBoolean(alias);\nacceptBoolean(objectValue.value);\nacceptBoolean(getValue());\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:198",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": false,
+          "strictNullChecks": false,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\ndeclare const values: Set<any>;\nacceptStrings(...values);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:330",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\nfunction forward<T extends Iterable<any>>(values: T): void {\n  acceptStrings(...values);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:338",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\nfunction forward<T extends readonly any[]>(values: T): void {\n  acceptStrings(...values);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:347",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptSets(...values: Set<string>[]): void;\ndeclare const values: Set<any>[];\nacceptSets(...values);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:356",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\nfunction forward<T extends (...values: any[]) => void>(...values: Parameters<T>) {\n  acceptStrings(...values);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:365",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\nclass Model {\n  add(value: string): void {}\n  remove(value: number): void {}\n  withLoading<T extends this['add'] | this['remove']>(operateFn: T) {\n    return async (...args: Parameters<T>) => {\n      await operateFn.call(this, ...args);\n    };\n  }\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:374",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\ndeclare const values: [any] | [string, any];\nacceptStrings(...values);\nfunction forward<T extends [any]>(values: T): void {\n  acceptStrings(...values);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:388",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare class Box { constructor(...values: string[]); }\ndeclare const values: Set<any>;\nnew Box(...values);\nfunction forward<T extends readonly any[]>(values: T): void {\n  new Box(...values);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:399",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare const constrained: <T extends number>(value: T) => void;\nconstrained(1 as any);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:411",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare const fromLibrary: { value: any };\ndeclare function acceptObject(value: { value: number }): void;\nacceptObject(fromLibrary);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:419",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ntype RecursiveArray = Array<RecursiveArray>;\ndeclare const values: RecursiveArray;\ndeclare function identity<T>(value: T): T;\nidentity(values);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:427",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\ndeclare const values: Set<string>;\nacceptStrings(...values);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:436",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\nfunction forward<T extends Iterable<string>>(values: T): void {\n  acceptStrings(...values);\n}\nforward(new Set<string>());\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:444",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptAnything(...values: any[]): void;\ndeclare const values: Set<any>;\nacceptAnything(...values);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:454",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\nacceptStrings(...'safe');\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:462",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function genericRest<T extends string[]>(...values: T): void;\ngenericRest('safe', 1 as any);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:469",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptsMap(value: Map<string, string>): void;\nacceptsMap((new Map()));\nacceptsMap(((new Map())));\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:476",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function optional(value?: number): void;\noptional();\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:484",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndoesNotExist(1 as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:16",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\nconst foo = 1;\nfoo(1 as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:19",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(arg: number): void;\nfoo(1, 1 as any, 2 as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:23",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(arg: number, arg2: string): void;\nfoo(1, 'a');\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:27",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(arg: any): void;\nfoo(1 as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:31",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(arg: unknown): void;\nfoo(1 as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:35",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(...arg: number[]): void;\nfoo(1, 2, 3);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:39",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(...arg: any[]): void;\nfoo(1, 2, 3, 4 as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:43",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(arg: number, arg2: number): void;\nconst x = [1, 2] as const;\nfoo(...x);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:47",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(arg: any, arg2: number): void;\nconst x = [1 as any, 2] as const;\nfoo(...x);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:52",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(arg1: string, arg2: string): void;\nconst x: string[] = [];\nfoo(...x);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:57",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\nfunction foo(arg1: number, arg2: number) {}\nfoo(...([1, 1, 1] as [number, number, number]));\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:62",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(arg1: Set<string>, arg2: Map<string, string>): void;\n\nconst x = [new Map<string, string>()] as const;\nfoo(new Set<string>(), ...x);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:66",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(arg1: unknown, arg2: Set<unknown>, arg3: unknown[]): void;\nfoo(1 as any, new Set<any>(), [] as any[]);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:72",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(...params: [number, string, any]): void;\nfoo(1, 'a', 1 as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:76",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo<E extends string[]>(...params: E): void;\n\nfoo('a', 'b', 1 as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:80",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function toHaveBeenCalledWith<E extends any[]>(...params: E): void;\ntoHaveBeenCalledWith(1 as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:85",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function acceptsMap(arg: Map<string, string>): void;\nacceptsMap(new Map());\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:89",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ntype T = [number, T[]];\ndeclare function foo(t: T): void;\ndeclare const t: T;\n\nfoo(t);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:93",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ntype T = Array<T>;\ndeclare function foo<T>(t: T): T;\nconst t: T = [];\nfoo(t);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:100",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\nfunction foo(templates: TemplateStringsArray) {}\nfoo``;\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:106",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\nfunction foo(templates: TemplateStringsArray, arg: any) {}\nfoo`${1 as any}`;\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:110",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare function foo(...args: any): void;\nfoo(1 as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:114",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "text": "\ndeclare function acceptBoolean(value: boolean): void;\ndeclare const anyValue: any;\nconst value = anyValue && true;\nacceptBoolean(value);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:224",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 5,
+            "column": 15,
+            "endColumn": 20
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptBoolean(value: boolean): void;\ndeclare const anyValue: any;\nconst value: any = anyValue && true;\nacceptBoolean(value);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:240",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": false,
+          "strictNullChecks": false,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 5,
+            "column": 15,
+            "endColumn": 20
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptBoolean(value: boolean): void;\ndeclare const anyValue: any;\nconst value = true && anyValue;\nacceptBoolean(value);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:256",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": false,
+          "strictNullChecks": false,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 5,
+            "column": 15,
+            "endColumn": 20
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptBoolean(value: boolean): void;\ndeclare const anyValue: any;\nconst value = anyValue && missingName;\nacceptBoolean(value);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:272",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": false,
+          "strictNullChecks": false,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "message": "Unsafe argument of type error typed assigned to a parameter of type `boolean`.",
+            "line": 5,
+            "column": 15,
+            "endLine": 5,
+            "endColumn": 20
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptValues(first: string, second: number): void;\ndeclare const values: Set<any>;\nacceptValues(...values, 1 as any);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:493",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "message": "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+            "line": 4,
+            "column": 25,
+            "endLine": 4,
+            "endColumn": 33
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptValues(first: number, second: string, third: boolean): void;\ndeclare const values: Set<any>;\nacceptValues(...[1] as [number], ...values, ...[1 as any] as [any]);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:509",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeTupleSpread",
+            "message": "Unsafe spread of a tuple type. The argument is of type `any` and is assigned to a parameter of type `string`.",
+            "line": 4,
+            "column": 45,
+            "endLine": 4,
+            "endColumn": 67
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptStrings(...values: string[]): void;\ndeclare const values: readonly any[];\nacceptStrings(...values);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:525",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArraySpread",
+            "message": "Unsafe spread of an `readonly any[]` array type.",
+            "line": 4,
+            "column": 15,
+            "endLine": 4,
+            "endColumn": 24
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptStrings<T extends string[]>(...values: T): void;\nfunction forward<T extends string[]>(value: any): void {\n  acceptStrings<T>(value);\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:541",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "message": "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+            "line": 4,
+            "column": 20,
+            "endLine": 4,
+            "endColumn": 25
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptValues(first: string, second: number): void;\ndeclare const values: string[];\nacceptValues(...values, 1 as any);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:558",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "message": "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+            "line": 4,
+            "column": 25,
+            "endLine": 4,
+            "endColumn": 33
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptValues(first: string, ...rest: number[]): void;\ndeclare const values: string[];\nacceptValues(...values, 1 as any);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:574",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "message": "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+            "line": 4,
+            "column": 25,
+            "endLine": 4,
+            "endColumn": 33
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptNumber(value: number): void;\ndeclare const anyValue: any;\nacceptNumber((anyValue));\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:590",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "message": "Unsafe argument of type `any` assigned to a parameter of type `number`.",
+            "line": 4,
+            "column": 15,
+            "endLine": 4,
+            "endColumn": 23
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptNumber(value: number): void;\ndeclare const anyValue: any;\nacceptNumber(((anyValue)));\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:606",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 4,
+            "column": 16,
+            "endLine": 4,
+            "endColumn": 24
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptNumber(value: number): void;\ndeclare const anyValue: any;\nacceptNumber((/* leading */ anyValue));\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:621",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 4,
+            "column": 29,
+            "endLine": 4,
+            "endColumn": 37
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptNumber(value: number): void;\ndeclare const anyValue: any;\nacceptNumber(anyValue!);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:636",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 4,
+            "column": 14,
+            "endLine": 4,
+            "endColumn": 23
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptNumber(value: number): void;\ndeclare const anyValue: any;\nacceptNumber(anyValue as any);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:651",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 4,
+            "column": 14,
+            "endLine": 4,
+            "endColumn": 29
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function acceptNumber(value: number): void;\ndeclare const anyValue: any;\nacceptNumber(anyValue satisfies unknown);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:666",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 4,
+            "column": 14,
+            "endLine": 4,
+            "endColumn": 40
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare const anyValue: any;\ndeclare const maybeFunction: ((value: number) => void) | undefined;\nmaybeFunction?.(anyValue);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:681",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 4,
+            "column": 17,
+            "endLine": 4,
+            "endColumn": 25
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare const anyValue: any;\ndeclare class Box { constructor(value: number); }\nnew Box(anyValue);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:696",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 4,
+            "column": 9,
+            "endLine": 4,
+            "endColumn": 17
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare const anyValue: any;\ndeclare class Box { constructor(value: number); }\nnew Box(...([anyValue] as const));\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:711",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeTupleSpread",
+            "message": "Unsafe spread of a tuple type. The argument is of type `any` and is assigned to a parameter of type `number`.",
+            "line": 4,
+            "column": 9,
+            "endLine": 4,
+            "endColumn": 33
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function tupleRest(...values: [number, string]): void;\ndeclare const anyValue: any;\ntupleRest(...([1, 'ok', anyValue] as [number, string, any]));\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:727",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeTupleSpread",
+            "message": "Unsafe spread of a tuple type. The argument is of type `any` and is assigned to a parameter of type `string`.",
+            "line": 4,
+            "column": 11,
+            "endLine": 4,
+            "endColumn": 60
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nimport type { InfrastructureLogging } from './no_unsafe_argument_types';\n\ndeclare const infrastructureLogging: InfrastructureLogging;\ndeclare const process: { env: { TERM?: string } };\n\nconst tty =\n  (infrastructureLogging as any).stream?.isTTY &&\n  process.env.TERM !== 'dumb';\n\ndeclare function setDefault<T, P extends keyof T>(\n  object: T,\n  property: P,\n  value: T[P],\n): void;\nsetDefault(infrastructureLogging, 'colors', tty);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:89",
+        "compilerOptions": {},
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "message": "Unsafe argument of type `any` assigned to a parameter of type `boolean | undefined`."
+          }
+        ],
+        "outputSteps": null,
+        "contextAdaptation": "Frozen isolated lenient Program uses empty compiler options.",
+        "files": {
+          "no_unsafe_argument_types.ts": "\nexport type InfrastructureLogging = {\n  colors?: boolean;\n  stream?: { isTTY?: boolean };\n};\n"
+        }
+      },
+      {
+        "text": "\ndeclare function acceptBoolean(value: boolean): void;\ndeclare const anyValue: any;\nlet value = anyValue && true;\nvalue = anyValue;\nacceptBoolean(value);\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_extras_test.go:291",
+        "compilerOptions": {},
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "message": "Unsafe argument of type `any` assigned to a parameter of type `boolean`."
+          }
+        ],
+        "outputSteps": null,
+        "contextAdaptation": "Frozen isolated lenient Program uses empty compiler options."
+      },
+      {
+        "text": "\ndeclare function foo(...args: [string, string]): void;\n\ndeclare const spread: [string, ...string[]];\nfoo(...spread, 1 as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:120",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 5,
+            "column": 16,
+            "endLine": 5,
+            "endColumn": 24
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(...args: [string, ...string[]]): void;\n\nfoo('a', 'b', 1 as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:135",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 4,
+            "column": 15,
+            "endLine": 4,
+            "endColumn": 23
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg: number): void;\nfoo(1 as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:149",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "message": "Unsafe argument of type `any` assigned to a parameter of type `number`.",
+            "line": 3,
+            "column": 5,
+            "endColumn": 13
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg: number): void;\nfoo(error);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:164",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "message": "Unsafe argument of type error typed assigned to a parameter of type `number`.",
+            "line": 3,
+            "column": 5,
+            "endColumn": 10
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg1: number, arg2: string): void;\nfoo(1, 1 as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:179",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 3,
+            "column": 8,
+            "endColumn": 16
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(...arg: number[]): void;\nfoo(1, 2, 3, 1 as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:193",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 3,
+            "column": 14,
+            "endColumn": 22
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg: string, ...arg: number[]): void;\nfoo(1 as any, 1 as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:207",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 3,
+            "column": 5,
+            "endColumn": 13
+          },
+          {
+            "messageId": "unsafeArgument",
+            "line": 3,
+            "column": 15,
+            "endColumn": 23
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg1: string, arg2: number): void;\n\nfoo(...(x as any));\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:227",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeSpread",
+            "message": "Unsafe spread of an `any` type.",
+            "line": 4,
+            "column": 5,
+            "endColumn": 18
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg1: string, arg2: number): void;\n\nfoo(...(x as any[]));\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:243",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArraySpread",
+            "message": "Unsafe spread of an `any[]` array type.",
+            "line": 4,
+            "column": 5,
+            "endColumn": 20
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg1: string, arg2: number): void;\n\ndeclare const errors: error[];\n\nfoo(...errors);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:259",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArraySpread",
+            "message": "Unsafe spread of an error array type.",
+            "line": 6,
+            "column": 5,
+            "endColumn": 14
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg1: string, arg2: number): void;\n\nconst x = ['a', 1 as any] as const;\nfoo(...x);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:277",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeTupleSpread",
+            "message": "Unsafe spread of a tuple type. The argument is of type `any` and is assigned to a parameter of type `number`.",
+            "line": 5,
+            "column": 5,
+            "endColumn": 9
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg1: string, arg2: number): void;\n\nconst x = ['a', error] as const;\nfoo(...x);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:294",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeTupleSpread",
+            "message": "Unsafe spread of a tuple type. The argument is error typed and is assigned to a parameter of type `number`.",
+            "line": 5,
+            "column": 5,
+            "endColumn": 9
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg1: string, arg2: number): void;\nfoo(...(['foo', 1, 2] as [string, any, number]));\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:311",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeTupleSpread",
+            "line": 3,
+            "column": 5,
+            "endColumn": 48
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg1: string, arg2: number, arg2: string): void;\n\nconst x = [1] as const;\nfoo('a', ...x, 1 as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:325",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 5,
+            "column": 16,
+            "endColumn": 24
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg1: string, arg2: number, ...rest: string[]): void;\n\nconst x = [1, 2] as [number, ...number[]];\nfoo('a', ...x, 1 as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:341",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 5,
+            "column": 16,
+            "endColumn": 24
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg1: Set<string>, arg2: Map<string, string>): void;\n\nconst x = [new Map<any, string>()] as const;\nfoo(new Set<any>(), ...x);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:357",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 5,
+            "column": 5,
+            "endColumn": 19
+          },
+          {
+            "messageId": "unsafeTupleSpread",
+            "line": 5,
+            "column": 21,
+            "endColumn": 25
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(...params: [number, string, any]): void;\nfoo(1 as any, 'a' as any, 1 as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:379",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 3,
+            "column": 5,
+            "endColumn": 13
+          },
+          {
+            "messageId": "unsafeArgument",
+            "line": 3,
+            "column": 15,
+            "endColumn": 25
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(param1: string, ...params: [number, string, any]): void;\nfoo('a', 1 as any, 'a' as any, 1 as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:399",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 3,
+            "column": 10,
+            "endColumn": 18
+          },
+          {
+            "messageId": "unsafeArgument",
+            "line": 3,
+            "column": 20,
+            "endColumn": 30
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ntype T = [number, T[]];\ndeclare function foo(t: T): void;\ndeclare const t: T;\nfoo(t as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:419",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 5,
+            "column": 5,
+            "endColumn": 13
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(\n  templates: TemplateStringsArray,\n  arg1: number,\n  arg2: any,\n  arg3: string,\n) {}\ndeclare const arg: any;\nfoo<number>`${arg}${arg}${arg}`;\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:435",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 9,
+            "column": 15,
+            "endColumn": 18
+          },
+          {
+            "messageId": "unsafeArgument",
+            "line": 9,
+            "column": 27,
+            "endColumn": 30
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(templates: TemplateStringsArray, arg: number) {}\ndeclare const arg: any;\nfoo`${arg}`;\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:461",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 4,
+            "column": 7,
+            "endColumn": 10
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ntype T = [number, T[]];\nfunction foo(templates: TemplateStringsArray, arg: T) {}\ndeclare const arg: any;\nfoo`${arg}`;\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_argument/no_unsafe_argument_upstream_test.go:476",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeArgument",
+            "line": 5,
+            "column": 7,
+            "endColumn": 10
+          }
+        ],
+        "outputSteps": null
+      }
+    ],
+    "originalSkip": [],
+    "excludedNonDefaultCases": []
+  },
+  {
+    "rule": "@typescript-eslint/no-unsafe-return",
+    "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+    "sources": [
+      "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go"
+    ],
+    "valid": [
+      {
+        "text": "\nfunction foo() {\n  return;\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:12",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nfunction foo() {\n  return 1;\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:17",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nfunction foo() {\n  return '';\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:22",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nfunction foo() {\n  return true;\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:27",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nfunction foo() {\n  return [];\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:32",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nfunction foo(): any {\n  return {} as any;\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:37",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\ndeclare function foo(arg: () => any): void;\nfoo((): any => 'foo' as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:42",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\ndeclare function foo(arg: null | (() => any)): void;\nfoo((): any => 'foo' as any);\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:46",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nfunction foo(): any[] {\n  return [] as any[];\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:50",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nfunction foo(): Set<any> {\n  return new Set<any>();\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:55",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nasync function foo(): Promise<any> {\n  return Promise.resolve({} as any);\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:60",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nasync function foo(): Promise<any> {\n  return {} as any;\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:65",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nfunction foo(): object {\n  return Promise.resolve({} as any);\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:70",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nfunction foo(): ReadonlySet<number> {\n  return new Set<any>();\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:75",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\nfunction foo(): Set<number> {\n  return new Set([1]);\n}\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:80",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      type Foo<T = number> = { prop: T };\n      function foo(): Foo {\n        return { prop: 1 } as Foo<number>;\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:85",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      type Foo = { prop: any };\n      function foo(): Foo {\n        return { prop: '' } as Foo;\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:91",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function fn<T extends any>(x: T) {\n        return x;\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:97",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function fn<T extends any>(x: T): unknown {\n        return x as any;\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:102",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function fn<T extends any>(x: T): unknown[] {\n        return x as any[];\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:107",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function fn<T extends any>(x: T): Set<unknown> {\n        return x as Set<any>;\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:112",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      async function fn<T extends any>(x: T): Promise<unknown> {\n        return x as any;\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:117",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function fn<T extends any>(x: T): Promise<unknown> {\n        return Promise.resolve(x as any);\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:122",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function test(): Map<string, string> {\n        return new Map();\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:127",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function foo(): any {\n        return [] as any[];\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:132",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function foo(): unknown {\n        return [] as any[];\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:137",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      declare const value: Promise<any>;\n      function foo() {\n        return value;\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:142",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "const foo: (() => void) | undefined = () => 1;",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:148",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      class Foo {\n        public foo(): this {\n          return this;\n        }\n\n        protected then(resolve: () => void): void {\n          resolve();\n        }\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:149",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function foo(): readonly [1, 2] {\n        return [1, 2] as const;\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:160",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function foo(): unknown {\n        return 1 as unknown;\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:165",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function foo(this: { n: number }) {\n        return this;\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:170",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      function foo(): void {\n        return undefined;\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:175",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\n      type AsArray<T> = T extends any[] ? T : [T];\n      interface Hook<T> {\n        call(data: AsArray<T>[0]): AsArray<T>[0];\n      }\n      declare function getHooks<T>(): Hook<T>[];\n      function reduceHooks<T>(\n        data: AsArray<T>[0],\n        fn: (hook: Hook<T>, data: AsArray<T>[0]) => AsArray<T>[0],\n      ): AsArray<T>[0] {\n        return getHooks<T>().reduce((d, hook) => {\n          return fn(hook, d);\n        }, data);\n      }\n    ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:180",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        }
+      },
+      {
+        "text": "\ntype UnionSet = (() => Set<string>) | (() => Set<number>);\nconst unionSets: UnionSet = () => new Set<any>();\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:839",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        }
+      },
+      {
+        "text": "\ndeclare const value: any;\ndeclare const bool: boolean;\nfunction identifierAny() {\n  return value && bool;\n}\nfunction callAny() {\n  return value.method() && bool;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:871 strict false",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": false,
+          "strictNullChecks": false,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "contextAdaptation": "Materialized frozen strictness matrix without changing source."
+      },
+      {
+        "text": "\ndeclare const value: any;\ndeclare const bool: boolean;\nfunction identifierAny() {\n  return value && bool;\n}\nfunction callAny() {\n  return value.method() && bool;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:871 strict true with strictNullChecks false",
+        "compilerOptions": {
+          "module": "ESNext",
+          "strict": true,
+          "strictNullChecks": false,
+          "target": "ES2020"
+        },
+        "contextAdaptation": "Materialized frozen strictness matrix without changing source."
+      }
+    ],
+    "invalid": [
+      {
+        "text": "\nfunction foo() {\n  return 1 as any;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:197",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo() {\n  return Object.create(null);\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:209",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nconst foo = () => {\n  return 1 as any;\n};\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:221",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "const foo = () => Object.create(null);",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:233",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo() {\n  return [] as any[];\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:241",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo() {\n  return [] as Array<any>;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:253",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo() {\n  return [] as readonly any[];\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:265",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo() {\n  return [] as Readonly<any[]>;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:277",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nconst foo = () => {\n  return [] as any[];\n};\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:289",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "const foo = () => [] as any[];",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:301",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(): Set<string> {\n  return new Set<any>();\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:309",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturnAssignment"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(): Map<string, string> {\n  return new Map<string, any>();\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:321",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturnAssignment"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(): Set<string[]> {\n  return new Set<any[]>();\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:333",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturnAssignment"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(): Set<Set<Set<string>>> {\n  return new Set<Set<Set<any>>>();\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:345",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturnAssignment"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ntype Fn = () => Set<string>;\nconst foo1: Fn = () => new Set<any>();\nconst foo2: Fn = function test() {\n  return new Set<any>();\n};\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:357",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturnAssignment",
+            "line": 3
+          },
+          {
+            "messageId": "unsafeReturnAssignment",
+            "line": 5
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ntype Fn = () => Set<string>;\nfunction receiver(arg: Fn) {}\nreceiver(() => new Set<any>());\nreceiver(function test() {\n  return new Set<any>();\n});\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:376",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturnAssignment",
+            "line": 4
+          },
+          {
+            "messageId": "unsafeReturnAssignment",
+            "line": 6
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo() {\n  return this;\n}\n\nfunction bar() {\n  return () => this;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:396",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturnThis",
+            "line": 3,
+            "column": 3,
+            "endColumn": 15
+          },
+          {
+            "messageId": "unsafeReturnThis",
+            "line": 7,
+            "column": 16,
+            "endColumn": 20
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare function foo(arg: null | (() => any)): void;\nfoo(() => 'foo' as any);\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:421",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 11,
+            "endColumn": 23
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nlet value: NotKnown;\n\nfunction example() {\n  return value;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:435",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 5,
+            "column": 3,
+            "endColumn": 16
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare const value: any;\nasync function foo() {\n  return value;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:452",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 4,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare const value: Promise<any>;\nasync function foo(): Promise<number> {\n  return value;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:467",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 4,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nasync function foo(arg: number) {\n  return arg as Promise<any>;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:482",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(): Promise<any> {\n  return {} as any;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:496",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(): Promise<object> {\n  return {} as any;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:510",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nasync function foo(): Promise<object> {\n  return Promise.resolve<any>({});\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:524",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nasync function foo(): Promise<object> {\n  return Promise.resolve<Promise<Promise<any>>>({} as Promise<any>);\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:538",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nasync function foo(): Promise<object> {\n  return {} as Promise<Promise<Promise<Promise<any>>>>;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:552",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nasync function foo() {\n  return {} as Promise<Promise<Promise<Promise<any>>>>;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:566",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nasync function foo() {\n  return {} as Promise<any> | Promise<object>;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:580",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nasync function foo() {\n  return {} as Promise<any | object>;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:594",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nasync function foo() {\n  return {} as Promise<any> & { __brand: 'any' };\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:608",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ninterface Alias<T> extends Promise<any> {\n  foo: 'bar';\n}\n\ndeclare const value: Alias<number>;\nasync function foo() {\n  return value;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:622",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 8,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nclass Foo {\n  bar() {\n    return 1 as any;\n  }\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:641",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 4,
+            "column": 5
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nclass Foo {\n  bar(): string {\n    return 1 as any;\n  }\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:653",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 4,
+            "column": 5
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nclass Foo {\n  get val() {\n    return 1 as any;\n  }\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:665",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 4,
+            "column": 5
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction* gen() {\n  return 1 as any;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:677",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nasync function* gen() {\n  return 1 as any;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:687",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction outer() {\n  function inner() {\n    return 1 as any;\n  }\n  return 1;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:697",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 4,
+            "column": 5
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(): string {\n  return 1 as unknown as any;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:710",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 3,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(): string {\n  const x: any = 1;\n  return x satisfies any;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:720",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 4,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(): string {\n  const x: any = 1;\n  return x!;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:731",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 4,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare const cond: boolean;\nfunction foo(): string {\n  return cond ? (1 as any) : 'x';\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:742",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 4,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(): string {\n  try {\n    return 1 as any;\n  } catch {\n    return 'x';\n  }\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:753",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 4,
+            "column": 5
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(n: number): string {\n  switch (n) {\n    case 1:\n      return 1 as any;\n    default:\n      return 'x';\n  }\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:767",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 5,
+            "column": 7
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction foo(x: boolean): string {\n  if (x) return 'y';\n  return 1 as any;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:782",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 4,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nclass Foo {\n  make: () => Set<string> = () => new Set<any>();\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:793",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturnAssignment",
+            "line": 3,
+            "column": 35
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nconst f: () => Promise<number> = async () => 1 as any;\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:803",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 2,
+            "column": 46
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nconst obj = {\n  foo() {\n    return this;\n  },\n};\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:811",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturnThis",
+            "line": 4,
+            "column": 5
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction overload(x: number): number;\nfunction overload(x: string): string;\nfunction overload(x: any): any {\n  return x;\n}\n      ",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:823",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 5,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ntype IntersectionSet = (() => Set<string>) & (() => Set<number>);\nconst intersectionSets: IntersectionSet = () => new Set<any>();\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:845",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturnAssignment"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\nfunction implicitThis() {\n  return this;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:857",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": [],
+          "noImplicitThis": false
+        },
+        "expected": [
+          {
+            "messageId": "unsafeReturnThis",
+            "message": "Unsafe return of a value of type ``any``. `this` is typed as `any`.\nYou can try to fix this by turning on the `noImplicitThis` compiler option, or adding a `this` parameter to the function."
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare const value: any;\ndeclare const bool: boolean;\nfunction identifierAny() {\n  return value && bool;\n}\nfunction callAny() {\n  return value.method() && bool;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:871 strict true",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "strictNullChecks": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "experimentalDecorators": true,
+          "types": []
+        },
+        "contextAdaptation": "Materialized frozen strictness matrix without changing source.",
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 5,
+            "column": 3
+          },
+          {
+            "messageId": "unsafeReturn",
+            "line": 8,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "\ndeclare const value: any;\ndeclare const bool: boolean;\nfunction identifierAny() {\n  return value && bool;\n}\nfunction callAny() {\n  return value.method() && bool;\n}\n",
+        "origin": "internal/plugins/typescript/rules/no_unsafe_return/no_unsafe_return_test.go:871 strict false with strictNullChecks true",
+        "compilerOptions": {
+          "module": "ESNext",
+          "strict": false,
+          "strictNullChecks": true,
+          "target": "ES2020"
+        },
+        "contextAdaptation": "Materialized frozen strictness matrix without changing source.",
+        "expected": [
+          {
+            "messageId": "unsafeReturn",
+            "line": 5,
+            "column": 3
+          },
+          {
+            "messageId": "unsafeReturn",
+            "line": 8,
+            "column": 3
+          }
+        ],
+        "outputSteps": null
+      }
+    ],
+    "originalSkip": [],
+    "excludedNonDefaultCases": []
+  }
+]

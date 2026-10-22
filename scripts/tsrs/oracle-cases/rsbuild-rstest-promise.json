@@ -1,0 +1,2060 @@
+[
+  {
+    "rule": "rstest/valid-expect-in-promise",
+    "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+    "exactCompilerOptions": true,
+    "sources": [
+      {
+        "path": "internal/plugins/rstest/rules/valid_expect_in_promise/valid_expect_in_promise_test.go",
+        "sha256": "203cbfd16a318c7123302d60aee77a15fee3a8013a2999b0732f45d806e54263"
+      }
+    ],
+    "valid": [
+      {
+        "text": "test(\"case\", async (context) => { await promise.then(value => context.expect(value).toBe(1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:0"
+      },
+      {
+        "text": "test(\"case\", (context) => promise.then(value => context.expect(value).toBe(1)));",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:1"
+      },
+      {
+        "text": "test(\"case\", () => { try { return promise.then(value => expect(value).toBe(1)); } catch (error) {} });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:2"
+      },
+      {
+        "text": "test(\"case\", async () => { try { return promise.then(value => expect(value).toBe(1)); } catch (error) {} });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:3"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = promise.then(value => assert.equal(value, 1)); await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:4"
+      },
+      {
+        "text": "test(\"case\", () => { const pending = promise.then(value => assert.equal(value, 1)); expect(pending).resolves.toBeUndefined(); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:5"
+      },
+      {
+        "text": "test(\"case\", () => expect(promise.then(value => assert.equal(value, 1))).resolves.toBeUndefined());",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:6"
+      },
+      {
+        "text": "test(\"case\", () => condition ? promise.then(value => assert.equal(value, 1)) : Promise.resolve());",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:7"
+      },
+      {
+        "text": "test(\"case\", () => condition && promise.then(value => assert.equal(value, 1)));",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:8"
+      },
+      {
+        "text": "test(\"case\", () => { const [pending] = [promise.then(value => assert.equal(value, 1))]; return pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:9"
+      },
+      {
+        "text": "test(\"case\", () => { const { pending } = { pending: promise.then(value => assert.equal(value, 1)) }; return pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:10"
+      },
+      {
+        "text": "test(\"case\", () => { let pending; [pending] = [promise.then(value => assert.equal(value, 1))]; return pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:11"
+      },
+      {
+        "text": "test(\"case\", () => { let pending; ({ pending } = { pending: promise.then(value => assert.equal(value, 1)) }); return pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:12"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending; pending ||= promise.then(value => expect(value).toBe(1)); await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:13"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending; pending ??= promise.then(value => assert.equal(value, 1)); await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:14"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = other; pending &&= promise.then(value => expect(value).toBe(1)); await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:15"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending; await (pending ||= promise.then(value => expect(value).toBe(1))); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:16"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = promise.then(value => expect(value).toBe(1)); pending ||= other; await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:17"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = fallback || promise.then(value => expect(value).toBe(1)); await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:18"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = fallback ?? promise.then(value => expect(value).toBe(1)); await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:19"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = ready && promise.then(value => expect(value).toBe(1)); await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:20"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = condition ? promise.then(value => expect(value).toBe(1)) : other; await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:21"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = (setup(), promise.then(value => expect(value).toBe(1))); await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:22"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = other; pending = pending || promise.then(value => expect(value).toBe(1)); await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:23"
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = promise.then(value => assert.equal(value, 1)); pending = pending || other; await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:24"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await Promise.all(pending); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:25"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; for await (const settled of pending) {} });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:26"
+      },
+      {
+        "text": "test(\"case\", async () => { for await (const settled of [promise.then(value => expect(value).toBe(1))]) {} });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:27"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await Promise.all([...pending]); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:28"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await Promise.all([...pending, other()]); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:29"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; for await (const settled of [...pending]) {} });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:30"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await pending[0]; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:31"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = [first.then(value => expect(value).toBe(1)), second.then(value => expect(value).toBe(2))]; await Promise.all(pending); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:32"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = [first.then(value => expect(value).toBe(1)), second.then(value => expect(value).toBe(2))]; for await (const settled of pending) {} });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:33"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = [first.then(value => expect(value).toBe(1)), second.then(value => expect(value).toBe(2))]; await Promise.all([...pending]); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:34"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = [first.then(value => expect(value).toBe(1)), second.then(value => expect(value).toBe(2)), third.then(value => expect(value).toBe(3))]; await Promise.all(pending); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:35"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = promise.then(value => expect(value).toBe(1)); for await (const settled of [pending]) {} });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:36"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { await pending; } catch (error) { throw error; } });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:37"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = promise.then(value => assert.equal(value, 1)); if (!ready) { throw new Error(\"no\"); } await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:38"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { setup(); await pending; } catch (error) { throw error; } });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:39"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { throw new Error(\"no\"); } finally { cleanup(); } });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:40"
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { await pending; } finally { cleanup(); } });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:41"
+      },
+      {
+        "text": "try { test(\"case\", async () => { const pending = promise.then(value => expect(value).toBe(1)); await pending; }); } catch (error) {}",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:42"
+      },
+      {
+        "text": "try { test(\"case\", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.resolve(pending); }); } catch (error) {}",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:43"
+      },
+      {
+        "text": "try { test(\"case\", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.all([pending]); }); } catch (error) {}",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:44"
+      },
+      {
+        "text": "import assert from \"node:assert\"; test(\"case\", () => { promise.then(value => assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:45"
+      },
+      {
+        "text": "import { assert } from \"chai\"; test(\"case\", () => { promise.then(value => assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:46"
+      },
+      {
+        "text": "const assert = createAssertionLibrary(); test(\"case\", () => { promise.then(value => assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:47"
+      },
+      {
+        "text": "function handler() { queue.then(handler); } test(\"case\", () => promise.then(handler));",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:48"
+      },
+      {
+        "text": "function first() { queue.then(second); } function second() { queue.then(first); } test(\"case\", () => promise.then(first));",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:49"
+      },
+      {
+        "text": "function handler(value) { expect(value).toBe(1); return queue.then(handler); } test(\"case\", () => promise.then(handler));",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:50"
+      },
+      {
+        "text": "let handler; test(\"case\", () => promise.then(handler));",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:51"
+      },
+      {
+        "text": "declare const handler: () => void; test(\"case\", () => promise.then(handler));",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:52"
+      },
+      {
+        "text": "let handler: (value: unknown) => void; beforeEach(() => { handler = value => expect(value).toBe(1); }); test(\"case\", () => promise.then(handler));",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:valid:53"
+      },
+      {
+        "text": "import { expect, test } from \"rstack/test\"; test(\"case\", async () => { await promise.then(value => expect(value).toBe(1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRstackTestModule:valid:0"
+      },
+      {
+        "text": "import { assert, test } from \"rstack/test\"; test(\"case\", async () => { await promise.then(value => assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRstackTestModule:valid:1"
+      },
+      {
+        "text": "import { assert } from \"rstack/lib\"; test(\"case\", () => { promise.then(value => assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRstackTestModule:valid:2"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "test(\"case\", () => { promise[(\"then\")](value => expect(value).toBe(1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:0",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "message": "This promise should either be returned or awaited to ensure the assertions in its chain are called",
+            "line": 1,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { promise[﻿(\"then\")](value => expect(value).toBe(1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:1",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "message": "This promise should either be returned or awaited to ensure the assertions in its chain are called",
+            "line": 1,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", (context) => { promise.then(value => context.expect(value).toBe(1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:2",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "message": "This promise should either be returned or awaited to ensure the assertions in its chain are called",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "test.for([1])(\"case\", (row, context) => { promise.then(value => context.expect(value).toBe(row)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:3",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 43
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { promise.then(value => assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:4",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "import { assert, test } from \"@rstest/core\"; test(\"case\", () => { promise.then(value => assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:5",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 67
+          }
+        ]
+      },
+      {
+        "text": "import * as rstest from \"@rstest/core\"; rstest.test(\"case\", () => { promise.then(value => rstest.assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:6",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 69
+          }
+        ]
+      },
+      {
+        "text": "import.meta.rstest.test(\"case\", () => { promise.then(value => import.meta.rstest.assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:7",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 41
+          }
+        ]
+      },
+      {
+        "text": "const { assert, test } = import.meta.rstest; test(\"case\", () => { promise.then(value => assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:8",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 67
+          }
+        ]
+      },
+      {
+        "text": "const api = import.meta.rstest; api.test(\"case\", () => { promise.then(value => api.assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:9",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 58
+          }
+        ]
+      },
+      {
+        "text": "import { expect, test } from \"@rstest/playwright\"; test(\"case\", async ({ page }) => { page.goto(\"url\").then(() => expect(page).toBeDefined()); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:10",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 87
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { promise.then(value => assert(value)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:11",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "import * as rstest from \"@rstest/core\"; rstest.test(\"case\", () => { promise.then(value => rstest.assert(value)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:12",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { promise.then(value => expect(value).to.be.ok).then(value => assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:13",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "function handler(value) { assert.equal(value, 1); } test(\"one\", () => { promise.then(handler); }); test(\"two\", () => { promise.then(handler); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:14",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          },
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "function leaf(value) { assert.equal(value, 1); } function shared() { return queue.then(leaf); } test(\"one\", () => { promise.then(shared); }); test(\"two\", () => { promise.then(shared); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:15",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          },
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "function leaf(value) { assert.equal(value, 1); } function shared() { queue.then(leaf); } test(\"one\", () => promise.then(shared)); test(\"two\", () => promise.then(shared));",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:16",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { await pending; } catch {} });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:17",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { await pending; } finally { return; } });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:18",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { const pending = promise.then(value => assert.equal(value, 1)); return Promise.all([[pending]]); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:19",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { let pending; [pending] = [promise.then(value => assert.equal(value, 1))]; log(pending); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:20",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { let pending; ({ pending } = { pending: promise.then(value => assert.equal(value, 1)) }); log(pending); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:21",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { let pending; pending ||= promise.then(value => expect(value).toBe(1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:22",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 41,
+            "endColumn": 97
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { obj.pending ||= promise.then(value => expect(value).toBe(1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:23",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 28,
+            "endColumn": 88
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { list.push(promise.then(value => expect(value).toBe(1))); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:24",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 22,
+            "endColumn": 78
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { helper(promise.then(value => expect(value).toBe(1))); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:25",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 22,
+            "endColumn": 75
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:26",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = promise.then(value => expect(value).toBe(1)); pending = pending && other; await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:27",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = promise.then(value => expect(value).toBe(1)); pending &&= other; await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:28",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { let count = 0; count += promise.then(value => assert.equal(value, 1)); await count; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:29",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { const pending = promise.then(value => assert.equal(value, 1)); return condition ? pending : other; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:30",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { const pending = promise.then(value => assert.equal(value, 1)); return condition && pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:31",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { throw new Error(\"caught\"); } catch {} });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:32",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { throw new Error(\"suppressed\"); } finally { return; } });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:33",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = promise.then(value => assert.equal(value, 1)); pending = condition ? pending : other; await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:34",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = promise.then(value => assert.equal(value, 1)); pending = other || pending; await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:35",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = promise.then(value => assert.equal(value, 1)); pending = other ?? pending; await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:36",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => { let pending = promise.then(value => assert.equal(value, 1)); pending = ready && pending; await pending; });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRule:invalid:37",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      },
+      {
+        "text": "import { expect, test } from \"rstack/test\"; test(\"case\", () => { promise.then(value => expect(value).toBe(1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRstackTestModule:invalid:0",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 66
+          }
+        ]
+      },
+      {
+        "text": "import { assert, test } from \"rstack/test\"; test(\"case\", () => { promise.then(value => assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRstackTestModule:invalid:1",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 66
+          }
+        ]
+      },
+      {
+        "text": "import * as rstest from \"rstack/test\"; rstest.test(\"case\", () => { promise.then(value => rstest.assert.equal(value, 1)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRstackTestModule:invalid:2",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise",
+            "line": 1,
+            "column": 68
+          }
+        ]
+      },
+      {
+        "text": "import * as rstest from \"rstack/test\"; rstest.test(\"case\", () => { promise.then(value => rstest.assert(value)); });",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10"
+        },
+        "origin": "valid_expect_in_promise_test.go:TestValidExpectInPromiseRstackTestModule:invalid:3",
+        "expected": [
+          {
+            "messageId": "expectInFloatingPromise"
+          }
+        ]
+      }
+    ],
+    "originalSkip": [],
+    "excludedOptions": []
+  }
+]

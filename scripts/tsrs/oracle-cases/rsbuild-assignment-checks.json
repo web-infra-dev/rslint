@@ -1,0 +1,3905 @@
+[
+  {
+    "rule": "no-class-assign",
+    "valid": [
+      {
+        "text": "class A { } foo(A);",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:19"
+      },
+      {
+        "text": "let A = class A { }; foo(A);",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:22"
+      },
+      {
+        "text": "class A { b(A) { A = 0; } }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:25"
+      },
+      {
+        "text": "class A { b() { let A; A = 0; } }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:28"
+      },
+      {
+        "text": "let A = class { b() { A = 0; } }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:31"
+      },
+      {
+        "text": "class A { }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:34"
+      },
+      {
+        "text": "class A { b() { } }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:35"
+      },
+      {
+        "text": "class A { b() { c(A); } }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:36"
+      },
+      {
+        "text": "var x = 0; x = 1;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:39"
+      },
+      {
+        "text": "let x = 0; x = 1;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:40"
+      },
+      {
+        "text": "const x = 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:41"
+      },
+      {
+        "text": "function x() {} x = 1;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:44"
+      },
+      {
+        "text": "function foo(x) { x = 1; }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:47"
+      },
+      {
+        "text": "try {} catch (x) { x = 1; }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:50"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "class A { } A = 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:56",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } ({A} = 0);",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:64",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "class A { } ({b: A = 0} = {});",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:72",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "class A { } [A] = 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:80",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "A = 0; class A { }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:88",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "class A { b() { A = 0; } }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:96",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "text": "let A = class A { b() { A = 0; } }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:104",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "class A { } A = 0; A = 1;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:112",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          },
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "class A {}\nA = 0;\nA++;\n[A] = [];\nfor (A in object) {}\nfor (A of values) {}",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:122",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "message": "'A' is a class.",
+            "line": 2,
+            "column": 1
+          },
+          {
+            "messageId": "classReassignment",
+            "line": 3,
+            "column": 1
+          },
+          {
+            "messageId": "classReassignment",
+            "line": 4,
+            "column": 2
+          },
+          {
+            "messageId": "classReassignment",
+            "line": 5,
+            "column": 6
+          },
+          {
+            "messageId": "classReassignment",
+            "message": "'A' is a class.",
+            "line": 6,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "class A { } A += 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:139",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A -= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:146",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A *= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:153",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A /= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:160",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A %= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:167",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A <<= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:174",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A >>= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:181",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A >>>= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:188",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A &= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:195",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A |= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:202",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A ^= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:209",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A &&= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:216",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A ||= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:223",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A ??= 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:230",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A++;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:238",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } A--;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:245",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class A { } ++A;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:252",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "class A { } --A;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:259",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "class A { b() { c(() => { A = 0; }); } }",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:267",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "text": "class A { } (A as any) = 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:275",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "export default class A {}\nA = 0;",
+        "origin": "internal/rules/no_class_assign/no_class_assign_test.go:285",
+        "expected": [
+          {
+            "messageId": "classReassignment",
+            "message": "'A' is a class.",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      }
+    ],
+    "scopeNote": "Frozen e0a29 default options. Explicit props:true cases use the equivalent default; props:false remains outside the frozen rsbuild options. Expected fields retain the frozen assertions; differential oracle compares all diagnostics and fixes."
+  },
+  {
+    "rule": "no-const-assign",
+    "valid": [
+      {
+        "text": "const x = 0; { let x; x = 1; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:19"
+      },
+      {
+        "text": "const x = 0; function a(x) { x = 1; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:22"
+      },
+      {
+        "text": "const x = 0; foo(x);",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:25"
+      },
+      {
+        "text": "for (const x in [1,2,3]) { foo(x); }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:28"
+      },
+      {
+        "text": "for (const x of [1,2,3]) { foo(x); }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:31"
+      },
+      {
+        "text": "function f() { using x = foo(); bar(x); }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:34"
+      },
+      {
+        "text": "async function f() { await using x = foo(); bar(x); }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:35"
+      },
+      {
+        "text": "const x = {key: 0}; x.key = 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:38"
+      },
+      {
+        "text": "var x = 0; x = 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:41"
+      },
+      {
+        "text": "let x = 0; x = 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:44"
+      },
+      {
+        "text": "let constable = 0; constable = 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:47"
+      },
+      {
+        "text": "const local = 0; name = \"value\";",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:51"
+      },
+      {
+        "text": "const x = 0; { x = 1; let x; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:55"
+      },
+      {
+        "text": "function x() {} x = 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:58"
+      },
+      {
+        "text": "try {} catch (x) { x = 1; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:61"
+      },
+      {
+        "text": "const x = x;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:64"
+      },
+      {
+        "text": "const x = 0, y = 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:67"
+      },
+      {
+        "text": "const {a} = {a: 0};",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:70"
+      },
+      {
+        "text": "const [a] = [0];",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:73"
+      },
+      {
+        "text": "const x = {}; x.method();",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:76"
+      },
+      {
+        "text": "function f() { using x = foo(); x.value = 1; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:79"
+      },
+      {
+        "text": "const x = 0; if (x === 0) {}",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:82"
+      },
+      {
+        "text": "const x = 0; const f = (y = x) => y;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:85"
+      },
+      {
+        "text": "const {x} = {x: 0}; { let x; x = 1; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:88"
+      },
+      {
+        "text": "const {x} = {x: 0}; { const x = 1; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:91"
+      },
+      {
+        "text": "try { const x = 1; } catch (e) { const x = 2; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:94"
+      },
+      {
+        "text": "const e = 0; try {} catch (e) { e = 1; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:97"
+      },
+      {
+        "text": "const x = 0; function outer() { function inner(x) { x = 1; } }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:100"
+      },
+      {
+        "text": "const x = 0; const f = (x) => { x = 1; };",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:103"
+      },
+      {
+        "text": "const x = 0; { const x = 1; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:106"
+      },
+      {
+        "text": "const x = 0; { { let x; x = 1; } }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:109"
+      },
+      {
+        "text": "const x = 0; let y; ({a: y = {x}} = {});",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:115"
+      },
+      {
+        "text": "const x = 0; let y; ([y = [x]] = []);",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:118"
+      },
+      {
+        "text": "const x = 0; let y; ({y = {x}} = {});",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:121"
+      },
+      {
+        "text": "const x = 0; let y; ({y = x} = {});",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:124"
+      },
+      {
+        "text": "const x = 0; let y; ({a: y = foo({x})} = {});",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:128"
+      },
+      {
+        "text": "const x = 0; let y; ({a: y = true ? {x} : {}} = {});",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:132"
+      },
+      {
+        "text": "const x = 0; let y; ({[{x}]: y} = {});",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:138"
+      },
+      {
+        "text": "const x = 0; let y; ({[foo({x})]: y} = {});",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:141"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "x = 1;\nconst x = 0;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:148",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x = 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:156",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "function f() {\n  using x = foo();\n  x = 1;\n}",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:164",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 3,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "async function f() {\n  await using x = foo();\n  x ||= bar();\n}",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:170",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 3,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "const {a: x} = {a: 0}; x = 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:178",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; ({x} = {x: 1});",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:186",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x += 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:194",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; for (x of values) {}",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:202",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; (x as any) = 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:210",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; [x = 1] = values;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:218",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "function f() {\n  using x = foo();\n  [x, y] = bar();\n}",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:226",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 3,
+            "column": 4
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; ++x;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:234",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x++;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:242",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "for (const i = 0; i < 10; ++i) { foo(i); }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:250",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x = 1; x = 2;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:258",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          },
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x -= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:267",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x *= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:275",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x /= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:283",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x %= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:291",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x <<= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:299",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x >>= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:307",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x >>>= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:315",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x &= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:323",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x |= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:331",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x ^= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:339",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; --x;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:347",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x--;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:355",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const [x] = [0]; x = 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:363",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "const {a: {b: x}} = {a: {b: 0}}; x = 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:371",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 34
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; if (true) { x = 1; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:379",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; function f() { x = 1; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:387",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; const f = () => { x = 1; };",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:395",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 32
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x ??= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:403",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 1; x &&= 2;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:411",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; x ||= 1;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:419",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 2; x **= 3;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:427",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "const x = 1; function foo() { const x = 2; x = 3; } x = 4;",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:435",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 44
+          },
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 53
+          }
+        ]
+      },
+      {
+        "text": "try { const x = 1; x = 2; } catch (e) { const x = 3; x = 4; }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:444",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 20
+          },
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 54
+          }
+        ]
+      },
+      {
+        "text": "const x = 1; function outer() { function inner() { x = 2; } }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:453",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 52
+          }
+        ]
+      },
+      {
+        "text": "const x = 1; { { x = 2; } }",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:461",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "const x = 0; ({a: x = 1} = {});",
+        "origin": "internal/rules/no_const_assign/no_const_assign_test.go:470",
+        "expected": [
+          {
+            "messageId": "const",
+            "line": 1,
+            "column": 19
+          }
+        ]
+      }
+    ],
+    "scopeNote": "Frozen e0a29 default options. Explicit props:true cases use the equivalent default; props:false remains outside the frozen rsbuild options. Expected fields retain the frozen assertions; differential oracle compares all diagnostics and fixes."
+  },
+  {
+    "rule": "no-ex-assign",
+    "valid": [
+      {
+        "text": "try { } catch { e = 10; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_extras_test.go:23"
+      },
+      {
+        "text": "try { } catch (e) { const f = (e: unknown) => { e = 10; }; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_extras_test.go:26"
+      },
+      {
+        "text": "try { } catch (e) { e: for (;;) { break e; } }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_extras_test.go:28"
+      },
+      {
+        "text": "try { } catch (e) { let x: typeof e; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_extras_test.go:31"
+      },
+      {
+        "text": "try { } catch ({...rest}) { log(rest); }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_extras_test.go:33"
+      },
+      {
+        "text": "try { } catch (e) { three = 2 + 1; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:18"
+      },
+      {
+        "text": "try { } catch ({e}) { this.something = 2; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:19"
+      },
+      {
+        "text": "function foo() { try { } catch (e) { return false; } }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:20"
+      },
+      {
+        "text": "try { } catch (e) { let e = 10; e = 10; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:21"
+      },
+      {
+        "text": "try { } catch (e) { console.log({e}); }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:22"
+      },
+      {
+        "text": "try { } catch (e) { foo({x: e}); }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:23"
+      },
+      {
+        "text": "try { } catch (ex) { ({ex: y} = {}); }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:24"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "try { } catch (e) { function f() { e = 10; } }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_extras_test.go:39",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 36
+          }
+        ]
+      },
+      {
+        "text": "try { } catch ({a, b}) { b = 1; a = 2; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_extras_test.go:47",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 26
+          },
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 33
+          }
+        ]
+      },
+      {
+        "text": "try { } catch ({a, b = (a = 1)}) { }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_extras_test.go:57",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "try { } catch ({...rest}) { rest = {}; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_extras_test.go:64",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "try { } catch ({a: {b}}) { b = 1; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_extras_test.go:71",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 28
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (e) { (e) = 10; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_extras_test.go:78",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (e) { e = 10; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:29",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (ex) { ex = 10; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:35",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (ex) { [ex] = []; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:41",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (ex) { ({x: ex = 0} = {}); }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:47",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "text": "try { } catch ({message}) { message = 10; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:53",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (e) { for (;;) { e = 10; } }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:59",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 32
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (e) { for (e in obj) {} }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:65",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (e) { e += 1; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:71",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (e) { e++; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:77",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (e) { --e; }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:83",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (e) { for (e of arr) {} }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:89",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (ex) { ({ex} = {}); }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:95",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "text": "try { } catch (ex) { ({x: ex} = {}); }",
+        "origin": "internal/rules/no_ex_assign/no_ex_assign_test.go:101",
+        "expected": [
+          {
+            "messageId": "unexpected",
+            "line": 1,
+            "column": 27
+          }
+        ]
+      }
+    ],
+    "scopeNote": "Frozen e0a29 default options. Explicit props:true cases use the equivalent default; props:false remains outside the frozen rsbuild options. Expected fields retain the frozen assertions; differential oracle compares all diagnostics and fixes."
+  },
+  {
+    "rule": "no-func-assign",
+    "valid": [
+      {
+        "text": "function foo() { var foo = bar; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:19"
+      },
+      {
+        "text": "function foo(foo) { foo = bar; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:22"
+      },
+      {
+        "text": "function foo() { var foo; foo = bar; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:25"
+      },
+      {
+        "text": "var foo = function() {}; foo = bar;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:28"
+      },
+      {
+        "text": "function foo() {} foo();",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:31"
+      },
+      {
+        "text": "function foo() {} bar(foo);",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:34"
+      },
+      {
+        "text": "var foo = () => {}; foo = bar;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:37"
+      },
+      {
+        "text": "let foo = function() {}; foo = bar;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:40"
+      },
+      {
+        "text": "var foo = function() { foo = 1; };",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:43"
+      },
+      {
+        "text": "function foo() { var foo = 1; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:46"
+      },
+      {
+        "text": "import bar from 'bar'; function foo() { var foo = bar; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:49"
+      },
+      {
+        "text": "function foo() { let foo = 1; foo = 2; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:52"
+      },
+      {
+        "text": "function foo() { const foo = 1; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:55"
+      },
+      {
+        "text": "function foo() { function foo() {} }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:58"
+      },
+      {
+        "text": "function foo() {} try {} catch(foo) { foo = 1; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:61"
+      },
+      {
+        "text": "export default function foo() {}\nfunction bar() { var foo; foo = 1; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:64"
+      },
+      {
+        "text": "export default function foo() {}\nexport { foo as bar };",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:68"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "function foo() {}; foo = bar;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:75",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "function foo() { foo = bar; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:83",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "foo = bar; function foo() { };",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:91",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "function foo() {}; [foo] = bar;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:99",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "function foo() {}; foo++;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:107",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "function foo() {}; foo += 1;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:115",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "function foo() {}; foo = bar; foo = baz;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:123",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 20
+          },
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 31
+          }
+        ]
+      },
+      {
+        "text": "var a = function foo() { foo = 123; };",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:132",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "foo = 1; function foo() { };",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:140",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "function foo() {} foo++;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:148",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "function foo() {} [foo] = [1];",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:156",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "[foo] = bar; function foo() { };",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:164",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 2
+          }
+        ]
+      },
+      {
+        "text": "({x: foo = 0} = bar); function foo() { };",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:172",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "function foo() { [foo] = bar; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:180",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "(function() { ({x: foo = 0} = bar); function foo() { }; })();",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:188",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "function foo() {} ({foo} = bar);",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:196",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "function foo() {} for (foo in bar) {}",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:204",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "text": "function foo() {} for (foo of bar) {}",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:212",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "text": "function foo() {} ({...foo} = bar);",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:220",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "text": "function foo() {} [...foo] = bar;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:228",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "function foo() {} --foo;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:236",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "function foo() {} foo--;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:244",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "function foo() { function foo() {} foo = 1; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:252",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 36
+          }
+        ]
+      },
+      {
+        "text": "function foo() {} try { foo = 1; } catch(foo) { foo = 2; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:260",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "export default function foo() {}\nfoo = bar;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:270",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "message": "'foo' is a function.",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "export default function foo() { foo = 1; }",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:279",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 1,
+            "column": 33
+          }
+        ]
+      },
+      {
+        "text": "export default function foo() {}\n[foo] = [1];",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:287",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 2,
+            "column": 2
+          }
+        ]
+      },
+      {
+        "text": "export function foo() {}\nfoo = bar;",
+        "origin": "internal/rules/no_func_assign/no_func_assign_test.go:296",
+        "expected": [
+          {
+            "messageId": "isAFunction",
+            "line": 2,
+            "column": 1
+          }
+        ]
+      }
+    ],
+    "scopeNote": "Frozen e0a29 default options. Explicit props:true cases use the equivalent default; props:false remains outside the frozen rsbuild options. Expected fields retain the frozen assertions; differential oracle compares all diagnostics and fixes."
+  },
+  {
+    "rule": "no-import-assign",
+    "valid": [
+      {
+        "text": "import mod from 'mod'; mod.prop = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:25"
+      },
+      {
+        "text": "import mod from 'mod'; mod.prop += 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:26"
+      },
+      {
+        "text": "import mod from 'mod'; mod.prop++",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:27"
+      },
+      {
+        "text": "import mod from 'mod'; delete mod.prop",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:28"
+      },
+      {
+        "text": "import mod from 'mod'; for (mod.prop in foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:29"
+      },
+      {
+        "text": "import mod from 'mod'; for (mod.prop of foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:30"
+      },
+      {
+        "text": "import mod from 'mod'; [mod.prop] = foo;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:31"
+      },
+      {
+        "text": "import mod from 'mod'; [...mod.prop] = foo;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:32"
+      },
+      {
+        "text": "import mod from 'mod'; ({ bar: mod.prop } = foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:33"
+      },
+      {
+        "text": "import mod from 'mod'; ({ ...mod.prop } = foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:34"
+      },
+      {
+        "text": "import {named} from 'mod'; named.prop = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:37"
+      },
+      {
+        "text": "import {named} from 'mod'; named.prop += 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:38"
+      },
+      {
+        "text": "import {named} from 'mod'; named.prop++",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:39"
+      },
+      {
+        "text": "import {named} from 'mod'; delete named.prop",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:40"
+      },
+      {
+        "text": "import {named} from 'mod'; for (named.prop in foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:41"
+      },
+      {
+        "text": "import {named} from 'mod'; for (named.prop of foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:42"
+      },
+      {
+        "text": "import {named} from 'mod'; [named.prop] = foo;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:43"
+      },
+      {
+        "text": "import {named} from 'mod'; [...named.prop] = foo;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:44"
+      },
+      {
+        "text": "import {named} from 'mod'; ({ bar: named.prop } = foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:45"
+      },
+      {
+        "text": "import {named} from 'mod'; ({ ...named.prop } = foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:46"
+      },
+      {
+        "text": "import * as mod from 'mod'; mod.named.prop = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:49"
+      },
+      {
+        "text": "import * as mod from 'mod'; mod.named.prop += 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:50"
+      },
+      {
+        "text": "import * as mod from 'mod'; mod.named.prop++",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:51"
+      },
+      {
+        "text": "import * as mod from 'mod'; delete mod.named.prop",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:52"
+      },
+      {
+        "text": "import * as mod from 'mod'; for (mod.named.prop in foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:53"
+      },
+      {
+        "text": "import * as mod from 'mod'; for (mod.named.prop of foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:54"
+      },
+      {
+        "text": "import * as mod from 'mod'; [mod.named.prop] = foo;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:55"
+      },
+      {
+        "text": "import * as mod from 'mod'; [...mod.named.prop] = foo;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:56"
+      },
+      {
+        "text": "import * as mod from 'mod'; ({ bar: mod.named.prop } = foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:57"
+      },
+      {
+        "text": "import * as mod from 'mod'; ({ ...mod.named.prop } = foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:58"
+      },
+      {
+        "text": "import * as mod from 'mod'; obj[mod] = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:61"
+      },
+      {
+        "text": "import * as mod from 'mod'; obj[mod.named] = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:62"
+      },
+      {
+        "text": "import * as mod from 'mod'; for (var foo in mod.named);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:63"
+      },
+      {
+        "text": "import * as mod from 'mod'; for (var foo of mod.named);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:64"
+      },
+      {
+        "text": "import * as mod from 'mod'; [bar = mod.named] = foo;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:65"
+      },
+      {
+        "text": "import * as mod from 'mod'; ({ bar = mod.named } = foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:66"
+      },
+      {
+        "text": "import * as mod from 'mod'; ({ bar: baz = mod.named } = foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:67"
+      },
+      {
+        "text": "import * as mod from 'mod'; ({ [mod.named]: bar } = foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:68"
+      },
+      {
+        "text": "import * as mod from 'mod'; var obj = { ...mod.named };",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:69"
+      },
+      {
+        "text": "import * as mod from 'mod'; var obj = { foo: mod.named };",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:70"
+      },
+      {
+        "text": "import mod from 'mod'; { let mod = 0; mod = 1 }",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:73"
+      },
+      {
+        "text": "import * as mod from 'mod'; { let mod = 0; mod = 1 }",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:74"
+      },
+      {
+        "text": "import * as mod from 'mod'; { let mod = 0; mod.named = 1 }",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:75"
+      },
+      {
+        "text": "import * as mod from 'mod'; (mod.named as any) = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:79"
+      },
+      {
+        "text": "import * as mod from 'mod'; (mod.named as any) += 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:80"
+      },
+      {
+        "text": "import * as mod from 'mod'; (mod.named as any)++",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:81"
+      },
+      {
+        "text": "import * as mod from 'mod'; (<any>mod.named) = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:82"
+      },
+      {
+        "text": "import * as mod from 'mod'; (mod.named!) = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:83"
+      },
+      {
+        "text": "import * as mod from 'mod'; (mod[\"named\"] as any) = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:85"
+      },
+      {
+        "text": "import * as mod from 'mod'; ((mod.named as any)) = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:87"
+      },
+      {
+        "text": "import * as mod from 'mod'; (mod.named as any as unknown) = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:89"
+      },
+      {
+        "text": "import * as mod from 'mod'; delete (mod.named as any)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:91"
+      },
+      {
+        "text": "import * as mod from 'mod'; for ((mod.named as any) in foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:93"
+      },
+      {
+        "text": "import * as mod from 'mod'; for ((mod.named as any) of foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:94"
+      },
+      {
+        "text": "import * as mod from 'mod'; [(mod.named as any)] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:96"
+      },
+      {
+        "text": "import * as mod from 'mod'; ({ bar: (mod.named as any) } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:97"
+      },
+      {
+        "text": "import * as mod from 'mod'; Object.assign(mod as any, obj)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:99"
+      },
+      {
+        "text": "import * as mod from 'mod'; { var Object; Object.assign(mod, obj); }",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:102"
+      },
+      {
+        "text": "import * as mod from 'mod'; var Object; Object.assign(mod, obj);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:103"
+      },
+      {
+        "text": "import {} from 'mod'",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:106"
+      },
+      {
+        "text": "import 'mod'",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:107"
+      },
+      {
+        "text": "import mod from 'mod'; Object.assign(mod, obj);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:110"
+      },
+      {
+        "text": "import {named} from 'mod'; Object.assign(named, obj);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:111"
+      },
+      {
+        "text": "import * as mod from 'mod'; Object.assign(mod.prop, obj);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:114"
+      },
+      {
+        "text": "import * as mod from 'mod'; Object.assign(obj, mod, other);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:115"
+      },
+      {
+        "text": "import * as mod from 'mod'; Object[assign](mod, obj);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:116"
+      },
+      {
+        "text": "import * as mod from 'mod'; Object.getPrototypeOf(mod);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:117"
+      },
+      {
+        "text": "import * as mod from 'mod'; Reflect.set(obj, key, mod);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:118"
+      },
+      {
+        "text": "import * as mod from 'mod'; Object.seal(mod, obj)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:119"
+      },
+      {
+        "text": "import * as mod from 'mod'; Object.preventExtensions(mod)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:120"
+      },
+      {
+        "text": "import * as mod from 'mod'; Reflect.preventExtensions(mod)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:121"
+      },
+      {
+        "text": "import {a} from 'mod'; export {a}",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:124"
+      },
+      {
+        "text": "import mod from 'mod'; console.log(mod)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:127"
+      },
+      {
+        "text": "import {named} from 'mod'; console.log(named)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:128"
+      },
+      {
+        "text": "import * as mod from 'mod'; console.log(mod)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:129"
+      },
+      {
+        "text": "import mod from 'mod'; mod()",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:132"
+      },
+      {
+        "text": "import {named} from 'mod'; named()",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:133"
+      },
+      {
+        "text": "import { a } from \"mod\";\n\t\t\t\t{ let a = 0; a = 1; }\n\t\t\t\tconst object = { a: 1 };\n\t\t\t\tconst shorthand = { a };\n\t\t\t\tconst computed = { [a]: 1 };\n\t\t\t\tobject.a = 2;\n\t\t\t\texport { a };\n\t\t\t\ta: for (;;) { break a; }",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:400"
+      },
+      {
+        "text": "import * as ns from \"mod\";\n\t\t\t\t\t{ const Object = factory; ((Object)).assign(((ns)), source); }\n\t\t\t\t\tObject[method](((ns)), source);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:410"
+      },
+      {
+        "text": "import { value } from \"mod\";\nfunction f(value) {\n  /** @import { value } from \"types\" */\n  value = 1;\n}",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:491",
+        "extension": ".js"
+      },
+      {
+        "text": "import * as namespace from \"mod\";\nfunction f(namespace) {\n  /** @typedef {object} namespace */\n  namespace.member = 1;\n}",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:499",
+        "extension": ".js"
+      },
+      {
+        "text": "import * as namespace from \"mod\";\nfunction f(namespace) {\n  /** @typedef {object} namespace */\n  Object.assign(namespace, source);\n}",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:507",
+        "extension": ".js"
+      },
+      {
+        "text": "import { value } from \"mod\";\nconst f = function value(parameter = (value = 1)) {};",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:515",
+        "extension": ".js"
+      },
+      {
+        "text": "import { value } from \"mod\";\nfunction outer() {\n  let value;\n  function inner(parameter = (value = 1)) { function value() {} }\n}",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:520",
+        "extension": ".js"
+      },
+      {
+        "text": "import { value } from \"mod\"; { let value = 0; value = 1; }",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:644"
+      },
+      {
+        "text": "import { first, second } from \"mod\";\n\t\t\t\t\t{ let first = 0; first = 1; }\n\t\t\t\t\t{ let second = {}; second.member = 1; }",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:646"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "import mod1 from 'mod'; mod1 = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:139",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "import mod2 from 'mod'; mod2 += 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:143",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "import mod3 from 'mod'; mod3++",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:147",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "import mod4 from 'mod'; for (mod4 in foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:151",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "import mod5 from 'mod'; for (mod5 of foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:155",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "import mod6 from 'mod'; [mod6] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:159",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "import mod7 from 'mod'; [mod7 = 0] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:163",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "import mod8 from 'mod'; [...mod8] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:167",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "import mod9 from 'mod'; ({ bar: mod9 } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:171",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 33
+          }
+        ]
+      },
+      {
+        "text": "import mod10 from 'mod'; ({ bar: mod10 = 0 } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:175",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 34
+          }
+        ]
+      },
+      {
+        "text": "import mod11 from 'mod'; ({ ...mod11 } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:179",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 32
+          }
+        ]
+      },
+      {
+        "text": "import {named1} from 'mod'; named1 = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:185",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "import {named2} from 'mod'; named2 += 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:189",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "import {named3} from 'mod'; named3++",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:193",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "import {named4} from 'mod'; for (named4 in foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:197",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 34
+          }
+        ]
+      },
+      {
+        "text": "import {named5} from 'mod'; for (named5 of foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:201",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 34
+          }
+        ]
+      },
+      {
+        "text": "import {named6} from 'mod'; [named6] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:205",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "import {named7} from 'mod'; [named7 = 0] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:209",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "import {named8} from 'mod'; [...named8] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:213",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 33
+          }
+        ]
+      },
+      {
+        "text": "import {named9} from 'mod'; ({ bar: named9 } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:217",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "text": "import {named10} from 'mod'; ({ bar: named10 = 0 } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:221",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "text": "import {named11} from 'mod'; ({ ...named11 } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:225",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 36
+          }
+        ]
+      },
+      {
+        "text": "import * as mod1 from 'mod'; mod1 = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:231",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "import * as mod2 from 'mod'; mod2 += 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:235",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "import * as mod3 from 'mod'; mod3++",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:239",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "import * as mod4 from 'mod'; for (mod4 in foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:243",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "import * as mod5 from 'mod'; for (mod5 of foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:247",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "import * as mod6 from 'mod'; [mod6] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:251",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 31
+          }
+        ]
+      },
+      {
+        "text": "import * as mod7 from 'mod'; [mod7 = 0] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:255",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 31
+          }
+        ]
+      },
+      {
+        "text": "import * as mod8 from 'mod'; [...mod8] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:259",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 34
+          }
+        ]
+      },
+      {
+        "text": "import * as mod9 from 'mod'; ({ bar: mod9 } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:263",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "text": "import * as mod10 from 'mod'; ({ bar: mod10 = 0 } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:267",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 39
+          }
+        ]
+      },
+      {
+        "text": "import * as mod11 from 'mod'; ({ ...mod11 } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:271",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "line": 1,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "text": "import * as mod1 from 'mod'; mod1.named = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:277",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "import * as mod2 from 'mod'; mod2.named += 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:281",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "import * as mod3 from 'mod'; mod3.named++",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:285",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "import * as mod4 from 'mod'; for (mod4.named in foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:289",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "import * as mod5 from 'mod'; for (mod5.named of foo);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:293",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "import * as mod6 from 'mod'; [mod6.named] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:297",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 31
+          }
+        ]
+      },
+      {
+        "text": "import * as mod7 from 'mod'; [mod7.named = 0] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:301",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 31
+          }
+        ]
+      },
+      {
+        "text": "import * as mod8 from 'mod'; [...mod8.named] = foo",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:305",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 34
+          }
+        ]
+      },
+      {
+        "text": "import * as mod9 from 'mod'; ({ bar: mod9.named } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:309",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "text": "import * as mod10 from 'mod'; ({ bar: mod10.named = 0 } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:313",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 39
+          }
+        ]
+      },
+      {
+        "text": "import * as mod11 from 'mod'; ({ ...mod11.named } = foo)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:317",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "text": "import * as mod12 from 'mod'; delete mod12.named",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:323",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; Object.assign(mod, obj)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:327",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 43
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; Object.defineProperty(mod, key, d)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:331",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 51
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; Object.defineProperties(mod, d)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:335",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 53
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; Object.setPrototypeOf(mod, proto)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:339",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 51
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; Object.freeze(mod)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:343",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 43
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; Reflect.defineProperty(mod, key, d)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:347",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 52
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; Reflect.deleteProperty(mod, key)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:351",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 52
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; Reflect.set(mod, key, value)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:355",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 41
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; Reflect.setPrototypeOf(mod, proto)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:359",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 52
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; mod[\"named\"] = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:365",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; Object?.defineProperty(mod, key, d)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:371",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 52
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; (Object?.defineProperty)(mod, key, d)",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:375",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 54
+          }
+        ]
+      },
+      {
+        "text": "import * as mod from 'mod'; delete mod?.named",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:379",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 36
+          }
+        ]
+      },
+      {
+        "text": "import mod, * as mod_ns from 'mod'; mod.prop = 0; mod_ns.prop = 0",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:385",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "line": 1,
+            "column": 51
+          }
+        ]
+      },
+      {
+        "text": "import { a, b } from \"mod\";\n\t\t\t\t\tb = 1;\n\t\t\t\t\ta = 2;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:418",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'b' is read-only.",
+            "line": 2,
+            "column": 6
+          },
+          {
+            "messageId": "readonly",
+            "message": "'a' is read-only.",
+            "line": 3,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "import { a } from \"a\";\n\t\t\t\t\timport { b } from \"b\";\n\t\t\t\t\tb = 1;\n\t\t\t\t\ta = 2;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:428",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'a' is read-only.",
+            "line": 4,
+            "column": 6
+          },
+          {
+            "messageId": "readonly",
+            "message": "'b' is read-only.",
+            "line": 3,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "a = 1;\n\t\t\t\t\timport { a } from \"mod\";",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:439",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'a' is read-only.",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "ns.value = 1;\n\t\t\t\t\timport * as ns from \"mod\";",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:446",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "message": "The members of 'ns' are read-only.",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "import * as ns from \"mod\";\n\t\t\t\t\t((ns)).value = 1;\n\t\t\t\t\tObject.assign(((ns)), source);\n\t\t\t\t\tdelete (((ns).removed));\n\t\t\t\t\t((Object)).defineProperty(((ns)), key, descriptor);\n\t\t\t\t\tObject[\"assign\"](((ns)), source);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:454",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "message": "The members of 'ns' are read-only.",
+            "line": 2
+          },
+          {
+            "messageId": "readonlyMember",
+            "message": "The members of 'ns' are read-only.",
+            "line": 3
+          },
+          {
+            "messageId": "readonlyMember",
+            "message": "The members of 'ns' are read-only.",
+            "line": 4
+          },
+          {
+            "messageId": "readonlyMember",
+            "message": "The members of 'ns' are read-only.",
+            "line": 5
+          },
+          {
+            "messageId": "readonlyMember",
+            "message": "The members of 'ns' are read-only.",
+            "line": 6
+          }
+        ]
+      },
+      {
+        "text": "import { value } from \"mod\";\n\t\t\t\t\t({ value } = source);\n\t\t\t\t\t({ value = 0 } = source);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:471",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 2
+          },
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 3
+          }
+        ]
+      },
+      {
+        "text": "import { value } from \"mod\";\nfunction f() {\n  /** @import { value } from \"types\" */\n  value = 1;\n}",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:530",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 4,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "import { value } from \"mod\";\nfunction f() {\n  /** @typedef {number} value */\n  value = 1;\n}",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:541",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 4,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "import * as namespace from \"mod\";\nfunction f() {\n  /** @import { namespace } from \"types\" */\n  namespace.member = 1;\n}",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:552",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "message": "The members of 'namespace' are read-only.",
+            "line": 4,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "import { first, second } from \"mod\";\nfunction f() {\n  /** @import { first } from \"types\" */\n  first = 1;\n}\nsecond = 2;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:563",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'first' is read-only.",
+            "line": 4,
+            "column": 3
+          },
+          {
+            "messageId": "readonly",
+            "message": "'second' is read-only.",
+            "line": 6,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "import { callbackValue, other } from \"mod\";\nfunction f() {\n  /** @callback callbackValue */\n  callbackValue = 1;\n}\nother = 2;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:576",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'callbackValue' is read-only.",
+            "line": 4,
+            "column": 3
+          },
+          {
+            "messageId": "readonly",
+            "message": "'other' is read-only.",
+            "line": 6,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "import { value } from \"mod\";\nfunction f(parameter = (value = 1)) { function value() {} }",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:589",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 2,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "import { value } from \"mod\";\nfunction f({ item = (value = 1) } = {}) { const value = 2; }",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:597",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 2,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "import { value } from \"mod\";\nfunction f() {\n  /** @import { Type as value } from \"types\" */\n  { let value; value = 1; }\n  value = 2;\n}",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:605",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 5,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "import * as namespace from \"mod\";\nfunction f() {\n  /** @typedef {object} namespace */\n  Object.assign(namespace, source);\n}",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:617",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "message": "The members of 'namespace' are read-only.",
+            "line": 4,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "text": "import { value } from \"mod\"; value = 1;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:653",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "import * as ns from \"mod\"; Object.assign(ns, value);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:659",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "message": "The members of 'ns' are read-only.",
+            "line": 1,
+            "column": 42
+          }
+        ]
+      },
+      {
+        "text": "import { value } from \"mod\"; ({ value = 0 } = source);",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:665",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 1,
+            "column": 33
+          }
+        ]
+      },
+      {
+        "text": "import { first, second } from \"mod\";\n\t\t\t\t\tsecond = 1;\n\t\t\t\t\tfirst = 2;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:671",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'second' is read-only.",
+            "line": 2
+          },
+          {
+            "messageId": "readonly",
+            "message": "'first' is read-only.",
+            "line": 3
+          }
+        ]
+      },
+      {
+        "text": "import { value, other } from \"mod\";\nfunction f(parameter = (value = 1)) { function value() {} }",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:680",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 2,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "import { value } from \"mod\";\n\t\t\t\t\t{ let value = 0; value = 1; }\n\t\t\t\t\tvalue = 2;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:714",
+        "expected": [
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 3
+          }
+        ]
+      },
+      {
+        "text": "import * as namespace from \"namespace\";\n\t\t\t\t\timport { value } from \"value\";\n\t\t\t\t\tnamespace.member = 1;\n\t\t\t\t\tvalue = 2;",
+        "origin": "internal/rules/no_import_assign/no_import_assign_test.go:722",
+        "expected": [
+          {
+            "messageId": "readonlyMember",
+            "message": "The members of 'namespace' are read-only.",
+            "line": 3
+          },
+          {
+            "messageId": "readonly",
+            "message": "'value' is read-only.",
+            "line": 4
+          }
+        ]
+      }
+    ],
+    "scopeNote": "Frozen e0a29 default options. Explicit props:true cases use the equivalent default; props:false remains outside the frozen rsbuild options. Expected fields retain the frozen assertions; differential oracle compares all diagnostics and fixes."
+  },
+  {
+    "rule": "no-self-assign",
+    "valid": [
+      {
+        "text": "var a = a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:18"
+      },
+      {
+        "text": "a = b",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:19"
+      },
+      {
+        "text": "a += a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:20"
+      },
+      {
+        "text": "a = +a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:21"
+      },
+      {
+        "text": "a = [a]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:22"
+      },
+      {
+        "text": "a &= a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:23"
+      },
+      {
+        "text": "a |= a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:24"
+      },
+      {
+        "text": "let a = a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:25"
+      },
+      {
+        "text": "const a = a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:26"
+      },
+      {
+        "text": "a = a.b",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:27"
+      },
+      {
+        "text": "a = -a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:28"
+      },
+      {
+        "text": "[a] = a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:31"
+      },
+      {
+        "text": "[a = 1] = [a]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:32"
+      },
+      {
+        "text": "[a, b] = [b, a]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:33"
+      },
+      {
+        "text": "[a,, b] = [, b, a]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:34"
+      },
+      {
+        "text": "[x, a] = [...x, a]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:35"
+      },
+      {
+        "text": "[...a] = [...a, 1]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:36"
+      },
+      {
+        "text": "[a, ...b] = [0, ...b, 1]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:37"
+      },
+      {
+        "text": "[a, b] = {a, b}",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:38"
+      },
+      {
+        "text": "({a} = a)",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:41"
+      },
+      {
+        "text": "({a = 1} = {a})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:42"
+      },
+      {
+        "text": "({a: b} = {a})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:43"
+      },
+      {
+        "text": "({a} = {a: b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:44"
+      },
+      {
+        "text": "({a} = {a() {}})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:45"
+      },
+      {
+        "text": "({a} = {[a]: a})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:46"
+      },
+      {
+        "text": "({[a]: b} = {[a]: b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:47"
+      },
+      {
+        "text": "({'foo': a, 1: a} = {'bar': a, 2: a})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:48"
+      },
+      {
+        "text": "({a, ...b} = {a, ...b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:49"
+      },
+      {
+        "text": "({a, ...b} = {c, ...b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:50"
+      },
+      {
+        "text": "({a: b} = {a: c})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:51"
+      },
+      {
+        "text": "a.b = a.c",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:54"
+      },
+      {
+        "text": "a.b = c.b",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:55"
+      },
+      {
+        "text": "a.b = a[b]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:56"
+      },
+      {
+        "text": "a[b] = a.b",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:57"
+      },
+      {
+        "text": "a.b().c = a.b().c",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:58"
+      },
+      {
+        "text": "b().c = b().c",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:59"
+      },
+      {
+        "text": "a[b + 1] = a[b + 1]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:60"
+      },
+      {
+        "text": "a.null = a[/(?<zero>0)/]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:61"
+      },
+      {
+        "text": "this.x = this.y",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:62"
+      },
+      {
+        "text": "a[0] = a[1]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:63"
+      },
+      {
+        "text": "a = {...a}",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:74"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "a = a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:79",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "\\u0061 = \\u0061",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:85",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "message": "'\\u0061' is assigned to itself.",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "[a] = [a]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:93",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "[a, b] = [a, b]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:99",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 11
+          },
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "[a, b] = [a, c]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:106",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "[a, b] = [, b]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:112",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "[a, ...b] = [a, ...b]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:118",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 14
+          },
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "[[a], {b}] = [[a], {b}]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:125",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 16
+          },
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "({a} = {a})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:134",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "({a: b} = {a: b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:140",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "({'a': b} = {'a': b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:146",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "({a: b} = {'a': b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:152",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "text": "({'a': b} = {a: b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:158",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "text": "({1: b} = {1: b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:164",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "({1: b} = {'1': b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:170",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "text": "({'1': b} = {1: b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:176",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "text": "({['a']: b} = {a: b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:182",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "({'a': b} = {[`a`]: b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:188",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "({1: b} = {[1]: b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:194",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "text": "({a, b} = {a, b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:200",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 12
+          },
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "({a, b} = {b, a})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:207",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 15
+          },
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "({a, b} = {c, a})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:214",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "({a: {b}, c: [d]} = {a: {b}, c: [d]})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:220",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 26
+          },
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 34
+          }
+        ]
+      },
+      {
+        "text": "({a, b} = {a, ...x, b})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:227",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "({a} = {a: other, a, a})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:235",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "message": "'a' is assigned to itself.",
+            "line": 1,
+            "column": 19
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'a' is assigned to itself.",
+            "line": 1,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "({a} = {a, ...source, a: other, a})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:243",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 33
+          }
+        ]
+      },
+      {
+        "text": "({\"\": value} = {\"\": value})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:251",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "message": "'value' is assigned to itself.",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "({p00: v00, p01: v01, p02: v02, p03: v03, p04: v04, p05: v05, p06: v06, p07: v07, p08: v08, p09: v09, p10: v10, p11: v11, p12: v12, p13: v13, p14: v14, p15: v15} = {p15: v15, p14: v14, p13: v13, p12: v12, p11: v11, p10: v10, p09: v09, p08: v08, p07: v07, p06: v06, p05: v05, p04: v04, p03: v03, p02: v02, p01: v01, p00: v00})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:260",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "message": "'v00' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v01' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v02' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v03' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v04' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v05' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v06' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v07' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v08' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v09' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v10' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v11' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v12' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v13' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v14' is assigned to itself."
+          },
+          {
+            "messageId": "selfAssignment",
+            "message": "'v15' is assigned to itself."
+          }
+        ]
+      },
+      {
+        "text": "({target} = {p00: v00, p01: v01, p02: v02, p03: v03, p04: v04, p05: v05, p06: v06, p07: v07, p08: v08, p09: v09, p10: v10, p11: v11, p12: v12, p13: v13, p14: v14, p15: v15, p16: v16, p17: v17, p18: v18, p19: v19, p20: v20, p21: v21, p22: v22, p23: v23, p24: v24, p25: v25, p26: v26, p27: v27, p28: v28, p29: v29, p30: v30, p31: v31, target})",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:282",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "message": "'target' is assigned to itself."
+          }
+        ]
+      },
+      {
+        "text": "a.b = a.b",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:290",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "a.b.c = a.b.c",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:296",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "a[b] = a[b]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:302",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "a!.b = a.b",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:312",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "a['b'] = a['b']",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:318",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "class B { x: any } class C extends B { m() { super.x = super.x; } }",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:325",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 56
+          }
+        ]
+      },
+      {
+        "text": "this.x = this.x",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:359",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "a[1] = a[1]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:366",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "a[\"b\"] = a[\"b\"]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:372",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "a[0] = a[0]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:378",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "a.b = a['b']",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:385",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "a['b'] = a.b",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:391",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "a[0] = a['0']",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:398",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "a[\n    'b'\n] = a[\n    'b'\n]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:405",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "a['/(?<zero>0)/'] = a[/(?<zero>0)/]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:412",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "(a?.b).c = (a?.b).c",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:421",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "a.b = a?.b",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:427",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "a[0] = a?.[0]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:433",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "a &&= a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:441",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "a ||= a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:447",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "a ??= a",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:453",
+        "expected": [
+          {
+            "messageId": "selfAssignment",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      }
+    ],
+    "scopeNote": "Frozen e0a29 default options. Explicit props:true cases use the equivalent default; props:false remains outside the frozen rsbuild options. Expected fields retain the frozen assertions; differential oracle compares all diagnostics and fixes.",
+    "notAdmittedCases": [
+      {
+        "text": "a.b = a.b",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:66",
+        "category": "valid",
+        "reason": "Nondefault options: []interface{}{map[string]interface{}{\"props\":false}}"
+      },
+      {
+        "text": "a.b.c = a.b.c",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:67",
+        "category": "valid",
+        "reason": "Nondefault options: []interface{}{map[string]interface{}{\"props\":false}}"
+      },
+      {
+        "text": "a[b] = a[b]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:68",
+        "category": "valid",
+        "reason": "Nondefault options: []interface{}{map[string]interface{}{\"props\":false}}"
+      },
+      {
+        "text": "a['b'] = a['b']",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:69",
+        "category": "valid",
+        "reason": "Nondefault options: []interface{}{map[string]interface{}{\"props\":false}}"
+      },
+      {
+        "text": "this.x = this.x",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:70",
+        "category": "valid",
+        "reason": "Nondefault options: []interface{}{map[string]interface{}{\"props\":false}}"
+      },
+      {
+        "text": "a[0] = a[0]",
+        "origin": "internal/rules/no_self_assign/no_self_assign_test.go:71",
+        "category": "valid",
+        "reason": "Nondefault options: []interface{}{map[string]interface{}{\"props\":false}}"
+      }
+    ]
+  }
+]

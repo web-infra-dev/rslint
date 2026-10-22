@@ -1,0 +1,567 @@
+{
+  "schemaVersion": 1,
+  "scope": "Configured selected fixture diagnostics and fix parity; neither complete rsbuild workload nor full rule behavior acceptance. Root source has subsequent unverified changes.",
+  "sourceHashes": {
+    "crates/rslint-core/tests/rsbuild_type_values_rules.rs": "6003f20d789b583c9141c30e79730f247c0290cb8a616444d372e5a3e4418567",
+    "crates/rslint-core/tests/rsbuild_core_checks_rules.rs": "e6d1605c29a2988b5cb9f9144cfc1a7b2cb58f4ba4ac9a9a64c9835a6f18e7c8",
+    "crates/rslint-core/tests/rsbuild_expression_checks_rules.rs": "80a08986bf9bc29ac5d0bfaffb1055c67c190b6c328bb23dcc88f8bbdd01c4f4",
+    "crates/rslint-core/tests/rsbuild_ts_declarations_rules.rs": "049a22d80fbb65be299b8ea006f742d7917efca8d4a4fb670970dceec909bb7e",
+    "crates/rslint-core/tests/syntax_rules.rs": "5c2e12de4912d22242619b73267a68f07ef4da51fbde3db7d215940764f24dc7",
+    "crates/rslint-core/tests/ts_structural_rules.rs": "c19fd95e6955f69fe71e2e3169d2cca407ac93c7ed6fde2bb716cb0315c1e253",
+    "crates/rslint-core/tests/rsbuild_rstest_rules.rs": "4a7df62571304004bccd386c196c38214bbcbe66af922834ad6498ac2a584d67",
+    "crates/rslint-core/tests/rsbuild_declaration_checks_rules.rs": "5fef022d3f560b70bd341746a18c9bcfec9cccc26d486c01c7180040f8dd261e",
+    "crates/rslint-core/tests/typed_rules.rs": "cf1c1a41c5e8e087c100f650c176f9abbc0ed92662e211feaed38bd75e160a51",
+    "crates/rslint-core/tests/structural_rules.rs": "5627c4fa6096ee9b3b171b57e2e69f91e7d6c4e45538a9fcf0de367f17a3d723",
+    "crates/rslint-core/tests/rsbuild_syntax_rules.rs": "cf8bab3946d1987e35a5567d07b07aa01613c86f28d617b66463bba2895ba903",
+    "crates/rslint-core/tests/rsbuild_unsafe_access_rules.rs": "2b60c3ec0000fcbf8782bc3dd7afa3b59752ab1221a563f1099fe8f6f16debac",
+    "crates/rslint-core/tests/configured_rules.rs": "7ba3cc88e8ef994de64a21cab8c4476f8eeb8e22ca01d076196e374fd3c47f1a",
+    "crates/rslint-core/tests/comments.rs": "70bb40db21d348733993c4c4f1f08d4f91b677a77405a8a33faf59e88550181e",
+    "crates/rslint-core/tests/rsbuild_typed_rules.rs": "c45b864e13ac2afba4d24cbc4262404d04b9a05e82d249bf6f4e796ec2f85d2a",
+    "crates/rslint-core/tests/non_null_rules.rs": "a3442ad4de4153af38046e775524f4f09e4e167509c78dc0326cb88a3e9a50f3",
+    "crates/rslint-core/tests/rsbuild_type_relations_rules.rs": "9e90d62c7ea20dcd8e710d00f11802c322a9723e31e7bbf2ec33e7049bab3886",
+    "crates/rslint-core/tests/rsbuild_literal_rules.rs": "3d3036265bd7596cb4333cd2711515faa75d1c5905ed51ed4e6dd7c75fd653cc",
+    "crates/rslint-core/tests/rsbuild_type_assertion_rules.rs": "5926d5d6b839922206156546f98c340167d26767ca8d6130486fc38e175975cf",
+    "crates/rslint-core/tests/rsbuild_rstest_mock_rules.rs": "1e351e5599d3be488c0946d769e50b2f51a2ceebbacf5a403fa9e78a6b93ce2a",
+    "crates/rslint-core/tests/rsbuild_ts_syntax_rules.rs": "10154ffe79f2bf4824731e94b0befd185af18fbd46bdbaba985bab66650b9033",
+    "crates/rslint-core/tests/rsbuild_assignment_checks_rules.rs": "96afb62714f701b3c400761a17eeb642ec77294e33c6276077e24542d207afc0",
+    "crates/rslint-core/tests/control_flow_rules.rs": "31b8e422c3863d6fcb0cce664baee784b21555066abace8216710bbba84536de",
+    "crates/rslint-core/tests/rsbuild_ts_policy_rules.rs": "11017f573bfcec4b046eda660af4c206552396b03aa1255465367f25a32769c9",
+    "crates/rslint-core/src/lib.rs": "f4b812174a9583d7c01ba1e78bc768ebfebf88cc00908e91f60aeb9804679f92",
+    "crates/rslint-core/src/source.rs": "5b055d644ffef8eb78579818b8df4d01877cf41e20cf96a3fecfa8c70e1ecf98",
+    "crates/rslint-core/src/autofix.rs": "b8f94ff9bf4a7628f5926e6058d2549f664da60f02e54f7cb1fa64ed0d1836c6",
+    "crates/rslint-core/src/comments.rs": "2d654f9e803c7df647265f22909b2f4525c3b6ec361b9e2eb221a8870147b7fb",
+    "crates/rslint-core/src/tests.rs": "41c9ab4018d080dc4f0f871a5e1d17496164c90c88823614f6a70ceb048b1f37",
+    "crates/rslint-core/src/projects.rs": "f2713645c346405f78f83ccc9d8bc09a5168768601e24eb20392457906343438",
+    "crates/rslint-core/src/configured.rs": "b5030df301cbc3b28c511bdbc8c42ba9918a6e9deabccb63cf0b5d7648048c12",
+    "crates/rslint-core/src/edits.rs": "d7e438881507f7997e81117afece3a6443153d2e269b591f51a65a3416dd54d7",
+    "crates/rslint-core/src/directives.rs": "3264e14036199e706c2b31d6cb3863da325bf29462088f1a2c0f027c3d7d4d84",
+    "crates/rslint-core/src/programs.rs": "2f402bb000b6c7bfe810b26bb9dda9da16db93015aeb1e6690076d34acda5925",
+    "crates/rslint-core/src/rules/rsbuild_ts_declarations.rs": "992b700ba239ebe987f6a60ddd5c6784f79d44c84fe7d1d8546d2fcaf520696c",
+    "crates/rslint-core/src/rules/control_flow.rs": "bc8e2f26cc06f939a89f976b979e327734780789fc064d37fd1f054cc121b60a",
+    "crates/rslint-core/src/rules/rsbuild_type_relations.rs": "99c023bbf51a1072c91f776125c75f2276957723fd8c5ac5d0c965db9bd7f12d",
+    "crates/rslint-core/src/rules/rsbuild_literals.rs": "83151cae017ec8d58563ff9c6681cd6ce4a57f2e1d0acf07c631f44181d00cf0",
+    "crates/rslint-core/src/rules/rsbuild_rstest_mock.rs": "f7065098d9b7b2b7d955c6864c7608f47fe7dd54f883f7269d5ca15504733caf",
+    "crates/rslint-core/src/rules/rsbuild_ts_policy.rs": "df242a2e6d6801919d54d5cda76ca5cb02a81d68c693c8dc7a9d50b80d0ffdf7",
+    "crates/rslint-core/src/rules/rsbuild_type_values.rs": "b579d7b5fe035b55c2031efac3a68ece0938387cef3e7cb6f32bb5a304a0dd04",
+    "crates/rslint-core/src/rules/rsbuild_type_assertion.rs": "7ea7908e900c6fc58fca4d343c9b437c6017af31667d7a13aeae31931635274d",
+    "crates/rslint-core/src/rules/rsbuild_assignment_checks.rs": "36d32b34e515ada19693afbbda84029a00bf62614c839eba103c5575c597528b",
+    "crates/rslint-core/src/rules/rsbuild_unsafe_access.rs": "bb46b9fccdbbcfb354d37df0dffc9aa4f9ae7b42a4d23f648b04248a2d8f2aef",
+    "crates/rslint-core/src/rules/structural.rs": "b5e2dfb8030e6b6a6450041411df078897bca3a770c049efb02905a25b2e7785",
+    "crates/rslint-core/src/rules/rsbuild_expression_checks.rs": "bf7dcab5a4767945accc44925b2d60386451138eefbdb00ed3889c9e80324159",
+    "crates/rslint-core/src/rules/typed.rs": "49d7d4f8bce3a241da03088c4473610d954628830d1ba0a33523e5c73865303d",
+    "crates/rslint-core/src/rules/rsbuild_typed.rs": "c58c9972e4de96b0825b04799cf328f0a7bbb3147d9b09c46c45613e72dc99e0",
+    "crates/rslint-core/src/rules/rsbuild_core_checks.rs": "c8dbf7f13e282f7c5d3eb7d4b534f5a6ed66a14a9c707debc56e35ed4cb917bb",
+    "crates/rslint-core/src/rules/mod.rs": "b68c0f91fc5407c47f7657e73689e8135a38f78f90f615a45e7a3749926d9047",
+    "crates/rslint-core/src/rules/rsbuild_syntax.rs": "02fc61167bff47ee7cc2635c1c655510a874dc8e25eb49f3cfb645c46fc982d9",
+    "crates/rslint-core/src/rules/non_null.rs": "51b38cfec22d08c39d9716b4a572172ff5a633af2834af9a779f12bb77ee1742",
+    "crates/rslint-core/src/rules/rsbuild_rstest.rs": "fb1344a671e0511509f8253ff4245db94e276f80034225fd44857290f1d38561",
+    "crates/rslint-core/src/rules/rsbuild_ts_syntax.rs": "71fd4d28bda57562bcb2ca7d0613b07ca7c9ca71abc273d29df749c1b651fd8e",
+    "crates/rslint-core/src/rules/rsbuild_declaration_checks.rs": "6ba863edac8f7af5d675e347e5bc0c25cf576f7f5892f3423ce3857cccdd27f0",
+    "crates/rslint-core/src/rules/go_quote.rs": "bdfd8024fe7787ddc0e5c0c4d0d622ba89aef5d5f86ea53365c46a99c8eccf8a",
+    "crates/rslint-core/src/rules/syntax.rs": "69c3b1f0f8646095144722655abf661dec39a865f6b9808a6aab51c4699b7df6",
+    "crates/rslint-core/src/rules/ts_structural.rs": "6fba290a6b7db0fce1cb131cf076aee40c35b65a594c95f45152060860c0da2c",
+    "crates/rslint-core/Cargo.toml": "2ede0bf45a8198c6871c40d6fbda555315254cfbb3fc6c846ff4f1a03b68a049",
+    "crates/rslint-native/src/memory_transport.rs": "1db3105ae9e01f7672194b6d4a8c72ed4a1269e90ca4e53e6b1285c695c44e68",
+    "crates/rslint-native/src/parser_worker_test.rs": "f8fb353c17b2158662590941e88d61c2dca1ca4fac106f515ba07474c9963cb9",
+    "crates/rslint-native/src/lib.rs": "c6a774b032a75797bcbe83f0fa5e4f61918c01f670e1d17e72470cfaedc96176",
+    "crates/rslint-native/src/token_map.rs": "303ed23095b159cf1cdd562c2070ee6903211f62ecbea553e2f93d028be08725",
+    "crates/rslint-native/src/rust_lint.rs": "a0c0cd10d4e0ecc242a231c9ba3b8486e0dc475ffeed3f71311661d6d1226ca5",
+    "crates/rslint-native/src/parse.rs": "a24c6bcc5b70461120fa12845cc3af7bee2f156af41bcfd74b6320e5be117c1f",
+    "crates/rslint-native/tests/rust-lint.test.mjs": "d4492dda5752236e17b0b1b23e38a1f2a30433b6b10b244a16ba5d495c7c5828",
+    "Cargo.lock": "a40183995df5851796831435c12b80b97ddc375ab74d917cefccc98ffb4a10ce",
+    "packages/rslint/src/rust/projects.ts": "2827accbf5dc70f5a3632534d131f8f3a06f5fce3ae98db5a3f16ea404664142",
+    "packages/rslint/src/rust/admission.ts": "539074d498d247a6ceb3c4fc637bfddd35f7c2650084d583af30a0b8f9bedfce",
+    "packages/rslint/src/rust/engine.ts": "61caf240715a0406614441b1f714aa04c9b1454198be3c0cb5f15a628a1a29a1",
+    "packages/rslint/src/rust/index.ts": "147b46218f30fb6d3b53648b43f67222ced5261b49fc35c510094bef34c53d47",
+    "scripts/tsrs/oracle-cases/rsbuild-rstest-mock.json": "954c22c51489469cc42833f762e604b1147de05fbaa20fa4f14082d0abbbd0bd",
+    "scripts/tsrs/oracle-cases/rsbuild-syntax.json": "53bcaed5ad5426f70d36e31063b2a5d2b15aaeb6695062009859b663aa639f23",
+    "scripts/tsrs/oracle-cases/rsbuild-type-relations.json": "20a1668da087865e8622bb9964aef759d7c0686905bc849c92c2e98f5dfdff4b",
+    "scripts/tsrs/oracle-cases/rsbuild-ts-syntax.json": "7852ec71bde784dc6c564fb033090edb0ff899b7d012edd766aef8afb6f7d4b6",
+    "scripts/tsrs/oracle-cases/rsbuild-type-values.json": "961b4e677061ececfc1816cecac3f9699ae18f51dc5eeb12f69043e503de7593",
+    "scripts/tsrs/oracle-cases/rsbuild-expression-checks.json": "8db6a394ac6a0c2efd7129e4ad765b3189561bbc8594aa1ee4717d8d22552c04",
+    "scripts/tsrs/oracle-cases/rsbuild-core-checks.json": "b45e1c37d3199409df82e89b597c45d0ee94455e8987198a1e5dec4dd33e0c79",
+    "scripts/tsrs/oracle-cases/directive-cases.json": "17c51450ea4ddbc46d59105a650f9981fad3cfeb7b10692a86156d5d99f078a4",
+    "scripts/tsrs/oracle-cases/rsbuild-declaration-checks.json": "b5c826a918d85e371c12ad0673bae86f534f860c5f3641c0ba3521d23a063e7c",
+    "scripts/tsrs/oracle-cases/rsbuild-ts-declarations.json": "910ca4436c26dd9381bafee9b54451998ef1df10c902da7bfbd0654e0d567d3a",
+    "scripts/tsrs/oracle-cases/rsbuild-rstest.json": "70d6217f01feb9fcbc3dcff92854128b6c435484f0260718d87f45ace17a73bf",
+    "scripts/tsrs/oracle-cases/rsbuild-unsafe-access.json": "384a96678620c4f62b83557ef57375ff81bf4d2a48318556ec857ff2dfcc461a",
+    "scripts/tsrs/oracle-cases/rsbuild-type-assertion.json": "ee802b2df3258da91f1ab8ed93ef8688bc41d000f69beb1253364a63661a6710",
+    "scripts/tsrs/oracle-cases/rsbuild-typed.json": "e843338c8e8768fabc554bf0a1cfeda481fcbc3f91656023b5bbb35193a83eb0",
+    "scripts/tsrs/oracle-cases/rsbuild-literals.json": "015dde88b75c03240fc258be5d242e5ce0e2a0df581ee738447eaa0b491a70f3",
+    "scripts/tsrs/oracle-cases/rsbuild-ts-policy.json": "549ca8eb0741f8dd18a2fe78c8bb2538bda4d62969667be82022d2bbf55d48a7",
+    "scripts/tsrs/oracle-cases/rsbuild-assignment-checks.json": "7ca829e7468ab1a6c72aab020f12f028b139bdb27359a5e3ae1728cc9ccb7ff7",
+    "scripts/tsrs/rust-rule-oracle.mjs": "0e7d48b36c4811adb6b1481ca432b42126b723911d923c3ea32e5e81e7e0f36c"
+  },
+  "steps": [
+    {
+      "name": "clippy",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 2.594285
+    },
+    {
+      "name": "native-build",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 65.262801875
+    },
+    {
+      "name": "node-runtime",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 0.2978900840000023
+    },
+    {
+      "name": "js-api",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 0.8289892909999992
+    },
+    {
+      "name": "project-oracle",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 2.1472022500000065
+    },
+    {
+      "name": "oracle",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 0.5419575410000022
+    },
+    {
+      "name": "configured-oracle-rsbuild-syntax",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 5.930361082999994
+    },
+    {
+      "name": "configured-oracle-rsbuild-ts-syntax",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 7.356240124999999
+    },
+    {
+      "name": "configured-oracle-rsbuild-typed",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 5.406790084000008
+    },
+    {
+      "name": "configured-oracle-rsbuild-literals",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 3.0333323750000005
+    },
+    {
+      "name": "configured-oracle-rsbuild-ts-declarations",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 10.382975875
+    },
+    {
+      "name": "configured-oracle-rsbuild-unsafe-access",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 6.116126667000003
+    },
+    {
+      "name": "configured-oracle-rsbuild-core-checks",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 22.294341540999994
+    },
+    {
+      "name": "configured-oracle-rsbuild-type-values",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 8.142730749999998
+    },
+    {
+      "name": "configured-oracle-rsbuild-ts-policy",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 13.296029666999999
+    },
+    {
+      "name": "configured-oracle-directive-cases",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 2.7856817499999806
+    },
+    {
+      "name": "configured-oracle-rsbuild-declaration-checks",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 53.38583625000001
+    },
+    {
+      "name": "configured-oracle-rsbuild-assignment-checks",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 30.747659833
+    },
+    {
+      "name": "configured-oracle-rsbuild-rstest",
+      "exit_code": 1,
+      "expected_exit": 0,
+      "seconds": 21.074554957999993
+    },
+    {
+      "name": "configured-oracle-rsbuild-rstest-mock",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 8.602756542000009
+    },
+    {
+      "name": "configured-oracle-rsbuild-type-relations",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 15.480649249999999
+    },
+    {
+      "name": "configured-oracle-rsbuild-type-assertion",
+      "exit_code": 1,
+      "expected_exit": 0,
+      "seconds": 27.63083670900005
+    },
+    {
+      "name": "configured-oracle-rsbuild-expression-checks",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "seconds": 18.667617250000035
+    }
+  ],
+  "fixtureReports": [
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "17c51450ea4ddbc46d59105a650f9981fad3cfeb7b10692a86156d5d99f078a4",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/directive-cases.json",
+      "inputs": 37,
+      "checks": 74,
+      "failedChecks": 0,
+      "reportSHA256": "6d0929d9b262ad28a25ea92f00d31c97e2600b9a82ba83de37593261fdbe19e7",
+      "rules": ["@typescript-eslint/no-extra-non-null-assertion", "no-debugger"]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "7ca829e7468ab1a6c72aab020f12f028b139bdb27359a5e3ae1728cc9ccb7ff7",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-assignment-checks.json",
+      "inputs": 458,
+      "checks": 916,
+      "failedChecks": 0,
+      "reportSHA256": "89deb544746010dd2756c13fc2e3591642bf06b572d5ec414868647a9fe8514d",
+      "rules": [
+        "no-class-assign",
+        "no-const-assign",
+        "no-ex-assign",
+        "no-func-assign",
+        "no-import-assign",
+        "no-self-assign"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "b45e1c37d3199409df82e89b597c45d0ee94455e8987198a1e5dec4dd33e0c79",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-core-checks.json",
+      "inputs": 328,
+      "checks": 656,
+      "failedChecks": 0,
+      "reportSHA256": "90460a9cb3ae45d4815960628c90c9495db34c20ffd89ce21c82b91bba44b788",
+      "rules": [
+        "for-direction",
+        "no-async-promise-executor",
+        "no-empty",
+        "no-unsafe-negation",
+        "valid-typeof"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "b5c826a918d85e371c12ad0673bae86f534f860c5f3641c0ba3521d23a063e7c",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-declaration-checks.json",
+      "inputs": 794,
+      "checks": 1588,
+      "failedChecks": 0,
+      "reportSHA256": "03cf95b2d8d6a20b8f48df9751111e14e7d4716a434675b398a4703ec8afffd2",
+      "rules": [
+        "no-cond-assign",
+        "no-dupe-class-members",
+        "no-dupe-keys",
+        "no-prototype-builtins",
+        "no-setter-return",
+        "no-shadow-restricted-names"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "8db6a394ac6a0c2efd7129e4ad765b3189561bbc8594aa1ee4717d8d22552c04",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-expression-checks.json",
+      "inputs": 277,
+      "checks": 554,
+      "failedChecks": 0,
+      "reportSHA256": "6c705db33756c00cd6fe830d31e3869cf65092dc17b2287f0f8d0a187b07dc9b",
+      "rules": [
+        "no-extra-boolean-cast",
+        "prefer-rest-params",
+        "prefer-spread",
+        "use-isnan"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "015dde88b75c03240fc258be5d242e5ce0e2a0df581ee738447eaa0b491a70f3",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-literals.json",
+      "inputs": 45,
+      "checks": 90,
+      "failedChecks": 0,
+      "reportSHA256": "d23de48d3cf783a31c3ca9e168c7f74b2887b65421f16c131b3b1b252ce64590",
+      "rules": [
+        "no-empty-character-class",
+        "no-nonoctal-decimal-escape",
+        "no-octal"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "954c22c51489469cc42833f762e604b1147de05fbaa20fa4f14082d0abbbd0bd",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-rstest-mock.json",
+      "inputs": 126,
+      "checks": 252,
+      "failedChecks": 0,
+      "reportSHA256": "eca4a7b8a2a5255f45f7c4df3de6cb7cb0226da1441666a2bbb68d939636c3e7",
+      "rules": ["rstest/no-async-mock-factory"]
+    },
+    {
+      "status": "failed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "70d6217f01feb9fcbc3dcff92854128b6c435484f0260718d87f45ace17a73bf",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-rstest.json",
+      "inputs": 298,
+      "checks": 596,
+      "failedChecks": 6,
+      "reportSHA256": "a23530c58edef321b2151b085a5b22b1b52550f574d9dd0fab5d6a0c7706246f",
+      "rules": [
+        "rstest/no-disabled-tests",
+        "rstest/no-focused-tests",
+        "rstest/no-import-node-test",
+        "rstest/no-interpolation-in-snapshots",
+        "rstest/no-mocks-import"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "53bcaed5ad5426f70d36e31063b2a5d2b15aaeb6695062009859b663aa639f23",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-syntax.json",
+      "inputs": 86,
+      "checks": 172,
+      "failedChecks": 0,
+      "reportSHA256": "ff3e62c573ff710480629b9919f0348dafc6d8581e419df5119eb2070ac5c8d2",
+      "rules": [
+        "no-case-declarations",
+        "no-duplicate-case",
+        "no-empty-pattern",
+        "no-empty-static-block",
+        "require-yield"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "910ca4436c26dd9381bafee9b54451998ef1df10c902da7bfbd0654e0d567d3a",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-ts-declarations.json",
+      "inputs": 147,
+      "checks": 294,
+      "failedChecks": 0,
+      "reportSHA256": "5aac1c1d55c6b6a2354dbad66a3956d2533fc06addc4b5b28180efdd4c1fadcb",
+      "rules": [
+        "@typescript-eslint/no-array-constructor",
+        "@typescript-eslint/no-empty-object-type",
+        "@typescript-eslint/no-namespace",
+        "@typescript-eslint/no-this-alias"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "549ca8eb0741f8dd18a2fe78c8bb2538bda4d62969667be82022d2bbf55d48a7",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-ts-policy.json",
+      "inputs": 191,
+      "checks": 382,
+      "failedChecks": 0,
+      "reportSHA256": "917a765029b8784baffd462bf4ae31e9d309e5c612a9f6458a4b59599e2c108d",
+      "rules": [
+        "@typescript-eslint/ban-ts-comment",
+        "@typescript-eslint/no-require-imports",
+        "@typescript-eslint/no-unused-expressions",
+        "@typescript-eslint/triple-slash-reference"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "7852ec71bde784dc6c564fb033090edb0ff899b7d012edd766aef8afb6f7d4b6",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-ts-syntax.json",
+      "inputs": 103,
+      "checks": 206,
+      "failedChecks": 0,
+      "reportSHA256": "2456683c8b76a800e6f2218d2d7117990bdbf5de5bfc698e3c770d553b292025",
+      "rules": [
+        "@typescript-eslint/no-unnecessary-type-constraint",
+        "@typescript-eslint/no-unsafe-function-type",
+        "@typescript-eslint/no-wrapper-object-types",
+        "@typescript-eslint/prefer-as-const",
+        "@typescript-eslint/prefer-namespace-keyword"
+      ]
+    },
+    {
+      "status": "failed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "ee802b2df3258da91f1ab8ed93ef8688bc41d000f69beb1253364a63661a6710",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-type-assertion.json",
+      "inputs": 354,
+      "checks": 708,
+      "failedChecks": 1,
+      "reportSHA256": "e33005da51d2b087c1397cdee5b248a816680fbaf6c6f96d35d83ec64c201ac6",
+      "rules": ["@typescript-eslint/no-unnecessary-type-assertion"]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "20a1668da087865e8622bb9964aef759d7c0686905bc849c92c2e98f5dfdff4b",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-type-relations.json",
+      "inputs": 214,
+      "checks": 428,
+      "failedChecks": 0,
+      "reportSHA256": "6a290d7832b35ce24b398a4229ca9196728208703488f6396a323a906ae60abe",
+      "rules": [
+        "@typescript-eslint/no-duplicate-type-constituents",
+        "@typescript-eslint/no-redundant-type-constituents"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "961b4e677061ececfc1816cecac3f9699ae18f51dc5eeb12f69043e503de7593",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-type-values.json",
+      "inputs": 115,
+      "checks": 230,
+      "failedChecks": 0,
+      "reportSHA256": "0697c938bd76bd04e0e68eae44095d73f645cfc2513fa0eb7fc3ef809166c2a1",
+      "rules": [
+        "@typescript-eslint/prefer-promise-reject-errors",
+        "@typescript-eslint/restrict-template-expressions"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "e843338c8e8768fabc554bf0a1cfeda481fcbc3f91656023b5bbb35193a83eb0",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-typed.json",
+      "inputs": 80,
+      "checks": 160,
+      "failedChecks": 0,
+      "reportSHA256": "983267b1a570df9f5a7ead8cc9d220df62a0ce54a386e4b4cbc7d3f3d96074a6",
+      "rules": [
+        "@typescript-eslint/no-array-delete",
+        "@typescript-eslint/no-for-in-array",
+        "@typescript-eslint/only-throw-error",
+        "@typescript-eslint/restrict-plus-operands"
+      ]
+    },
+    {
+      "status": "passed",
+      "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+      "node": "v24.20.0",
+      "addonSha256": "09657a334fc77024c879fdbd522da71a7e074db3c6ed944b4734ef961232c23d",
+      "casesSha256": "384a96678620c4f62b83557ef57375ff81bf4d2a48318556ec857ff2dfcc461a",
+      "candidateEntryPoint": "lintProjectsTsrsSync",
+      "caseFile": "scripts/tsrs/oracle-cases/rsbuild-unsafe-access.json",
+      "inputs": 91,
+      "checks": 182,
+      "failedChecks": 0,
+      "reportSHA256": "8de8e95a16004bbcba1838a052ef19fa10b1a2f7645cab6bafe1e52e58244f56",
+      "rules": [
+        "@typescript-eslint/no-unsafe-call",
+        "@typescript-eslint/no-unsafe-member-access"
+      ]
+    }
+  ],
+  "totalInputs": 3744,
+  "totalChecks": 7488,
+  "failedChecks": 7,
+  "performanceAccepted": false
+}

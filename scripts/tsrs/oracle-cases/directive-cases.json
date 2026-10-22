@@ -1,0 +1,56 @@
+[
+  {
+    "rule": "no-debugger",
+    "valid": [
+      "/* eslint-disable no-debugger */ debugger;",
+      "// rslint-disable\ndebugger;",
+      "// rslint-disable-next-line no-debugger -- intentional\ndebugger;",
+      "debugger; // eslint-disable-line no-debugger",
+      "/* eslint-disable */ /* eslint-enable no-console */ debugger;",
+      "/* eslint-disable no-debugger */ debugger; /* eslint-enable */ const fine = 1;",
+      "// eslint-disable-next-line no-debugger\r\ndebugger;",
+      "// eslint-disable-next-line no-debugger debugger;",
+      "/* eslint-disable-next-line no-debugger\n -- reason */ debugger;",
+      "/* eslint-disable */ /* eslint-enable-line */ debugger;",
+      "/* eslint-disableno-debugger */ debugger;",
+      "/* eslint-disable , , */ debugger;",
+      "/*eslint-disable no-debugger */ debugger;",
+      "debugger; // eslint-disable-line *",
+      "#!/usr/bin/env node\n// eslint-disable-next-line\ndebugger;"
+    ],
+    "invalid": [
+      "debugger; /* eslint-disable no-debugger */",
+      "/* eslint-disable no-debugger */ debugger; /* eslint-enable no-debugger */ debugger;",
+      "/* eslint-disable */ /* eslint-enable no-debugger */ debugger;",
+      "/* eslint-disable no-console */ debugger;",
+      "/* eslint-disabled no-debugger */ debugger;",
+      "/* eslint-disable * */ debugger;",
+      "/* ESLINT-DISABLE */ debugger;",
+      "// eslint-disable-next-line no-debugger\nconst fine = 1;\ndebugger;",
+      "const s = \"/* eslint-disable */\"; debugger;",
+      "const s = `// eslint-disable`; debugger;",
+      "const r = /[/* eslint-disable */]/; debugger;",
+      {
+        "text": "const element = <div>/* eslint-disable */</div>; debugger;",
+        "extension": ".tsx"
+      },
+      "/* 😀 */ debugger; /* eslint-disable */ debugger;",
+      "debugger; // eslint-disable-line no-debugger\ndebugger;",
+      "/* eslint-disable no-debugger\t--\treason */ debugger;",
+      "/* eslint-disable no-debugger --- reason */ debugger;"
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-extra-non-null-assertion",
+    "valid": [
+      "/* eslint-disable @typescript-eslint/no-extra-non-null-assertion */ let value: string | null = null; value!!;",
+      "let value: string | null = null; value!!; // rslint-disable-line @typescript-eslint/no-extra-non-null-assertion",
+      "let value: string | null = null;\n// eslint-disable-next-line\nvalue!!;"
+    ],
+    "invalid": [
+      "let value: string | null = null;\n/* eslint-disable @typescript-eslint/no-extra-non-null-assertion */ value!!;\n/* eslint-enable @typescript-eslint/no-extra-non-null-assertion */ value!!;",
+      "let value: string | null = null; value!!; /* eslint-disable @typescript-eslint/no-extra-non-null-assertion */",
+      "let value: string | null = null;\n// eslint-disable-next-line\nvalue!!;\nvalue!!!;"
+    ]
+  }
+]

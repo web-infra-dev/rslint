@@ -1,0 +1,199 @@
+diff --git a/crates/tsrs_api/src/checker/handlers_symbols.rs b/crates/tsrs_api/src/checker/handlers_symbols.rs
+index bcfe98b..63f3e98 100644
+--- a/crates/tsrs_api/src/checker/handlers_symbols.rs
++++ b/crates/tsrs_api/src/checker/handlers_symbols.rs
+@@ -198,7 +198,7 @@ pub(crate) fn alias_query(
+ pub(crate) fn get_fully_qualified_name(host: &dyn CheckerHost, p: &Params) -> CheckerResult<Value> {
+     let mut s = setup(host, p)?;
+     let symbol = s.resolve_symbol(&p.symbol_ref("symbol")?)?;
+-    Ok(Value::String(s.c().get_fully_qualified_name_exported(symbol)))
++    super::rslint::wire_string(p, s.c().get_fully_qualified_name_exported(symbol))
+ }
+ 
+ pub(crate) fn get_exports_of_module(host: &dyn CheckerHost, p: &Params) -> CheckerResult<Value> {
+diff --git a/crates/tsrs_api/src/checker/handlers_types.rs b/crates/tsrs_api/src/checker/handlers_types.rs
+index 29822cb..0d53b89 100644
+--- a/crates/tsrs_api/src/checker/handlers_types.rs
++++ b/crates/tsrs_api/src/checker/handlers_types.rs
+@@ -386,7 +386,7 @@ pub(crate) fn get_apparent_properties_of_type(
+ pub(crate) fn get_property_of_type(host: &dyn CheckerHost, p: &Params) -> CheckerResult<Value> {
+     let mut s = setup(host, p)?;
+     let t = s.resolve_type(p.u32("type")?)?;
+-    let prop = s.c().get_property_of_type_exported(t, p.string("name")?);
++    let prop = s.c().get_property_of_type_exported(t, &p.byte_string("name")?);
+     s.opt_symbol_response(prop)
+ }
+ 
+@@ -396,7 +396,7 @@ pub(crate) fn get_type_of_property_of_type(
+ ) -> CheckerResult<Value> {
+     let mut s = setup(host, p)?;
+     let t = s.resolve_type(p.u32("type")?)?;
+-    let prop_type = s.c().get_type_of_property_of_type_exported(t, p.string("name")?);
++    let prop_type = s.c().get_type_of_property_of_type_exported(t, &p.byte_string("name")?);
+     s.opt_type_response(prop_type)
+ }
+ 
+@@ -737,7 +737,7 @@ pub(crate) fn type_to_string(host: &dyn CheckerHost, p: &Params) -> CheckerResul
+         TypeFormatFlags::AllowUniqueESSymbolType
+             | TypeFormatFlags::UseAliasDefinedOutsideCurrentScope
+     };
+-    Ok(Value::String(s.c().type_to_string_ex_exported(t, enclosing, flags, None)))
++    super::rslint::wire_string(p, s.c().type_to_string_ex_exported(t, enclosing, flags, None))
+ }
+ 
+ pub(crate) fn type_to_type_node(
+diff --git a/crates/tsrs_api/src/checker/params.rs b/crates/tsrs_api/src/checker/params.rs
+index 166d947..f9d4972 100644
+--- a/crates/tsrs_api/src/checker/params.rs
++++ b/crates/tsrs_api/src/checker/params.rs
+@@ -111,6 +111,25 @@ impl<'a> Params<'a> {
+         Ok(Params { obj: object(v, &pointer)?, pointer, value: v })
+     }
+ 
++    /// Exact compiler strings use byte arrays: JSON strings replace lone-surrogate WTF-8.
++    pub(crate) fn byte_string(&self, name: &str) -> CheckerResult<std::borrow::Cow<'a, str>> {
++        let key = format!("{name}Bytes");
++        let Some(raw) = self.raw(&key) else { return self.string(name).map(std::borrow::Cow::Borrowed); };
++        let Value::Array(values) = raw else { return Err(wrong_type(&key, "a byte array")); };
++        let bytes = values.iter().map(|v| unsigned(v, &key, 255.0).map(|n| n as u8)).collect::<CheckerResult<Vec<_>>>()?;
++        // The compiler represents JavaScript strings as UTF-8 plus encoded surrogate code units.
++        // Reject every other invalid sequence before constructing that established representation.
++        let mut rest = bytes.as_slice();
++        while let Err(error) = std::str::from_utf8(rest) {
++            rest = &rest[error.valid_up_to()..];
++            if rest.len() < 3 || rest[0] != 0xed || !(0xa0..=0xbf).contains(&rest[1]) || !(0x80..=0xbf).contains(&rest[2]) {
++                return Err(wrong_type(&key, "UTF-8 or WTF-8 bytes"));
++            }
++            rest = &rest[3..];
++        }
++        Ok(std::borrow::Cow::Owned(unsafe { String::from_utf8_unchecked(bytes) }))
++    }
++
+     pub(crate) fn raw(&self, name: &str) -> Option<&'a Value> {
+         get(self.obj, name)
+     }
+diff --git a/crates/tsrs_api/src/checker/rslint.rs b/crates/tsrs_api/src/checker/rslint.rs
+index 303c51e..8b79d00 100644
+--- a/crates/tsrs_api/src/checker/rslint.rs
++++ b/crates/tsrs_api/src/checker/rslint.rs
+@@ -45,7 +45,7 @@ pub(super) fn handle(host: &dyn CheckerHost, method: &str, params: &Value) -> Ch
+             if p.raw("verbosity").is_some() {
+                 return Err(CheckerError::unsupported("rslint/typeToString verbosity context"));
+             }
+-            Ok(Value::String(s.c().type_to_string_ex_exported(t, node, flags, None)))
++            wire_string(&p, s.c().type_to_string_ex_exported(t, node, flags, None))
+         }
+         "rslint/getPromisedTypeOfPromise" => {
+             let t = s.resolve_type(p.u32("type")?)?;
+@@ -58,7 +58,7 @@ pub(super) fn handle(host: &dyn CheckerHost, method: &str, params: &Value) -> Ch
+         }
+         "rslint/getPropertyNameFromType" => {
+             let t = s.resolve_type(p.u32("type")?)?;
+-            Ok(Value::String(tsrs_checker::get_property_name_from_type_exported(t).into_owned()))
++            wire_string(&p, tsrs_checker::get_property_name_from_type_exported(t).into_owned())
+         }
+         "rslint/getSymbolFlags" => {
+             let symbol = s.resolve_symbol(&p.symbol_ref("symbol")?)?;
+@@ -90,7 +90,7 @@ pub(super) fn handle(host: &dyn CheckerHost, method: &str, params: &Value) -> Ch
+         "rslint/getSymbolsOfParameterPropertyDeclaration" => {
+             let node = s.resolve_node(p.string("location")?)?;
+             let (parameter, property) =
+-                s.c().get_symbols_of_parameter_property_declaration(node, p.string("name")?);
++                s.c().get_symbols_of_parameter_property_declaration(node, &p.byte_string("name")?);
+             Ok(object([
+                 ("parameter", s.symbol_response(parameter)?),
+                 ("property", s.symbol_response(property)?),
+@@ -159,7 +159,7 @@ pub(super) fn handle(host: &dyn CheckerHost, method: &str, params: &Value) -> Ch
+                 ));
+             }
+             let symbol = s.c().get_global_symbol_exported(
+-                p.string("name")?,
++                &p.byte_string("name")?,
+                 SymbolFlags::from_bits_retain(p.u32("meaning")?),
+                 None,
+             );
+@@ -189,10 +189,10 @@ pub(super) fn handle(host: &dyn CheckerHost, method: &str, params: &Value) -> Ch
+         "rslint/getAccessedPropertyName" => {
+             let node = s.resolve_node(p.string("location")?)?;
+             let (name, ok) = s.c().get_accessed_property_name(node);
+-            Ok(object([("name", Value::String(name.into_owned())), ("ok", Value::Bool(ok))]))
++            Ok(object([("nameBytes", string_bytes(&name)), ("name", Value::String(name.into_owned())), ("ok", Value::Bool(ok))]))
+         }
+         "rslint/getPropertyNameForKnownSymbolName" => {
+-            Ok(Value::String(s.c().get_property_name_for_known_symbol_name(p.string("name")?)))
++            wire_string(&p, s.c().get_property_name_for_known_symbol_name(&p.byte_string("name")?))
+         }
+         "rslint/symbolGraph" => {
+             let root = s.resolve_symbol(&p.symbol_ref("symbol")?)?;
+@@ -202,6 +202,14 @@ pub(super) fn handle(host: &dyn CheckerHost, method: &str, params: &Value) -> Ch
+     }
+ }
+ 
++pub(super) fn string_bytes(text: &str) -> Value {
++    Value::Array(text.as_bytes().iter().map(|b| Value::Number(*b as f64)).collect())
++}
++
++pub(super) fn wire_string(p: &Params<'_>, text: String) -> CheckerResult<Value> {
++    Ok(if p.bool("byteStrings")? { string_bytes(&text) } else { Value::String(text) })
++}
++
+ fn optional_node(s: &Setup<'_>, handle: &str) -> CheckerResult<Option<P<Node>>> {
+     if handle.is_empty() { Ok(None) } else { s.resolve_node(handle).map(Some) }
+ }
+@@ -223,6 +231,11 @@ fn symbol_table(
+     queue: &mut Vec<P<Symbol>>,
+     seen: &mut FxHashSet<u64>,
+ ) -> Value {
++    if table.entries().iter().any(|(name, _)| std::str::from_utf8(name.as_bytes()).is_err()) {
++        return Value::Array(table.entries().into_iter().map(|(name, symbol)| {
++            Value::Array(vec![string_bytes(name), symbol_id(symbol, queue, seen)])
++        }).collect());
++    }
+     Value::Object(
+         table
+             .entries()
+@@ -243,8 +256,10 @@ fn symbol_graph(s: &Setup<'_>, root: P<Symbol>) -> CheckerResult<Value> {
+         let Value::Object(mut row) = s.symbol_response(symbol)? else { unreachable!() };
+         let id = tsrs_ast::get_symbol_id(symbol).0.to_string();
+         row.insert("id".into(), Value::String(id.clone()));
+-        row.insert("name".into(), Value::String(symbol.name().to_string()));
+-        row.insert("apiName".into(), Value::String(tsrs_ast::escape_symbol_name(symbol.name())));
++        row.insert("name".into(), Value::String(String::from_utf8_lossy(symbol.name().as_bytes()).into_owned()));
++        row.insert("nameBytes".into(), string_bytes(symbol.name()));
++        row.insert("apiNameBytes".into(), string_bytes(&tsrs_ast::escape_symbol_name(symbol.name())));
++        row.insert("apiName".into(), Value::String(String::from_utf8_lossy(tsrs_ast::escape_symbol_name(symbol.name()).as_bytes()).into_owned()));
+         // Keep the binder schema's required empty declarations array as well as exact table presence.
+         row.entry("declarations".into()).or_insert_with(|| Value::Array(Vec::new()));
+         if let Some(parent) = symbol.parent() {
+diff --git a/crates/tsrs_api/src/checker/setup.rs b/crates/tsrs_api/src/checker/setup.rs
+index 9eeaa86..c848805 100644
+--- a/crates/tsrs_api/src/checker/setup.rs
++++ b/crates/tsrs_api/src/checker/setup.rs
+@@ -330,7 +330,8 @@ fn build_symbol_response(
+ ) -> CheckerResult<Value> {
+     let mut o = Obj::new();
+     o.set("reference", reference);
+-    o.set("name", Value::String(tsrs_ast::escape_symbol_name(symbol.name())));
++    o.set("name", Value::String(String::from_utf8_lossy(tsrs_ast::escape_symbol_name(symbol.name()).as_bytes()).into_owned()));
++    o.set("nameBytes", super::rslint::string_bytes(&tsrs_ast::escape_symbol_name(symbol.name())));
+     o.num("flags", symbol.flags().bits() as f64);
+     o.num("checkFlags", symbol.check_flags().bits() as f64);
+     let decls = symbol.declarations();
+@@ -385,6 +386,9 @@ fn type_response_base(t: P<Type>, id: u32) -> Obj {
+         let lit = t.as_literal_type();
+         if flags.intersects(TypeFlags::Literal) {
+             value = super::json::literal_value_to_json(lit.value());
++            if let Some(tsrs_checker::LiteralValue::String(text)) = lit.value() {
++                late.set("valueBytes", super::rslint::string_bytes(text));
++            }
+         }
+         late.nonzero("freshType", lit.fresh_type().map_or(0.0, |f| f.id().0 as f64));
+         late.nonzero("regularType", lit.regular_type().map_or(0.0, |r| r.id().0 as f64));
+@@ -441,6 +445,7 @@ fn type_response_base(t: P<Type>, id: u32) -> Obj {
+         late.nonzero("substConstraint", data.subst_constraint().map_or(0.0, |x| x.id().0 as f64));
+     } else if flags.intersects(TypeFlags::TemplateLiteral) {
+         let texts = t.as_template_literal_type().texts();
++        late.set("textsBytes", Value::Array(texts.iter().map(|s| super::rslint::string_bytes(s)).collect()));
+         if !texts.is_empty() {
+             late.set(
+                 "texts",

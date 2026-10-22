@@ -1,3 +1,10 @@
 /scripts/tsrs/rust-migration-catalog.json linguist-generated=true
 /docs/tsrs-migration/rsbuild-workload.json linguist-generated=true
 /docs/tsrs-migration/logs/*.log linguist-generated=true
+
+# Preserve pinned upstream resources and patch payloads byte-for-byte.
+/vendor/typescript-libs/** -text whitespace=-blank-at-eol,-blank-at-eof,cr-at-eol
+/packages/rslint-api/src/ast-compat/** -text whitespace=-blank-at-eol,-blank-at-eof,cr-at-eol
+/patches/tsrs/*.patch -text whitespace=-blank-at-eol,-blank-at-eof,cr-at-eol
+/patches/tsrs/LICENSE -text whitespace=-blank-at-eol,-blank-at-eof,cr-at-eol
+/patches/tsrs/NOTICE -text whitespace=-blank-at-eol,-blank-at-eof,cr-at-eol

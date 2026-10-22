@@ -1,25 +1,20 @@
 #!/usr/bin/env node
 /**
- * Binary size monitoring for the `rslint` executable and native addon.
+ * Measure the single Rust addon shipped by each native platform package.
  *
- *   node scripts/binary-size.mjs record <binary> <native-addon> <out.json>
- *   node scripts/binary-size.mjs base-run <head.json>       # -> $GITHUB_OUTPUT
+ *   node scripts/binary-size.mjs record <native-addon> <out.json>
+ *   node scripts/binary-size.mjs base-run <head.json>
  *   node scripts/binary-size.mjs report <head.json> [base.json]
  *   node scripts/binary-size.mjs comment <report.md>
  *
- * The measurement itself is produced inside the existing `Test npm packages`
- * job, which has already built the host N-API addon and compiled every package
- * behind ./cmd/rslint. The release relink it measures is therefore a link-only
- * action off a warm Go build cache rather than a second build. Each run stores
- * its number as a workflow artifact; a pull request reads back the artifact of
- * the run that measured the commit its build was merged onto. That keeps the
- * whole system on the built-in GITHUB_TOKEN: no data branch, no personal
- * access token, no repository writes.
+ * The CLI/API JavaScript wrapper and package metadata are outside this native
+ * size measurement. Historical process-based artifacts remain readable, but
+ * their totals are never presented as comparable native-addon totals.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 4;
 
 // Ties an update to the comment this workflow posted last time, instead of
 // opening a new thread on every push.
@@ -111,9 +106,19 @@ function headCommitSha() {
 }
 
 /** Measure the native binaries and write the record this run will publish. */
-function record(binary, nativeAddon, out) {
-  const size = fs.statSync(binary).size;
-  const nativeAddonSize = fs.statSync(nativeAddon).size;
+function record(nativeAddon, out) {
+  const filename = path.basename(nativeAddon);
+  const target =
+    /^rslint\.(darwin-(?:arm64|x64)|linux-(?:arm64|x64)-(?:gnu|musl)|win32-(?:arm64|x64)-msvc)\.node$/.exec(
+      filename,
+    )?.[1];
+  if (!target) throw new Error(`Unknown native platform artifact: ${filename}`);
+  const info = fs.lstatSync(nativeAddon);
+  if (!info.isFile() || info.size === 0) {
+    throw new Error(
+      `Native addon must be a nonempty regular file: ${nativeAddon}`,
+    );
+  }
   const measurement = {
     schemaVersion: SCHEMA_VERSION,
     sha: process.env.GITHUB_SHA || '',
@@ -121,11 +126,10 @@ function record(binary, nativeAddon, out) {
     ref: process.env.GITHUB_REF_NAME || '',
     event: process.env.GITHUB_EVENT_NAME || '',
     runId: process.env.GITHUB_RUN_ID || '',
-    target: 'linux-x64-gnu',
-    goVersion: process.env.BINARY_SIZE_GO_VERSION || '',
-    buildFlags: '-ldflags=-s -w',
-    size,
-    nativeAddonSize,
+    target,
+    buildFlags: '--locked --release -p rslint-native --lib',
+    nativeAddonSize: info.size,
+    totalSize: info.size,
     measuredAt: new Date().toISOString(),
   };
   fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
@@ -372,29 +376,34 @@ function report(headPath, basePath) {
     ? `Base size was measured at main commit ${commitLink(baseOn.measuredSha)}. The Ubuntu measurement job was skipped for the following ${skippedShas.length === 1 ? 'main commit' : `${skippedShas.length} main commits`}: ${skippedShas.map(commitLink).join(', ')}.`
     : '';
 
-  // Keep `size` as the executable measurement so schema-v1 and schema-v2
-  // artifacts remain comparable in both directions. Native-addon comparisons
-  // begin once the base branch has published a schema-v2 artifact.
-  const rows = [sizeRow(`\`rslint\` (${head.target})`, head.size, base?.size)];
   const hasNativeAddon = Number.isSafeInteger(head.nativeAddonSize);
-  const baseNativeAddonSize = Number.isSafeInteger(base?.nativeAddonSize)
-    ? base.nativeAddonSize
-    : undefined;
-  if (hasNativeAddon) {
+  if (!hasNativeAddon) throw new Error('Artifact has no measured native addon');
+  const sameTarget = !base?.target || base.target === head.target;
+  const comparable = base?.schemaVersion === SCHEMA_VERSION && sameTarget;
+  const rows = [
+    sizeRow(
+      `\`rslint.node\` (${head.target})`,
+      head.nativeAddonSize,
+      sameTarget && Number.isSafeInteger(base?.nativeAddonSize)
+        ? base.nativeAddonSize
+        : undefined,
+    ),
+  ];
+  if (head.schemaVersion === SCHEMA_VERSION) {
     rows.push(
       sizeRow(
-        `\`rslint.node\` (${head.target})`,
+        '**Total native artifacts**',
         head.nativeAddonSize,
-        baseNativeAddonSize,
+        comparable ? base.nativeAddonSize : undefined,
       ),
     );
   }
-  const nativeBaselineNote =
-    base && hasNativeAddon && baseNativeAddonSize === undefined
-      ? 'The base artifact predates native-addon measurement. Its delta will be available after the base branch publishes its first schema-v2 measurement.'
-      : '';
-
-  const goVersion = head.goVersion ? `Go ${head.goVersion}, ` : '';
+  const architectureNote =
+    head.schemaVersion !== SCHEMA_VERSION
+      ? 'Historical artifact: this measures one component of the old process-based architecture and does not establish its complete native size.'
+      : base && !comparable
+        ? 'The base artifact uses a different architecture or target. Its complete native size is not comparable; the addon component alone does not establish an overall reduction.'
+        : '';
   const server = process.env.GITHUB_SERVER_URL;
   const run =
     head.runId && server && repository
@@ -408,13 +417,13 @@ function report(headPath, basePath) {
     '',
     `Commit ${commitLink(head.headSha)} merged into base ${commitLink(baseOn.sha)}${formatSubject(baseOn.subject)}.`,
     ...(skippedNote ? ['', skippedNote] : []),
-    ...(nativeBaselineNote ? ['', nativeBaselineNote] : []),
+    ...(architectureNote ? ['', architectureNote] : []),
     '',
     '| Binary | Base | This PR | Change |',
     '| --- | ---: | ---: | ---: |',
     ...rows.map((row) => `| ${row.join(' | ')} |`),
     '',
-    `<sub>\`rslint\`: stripped \`go build -ldflags="-s -w" ./cmd/rslint\`; \`rslint.node\`: release \`@rslint/native\` build; ${goVersion}linux/amd64 · ${run} · ${formatTimestamp(head.measuredAt)}</sub>`,
+    `<sub>\`rslint.node\`: release Rust addon. Total excludes JavaScript and package metadata. ${head.target} · ${run} · ${formatTimestamp(head.measuredAt)}</sub>`,
     '',
   ].join('\n');
 }
@@ -465,17 +474,13 @@ async function main() {
 
   switch (command) {
     case 'record': {
-      const [binary, nativeAddon, out] = args;
-      if (!binary || !nativeAddon || !out) {
-        throw new Error('usage: record <binary> <native-addon> <out.json>');
+      const [nativeAddon, out] = args;
+      if (!nativeAddon || !out || args.length !== 2) {
+        throw new Error('usage: record <native-addon> <out.json>');
       }
-      const measurement = record(binary, nativeAddon, out);
+      const measurement = record(nativeAddon, out);
       process.stdout.write(
-        [
-          `${measurement.target} rslint: ${measurement.size} bytes (${formatBytes(measurement.size)})`,
-          `${measurement.target} rslint.node: ${measurement.nativeAddonSize} bytes (${formatBytes(measurement.nativeAddonSize)})`,
-          '',
-        ].join('\n'),
+        `${measurement.target} total native artifacts: ${measurement.totalSize} bytes (${formatBytes(measurement.totalSize)})\n`,
       );
       break;
     }

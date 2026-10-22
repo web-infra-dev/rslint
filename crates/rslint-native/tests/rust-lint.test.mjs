@@ -17,6 +17,112 @@ const binding = createRequire(import.meta.url)(bindingPath);
 
 test('the addon exposes the direct Rust lint entry point', () => {
   assert.equal(typeof binding.lintTsrsSync, 'function');
+  assert.equal(typeof binding.planTsrsSync, 'function');
+  assert.equal(typeof binding.lintProjectsTsrsSync, 'function');
+  assert.equal(typeof binding.ruleCapabilitiesTsrsSync, 'function');
+});
+
+test('project planning keeps imported non-roots in the source-only group', (t) => {
+  const request = fixture(t);
+  fs.writeFileSync(
+    path.join(request.cwd, 'tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: { strict: true },
+      files: ['main.ts'],
+    }),
+  );
+  const plan = JSON.parse(
+    binding.planTsrsSync(
+      JSON.stringify({
+        schemaVersion: 1,
+        cwd: request.cwd,
+        files: request.files.map((file) => ({
+          path: file.path,
+          policy: { kind: 'service', rootDirectory: request.cwd },
+        })),
+      }),
+    ),
+  );
+  assert.equal(plan.backend, 'tsrs-rust');
+  assert.equal(plan.projects.length, 1);
+  assert.deepEqual(plan.fileProjects, [null, 0]);
+  assert.deepEqual(plan.projects[0].rootFiles, [request.files[1].path]);
+  assert.equal(plan.projects[0].sourceReferences, true);
+  assert.equal(plan.sourceOnlyCompilerOptions.noLib, true);
+  assert.equal(plan.sourceOnlyCompilerOptions.noResolve, true);
+});
+
+test('configured lint retains source-only inputs and exact per-file scheduling', (t) => {
+  const request = fixture(t);
+  fs.writeFileSync(
+    path.join(request.cwd, 'tsconfig.json'),
+    JSON.stringify({ compilerOptions: { strict: true }, files: ['main.ts'] }),
+  );
+  const result = JSON.parse(
+    binding.lintProjectsTsrsSync(
+      JSON.stringify({
+        schemaVersion: 1,
+        cwd: request.cwd,
+        files: request.files.map((file) => ({
+          ...file,
+          rules: request.rules,
+          policy: { kind: 'service', rootDirectory: request.cwd },
+        })),
+      }),
+    ),
+  );
+  assert.deepEqual(
+    result.files.map((file) => file.filePath),
+    request.files.map((file) => file.path),
+  );
+  assert.deepEqual(
+    result.files.map((file) => file.hasTypeInformation),
+    [false, true],
+  );
+  assert.deepEqual(result.files[0].appliedRules, ['no-debugger']);
+  assert.deepEqual(result.files[0].messages, []);
+  assert.deepEqual(
+    result.files[1].appliedRules,
+    request.rules.map((rule) => rule.name),
+  );
+  assert.deepEqual(
+    result.files[1].messages.map((message) => [
+      message.ruleId,
+      message.severity,
+    ]),
+    [
+      ['@typescript-eslint/no-unsafe-unary-minus', 2],
+      ['no-debugger', 1],
+    ],
+  );
+});
+
+test('scheduling metadata rejects unknown rules and empty admission does no compiler work', () => {
+  assert.deepEqual(
+    JSON.parse(
+      binding.ruleCapabilitiesTsrsSync(
+        JSON.stringify([
+          'no-debugger',
+          '@typescript-eslint/no-unsafe-unary-minus',
+        ]),
+      ),
+    ),
+    {
+      'no-debugger': false,
+      '@typescript-eslint/no-unsafe-unary-minus': true,
+    },
+  );
+  assert.throws(
+    () => binding.ruleCapabilitiesTsrsSync('["not-an-implemented-rule"]'),
+    /not been migrated/,
+  );
+  const result = JSON.parse(
+    binding.lintProjectsTsrsSync(
+      JSON.stringify({ schemaVersion: 1, cwd: process.cwd(), files: [] }),
+    ),
+  );
+  assert.deepEqual(result.files, []);
+  assert.equal(result.backend, 'tsrs-rust');
 });
 
 test('invalid lint requests become JavaScript exceptions', () => {
@@ -146,4 +252,45 @@ test('unsupported rules and duplicate files fail instead of reducing work', (t) 
       }),
     ),
   );
+});
+
+test('automatic fixing and syntax diagnostics run without external services', (t) => {
+  const request = fixture(t);
+  request.fix = true;
+  request.rules = [
+    { name: '@typescript-eslint/no-extra-non-null-assertion' },
+    { name: 'no-debugger' },
+  ];
+  request.files = [
+    {
+      path: path.join(request.cwd, 'fixed.ts'),
+      text: '\uFEFFvalue!!!!; debugger;',
+    },
+    {
+      path: path.join(request.cwd, 'bad.js'),
+      text: 'const value: number = 1; debugger;',
+    },
+  ];
+  const result = JSON.parse(binding.lintTsrsSync(JSON.stringify(request)));
+  assert.equal(result.files.length, 2);
+  assert.equal(result.files[0].output, '\uFEFFvalue!; debugger;');
+  assert.deepEqual(
+    result.files[0].messages.map((message) => message.ruleId),
+    ['no-debugger'],
+  );
+  assert.equal(result.files[1].hasSyntaxErrors, true);
+  assert.deepEqual(result.files[1].appliedRules, []);
+  assert.deepEqual(result.files[1].messages, [
+    {
+      ruleId: 'TypeScript(TS8010)',
+      severity: 2,
+      message: 'Type annotations can only be used in TypeScript files.',
+      line: 1,
+      column: 14,
+      endLine: 1,
+      endColumn: 20,
+      range: [13, 19],
+    },
+  ]);
+  assert.equal(result.files[1].output, undefined);
 });

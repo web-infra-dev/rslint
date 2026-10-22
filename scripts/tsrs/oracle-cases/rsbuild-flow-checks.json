@@ -1,0 +1,3725 @@
+[
+  {
+    "rule": "constructor-super",
+    "provenance": {
+      "repository": "web-infra-dev/rslint",
+      "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "sources": [
+        {
+          "path": "internal/rules/constructor_super/constructor_super_test.go",
+          "sha256": "b01736a6cd64ff12b7c0be587ccb9b62e41cc2622cd38c65ac1fffd2e80a35fc"
+        }
+      ]
+    },
+    "exactCompilerOptions": true,
+    "compilerOptions": {
+      "jsx": "preserve",
+      "target": "esnext",
+      "module": "commonjs",
+      "strict": true,
+      "strictNullChecks": true,
+      "esModuleInterop": true,
+      "lib": [
+        "es2015",
+        "es2017",
+        "esnext",
+        "DOM"
+      ],
+      "experimentalDecorators": true,
+      "types": []
+    },
+    "valid": [
+      {
+        "text": "class A { }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:19"
+      },
+      {
+        "text": "class A { constructor() { } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:20"
+      },
+      {
+        "text": "class A extends B { }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:23"
+      },
+      {
+        "text": "class A extends B { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:24"
+      },
+      {
+        "text": "class A extends null { }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:27"
+      },
+      {
+        "text": "class A extends B { constructor() { if (true) super(); else super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:30"
+      },
+      {
+        "text": "class A extends B { constructor() { a ? super() : super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:31"
+      },
+      {
+        "text": "class A extends B { constructor() { if (true) return a; super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:34"
+      },
+      {
+        "text": "class A extends B { constructor() { if (true) return; super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:35"
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) return; if (b) return; super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:36"
+      },
+      {
+        "text": "class A extends B { constructor() { switch (a) { case 0: super(); break; default: super(); break; } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:39"
+      },
+      {
+        "text": "class A extends (B = C) { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:42"
+      },
+      {
+        "text": "class A extends (B || C) { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:43"
+      },
+      {
+        "text": "class A extends (a ? B : C) { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:44"
+      },
+      {
+        "text": "class A extends B { constructor() { super(); class C extends D { constructor() { super(); } } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:47"
+      },
+      {
+        "text": "class A extends B { constructor() { super(); class C { } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:48"
+      },
+      {
+        "text": "class A { constructor() { class B extends C { constructor() { super(); } } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:51"
+      },
+      {
+        "text": "class A extends B { constructor() { throw new Error(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:54"
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) { return; } else { return; } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:57"
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) { super(); } else { super(); } b(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:61"
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) { c(); super(); d(); } else { super(); } e(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:62"
+      },
+      {
+        "text": "class A extends B { constructor() { switch (a) { case 0: super(); break; default: super(); break; } b(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:65"
+      },
+      {
+        "text": "class A extends B { constructor() { while (true) { super(); break; } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:68"
+      },
+      {
+        "text": "class A extends B { constructor() { for (;;) { super(); break; } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:69"
+      },
+      {
+        "text": "class A extends B { constructor() { label: while (true) { super(); break label; } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:70"
+      },
+      {
+        "text": "class A extends B { constructor() { do { super(); break; } while (true); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:76"
+      },
+      {
+        "text": "class A extends B { constructor() { do { super(); break; } while (false); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:77"
+      },
+      {
+        "text": "class A extends B { constructor() { try { super(); } finally {} } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:81"
+      },
+      {
+        "text": "class A extends B { constructor() { try { a(); } catch (e) { } finally { super(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:82"
+      },
+      {
+        "text": "class A extends B { constructor() { try { super(); } finally { b(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:86"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "class A { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:91",
+        "expected": [
+          {
+            "messageId": "badSuper",
+            "line": 1,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "text": "class A extends null { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:99",
+        "expected": [
+          {
+            "messageId": "badSuper",
+            "line": 1,
+            "column": 40
+          }
+        ]
+      },
+      {
+        "text": "class A extends 100 { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:107",
+        "expected": [
+          {
+            "messageId": "badSuper",
+            "line": 1,
+            "column": 39
+          }
+        ]
+      },
+      {
+        "text": "class A extends \"test\" { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:113",
+        "expected": [
+          {
+            "messageId": "badSuper",
+            "line": 1,
+            "column": 42
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:121",
+        "expected": [
+          {
+            "messageId": "missingAll",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { a; } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:127",
+        "expected": [
+          {
+            "messageId": "missingAll",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { class C extends D { constructor() { super(); } } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:135",
+        "expected": [
+          {
+            "messageId": "missingAll",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:143",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { a && super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:149",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) return; } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:155",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { switch (a) { case 0: super(); break; } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:161",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { switch (a) { case 0: super(); break; case 1: break; default: super(); break; } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:167",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { super(); super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:175",
+        "expected": [
+          {
+            "messageId": "duplicate",
+            "line": 1,
+            "column": 46
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { super(); if (a) super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:181",
+        "expected": [
+          {
+            "messageId": "duplicate",
+            "line": 1,
+            "column": 53
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) super(); else super(); super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:187",
+        "expected": [
+          {
+            "messageId": "duplicate",
+            "line": 1,
+            "column": 67
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) { super(); } else { super(); } if (b) { super(); } else { super(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:195",
+        "expected": [
+          {
+            "messageId": "duplicate"
+          },
+          {
+            "messageId": "duplicate"
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { super(); while (true) { super(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:204",
+        "expected": [
+          {
+            "messageId": "duplicate"
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { while (true) { super(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:214",
+        "expected": [
+          {
+            "messageId": "duplicate",
+            "line": 1,
+            "column": 52
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { while (true) { super(); continue; } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:220",
+        "expected": [
+          {
+            "messageId": "duplicate",
+            "line": 1,
+            "column": 52
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { do { super(); } while (true); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:226",
+        "expected": [
+          {
+            "messageId": "duplicate",
+            "line": 1,
+            "column": 42
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { do { super(); } while (false); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:232",
+        "expected": [
+          {
+            "messageId": "duplicate",
+            "line": 1,
+            "column": 42
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { for (;;) { super(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:238",
+        "expected": [
+          {
+            "messageId": "duplicate",
+            "line": 1,
+            "column": 48
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { try { super(); } finally { super(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:247",
+        "expected": [
+          {
+            "messageId": "duplicate",
+            "line": 1,
+            "column": 64
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { try { super(); } finally { } super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:255",
+        "expected": [
+          {
+            "messageId": "duplicate",
+            "line": 1,
+            "column": 66
+          }
+        ]
+      },
+      {
+        "text": "class A extends (B = 5) { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:263",
+        "expected": [
+          {
+            "messageId": "badSuper",
+            "line": 1,
+            "column": 43
+          }
+        ]
+      },
+      {
+        "text": "class A extends (B += C) { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:269",
+        "expected": [
+          {
+            "messageId": "badSuper",
+            "line": 1,
+            "column": 44
+          }
+        ]
+      },
+      {
+        "text": "class A extends (B -= C) { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:275",
+        "expected": [
+          {
+            "messageId": "badSuper",
+            "line": 1,
+            "column": 44
+          }
+        ]
+      },
+      {
+        "text": "class A extends (B *= C) { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:281",
+        "expected": [
+          {
+            "messageId": "badSuper",
+            "line": 1,
+            "column": 44
+          }
+        ]
+      },
+      {
+        "text": "class A extends (B /= C) { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:287",
+        "expected": [
+          {
+            "messageId": "badSuper",
+            "line": 1,
+            "column": 44
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) { super(); } else { } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:295",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) { } else { super(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:301",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) super(); else if (b) super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:309",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { switch (a) { case 0: super(); break; case 1: super(); break; } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:317",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { switch (a) { case 0: super(); break; default: super(); break; } super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:325",
+        "expected": [
+          {
+            "messageId": "duplicate",
+            "line": 1,
+            "column": 101
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { while (true) { if (a) break; super(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:333",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { for (var x of y) { super(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:339",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { for (var i = 0; i < 10; i++) { super(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:345",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { while (a) { super(); } } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:351",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { try { super(); } catch (e) {} } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:359",
+        "expected": [
+          {
+            "messageId": "missingSome",
+            "line": 1,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { super(); } } class C extends null { constructor() { super(); } }",
+        "origin": "internal/rules/constructor_super/constructor_super_test.go:367",
+        "expected": [
+          {
+            "messageId": "badSuper",
+            "line": 1,
+            "column": 89
+          }
+        ]
+      }
+    ],
+    "excluded": [],
+    "scopeNote": "All frozen Go test cases using the default Rsbuild rule options and language configuration. Original expected diagnostic fields are preserved verbatim; the differential oracle additionally compares complete diagnostics, fixes and suggestions. Explicit nondefault rule/language options are retained in excluded. There are no baseline Skip/Only cases or special per-case file fixtures in these source files."
+  },
+  {
+    "rule": "no-this-before-super",
+    "provenance": {
+      "repository": "web-infra-dev/rslint",
+      "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "sources": [
+        {
+          "path": "internal/rules/no_this_before_super/no_this_before_super_test.go",
+          "sha256": "a8c5008c6886e083141c7562276d77ba22dc6a4e7a4f6f703ee11e5b102eb813"
+        }
+      ]
+    },
+    "exactCompilerOptions": true,
+    "compilerOptions": {
+      "jsx": "preserve",
+      "target": "esnext",
+      "module": "commonjs",
+      "strict": true,
+      "strictNullChecks": true,
+      "esModuleInterop": true,
+      "lib": [
+        "es2015",
+        "es2017",
+        "esnext",
+        "DOM"
+      ],
+      "experimentalDecorators": true,
+      "types": []
+    },
+    "valid": [
+      {
+        "text": "class A { constructor() { this.b = 0; } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:19"
+      },
+      {
+        "text": "class A extends B { }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:21"
+      },
+      {
+        "text": "class A extends null { constructor() { } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:23"
+      },
+      {
+        "text": "class A extends B { constructor() { super(); this.c = 0; } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:25"
+      },
+      {
+        "text": "class A extends B { constructor() { super(); super.c(); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:27"
+      },
+      {
+        "text": "class A extends B { constructor() { if (true) { super(); } else { super(); } this.c(); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:29"
+      },
+      {
+        "text": "class A extends B { constructor() { class C extends D { constructor() { super(); this.d = 0; } } super(); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:31"
+      },
+      {
+        "text": "class A extends B { constructor() { function c() { this.d(); } super(); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:33"
+      },
+      {
+        "text": "class A extends B { constructor() { var c = () => this.d; super(); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:35"
+      },
+      {
+        "text": "class A extends B { constructor() { a ? super() : super(); this.c = 0; } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:37"
+      },
+      {
+        "text": "class A extends B { constructor() { super(); this.a = [this.b, this.c]; } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:39"
+      },
+      {
+        "text": "class A extends B { constructor() { super(); this.a = 1; super.b(); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:41"
+      },
+      {
+        "text": "class A extends B { constructor() { if (foo) { super(); } else { super(); } this.c = 0; } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:43"
+      },
+      {
+        "text": "class A { constructor() { } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:45"
+      },
+      {
+        "text": "class A extends B { constructor() { super(); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:47"
+      },
+      {
+        "text": "class A extends B { method() { this.x = 1; } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:49"
+      },
+      {
+        "text": "class A extends B { constructor() { (() => { })(); super(); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:51"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    do { super(); } while (false);\n    this.c = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:53"
+      },
+      {
+        "text": "class A extends B {\n  constructor(cond) {\n    (cond ? super() : super());\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:55"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const obj = { get foo() { return this.bar; } };\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:57"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const obj = { set foo(v) { this.bar = v; } };\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:59"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    label: super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:61"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super(), this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:63"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (super();;) { break; }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:65"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    let x = super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:67"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const obj = { method() { this.x = 1; } };\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:69"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try { } catch(e) { } finally { super(); }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:71"
+      },
+      {
+        "text": "class A extends B {\n  constructor(a, b) {\n    a ? (b ? super() : super()) : super();\n    this.c = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:73"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const fn = async function() { this.a = 0; };\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:75"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const fn = function*() { this.a = 0; };\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:77"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    [1,2].forEach(x => { this.a = x; });\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:79"
+      },
+      {
+        "text": "class A extends B {\n  constructor(a) {\n    if (a) return;\n    super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:81"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    throw new Error();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:83"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    let a, b;\n    a = b = super();\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:85"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    let a = super(), b = this.x;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:87"
+      },
+      {
+        "text": "class A extends B {\n  constructor(a) {\n    if (a) {\n      super();\n    } else {\n      super();\n    }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:89"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super().toString();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:91"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super() ?? null;\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:93"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const fn = async () => { await this.a; };\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:95"
+      },
+      {
+        "text": "class A extends B {\n  constructor(a) {\n    if (a === 1) {\n      super();\n    } else if (a === 2) {\n      super();\n    } else {\n      super();\n    }\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:97"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try {\n      try { } finally { super(); }\n    } catch(e) { super(); }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:99"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (let i = 0; i < 3; this.inc()) { break; }\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:101"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super() || null;\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:103"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super() && this.init();\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:105"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const obj = { key: super() };\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:107"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    foo(super());\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:109"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const x = `${super()}`;\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:111"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    new Foo(super());\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:113"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    let i;\n    for (i = 0, super();;) { break; }\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:115"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super().foo.bar;\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:117"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super().foo();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:119"
+      },
+      {
+        "text": "class A extends B {\n  constructor(x) {\n    switch(x) {\n      case 1:\n      case 2: super(); break;\n      default: super(); break;\n    }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:121"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    while(super()) { break; }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:123"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try { super(); } catch(e) { super(); }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:125"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    foo(...[super()]);\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:127"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super()?.foo;\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:129"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const C = class { constructor() { this.a = 0; } };\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:131"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const fn = () => this;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:133"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    let a;\n    [a] = [super()];\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:135"
+      },
+      {
+        "text": "class A extends B {\n  constructor(a, b) {\n    if (a) {\n      if (b) {\n        super();\n      } else {\n        super();\n      }\n    } else {\n      super();\n    }\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:137"
+      },
+      {
+        "text": "class A extends B {\n  constructor(a, b, c) {\n    a ? (b ? (c ? super() : super()) : super()) : super();\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:139"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const x = super() + this.a;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:141"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super() ? this.a : this.b;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:143"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    do {} while(super());\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:145"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (const x of [super()]) {}\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:147"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    while(true) { super(); break; }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:149"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const x = super() * this.a + this.b;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:151"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (const k in super()) {}\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:153"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    let x = 0;\n    x += super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:155"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    let a = 1, b = super(), c = this.x;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:157"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    +super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:159"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    !super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:161"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    void super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:163"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    typeof super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:165"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    ~super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:167"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    -super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:169"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const arr = [super(), this.a];\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:171"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    Object.assign(super(), { a: 1 });\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:173"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    new (class { constructor() { } })();\n    super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:175"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    a(b(c(super())));\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:177"
+      },
+      {
+        "text": "class A extends B {\n  constructor(x) {\n    switch(x) {\n      case 1: foo();\n      case 2: super(); break;\n      default: super(); break;\n    }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:179"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super()?.foo?.bar;\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:181"
+      },
+      {
+        "text": "class A extends B {\n  constructor(...args) {\n    super(...args);\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:183"
+      },
+      {
+        "text": "class A extends B {\n  constructor(key) {\n    super()[key];\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:185"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    let a;\n    ({ a = 1 } = super());\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:187"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const x = `${super()} ${this.a}`;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:189"
+      },
+      {
+        "text": "class A extends B {\n  constructor(fn = () => this) {\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:191"
+      },
+      {
+        "text": "class A extends B {\n  constructor(fn = function() { return this; }) {\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:193"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const obj = { method() { return () => this.a; } };\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:195"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const { a, b } = super();\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:197"
+      },
+      {
+        "text": "class A extends (true ? Object : Object) {\n  constructor() {\n    super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:199"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try {} catch(e) {} finally {}\n    super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:201"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super() || super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:203"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try { } catch(e) { super(); } finally { super(); }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:205"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for(;;) { super(); break; }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:207"
+      },
+      {
+        "text": "class A extends B {\n  constructor(cond) {\n    super();\n    if (cond) {\n      this.a = 0;\n    }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:209"
+      },
+      {
+        "text": "class A extends B {\n  constructor(cond) {\n    super();\n    if (cond) {\n      this.a = 0;\n    } else {\n      this.b = 0;\n    }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:211"
+      },
+      {
+        "text": "class A extends B {\n  constructor(x) {\n    super();\n    switch(x) {\n      case 1: this.a = 0; break;\n      default: this.b = 0; break;\n    }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:213"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super();\n    try { this.a = 0; } catch(e) { this.b = 0; } finally { this.c = 0; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:215"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    if (super()) {\n      this.a = 0;\n    } else {\n      this.b = 0;\n    }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:217"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    if (super()) {\n      { this.a = 0; }\n    }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:219"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for(super();;) { this.a = 0; break; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:221"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for(let x = super();;) { this.a = 0; break; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:223"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super();\n    {\n      this.a = 0;\n    }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:225"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super();\n    { { this.a = 0; } }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:227"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    switch(super()) {\n      case 1: this.a = 0; break;\n      default: this.b = 0; break;\n    }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:229"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    switch(super()) {}\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:231"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    return super() + this.a;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:233"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    return (super(), this.a);\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:235"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    throw (super(), new Error(this.a));\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:237"
+      },
+      {
+        "text": "class A extends B {\n  constructor(cond) {\n    for (; cond; ) { super(); this.a = 0; break; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:239"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (const k in {a:1}) { super(); this.a = 0; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:241"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (const x of [1]) { super(); this.a = 0; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:243"
+      },
+      {
+        "text": "class A extends B {\n  constructor(cond) {\n    while(cond) { super(); this.a = 0; break; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:245"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    return super().toString();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:247"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    return [super(), this.a];\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:249"
+      },
+      {
+        "text": "class A extends B {\n  constructor(cond) {\n    for (; cond; ) {\n      if (true) { super(); } else { super(); }\n      this.a = 0;\n      break;\n    }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:251"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    while(super()) { this.a = 0; break; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:253"
+      },
+      {
+        "text": "class A extends B {\n  constructor(x) {\n    switch(x) {\n      default: super(); break;\n    }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:255"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try { throw 1; } catch(e) { super(); }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:257"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    class Inner extends Object { constructor() { super(); this.x = 0; } }\n    super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:259"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    let a, b, c;\n    a = b = c = super();\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:261"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    (super() ? this.a : this.b);\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:263"
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super() ?? this.fallback;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:265"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "class A extends B { constructor() { this.c = 0; } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:270",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 1,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { this.c = 0; super(); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:277",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 1,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { super.c(); super(); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:284",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 1,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { super(this.c); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:291",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 1,
+            "column": 43
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { if (a) { super(); } this.c = 0; } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:298",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 1,
+            "column": 57
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { if (this.a) { super(); } } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:305",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 1,
+            "column": 41
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { this.c(); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:312",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 1,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "text": "class A extends B { constructor() { super(this.c()); } }",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:319",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 1,
+            "column": 43
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this.a = 0, super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:326",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(a) {\n    a && super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:333",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(a = this.x) {\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:340",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 2,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const { a = this.b } = {};\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:347",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const x = `${this.a}`;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:354",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this?.a;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:361",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (const x of this.items) {}\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:368",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(a = super.x) {\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:375",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 2,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this.a &&= 0;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:382",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this.a ||= 0;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:389",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this.a ??= 0;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:396",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const { a: { b = this.c } } = { a: {} };\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:403",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const [a = this.b] = [];\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:410",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (;this.check();) { break; }\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:417",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    new this.Foo();\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:424",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    delete this.foo;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:431",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const t = typeof this;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:438",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const arr = [...this.items];\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:445",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this.tag`hello`;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:452",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    void this.a;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:459",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(a) {\n    a ? super() : null;\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:466",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(a) {\n    if (a === 1) {\n      super();\n    } else if (a === 2) {\n      super();\n    }\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:473",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 8,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(a) {\n    for (;a;) { super(); break; }\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:480",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (let i = 0; i < 3; i++) {\n      if (i === 1) break;\n      super();\n    }\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:487",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 7,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(x) {\n    switch(x) {}\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:494",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (const {a} of this.items) {}\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:501",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this.a || super();\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:508",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          },
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this.x = super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:516",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const obj = { [this.key]: 1 };\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:523",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(a, b) {\n    a ? (b ? super() : null) : super();\n    this.c = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:530",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(a, b) {\n    if (a) {\n      if (b) {\n        super();\n      }\n    } else {\n      super();\n    }\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:537",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 10,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const x = this instanceof Object;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:544",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    while(this.check()) { break; }\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:551",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (const k in this.obj) {}\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:558",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    switch(this.type) {\n      case 'a': super(); break;\n    }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:565",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this.a = 0;\n    this.b = 1;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:572",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          },
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this['foo'];\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:580",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (this.i = 0;;) { break; }\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:587",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try { } catch(e) { super(); }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:594",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const x = this.a + 1 + super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:601",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const x = (this.a + this.b) * super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:608",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 16
+          },
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (const x of [1,2,3]) { super(); }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:616",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    do { } while(this.a);\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:623",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this.a ? super() : super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:630",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const arr = [this.a, super()];\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:637",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try { super(); } finally { this.a = 0; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:644",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 32
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try { this.a = 0; } finally { super(); }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:651",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (let i = 0; i < 1; i++) {\n      for (let j = 0; j < 1; j++) {\n        super();\n      }\n    }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:658",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 8,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    null || super();\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:665",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(a) {\n    if (a) { super(); }\n    if (!a) { super(); }\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:672",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 5,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const x = `${this.a} ${super()}`;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:679",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    while(true) { this.a = 0; break; }\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:686",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    do { this.a = 0; } while(super());\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:693",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(c) {\n    const x = (c ? super() : 0) + this.a;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:700",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    let i;\n    for (i = 0, this.a = 1, super();;) { break; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:707",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    this.a = this.b = super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:714",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 5
+          },
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(x) {\n    switch(x) {\n      case 1: super(); break;\n      case 2: super(); break;\n    }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:722",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 7,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    for (const k in {a:1}) { super(); }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:729",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try { super(); } catch(e) { }\n    this.a = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:736",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(a, b) {\n    (a || b) && super();\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:743",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try { } catch(e) { super(); } finally { this.a = 0; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:750",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 45
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(a, b, c) {\n    a ? (b ? super() : super()) : (c ? super() : 0);\n    this.x = 0;\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:757",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 4,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    try { super(); } catch(e) { this.a = 0; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:764",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 33
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super(this);\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:771",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    super(super.method());\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:778",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const obj = { ...this };\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:785",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    delete super.prop;\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:792",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 12
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor() {\n    const { [this.key]: val } = {};\n    super();\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:799",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "class A extends B {\n  constructor(cond) {\n    for (; cond; super()) { this.a = 0; break; }\n  }\n}",
+        "origin": "internal/rules/no_this_before_super/no_this_before_super_test.go:806",
+        "expected": [
+          {
+            "messageId": "noBeforeSuper",
+            "line": 3,
+            "column": 29
+          }
+        ]
+      }
+    ],
+    "excluded": [],
+    "scopeNote": "All frozen Go test cases using the default Rsbuild rule options and language configuration. Original expected diagnostic fields are preserved verbatim; the differential oracle additionally compares complete diagnostics, fixes and suggestions. Explicit nondefault rule/language options are retained in excluded. There are no baseline Skip/Only cases or special per-case file fixtures in these source files."
+  },
+  {
+    "rule": "getter-return",
+    "provenance": {
+      "repository": "web-infra-dev/rslint",
+      "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "sources": [
+        {
+          "path": "internal/rules/getter_return/getter_return_test.go",
+          "sha256": "d04edf45bdd0eeb4ccbc7fc6e414465c47ae5361120faf8d422e1f1d2587948d"
+        },
+        {
+          "path": "internal/rules/getter_return/getter_return_upstream_test.go",
+          "sha256": "0370ae2854ccc4a3b13e804663a4b2ba8ce51627c4714daef542b2bca5bdbae9"
+        }
+      ]
+    },
+    "exactCompilerOptions": true,
+    "compilerOptions": {
+      "jsx": "preserve",
+      "target": "esnext",
+      "module": "commonjs",
+      "strict": true,
+      "strictNullChecks": true,
+      "esModuleInterop": true,
+      "lib": [
+        "es2015",
+        "es2017",
+        "esnext",
+        "DOM"
+      ],
+      "experimentalDecorators": true,
+      "types": []
+    },
+    "valid": [
+      {
+        "text": "var foo = { get bar(){return true;} };",
+        "origin": "internal/rules/getter_return/getter_return_test.go:19"
+      },
+      {
+        "text": "class foo { get bar(){return true;} }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:22"
+      },
+      {
+        "text": "class foo { get bar(){if(baz){return true;} else {return false;} } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:23"
+      },
+      {
+        "text": "class foo { get(){return true;} }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:24"
+      },
+      {
+        "text": "Object.defineProperty(foo, \"bar\", { get: function () {return true;}});",
+        "origin": "internal/rules/getter_return/getter_return_test.go:27"
+      },
+      {
+        "text": "Object.defineProperty(foo, \"bar\", { get: function () { ~function (){ return true; }();return true;}});",
+        "origin": "internal/rules/getter_return/getter_return_test.go:28"
+      },
+      {
+        "text": "Object.defineProperties(foo, { bar: { get: function () {return true;}} });",
+        "origin": "internal/rules/getter_return/getter_return_test.go:31"
+      },
+      {
+        "text": "Reflect.defineProperty(foo, \"bar\", { get: function () {return true;}});",
+        "origin": "internal/rules/getter_return/getter_return_test.go:34"
+      },
+      {
+        "text": "Object.create(foo, { bar: { get() {return true;} } });",
+        "origin": "internal/rules/getter_return/getter_return_test.go:37"
+      },
+      {
+        "text": "Object.create(foo, { bar: { get: function () {return true;} } });",
+        "origin": "internal/rules/getter_return/getter_return_test.go:38"
+      },
+      {
+        "text": "var get = function(){};",
+        "origin": "internal/rules/getter_return/getter_return_test.go:41"
+      },
+      {
+        "text": "var foo = { bar(){} };",
+        "origin": "internal/rules/getter_return/getter_return_test.go:42"
+      },
+      {
+        "text": "var foo = { get: function () {} }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:43"
+      },
+      {
+        "text": "var foo = { get bar(){ throw new Error(\"not implemented\"); } };",
+        "origin": "internal/rules/getter_return/getter_return_test.go:68"
+      },
+      {
+        "text": "class foo { get bar(){ if(baz) { throw new Error(); } return true; } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:69"
+      },
+      {
+        "text": "class foo { get bar(){ if(baz) { return true; } else { throw new Error(); } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:70"
+      },
+      {
+        "text": "class foo { get bar(){ if(baz) { throw new Error(); } else { throw new Error(); } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:71"
+      },
+      {
+        "text": "class foo { get bar(){ try { return 1; } catch(e) { return 2; } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:74"
+      },
+      {
+        "text": "class foo { get bar(){ try { return 1; } catch(e) { throw e; } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:75"
+      },
+      {
+        "text": "class foo { get bar(){ try { throw new Error(); } catch(e) { return 1; } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:76"
+      },
+      {
+        "text": "class foo { get bar(){ try { return 1; } finally { } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:77"
+      },
+      {
+        "text": "class foo { get bar(){ try { return 1; } catch(e) { } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:78"
+      },
+      {
+        "text": "class foo { get bar(){ switch(x) { case 1: return 1; default: return 2; } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:81"
+      },
+      {
+        "text": "class foo { get bar(){ switch(x) { case 1: return 1; case 2: return 2; default: throw new Error(); } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:82"
+      },
+      {
+        "text": "Object.defineProperty(foo, \"bar\", { get: function () { throw new Error(\"not implemented\"); }});",
+        "origin": "internal/rules/getter_return/getter_return_test.go:85"
+      },
+      {
+        "text": "Object.defineProperty(foo, \"bar\", { get: () => true });",
+        "origin": "internal/rules/getter_return/getter_return_test.go:88"
+      },
+      {
+        "text": "Object.defineProperty(foo, \"bar\", { get: () => foo.bar });",
+        "origin": "internal/rules/getter_return/getter_return_test.go:89"
+      },
+      {
+        "text": "Object.create(foo, { bar: { get: () => true } });",
+        "origin": "internal/rules/getter_return/getter_return_test.go:90"
+      },
+      {
+        "text": "var foo = { get: function () {} };",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:22"
+      },
+      {
+        "text": "Object.defineProperty({ get() {} }, 'foo', { value: 1 });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:23"
+      },
+      {
+        "text": "Reflect.defineProperty({ get() {} }, 'foo', { value: 1 });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:24"
+      },
+      {
+        "text": "Object.defineProperties({ foo: { get() {} } }, { bar: { value: 1 } });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:25"
+      },
+      {
+        "text": "Object.create({ foo: { get() {} } }, { bar: { value: 1 } });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:26"
+      },
+      {
+        "text": "let Object; Object.defineProperty(foo, 'bar', { get() {} });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:27"
+      },
+      {
+        "text": "function f() { Reflect.defineProperty(foo, 'bar', { get() {} }); var Reflect; }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:28"
+      },
+      {
+        "text": "function f(Object) { Object.defineProperties(foo, { bar: { get() {} } }); }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:29"
+      },
+      {
+        "text": "if (x) { const Object = getObject(); Object.create(foo, { bar: { get() {} } }); }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:30"
+      },
+      {
+        "text": "/* globals Object:off */ Object.defineProperty(foo, 'bar', { get() {} });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:31"
+      },
+      {
+        "text": "Object.defineProperty(foo, 'bar', { get: () => value });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:40"
+      },
+      {
+        "text": "Object.create(foo, { bar: { get: () => value } });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:41"
+      },
+      {
+        "text": "class C { get value() { throw new Error(); } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:42"
+      },
+      {
+        "text": "class C { get value() { while (true) {} } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:43"
+      },
+      {
+        "text": "class C { get value() { try { return 1; } catch (error) {} } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:44"
+      },
+      {
+        "text": "class C { get value() { for (;;) { try { return 1; } finally { continue; } } } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:45"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "var foo = { get bar() {} };",
+        "origin": "internal/rules/getter_return/getter_return_test.go:95",
+        "expected": [
+          {
+            "messageId": "expected",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "var foo = { get bar(){if(baz) {return true;}} };",
+        "origin": "internal/rules/getter_return/getter_return_test.go:105",
+        "expected": [
+          {
+            "messageId": "expectedAlways",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "var foo = { get bar() { return; } };",
+        "origin": "internal/rules/getter_return/getter_return_test.go:115",
+        "expected": [
+          {
+            "messageId": "expected",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "class foo { get bar(){} }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:127",
+        "expected": [
+          {
+            "messageId": "expected",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class foo { get bar(){ if (baz) { return true; }}}",
+        "origin": "internal/rules/getter_return/getter_return_test.go:137",
+        "expected": [
+          {
+            "messageId": "expectedAlways",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "Object.defineProperty(foo, 'bar', { get: function (){}});",
+        "origin": "internal/rules/getter_return/getter_return_test.go:149",
+        "expected": [
+          {
+            "messageId": "expected",
+            "line": 1,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "text": "Object.defineProperty(foo, 'bar', { get(){} });",
+        "origin": "internal/rules/getter_return/getter_return_test.go:159",
+        "expected": [
+          {
+            "messageId": "expected",
+            "line": 1,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "text": "class foo { get bar(){ if(baz) { throw new Error(); } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:171",
+        "expected": [
+          {
+            "messageId": "expected",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class foo { get bar(){ switch(x) { case 1: return 1; } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:183",
+        "expected": [
+          {
+            "messageId": "expectedAlways",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class foo { get bar(){ try { return value; } catch(e) { } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:195",
+        "expected": [
+          {
+            "messageId": "expectedAlways",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "class foo { get bar(){ try { return 1; } finally { return; } } }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:207",
+        "expected": [
+          {
+            "messageId": "expected",
+            "line": 1,
+            "column": 52
+          }
+        ]
+      },
+      {
+        "text": "Object?.defineProperty(foo, 'bar', { get: function (){} });",
+        "origin": "internal/rules/getter_return/getter_return_test.go:219",
+        "expected": [
+          {
+            "messageId": "expected",
+            "line": 1,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "text": "(Object?.defineProperty)(foo, 'bar', { get: function (){} });",
+        "origin": "internal/rules/getter_return/getter_return_test.go:229",
+        "expected": [
+          {
+            "messageId": "expected",
+            "line": 1,
+            "column": 40
+          }
+        ]
+      },
+      {
+        "text": "var foo = { get bar() {} };",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:52",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in getter 'bar'.",
+            "line": 1,
+            "column": 13,
+            "endLine": 1,
+            "endColumn": 20
+          }
+        ]
+      },
+      {
+        "text": "var foo = { get\n bar () {} };",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:63",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in getter 'bar'.",
+            "line": 1,
+            "column": 13,
+            "endLine": 2,
+            "endColumn": 6
+          }
+        ]
+      },
+      {
+        "text": "class C { static get value() {} }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:74",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in static getter 'value'.",
+            "line": 1,
+            "column": 11,
+            "endLine": 1,
+            "endColumn": 27
+          }
+        ]
+      },
+      {
+        "text": "var foo = { get bar() { return; } };",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:85",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in getter 'bar'.",
+            "line": 1,
+            "column": 25,
+            "endLine": 1,
+            "endColumn": 32
+          }
+        ]
+      },
+      {
+        "text": "var foo = { get bar() { if (condition) return; } };",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:116",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in getter 'bar'.",
+            "line": 1,
+            "column": 40
+          },
+          {
+            "messageId": "expectedAlways",
+            "message": "Expected getter 'bar' to always return a value.",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "Object.defineProperty(foo, 'bar', { get: function (){} });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:133",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in method 'get'.",
+            "line": 1,
+            "column": 37,
+            "endLine": 1,
+            "endColumn": 51
+          }
+        ]
+      },
+      {
+        "text": "Object.defineProperty(foo, 'bar', { get(){} });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:144",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in method 'get'.",
+            "line": 1,
+            "column": 37,
+            "endLine": 1,
+            "endColumn": 40
+          }
+        ]
+      },
+      {
+        "text": "Object.defineProperty(foo, 'bar', { ...descriptor, get() {} });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:155",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in method 'get'.",
+            "line": 1,
+            "column": 52,
+            "endLine": 1,
+            "endColumn": 55
+          }
+        ]
+      },
+      {
+        "text": "Object.defineProperty(foo, 'bar', { get: () => {} });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:166",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in method 'get'.",
+            "line": 1,
+            "column": 37,
+            "endLine": 1,
+            "endColumn": 42
+          }
+        ]
+      },
+      {
+        "text": "Object.defineProperties(foo, { bar: { get: function () {} } });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:177",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in method 'get'.",
+            "line": 1,
+            "column": 39
+          }
+        ]
+      },
+      {
+        "text": "Reflect.defineProperty(foo, 'bar', { get: function (){} });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:186",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in method 'get'.",
+            "line": 1,
+            "column": 38,
+            "endLine": 1,
+            "endColumn": 52
+          }
+        ]
+      },
+      {
+        "text": "Object.create(foo, { bar: { get: function() {} } });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:197",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in method 'get'.",
+            "line": 1,
+            "column": 29,
+            "endLine": 1,
+            "endColumn": 42
+          }
+        ]
+      },
+      {
+        "text": "Object?.defineProperty(foo, 'bar', { ['get']: function (){} });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:208",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in method 'get'.",
+            "line": 1,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "text": "(Object)[('defineProperty')](foo, 'bar', ({ get: (function () {}) }));",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:217",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in method 'get'."
+          }
+        ]
+      },
+      {
+        "text": "class C { get value() { while (true) { if (condition) break; } } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:224",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in getter 'value'.",
+            "line": 1,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "class C { get value() { try { return 1; } finally { if (condition) return; } } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:233",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in getter 'value'.",
+            "line": 1,
+            "column": 68
+          }
+        ]
+      },
+      {
+        "text": "class C { get value() { function nested() { return 1; } } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:242",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in getter 'value'.",
+            "line": 1,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "class C { get value() { throw error; return; } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:251",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in getter 'value'.",
+            "line": 1,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "text": "class C { get value() { if (false) return 1; } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:260",
+        "expected": [
+          {
+            "messageId": "expectedAlways",
+            "message": "Expected getter 'value' to always return a value.",
+            "line": 1,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "class C { get value() { if (true) return 1; } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:269",
+        "expected": [
+          {
+            "messageId": "expectedAlways",
+            "message": "Expected getter 'value' to always return a value.",
+            "line": 1,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "class C { get value() { try { return value; } catch (error) {} } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:278",
+        "expected": [
+          {
+            "messageId": "expectedAlways",
+            "message": "Expected getter 'value' to always return a value.",
+            "line": 1,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "text": "class C { get value() { do { try { return 1; } finally { continue; } } while (false); } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:287",
+        "expected": [
+          {
+            "messageId": "expectedAlways",
+            "message": "Expected getter 'value' to always return a value.",
+            "line": 1,
+            "column": 11
+          }
+        ]
+      }
+    ],
+    "excluded": [
+      {
+        "text": "var foo = { get bar() {return;} };",
+        "origin": "internal/rules/getter_return/getter_return_test.go:46",
+        "options": [
+          {
+            "allowImplicit": true
+          }
+        ],
+        "category": "valid",
+        "reason": "Nondefault allowImplicit:true is not enabled by the frozen Rsbuild configuration."
+      },
+      {
+        "text": "var foo = { get bar(){return true;} };",
+        "origin": "internal/rules/getter_return/getter_return_test.go:50",
+        "options": [
+          {
+            "allowImplicit": true
+          }
+        ],
+        "category": "valid",
+        "reason": "Nondefault allowImplicit:true is not enabled by the frozen Rsbuild configuration."
+      },
+      {
+        "text": "var foo = { get bar(){if(bar) {return;} return true;} };",
+        "origin": "internal/rules/getter_return/getter_return_test.go:54",
+        "options": [
+          {
+            "allowImplicit": true
+          }
+        ],
+        "category": "valid",
+        "reason": "Nondefault allowImplicit:true is not enabled by the frozen Rsbuild configuration."
+      },
+      {
+        "text": "class foo { get bar(){return true;} }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:58",
+        "options": [
+          {
+            "allowImplicit": true
+          }
+        ],
+        "category": "valid",
+        "reason": "Nondefault allowImplicit:true is not enabled by the frozen Rsbuild configuration."
+      },
+      {
+        "text": "class foo { get bar(){return;} }",
+        "origin": "internal/rules/getter_return/getter_return_test.go:62",
+        "options": [
+          {
+            "allowImplicit": true
+          }
+        ],
+        "category": "valid",
+        "reason": "Nondefault allowImplicit:true is not enabled by the frozen Rsbuild configuration."
+      },
+      {
+        "text": "Reflect.defineProperty(foo, 'bar', { get() {} });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:32",
+        "languageOptions": {
+          "eCMAVersion": 5
+        },
+        "category": "valid",
+        "reason": "Nondefault language options are not enabled by the frozen Rsbuild configuration."
+      },
+      {
+        "text": "Reflect.defineProperty(foo, 'bar', { get() {} });",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:36",
+        "globals": {
+          "Reflect": "off"
+        },
+        "category": "valid",
+        "reason": "Custom globals are not enabled by the frozen Rsbuild configuration."
+      },
+      {
+        "text": "class C { get value() { if (condition) return; return; } }",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:46",
+        "options": {
+          "allowImplicit": true
+        },
+        "category": "valid",
+        "reason": "Nondefault allowImplicit:true is not enabled by the frozen Rsbuild configuration."
+      },
+      {
+        "text": "var foo = { get bar() {} };",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:96",
+        "expected": [
+          {
+            "messageId": "expected",
+            "message": "Expected to return a value in getter 'bar'.",
+            "line": 1,
+            "column": 13
+          }
+        ],
+        "options": {
+          "allowImplicit": true
+        },
+        "category": "invalid",
+        "reason": "Nondefault allowImplicit:true is not enabled by the frozen Rsbuild configuration."
+      },
+      {
+        "text": "var foo = { get bar() { if (condition) return; } };",
+        "origin": "internal/rules/getter_return/getter_return_upstream_test.go:106",
+        "expected": [
+          {
+            "messageId": "expectedAlways",
+            "message": "Expected getter 'bar' to always return a value.",
+            "line": 1,
+            "column": 13
+          }
+        ],
+        "options": {
+          "allowImplicit": true
+        },
+        "category": "invalid",
+        "reason": "Nondefault allowImplicit:true is not enabled by the frozen Rsbuild configuration."
+      }
+    ],
+    "scopeNote": "All frozen Go test cases using the default Rsbuild rule options and language configuration. Original expected diagnostic fields are preserved verbatim; the differential oracle additionally compares complete diagnostics, fixes and suggestions. Explicit nondefault rule/language options are retained in excluded. There are no baseline Skip/Only cases or special per-case file fixtures in these source files."
+  },
+  {
+    "rule": "no-unreachable",
+    "provenance": {
+      "repository": "web-infra-dev/rslint",
+      "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "sources": [
+        {
+          "path": "internal/rules/no_unreachable/no_unreachable_test.go",
+          "sha256": "dbf8dfe16f126261467a19f3e0e99d37520b46091ce1606b8218f223f2655b7b"
+        }
+      ]
+    },
+    "exactCompilerOptions": true,
+    "compilerOptions": {
+      "jsx": "preserve",
+      "target": "esnext",
+      "module": "commonjs",
+      "strict": true,
+      "strictNullChecks": true,
+      "esModuleInterop": true,
+      "lib": [
+        "es2015",
+        "es2017",
+        "esnext",
+        "DOM"
+      ],
+      "experimentalDecorators": true,
+      "types": []
+    },
+    "valid": [
+      {
+        "text": "function foo() { function bar() { return 1; } return bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:19"
+      },
+      {
+        "text": "function foo() { return bar(); function bar() { return 1; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:20"
+      },
+      {
+        "text": "function foo() { return x; var x; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:23"
+      },
+      {
+        "text": "function foo() { return; var x; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:24"
+      },
+      {
+        "text": "function foo() { return; var x, y, z; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:25"
+      },
+      {
+        "text": "while (true) { break; var x; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:26"
+      },
+      {
+        "text": "while (true) { continue; var x, y; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:27"
+      },
+      {
+        "text": "while (true) { throw 'message'; var x; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:28"
+      },
+      {
+        "text": "function foo() { return; ; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:31"
+      },
+      {
+        "text": "function foo() { throw new Error(); function bar() {} }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:34"
+      },
+      {
+        "text": "function foo() { if (x) { return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:37"
+      },
+      {
+        "text": "function foo() { if (x) { } else { return; } x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:38"
+      },
+      {
+        "text": "function foo() { if (x) { return; } else { bar(); } baz(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:39"
+      },
+      {
+        "text": "function foo() { switch (x) { case 0: break; default: return; } x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:40"
+      },
+      {
+        "text": "function foo() { while (x) { return; } x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:41"
+      },
+      {
+        "text": "function foo() { for (x in {}) { return; } x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:42"
+      },
+      {
+        "text": "function foo() { for (;;) { if (x) break; } x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:43"
+      },
+      {
+        "text": "function foo() { try { return; } finally { x = 2; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:46"
+      },
+      {
+        "text": "switch (x) { case 1: break; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:49"
+      },
+      {
+        "text": "function foo() { switch(x) { case 1: return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:50"
+      },
+      {
+        "text": "while (true) { switch (foo) { case 1: x = 1; x = 2; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:51"
+      },
+      {
+        "text": "switch (foo) { case 1: break; var x; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:52"
+      },
+      {
+        "text": "function foo() { A: { break A; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:55"
+      },
+      {
+        "text": "var x = 1; throw 'uh oh'; var y;",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:58"
+      },
+      {
+        "text": "while (true) continue;",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:61"
+      },
+      {
+        "text": "function foo() { try { bar(); return; } catch (err) { return err; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:64"
+      },
+      {
+        "text": "function foo() { try { a.b.c = 1; return; } catch (err) { return err; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:65"
+      },
+      {
+        "text": "function foo() { return; type A = string; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:68"
+      },
+      {
+        "text": "function foo() { return; interface B {} }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:69"
+      },
+      {
+        "text": "function foo() { return; function bar() { var x = 1; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:72"
+      },
+      {
+        "text": "function foo() { var f = () => { return 1; }; bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:75"
+      },
+      {
+        "text": "function foo() { if (false) { return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:78"
+      },
+      {
+        "text": "function foo() { if (1) { return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:81"
+      },
+      {
+        "text": "function foo() { if (0) { return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:82"
+      },
+      {
+        "text": "function foo() { if (\"x\") { return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:83"
+      },
+      {
+        "text": "function foo() { if (null) { return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:84"
+      },
+      {
+        "text": "function foo() { for (const x of arr) { return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:87"
+      },
+      {
+        "text": "function foo() { for (const x in obj) { return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:88"
+      },
+      {
+        "text": "function foo() { do { break; } while (false); bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:91"
+      },
+      {
+        "text": "async function foo() { var f = async () => { return 1; }; bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:94"
+      },
+      {
+        "text": "function foo() { var f = function*() { return 1; }; bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:95"
+      },
+      {
+        "text": "class C { foo() { return bar(); function bar() { return 1; } } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:98"
+      },
+      {
+        "text": "function foo() { switch(x) { default: if (y) { try { return; } finally {} } } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:101"
+      },
+      {
+        "text": "function foo() { if (false) { return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:105"
+      },
+      {
+        "text": "function foo() { if (true) { return; } else { bar(); } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:106"
+      },
+      {
+        "text": "while (true) { if (true) break; var x = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:109"
+      },
+      {
+        "text": "function foo() { if (true) return; first(); second(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:110"
+      },
+      {
+        "text": "function foo() { if (true) return; function bar() {} after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:111"
+      },
+      {
+        "text": "while (condition) { if (true) break; else first(); second(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:112"
+      },
+      {
+        "text": "function foo() { if (true) return; label: { break label; } after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:113"
+      },
+      {
+        "text": "function foo() { if (true) return; label: { process.exit(); } after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:114"
+      },
+      {
+        "text": "function foo() { if (true) return; process.exit(); after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:115"
+      },
+      {
+        "text": "function foo() { if (true) return; { process.exit(); } after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:116"
+      },
+      {
+        "text": "function foo() { if (true) return; try { throw error; } catch (error) { recover(); } after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:117"
+      },
+      {
+        "text": "function foo() { if (true) return; try { process.exit(); } finally {} after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:118"
+      },
+      {
+        "text": "function foo() { if (true) return; do { process.exit(); } while (false); after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:119"
+      },
+      {
+        "text": "function foo() { if (true) return; do { process.exit(); } while (0); after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:120"
+      },
+      {
+        "text": "function foo() { if (true) return; switch (value) { case 1: break; default: return; } after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:121"
+      },
+      {
+        "text": "function foo() { if (true) return; switch (value) { default: process.exit(); } after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:122"
+      },
+      {
+        "text": "function foo() { if (false) first(); else return; after(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:123"
+      },
+      {
+        "text": "if (true) throw new Error(); after();",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:124"
+      },
+      {
+        "text": "class C { static { if (true) throw new Error(); after(); } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:125"
+      },
+      {
+        "text": "function outer() { function inner() { if (true) return; process.exit(); after(); } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:126"
+      },
+      {
+        "text": "function* foo() { try { yield 1; return; } catch (err) { return err; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:129"
+      },
+      {
+        "text": "export enum Foo { A, B }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:132"
+      },
+      {
+        "text": "const x = 1; export enum Foo { A, B }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:133"
+      },
+      {
+        "text": "const x = 1; enum Foo { A, B }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:134"
+      },
+      {
+        "text": "const x = 1; class Bar {}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:135"
+      },
+      {
+        "text": "const x = 1; namespace NS { export const a = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:136"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "function foo() { return; x = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:141",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "function foo() { throw new Error(); x = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:145",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "text": "while (true) { break; x = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:149",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "while (true) { continue; x = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:153",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "function foo() { return; var x = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:159",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "function foo() { return x; var x, y = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:164",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "while (true) { continue; var x = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:169",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { return; x = 1; y = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:175",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  return;\n  a();\n  b();\n  c();\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:180",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 3,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  return;\n  a();\n  if (b()) {\n    c()\n  } else {\n    d()\n  }\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:185",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 3,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "switch (x) { case 1: return; foo(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:191",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "switch (x) { default: return; foo(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:195",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 31
+          }
+        ]
+      },
+      {
+        "text": "function foo() { switch (foo) { case 1: throw e; x = 1; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:200",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "while (true) { switch (foo) { case 1: break; x = 1; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:205",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "while (true) { switch (foo) { case 1: continue; x = 1; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:210",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { return; let x = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:216",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "function foo() { return; const x = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:220",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "function foo() { return; class Bar {} }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:224",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "var x = 1; throw 'uh oh'; var y = 2;",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:230",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { if (x) { return; } else { throw e; } x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:236",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { if (x) return; else throw -1; x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:241",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { if (x) { return 1; } else { return 2; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:246",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 58
+          }
+        ]
+      },
+      {
+        "text": "function foo() { try { return; } finally {} x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:252",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { try { } finally { return; } x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:256",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { try { return 1; } catch(e) { return 2; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:261",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { try { console.log('x'); } finally { return 1; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:266",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { do { return; } while (x); x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:273",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { do { return; x = 1; } while(true); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:278",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 1,
+            "column": 31
+          }
+        ]
+      },
+      {
+        "text": "function foo() { while (x) { if (x) break; else continue; x = 2; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:283",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { for (;;) { if (x) continue; } x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:288",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { while (true) { } x = 2; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:293",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { while(true) { doSomething(); } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:298",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { for(;;) { doSomething(); } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:303",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "outer: while(true) { while(true) { break outer; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:309",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { switch(x) { case 1: return 1; default: return 2; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:315",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { if (a) { if (b) { return; } else { return; } } else { return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:321",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  if (a) {\n    return\n    b();\n    c();\n  } else {\n    throw err\n    d();\n  }\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:327",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 4
+          },
+          {
+            "messageId": "unreachableCode",
+            "line": 8
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  if (a) {\n    return\n    b();\n  } else {\n    throw err\n    d();\n  }\n  e();\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:336",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 9
+          },
+          {
+            "messageId": "unreachableCode",
+            "line": 4
+          },
+          {
+            "messageId": "unreachableCode",
+            "line": 7
+          }
+        ]
+      },
+      {
+        "text": "var f = (arrow) => { switch (arrow) { default: throw new Error(); }; g() }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:346",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { return; enum Color { Red } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:352",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "export const x = 1; throw new Error(); export enum Bar { A, B }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:357",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "export const x = 1; throw new Error(); export class Foo {}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:361",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  return;\n  x = 1;\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:367",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 3,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  var i = 0;\n  if (true) {\n    return;\n  }\n  throw \"test\";\n  var j = 0;\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:373",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 7,
+            "column": 3,
+            "endLine": 7,
+            "endColumn": 13
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  if (true) return;\n  else throw new Error();\n  after();\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:383",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 4,
+            "column": 3,
+            "endLine": 4,
+            "endColumn": 11
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  if (true) return;\n  if (condition) return;\n  else throw new Error();\n  after();\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:393",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 5,
+            "column": 3,
+            "endLine": 5,
+            "endColumn": 11
+          }
+        ]
+      },
+      {
+        "text": "function foo(object) {\n  if (true) return;\n  with (object) {\n    return;\n  }\n  after();\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:403",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 6,
+            "column": 3,
+            "endLine": 6,
+            "endColumn": 11
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  if (true) return;\n  else {\n    throw new Error();\n    after();\n  }\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:413",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 5,
+            "column": 5,
+            "endLine": 5,
+            "endColumn": 13
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  if (false) {\n    return;\n    after();\n  }\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:423",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 4,
+            "column": 5,
+            "endLine": 4,
+            "endColumn": 13
+          }
+        ]
+      },
+      {
+        "text": "class C { foo() { return; bar(); } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:434",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "class C { get x() { return 1; bar(); } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:438",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "async function foo() { return; bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:444",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function* foo() { return; bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:448",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "async function* foo() { return; bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:452",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { switch(x) { default: if (y) { return; } else { try { throw e; } catch(e) { return; } } } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:458",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "namespace Foo { throw new Error(); var x = 1; }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:464",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { switch(x) { case 1: return 1; case 2: return 2; case 3: return 3; default: return 0; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:470",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  try {\n    return;\n  } catch (err) {\n    return err;\n  }\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:476",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 4
+          }
+        ]
+      },
+      {
+        "text": "function* foo() {\n  try {\n    return;\n  } catch (err) {\n    return err;\n  }\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:483",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 4
+          }
+        ]
+      },
+      {
+        "text": "function foo() {\n  try {\n    return;\n    let a = 1;\n  } catch (err) {\n    return err;\n  }\n}",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:491",
+        "expected": [
+          {
+            "messageId": "unreachableCode",
+            "line": 5
+          },
+          {
+            "messageId": "unreachableCode",
+            "line": 4
+          }
+        ]
+      },
+      {
+        "text": "function foo() { try { ; return; } catch (err) { return err; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:501",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { while (true) { try { break; } catch (err) { return err; } } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:506",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { try { { return; } } catch (err) { return err; } }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:511",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      },
+      {
+        "text": "function foo() { try { foo(); } catch (err) {} finally { return; } bar(); }",
+        "origin": "internal/rules/no_unreachable/no_unreachable_test.go:516",
+        "expected": [
+          {
+            "messageId": "unreachableCode"
+          }
+        ]
+      }
+    ],
+    "excluded": [],
+    "scopeNote": "All frozen Go test cases using the default Rsbuild rule options and language configuration. Original expected diagnostic fields are preserved verbatim; the differential oracle additionally compares complete diagnostics, fixes and suggestions. Explicit nondefault rule/language options are retained in excluded. There are no baseline Skip/Only cases or special per-case file fixtures in these source files."
+  }
+]

@@ -4,9 +4,15 @@
 //! complete rule catalog. Unsupported enabled rules are errors. No legacy
 //! process, AST export, or fallback engine is used by this entry point.
 
+mod autofix;
 mod comments;
+mod configured;
+mod directives;
 mod edits;
+mod programs;
+mod projects;
 mod rules;
+mod source;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -24,6 +30,8 @@ use tsrs_core::{
 use tsrs_project::ID;
 use tsrs_vfs::{FS, bundled, osvfs};
 
+pub use configured::lint_projects_json;
+
 pub const COMPILER_REVISION: &str = "280b426b89cd4ecd6153cf48228826bd60a99c61";
 
 #[derive(Deserialize)]
@@ -35,6 +43,8 @@ struct Request {
     rules: Vec<RuleConfig>,
     project: Option<String>,
     compiler_options: Option<Value>,
+    #[serde(default)]
+    fix: bool,
 }
 
 #[derive(Deserialize)]
@@ -44,14 +54,31 @@ struct InputFile {
     text: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct RuleConfig {
+pub(crate) struct RuleConfig {
     name: String,
     #[serde(default = "error_severity")]
     severity: u8,
     #[serde(default)]
     options: Vec<Value>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PlanRequest {
+    schema_version: u32,
+    cwd: String,
+    files: Vec<PlanInput>,
+    #[serde(default)]
+    sources: Vec<InputFile>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PlanInput {
+    path: String,
+    policy: projects::ProjectPolicy,
 }
 
 fn error_severity() -> u8 {
@@ -68,21 +95,37 @@ struct LintResult {
     backend: &'static str,
     compiler: Value,
     files: Vec<FileResult>,
+    summary: LintSummary,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LintSummary {
+    fixed_issues: usize,
+    /// Actual rule-execution workers, excluding compiler-internal parallelism.
+    threads: usize,
+}
+
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FileResult {
     file_path: String,
     messages: Vec<Diagnostic>,
     applied_rules: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    has_type_information: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    output: Option<String>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    has_syntax_errors: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Diagnostic {
     rule_id: String,
-    message_id: &'static str,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    message_id: String,
     message: String,
     severity: u8,
     line: usize,
@@ -94,9 +137,13 @@ struct Diagnostic {
     fix: Option<edits::Fix>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     suggestions: Vec<ReportedSuggestion>,
+    // Owned original byte edits are used for atomic automatic fix selection.
+    // Public merged UTF-16 payloads must never be used as compiler offsets.
+    #[serde(skip)]
+    edits: Vec<edits::Edit>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ReportedSuggestion {
     message_id: &'static str,
@@ -160,10 +207,30 @@ impl Violation {
     }
 }
 
-struct SessionOwner(Arc<Session>);
+struct SessionOwner {
+    session: Arc<Session>,
+    fs: Arc<source::SourceFs>,
+}
+
+impl SessionOwner {
+    fn new(cwd: &str) -> Self {
+        let base: Arc<dyn FS> = Arc::new(bundled::wrap_fs(osvfs::fs()));
+        let fs = Arc::new(source::SourceFs::new(base));
+        let session = Session::new(SessionOptions::new(
+            cwd.into(),
+            bundled::default_lib_path(),
+            fs.clone(),
+            false,
+        ));
+        Self { session, fs }
+    }
+}
 impl Drop for SessionOwner {
     fn drop(&mut self) {
-        self.0.close();
+        self.session.close();
+        // At this compiler pin the parse-config host retains its base FS Arc.
+        // Clear generation-owned sources even on errors and panics.
+        self.fs.clear();
     }
 }
 
@@ -190,6 +257,57 @@ pub fn lint_json(request: &str) -> Result<String, String> {
         .and_then(|result| serde_json::to_string(&result).map_err(|e| e.to_string()))
 }
 
+/// Resolve per-file project policy without guessing ownership from imports.
+/// This planning boundary returns owned metadata; it does not execute lint.
+pub fn plan_json(request: &str) -> Result<String, String> {
+    let request: PlanRequest = serde_json::from_str(request)
+        .map_err(|error| format!("invalid project plan request: {error}"))?;
+    if request.schema_version != 1 || !std::path::Path::new(&request.cwd).is_absolute() {
+        return Err("project plan requires schemaVersion 1 and absolute cwd".into());
+    }
+    if request.files.is_empty() {
+        return Err("project plan files must include every admitted input".into());
+    }
+    std::thread::Builder::new()
+        .name("rslint-rust-projects".into())
+        .stack_size(512 << 20)
+        .spawn(move || {
+            let owner = SessionOwner::new(&request.cwd);
+            let mut sources = BTreeMap::new();
+            for source in request.sources {
+                let name = path(&request.cwd, &source.path);
+                let text = source.text.ok_or("planning source overlay requires text")?;
+                if sources.insert(name, text).is_some() {
+                    return Err("duplicate project plan overlay".into());
+                }
+            }
+            owner.fs.set_generation(&request.cwd, &sources)?;
+            let mut seen = BTreeSet::new();
+            let mut inputs = Vec::new();
+            for input in request.files {
+                let name = path(&request.cwd, &input.path);
+                if !seen.insert(name.clone()) {
+                    return Err(format!("duplicate admitted project input: {name}"));
+                }
+                inputs.push(projects::InputProject {
+                    path: name,
+                    policy: input.policy,
+                });
+            }
+            let plan = projects::select(&owner.session, &inputs)?;
+            serde_json::to_string(&json!({
+                "schemaVersion": 1, "backend": "tsrs-rust",
+                "compiler": {"revision": COMPILER_REVISION},
+                "projects": plan.projects, "fileProjects": plan.file_projects,
+                "sourceOnlyCompilerOptions": projects::source_only_compiler_options(),
+            }))
+            .map_err(|error| error.to_string())
+        })
+        .map_err(|error| format!("cannot start project planning worker: {error}"))?
+        .join()
+        .map_err(|_| "Rust project planning worker failed".to_owned())?
+}
+
 fn validate(request: &Request) -> Result<(), String> {
     if request.schema_version != 1 {
         return Err("unsupported lint request schemaVersion".into());
@@ -210,8 +328,12 @@ fn validate(request: &Request) -> Result<(), String> {
     if request.project.is_some() && request.compiler_options.is_some() {
         return Err("project and compilerOptions cannot be combined".into());
     }
+    validate_rules(&request.rules)
+}
+
+fn validate_rules(rules: &[RuleConfig]) -> Result<(), String> {
     let mut names = BTreeSet::new();
-    for rule in &request.rules {
+    for rule in rules {
         if !names.insert(&rule.name) {
             return Err(format!("duplicate rule: {}", rule.name));
         }
@@ -221,9 +343,7 @@ fn validate(request: &Request) -> Result<(), String> {
         if !rules::supported(&rule.name) {
             return Err(format!("rule has not been migrated to Rust: {}", rule.name));
         }
-        if !rule.options.is_empty() {
-            return Err(format!("{} does not accept options", rule.name));
-        }
+        rules::validate_options(&rule.name, &rule.options)?;
     }
     Ok(())
 }
@@ -236,31 +356,70 @@ fn lint(request: Request) -> Result<LintResult, String> {
     let mut inputs = Vec::new();
     let mut seen = BTreeSet::new();
     let mut overrides = BTreeMap::new();
-    for file in request.files {
+    for file in &request.files {
         let name = path(&request.cwd, &file.path);
         if !seen.insert(name.clone()) {
             return Err(format!("duplicate admitted file: {name}"));
         }
-        if let Some(text) = file.text {
-            overrides.insert(name.clone(), text);
+        if let Some(text) = &file.text {
+            overrides.insert(name.clone(), text.clone());
+        } else if request.fix {
+            // The compiler disk VFS strips BOMs. Fixing needs the original
+            // source mark; freeze admitted disk sources as explicit overlays.
+            if let Some(text) = source::read(&name)? {
+                overrides.insert(name.clone(), text);
+            }
         }
         inputs.push(name);
     }
-    let fs: Arc<dyn FS> = Arc::new(bundled::wrap_fs(osvfs::fs()));
-    let session = SessionOwner(Session::new(SessionOptions::new(
-        request.cwd.clone(),
-        bundled::default_lib_path(),
-        fs,
-        false,
-    )));
-    let mut options = json!({"fileSystem": {"kind": "layer", "files": overrides}});
+    let session = SessionOwner::new(&request.cwd);
+    let initial = observe(&session, &request, &inputs, &overrides)?;
+    let outcome = if request.fix {
+        autofix::run(initial, |sources| {
+            let mut overlays = overrides.clone();
+            overlays.extend(sources.clone());
+            observe(&session, &request, &inputs, &overlays)
+        })?
+    } else {
+        autofix::Outcome {
+            files: initial.into_iter().map(|file| file.result).collect(),
+            fixed_issues: 0,
+        }
+    };
+    Ok(LintResult {
+        schema_version: 1,
+        backend: "tsrs-rust",
+        compiler: json!({"revision": COMPILER_REVISION}),
+        files: outcome.files,
+        summary: LintSummary {
+            fixed_issues: outcome.fixed_issues,
+            threads: 1,
+        },
+    })
+}
+
+/// A generation contains only owned values. No compiler pointer outlives the
+/// observation, so the next generation can rebuild all cross-file type state.
+struct FileObservation {
+    result: FileResult,
+    source: String,
+}
+
+fn observe(
+    owner: &SessionOwner,
+    request: &Request,
+    inputs: &[String],
+    overrides: &BTreeMap<String, String>,
+) -> Result<Vec<FileObservation>, String> {
+    owner.fs.set_generation(&request.cwd, overrides)?;
+    let session = &owner.session;
+    let mut options = json!({});
     if let Some(project) = &request.project {
         options["openProjects"] = json!([path(&request.cwd, project)]);
     } else {
-        options["createPrograms"] = json!([{"rootFiles": inputs, "compilerOptions": request.compiler_options.unwrap_or_else(default_compiler_options)}]);
+        options["createPrograms"] = json!([{"rootFiles": inputs, "compilerOptions": request.compiler_options.clone().unwrap_or_else(default_compiler_options)}]);
     }
     let response = session
-        .0
         .handle_request(
             "createSnapshot",
             &serde_json::to_vec(&options).map_err(|e| e.to_string())?,
@@ -291,7 +450,7 @@ fn lint(request: Request) -> Result<LintResult, String> {
     if ids.is_empty() {
         return Err("compiler did not create a project".into());
     }
-    let snapshot = session.0.snapshot_data(handle).map_err(|e| e.to_string())?;
+    let snapshot = session.snapshot_data(handle).map_err(|e| e.to_string())?;
     let context = with_checker_lifetime(&Context::background(), CheckerLifetime::API);
     let mut files = Vec::new();
     for name in inputs {
@@ -300,58 +459,137 @@ fn lint(request: Request) -> Result<LintResult, String> {
             let program = snapshot
                 .get_program(&ID(id.clone()))
                 .map_err(|e| e.to_string())?;
-            if let Some(file) = program.get_source_file(&name) {
+            if let Some(file) = program.get_source_file(name) {
                 owner = Some((program, file));
                 break;
             }
         }
         let (program, file) = owner
             .ok_or_else(|| format!("admitted file is missing from compiler project: {name}"))?;
-        if !program
-            .get_syntactic_diagnostics(&context, Some(file))
-            .is_empty()
-        {
-            return Err(format!(
-                "syntax diagnostics are not yet supported by the Rust entry point: {name}"
-            ));
+        files.push(observe_file(
+            name,
+            file,
+            program,
+            &context,
+            &request.rules,
+            true,
+        )?);
+    }
+    drop(snapshot);
+    // Session owns a registry reference as well as the Arc above. Release each
+    // successful generation before building the next; SessionOwner closes all
+    // remaining handles on an error or panic.
+    session
+        .handle_request(
+            "release",
+            &serde_json::to_vec(&json!({"snapshot": handle})).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| format!("release compiler snapshot: {e}"))?;
+    Ok(files)
+}
+
+fn observe_file(
+    name: &str,
+    file: P<SourceFile>,
+    program: &tsrs_compiler::Program,
+    context: &Context,
+    file_rules: &[RuleConfig],
+    has_type_information: bool,
+) -> Result<FileObservation, String> {
+    let syntactic = program.get_syntactic_diagnostics(context, Some(file));
+    let has_syntax_errors = !syntactic.is_empty();
+    let mut messages = Vec::new();
+    if has_syntax_errors {
+        for diagnostic in syntactic {
+            let start = diagnostic
+                .pos()
+                .ok_or("synthetic syntax diagnostic start")? as usize;
+            let end = diagnostic.end().ok_or("synthetic syntax diagnostic end")? as usize;
+            let (offset, line, column) = position(file.text(), start);
+            let (end_offset, end_line, end_column) = position(file.text(), end);
+            messages.push(Diagnostic {
+                rule_id: format!("TypeScript(TS{})", diagnostic.code()),
+                message_id: String::new(),
+                message: diagnostic.localize(),
+                severity: 2,
+                line,
+                column,
+                end_line,
+                end_column,
+                range: [offset, end_offset],
+                fix: None,
+                suggestions: vec![],
+                edits: vec![],
+            });
         }
-        comments::ensure_supported(file)?;
-        let mut checker = program.get_type_checker_for_file_exclusive(&context, file);
-        let mut messages = Vec::new();
+    } else {
+        let directives = directives::Directives::parse(file)?;
+        directives
+            .ensure_supported()
+            .map_err(|error| format!("{error} in {}", file.file_name()))?;
+        let _globals_scope = directives.enter_globals(file);
+        let prepared_rules = rules::prepare(file_rules, file.text())?;
+        let mut checker = program.get_type_checker_for_file_exclusive(context, file);
         visit(
             file.as_node(),
-            file,
             &mut checker,
-            &request.rules,
+            &prepared_rules,
+            &RuleContext {
+                file,
+                program,
+                default_library: &|source| program.is_source_file_default_library(source.path()),
+                directives: &directives,
+                has_type_information,
+            },
             &mut messages,
         )?;
         drop(checker);
-        // Equal starts retain emission order, matching the original engine.
-        messages.sort_by_key(|message| message.range[0]);
-        files.push(FileResult {
-            file_path: name,
-            messages,
-            applied_rules: request.rules.iter().map(|r| r.name.clone()).collect(),
-        });
     }
-    drop(snapshot);
-    Ok(LintResult {
-        schema_version: 1,
-        backend: "tsrs-rust",
-        compiler: json!({"revision": COMPILER_REVISION}),
-        files,
+    // Equal starts retain emission order, matching the original engine.
+    messages.sort_by_key(|message| message.range[0]);
+    Ok(FileObservation {
+        result: FileResult {
+            file_path: name.to_owned(),
+            messages,
+            applied_rules: if has_syntax_errors {
+                vec![]
+            } else {
+                file_rules.iter().map(|r| r.name.clone()).collect()
+            },
+            output: None,
+            has_type_information: None,
+            has_syntax_errors,
+        },
+        source: file.text().to_owned(),
     })
+}
+
+struct RuleContext<'a> {
+    file: P<SourceFile>,
+    program: &'a tsrs_compiler::Program,
+    default_library: &'a dyn Fn(P<SourceFile>) -> bool,
+    directives: &'a directives::Directives,
+    has_type_information: bool,
 }
 
 fn visit(
     node: P<Node>,
-    file: P<SourceFile>,
     checker: &mut Checker,
-    rules: &[RuleConfig],
+    rules: &rules::PreparedRules<'_>,
+    context: &RuleContext<'_>,
     out: &mut Vec<Diagnostic>,
 ) -> Result<(), String> {
-    for rule in rules {
-        for violation in rules::check(&rule.name, node, file, checker) {
+    let file = context.file;
+    for prepared in rules.for_kind(node.kind()) {
+        let rule = prepared.config;
+        for violation in prepared.check(
+            node,
+            file,
+            checker,
+            context.default_library,
+            context.has_type_information,
+            context.program,
+        ) {
             let text = file.text();
             let [start, end] = match violation.byte_range {
                 Some(range) => range,
@@ -372,6 +610,12 @@ fn visit(
             if start > end || !text.is_char_boundary(start) || !text.is_char_boundary(end) {
                 return Err("invalid compiler diagnostic range".into());
             }
+            if context
+                .directives
+                .is_rule_disabled(text, &rule.name, start)?
+            {
+                continue;
+            }
             let (offset, line, column) = position(text, start);
             let (end_offset, end_line, end_column) = position(text, end);
             let fix = edits::merge_edits(text, &violation.edits)?;
@@ -388,7 +632,7 @@ fn visit(
             }
             out.push(Diagnostic {
                 rule_id: rule.name.clone(),
-                message_id: violation.message_id,
+                message_id: violation.message_id.into(),
                 message: violation.message,
                 severity: rule.severity,
                 line,
@@ -398,12 +642,13 @@ fn visit(
                 range: [offset, end_offset],
                 fix,
                 suggestions,
+                edits: violation.edits,
             });
         }
     }
     let mut error = None;
     node.for_each_child(&mut |child| {
-        if let Err(value) = visit(child, file, checker, rules, out) {
+        if let Err(value) = visit(child, checker, rules, context, out) {
             error = Some(value);
             return true;
         }
@@ -441,3 +686,18 @@ fn position(text: &str, end: usize) -> (usize, usize, usize) {
 
 #[cfg(test)]
 mod tests;
+
+/// Immutable scheduling metadata without creating compiler state.
+pub fn rule_capabilities_json(request: &str) -> Result<String, String> {
+    let names: Vec<String> = serde_json::from_str(request)
+        .map_err(|error| format!("invalid rule capability request: {error}"))?;
+    let mut result = BTreeMap::new();
+    for name in names {
+        if !rules::supported(&name) {
+            return Err(format!("rule has not been migrated to Rust: {name}"));
+        }
+        let typed = rules::requires_type_information(&name);
+        result.insert(name, typed);
+    }
+    serde_json::to_string(&result).map_err(|error| error.to_string())
+}

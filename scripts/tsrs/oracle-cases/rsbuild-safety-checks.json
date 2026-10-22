@@ -1,0 +1,1998 @@
+[
+  {
+    "rule": "no-unused-labels",
+    "provenance": {
+      "repository": "web-infra-dev/rslint",
+      "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "sources": [
+        {
+          "path": "internal/rules/no_unused_labels/no_unused_labels_extras_test.go",
+          "sha256": "edb86371431a3c7d8beadc1ee93d49d4bea916a84d8c7729d1056e060da31e77"
+        },
+        {
+          "path": "internal/rules/no_unused_labels/no_unused_labels_upstream_test.go",
+          "sha256": "4c79211f25635decac1d080e16948a3908d0d244a7f6f8d99aff6ce9fff6e792"
+        }
+      ]
+    },
+    "valid": [
+      {
+        "text": "A: { function f() { B: { break B; } } break A; }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:valid:0",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: { class C { method() { B: { break B; } } } break A; }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:valid:1",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: { const f = () => { B: { break B; } }; break A; }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:valid:2",
+        "extension": ".ts"
+      },
+      {
+        "text": "async function* f() { A: { break A; } }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:valid:3",
+        "extension": ".ts"
+      },
+      {
+        "text": "class C { static { A: { break A; } } }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:valid:4",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: { B: { C: { if (ok) break C; } break B; } break A; }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:valid:5",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: switch (kind) { case 1: while (ok) break A; default: break; }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:valid:6",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: for (const x of xs) { switch (x.kind) { case \"skip\": continue A; case \"stop\": break A; } }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:valid:7",
+        "extension": ".ts"
+      },
+      {
+        "text": "const obj = { A: foo, \"B\": bar, 0: baz, [key]: value, ...rest };",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:valid:8",
+        "extension": ".ts"
+      },
+      {
+        "text": "B: for (let i = 0; i < 10; ++i) { for (let j = 0; j < 10; ++j) { if (foo()) { break B; } } bar(); }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:valid:9",
+        "extension": ".ts"
+      },
+      {
+        "text": "const get = () => Promise.resolve({ json: () => ({ billing_contact: { id: \"54321\" } }) });",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:valid:10",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: break A;",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:valid:0",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: { foo(); break A; bar(); }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:valid:1",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: if (a) { foo(); if (b) break A; bar(); }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:valid:2",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: for (var i = 0; i < 10; ++i) { foo(); if (a) break A; bar(); }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:valid:3",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: for (var i = 0; i < 10; ++i) { foo(); if (a) continue A; bar(); }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:valid:4",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: { B: break B; C: for (var i = 0; i < 10; ++i) { foo(); if (a) break A; if (c) continue C; bar(); } }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:valid:5",
+        "extension": ".ts"
+      },
+      {
+        "text": "A: { var A = 0; console.log(A); break A; console.log(A); }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:valid:6",
+        "extension": ".ts"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "A: while (a) { break; continue; }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:0",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "while (a) { break; continue; }"
+        ]
+      },
+      {
+        "text": "A: while (a) { while (b) { break; } }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:1",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "while (a) { while (b) { break; } }"
+        ]
+      },
+      {
+        "text": "A: foo();",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:2",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "message": "'A:' is defined but never used.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "foo();"
+        ]
+      },
+      {
+        "text": "A: for (const x of xs) { B: { if (x) continue A; } }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:3",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 26,
+            "endLine": 1,
+            "endColumn": 27
+          }
+        ],
+        "outputSteps": [
+          "A: for (const x of xs) { { if (x) continue A; } }"
+        ]
+      },
+      {
+        "text": "A\n/* comment */: foo();",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:4",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ]
+      },
+      {
+        "text": "A: // comment\nfoo();",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:5",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ]
+      },
+      {
+        "text": "A:\nfoo();",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:6",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "foo();"
+        ]
+      },
+      {
+        "text": "A: (foo as any);",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:7",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "(foo as any);"
+        ]
+      },
+      {
+        "text": "A: (foo satisfies T);",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:8",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "(foo satisfies T);"
+        ]
+      },
+      {
+        "text": "A: foo!;",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:9",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "foo!;"
+        ]
+      },
+      {
+        "text": "A: foo?.();",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:10",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "foo?.();"
+        ]
+      },
+      {
+        "text": "A: switch (kind) { case 1: break; default: break; }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:11",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "switch (kind) { case 1: break; default: break; }"
+        ]
+      },
+      {
+        "text": "A: { B: { break A; } }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:12",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 6,
+            "endLine": 1,
+            "endColumn": 7
+          }
+        ],
+        "outputSteps": [
+          "A: { { break A; } }"
+        ]
+      },
+      {
+        "text": "A: { function f() {} }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:13",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "{ function f() {} }"
+        ]
+      },
+      {
+        "text": "class C { static { A: foo(); } }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:14",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 20,
+            "endLine": 1,
+            "endColumn": 21
+          }
+        ],
+        "outputSteps": [
+          "class C { static { foo(); } }"
+        ]
+      },
+      {
+        "text": "const face = \"😀\";\n中文: foo();",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:15",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "message": "'中文:' is defined but never used.",
+            "line": 2,
+            "column": 1,
+            "endLine": 2,
+            "endColumn": 3
+          }
+        ],
+        "outputSteps": [
+          "const face = \"😀\";\nfoo();"
+        ]
+      },
+      {
+        "text": "A: ({ ...obj, value: 1 });",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:16",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "({ ...obj, value: 1 });"
+        ]
+      },
+      {
+        "text": "A: {}",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:17",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "{}"
+        ]
+      },
+      {
+        "text": "A: ;",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:18",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          ";"
+        ]
+      },
+      {
+        "text": "function test3() {\n    NoDirective: \"use strict\";\n    return 7;\n}",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:19",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 2,
+            "column": 5,
+            "endLine": 2,
+            "endColumn": 16
+          }
+        ]
+      },
+      {
+        "text": "function test3() {\n    NoDirective: (\"use strict\");\n    return 7;\n}",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:20",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 2,
+            "column": 5,
+            "endLine": 2,
+            "endColumn": 16
+          }
+        ]
+      },
+      {
+        "text": "function test3() {\n    foo();\n    NoDirective: \"use strict\";\n}",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:21",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 3,
+            "column": 5,
+            "endLine": 3,
+            "endColumn": 16
+          }
+        ]
+      },
+      {
+        "text": "function test3() { NoDirective: `use ${mode}`; }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:22",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 20,
+            "endLine": 1,
+            "endColumn": 31
+          }
+        ],
+        "outputSteps": [
+          "function test3() { `use ${mode}`; }"
+        ]
+      },
+      {
+        "text": "if (foo) { bar: \"baz\" }",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:23",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 12,
+            "endLine": 1,
+            "endColumn": 15
+          }
+        ],
+        "outputSteps": [
+          "if (foo) { \"baz\" }"
+        ]
+      },
+      {
+        "text": "const get = () => Promise.resolve({ json: () => { billing_contact: { id: \"54321\" } } });",
+        "origin": "no_unused_labels_extras_test.go:TestNoUnusedLabelsExtras:invalid:24",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 70,
+            "endLine": 1,
+            "endColumn": 72
+          },
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 51,
+            "endLine": 1,
+            "endColumn": 66
+          }
+        ],
+        "outputSteps": [
+          "const get = () => Promise.resolve({ json: () => { { \"54321\" } } });"
+        ]
+      },
+      {
+        "text": "A: var foo = 0;",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:0",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "message": "'A:' is defined but never used.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "var foo = 0;"
+        ]
+      },
+      {
+        "text": "A: { foo(); bar(); }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:1",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "{ foo(); bar(); }"
+        ]
+      },
+      {
+        "text": "A: if (a) { foo(); bar(); }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:2",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "if (a) { foo(); bar(); }"
+        ]
+      },
+      {
+        "text": "A: for (var i = 0; i < 10; ++i) { foo(); if (a) break; bar(); }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:3",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "for (var i = 0; i < 10; ++i) { foo(); if (a) break; bar(); }"
+        ]
+      },
+      {
+        "text": "A: for (var i = 0; i < 10; ++i) { foo(); if (a) continue; bar(); }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:4",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "for (var i = 0; i < 10; ++i) { foo(); if (a) continue; bar(); }"
+        ]
+      },
+      {
+        "text": "A: for (var i = 0; i < 10; ++i) { B: break A; }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:5",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 35,
+            "endLine": 1,
+            "endColumn": 36
+          }
+        ],
+        "outputSteps": [
+          "A: for (var i = 0; i < 10; ++i) { break A; }"
+        ]
+      },
+      {
+        "text": "A: { var A = 0; console.log(A); }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:6",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "{ var A = 0; console.log(A); }"
+        ]
+      },
+      {
+        "text": "A: /* comment */ foo",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:7",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ]
+      },
+      {
+        "text": "A /* comment */: foo",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:8",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ]
+      },
+      {
+        "text": "A: \"use strict\"",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:9",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ]
+      },
+      {
+        "text": "\"use strict\"; foo: \"bar\"",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:10",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 15,
+            "endLine": 1,
+            "endColumn": 18
+          }
+        ]
+      },
+      {
+        "text": "A: (\"use strict\")",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:11",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ]
+      },
+      {
+        "text": "A: `use strict`",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:12",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ]
+      },
+      {
+        "text": "if (foo) { bar: 'baz' }",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:13",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 12,
+            "endLine": 1,
+            "endColumn": 15
+          }
+        ],
+        "outputSteps": [
+          "if (foo) { 'baz' }"
+        ]
+      },
+      {
+        "text": "A: B: 'foo'",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:14",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 4,
+            "endLine": 1,
+            "endColumn": 5
+          },
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "B: 'foo'"
+        ]
+      },
+      {
+        "text": "A: B: C: 'foo'",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:15",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 7,
+            "endLine": 1,
+            "endColumn": 8
+          },
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 4,
+            "endLine": 1,
+            "endColumn": 5
+          },
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "C: 'foo'"
+        ]
+      },
+      {
+        "text": "A: B: C: D: 'foo'",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:16",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 10,
+            "endLine": 1,
+            "endColumn": 11
+          },
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 7,
+            "endLine": 1,
+            "endColumn": 8
+          },
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 4,
+            "endLine": 1,
+            "endColumn": 5
+          },
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "D: 'foo'"
+        ]
+      },
+      {
+        "text": "A: B: C: D: E: 'foo'",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:17",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 13,
+            "endLine": 1,
+            "endColumn": 14
+          },
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 10,
+            "endLine": 1,
+            "endColumn": 11
+          },
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 7,
+            "endLine": 1,
+            "endColumn": 8
+          },
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 4,
+            "endLine": 1,
+            "endColumn": 5
+          },
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "E: 'foo'"
+        ]
+      },
+      {
+        "text": "A: 42",
+        "origin": "no_unused_labels_upstream_test.go:TestNoUnusedLabelsUpstream:invalid:18",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unused",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 2
+          }
+        ],
+        "outputSteps": [
+          "42"
+        ]
+      }
+    ],
+    "excluded": []
+  },
+  {
+    "rule": "no-unsafe-optional-chaining",
+    "provenance": {
+      "repository": "web-infra-dev/rslint",
+      "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "sources": [
+        {
+          "path": "internal/rules/no_unsafe_optional_chaining/no_unsafe_optional_chaining_test.go",
+          "sha256": "9ca9df392469952da0f53ff5e9af27a88f657887e36b60cf398bf1e211ac620b"
+        }
+      ]
+    },
+    "valid": [
+      {
+        "text": "obj?.foo;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:0",
+        "extension": ".ts"
+      },
+      {
+        "text": "obj?.foo();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:1",
+        "extension": ".ts"
+      },
+      {
+        "text": "obj?.foo.bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:2",
+        "extension": ".ts"
+      },
+      {
+        "text": "obj?.foo?.bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:3",
+        "extension": ".ts"
+      },
+      {
+        "text": "obj?.foo?.bar();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:4",
+        "extension": ".ts"
+      },
+      {
+        "text": "obj?.foo?.bar?.();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:5",
+        "extension": ".ts"
+      },
+      {
+        "text": "(obj?.foo ?? bar)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:6",
+        "extension": ".ts"
+      },
+      {
+        "text": "(obj?.foo ?? bar).baz;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:7",
+        "extension": ".ts"
+      },
+      {
+        "text": "(obj?.foo ?? bar)[0];",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:8",
+        "extension": ".ts"
+      },
+      {
+        "text": "new (obj?.foo ?? bar)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:9",
+        "extension": ".ts"
+      },
+      {
+        "text": "(obj?.foo || bar)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:10",
+        "extension": ".ts"
+      },
+      {
+        "text": "(obj?.foo || bar).baz;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:11",
+        "extension": ".ts"
+      },
+      {
+        "text": "obj?.foo + bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:12",
+        "extension": ".ts"
+      },
+      {
+        "text": "+obj?.foo;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:13",
+        "extension": ".ts"
+      },
+      {
+        "text": "({...obj?.foo});",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:14",
+        "extension": ".ts"
+      },
+      {
+        "text": "({...obj?.foo, x: 1});",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:15",
+        "extension": ".ts"
+      },
+      {
+        "text": "(obj?.foo, bar)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:16",
+        "extension": ".ts"
+      },
+      {
+        "text": "(obj?.foo, bar).baz;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:17",
+        "extension": ".ts"
+      },
+      {
+        "text": "for (const x in obj?.foo) {}",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:18",
+        "extension": ".ts"
+      },
+      {
+        "text": "const {x = obj?.foo} = obj;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:19",
+        "extension": ".ts"
+      },
+      {
+        "text": "function f({x = obj?.foo}: any) {}",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:20",
+        "extension": ".ts"
+      },
+      {
+        "text": "const [a = obj?.foo] = arr;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:21",
+        "extension": ".ts"
+      },
+      {
+        "text": "(obj?.foo)!.bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:22",
+        "extension": ".ts"
+      },
+      {
+        "text": "(obj?.foo)!();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:23",
+        "extension": ".ts"
+      },
+      {
+        "text": "new (obj?.foo)!();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:24",
+        "extension": ".ts"
+      },
+      {
+        "text": "((obj?.foo && bar) ?? fallback)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:25",
+        "extension": ".ts"
+      },
+      {
+        "text": "((obj?.foo && bar) || fallback).baz;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:26",
+        "extension": ".ts"
+      },
+      {
+        "text": "(obj?.foo ?? (obj?.bar ?? baz))();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:27",
+        "extension": ".ts"
+      },
+      {
+        "text": "((obj?.foo || a) ?? b).bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:28",
+        "extension": ".ts"
+      },
+      {
+        "text": "obj.foo.bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:29",
+        "extension": ".ts"
+      },
+      {
+        "text": "new obj.Foo();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:30",
+        "extension": ".ts"
+      },
+      {
+        "text": "const marker = \"?.\"; (obj.foo)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:31",
+        "extension": ".ts"
+      },
+      {
+        "text": "class Foo extends Bar {}",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:35",
+        "extension": ".ts"
+      },
+      {
+        "text": "\"foo\" in obj;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:36",
+        "extension": ".ts"
+      },
+      {
+        "text": "obj instanceof Foo;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:37",
+        "extension": ".ts"
+      },
+      {
+        "text": "[...arr];",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:38",
+        "extension": ".ts"
+      },
+      {
+        "text": "const {foo} = obj;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:39",
+        "extension": ".ts"
+      },
+      {
+        "text": "const [a] = arr;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:40",
+        "extension": ".ts"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "(obj?.foo)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:0",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 2
+          }
+        ]
+      },
+      {
+        "text": "(obj?.foo).bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:1",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 2
+          }
+        ]
+      },
+      {
+        "text": "(obj?.foo)[0];",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:2",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 2
+          }
+        ]
+      },
+      {
+        "text": "(obj?.[key])();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:3",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain"
+          }
+        ]
+      },
+      {
+        "text": "(obj.method?.())[0];",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:4",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain"
+          }
+        ]
+      },
+      {
+        "text": "new (obj?.foo)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:5",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "(obj?.foo)`text`;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:6",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 2
+          }
+        ]
+      },
+      {
+        "text": "[...obj?.foo];",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:7",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "foo(...obj?.foo);",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:8",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "for (const x of obj?.foo) {}",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:9",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "text": "\"foo\" in obj?.bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:10",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "foo instanceof obj?.bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:11",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "const {foo} = obj?.bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:12",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "const [a] = obj?.bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:13",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "({foo} = obj?.bar);",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:14",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "([a] = obj?.bar);",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:15",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "const {x: {y} = obj?.foo} = obj;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:16",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "text": "const [, [a] = obj?.foo] = arr;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:17",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "function f({x: {y} = obj?.foo}: any) {}",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:18",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "const g = ({x: [y] = obj?.foo}: any) => {};",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:19",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "class Foo extends obj?.bar {}",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:20",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "text": "const C = class extends obj?.bar {};",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:21",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "((((obj?.foo))))();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:22",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "(cond ? obj?.foo : obj?.bar)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:23",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 9
+          },
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "text": "(cond ? obj?.foo : bar)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:24",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "(cond ? bar : obj?.foo)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:25",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "(cond ? (cond ? obj?.a : obj?.b) : obj?.c)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:26",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 17
+          },
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 26
+          },
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 36
+          }
+        ]
+      },
+      {
+        "text": "(obj?.foo && obj?.bar)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:27",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 2
+          },
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "text": "(obj?.foo && bar)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:28",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 2
+          }
+        ]
+      },
+      {
+        "text": "(a && obj?.foo)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:29",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "(a, b, obj?.foo)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:30",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "async function h() { (await obj?.foo)(); }",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:31",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "async function h2() { (cond ? await obj?.foo : obj?.bar)(); }",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:32",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 37
+          },
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 48
+          }
+        ]
+      },
+      {
+        "text": "(((obj?.foo && a) || b) && obj?.bar)();",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:33",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 28
+          }
+        ]
+      },
+      {
+        "text": "async function h3() { (cond ? ((await obj?.foo)) : ((obj?.bar)))(); }",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:34",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 39
+          },
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 54
+          }
+        ]
+      },
+      {
+        "text": "\"key\" in (cond ? obj?.a : obj?.b);",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:50",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 18
+          },
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "text": "for (const v of (cond ? obj?.a : obj?.b)) {}",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:51",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 25
+          },
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 34
+          }
+        ]
+      },
+      {
+        "text": "[...(cond ? obj?.a : obj?.b)];",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:52",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 13
+          },
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "const {w} = (cond ? obj?.a : obj?.b);",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:53",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 21
+          },
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "text": "class Bar extends (cond ? obj?.a : obj?.b) {}",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:54",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 27
+          },
+          {
+            "messageId": "unsafeOptionalChain",
+            "line": 1,
+            "column": 36
+          }
+        ]
+      }
+    ],
+    "excluded": [
+      {
+        "text": "(obj?.foo ?? 0) + bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:32",
+        "extension": ".ts",
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "+(obj?.foo ?? 0);",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:33",
+        "extension": ".ts",
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "bar -= (obj?.foo ?? 0);",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:valid:34",
+        "extension": ".ts",
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "obj?.foo + obj?.bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:35",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 1
+          },
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 12
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "obj?.foo - bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:36",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "obj?.foo * bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:37",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "obj?.foo / bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:38",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "obj?.foo % bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:39",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "obj?.foo ** bar;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:40",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "+obj?.foo;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:41",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 2
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "-obj?.foo;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:42",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 2
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "x += obj?.foo;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:43",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 6
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "x -= obj?.foo;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:44",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 6
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "x *= obj?.foo;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:45",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 6
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "x /= obj?.foo;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:46",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 6
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "x %= obj?.foo;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:47",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 6
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "x **= obj?.foo;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:48",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 7
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      },
+      {
+        "text": "(cond ? obj?.a : obj?.b) + 1;",
+        "origin": "no_unsafe_optional_chaining_test.go:TestNoUnsafeOptionalChainingRule:invalid:49",
+        "extension": ".ts",
+        "expected": [
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 9
+          },
+          {
+            "messageId": "unsafeArithmetic",
+            "line": 1,
+            "column": 18
+          }
+        ],
+        "configuration": {
+          "Options": [
+            {
+              "disallowArithmeticOperators": true
+            }
+          ]
+        },
+        "reason": "Original per-case configuration differs from the frozen Rsbuild rule plan; retained for explicit non-scope review."
+      }
+    ]
+  }
+]

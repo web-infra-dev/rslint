@@ -206,11 +206,7 @@ pub fn map_token(kind: Kind, start: u32, end: u32, cover: &Cover, is_ts: bool) -
                 T::Identifier
             } else if kind.is_future_reserved_keyword() && kind != Kind::Static {
                 // interface/private/public/... -- Identifier in .js, Keyword in .ts.
-                if is_ts {
-                    T::Keyword
-                } else {
-                    T::Identifier
-                }
+                if is_ts { T::Keyword } else { T::Identifier }
             } else if kind.is_any_keyword() {
                 // true reserved words + let/yield/static.
                 T::Keyword
@@ -265,7 +261,7 @@ pub fn build_columns(
 mod tests {
     use super::*;
     use oxc_allocator::Allocator;
-    use oxc_parser::{config::TokensParserConfig, Parser};
+    use oxc_parser::{Parser, config::TokensParserConfig};
     use oxc_span::SourceType;
 
     /// Parse with tokens, then return `(value, eslintType)` pairs for every token -- the

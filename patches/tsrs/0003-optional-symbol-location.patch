@@ -1,0 +1,16 @@
+diff --git a/crates/tsrs_api/src/checker/rslint.rs b/crates/tsrs_api/src/checker/rslint.rs
+--- a/crates/tsrs_api/src/checker/rslint.rs
++++ b/crates/tsrs_api/src/checker/rslint.rs
+@@ -27,6 +27,12 @@ pub(super) fn handle(host: &dyn CheckerHost, method: &str, params: &Value) -> Ch
+             let t = s.c().get_error_type();
+             s.type_response(t)
+         }
++        "rslint/getTypeOfSymbolAtLocation" => {
++            let symbol = s.resolve_symbol(&p.symbol_ref("symbol")?)?;
++            let node = optional_node(&s, p.string("location")?)?;
++            let result = s.c().get_type_of_symbol_at_location(symbol, node);
++            result.map_or(Ok(Value::Null), |t| s.type_response(t))
++        }
+         "rslint/getIndexTypeOfType" => {
+             let t = s.resolve_type(p.u32("type")?)?;
+             let key = s.resolve_type(p.u32("keyType")?)?;

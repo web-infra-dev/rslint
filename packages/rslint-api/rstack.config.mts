@@ -4,6 +4,8 @@ define.lib({
   format: 'esm',
   dts: {
     bundle: true,
+    // Declaration generation uses the pinned JavaScript TypeScript compiler.
+    tsgo: false,
   },
   source: {
     tsconfigPath: './tsconfig.build.json',

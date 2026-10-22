@@ -1,0 +1,288 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "context": "Publication checks after the accepted benchmark; not an additional timing batch.",
+  "benchmarkIdentitySHA256": "66bf0a58f305887df3778d014f23c28ebf5d0fe57c745a8fc73827bac0a35c67",
+  "candidateArtifactSHA256": "4b167a98e3b6162511c49b5dc8a79ebf05965475af00176bb4c07755443ae08c",
+  "all71MeasuredArtifactsByteIdenticalAfterRebuild": true,
+  "measuredArtifactHashes": {
+    "packages/rslint/dist/cli.d.ts": "c49bcf7227008b7efd43b1e287bf1a50595699ee3d764b42453c4701064069e2",
+    "packages/rslint/dist/cli.js": "937f50c039efdbd42fb45e34036bd8db1ad1248cce4663eb0fc54c4f9e9e8a5c",
+    "packages/rslint/dist/config-loader.d.ts": "380a46197047bbf5e0ec59721074514e9e6722322e433f7e1bb9738d3a79d064",
+    "packages/rslint/dist/config-loader.js": "9913fd8245dbba9b092659caa37245a372d038f1e89e19cbbebdcd630f832c01",
+    "packages/rslint/dist/index.d.ts": "f4e8f6cc51cae267e66b497f2c1e5d2b3468f3fdf3ddcf8524578fae1de3a756",
+    "packages/rslint/dist/index.js": "2cd8e69ca38b5d9384df2b841ea6a76033edf4e5adeee79aeff9e57bafd4fa73",
+    "packages/rslint/dist/internal.js": "e421c1aa15ef0a8abb806922dbe59a61bf437a59e2bc3c1da8589f1638fb4acb",
+    "packages/rslint/dist/service.js": "a18b6d98146c7c02678a2e0f544ad52278c3e31f5da1458b03dcebe7fd081531",
+    "packages/rslint/dist/x~0.js": "1b9beceff1344190fb0300c4ecb104a96c72ba45aeb8979d9e9d175e2ed9ead6",
+    "packages/rslint/dist/globals/amd.json": "47d599108724adde108ad4119251bf1d0a21b6c4be520e74a2d326c9d9ffa119",
+    "packages/rslint/dist/globals/applescript.json": "16a3feb5df113c0ba00bcf26b80d9e3278ad494c9049bebe627871726548f3f3",
+    "packages/rslint/dist/globals/astro.json": "64dfa3373bc53fcb2a39988b0174b3e7961d71b4cf7a974160c21ac55bc6c153",
+    "packages/rslint/dist/globals/atomtest.json": "c37d839ff560422bdf1adfada739915ef67a0b7d92cd29c269125a9efa552181",
+    "packages/rslint/dist/globals/audioWorklet.json": "3429f89b2c26a9f0e70e255712490006bb9468b53cf01f59576dc2f67d307479",
+    "packages/rslint/dist/globals/browser.json": "eef1af10b45ecdc856d2502701b47dedc71765870cf3f04303afac4356dc060f",
+    "packages/rslint/dist/globals/builtin.json": "5368c5f216370e232d84fc0aee5a69c9b011936dc19502bcdd9b24c6381f3405",
+    "packages/rslint/dist/globals/bunBuiltin.json": "1a2993074ae1fffae7ff2381ba334ff6821b9f4d7fe198769cc55dcf6ae3226e",
+    "packages/rslint/dist/globals/chai.json": "35dfb508d05b3f1b70a82eb6742a0dede96927c32032e5728f395d026a8aa0f0",
+    "packages/rslint/dist/globals/commonjs.json": "1d3d050da9c7aa3317df04bd24c0382ed278209401cce6feaf8d1f10f02b9ce7",
+    "packages/rslint/dist/globals/couch.json": "3cb90a9a63d3b96b18d6baf3a54147f91d1bcceae96ed20244f62e714c8994d4",
+    "packages/rslint/dist/globals/denoBuiltin.json": "21218b009e01bcc9eb22b84abdf504d20ba5e1ea4c4190adf785c563d22491dc",
+    "packages/rslint/dist/globals/devtools.json": "cc4ba52205bfe55e39459e3c9eeb5cc527c2e20d603bca4041543afc745ce337",
+    "packages/rslint/dist/globals/embertest.json": "f79c8a946a8f6a0ae8caf6a5ff150a70e765ad028961b416b3c023b4ce058d48",
+    "packages/rslint/dist/globals/es2015.json": "a1cdd22759ef31f495f44bee5a649d24cb8a8c27dd8c58063478c1b297431745",
+    "packages/rslint/dist/globals/es2016.json": "a1cdd22759ef31f495f44bee5a649d24cb8a8c27dd8c58063478c1b297431745",
+    "packages/rslint/dist/globals/es2017.json": "261335953389920886e859d4513fd217c9528ae7e0ea7d7d2ebcf02c31a56b2f",
+    "packages/rslint/dist/globals/es2018.json": "261335953389920886e859d4513fd217c9528ae7e0ea7d7d2ebcf02c31a56b2f",
+    "packages/rslint/dist/globals/es2019.json": "261335953389920886e859d4513fd217c9528ae7e0ea7d7d2ebcf02c31a56b2f",
+    "packages/rslint/dist/globals/es2020.json": "5da8c757802631f63020a04ccbffab52751e31c0a51d950e925668ae96c53966",
+    "packages/rslint/dist/globals/es2021.json": "94381637dc6247c4d6910ec6ca90a42e3a1ccadb6d67814f216de99b7f773aab",
+    "packages/rslint/dist/globals/es2022.json": "94381637dc6247c4d6910ec6ca90a42e3a1ccadb6d67814f216de99b7f773aab",
+    "packages/rslint/dist/globals/es2023.json": "94381637dc6247c4d6910ec6ca90a42e3a1ccadb6d67814f216de99b7f773aab",
+    "packages/rslint/dist/globals/es2024.json": "94381637dc6247c4d6910ec6ca90a42e3a1ccadb6d67814f216de99b7f773aab",
+    "packages/rslint/dist/globals/es2025.json": "bfc011673403c91f788fbbd5bacd41e7e5eb098e74a219ed1a074dfc7be46f0a",
+    "packages/rslint/dist/globals/es2026.json": "bfc011673403c91f788fbbd5bacd41e7e5eb098e74a219ed1a074dfc7be46f0a",
+    "packages/rslint/dist/globals/es2027.json": "5368c5f216370e232d84fc0aee5a69c9b011936dc19502bcdd9b24c6381f3405",
+    "packages/rslint/dist/globals/es3.json": "25b5f841e4ffe1e08cf01c72bb8cf1ef8cf1cbe6adfb3ec46a83dfca28d1a367",
+    "packages/rslint/dist/globals/es5.json": "27ec01dc8985e2a646758bd5b059f09185d482cd1fadaf9c3e57909869fc234e",
+    "packages/rslint/dist/globals/greasemonkey.json": "e9f91bda39f7f9e9226e8b8e58d8eb97ac3a43ed679a06e46484614eee28bf42",
+    "packages/rslint/dist/globals/index.d.ts": "a757913d20ce16950627624aef9cbf16222a71e2aad25a4cbf7b756a654fab5c",
+    "packages/rslint/dist/globals/jasmine.json": "62f45dd56d802b1b0a1c14c38b402ae1893cba4e11598ce5f9a34cebb66defa0",
+    "packages/rslint/dist/globals/jest.json": "2c2e4660478c8422f08e6b87c8215a5d658fc72e8ebc8310a58684f114e4f30f",
+    "packages/rslint/dist/globals/jquery.json": "630a0e07903a769bd60c2f4fab72d13f1267fcb8d403755f64f8189023c9515f",
+    "packages/rslint/dist/globals/meteor.json": "e9846f5f483e9cded662853a9cd4a05adc715f07bcae93a1a15bb097204ea43c",
+    "packages/rslint/dist/globals/mocha.json": "19c7b9196fd7146d3cbb154abbeddd0c0262a27e24d09ee4bebaf0c4eeb12f22",
+    "packages/rslint/dist/globals/mongo.json": "c25c0f498b1771ccf5e1cfe61f541300f35e350b027e31b49b0335a2b663d135",
+    "packages/rslint/dist/globals/nashorn.json": "63daef4f0499a247c0d104485b6831bf5c66395b3c4661403990d0c2b5b43b78",
+    "packages/rslint/dist/globals/node.json": "eb7a78a9f8d4bd6b52b62457364fea4af2c799b9f6f25da243545eb360b36d9c",
+    "packages/rslint/dist/globals/nodeBuiltin.json": "a951de42f57844502762b8c4409f828ab428aec8d690f9e6148186fc795a32ea",
+    "packages/rslint/dist/globals/paintWorklet.json": "7a5811b27c9aeb7280a824dd2d9a7d9f5ee29ea76849975825f57ad514ec0a1f",
+    "packages/rslint/dist/globals/phantomjs.json": "fd8e19a36dc2f2ebadd295749104e2f5357a75f2d6f5235e74cc2c28cd2d1184",
+    "packages/rslint/dist/globals/prototypejs.json": "b158c727aa8c802ae24705e23390e38666a0f3d92464d3a01a70f8b3cf8bdc07",
+    "packages/rslint/dist/globals/protractor.json": "dd0a26169b3e4cb681702a6222a7b6ad0296af1d222e01ea49f59fe495f0586a",
+    "packages/rslint/dist/globals/qunit.json": "59b3d14c597f2898936011cef93c27c33c1bf0016b410e50410f66e0fc8b0909",
+    "packages/rslint/dist/globals/react-native.json": "cfc9b4a7d039af49c751590c71cded8a1d8faf10e7db82f28578e6a2a1d0421e",
+    "packages/rslint/dist/globals/rhino.json": "5e8806620e795536b41f91b6644670945a655e98737240f5b43fba703ed4b4db",
+    "packages/rslint/dist/globals/rspack.json": "fa2c7cf13c3991714ad712047ac115eed5f746bca248b153d7629a02cc5be1b1",
+    "packages/rslint/dist/globals/serviceworker.json": "8342ada1ee7bb3e448bfea5f3792f6523e3c5c4ac6b7204a379cbe17fb459c4b",
+    "packages/rslint/dist/globals/shared-node-browser.json": "358284a9865a0043b9685c892fa6a12c0d558d6aefb07c367f03721193b15f58",
+    "packages/rslint/dist/globals/sharedWorker.json": "c9ab76b58a3cf76d72b4a80824471a6df7b3f5932aa1f101a76b919c4f87bb2f",
+    "packages/rslint/dist/globals/shelljs.json": "936a0894456e55df2745f8992834a733e42341d7d802dcdb2239ebc6cb40e7e9",
+    "packages/rslint/dist/globals/svelte.json": "bf9b378304875d0d30a0dbb5d869c178af961ec9300aaa6a18f521c0fa8b41ad",
+    "packages/rslint/dist/globals/vitest.json": "1fbcb59c851d08e32e12f534bb6b6bcf3ff0bd5e771429732a85b7af4bb74a72",
+    "packages/rslint/dist/globals/vue.json": "538b7f0fa1a756f7f88f3cc9a99d385b94752533a98189eeaaac752b7fe8cfdb",
+    "packages/rslint/dist/globals/webextensions.json": "f2c8bff9326fd91549a32c74c4f23a8d8972c83ca9c4319204427ad7ac6224f2",
+    "packages/rslint/dist/globals/webpack.json": "488cecd9f72a33d630e608d199e27611bbdf3698beab294845b314f10116767f",
+    "packages/rslint/dist/globals/worker.json": "9ef4d068cd8fc263b528dfe57b9dbfee9040a3f6d9538de33909d35b9356f541",
+    "packages/rslint/dist/globals/wsh.json": "c619039d0beb7c538501f2ffd1902763c695802b726b07893c85cc1926ea3943",
+    "packages/rslint/dist/globals/yui.json": "99fc270cc64ae1a140fd7181ec793fa013d761a54c7ce800f90220afe372e329",
+    "packages/rslint/bin/rslint.js": "d9d5233f52c5ba31628b3be103e3a7febb0bd0e15d944ffb20ac180f837202c3",
+    "npm/rslint/darwin-arm64/rslint.darwin-arm64.node": "4b167a98e3b6162511c49b5dc8a79ebf05965475af00176bb4c07755443ae08c"
+  },
+  "formatting": {
+    "files": 19,
+    "javascriptTypescriptStructuralAstChecks": 13,
+    "jsonSemanticChecks": 5,
+    "markdownCodeBlocksUnchanged": true,
+    "checks": [
+      {
+        "path": "CONTRIBUTING.md",
+        "beforeSHA256": "5a5ba9ed75d03dd57f2935611aa1ffede582bc08ce690c9241614593d2c5fec0",
+        "afterSHA256": "9875b66986f7ef44e47619e24ed8d112ec68a151a6ebf06d38c35d8fbcc915ae",
+        "semanticCheck": {
+          "method": "Markdown formatting only, no executable code changed",
+          "passed": true,
+          "fencedCodeBlocksUnchanged": true
+        }
+      },
+      {
+        "path": "crates/rslint-native/tests/rust-lint.test.mjs",
+        "beforeSHA256": "d4492dda5752236e17b0b1b23e38a1f2a30433b6b10b244a16ba5d495c7c5828",
+        "afterSHA256": "98013bec4ea5e45ff2763bb7719288af6f5cf0ffd533e6f853affae8c798aa2f",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "a0992e0e099f7233b9d3e6fbf8e938cec2af4e60abdbc4ca2ce995fa76928a7b"
+        }
+      },
+      {
+        "path": "docs/tsrs-migration/compiler-compatibility.json",
+        "beforeSHA256": "282019477c901b632512cdd38c234a5b08e83d56e22466a3de0276999fa87e88",
+        "afterSHA256": "cf4daa9d151e5da29aacea3c9550c22c45e263b5438b210edfddf72b3c25e6f3",
+        "semanticCheck": {
+          "method": "JSON parse equality",
+          "passed": true
+        }
+      },
+      {
+        "path": "docs/tsrs-migration/rsbuild-performance.json",
+        "beforeSHA256": "2b9be5dbad46fa0f4518581ed34f4e2e7c891f2b66cff88c410e71e34c639c8b",
+        "afterSHA256": "fb4662e4a153fb5ebc93abbf029043c103ae214b48fec6e02ef53d3a8ab0f1de",
+        "semanticCheck": {
+          "method": "JSON parse equality",
+          "passed": true
+        }
+      },
+      {
+        "path": "docs/tsrs-migration/validation-batch4.json",
+        "beforeSHA256": "be52a479485dc3490f3d965d883dd5041f619e865d63e264cb9bea4c1320270e",
+        "afterSHA256": "67898c0fc6b8b3b94c57d90e69c36eff7ec24945971b2332cc54df4559d8ffac",
+        "semanticCheck": {
+          "method": "JSON parse equality",
+          "passed": true
+        }
+      },
+      {
+        "path": "docs/tsrs-migration/validation-batch5b.json",
+        "beforeSHA256": "592bdef2d14ce0622b28e6209ef2d51dd4d2434a6c861a23220fb1ba9146a46f",
+        "afterSHA256": "ca4eb75cf58556ee9809147909c095ff864001c2724b3c0a3f1561bf02df57e0",
+        "semanticCheck": {
+          "method": "JSON parse equality",
+          "passed": true
+        }
+      },
+      {
+        "path": "packages/rslint/src/rust/engine.ts",
+        "beforeSHA256": "250e7448f107d1551e7a4abfdd0faab3f95099240ffecb4b008d2e44431bf14b",
+        "afterSHA256": "e250aaf31ab69e45f6df48f6d3b655c27e968f7a6bc2c4f0dfd5870a7edf6ca8",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "0da784692f5631d6cee4c389a87c151449b68aa71150dad764e441db5413cb9d"
+        }
+      },
+      {
+        "path": "packages/rslint/tests/rust-engine.test.ts",
+        "beforeSHA256": "2c158e683927f7f388b70e199307d7a2d3c2075063ab8c3b8318bb26dad4a1f6",
+        "afterSHA256": "7688b153da2e3be43a52ea5648d4f57a30213c7c534b1689d3d472262dedd7c8",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "c1162cc96d2ca494788432a20bc19c170ec7a09fc2502f1d36ba0dec017f52fc"
+        }
+      },
+      {
+        "path": "packages/rslint/unsupported.d.ts",
+        "beforeSHA256": "f6340728706b82026bb775a9e815a003dd5b7415a4ab9631a75c37a85f8854fb",
+        "afterSHA256": "4a27bda127be5d6b0a6d31c44909d1bb6341f7712308c7f0d7fde61a6ff85053",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "074819cefd9bea247fc85d5ccde0ad3b89ad647a30bed7ed03c7b405e890c6a6"
+        }
+      },
+      {
+        "path": "packages/rslint/unsupported.mjs",
+        "beforeSHA256": "cb6f591bcf98e7638e4d140198d1525c4313adcdca0d2703159da41dada41c04",
+        "afterSHA256": "43646aff1ef5059b71a0dff6bf123297d0ca1fafeb71aebfaa4cae7336a5230a",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "ca0f2c2becf120ed9e471ad2a58a8de3f8cdaf6ed98c3bd428fba5186993bc7f"
+        }
+      },
+      {
+        "path": "scripts/build-npm.mjs",
+        "beforeSHA256": "30c571b1c60b5c02d3b7080e6ebcc5ed2a41322a5c1730df228c7350a9c68c59",
+        "afterSHA256": "ca16153dbb9e714ccb991b5bb844e7fb0fe6d9bf6d869af2c86cf7708df1d132",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "0feeebebae081bd809e4313b9b8eb2dc8fd2e7f288faa87fbbb4346001177cc3"
+        }
+      },
+      {
+        "path": "scripts/tsrs/build-rust.mjs",
+        "beforeSHA256": "5e22e17acb4c2dec889136c0831bd1e3acdbc824adfdfb8053dd38e6ea4c72d9",
+        "afterSHA256": "c3589fbe14aa52db4752d28511619ba0c6fad32da52ca78f01ee790bb58846d4",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "351eee176b89ddeaccb13d69ad06814d72ca3a30dd1f0e5d5ef0e51b639266b8"
+        }
+      },
+      {
+        "path": "scripts/tsrs/build-rust.test.mjs",
+        "beforeSHA256": "b5229240d5b82e3ca37e10d161c2bc38fd670341fb5f84f104bfe71fffafe4dc",
+        "afterSHA256": "a29ee2572fd95224d1f24fffc4e57e740fa7928af786553edb4c363a2632c68e",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "d5c18e250f6c3901d583660e53bbb5a8066827dda800ed4fb9671abd461249a8"
+        }
+      },
+      {
+        "path": "scripts/tsrs/generate-printable-ranges.mjs",
+        "beforeSHA256": "c00e147ca8f40d27ccf5376209460d717fc1e28f90c5bc5494502408669a53cb",
+        "afterSHA256": "d3ee90188fa37e025dc83e1b41ab9c1875aa7031498726dade774fe20a79fd06",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "2761313b176a880bb17519afb6b66c0bcde5a092ddd9b409b80b81318efe4687"
+        }
+      },
+      {
+        "path": "scripts/tsrs/rust-migration-reference-review.json",
+        "beforeSHA256": "07ab36176b42eb5258d36b65ee7654d229b316447df05edc4a736725e959cc25",
+        "afterSHA256": "f4e92304609c442c34d39dcc07f098346252749b85caaca30daaf2d67e67a703",
+        "semanticCheck": {
+          "method": "JSON parse equality",
+          "passed": true
+        }
+      },
+      {
+        "path": "scripts/tsrs/rust-program-universe-oracle.mjs",
+        "beforeSHA256": "635ce493f90210c6943d00c17b532c7f7aae5262a141b72f38d34deaae3c5ded",
+        "afterSHA256": "195762358eb3e95c87bcfe5a0a1cda3953e02228539bc3add2d8a9273c9916ab",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "a4cae06cef14911798f3922b0204e9c31c93f5db017ba03f838ddd86cdca778c"
+        }
+      },
+      {
+        "path": "scripts/tsrs/rust-rsbuild-observe.mjs",
+        "beforeSHA256": "2775c3940de02e1a0f7ee6a9460d1314663207de1e7b36ec850f8b313655858d",
+        "afterSHA256": "7793aa3b6db869d61767b042bc916073e80409809ae6f2999e31aba737a85ce8",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "49905558d062891e2b82aea60e2f6513c10c9da923674ec60025404dc135c64d"
+        }
+      },
+      {
+        "path": "scripts/tsrs/rust-rule-oracle.mjs",
+        "beforeSHA256": "c492278c294473a7f180ba61e9ff1aa560688b03be6071feec50ffc4f4da312d",
+        "afterSHA256": "7549255ff578c2811c932f2873186edef046909069e45ea3ff951a73cacc8a9d",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "6f23e52613375bd46c1520519b1429e32fb70fbeea7e33209fd277f629493e17"
+        }
+      },
+      {
+        "path": "scripts/tsrs/unsupported-entrypoint.mjs",
+        "beforeSHA256": "7e7d13b1f023ab9f27c9d03d8bc572bbabf7667ebbdeb1dfe1500ddfc2841ed5",
+        "afterSHA256": "5a052a37bfe5e0e657209553314b99a4d18a419ca414055defe566204f345b2f",
+        "semanticCheck": {
+          "method": "TypeScript structural AST equality: syntax kinds, primitive semantic fields, names, literal and regex text, ordered children and diagnostics; positions/comments/quote style excluded",
+          "passed": true,
+          "canonicalSHA256": "0109ee1ab78de589e419af8583dee134be0e0f14fc26b8afd6dd621b54eea8e0"
+        }
+      }
+    ]
+  },
+  "currentChecks": {
+    "javascriptConsumerTests": 97,
+    "nativeBoundaryTests": 8,
+    "buildPackagingTests": 13,
+    "zeroGoGate": true,
+    "fullRepositoryFormatting": true,
+    "explicitChangedFileSpelling": true,
+    "diffWhitespace": true
+  },
+  "limitations": [
+    "No new benchmark samples were added or substituted.",
+    "Rust targeted tests and full rule oracle results remain bound to the unchanged Rust source and native artifact.",
+    "Remote CI and default parallel performance are not established by these local checks."
+  ]
+}

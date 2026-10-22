@@ -1,418 +1,152 @@
-name: 🚀 Release packages
+name: Build native npm packages
 # cspell:ignore mlugg
 
 on:
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to release'
+        description: Branch or commit to build
         required: true
-        default: 'main'
+        default: main
       dry_run:
+        description: Only package locally; publishing remains disabled during migration
         type: boolean
-        description: 'Run the workflow in dry-run mode'
-        required: false
-        default: false
-      npm_tag:
-        type: choice
-        description: 'Specify npm tag'
-        required: true
-        default: 'alpha'
-        options:
-          - alpha
-          - beta
-          - rc
-          - canary
-          - latest
-      extension_type:
-        type: choice
-        description: 'Specify the release type of extension'
-        required: true
-        default: pre-release
-        options:
-          - official
-          - pre-release
+        default: true
 
-      to_release:
-        description: 'Packages to release'
-        type: choice
-        required: true
-        options:
-          - all
-          - npm
-          - extension
 permissions:
   contents: read
 
 jobs:
   resolve-release:
-    name: Resolve release commit
+    name: Freeze package source
     runs-on: ubuntu-22.04
     outputs:
       sha: ${{ steps.source.outputs.sha }}
     steps:
-      - name: Checkout release branch
+      - name: Checkout source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 1
           ref: ${{ inputs.branch }}
-      - name: Freeze release commit
+      - name: Reject publication until migration acceptance
+        if: ${{ !inputs.dry_run }}
+        run: |
+          echo '::error::Publishing is unsupported while Rust backend compatibility is under review. This workflow builds npm tarballs only.'
+          exit 1
+      - name: Freeze commit
         id: source
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  publish-npm:
-    if: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
-    name: ${{ inputs.dry_run == true && 'Dry Run - NPM Packages' || 'Publish NPM Packages' }}
-    needs: [resolve-release, build, build-wasm, napi-build]
-    runs-on: ubuntu-22.04
-    environment: release
-    permissions:
-      # For push git tags
-      contents: write
-      # For Trusted Publish
-      id-token: write
-    steps:
-      - name: Show dry-run status
-        run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "🏃‍♂️ RUNNING IN DRY-RUN MODE - No packages will be published to npm registry"
-            echo "=================================================="
-          else
-            echo "🚀 LIVE MODE - Packages will be published to npm registry"
-            echo "========================================"
-          fi
-
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 1
-          ref: ${{ needs.resolve-release.outputs.sha }}
-          submodules: true
-
-      - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '24'
-
-      # Update npm to the latest version to enable OIDC
-      - name: Update npm
-        run: |
-          npm install -g npm@latest
-          npm --version
-
-      - name: Install pnpm
-        run: corepack enable
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Download Artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          path: binaries
-
-      - name: Copy rslint WASM artifact
-        run: cp binaries/rslint-wasm/rslint.wasm packages/rslint-wasm/rslint.wasm
-
-      - name: Move binaries
-        uses: ./.github/actions/move-artifacts
-
-      # The native binaries and WASM are downloaded above. The JavaScript
-      # package outputs are fast to build and remain part of the publish job.
-      - name: Build npm package JavaScript
-        run: |
-          pnpm --filter @rslint/core build:js
-          pnpm --filter @rslint/wasm build:js
-
-      - name: Publish npm packages
-        if: ${{ inputs.dry_run == false }}
-        run: |
-          pnpm --filter='!@rslint/tsgo-server' --filter='!@rslint/tsgo-server-*' -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions"
-          version=$(jq -r .version package.json)
-          git tag v$version -m "v$version"
-          git push origin v$version
-
-  publish-extension-vscode:
+  build-native:
+    name: Build ${{ matrix.tuple }}
     needs: resolve-release
-    if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
-    name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
-    runs-on: rspack-ubuntu-22.04-large
-    environment: release
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 1
-          ref: ${{ needs.resolve-release.outputs.sha }}
-          submodules: true
-
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
-
-      - name: Build and publish to Microsoft VS Code Marketplace
-        env:
-          VSCE_PAT: ${{ secrets.RSLINT_VSCE_PAT }}
-        run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "🚀 DRY RUN: Building and packaging VS Code extension without publishing..."
-            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
-              pnpm publish:vsce --prerelease --dry-run
-            else
-              pnpm publish:vsce --dry-run
-            fi
-          else
-            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
-              pnpm publish:vsce --prerelease
-            else
-              pnpm publish:vsce
-            fi
-          fi
-      - name: Upload VSCE artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          path: packages/vscode-extension/rslint-*.vsix
-
-  publish-extension-open-vsx:
-    needs: resolve-release
-    if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
-    name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
-    runs-on: ubuntu-22.04
-    environment: release
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 1
-          ref: ${{ needs.resolve-release.outputs.sha }}
-          submodules: true
-
-      - name: Setup Node
-        uses: ./.github/actions/setup-node
-
-      - name: Build and publish to Open VSX Registry
-        env:
-          OVSX_PAT: ${{ secrets.RSLINT_OVSX_PAT }}
-        run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "🚀 DRY RUN: Building and packaging for Open VSX Registry without publishing..."
-            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
-              pnpm publish:ovsx --prerelease --dry-run
-            else
-              pnpm publish:ovsx --dry-run
-            fi
-          else
-            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
-              pnpm publish:ovsx --prerelease
-            else
-              pnpm publish:ovsx
-            fi
-          fi
-
-  build-wasm:
-    needs: resolve-release
-    name: Build WASM
-    runs-on: rspack-ubuntu-22.04-large
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 1
-          ref: ${{ needs.resolve-release.outputs.sha }}
-          submodules: true
-
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: 1.27.0
-          cache-name: release-wasm
-
-      - name: Build rslint WASM
-        run: GOOS=js GOARCH=wasm go build -o packages/rslint-wasm/rslint.wasm -ldflags="-s -w" ./cmd/rslint
-
-      - name: Upload rslint WASM artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: rslint-wasm
-          path: packages/rslint-wasm/rslint.wasm
-          if-no-files-found: error
-
-  build:
-    needs: resolve-release
-    env:
-      GOMAXPROCS: 8
-    name: Build-Binaries
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         include:
-          - goos: darwin
-            goarch: amd64
-            node_arch: x64
-            node_os: darwin
-          - goos: darwin
-            goarch: arm64
-            node_arch: arm64
-            node_os: darwin
-          - goos: linux
-            goarch: amd64
-            node_arch: x64
-            node_os: linux
-          - goos: linux
-            goarch: arm64
-            node_arch: arm64
-            node_os: linux
-          - goos: windows
-            goarch: amd64
-            node_arch: x64
-            node_os: win32
-          - goos: windows
-            goarch: arm64
-            node_arch: arm64
-            node_os: win32
-    runs-on: rspack-ubuntu-22.04-large
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 1
-          ref: ${{ needs.resolve-release.outputs.sha }}
-          submodules: true
-
-      - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '24'
-
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: 1.27.0
-          cache-name: ${{ matrix.node_os }}-${{ matrix.node_arch }}
-
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-
-      - name: Install pnpm
-        run: corepack enable
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Go Build rslint
-        # Linux outputs also ship in musl packages and must not depend on glibc.
-        env:
-          CGO_ENABLED: '0'
-        run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint ./cmd/rslint
-
-      # Rule options JSON Schema dump for the generate-rule-option-types
-      # rslib plugin (see packages/rslint/rstack.config.ts), read by
-      # publish-npm once move-artifacts places it. The dump is
-      # platform-independent JSON, so it only needs to run once, on this
-      # matrix leg's host (ubuntu-22.04, not a cross-compile target) — no
-      # GOOS/GOARCH override, it runs natively rather than being cross-built.
-      - name: Dump rule schemas
-        if: ${{ matrix.goos == 'linux' && matrix.goarch == 'amd64' }}
-        run: go run ./tools/dump_rule_schemas > rule-schemas.json
-
-      - name: Upload rule schemas
-        if: ${{ matrix.goos == 'linux' && matrix.goarch == 'amd64' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: rule-schemas
-          path: rule-schemas.json
-          if-no-files-found: error
-
-      - name: Upload rslint artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
-          path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
-          if-no-files-found: error
-
-  # napi `.node` parser binaries, one per target → the @rslint/native-{tuple}
-  # subpackages. Separate matrix from the Go build job (which is ubuntu-only):
-  # napi win32-msvc/darwin need native runners since zig and
-  # @napi-rs/cross-toolchain can't target windows-msvc. Each leg uploads a
-  # uniquely-named artifact (`native-{tuple}` — upload-artifact@v4 rejects
-  # dupes); move-artifacts matches the `rslint.` filename prefix. gnu cross
-  # legs use --use-napi-cross (@napi-rs/cross-toolchain, gnu-only); musl uses
-  # -x (cargo-zigbuild) since cross-toolchain has no musl sysroot.
-  napi-build:
-    needs: resolve-release
-    name: Build napi (${{ matrix.settings.target }})
-    strategy:
-      fail-fast: false
-      matrix:
-        settings:
           - host: macos-latest
+            tuple: darwin-arm64
             target: aarch64-apple-darwin
-            artifact: native-darwin-arm64
           - host: macos-latest
+            tuple: darwin-x64
             target: x86_64-apple-darwin
-            artifact: native-darwin-x64
           - host: windows-latest
+            tuple: win32-x64-msvc
             target: x86_64-pc-windows-msvc
-            artifact: native-win32-x64-msvc
           - host: windows-latest
+            tuple: win32-arm64-msvc
             target: aarch64-pc-windows-msvc
-            artifact: native-win32-arm64-msvc
-          - host: rspack-ubuntu-22.04-large
+          - host: ubuntu-22.04
+            tuple: linux-x64-gnu
             target: x86_64-unknown-linux-gnu
-            artifact: native-linux-x64-gnu
-          - host: rspack-ubuntu-22.04-large
+            zig: x86_64-linux-gnu.2.28
+          - host: ubuntu-22.04
+            tuple: linux-arm64-gnu
             target: aarch64-unknown-linux-gnu
-            artifact: native-linux-arm64-gnu
-            cross: '--use-napi-cross'
-          - host: rspack-ubuntu-22.04-large
+            zig: aarch64-linux-gnu.2.28
+          - host: ubuntu-22.04
+            tuple: linux-x64-musl
             target: x86_64-unknown-linux-musl
-            artifact: native-linux-x64-musl
-            cross: '-x'
-          - host: rspack-ubuntu-22.04-large
+            zig: x86_64-linux-musl
+          - host: ubuntu-22.04
+            tuple: linux-arm64-musl
             target: aarch64-unknown-linux-musl
-            artifact: native-linux-arm64-musl
-            cross: '-x'
-    runs-on: ${{ matrix.settings.host }}
+            zig: aarch64-linux-musl
+    env:
+      CARGO_BUILD_JOBS: 2
     steps:
-      - name: Checkout
+      - name: Checkout frozen source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 1
           ref: ${{ needs.resolve-release.outputs.sha }}
-          submodules: true
-
       - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '24'
-
-      - name: Install pnpm
-        run: corepack enable
-
+        uses: ./.github/actions/setup-node
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
-          targets: ${{ matrix.settings.target }}
-          cache-key: ${{ matrix.settings.target }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # musl legs cross-compile via cargo-zigbuild (napi -x); zig must be on
-      # PATH (@napi-rs/cli auto-installs cargo-zigbuild when missing, but not
-      # zig itself).
-      - name: Setup zig (musl cross-compile)
-        if: ${{ contains(matrix.settings.target, 'musl') }}
+          targets: ${{ matrix.target }}
+          cache-key: ${{ matrix.target }}
+      - name: Setup Linux cross linker
+        if: ${{ matrix.zig != '' }}
         uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
-
-      - name: Build napi
-        run: pnpm --filter @rslint/native exec napi build --platform --release --no-js --target ${{ matrix.settings.target }} ${{ matrix.settings.cross || '' }}
-
-      - name: Upload napi artifact
+      - name: Configure Linux target linker
+        if: ${{ matrix.zig != '' }}
+        shell: bash
+        env:
+          RUST_TARGET: ${{ matrix.target }}
+          ZIG_TARGET: ${{ matrix.zig }}
+        run: |
+          mkdir -p target/ci-linkers
+          linker="$PWD/target/ci-linkers/zig-linker"
+          printf '#!/bin/sh\nexec "%s" cc -target "%s" "$@"\n' "$(command -v zig)" "$ZIG_TARGET" > "$linker"
+          chmod +x "$linker"
+          target_key=$(echo "$RUST_TARGET" | tr '[:lower:]-' '[:upper:]_')
+          echo "CARGO_TARGET_${target_key}_LINKER=$linker" >> "$GITHUB_ENV"
+          if [[ "$RUST_TARGET" == *-musl ]]; then
+            echo "CARGO_TARGET_${target_key}_RUSTFLAGS=-C target-feature=-crt-static" >> "$GITHUB_ENV"
+          fi
+      - name: Build direct Rust addon
+        run: node scripts/tsrs/build-rust.mjs --platform ${{ matrix.tuple }}
+      - name: Upload native addon
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ${{ matrix.settings.artifact }}
-          path: crates/rslint-native/rslint.*.node
+          name: native-${{ matrix.tuple }}
+          path: npm/rslint/${{ matrix.tuple }}/rslint.${{ matrix.tuple }}.node
           if-no-files-found: error
+
+  package-npm:
+    name: Assemble native CLI and API tarballs
+    needs: [resolve-release, build-native]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout frozen source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.resolve-release.outputs.sha }}
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+      - name: Download native addons
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: native-*
+          path: binaries
+      - name: Assemble platform packages
+        uses: ./.github/actions/move-artifacts
+      - name: Build public JavaScript
+        run: |
+          pnpm --filter @rslint/api build
+          pnpm --filter @rslint/core build:js
+      - name: Pack CLI, API and native packages
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/npm-tarballs"
+          pnpm --filter @rslint/core --filter @rslint/api --filter '@rslint/native-*' -r pack --pack-destination "$RUNNER_TEMP/npm-tarballs"
+      - name: Upload npm tarballs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-npm-tarballs
+          path: ${{ runner.temp }}/npm-tarballs/*.tgz
+          if-no-files-found: error
+# Browser, editor and semantic-service packages are intentionally absent. Their
+# old process-based release pipelines do not establish direct Rust compatibility.

@@ -131,14 +131,11 @@ async function updateWorkspaceDependencies(packagePath, versionMap) {
 
 async function main() {
   try {
-    // Find packages on the unified rslint release line. tsgo-server has an
-    // independent version shared with crates/tsgo-client.
+    // Find packages on the unified Rust+JS rslint release line.
     const rootPackagePath = path.join(process.cwd(), 'package.json');
-    const workspacePackagePaths = (
-      await glob('packages/*/package.json', {
-        cwd: process.cwd(),
-      })
-    ).filter((packagePath) => packagePath !== 'packages/tsgo/package.json');
+    const workspacePackagePaths = await glob('packages/*/package.json', {
+      cwd: process.cwd(),
+    });
     const npmRslintPackagePaths = await glob('npm/rslint/*/package.json', {
       cwd: process.cwd(),
     });

@@ -1,0 +1,158 @@
+[
+  {
+    "rule": "@typescript-eslint/no-unnecessary-type-constraint",
+    "valid": [
+      "function f<T>() {}",
+      "function f<T extends number | string>() {}",
+      "function f<T extends (any)>() {}",
+      "type M = { [K in any]: K };",
+      "type First<T> = T extends [infer U extends any] ? U : never;",
+      {
+        "text": "/** @template {unknown} T */\nfunction f(value) { return value; }",
+        "extension": ".js"
+      }
+    ],
+    "invalid": [
+      "function f<T extends any>() {}",
+      "interface I<T extends unknown = string> {}",
+      "const f = <T extends any>() => {};",
+      {
+        "text": "const f = <T extends any>() => {};",
+        "extension": ".tsx"
+      },
+      {
+        "text": "const f = <T extends any>() => {};",
+        "extension": ".mts"
+      },
+      {
+        "text": "const f = <T extends any>() => {};",
+        "extension": ".cts"
+      },
+      {
+        "text": "const f = <T extends any /* trailing */,>() => {};",
+        "extension": ".tsx"
+      },
+      {
+        "text": "const f = <T extends unknown = string>() => {};",
+        "extension": ".tsx"
+      },
+      "function f<const T extends unknown>() {}"
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-wrapper-object-types",
+    "valid": [
+      "let value: number;",
+      "let value: A.Number;",
+      "class C extends Number {}",
+      "let value: typeof Number;",
+      "const wrapped = new Number(1);",
+      "type Number = 0 | 1; let value: Number;",
+      "export {}; type Number = 0 | 1; let value: Number;",
+      "interface Number { custom: string } let value: Number;",
+      "{ type Number = 1; let value: Number; }",
+      "function f(Number: number) { let x: Number; }",
+      "function f() { let value: Number; if (true) { var Number = 1; } }",
+      "for (let Number = 1; Number; Number--) { let value: Number; }",
+      "for (const Number of []) { let value: Number; }",
+      "for (const Number in {}) { let value: Number; }",
+      "function f({ Number }: {Number: number}) { let value: Number; }",
+      "function f([Number]: number[]) { let value: Number; }",
+      "namespace M { import Number = require(\"x\"); let value: Number; }",
+      "import { value as Number } from \"x\"; let value: Number;",
+      "import Number from \"x\"; let value: Number;",
+      "import * as Number from \"x\"; let value: Number;",
+      "import Number = require(\"x\"); let value: Number;",
+      "function f<Number>(x: Number): Number { return x; }",
+      "class C<Number> { value!: Number; }",
+      "type Unwrap<T> = T extends Promise<infer Number> ? Number : never;",
+      "namespace Inner { type Number = 1; export let value: Number; }",
+      "declare global { interface Number { custom: string } } let value: Number; export {};",
+      "class C { static { let value: Number; if (true) { var Number = 1; } } }",
+      "switch (0) { case 0: let value: Number; break; case 1: const Number = 1; }"
+    ],
+    "invalid": [
+      "let value: Number;",
+      "let values: [BigInt, Boolean, Number, Object, String, Symbol];",
+      "interface I extends Number {}",
+      "class C implements Number {}",
+      "class C implements Box<Number> {}",
+      "let value: Number<string>;",
+      "function f(): String { return \"\"; }",
+      "let value = \"x\" as String;",
+      "function f() { { let Number = 1; } let value: Number; }",
+      "namespace X { export type Number = 1; } let value: Number;",
+      "class C extends A<Number> {}",
+      "class C { static { var Number = 1; } value!: Number; }"
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/prefer-as-const",
+    "valid": [
+      "let x = 'x' as const;",
+      "let x = 'x' as string;",
+      "let x = `x` as `x`;",
+      "let x = `x` as 'x';",
+      "let x = \"x\" as 'x';",
+      "let x = '\\x78' as 'x';",
+      "let x = 1.0 as 1;",
+      "let x = -1 as -1;",
+      "let x: null = null;",
+      "let x: 'x' = 'x' as const;"
+    ],
+    "invalid": [
+      "let x = 'x' as 'x';",
+      "let x = <4>4;",
+      "let x = false as false;",
+      "let x: 'x' = 'x';",
+      "let x: true = true;",
+      "class C { x: 'x' = 'x'; }",
+      "let x /*before*/ : /*after: colon*/ '值' = /*value*/ '值';",
+      "const x = /*value*/ '值' as /*type*/ '值';",
+      "const x = < /*type*/ '值'>/*value*/ '值';"
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/prefer-namespace-keyword",
+    "valid": [
+      "declare module 'foo';",
+      "declare module 'foo' {}",
+      "namespace Foo {}",
+      "declare namespace Foo {}",
+      "declare global {}"
+    ],
+    "invalid": [
+      "module Foo {}",
+      "declare module Foo {}",
+      "module Foo.Bar {}",
+      "export declare /*keyword*/ module /*name*/ Foo {}",
+      "declare module Foo { module Bar {} }"
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-unsafe-function-type",
+    "valid": [
+      "let value: FunctionLike;",
+      "let value: NS.Function;",
+      "class C extends Function {}",
+      "let value: typeof Function;",
+      "const value = Function;",
+      "type Function = () => void; let value: Function;",
+      "{ class Function {} let value: Function; }",
+      "function f(Function: unknown) { let value: Function; }",
+      "function f() { type Function = () => void; let value: Function; }",
+      "declare global { interface Function { custom: string } } let value: Function; export {};",
+      "function f<Function>(value: Function) {}",
+      "namespace Inner { type Function = () => void; let value: Function; }"
+    ],
+    "invalid": [
+      "let value: Function;",
+      "let value: Function<number>;",
+      "class C implements Function {}",
+      "interface I extends Function {}",
+      "let value: [Function, () => Function];",
+      "type F<T> = T extends Function ? true : false;",
+      "let value = (() => {}) satisfies Function;"
+    ]
+  }
+]

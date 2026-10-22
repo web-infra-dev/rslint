@@ -1,0 +1,624 @@
+{
+  "schema_version": 1,
+  "policy": [
+    "Only these reviewed complete UTF-8 lines at these line numbers and file digests may be classified as non-executable references.",
+    "Any file edit, moved line, new invocation, source signature or release artifact is rejected or rescanned without the review.",
+    "This review does not establish behavior compatibility, build reproducibility or performance."
+  ],
+  "files": [
+    {
+      "path": "crates/rslint-core/src/rules/go_quote.rs",
+      "sha256": "bdfd8024fe7787ddc0e5c0c4d0d622ba89aef5d5f86ea53365c46a99c8eccf8a",
+      "lines": [
+        {
+          "line_numbers": [5],
+          "sha256": "f74f28aac37715caf8196318d19a8e2b9fde1e37cad871a350f9440a16e8501c",
+          "category": "source_attribution",
+          "reason": "Rust implementation attribution to upstream authors and original source; no source is fetched or executed."
+        }
+      ]
+    },
+    {
+      "path": "packages/rslint-api/src/ast-compat/ast/clone.ts",
+      "sha256": "2e67d966bd94ab9a7c3f3e4403644940bd4acd6efa848cde2706e512609ab6dc",
+      "lines": [
+        {
+          "line_numbers": [18],
+          "sha256": "23fdef3c11f2c0c96d20d3a37ab5c9c320b1fa7db9aa8f0b062b2e71b6b5ff14",
+          "category": "source_attribution",
+          "reason": "Comment links an upstream language issue explaining the local JavaScript implementation."
+        }
+      ]
+    },
+    {
+      "path": "packages/rslint-api/src/ast-compat/ast/scanner.ts",
+      "sha256": "4ed9b1543b05541305058b38477daef7058709b55fdc0b025c19cdae45744775",
+      "lines": [
+        {
+          "line_numbers": [895],
+          "sha256": "70306139828bbfff07ef6cce4ff6583ef5c3f3441a0ecffee8aa8978662dee96",
+          "category": "source_attribution",
+          "reason": "Comment links an upstream language issue explaining the local JavaScript implementation."
+        }
+      ]
+    },
+    {
+      "path": "packages/rslint-test-tools/tests/eslint-plugin-react/rules/jsx-one-expression-per-line.test.ts",
+      "sha256": "d70be51be891577d47ae85e361189e2dcfe5c6beb052cc5d2c62e8fb907a426c",
+      "lines": [
+        {
+          "line_numbers": [1494],
+          "sha256": "efdc87c864abaa09f8bbbdeda2179b40064197745add544bb76022ba2796ab45",
+          "category": "fixture_text",
+          "reason": "Static JSX fixture prose or its expected diagnostic descriptor; not a shell command."
+        },
+        {
+          "line_numbers": [1504, 1537, 1549],
+          "sha256": "b2fd9f3868ff58025f8159966df4ab4f873947ab408fea3afc8d708522637589",
+          "category": "fixture_text",
+          "reason": "Static JSX fixture prose or its expected diagnostic descriptor; not a shell command."
+        },
+        {
+          "line_numbers": [1517],
+          "sha256": "5681506508f2781aa4875dff63406932693359a3bb3dc2b6536125f9ec126912",
+          "category": "fixture_text",
+          "reason": "Static JSX fixture prose or its expected diagnostic descriptor; not a shell command."
+        }
+      ]
+    },
+    {
+      "path": "packages/rslint-test-tools/tests/typescript-eslint/rules/no-unnecessary-condition.test.ts",
+      "sha256": "3738c8c4bde59bb5826e77ce1019a17e38aedb6cd2c9c534bd936931c676801a",
+      "lines": [
+        {
+          "line_numbers": [1761],
+          "sha256": "01382a1c57b4fde0586636868e7aa4270ea9671fe7e58a8a2610bfc91cd8e6ad",
+          "category": "source_attribution",
+          "reason": "Comment links an upstream language issue explaining a fixture behavior."
+        }
+      ]
+    },
+    {
+      "path": "packages/rslint-test-tools/tests/typescript-eslint/rules/no-useless-empty-export.test.ts",
+      "sha256": "0ea91b7171d62c295e9df424615e53c807b4593ee89980e58c310c023297bfb9",
+      "lines": [
+        {
+          "line_numbers": [39],
+          "sha256": "99767a6dcc236ccf8884b1e6a2c19b708fb57097352c4ab1a84404bae2455de0",
+          "category": "source_attribution",
+          "reason": "Comment links an upstream language issue explaining a fixture behavior."
+        }
+      ]
+    },
+    {
+      "path": "packages/rslint-test-tools/tests/typescript-eslint/rules/prefer-optional-chain/prefer-optional-chain.test.ts",
+      "sha256": "c8ef26754d920b05e3a1f2ce320379360b5633b90caa690fa6e0212c66417b54",
+      "lines": [
+        {
+          "line_numbers": [1769],
+          "sha256": "3228e8716cf6433cec64f789e5e26226a287692491d803273f2685d89b7f0a9a",
+          "category": "source_attribution",
+          "reason": "Comment links an upstream language issue explaining a fixture behavior."
+        }
+      ]
+    },
+    {
+      "path": "packages/rslint-test-tools/tests/typescript-eslint/rules/strict-boolean-expressions.test.ts",
+      "sha256": "a61656061d0c04bf78344e433cefde42ceee5e615efa2a838ed3384fdbd1aae2",
+      "lines": [
+        {
+          "line_numbers": [3549],
+          "sha256": "89c7dd0cd699e28fbb9fb6f22eecb9328e891fe11a9470e39cf8b674a83166c2",
+          "category": "source_attribution",
+          "reason": "Comment links an upstream language issue explaining a fixture behavior."
+        }
+      ]
+    },
+    {
+      "path": "scripts/ci-delivery.test.mjs",
+      "sha256": "010379cc045e5f80e7c66144d8b4cb3592e0b8b893536d0380ca34fa51a221e8",
+      "lines": [
+        {
+          "line_numbers": [254],
+          "sha256": "81f38f1e33c7c191b54f8179fdbd00aec7fbc2bf0be5b581f98b74d03b47dc18",
+          "category": "negative_assertion",
+          "reason": "Regular expression passed to assert.doesNotMatch rejects obsolete workflow dependencies; it never executes its tokens."
+        },
+        {
+          "line_numbers": [281],
+          "sha256": "c6226a226ddafb434d76eee33d65df7b8aa3afad70d80413a096a00c3fd01f29",
+          "category": "negative_assertion",
+          "reason": "Regular expression passed to assert.doesNotMatch rejects obsolete workflow dependencies; it never executes its tokens."
+        }
+      ]
+    },
+    {
+      "path": "scripts/tsrs/rust-migration-catalog.json",
+      "sha256": "5b2d048f893804844e623d62eca1ab39e1564ba754f901e8a59c536aaed5d4be",
+      "lines": [
+        {
+          "line_numbers": [
+            81, 144, 374, 454, 499, 681, 1060, 1386, 1770, 1817, 4025, 4065,
+            4165, 4528, 5091, 5130, 5319, 5947, 6145, 6238, 6479, 6660, 7158,
+            7241, 7294, 7483, 7756, 7893, 7947, 7987, 8453, 8537, 8676, 9466,
+            10519, 10571, 10757, 10924, 11128, 11285, 11324, 11627, 11747,
+            11801, 11837, 12122, 12593, 12647, 12698, 12749, 12915, 13068,
+            13234, 13345, 13626, 13665, 13704, 14174, 14344, 14828, 14885,
+            14947, 15002, 15054, 15096, 15174, 15225, 15263, 15301, 15340,
+            15421, 15460, 15496, 15590, 15631, 15669, 15707, 15794, 15844,
+            15898, 15936, 15977, 16059, 16101, 16495, 16581, 16642, 16744,
+            16784, 16824, 16863, 16925, 16963, 17036, 17161, 17245, 17370,
+            17491, 17546, 17588, 17640, 17733, 17840, 17891, 18081, 18168,
+            18281, 18398, 18437, 18476, 18534, 18572, 18628, 18667, 18751,
+            18806, 18845, 18884, 18948, 19040, 19120, 19159, 19231, 19295,
+            19334, 19373, 19425, 19482, 19534, 19589, 19641, 19704, 19756,
+            19811, 19892, 19931, 19970, 20009, 20207, 20412, 20487, 20560,
+            20637, 20673, 20787, 20895, 20933, 20965, 20999, 21041, 21098,
+            21130, 21181, 21227, 21261, 21300, 21336, 21371, 21407, 21485,
+            21523, 21559, 21595, 21633, 21686, 21833, 21955, 21994, 22033,
+            22084, 22123, 22175, 22415, 22470, 22536, 22587, 22623, 22659,
+            22768, 22822, 22979, 23015, 23066, 23102, 23180, 23313, 23416,
+            23452, 23491, 23529, 23565, 23604, 23643, 23679, 23715, 23751,
+            23871, 24027, 24078, 24169, 24971, 25007, 25055, 25091, 25139,
+            25178, 25303, 25372, 25411, 25449, 25485, 25524, 25838, 25888,
+            25988, 26026, 26130, 26193, 26457, 26496, 26575, 26611, 27000,
+            27105, 27210, 27306, 27362, 27525, 27712, 27751, 28004, 28119,
+            28230, 28291, 28372, 28426, 28465, 28542, 28619, 29096, 29229,
+            29571, 31957, 32002, 32047, 32092, 32137, 32182, 32227, 32272,
+            32365, 32404, 32860, 32984, 33023, 33117, 33209, 33245, 33424,
+            33463, 33533, 33590, 33713, 33806, 33845, 33895, 33948, 33987,
+            34038, 34135, 34189, 34490, 34549, 34602, 34655, 34956, 35041,
+            35164, 35223, 35262, 35401, 35440, 36201, 36353, 36491, 36551,
+            36832, 36964, 37023, 37225, 37343, 37394, 37518, 37600, 37686,
+            38064, 38104, 38142, 38236, 38289, 38327, 38366, 38509, 38547,
+            38638, 38732, 38812, 38851, 38889, 38940, 38978, 39014, 39147,
+            39199, 39301, 39368, 39548, 39710, 39805, 39900, 40021, 40074,
+            40141, 40186, 40284, 40339, 40377, 40428, 40624, 40675, 40788,
+            40850, 40949, 41003, 41045, 41168, 41220, 41261, 41300, 41340,
+            41437, 41478, 41516, 41692, 41739, 41793, 41834, 41917, 41959,
+            42466, 42550, 42592, 42635, 42697, 42739, 42801, 42842, 42925,
+            42965, 43134, 43252, 43299, 43426, 43466, 43519, 43572, 43613,
+            43653, 43692, 43733, 43814, 43869, 43907, 43958, 43997, 44040,
+            44094, 44449, 44488, 44628, 44768, 44917, 44999, 45081, 45498,
+            45552, 45866, 45905, 45944, 45983, 46034, 46085, 46293, 46431,
+            46471, 46579, 46618, 46701, 46824, 46905, 47005, 47128, 47167,
+            47206, 47342, 47424, 47463, 47502, 47541, 47622, 47843, 47882,
+            47944, 48026, 48108, 48147, 48186, 48226, 48265, 48493, 48546,
+            48686, 48880, 49090, 49141, 49189, 49228
+          ],
+          "sha256": "d6fce16d7bd89c4ec2841770b69160f27b3c07171ce8033c2059f8fb05acb4c4",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [
+            185, 281, 324, 547, 600, 729, 786, 855, 966, 1168, 1249, 1322, 3599,
+            3643, 3686, 3747, 3790, 3853, 3981, 4122, 4291, 4360, 4420, 4462,
+            4779, 4822, 4864, 4907, 4967, 5278, 5416, 5560, 5603, 5660, 5702,
+            5744, 5786, 5885, 6381, 6540, 6616, 6701, 6745, 6788, 6853, 6897,
+            6942, 6986, 7031, 7073, 7116, 7199, 7334, 7376, 7418, 7524, 7667,
+            7796, 7853, 8027, 8185, 8262, 8304, 8410, 8494, 8578, 8621, 8716,
+            8825, 8911, 9069, 9124, 9284, 9327, 9369, 9411, 9506, 9582, 9624,
+            9678, 9722, 9796, 9951, 10019, 10107, 10164, 10234, 10303, 10359,
+            10419, 10460, 10640, 10683, 10858, 10989, 11044, 11091, 11192,
+            11245, 11380, 11449, 11485, 11567, 11694, 11881, 11957, 12030,
+            12081, 12192, 12241, 12284, 12326, 12502, 12552, 12807, 12996,
+            13151, 13193, 13289, 13385, 13458, 13516, 13744, 13787, 13844,
+            14249, 14656, 14714, 14757, 15379, 15535, 16018, 16538, 16684,
+            17201, 17286, 17328, 17409, 17451, 17693, 17799, 17948, 18224,
+            18356, 19851, 20077, 20144, 20271, 20343, 20713, 20751, 20857,
+            21447, 21738, 21792, 21904, 22212, 22279, 22318, 22377, 22712,
+            22875, 22940, 23142, 23220, 23366, 23790, 23830, 23908, 23947,
+            24130, 24208, 24263, 24302, 24407, 24522, 24767, 24857, 24926,
+            25251, 25336, 25577, 25616, 25659, 25742, 25784, 25925, 26077,
+            26233, 26276, 26376, 26536, 26662, 26704, 26745, 26802, 26862,
+            26905, 26947, 27067, 27154, 27263, 27873, 28331, 28735, 28843,
+            30221, 32324, 32509, 32598, 32647, 32704, 32759, 32900, 32943,
+            33063, 33169, 33282, 33363, 33630, 33672, 33753, 34078, 34232,
+            34320, 34377, 34420, 34714, 34771, 35112, 35346, 35540, 35581,
+            35675, 35736, 35805, 35870, 35987, 36035, 36098, 36152, 36417,
+            36603, 36685, 36762, 36871, 36912, 37134, 37291, 37449, 37558,
+            37764, 37834, 38023, 38182, 38597, 38691, 38772, 39088, 39259,
+            39407, 39506, 39588, 39644, 39860, 39956, 40468, 40522, 40561,
+            40890, 41087, 41379, 41556, 41598, 41875, 42423, 42506, 42882,
+            43017, 43059, 43340, 43382, 43773, 44149, 44217, 44260, 44315,
+            44558, 44680, 44728, 44876, 44958, 45039, 45163, 45219, 45268,
+            45676, 45720, 45763, 45824, 46125, 46167, 46209, 46251, 46346,
+            46389, 46538, 46658, 46741, 46783, 46864, 46964, 47045, 47086,
+            47259, 47301, 47382, 47581, 47662, 47704, 47748, 47790, 47984,
+            48066, 48305, 48348, 48409, 48452, 48586, 48645, 48743, 48794,
+            48837, 48920, 48962, 49005, 49048, 49286
+          ],
+          "sha256": "258b7d7c982d1b909c3bbaf630dd4826eba01da3e8a3f76bf21168b761a537a6",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [
+            186, 787, 3600, 3687, 3854, 3982, 4123, 4780, 5561, 6541, 6617,
+            6746, 6789, 6854, 6943, 6987, 7074, 7854, 8411, 8495, 8622, 8826,
+            8912, 9125, 9723, 10108, 10165, 10235, 26537, 28736, 30222, 34772,
+            39260, 39589, 39645, 41088, 42424, 44316, 48838
+          ],
+          "sha256": "269e9617844824c368336739d10d08b249222fd3192cff67c96da3a2e8bdf4f6",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [
+            187, 283, 326, 549, 731, 790, 1170, 1251, 3601, 3645, 3688, 3791,
+            3855, 3984, 4125, 4293, 4362, 4463, 4781, 4909, 4969, 5562, 5661,
+            5703, 5745, 5788, 6382, 6619, 6703, 6791, 6856, 6989, 7798, 8263,
+            8306, 8497, 8580, 8718, 8828, 8914, 9286, 9370, 10020, 10166, 10237,
+            10305, 10421, 10642, 10686, 10990, 11046, 11093, 11194, 11451,
+            11487, 11568, 11883, 11959, 12032, 12328, 12809, 12998, 13152,
+            13387, 13746, 13789, 13845, 14716, 14759, 15381, 17694, 18358,
+            20079, 20273, 20345, 20715, 20754, 20858, 21794, 21906, 22214,
+            22320, 22378, 22713, 22876, 22942, 23222, 23792, 23831, 23909,
+            23948, 24132, 24210, 24523, 24768, 24928, 25252, 25337, 25618,
+            25744, 25786, 26079, 26235, 26278, 26378, 26664, 26705, 26804,
+            27155, 28332, 30224, 32511, 32600, 32648, 32706, 32760, 32902,
+            33065, 33170, 33283, 33365, 33631, 33673, 34080, 34234, 34322,
+            34379, 34421, 34774, 35348, 35677, 35738, 35807, 35872, 36037,
+            36154, 36419, 36687, 36913, 37451, 37560, 37766, 37836, 38025,
+            38184, 39262, 39508, 39590, 40563, 40892, 42426, 44261, 44560,
+            44877, 45678, 45722, 45825, 46253, 46348, 46391, 46660, 47088,
+            47302, 47384, 47706, 47749, 47985, 48068, 48307, 48411, 48745,
+            48796, 48840, 48964, 49007, 49050, 49287
+          ],
+          "sha256": "7966a8a84422614c4c31097e3a53898456249b9d47627b54dc175ae7bf871e40",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [
+            282, 325, 548, 730, 789, 1169, 1250, 3644, 3983, 4124, 4292, 4361,
+            4908, 4968, 5787, 6618, 6702, 6790, 6855, 6898, 6988, 7797, 8305,
+            8496, 8579, 8717, 8827, 8913, 9285, 10236, 10304, 10420, 10641,
+            10685, 11045, 11092, 11193, 11450, 11486, 11882, 11958, 12031,
+            12193, 12242, 12327, 12503, 12808, 12997, 13290, 13386, 13459,
+            13745, 13788, 13968, 14250, 14657, 14715, 14758, 15380, 18357,
+            20078, 20272, 20344, 20714, 20753, 21793, 21905, 22213, 22319,
+            22941, 23221, 23791, 24131, 24209, 24927, 25617, 25743, 25785,
+            26078, 26234, 26277, 26377, 26663, 26803, 27264, 27483, 30223,
+            32510, 32599, 32705, 32901, 33064, 33364, 34079, 34233, 34378,
+            34773, 35347, 35676, 35737, 35806, 35871, 36036, 36153, 36418,
+            36686, 37450, 37559, 37765, 37835, 38024, 38183, 39261, 39507,
+            40562, 40891, 42425, 44559, 45164, 45401, 45677, 45721, 45764,
+            46252, 46347, 46390, 46659, 47087, 47383, 47705, 48067, 48306,
+            48410, 48744, 48795, 48839, 48963, 49006, 49049
+          ],
+          "sha256": "fa0b89415cd42ef9b3c8b8d860b49a6287a9ed81218a305734683b99ff99c4cb",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [
+            601, 967, 3748, 4823, 4865, 5279, 5417, 5604, 5886, 7032, 7117,
+            7200, 7335, 7377, 7419, 7525, 7668, 8028, 8186, 9070, 9328, 9412,
+            9583, 9625, 9679, 9797, 9952, 10360, 10461, 16019, 34715, 35113,
+            36604, 38692, 39408, 41599, 41876, 44150, 46126
+          ],
+          "sha256": "9183a5fa44456af3b6c880ded046261fa4e86c6114d4d793d00cdbad766b7fc5",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [788, 34321],
+          "sha256": "fdd099dccffe0fc7a8e0b245fe928cd9811544ce8c91a62fb6c7e6099a4b0fba",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [
+            856, 1323, 4421, 6542, 6747, 6944, 7075, 7855, 8412, 8623, 9126,
+            9507, 9724, 10109, 10859, 11246, 11381, 11695, 12082, 12285, 12553,
+            13194, 15536, 16539, 16685, 17202, 17287, 17329, 17410, 17452,
+            17800, 20145, 21448, 21739, 22280, 23143, 23367, 24264, 24303,
+            24408, 24858, 25578, 25660, 25926, 26538, 26746, 26863, 26906,
+            26948, 27068, 28737, 32325, 32944, 33754, 35541, 35582, 35988,
+            36099, 36872, 37135, 38598, 38773, 39089, 39646, 39861, 39957,
+            40469, 40523, 41089, 41380, 41557, 42507, 42883, 43018, 43060,
+            43341, 43383, 43774, 44218, 44317, 44681, 44729, 44959, 45040,
+            45269, 46168, 46210, 46539, 46742, 46784, 46965, 47046, 47260,
+            47582, 47663, 47791, 48349, 48453, 48587, 48646, 48921
+          ],
+          "sha256": "4598b74e82f1efa77514d6dd7a24565771c22d8f17868d87c448822603123714",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [6899, 13292, 14658, 27484, 28844, 36763, 45765],
+          "sha256": "483f205985dcce215e7ec3caac91083b7474acfb4b57672a557a5a680ab37755",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [
+            6900, 13293, 13460, 13517, 13969, 14251, 14659, 17949, 27485, 28845,
+            45165, 45402, 45766
+          ],
+          "sha256": "8e4c7cc7cc675787c77eb48185ca281d19332da1452312a904b78eac460d3c62",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [10684, 20752],
+          "sha256": "bfad902189d5c6da4f6062ff7c7699a1ffdd1cceb0cd9c9e52c1a24f8afa65b2",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [12194],
+          "sha256": "8ab9fe0a1a9b065747b64856683e1ccba33fb53f28063850bd92bee4b0b61948",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [12243],
+          "sha256": "f05f0461922e717db930426534c07da6b3d0571a2852ad3a746cfa21736ee5c3",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [12504],
+          "sha256": "ce80c5004136a57f5621fcea40060e24690558ab5929962629d8924eea84c802",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [12876, 14073, 28959],
+          "sha256": "11ae7a639042ab92baa4b64fd1e23ee861c0e9fcb6e66d8012ece0f6f441efd9",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [13291],
+          "sha256": "8827848a6e4d089d016788d4dc7bd2cdfd4bf50bce3480db4be97af26b9e388e",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [13588, 13901, 14306, 40731, 44814],
+          "sha256": "77045c3bb15cd94c32661dc77ff4e913919fe8558b2f68bfbfaf1d2026f85ff5",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [18225, 19852, 36764, 37292],
+          "sha256": "c34578ff56bf4dc08f6245d328d5f47cb463d179cf48da2197eee0a6afed0b1b",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [27265],
+          "sha256": "1573a890602a8039e7cff7fc64f26eec0cfa9b350bf50018fca8d253bf9f044f",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [27266],
+          "sha256": "76c298beac944c64d4c0ca80d712dfbc5366a6aef9ace2c41d8eacbba9b6be12",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [27874],
+          "sha256": "b9240ff51ba525ebeb3bd5f5f3691cacf58863955d18f9f866bf0a28bfc2222f",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [45220, 46865],
+          "sha256": "24e7c0d21fcbd1b8ba7b2b31f12d7b09f3b70fc281e1e741ebcb3e6f8bb01255",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [49413],
+          "sha256": "465ceb4927954c9890af5c8d4248035cc7f110f600f2b7dd0fa411da6870bbc0",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [49483],
+          "sha256": "6cebab30da49588b19717a1e41e25fdb243743123c2d6a323f9256c673e5b9d9",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [49870],
+          "sha256": "cff119e9bdc341e1efbca1349ef45761eab3738bffd30e0640e636a6947a972a",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [49871],
+          "sha256": "b4e2cbcc058cae4418fb284d77cc1b5d8110234a6285f6607654f414d1b2268d",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [49974],
+          "sha256": "e901ef6dd99a151b0aef88f6e45760ddbcba2d244509317ac426341920bc199e",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [50003],
+          "sha256": "d55311c3d1f21d943f60daecb35a3ad6093f263e92a40cefbcbc18457173e672",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [50178],
+          "sha256": "d87eda4f89b5dc5a3a0d8eb1e488447b7ac72e5182315b7dd8d7994d8416d9c5",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [50333],
+          "sha256": "f7d930bdd902154c446578d50861e971d5297dc736fc9bd8a57885ccb70d193c",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [50422],
+          "sha256": "d76c904a947c8dc4173f8114876a88dae5f2ef7cc74e87f8e335c2bb32096dc7",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [50454],
+          "sha256": "8f4d825be9439762698f34d0e8cec61017503534b3ca967f10ebed9123946a47",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        },
+        {
+          "line_numbers": [50532],
+          "sha256": "a946c024b1d01165bd2fafdf35dfb1fc33254d44d0fff8ad9605b6bbbef10561",
+          "category": "external_oracle_metadata",
+          "reason": "Frozen baseline import paths and historical test-command data; not a candidate build or runtime input."
+        }
+      ]
+    },
+    {
+      "path": "scripts/tsrs/rust-migration-inventory.py",
+      "sha256": "be1103b51bd382cc441ecf301cbda366188714a01c2df38f81a5075a50fe384d",
+      "lines": [
+        {
+          "line_numbers": [2],
+          "sha256": "ccd6f2cb8bd03d2984fe92c737614b6797184fc5e90bc5f05d35d85492a9e144",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [240],
+          "sha256": "7eeb52ac5a2ae79054fcae03d9c6103ee5220be0e6bdd5d1267f59d4d02e9830",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [244],
+          "sha256": "8da82d4cf7702ff0bc6538c1937b5c18074f9e91a87c055e27d25b88997aab25",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [248],
+          "sha256": "eb1b805533c411612d1e0585c6f5d5a4322215b3b06b788d05eb6e12a3c40506",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [249],
+          "sha256": "b0be3454c491cb9bcca86bf4a55463c1a945d0a444b01251e1a8c7942353b6f8",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [253],
+          "sha256": "ada7bf4220202717abb2ade6fc738eba9aeb5630dd54932234a8e98fdd2fdca9",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [258],
+          "sha256": "06bb9395be50a866263cf97834eadccad44ef60a1329675612e1728ab21d2cae",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [271],
+          "sha256": "660fba6d842a56539db64ade26d5a4094a817d5f41c44a013683ec9603c1dc62",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [276],
+          "sha256": "5e04f7a97fec67c44c8cb1485dada645cba553a50031ed79be28741493bdaedd",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [281],
+          "sha256": "1cb2c0a8ddc769379a7a1b69ebdf80a59c006502e5456c4afee1f70d146aae47",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [285],
+          "sha256": "1a8b23c3eaa5d757696b532fc47a5d3117a4592fa10325b9a3f5eab7c629ef8a",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [297],
+          "sha256": "432138cfc3d575c1947206045a105b485a2ea7674680fbe90dc3bee5397e9217",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [452],
+          "sha256": "01b63dfd76de3ea3c2ae8d4c91fff89fe5e56a073b1fcf0926294939ab2643bc",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [487],
+          "sha256": "2e42b42b8193a8c912f0e1de35168b73f7575ea338fe44a4edd6dd63d7050ed1",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [678],
+          "sha256": "71263d9d31bc5788a2ddc5f39776b887fd00e1e47489d0d567962aa42e6b1b34",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [679],
+          "sha256": "7b7444a13f322e968d7cd01aef0564683ee10e6e3ee79bb3391f304fee37e2c5",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [680],
+          "sha256": "edeed16cb37adf6698c3dda21c8b10ee2fbf853d8401cc2e869348bf8275d22a",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [710],
+          "sha256": "6696d7aba6c13fd31b665708b8ba51e4549db91a6588a84a66ee7df391770e76",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        },
+        {
+          "line_numbers": [726],
+          "sha256": "29a24002819d5e514886efc544fe9cbcb18e50ba9da130bf15f72f55599ea0c5",
+          "category": "detector_test_or_pattern",
+          "reason": "Detector patterns, non-executed fixture byte strings and external oracle command metadata; command strings here are never launched."
+        }
+      ]
+    },
+    {
+      "path": "website/theme/components/TypeScriptVersions.tsx",
+      "sha256": "214b5728090d510bda1152f3a20672f283759e3f8e00a994dee50714541eb184",
+      "lines": [
+        {
+          "line_numbers": [42],
+          "sha256": "e6d674c6027fd1ca1a25c6e08bcbce98a48f73be0671a8fb00f68682955bdf6f",
+          "category": "source_attribution",
+          "reason": "Public upstream compiler release and commit hyperlinks rendered on the version table."
+        },
+        {
+          "line_numbers": [56],
+          "sha256": "3438750b3ee7fc46f68863c92218144ffea1284d96cb6060433055c2f0b98485",
+          "category": "source_attribution",
+          "reason": "Public upstream compiler release and commit hyperlinks rendered on the version table."
+        }
+      ]
+    }
+  ]
+}

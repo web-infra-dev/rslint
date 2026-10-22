@@ -1,0 +1,99 @@
+--- a/crates/tsrs_tsoptions/src/enummaps.rs
++++ b/crates/tsrs_tsoptions/src/enummaps.rs
+@@ -36,7 +36,6 @@
+             ("es2023", CompilerOptionsValue::String("lib.es2023.d.ts".to_string())),
+             ("es2024", CompilerOptionsValue::String("lib.es2024.d.ts".to_string())),
+             ("es2025", CompilerOptionsValue::String("lib.es2025.d.ts".to_string())),
+-            ("es2026", CompilerOptionsValue::String("lib.es2026.d.ts".to_string())),
+             ("esnext", CompilerOptionsValue::String("lib.esnext.d.ts".to_string())),
+             // Host only
+             ("dom", CompilerOptionsValue::String("lib.dom.d.ts".to_string())),
+@@ -176,22 +175,6 @@
+             ),
+             ("es2025.promise", CompilerOptionsValue::String("lib.es2025.promise.d.ts".to_string())),
+             ("es2025.regexp", CompilerOptionsValue::String("lib.es2025.regexp.d.ts".to_string())),
+-            ("es2026.array", CompilerOptionsValue::String("lib.es2026.array.d.ts".to_string())),
+-            (
+-                "es2026.collection",
+-                CompilerOptionsValue::String("lib.es2026.collection.d.ts".to_string()),
+-            ),
+-            ("es2026.error", CompilerOptionsValue::String("lib.es2026.error.d.ts".to_string())),
+-            (
+-                "es2026.iterator",
+-                CompilerOptionsValue::String("lib.es2026.iterator.d.ts".to_string()),
+-            ),
+-            ("es2026.json", CompilerOptionsValue::String("lib.es2026.json.d.ts".to_string())),
+-            ("es2026.math", CompilerOptionsValue::String("lib.es2026.math.d.ts".to_string())),
+-            (
+-                "es2026.typedarrays",
+-                CompilerOptionsValue::String("lib.es2026.typedarrays.d.ts".to_string()),
+-            ),
+             // Fallback for backward compatibility
+             (
+                 "esnext.asynciterable",
+@@ -204,22 +187,17 @@
+             ("esnext.regexp", CompilerOptionsValue::String("lib.es2024.regexp.d.ts".to_string())),
+             ("esnext.string", CompilerOptionsValue::String("lib.es2024.string.d.ts".to_string())),
+             ("esnext.float16", CompilerOptionsValue::String("lib.es2025.float16.d.ts".to_string())),
++            (
++                "esnext.iterator",
++                CompilerOptionsValue::String("lib.es2025.iterator.d.ts".to_string()),
++            ),
+             ("esnext.promise", CompilerOptionsValue::String("lib.es2025.promise.d.ts".to_string())),
+-            ("esnext.array", CompilerOptionsValue::String("lib.es2026.array.d.ts".to_string())),
++            // ESNext By-feature options
++            ("esnext.array", CompilerOptionsValue::String("lib.esnext.array.d.ts".to_string())),
+             (
+                 "esnext.collection",
+-                CompilerOptionsValue::String("lib.es2026.collection.d.ts".to_string()),
+-            ),
+-            ("esnext.error", CompilerOptionsValue::String("lib.es2026.error.d.ts".to_string())),
+-            (
+-                "esnext.iterator",
+-                CompilerOptionsValue::String("lib.es2026.iterator.d.ts".to_string()),
+-            ),
+-            (
+-                "esnext.typedarrays",
+-                CompilerOptionsValue::String("lib.es2026.typedarrays.d.ts".to_string()),
+-            ),
+-            // ESNext By-feature options
++                CompilerOptionsValue::String("lib.esnext.collection.d.ts".to_string()),
++            ),
+             ("esnext.date", CompilerOptionsValue::String("lib.esnext.date.d.ts".to_string())),
+             (
+                 "esnext.decorators",
+@@ -229,6 +207,7 @@
+                 "esnext.disposable",
+                 CompilerOptionsValue::String("lib.esnext.disposable.d.ts".to_string()),
+             ),
++            ("esnext.error", CompilerOptionsValue::String("lib.esnext.error.d.ts".to_string())),
+             ("esnext.intl", CompilerOptionsValue::String("lib.esnext.intl.d.ts".to_string())),
+             (
+                 "esnext.sharedmemory",
+@@ -237,6 +216,10 @@
+             (
+                 "esnext.temporal",
+                 CompilerOptionsValue::String("lib.esnext.temporal.d.ts".to_string()),
++            ),
++            (
++                "esnext.typedarrays",
++                CompilerOptionsValue::String("lib.esnext.typedarrays.d.ts".to_string()),
+             ),
+             // Decorators
+             ("decorators", CompilerOptionsValue::String("lib.decorators.d.ts".to_string())),
+@@ -290,7 +273,6 @@
+             ("es2023", CompilerOptionsValue::ScriptTarget(ScriptTarget::ES2023)),
+             ("es2024", CompilerOptionsValue::ScriptTarget(ScriptTarget::ES2024)),
+             ("es2025", CompilerOptionsValue::ScriptTarget(ScriptTarget::ES2025)),
+-            ("es2026", CompilerOptionsValue::ScriptTarget(ScriptTarget::ES2026)),
+             ("esnext", CompilerOptionsValue::ScriptTarget(ScriptTarget::ESNext)),
+         ])
+     });
+@@ -348,7 +330,6 @@
+     LazyLock::new(|| {
+         let mut m = FxHashMap::default();
+         m.insert(ScriptTarget::ESNext, "lib.esnext.full.d.ts");
+-        m.insert(ScriptTarget::ES2026, "lib.es2026.full.d.ts");
+         m.insert(ScriptTarget::ES2025, "lib.es2025.full.d.ts");
+         m.insert(ScriptTarget::ES2024, "lib.es2024.full.d.ts");
+         m.insert(ScriptTarget::ES2023, "lib.es2023.full.d.ts");

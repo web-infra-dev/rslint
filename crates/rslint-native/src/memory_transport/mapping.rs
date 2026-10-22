@@ -254,8 +254,9 @@ mod platform {
     use windows_sys::Win32::{
         Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE},
         System::Memory::{
-            CreateFileMappingW, MapViewOfFile, UnmapViewOfFile, VirtualAlloc, FILE_MAP_READ,
-            FILE_MAP_WRITE, MEMORY_MAPPED_VIEW_ADDRESS, MEM_COMMIT, PAGE_READWRITE, SEC_RESERVE,
+            CreateFileMappingW, FILE_MAP_READ, FILE_MAP_WRITE, MEM_COMMIT,
+            MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile, PAGE_READWRITE, SEC_RESERVE,
+            UnmapViewOfFile, VirtualAlloc,
         },
     };
 
@@ -309,13 +310,15 @@ mod platform {
                 let view = MapViewOfFile(self.handle, FILE_MAP_WRITE, 0, 0, self.layout.capacity);
                 assert!(!view.Value.is_null());
                 let start = self.layout.header_size + slot * self.layout.slot_size;
-                assert!(!VirtualAlloc(
-                    view.Value.cast::<u8>().add(start).cast(),
-                    self.layout.slot_size,
-                    MEM_COMMIT,
-                    PAGE_READWRITE,
-                )
-                .is_null());
+                assert!(
+                    !VirtualAlloc(
+                        view.Value.cast::<u8>().add(start).cast(),
+                        self.layout.slot_size,
+                        MEM_COMMIT,
+                        PAGE_READWRITE,
+                    )
+                    .is_null()
+                );
                 ptr::copy_nonoverlapping(
                     bytes.as_ptr(),
                     view.Value.cast::<u8>().add(start),
@@ -424,7 +427,7 @@ mod platform {
     #[test]
     fn payload_is_committed_only_when_published() {
         use windows_sys::Win32::System::Memory::{
-            VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_RESERVE, PAGE_READONLY,
+            MEM_RESERVE, MEMORY_BASIC_INFORMATION, PAGE_READONLY, VirtualQuery,
         };
 
         let layout = Layout::new(super::super::test_configuration()).unwrap();

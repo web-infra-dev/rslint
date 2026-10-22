@@ -2,15 +2,13 @@ import { describe, expect, test } from 'rstack/test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import ts from 'typescript';
-import { compileRuleOptionTypes } from '../plugins/generate-rule-option-types.js';
-import { writeRuleDocsToDir } from '../../../website/plugin-rule-manifest.js';
-import { buildManifest } from '../../../scripts/gen-rule-manifest.js';
 import {
-  getCurrentRuleIds,
-  getRuleIdsAtRef,
-} from '../../../scripts/sync-version-info/release.js';
+  collectRuleSchemas,
+  compileRuleOptionTypes,
+} from '../plugins/generate-rule-option-types.js';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 function withFixture<T>(
   run: (root: string, write: (file: string, content: string) => void) => T,
@@ -29,157 +27,178 @@ function withFixture<T>(
 }
 
 describe('rule metadata', () => {
-  test('filesystem and Git discovery preserve nested rule IDs and test ownership', () => {
-    withFixture((root, write) => {
-      write('internal/rules/core_rule/core_rule.go', 'package core_rule');
-      write('internal/rules/core_rule/helper/helper.go', 'package helper');
-      write(
-        'internal/plugins/node/plugin.go',
-        'package node_plugin\nconst PLUGIN_NAME = "eslint-plugin-node"',
-      );
-      for (const rule of [
-        'prefer_global',
-        'prefer_global/url',
-        'prefer_global/url/deep',
-        'prefer_global_url',
-      ]) {
-        const leaf = rule.split('/').at(-1)!;
-        const base = `internal/plugins/node/rules/${rule}`;
-        write(`${base}/${leaf}.go`, `package ${leaf}`);
-        write(
-          `${base}/${leaf}.md`,
-          `# ${rule.replaceAll('_', '-')}\n\nRule details.\n`,
-        );
-      }
-      // Real helper and fixture trees must not become public rules.
-      write(
-        'internal/plugins/node/rules/prefer_global/testdata/fake/fake.go',
-        'package fake',
-      );
-      write(
-        'internal/plugins/node/rules/prefer_global/fixtures/fake/fake.go',
-        'package fake',
-      );
-      write(
-        'internal/plugins/node/rules/prefer_global/.hidden/fake/fake.go',
-        'package fake',
-      );
-      write(
-        'internal/plugins/node/rules/prefer_global/helpers/helpers_test.go',
-        'package helpers',
-      );
-      const tests = 'packages/rslint-test-tools/tests';
-      write(`${tests}/eslint/rules/core-rule.test.ts`, '// core');
-      write(
-        `${tests}/eslint-plugin-node/rules/prefer-global/base.test.ts`,
-        '// parent',
-      );
-      write(
-        `${tests}/eslint-plugin-node/rules/prefer-global/url.test.ts`,
-        '// nested',
-      );
-      write(
-        `${tests}/eslint-plugin-node/rules/prefer-global/url/extra.test.ts`,
-        "it.skip('nested skip', () => {});",
-      );
-      write(
-        `${tests}/eslint-plugin-node/rules/prefer-global/url/deep.test.ts`,
-        '// deeper',
-      );
-      write(
-        `${tests}/eslint-plugin-node/rules/prefer-global-url.test.ts`,
-        '// flat',
-      );
-      write(
-        'packages/rslint-test-tools/rstack.config.mts',
-        [
-          'eslint/rules/core-rule',
-          'eslint-plugin-node/rules/prefer-global/base',
-          'eslint-plugin-node/rules/prefer-global/url',
-          'eslint-plugin-node/rules/prefer-global/url/extra',
-          'eslint-plugin-node/rules/prefer-global/url/deep',
-          'eslint-plugin-node/rules/prefer-global-url',
-        ]
-          .map((file) => `'./tests/${file}.test.ts',`)
-          .join('\n'),
-      );
-
-      const manifest = buildManifest(root);
-      const nodeRules = manifest.rules.filter(
-        (rule: { group: string }) => rule.group === 'eslint-plugin-node',
-      );
-      expect(
-        nodeRules.map((rule: { name: string }) => rule.name).sort(),
-      ).toEqual([
-        'prefer-global',
-        'prefer-global-url',
-        'prefer-global/url',
-        'prefer-global/url/deep',
-      ]);
-      const nested = nodeRules.find(
-        (rule: { name: string }) => rule.name === 'prefer-global/url',
-      );
-      expect(nested.docPath).toBe(
-        'internal/plugins/node/rules/prefer_global/url/url.md',
-      );
-      expect(nested.status).toBe('partial-impl');
-      expect(nested.failing_case).toHaveLength(1);
-      expect(
-        nodeRules
-          .filter((rule: { name: string }) => rule.name !== nested.name)
-          .every((rule: { status: string }) => rule.status === 'full'),
-      ).toBe(true);
-
-      const current = getCurrentRuleIds(root);
-      expect(current).toEqual(
-        [
-          'eslint-plugin-node:prefer-global',
-          'eslint-plugin-node:prefer-global-url',
-          'eslint-plugin-node:prefer-global/url',
-          'eslint-plugin-node:prefer-global/url/deep',
-          'eslint:core-rule',
-        ].sort(),
-      );
-      const git = (...args: string[]) =>
-        execFileSync('git', args, { cwd: root, stdio: 'pipe' })
-          .toString()
-          .trim();
-      git('init', '--quiet');
-      git('add', '.');
-      const tree = git('write-tree');
-      // Before the TypeScript plugin directory existed, core rules belonged
-      // to @typescript-eslint. Preserve that historical indexing convention.
-      expect(getRuleIdsAtRef(tree, root)).toEqual(
-        current
-          .map((id: string) => id.replace(/^eslint:/, '@typescript-eslint:'))
-          .sort(),
-      );
-
-      // Generate actual MDX and sidebar entries with both parent and child rules.
-      write('docs/index.mdx', '# Overview');
-      writeRuleDocsToDir(
-        nodeRules.map((rule: { docPath: string }) => ({
-          ...rule,
-          docPath: path.join(root, rule.docPath),
-          presets: [],
-        })),
-        path.join(root, 'docs'),
-      );
-      expect(
-        fs.readFileSync(
-          path.join(root, 'docs/node/prefer-global/url.mdx'),
-          'utf8',
-        ),
-      ).toContain('name="node/prefer-global/url"');
-      expect(
-        fs.existsSync(path.join(root, 'docs/node/prefer-global/url/deep.mdx')),
-      ).toBe(true);
-      expect(
-        JSON.parse(
-          fs.readFileSync(path.join(root, 'docs/node/_meta.json'), 'utf8'),
-        ),
-      ).toContainEqual({ type: 'file', name: 'prefer-global/url' });
+  test('Rust registry and frozen baseline metadata cover the scoped schemas without registering unsupported rules', async () => {
+    const root = fileURLToPath(new URL('../../../', import.meta.url));
+    const provenance = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'packages/rslint/rust-rule-schemas.provenance.json'),
+        'utf8',
+      ),
+    );
+    const bytes = fs.readFileSync(path.join(root, provenance.workload.path));
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(
+      provenance.workload.sha256,
+    );
+    const manifest = JSON.parse(bytes.toString('utf8'));
+    expect(manifest.project.commit).toBe(
+      'e7d65898ce92d5f5d78afb0d93b4670b5e2a469d',
+    );
+    expect(manifest.counts).toMatchObject({
+      unique_files: 2394,
+      unique_rule_count: 129,
+      plans: 33,
+      rule_passes: 221014,
     });
+    expect(provenance.baseline.commit).toBe(manifest.baseline.commit);
+    for (const field of [
+      'traceSHA256',
+      'summarySHA256',
+      'commandRecordSHA256',
+      'sourceRecordSHA256',
+    ]) {
+      expect(provenance.baselineWorkloadProof[field]).toBe(
+        manifest.baseline[field],
+      );
+      expect(provenance.baselineWorkloadProof[field]).toMatch(/^[a-f0-9]{64}$/);
+    }
+    // These tracked byte hashes bind the original oracle's metadata. Reading
+    // or rebuilding the external Go checkout is not part of candidate tests.
+    const catalogBytes = fs.readFileSync(
+      path.join(root, provenance.baselineMetadataCatalog.path),
+    );
+    expect(createHash('sha256').update(catalogBytes).digest('hex')).toBe(
+      provenance.baselineMetadataCatalog.sha256,
+    );
+    const catalog = JSON.parse(catalogBytes.toString('utf8'));
+    expect(catalog.baseline.commit).toBe(provenance.baseline.commit);
+    expect(catalog.baseline.tree).toBe(provenance.baseline.tree);
+    const original = new Map(
+      catalog.rules.map((rule: { name: string; options_schema: unknown }) => [
+        rule.name,
+        rule.options_schema,
+      ]),
+    );
+    const schemas = await collectRuleSchemas();
+    for (const rule of schemas)
+      expect(rule.schema).toEqual(original.get(rule.name));
+
+    // Fail closed on unknown registry expressions; do not treat metadata or
+    // schema presence alone as proof of behavioral compatibility.
+    const directory = path.join(root, 'crates/rslint-core/src/rules');
+    const registry = fs.readFileSync(path.join(directory, 'mod.rs'), 'utf8');
+    const body =
+      /pub\(crate\) fn supported\(name: &str\) -> bool \{([\s\S]*?)\n\}/.exec(
+        registry,
+      )?.[1];
+    expect(body).toBeDefined();
+    const registered: string[] = [];
+    for (const part of body!.replace(/\s/g, '').split('||')) {
+      const module = /^([a-z_]+)::NAMES\.contains\(&name\)$/.exec(part)?.[1];
+      if (module) {
+        const source = fs.readFileSync(
+          path.join(directory, `${module}.rs`),
+          'utf8',
+        );
+        const names = /const NAMES: &\[&str\] = &\[([\s\S]*?)\];/.exec(
+          source,
+        )?.[1];
+        expect(names, module).toBeDefined();
+        registered.push(...JSON.parse(`[${names!.replace(/,\s*$/, '')}]`));
+      } else {
+        const constant = /^name==([A-Z_]+)$/.exec(part)?.[1];
+        expect(constant, part).toBeDefined();
+        const name = new RegExp(`const ${constant}: &str = "([^"]+)";`).exec(
+          registry,
+        )?.[1];
+        expect(name, part).toBeDefined();
+        registered.push(name!);
+      }
+    }
+    expect(new Set(registered).size).toBe(registered.length);
+    const typedNames = new Set(schemas.map((rule) => rule.name));
+    expect(
+      [...typedNames].filter((name) => !registered.includes(name)),
+    ).toEqual([]);
+    expect([...typedNames].sort()).toEqual(
+      [
+        ...new Set(manifest.rules.map((rule: { name: string }) => rule.name)),
+      ].sort(),
+    );
+    const extras = registered.filter((name) => !typedNames.has(name)).sort();
+    expect(extras).toEqual(provenance.retainedUntypedRules);
+    expect(extras).toHaveLength(10);
+    // Extra implemented rules are retained, but the 129-rule typed schema
+    // export makes no additional compatibility claim about those ten rules.
+    const configSource = fs.readFileSync(
+      path.join(root, 'packages/rslint/src/config/define-config.ts'),
+      'utf8',
+    );
+    expect(configSource).toContain(
+      '[key: string]: RuleEntry<any[]> | undefined;',
+    );
+  });
+
+  test('committed Rust option schemas cover the exact frozen workload and fail on missing or stale inputs', async () => {
+    const rules = await collectRuleSchemas();
+    const manifest = JSON.parse(
+      fs.readFileSync(
+        new URL(
+          '../../../docs/tsrs-migration/rsbuild-workload.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    );
+    expect(rules.map((rule) => rule.name).sort()).toEqual(
+      [
+        ...new Set(manifest.rules.map((rule: { name: string }) => rule.name)),
+      ].sort(),
+    );
+    expect(rules).toHaveLength(129);
+    const generated = await compileRuleOptionTypes(rules);
+    expect(generated.recordProperties).toHaveLength(rules.length);
+
+    const directory = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'rslint-rust-schemas-'),
+    );
+    const schemasPath = path.join(directory, 'schemas.json');
+    const provenancePath = path.join(directory, 'provenance.json');
+    try {
+      await expect(
+        collectRuleSchemas(schemasPath, provenancePath),
+      ).rejects.toThrow();
+      fs.writeFileSync(schemasPath, JSON.stringify(rules));
+      fs.writeFileSync(
+        provenancePath,
+        JSON.stringify({
+          schemas: {
+            count: 129,
+            sha256: 'wrong',
+            bytes: fs.statSync(schemasPath).size,
+          },
+        }),
+      );
+      await expect(
+        collectRuleSchemas(schemasPath, provenancePath),
+      ).rejects.toThrow('do not match their provenance');
+      const duplicates = Buffer.from(JSON.stringify([rules[0], rules[0]]));
+      fs.writeFileSync(schemasPath, duplicates);
+      fs.writeFileSync(
+        provenancePath,
+        JSON.stringify({
+          schemas: {
+            count: 2,
+            sha256: createHash('sha256').update(duplicates).digest('hex'),
+            bytes: duplicates.length,
+          },
+        }),
+      );
+      await expect(
+        collectRuleSchemas(schemasPath, provenancePath),
+      ).rejects.toThrow('do not match their provenance');
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   test('generated option types preserve punctuation-distinct IDs without declaration collisions', async () => {

@@ -1,0 +1,926 @@
+[
+  {
+    "rule": "rstest/prefer-called-exactly-once-with",
+    "provenance": {
+      "repository": "web-infra-dev/rslint",
+      "commit": "e0a29f751d4def86d27931759098f27748fa3003",
+      "sources": [
+        {
+          "path": "internal/plugins/rstest/rules/prefer_called_exactly_once_with/prefer_called_exactly_once_with_internal_test.go",
+          "sha256": "8a9558fc648cdaa84733a42a09584c9255f5f598747859aba9ae255e849d2e3b"
+        },
+        {
+          "path": "internal/plugins/rstest/rules/prefer_called_exactly_once_with/prefer_called_exactly_once_with_test.go",
+          "sha256": "bd9314607dd6f7361148a1c5e964417fd36959dd5ef2f7550cb905c35b14db0f"
+        }
+      ],
+      "internalAssertions": "Internal file-gate inputs, inert intervals, and block/source-order witnesses are retained as public API corpus cases. The bracket scanner is directly covered in Rust unit tests. Nil or non-SourceFile defensive arguments are unrepresentable in this Rust entry signature. The original benchmark is not a behavior case."
+    },
+    "compilerOptions": {
+      "jsx": "preserve",
+      "target": "esnext",
+      "module": "commonjs",
+      "strict": true,
+      "esModuleInterop": true,
+      "lib": [
+        "es2015",
+        "es2017",
+        "esnext",
+        "DOM"
+      ]
+    },
+    "valid": [
+      {
+        "text": "expect(fn).toHaveBeenCalledExactlyOnceWith();",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:0"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:1"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:2"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(y).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:3"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledWith('hoge'); expect(x).toHaveBeenCalledWith('foo');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:4"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(x).not.toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:5"
+      },
+      {
+        "text": "expect(x).not.toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:6"
+      },
+      {
+        "text": "expect(x).not.toHaveBeenCalledOnce(); expect(x).not.toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:7"
+      },
+      {
+        "text": "expect(x).resolves.toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:8"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(x).rejects.toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:9"
+      },
+      {
+        "text": "expect(x).resolves.toHaveBeenCalledOnce(); expect(x).rejects.toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:10"
+      },
+      {
+        "text": "async function f() { await expect(x).resolves.toHaveBeenCalledOnce(); expect(x).resolves.toHaveBeenCalledWith('a'); }",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:11"
+      },
+      {
+        "text": "async function f() { expect(x).resolves.toHaveBeenCalledOnce(); await expect(x).resolves.toHaveBeenCalledWith('a'); }",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:12"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); x.mockRestore(); expect(x).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:13"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); x.mockReset(); expect(x).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:14"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); x.mockClear(); expect(x).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:15"
+      },
+      {
+        "text": "expect(obj.fn).toHaveBeenCalledOnce(); obj.fn.mockClear(); expect(obj.fn).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:16"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); if (c) { x.mockClear(); } expect(x).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:17"
+      },
+      {
+        "text": "expect.soft(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:18"
+      },
+      {
+        "text": "test('x', ctx => { ctx.expect(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('hoge'); });",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:19"
+      },
+      {
+        "text": "import { expect } from 'vitest'; expect(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:20"
+      },
+      {
+        "text": "import { expect } from '@jest/globals'; expect(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:21"
+      },
+      {
+        "text": "import { expect } from '@playwright/test'; expect(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:22"
+      },
+      {
+        "text": "const expect = makeExpect(); expect(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:23"
+      },
+      {
+        "text": "test('a', () => { expect(x).toHaveBeenCalledOnce(); }); test('b', () => { expect(x).toHaveBeenCalledWith('a'); });",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:24"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('a'); expect(x).toHaveBeenCalledWith('b');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:25"
+      },
+      {
+        "text": "expect(x).to.have.been.calledOnceWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:26"
+      },
+      {
+        "text": "expect(x).to.have.been.calledOnce;",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:27"
+      },
+      {
+        "text": "expect(x).to.have.been.calledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:28"
+      },
+      {
+        "text": "expect(x).to.have.been.calledOnce; expect(y).to.have.been.calledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:29"
+      },
+      {
+        "text": "expect(x).to.have.been.calledOnce; x.mockClear(); expect(x).to.have.been.calledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:30"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(x).toBeCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:31"
+      },
+      {
+        "text": "expect(obj.fn).toHaveBeenCalledOnce(); obj /* keep */ .fn.mockClear(); expect(obj.fn).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:32"
+      },
+      {
+        "text": "expect(obj.fn).toHaveBeenCalledOnce(); (obj.fn).mockClear(); expect(obj.fn).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:33"
+      },
+      {
+        "text": "expect(obj.fn).toHaveBeenCalledOnce(); (obj.fn as Mock).mockClear(); expect(obj.fn).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:34"
+      },
+      {
+        "text": "expect(mocks['a']).toHaveBeenCalledOnce(); mocks[\"a\"].mockClear(); expect(mocks['a']).toHaveBeenCalledWith('x');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:35"
+      },
+      {
+        "text": "expect(x).to.have.been.calledOnce.and.not.calledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:36"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); x = createMock(); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:37"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); x('b'); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:38"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); doMoreWork(); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:39"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); y.mockClear(); expect(x).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:40"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); const y = compute(); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:41"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(makeExpected()); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:42"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); [1, 2].forEach(cb); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:43"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); console.log(unresolved); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:44"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); setTimeout(() => x('b'), 0); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:45"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); console.log(x); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:46"
+      },
+      {
+        "text": "function f() { const console = makeLogger(); expect(x).toHaveBeenCalledOnce(); console.log('checkpoint'); expect(x).toHaveBeenCalledWith('a'); }",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:47"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); var x = makeMock; expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:48"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(callX).toThrow(); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:49"
+      },
+      {
+        "text": "async function f() { expect(x).toHaveBeenCalledOnce(); await expect(p).resolves.toBe(1); expect(x).toHaveBeenCalledWith('a'); }",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:50"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(makeExpected()); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:51"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(callX).toThrowErrorMatchingSnapshot(); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:52"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(callX).toThrowErrorMatchingInlineSnapshot(); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:53"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(v).to.satisfy(pred); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:54"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(v).to.satisfies(pred); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:55"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(callX).to.change(obj, 'value'); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:56"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(callX).to.increase(obj, 'value'); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:57"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(callX).to.decrease(obj, 'value'); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:58"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); eval('x(\"b\")'); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:59"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); globalThis.eval('x(\"b\")'); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:60"
+      },
+      {
+        "text": "declare const x: { (a: string): void }; expect(x).toHaveBeenCalledOnce(); x.call(null, 'b'); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:61"
+      },
+      {
+        "text": "declare const obj: { fn: (a: string) => void }; expect(obj.fn).toHaveBeenCalledOnce(); obj.fn.apply(null, ['b']); expect(obj.fn).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:62"
+      },
+      {
+        "text": "declare const cmp: ((a: number, b: number) => number) | undefined; expect(x).toHaveBeenCalledOnce(); [2, 1].sort(cmp); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:63"
+      },
+      {
+        "text": "declare const replacer: ((k: string, v: unknown) => unknown) | undefined; expect(x).toHaveBeenCalledOnce(); JSON.stringify({}, replacer); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:64"
+      },
+      {
+        "text": "declare const pred: ((v: number) => boolean) | undefined; expect(x).toHaveBeenCalledOnce(); [1, 2].every(pred!); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:65"
+      },
+      {
+        "text": "declare const t: object; expect(x).toHaveBeenCalledOnce(); [1].forEach(t as unknown as () => void); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:66"
+      },
+      {
+        "text": "async function f() { await expect.poll(getSpy).toHaveBeenCalledOnce(); await expect.poll(getSpy).toHaveBeenCalledWith('a'); }",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:67"
+      },
+      {
+        "text": "async function f() { await expect.element(locator).toHaveBeenCalledOnce(); await expect.element(locator).toHaveBeenCalledWith('a'); }",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:68"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(expect.toSatisfy(pred)); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:69"
+      },
+      {
+        "text": "test('t', ({ expect }) => { expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(expect.myAsymmetric()); expect(x).toHaveBeenCalledWith('a'); });",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:70"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(expect.schemaMatching(schema)); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:71"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(y).toEqual([...gen]); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:72"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); const [a] = items; expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:73"
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); const { b } = obj; expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:valid:74"
+      },
+      {
+        "text": "test(\"case\", () => expect(spy).toHaveBeenCalledOnce())",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:0"
+      },
+      {
+        "text": "test(\"case\", () => expect(spy).toHaveBeenCalledWith(\"a\"))",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:1"
+      },
+      {
+        "text": "test(\"case\", () => expect(spy).toHaveBeenCalledExactlyOnceWith(\"a\"))",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:14"
+      },
+      {
+        "text": "test(\"case\", () => expect(spy).calledOnceWith(\"a\"))",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:15"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy).calledOnceAgain; expect(spy).calledWithout(\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:16"
+      },
+      {
+        "text": "test(\"case\", () => expect(rows[(index + 1)]).toBe(1))",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:17"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy)[(\"other\")]; expect(spy).calledWith(\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:18"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\nspy.mockClear(); const unrelated = 1;\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:4"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\nconst unrelated = 1; spy.mockClear();\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:5"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\n;\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:6"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\nif (flag) { spy.mockReset(); }\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:7"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\nspy = other;\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:8"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\nvar spy;\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:9"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\nvar expected;\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:10"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\nvar toHaveBeenCalledWith;\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:11"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\nawait expect(other).resolves.toBe(1);\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:13"
+      },
+      {
+        "text": "test(\"case\", () => expect(spy).calledOnce.toHaveBeenCalledWith(\"a\"))",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:5",
+        "contextAdaptation": "Original internal test proves only the file gate. An expression-bodied arrow has no assertion expression statement to merge."
+      }
+    ],
+    "invalid": [
+      {
+        "text": "expect(getMock())[(\"toHaveBeenCalledOnce\")](); expect(getMock())[(\"toHaveBeenCalledWith\")]('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:0",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ]
+      },
+      {
+        "text": "expect(getMock())[(\"\\x74oHaveBeenCalledOnce\")](); expect(getMock()).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:1",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ]
+      },
+      {
+        "text": "expect(getMock()).toHaveBeenCalledOnce(); expect(getMock()).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:2",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ]
+      },
+      {
+        "text": "expect(mocks[next()]).toHaveBeenCalledOnce(); expect(mocks[next()]).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:3",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ]
+      },
+      {
+        "text": "expect(mocks['a']).toHaveBeenCalledOnce(); expect(mocks['a']).toHaveBeenCalledWith('x');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:4",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          " expect(mocks['a']).toHaveBeenCalledExactlyOnceWith('x');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('hoge');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:5",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith",
+            "column": 45
+          }
+        ],
+        "outputSteps": [
+          " expect(x).toHaveBeenCalledExactlyOnceWith('hoge');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledWith('hoge', 123); expect(x).toHaveBeenCalledOnce();",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:6",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "expect(x).toHaveBeenCalledExactlyOnceWith('hoge', 123); "
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nconsole.log('checkpoint');\nexpect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:7",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "console.log('checkpoint');\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nconst parsed = JSON.parse('{}');\nexpect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:8",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "const parsed = JSON.parse('{}');\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nexpect.poll(getSpy).toBe(1);\nexpect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:9",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "expect.poll(getSpy).toBe(1);\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nvar hoge = 'foo';\nexpect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:10",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "var hoge = 'foo';\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nexpect(y).toEqual({ ...obj });\nexpect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:11",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "expect(y).toEqual({ ...obj });\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nexpect(y).toEqual({ id: 1 });\nexpect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:12",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "expect(y).toEqual({ id: 1 });\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nexpect(y).toHaveBeenCalledWith(expect.any(String));\nexpect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:13",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "expect(y).toHaveBeenCalledWith(expect.any(String));\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nconst hoge = 'foo';\nexpect(x).toHaveBeenCalledWith('hoge', 123);",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:14",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "const hoge = 'foo';\nexpect(x).toHaveBeenCalledExactlyOnceWith('hoge', 123);"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nexpect(x).toHaveBeenCalledWith<\n  [string, number]\n>('hoge', /* keep */ 123);",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:15",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "expect(x).toHaveBeenCalledExactlyOnceWith<\n  [string, number]\n>('hoge', /* keep */ 123);"
+        ]
+      },
+      {
+        "text": "test('x', ({ expect }) => {\n  expect(x).toHaveBeenCalledOnce();\n  expect(x).toHaveBeenCalledWith('a');\n});",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:16",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "test('x', ({ expect }) => {\n  expect(x).toHaveBeenCalledExactlyOnceWith('a');\n});"
+        ]
+      },
+      {
+        "text": "import { expect as check } from '@rstest/core';\ncheck(x).toHaveBeenCalledOnce();\ncheck(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:17",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "import { expect as check } from '@rstest/core';\ncheck(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "import.meta.rstest.expect(x).toHaveBeenCalledOnce();\nimport.meta.rstest.expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:18",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "import.meta.rstest.expect(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nexpect(x)['toHaveBeenCalledWith']('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:19",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "expect(x)['toHaveBeenCalledExactlyOnceWith']('a');"
+        ]
+      },
+      {
+        "text": "expect(aaa).toHaveBeenCalledOnce();\nexpect(aaa).toHaveBeenCalledWith('a');\nexpect(bbb).toHaveBeenCalledWith('b');\nexpect(bbb).toHaveBeenCalledOnce();",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:20",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith",
+            "line": 2
+          },
+          {
+            "messageId": "preferCalledExactlyOnceWith",
+            "line": 4
+          }
+        ],
+        "outputSteps": [
+          "expect(aaa).toHaveBeenCalledExactlyOnceWith('a');\nexpect(bbb).toHaveBeenCalledExactlyOnceWith('b');\n"
+        ]
+      },
+      {
+        "text": "foo(); expect(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:21",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "foo();  expect(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce(); // keep me\nexpect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:22",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          " // keep me\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).resolves.toHaveBeenCalledOnce();\nexpect(x).resolves.toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:23",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "expect(x).resolves.toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).rejects.toHaveBeenCalledWith('a');\nexpect(x).rejects.toHaveBeenCalledOnce();",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:24",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "expect(x).rejects.toHaveBeenCalledExactlyOnceWith('a');\n"
+        ]
+      },
+      {
+        "text": "async function f() {\n  await expect(x).resolves.toHaveBeenCalledOnce();\n  await expect(x).resolves.toHaveBeenCalledWith('a');\n}",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:25",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "async function f() {\n  await expect(x).resolves.toHaveBeenCalledExactlyOnceWith('a');\n}"
+        ]
+      },
+      {
+        "text": "expect(x).to.have.been.calledOnce;\nexpect(x).to.have.been.calledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:26",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith",
+            "message": "Using `calledOnce` and `calledWith` on the same target; prefer `calledOnceWith` instead."
+          }
+        ],
+        "outputSteps": [
+          "expect(x).to.have.been.calledOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).to.have.been.calledOnce;\nexpect(x).toHaveBeenCalledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:27",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith",
+            "message": "Using `calledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead."
+          }
+        ],
+        "outputSteps": [
+          "expect(x).toHaveBeenCalledExactlyOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nexpect(x).to.have.been.calledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:28",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith",
+            "message": "Using `toHaveBeenCalledOnce` and `calledWith` on the same target; prefer `calledOnceWith` instead."
+          }
+        ],
+        "outputSteps": [
+          "expect(x).to.have.been.calledOnceWith('a');"
+        ]
+      },
+      {
+        "text": "expect(x).to.have.been.calledWith('a');\nexpect(x).to.have.been.calledOnce;",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:29",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": [
+          "expect(x).to.have.been.calledOnceWith('a');\n"
+        ]
+      },
+      {
+        "text": "expect(x).to.have.been.calledOnce.and.to.be.ok;\nexpect(x).to.have.been.calledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:30",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith",
+            "message": "Using `calledOnce` and `calledWith` on the same target; prefer `calledOnceWith` instead.",
+            "line": 2
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "expect(x).toHaveBeenCalledOnce();\nexpect(x).to.have.been.calledWith('a').and.to.be.ok;",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:31",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith",
+            "line": 2
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "expect(x).to.have.been.calledOnce.and.calledWith('a');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:32",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith",
+            "message": "Using `calledOnce` and `calledWith` on the same target; prefer `calledOnceWith` instead."
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "expect(x).to.have.been.calledWith('a').and.calledOnce;",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:33",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "expect(x).to.have.been.calledOnce.and.calledWith('a');\nexpect(y).toHaveBeenCalledOnce();\nexpect(y).toHaveBeenCalledWith('b');",
+        "origin": "prefer_called_exactly_once_with_test.go:invalid:34",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith",
+            "line": 1
+          },
+          {
+            "messageId": "preferCalledExactlyOnceWith",
+            "line": 3
+          }
+        ],
+        "outputSteps": [
+          "expect(x).to.have.been.calledOnce.and.calledWith('a');\nexpect(y).toHaveBeenCalledExactlyOnceWith('b');"
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy).toHaveBeenCalledOnce(); expect(spy).toHaveBeenCalledWith(\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:2"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy).calledOnce; expect(spy).calledWith(\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:3"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy).toHaveBeenCalledOnce(); expect(spy).calledWith(\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:4"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy)[\"calledOnce\"]; expect(spy)[\"calledWith\"](\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:6"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy)[`calledOnce`]; expect(spy)[`calledWith`](\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:7"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy)[\"\\x63alledOnce\"]; expect(spy)[\"\\x63alledWith\"](\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:8"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy)[(\"calledOnce\")]; expect(spy).calledWith(\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:9"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy)[ /* key */ (\"calledOnce\") ]; expect(spy)[(\"calledWith\")](\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:10"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy)[﻿(\"calledOnce\")]; expect(spy).calledWith(\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:11"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy)[// key (\"calledOnce\")]; expect(spy).calledWith(\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:12"
+      },
+      {
+        "text": "test(\"case\", () => { expect(spy)[(\"\\x63alledOnce\")]; expect(spy)[(\"\\x63alledWith\")](\"a\") })",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePair:13"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\n\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:0"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\n// keep\n/* keep */\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:1"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\nconst unrelated = 1; let value; var other = 2;\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:2"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\nexpect(other).toBe(1); expect(third).toEqual({ value: 2 });\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:3"
+      },
+      {
+        "text": "before();\nexpect(spy).toHaveBeenCalledOnce();\nconsole.log('checkpoint');\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestOnlyInertStatementIntervals:12",
+        "contextAdaptation": "Original helper passes a nil checker; configured public API proves console.log with a string argument is inert through the default library."
+      },
+      {
+        "text": "before();\nexpect(first).toHaveBeenCalledOnce();\nexpect(first).toHaveBeenCalledWith(1);\nbetween();\nexpect(second).toHaveBeenCalledWith(2);\nconst unrelated = 0;\nexpect(second).toHaveBeenCalledOnce();\nexpect(third).calledOnce.and.calledWith(3);\nexpect(blocked).toHaveBeenCalledOnce();\nblocked.mockReset();\nexpect(blocked).toHaveBeenCalledWith(4);\nafter();",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestCheckBlockStatementIndices:False",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          },
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          },
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ]
+      },
+      {
+        "text": "{\nbefore();\nexpect(first).toHaveBeenCalledOnce();\nexpect(first).toHaveBeenCalledWith(1);\nbetween();\nexpect(second).toHaveBeenCalledWith(2);\nconst unrelated = 0;\nexpect(second).toHaveBeenCalledOnce();\nexpect(third).calledOnce.and.calledWith(3);\nexpect(blocked).toHaveBeenCalledOnce();\nblocked.mockReset();\nexpect(blocked).toHaveBeenCalledWith(4);\nafter();\n}",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestCheckBlockStatementIndices:True",
+        "expected": [
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          },
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          },
+          {
+            "messageId": "preferCalledExactlyOnceWith"
+          }
+        ]
+      },
+      {
+        "text": "expect(spy).toHaveBeenCalledOnce(); expect(spy).toHaveBeenCalledWith(value);",
+        "origin": "prefer_called_exactly_once_with_internal_test.go:TestSourceMayContainMergePairKeepsUnknownSourceFile:uncached source"
+      }
+    ],
+    "originalSkip": [],
+    "nonDefaultOptions": [],
+    "exactCompilerOptions": true
+  }
+]

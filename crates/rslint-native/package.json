@@ -2,7 +2,7 @@
   "name": "@rslint/native",
   "version": "0.0.0",
   "private": true,
-  "description": "Build-only napi config and Rust sources for the rslint native parser. Not published — the compiled .node ships in the @rslint/native-<tuple> platform packages.",
+  "description": "Build-only Rust lint engine and Node addon. Platform packages publish the compiled .node.",
   "napi": {
     "binaryName": "rslint",
     "targets": [
@@ -17,8 +17,8 @@
     ]
   },
   "scripts": {
-    "build": "napi build --platform --release --no-js -- --locked && node ../../scripts/place-host-build.mjs node",
-    "build:debug": "napi build --platform --no-js -- --locked && node ../../scripts/place-host-build.mjs node"
+    "build": "node ../../scripts/tsrs/build-rust.mjs",
+    "build:debug": "node ../../scripts/tsrs/build-rust.mjs --debug"
   },
   "devDependencies": {
     "@napi-rs/cli": "catalog:"

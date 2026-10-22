@@ -1,8 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/*"
+    "crates/rslint-core",
+    "crates/rslint-native",
 ]
+
 
 [workspace.package]
 edition = "2024"

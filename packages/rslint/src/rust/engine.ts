@@ -28,8 +28,8 @@ interface RustLintInputs {
   project?: string;
   /** tsrs compiler option values for a source-only program, without project. */
   compilerOptions?: { [key: string]: RustJsonValue };
-  /** Fix execution has not been migrated into this entry point yet. */
-  fix?: false;
+  /** Apply automatic edits in memory; suggestions never apply automatically. */
+  fix?: boolean;
 }
 
 /**
@@ -48,7 +48,8 @@ export interface RustLintConfigFileOptions extends RustLintInputs {
 
 export interface RustLintDiagnostic {
   ruleId: string;
-  messageId: string;
+  /** Compiler syntax diagnostics have no rule message identifier. */
+  messageId?: string;
   message: string;
   severity: 1 | 2;
   line: number;
@@ -57,7 +58,7 @@ export interface RustLintDiagnostic {
   endColumn: number;
   /** BOM-free JavaScript UTF-16 offsets, with an exclusive end. */
   range: [number, number];
-  /** Proposed edit; fix application remains unsupported by this entry. */
+  /** Proposed edit against the source used for these final diagnostics. */
   fix?: { range: [number, number]; text: string };
   suggestions?: Array<{
     messageId: string;
@@ -70,8 +71,12 @@ export interface RustLintDiagnostic {
 export interface RustLintFileResult {
   filePath: string;
   messages: RustLintDiagnostic[];
-  /** Includes all enabled rules even when the file has no diagnostics. */
+  /** Includes enabled rules, or is empty when syntax errors prevent linting. */
   appliedRules: string[];
+  /** Present only when compiler syntax diagnostics prevent rule execution. */
+  hasSyntaxErrors?: true;
+  /** Present if automatic edits applied, even when empty or unchanged. */
+  output?: string;
 }
 
 export interface RustLintResult {
@@ -79,9 +84,15 @@ export interface RustLintResult {
   backend: 'tsrs-rust';
   compiler: { revision: string };
   files: RustLintFileResult[];
+  summary: {
+    /** Applied diagnostic groups across all fix rounds, not individual edits. */
+    fixedIssues: number;
+    /** Actual lint rule workers, excluding compiler-internal parallelism. */
+    threads: number;
+  };
 }
 
-interface RustRuleConfig {
+export interface RustRuleConfig {
   name: string;
   severity: 1 | 2;
   options: RustJsonValue[];
@@ -94,6 +105,7 @@ interface RustLintRequest {
   rules: RustRuleConfig[];
   project?: string;
   compilerOptions?: { [key: string]: RustJsonValue };
+  fix?: boolean;
 }
 
 interface RustNativeBinding {
@@ -108,7 +120,7 @@ const INPUT_KEYS = new Set([
   'fix',
 ]);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
@@ -116,7 +128,7 @@ function unsupported(message: string): never {
   throw new Error(`experimental Rust lint: ${message}`);
 }
 
-function validateUnicode(value: string, label: string): void {
+export function validateUnicode(value: string, label: string): void {
   for (let index = 0; index < value.length; index++) {
     const code = value.charCodeAt(index);
     if (code >= 0xd800 && code <= 0xdbff) {
@@ -134,7 +146,7 @@ function validateUnicode(value: string, label: string): void {
   }
 }
 
-function validateKeys(
+export function validateKeys(
   value: Record<string, unknown>,
   allowed: ReadonlySet<string>,
   label: string,
@@ -151,7 +163,7 @@ function validateKeys(
 }
 
 /** JSON.stringify must not silently drop or coerce any configured value. */
-function validateJson(
+export function validateJson(
   value: unknown,
   label: string,
   active = new Set<object>(),
@@ -232,11 +244,11 @@ function compileRules(config: unknown): RustRuleConfig[] {
   );
 }
 
-function buildRequest(options: RustLintOptions): RustLintRequest {
+function buildRequest(options: unknown): RustLintRequest {
   if (!isRecord(options)) unsupported('options must be an object');
   validateKeys(options, new Set([...INPUT_KEYS, 'config']), 'options');
-  if (options.fix !== undefined && options.fix !== false) {
-    unsupported('fix is not supported yet');
+  if (options.fix !== undefined && typeof options.fix !== 'boolean') {
+    unsupported('fix must be a boolean');
   }
   if (options.cwd !== undefined && typeof options.cwd !== 'string') {
     unsupported('cwd must be a string');
@@ -291,6 +303,7 @@ function buildRequest(options: RustLintOptions): RustLintRequest {
     ...(options.compilerOptions === undefined
       ? {}
       : { compilerOptions: options.compilerOptions }),
+    ...(options.fix === undefined ? {} : { fix: options.fix }),
   };
 }
 
@@ -325,9 +338,12 @@ function isSuggestion(value: unknown): boolean {
   );
 }
 
-function validateResult(
+export function validateRustResult(
   value: unknown,
-  request: RustLintRequest,
+  request: {
+    files: ReadonlyArray<{ path: string; rules: readonly RustRuleConfig[] }>;
+    fix?: boolean;
+  },
 ): asserts value is RustLintResult {
   const fail = (): never =>
     unsupported('native addon returned an invalid or incomplete lint result');
@@ -338,15 +354,20 @@ function validateResult(
     !isRecord(value.compiler) ||
     typeof value.compiler.revision !== 'string' ||
     !/^[a-f\d]{40}$/.test(value.compiler.revision) ||
+    !isRecord(value.summary) ||
+    !integer(value.summary.fixedIssues, 0) ||
+    !integer(value.summary.threads, 1) ||
+    (request.fix !== true && value.summary.fixedIssues !== 0) ||
     !Array.isArray(value.files) ||
     value.files.length !== request.files.length
   ) {
     return fail();
   }
-  const enabled = new Map(
-    request.rules.map((rule) => [rule.name, rule.severity]),
-  );
   for (const [index, file] of value.files.entries()) {
+    const expectedRules = request.files[index].rules;
+    const enabled = new Map(
+      expectedRules.map((rule) => [rule.name, rule.severity]),
+    );
     if (
       !isRecord(file) ||
       typeof file.filePath !== 'string' ||
@@ -354,10 +375,20 @@ function validateResult(
         path.normalize(request.files[index].path) ||
       !Array.isArray(file.messages) ||
       !Array.isArray(file.appliedRules) ||
-      file.appliedRules.length !== request.rules.length ||
-      file.appliedRules.some(
-        (name, ruleIndex) => name !== request.rules[ruleIndex].name,
-      )
+      ('hasSyntaxErrors' in file && file.hasSyntaxErrors !== true) ||
+      ('output' in file &&
+        (request.fix !== true || typeof file.output !== 'string'))
+    ) {
+      return fail();
+    }
+    const syntaxErrors = file.hasSyntaxErrors === true;
+    if (
+      syntaxErrors
+        ? file.appliedRules.length !== 0 || file.messages.length === 0
+        : file.appliedRules.length !== expectedRules.length ||
+          file.appliedRules.some(
+            (name, ruleIndex) => name !== expectedRules[ruleIndex].name,
+          )
     ) {
       return fail();
     }
@@ -365,9 +396,15 @@ function validateResult(
       if (
         !isRecord(message) ||
         typeof message.ruleId !== 'string' ||
-        !enabled.has(message.ruleId) ||
-        message.severity !== enabled.get(message.ruleId) ||
-        typeof message.messageId !== 'string' ||
+        (syntaxErrors
+          ? !/^TypeScript\(TS\d+\)$/.test(message.ruleId) ||
+            message.severity !== 2 ||
+            'messageId' in message ||
+            'fix' in message ||
+            'suggestions' in message
+          : !enabled.has(message.ruleId) ||
+            message.severity !== enabled.get(message.ruleId) ||
+            typeof message.messageId !== 'string') ||
         typeof message.message !== 'string' ||
         !integer(message.line, 1) ||
         !integer(message.column, 1) ||
@@ -398,6 +435,11 @@ function isRustBinding(value: unknown): value is RustNativeBinding {
  * consumers. It does not invoke the existing public CLI or another process.
  */
 export function lintRustFilesSync(options: RustLintOptions): RustLintResult {
+  return executeRustLint(options);
+}
+
+/** Keep untrusted config-module values behind the same runtime validation. */
+function executeRustLint(options: unknown): RustLintResult {
   const request = buildRequest(options);
   const binding: unknown = getNativeBinding();
   if (!isRustBinding(binding)) {
@@ -408,7 +450,13 @@ export function lintRustFilesSync(options: RustLintOptions): RustLintResult {
   const response: unknown = JSON.parse(
     binding.lintTsrsSync(JSON.stringify(request)),
   );
-  validateResult(response, request);
+  validateRustResult(response, {
+    files: request.files.map((file) => ({
+      path: file.path,
+      rules: request.rules,
+    })),
+    fix: request.fix,
+  });
   return response;
 }
 
@@ -421,7 +469,7 @@ export async function lintRustFiles(
   options: RustLintOptions | RustLintConfigFileOptions,
 ): Promise<RustLintResult> {
   if (!isRecord(options)) unsupported('options must be an object');
-  if ('config' in options) return lintRustFilesSync(options as RustLintOptions);
+  if ('config' in options) return executeRustLint(options);
   validateKeys(options, new Set([...INPUT_KEYS, 'configFile']), 'options');
   if (
     typeof options.configFile !== 'string' ||
@@ -443,5 +491,5 @@ export async function lintRustFiles(
   const { configFile: _configFile, ...inputs } = options;
   const config: unknown = await loadConfigFile(configFile);
   // buildRequest owns the same authored-config validation for both entry points.
-  return lintRustFilesSync({ ...inputs, config } as RustLintOptions);
+  return executeRustLint({ ...inputs, config });
 }

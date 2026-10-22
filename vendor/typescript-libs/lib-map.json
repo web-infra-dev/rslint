@@ -1,0 +1,430 @@
+[
+  {
+    "name": "es5",
+    "file": "lib.es5.d.ts"
+  },
+  {
+    "name": "es6",
+    "file": "lib.es2015.d.ts"
+  },
+  {
+    "name": "es2015",
+    "file": "lib.es2015.d.ts"
+  },
+  {
+    "name": "es7",
+    "file": "lib.es2016.d.ts"
+  },
+  {
+    "name": "es2016",
+    "file": "lib.es2016.d.ts"
+  },
+  {
+    "name": "es2017",
+    "file": "lib.es2017.d.ts"
+  },
+  {
+    "name": "es2018",
+    "file": "lib.es2018.d.ts"
+  },
+  {
+    "name": "es2019",
+    "file": "lib.es2019.d.ts"
+  },
+  {
+    "name": "es2020",
+    "file": "lib.es2020.d.ts"
+  },
+  {
+    "name": "es2021",
+    "file": "lib.es2021.d.ts"
+  },
+  {
+    "name": "es2022",
+    "file": "lib.es2022.d.ts"
+  },
+  {
+    "name": "es2023",
+    "file": "lib.es2023.d.ts"
+  },
+  {
+    "name": "es2024",
+    "file": "lib.es2024.d.ts"
+  },
+  {
+    "name": "es2025",
+    "file": "lib.es2025.d.ts"
+  },
+  {
+    "name": "esnext",
+    "file": "lib.esnext.d.ts"
+  },
+  {
+    "name": "dom",
+    "file": "lib.dom.d.ts"
+  },
+  {
+    "name": "dom.iterable",
+    "file": "lib.dom.iterable.d.ts"
+  },
+  {
+    "name": "dom.asynciterable",
+    "file": "lib.dom.asynciterable.d.ts"
+  },
+  {
+    "name": "webworker",
+    "file": "lib.webworker.d.ts"
+  },
+  {
+    "name": "webworker.importscripts",
+    "file": "lib.webworker.importscripts.d.ts"
+  },
+  {
+    "name": "webworker.iterable",
+    "file": "lib.webworker.iterable.d.ts"
+  },
+  {
+    "name": "webworker.asynciterable",
+    "file": "lib.webworker.asynciterable.d.ts"
+  },
+  {
+    "name": "scripthost",
+    "file": "lib.scripthost.d.ts"
+  },
+  {
+    "name": "es2015.core",
+    "file": "lib.es2015.core.d.ts"
+  },
+  {
+    "name": "es2015.collection",
+    "file": "lib.es2015.collection.d.ts"
+  },
+  {
+    "name": "es2015.generator",
+    "file": "lib.es2015.generator.d.ts"
+  },
+  {
+    "name": "es2015.iterable",
+    "file": "lib.es2015.iterable.d.ts"
+  },
+  {
+    "name": "es2015.promise",
+    "file": "lib.es2015.promise.d.ts"
+  },
+  {
+    "name": "es2015.proxy",
+    "file": "lib.es2015.proxy.d.ts"
+  },
+  {
+    "name": "es2015.reflect",
+    "file": "lib.es2015.reflect.d.ts"
+  },
+  {
+    "name": "es2015.symbol",
+    "file": "lib.es2015.symbol.d.ts"
+  },
+  {
+    "name": "es2015.symbol.wellknown",
+    "file": "lib.es2015.symbol.wellknown.d.ts"
+  },
+  {
+    "name": "es2016.array.include",
+    "file": "lib.es2016.array.include.d.ts"
+  },
+  {
+    "name": "es2016.intl",
+    "file": "lib.es2016.intl.d.ts"
+  },
+  {
+    "name": "es2017.arraybuffer",
+    "file": "lib.es2017.arraybuffer.d.ts"
+  },
+  {
+    "name": "es2017.date",
+    "file": "lib.es2017.date.d.ts"
+  },
+  {
+    "name": "es2017.object",
+    "file": "lib.es2017.object.d.ts"
+  },
+  {
+    "name": "es2017.sharedmemory",
+    "file": "lib.es2017.sharedmemory.d.ts"
+  },
+  {
+    "name": "es2017.string",
+    "file": "lib.es2017.string.d.ts"
+  },
+  {
+    "name": "es2017.intl",
+    "file": "lib.es2017.intl.d.ts"
+  },
+  {
+    "name": "es2017.typedarrays",
+    "file": "lib.es2017.typedarrays.d.ts"
+  },
+  {
+    "name": "es2018.asyncgenerator",
+    "file": "lib.es2018.asyncgenerator.d.ts"
+  },
+  {
+    "name": "es2018.asynciterable",
+    "file": "lib.es2018.asynciterable.d.ts"
+  },
+  {
+    "name": "es2018.intl",
+    "file": "lib.es2018.intl.d.ts"
+  },
+  {
+    "name": "es2018.promise",
+    "file": "lib.es2018.promise.d.ts"
+  },
+  {
+    "name": "es2018.regexp",
+    "file": "lib.es2018.regexp.d.ts"
+  },
+  {
+    "name": "es2019.array",
+    "file": "lib.es2019.array.d.ts"
+  },
+  {
+    "name": "es2019.object",
+    "file": "lib.es2019.object.d.ts"
+  },
+  {
+    "name": "es2019.string",
+    "file": "lib.es2019.string.d.ts"
+  },
+  {
+    "name": "es2019.symbol",
+    "file": "lib.es2019.symbol.d.ts"
+  },
+  {
+    "name": "es2019.intl",
+    "file": "lib.es2019.intl.d.ts"
+  },
+  {
+    "name": "es2020.bigint",
+    "file": "lib.es2020.bigint.d.ts"
+  },
+  {
+    "name": "es2020.date",
+    "file": "lib.es2020.date.d.ts"
+  },
+  {
+    "name": "es2020.promise",
+    "file": "lib.es2020.promise.d.ts"
+  },
+  {
+    "name": "es2020.sharedmemory",
+    "file": "lib.es2020.sharedmemory.d.ts"
+  },
+  {
+    "name": "es2020.string",
+    "file": "lib.es2020.string.d.ts"
+  },
+  {
+    "name": "es2020.symbol.wellknown",
+    "file": "lib.es2020.symbol.wellknown.d.ts"
+  },
+  {
+    "name": "es2020.intl",
+    "file": "lib.es2020.intl.d.ts"
+  },
+  {
+    "name": "es2020.number",
+    "file": "lib.es2020.number.d.ts"
+  },
+  {
+    "name": "es2021.promise",
+    "file": "lib.es2021.promise.d.ts"
+  },
+  {
+    "name": "es2021.string",
+    "file": "lib.es2021.string.d.ts"
+  },
+  {
+    "name": "es2021.weakref",
+    "file": "lib.es2021.weakref.d.ts"
+  },
+  {
+    "name": "es2021.intl",
+    "file": "lib.es2021.intl.d.ts"
+  },
+  {
+    "name": "es2022.array",
+    "file": "lib.es2022.array.d.ts"
+  },
+  {
+    "name": "es2022.error",
+    "file": "lib.es2022.error.d.ts"
+  },
+  {
+    "name": "es2022.intl",
+    "file": "lib.es2022.intl.d.ts"
+  },
+  {
+    "name": "es2022.object",
+    "file": "lib.es2022.object.d.ts"
+  },
+  {
+    "name": "es2022.string",
+    "file": "lib.es2022.string.d.ts"
+  },
+  {
+    "name": "es2022.regexp",
+    "file": "lib.es2022.regexp.d.ts"
+  },
+  {
+    "name": "es2023.array",
+    "file": "lib.es2023.array.d.ts"
+  },
+  {
+    "name": "es2023.collection",
+    "file": "lib.es2023.collection.d.ts"
+  },
+  {
+    "name": "es2023.intl",
+    "file": "lib.es2023.intl.d.ts"
+  },
+  {
+    "name": "es2024.arraybuffer",
+    "file": "lib.es2024.arraybuffer.d.ts"
+  },
+  {
+    "name": "es2024.collection",
+    "file": "lib.es2024.collection.d.ts"
+  },
+  {
+    "name": "es2024.object",
+    "file": "lib.es2024.object.d.ts"
+  },
+  {
+    "name": "es2024.promise",
+    "file": "lib.es2024.promise.d.ts"
+  },
+  {
+    "name": "es2024.regexp",
+    "file": "lib.es2024.regexp.d.ts"
+  },
+  {
+    "name": "es2024.sharedmemory",
+    "file": "lib.es2024.sharedmemory.d.ts"
+  },
+  {
+    "name": "es2024.string",
+    "file": "lib.es2024.string.d.ts"
+  },
+  {
+    "name": "es2025.collection",
+    "file": "lib.es2025.collection.d.ts"
+  },
+  {
+    "name": "es2025.float16",
+    "file": "lib.es2025.float16.d.ts"
+  },
+  {
+    "name": "es2025.intl",
+    "file": "lib.es2025.intl.d.ts"
+  },
+  {
+    "name": "es2025.iterator",
+    "file": "lib.es2025.iterator.d.ts"
+  },
+  {
+    "name": "es2025.promise",
+    "file": "lib.es2025.promise.d.ts"
+  },
+  {
+    "name": "es2025.regexp",
+    "file": "lib.es2025.regexp.d.ts"
+  },
+  {
+    "name": "esnext.asynciterable",
+    "file": "lib.es2018.asynciterable.d.ts"
+  },
+  {
+    "name": "esnext.symbol",
+    "file": "lib.es2019.symbol.d.ts"
+  },
+  {
+    "name": "esnext.bigint",
+    "file": "lib.es2020.bigint.d.ts"
+  },
+  {
+    "name": "esnext.weakref",
+    "file": "lib.es2021.weakref.d.ts"
+  },
+  {
+    "name": "esnext.object",
+    "file": "lib.es2024.object.d.ts"
+  },
+  {
+    "name": "esnext.regexp",
+    "file": "lib.es2024.regexp.d.ts"
+  },
+  {
+    "name": "esnext.string",
+    "file": "lib.es2024.string.d.ts"
+  },
+  {
+    "name": "esnext.float16",
+    "file": "lib.es2025.float16.d.ts"
+  },
+  {
+    "name": "esnext.iterator",
+    "file": "lib.es2025.iterator.d.ts"
+  },
+  {
+    "name": "esnext.promise",
+    "file": "lib.es2025.promise.d.ts"
+  },
+  {
+    "name": "esnext.array",
+    "file": "lib.esnext.array.d.ts"
+  },
+  {
+    "name": "esnext.collection",
+    "file": "lib.esnext.collection.d.ts"
+  },
+  {
+    "name": "esnext.date",
+    "file": "lib.esnext.date.d.ts"
+  },
+  {
+    "name": "esnext.decorators",
+    "file": "lib.esnext.decorators.d.ts"
+  },
+  {
+    "name": "esnext.disposable",
+    "file": "lib.esnext.disposable.d.ts"
+  },
+  {
+    "name": "esnext.error",
+    "file": "lib.esnext.error.d.ts"
+  },
+  {
+    "name": "esnext.intl",
+    "file": "lib.esnext.intl.d.ts"
+  },
+  {
+    "name": "esnext.sharedmemory",
+    "file": "lib.esnext.sharedmemory.d.ts"
+  },
+  {
+    "name": "esnext.temporal",
+    "file": "lib.esnext.temporal.d.ts"
+  },
+  {
+    "name": "esnext.typedarrays",
+    "file": "lib.esnext.typedarrays.d.ts"
+  },
+  {
+    "name": "decorators",
+    "file": "lib.decorators.d.ts"
+  },
+  {
+    "name": "decorators.legacy",
+    "file": "lib.decorators.legacy.d.ts"
+  }
+]

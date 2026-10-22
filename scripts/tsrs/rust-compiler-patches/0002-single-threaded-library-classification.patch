@@ -1,0 +1,26 @@
+--- a/crates/tsrs_compiler/src/filesparser.rs
++++ b/crates/tsrs_compiler/src/filesparser.rs
+@@ -663,8 +663,10 @@
+         loader.files_parser.datas.reserve(tasks.len());
+         Self::start(loader, tasks, 0);
+         // Go's single-threaded work group runs the queued closures last-queued first (core/workgroup.go), a depth-first
+-        // order that the rounds below do not keep. The program's files do not depend on it, but two outputs do, and
+-        // for them the load runs Go's order:
++        // order that the rounds below do not keep. File membership does not depend on it, but external-library
++        // propagation does: visiting a shared task at a lower node_modules depth after its children started
++        // can otherwise leave their classification dependent on load order. Match Go for every single-threaded
++        // Program, including content mapping and resolution tracing:
+         // - which files a failing content mapper reports before the failure budget disables it (fileloader.go:681,
+         //   the tsc contentMapperFailures scenarios), single-threaded;
+         // - `--traceResolution`, at any checker count: a lookup traces as served "according to earlier cached
+@@ -672,9 +674,7 @@
+         //   the one deterministic reference. Traced resolutions run sequentially anyway (`prefetch`).
+         let trace_resolution =
+             loader.opts.config.compiler_options().unwrap().trace_resolution.is_true();
+-        if trace_resolution
+-            || (loader.files_parser.single_threaded && !loader.content_mapper_extensions.is_empty())
+-        {
++        if trace_resolution || loader.files_parser.single_threaded {
+             while let Some(item) = loader.files_parser.queue.pop() {
+                 Self::run_queued(loader, item);
+             }

@@ -175,20 +175,23 @@ fn duplicate_enum_values_keep_nonliteral_expressions_and_nan_silent() {
 }
 
 #[test]
-fn public_entry_rejects_invalid_template_syntax_without_claiming_rule_success() {
-    // The same source remains covered at rule level in ts_structural::tests.
-    // This records the current entry-point limitation instead of treating a
-    // syntax rejection as a successful lint with no duplicate-value report.
-    let input = json!({
-        "schemaVersion": 1,
-        "cwd": "/rslint-ts-structural-tests",
-        "files": [{"path":"invalid-template.ts","text":r"enum E { A = `\unicode`, B = `\unicode` }"}],
-        "rules": [{"name":DUPLICATE}]
-    });
-    assert_eq!(
-        lint_json(&input.to_string()).unwrap_err(),
-        "syntax diagnostics are not yet supported by the Rust entry point: /rslint-ts-structural-tests/invalid-template.ts"
-    );
+fn public_entry_reports_invalid_template_syntax_without_running_rules() {
+    // Isolated rule semantics remain separately tested with the actual parser.
+    let input = json!({"schemaVersion":1,"cwd":"/rslint-ts-structural-tests",
+        "files":[{"path":"invalid-template.ts","text":r"enum E { A = `\unicode`, B = `\unicode` }"}],
+        "rules":[{"name":DUPLICATE}]});
+    let result: Value = serde_json::from_str(&lint_json(&input.to_string()).unwrap()).unwrap();
+    assert_eq!(result["files"][0]["hasSyntaxErrors"], true);
+    assert_eq!(result["files"][0]["appliedRules"], json!([]));
+    let messages = result["files"][0]["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 2);
+    for message in messages {
+        assert_eq!(message["ruleId"], "TypeScript(TS1125)");
+        assert_eq!(message["message"], "Hexadecimal digit expected.");
+        assert_eq!(message["severity"], 2);
+        assert!(message.get("messageId").is_none());
+        assert!(message.get("fix").is_none());
+    }
 }
 
 #[test]

@@ -1,0 +1,4688 @@
+[
+  {
+    "rule": "rstest/expect-expect",
+    "source": "rslint e0a29f751d4def86d27931759098f27748fa3003 default options",
+    "valid": [
+      {
+        "text": "test(\"case\", () => { expect(value).toBe(1); });",
+        "origin": "expect_expect/expect_expect_test.go:19",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "it(\"case\", () => { expect(value).toBe(1); });",
+        "origin": "expect_expect/expect_expect_test.go:20",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"case\", () => expect(value).toBe(1));",
+        "origin": "expect_expect/expect_expect_test.go:21",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"case\", () => { assert.equal(value, 1); });",
+        "origin": "expect_expect/expect_expect_test.go:23",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { test, assert as check } from '@rstest/core';\ntest(\"case\", () => { check.equal(value, 1); });",
+        "origin": "expect_expect/expect_expect_test.go:27",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import * as rstest from '@rstest/core';\nrstest.test(\"case\", () => { rstest.assert.equal(value, 1); });",
+        "origin": "expect_expect/expect_expect_test.go:29",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "const { assert: check } = import.meta.rstest;\ntest(\"case\", () => { check.equal(value, 1); });",
+        "origin": "expect_expect/expect_expect_test.go:31",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"case\", () => { import.meta.rstest.assert.equal(value, 1); });",
+        "origin": "expect_expect/expect_expect_test.go:33",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "it(\"case\", () => somePromise().then(() => expect(true).toBeDefined()));",
+        "origin": "expect_expect/expect_expect_test.go:35",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test.todo(\"later\");",
+        "origin": "expect_expect/expect_expect_test.go:38",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "it.todo(\"later\");",
+        "origin": "expect_expect/expect_expect_test.go:39",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "const todoTest = test.todo;\ntodoTest(\"later\");",
+        "origin": "expect_expect/expect_expect_test.go:42",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "it(\"case\", run); function run() { expect(true).toBeDefined(); }",
+        "origin": "expect_expect/expect_expect_test.go:46",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "function run() { expect(true).toBeDefined(); } test(\"case\", run);",
+        "origin": "expect_expect/expect_expect_test.go:47",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "const run = () => { expect(true).toBeDefined(); }; test(\"case\", run);",
+        "origin": "expect_expect/expect_expect_test.go:48",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "let run = () => { expect(true).toBeDefined(); }; test(\"case\", run);",
+        "origin": "expect_expect/expect_expect_test.go:49",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "var run = () => { expect(true).toBeDefined(); }; test(\"case\", run);",
+        "origin": "expect_expect/expect_expect_test.go:50",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"case\", run, TIMEOUT); function run() { expect(true).toBeDefined(); }",
+        "origin": "expect_expect/expect_expect_test.go:51",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"case\", { timeout: 100 }, run); function run() { expect(true).toBeDefined(); }",
+        "origin": "expect_expect/expect_expect_test.go:52",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "it(\"first\", shared);\ntest(\"second\", shared);\nfunction shared() { expect(true).toBeDefined(); }",
+        "origin": "expect_expect/expect_expect_test.go:53",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { test, expect } from \"@rstest/core\";\ntest(\"case\", () => { expect(value).toBe(1); });",
+        "origin": "expect_expect/expect_expect_test.go:58",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { test as check, expect } from \"@rstest/core\";\ncheck(\"case\", () => { expect(value).toBe(1); });",
+        "origin": "expect_expect/expect_expect_test.go:60",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "const { test, expect } = require(\"@rstest/core\");\ntest(\"case\", () => { expect(value).toBe(1); });",
+        "origin": "expect_expect/expect_expect_test.go:62",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "if (import.meta.rstest) {\n  const { test, expect } = import.meta.rstest;\n  test(\"case\", () => { expect(value).toBe(1); });\n}",
+        "origin": "expect_expect/expect_expect_test.go:64",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"case\", context => { context.expect(value).toBe(1); });",
+        "origin": "expect_expect/expect_expect_test.go:71",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test.for([{ enabled: true }])(\"case\", (row, context) => { context.expect(row).toBeDefined(); });",
+        "origin": "expect_expect/expect_expect_test.go:72",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import * as rstest from \"@rstest/core\";\nrstest.test(\"case\", () => { rstest.expect(value).toBe(1); });",
+        "origin": "expect_expect/expect_expect_test.go:73",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { test, expect as check } from \"@rstest/core\";\ntest(\"case\", () => { check(value).toBe(1); });",
+        "origin": "expect_expect/expect_expect_test.go:75",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "if (import.meta.rstest) {\n  import.meta.rstest.test(\"case\", () => {\n    import.meta.rstest.expect(value).toBe(1);\n  });\n}",
+        "origin": "expect_expect/expect_expect_test.go:77",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "const appTest = test.extend({ user: async ({}, use) => use({}) });\nappTest(\"case\", ({ expect }) => { expect(value).toBe(1); });",
+        "origin": "expect_expect/expect_expect_test.go:84",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test.each([[1]])(\"case\", value => { expect(value).toBe(1); });",
+        "origin": "expect_expect/expect_expect_test.go:86",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test.for([[1]])(\"case\", (row, context) => { expect(row).toBe(1); });",
+        "origin": "expect_expect/expect_expect_test.go:87",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "describe(\"suite\", () => {});",
+        "origin": "expect_expect/expect_expect_test.go:90",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "beforeEach(() => {});",
+        "origin": "expect_expect/expect_expect_test.go:91",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { test } from \"vitest\";\ntest(\"case\", () => {});",
+        "origin": "expect_expect/expect_expect_test.go:94",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "const test = () => {};\ntest(\"case\", () => {});",
+        "origin": "expect_expect/expect_expect_test.go:97",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "text": "import { test, assert as check } from '@rstest/core';\ntest(\"case\", () => { const check = () => {}; check(); });",
+        "origin": "expect_expect/expect_expect_test.go:134",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "noAssertions",
+            "line": 2,
+            "column": 1,
+            "endLine": 2,
+            "endColumn": 5,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "let run = () => { expect(true).toBeDefined(); }; run = () => {}; test(\"case\", run);",
+        "origin": "expect_expect/expect_expect_test.go:141",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "noAssertions",
+            "line": 1,
+            "column": 66,
+            "endLine": 1,
+            "endColumn": 70,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => {});",
+        "origin": "expect_expect/expect_expect_test.go:147",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "noAssertions",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 5,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "it(\"case\", () => { doStuff(); });",
+        "origin": "expect_expect/expect_expect_test.go:153",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "noAssertions",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 3,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "it(\"case\", run); function run() {}",
+        "origin": "expect_expect/expect_expect_test.go:160",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "noAssertions",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 3,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "const custom = test;\ncustom(\"case\", () => {});",
+        "origin": "expect_expect/expect_expect_test.go:167",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "noAssertions",
+            "line": 2,
+            "column": 1,
+            "endLine": 2,
+            "endColumn": 7,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test.each([[1]])(\"case\", () => {});",
+        "origin": "expect_expect/expect_expect_test.go:176",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "noAssertions",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 17,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "const appTest = test.extend({});\nappTest(\"case\", () => {});",
+        "origin": "expect_expect/expect_expect_test.go:183",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "noAssertions",
+            "line": 2,
+            "column": 1,
+            "endLine": 2,
+            "endColumn": 8,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => { agent.expect(200); });",
+        "origin": "expect_expect/expect_expect_test.go:193",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "noAssertions",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 5,
+            "suggestions": []
+          }
+        ]
+      }
+    ],
+    "excludedNonDefaultOptions": [
+      {
+        "origin": "expect_expect/expect_expect_test.go:101",
+        "optionsSource": "[]interface{}{map[string]interface{}{\"assertFunctionNames\": []interface{}{\"expectSaga\"}}},\n\t\t\t}",
+        "text": "it(\"case\", () => expectSaga(mySaga).returns());"
+      },
+      {
+        "origin": "expect_expect/expect_expect_test.go:105",
+        "optionsSource": "[]interface{}{map[string]interface{}{\"assertFunctionNames\": []interface{}{\"request.**.expect\"}}},\n\t\t\t}",
+        "text": "test(\"case\", () => request.get().foo().expect(200));"
+      },
+      {
+        "origin": "expect_expect/expect_expect_test.go:109",
+        "optionsSource": "[]interface{}{map[string]interface{}{\n\t\t\t\t\t\"additionalTestBlockFunctions\": []interface{}{\"theoretically\"},\n\t\t\t\t}},\n\t\t\t}",
+        "text": "theoretically(\"case\", theories, theory => { expect(f(theory.input)).toBe(theory.expected); });"
+      },
+      {
+        "origin": "expect_expect/expect_expect_test.go:115",
+        "optionsSource": "[]interface{}{map[string]interface{}{\"additionalTestBlockFunctions\": []interface{}{\"foo.todo\"}}},\n\t\t\t}",
+        "text": "foo.todo(\"eventual test\");"
+      },
+      {
+        "origin": "expect_expect/expect_expect_test.go:122",
+        "optionsSource": "[]interface{}{map[string]interface{}{\n\t\t\t\t\t\"additionalTestBlockFunctions\": []interface{}{\"\"},\n\t\t\t\t}},\n\t\t\t}",
+        "text": "arr[0](); obj[key](); (arr[0] ?? obj[key])();"
+      },
+      {
+        "origin": "expect_expect/expect_expect_test.go:200",
+        "optionsSource": "[]interface{}{map[string]interface{}{\"assertFunctionNames\": []interface{}{\"expect\"}}},\n\t\t\t\tErrors: []rule_tester.InvalidTestCaseError{\n\t\t\t\t\t{MessageId: \"noAssertions\", Line: 1, Column: 1, EndLine: 1, EndColumn: 5},\n\t\t\t\t},\n\t\t\t}",
+        "text": "test(\"case\", () => { notExpect(value); });"
+      },
+      {
+        "origin": "expect_expect/expect_expect_test.go:208",
+        "optionsSource": "[]interface{}{map[string]interface{}{\"assertFunctionNames\": []interface{}{\"expect\"}}},\n\t\t\t\tErrors: []rule_tester.InvalidTestCaseError{\n\t\t\t\t\t{MessageId: \"noAssertions\", Line: 1, Column: 1, EndLine: 1, EndColumn: 3},\n\t\t\t\t},\n\t\t\t}",
+        "text": "it(\"case\", () => expectSaga(mySaga).returns());"
+      },
+      {
+        "origin": "expect_expect/expect_expect_test.go:216",
+        "optionsSource": "[]interface{}{map[string]interface{}{\"additionalTestBlockFunctions\": []interface{}{\"theoretically\"}}},\n\t\t\t\tErrors: []rule_tester.InvalidTestCaseError{\n\t\t\t\t\t{MessageId: \"noAssertions\", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},\n\t\t\t\t},\n\t\t\t}",
+        "text": "theoretically(\"case\", theories, theory => { const output = f(theory.input); });"
+      }
+    ],
+    "baselineSkips": []
+  },
+  {
+    "rule": "rstest/no-conditional-expect",
+    "source": "rslint e0a29f751d4def86d27931759098f27748fa3003 default options",
+    "valid": [
+      {
+        "text": "test(\"case\", () => { expect(value).toBe(1); });",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:18",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"case\", () => {\n  if (condition) setup();\n  expect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:19",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"case\", () => {\n  const expected = condition ? 1 : 2;\n  expect(value).toBe(expected);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:23",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"case\", () => {\n  try { run(); } catch { recover(); } finally {\n    expect(value).toBe(1);\n  }\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:27",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "describe(\"suite\", () => {\n  if (condition) expect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:32",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "beforeEach(() => {\n  if (condition) expect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:35",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { expect } from \"vitest\";\ntest(\"case\", () => { if (condition) expect(value).toBe(1); });",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:38",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { expect } from \"@jest/globals\";\ntest(\"case\", () => { if (condition) expect(value).toBe(1); });",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:40",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { test, expect } from \"@playwright/test\";\ntest(\"case\", () => { if (condition) expect(value).toBe(1); });",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:42",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "const expect = createAssertionLibrary();\ntest(\"case\", () => { if (condition) expect(value); });",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:44",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "const custom = { expect };\ntest(\"case\", () => { if (condition) custom.expect(value).toBe(1); });",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:46",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test.each([[1]])(\"case\", value => {\n  if (value) custom.expect(value);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:48",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test.each([{ expect: customExpect }])(\"case\", ({ expect }) => {\n  if (condition) expect(value);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:51",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { expect, test } from \"@rstest/playwright\";\ntest.describe(\"suite\", () => {\n  if (condition) expect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:54",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { expect, test } from \"@rstest/playwright\";\ntest.beforeEach(() => {\n  if (condition) expect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:58",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "let logger;\nexport function run() { logger(); }",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:64",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "let cb; cb = () => {}; test(\"case\", cb);",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:68",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"case\", callback);\nlet state;",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:71",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "text": "import.meta.rstest.test(\"case\", () => {\n  if (condition) import.meta.rstest?.expect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:78",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "import.meta.rstest?.test(\"case\", () => {\n  if (condition) import.meta.rstest?.expect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:86",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => {\n  if (condition) expect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:94",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "line": 2,
+            "column": 18,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "it(\"case\", () => {\n  condition && expect(value).toBe(1);\n  condition || expect(other).toBe(2);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:102",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "line": 2,
+            "column": 16,
+            "suggestions": []
+          },
+          {
+            "messageId": "conditionalExpect",
+            "line": 3,
+            "column": 16,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => {\n  condition ? expect(value).toBe(1) : expect(value).toBe(2);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:112",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          },
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => {\n  try { await request(); } catch (error) {\n    expect(error).toBeInstanceOf(Error);\n  }\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:121",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => {\n  await request().catch(error => expect(error).toBeInstanceOf(Error));\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:131",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "expect(value).catch(() => {});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:139",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", ({ expect }) => { if (condition) expect(value).toBe(1); }, TIMEOUT);",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:145",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "const TIMEOUT = 5000;\ntest(\"case\", ({ expect }) => { if (condition) expect(value).toBe(1); }, TIMEOUT);",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:153",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", { timeout: 1 }, handler);\nfunction handler({ expect }) { if (condition) expect(value).toBe(1); }",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:160",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "import { expect as check, test } from \"@rstest/core\";\ntest(\"case\", () => { if (condition) check(value).toBe(1); });",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:169",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "const { expect: check, test } = require(\"@rstest/core\");\ntest(\"case\", () => { if (condition) check(value).toBe(1); });",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:176",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "import * as rstest from \"@rstest/core\";\nrstest.test(\"case\", () => {\n  if (condition) rstest.expect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:183",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "import * as rstest from \"@rstest/core\";\nrstest[\"test\"](\"case\", () => {\n  if (condition) rstest[\"expect\"](value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:192",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "import { test, expect as \\u0063heck } from \"@rstest/core\";\ntest(\"case\", () => {\n  if (condition) \\u0063heck(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:201",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "const rstest = require(\"@rstest/core\");\nrstest.test(\"case\", () => {\n  if (condition) rstest[\"expect\"](value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:210",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "if (import.meta.rstest) {\n  import.meta.rstest.test(\"case\", () => {\n    if (condition) import.meta.rstest.expect(value).toBe(1);\n  });\n}",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:219",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "if (import.meta.rstest) {\n  const { test, expect: check } = import.meta.rstest;\n  test(\"case\", () => { if (condition) check(value).toBe(1); });\n}",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:229",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "if (import.meta.rstest) {\n  const api = import.meta.rstest;\n  api.test(\"case\", () => { if (condition) api.expect(value).toBe(1); });\n}",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:238",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", context => {\n  if (condition) context.expect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:247",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", ({ expect: check }) => {\n  if (condition) check(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:255",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test.for([{ enabled: true }])(\"case\", (row, context) => {\n  if (row.enabled) context.expect(row).toBeDefined();\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:263",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", { timeout: 100 }, ({ expect }) => {\n  if (condition) expect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:271",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "const appTest = test.extend({});\nappTest.concurrent(\"case\", ({ expect }) => {\n  if (condition) expect.soft(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:279",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => {\n  if (condition) await expect.poll(readValue).toBe(1);\n  if (other) await expect.element(locator).toBeVisible();\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:288",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          },
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => {\n  if (condition) {\n    expect.assertions(1);\n    expect.hasAssertions();\n    expect.unreachable();\n  }\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:298",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          },
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          },
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "import { expect, test } from \"@rstest/playwright\";\ntest.fail(\"case\", async ({ page }) => {\n  if (condition) await expect.soft(page).toHaveTitle(\"Dashboard\");\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:312",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "import { expect as check, test as playwrightTest } from \"@rstest/playwright\";\nplaywrightTest.extend({}).for([{ enabled: true }])(\"case\", (row, context) => {\n  if (row.enabled) check(context).toBeDefined();\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:321",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "import * as playwright from \"@rstest/playwright\";\nplaywright.test(\"case\", async ({ page }) => {\n  if (condition) await playwright.expect(page).toHaveTitle(\"Dashboard\");\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:330",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "const forCase = test.for([{ enabled: true }]);\nforCase(\"case\", (row, context) => {\n  if (row.enabled) context.expect(row).toBeDefined();\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:339",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "import { test as importedTest, expect as importedExpect } from \"@rstest/core\";\nconst testAlias = importedTest;\nconst testCase = testAlias;\ntestCase(\"case\", () => {\n  if (condition) importedExpect(value).toBe(1);\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:348",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", async () => {\n  await a().catch(() => {\n    b().catch(() => { expect(1).toBe(1); });\n    expect(2).toBe(2);\n  });\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:359",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          },
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => {\n  if (condition) log(expect(value).toBe(1));\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:372",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => {\n  if (condition) expect(value).toBe(expect.stringContaining(\"x\"));\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:380",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          },
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"case\", () => {\n  if (condition) results[expect(value).toBe(1)] = 1;\n});",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:389",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "function callback() {\n  if (condition) expect(value).toBe(1);\n}\ntest(\"case\", callback);",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:397",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "const callback = () => {\n  if (condition) expect(value).toBe(1);\n};\ntest(\"case\", { retry: 1 }, callback);",
+        "origin": "no_conditional_expect/no_conditional_expect_test.go:406",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "conditionalExpect",
+            "suggestions": []
+          }
+        ]
+      }
+    ],
+    "excludedNonDefaultOptions": [],
+    "baselineSkips": []
+  },
+  {
+    "rule": "rstest/require-local-test-context-for-concurrent-snapshots",
+    "source": "rslint e0a29f751d4def86d27931759098f27748fa3003 default options",
+    "valid": [
+      {
+        "text": "it(\"x\", () => expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:20",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "it.concurrent(\"x\", () => expect(true).toBe(true));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:21",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "it.concurrent(\"x\", () => expect(\"a\").to.be.a(\"string\").and.have.length(1));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:23",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "it.concurrent(\"x\", ({ expect }) => expect(\"a\").to.be.a(\"string\").and.matchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:24",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "it.concurrent(\"x\", ({ expect }) => expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:25",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "it.concurrent(\"x\", ({ expect }) => expect(1).toMatchInlineSnapshot(\"1\"));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:26",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "it.concurrent(\"x\", ctx => ctx.expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:27",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "describe.concurrent(\"s\", () => it(\"x\", ({ expect }) => expect(1).toMatchSnapshot()));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:28",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "describe(\"s\", () => it(\"x\", context => context.expect(1).toMatchInlineSnapshot()));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:29",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "describe(\"s\", () => it(\"x\", context => expect(1).toMatchInlineSnapshot()));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:30",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "describe.concurrent(\"s\", () => it.sequential(\"x\", () => expect(1).toMatchSnapshot()));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:31",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test.concurrent(\"x\", ({ expect: check }) => check(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:32",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test.concurrent.for(rows)(\"x\", (row, ctx) => ctx.expect(row).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:33",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { test, expect } from '@playwright/test'; test.concurrent(\"x\", () => expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:34",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { test, expect } from 'vitest'; test.concurrent(\"x\", () => expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:35",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "const expect = createAssertionLibrary(); test.concurrent(\"x\", () => expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:36",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "function helper() { expect(1).toMatchSnapshot(); } test.concurrent(\"x\", () => helper());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:39",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"x\", { concurrent: true }, () => expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:44",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "describe(\"s\", { concurrent: true }, () => it(\"x\", () => expect(1).toMatchSnapshot()));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:45",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "describe(\"s\", () => { function cb() { expect(1).toMatchSnapshot(); } }); test.concurrent(\"x\", cb);",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:49",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "describe(\"s\", () => { const cb = () => { expect(1).toMatchSnapshot(); }; }); test.concurrent(\"x\", cb);",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:50",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "text": "it.concurrent(\"x\", () => expect(true).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:53",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "it.concurrent(\"x\", () => expect(true).toMatchInlineSnapshot(\"true\"));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:54",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "it.concurrent(\"x\", () => expect(true).toMatchFileSnapshot(\"./o.html\"));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:55",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "it.concurrent(\"x\", () => expect(foo()).toThrowErrorMatchingSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:56",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "it.concurrent(\"x\", () => expect(foo()).toThrowErrorMatchingInlineSnapshot(\"bar\"));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:57",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "describe.concurrent(\"s\", () => it(\"x\", () => expect(true).toMatchSnapshot()));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:58",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "describe.sequential(\"s\", () => it.concurrent(\"x\", () => expect(true).toMatchSnapshot()));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:59",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "it.concurrent(\"x\", context => expect(true).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:60",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "it.concurrent(\"x\", () => { expect(1).toMatchSnapshot(); expect(2).toMatchSnapshot(); });",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:61",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          },
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "const t = test.concurrent; t(\"x\", () => expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:62",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "import.meta.rstest.test.concurrent(\"x\", () => import.meta.rstest.expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:63",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "import { test, expect } from '@rstest/playwright'; test.concurrent(\"x\", () => expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:64",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test.concurrent.each(rows)(\"x\", () => expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:65",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test.concurrent(\"x\", callback); function callback() { expect(1).toMatchSnapshot(); }",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:66",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "describe.concurrent(\"s\", suite); function suite() { test(\"x\", callback); } function callback() { expect(1).toMatchSnapshot(); }",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:67",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test.sequential(\"a\", callback); test.concurrent(\"b\", callback); function callback() { expect(1).toMatchSnapshot(); }",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:68",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test.concurrent(\"x\", { concurrent: false }, () => expect(1).toMatchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:72",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "describe.concurrent(\"s\", () => it(\"x\", { sequential: true }, () => expect(1).toMatchSnapshot()));",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:73",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test.concurrent(\"x\", () => expect(1).matchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:75",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test.concurrent(\"x\", () => expect(\"a\").to.be.a(\"string\").and.matchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:78",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test.concurrent(\"x\", () => expect(1).to.matchSnapshot().and.matchSnapshot());",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:79",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test.concurrent(\"x\", () => { const helper = () => expect(1).toMatchSnapshot(); });",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:82",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "it.concurrent(\"x\", () => { items.forEach(item => { expect(item).toMatchSnapshot(); }); });",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:83",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "it.concurrent(\"x\", async () => { await Promise.all(items.map(async item => { expect(item).toMatchSnapshot(); })); });",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:84",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "describe.concurrent(\"s\", () => { beforeEach(() => { expect(1).toMatchSnapshot(); }); });",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:85",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "describe.concurrent(\"s\", () => { function helper() { expect(1).toMatchSnapshot(); } it(\"t\", () => helper()); });",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:86",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "describe.concurrent(\"s\", () => { rows.forEach(row => { it(row, () => { expect(row).toMatchSnapshot(); }); }); });",
+        "origin": "require_local_test_context_for_concurrent_snapshots/require_local_test_context_for_concurrent_snapshots_test.go:89",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "requireLocalTestContext",
+            "message": "Use local Test Context instead",
+            "suggestions": []
+          }
+        ]
+      }
+    ],
+    "excludedNonDefaultOptions": [],
+    "baselineSkips": []
+  },
+  {
+    "rule": "rstest/valid-expect",
+    "source": "rslint e0a29f751d4def86d27931759098f27748fa3003 default options",
+    "valid": [
+      {
+        "text": "expect(value).toBe(1);",
+        "origin": "valid_expect/valid_expect_test.go:19",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect(value).toBe(1).message;",
+        "origin": "valid_expect/valid_expect_test.go:23",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "const r = expect(value).toHaveBeenCalled().message;",
+        "origin": "valid_expect/valid_expect_test.go:24",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect(value).toBe(1)[key];",
+        "origin": "valid_expect/valid_expect_test.go:25",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect(value).toHaveReturned()[key]();",
+        "origin": "valid_expect/valid_expect_test.go:26",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { (await expect(value).resolves.toBe(1)).message; });",
+        "origin": "valid_expect/valid_expect_test.go:27",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect(value).not.toBe(1);",
+        "origin": "valid_expect/valid_expect_test.go:28",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect(\"something\").toEqual(\"else\");",
+        "origin": "valid_expect/valid_expect_test.go:29",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect.hasAssertions();",
+        "origin": "valid_expect/valid_expect_test.go:32",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect.assertions(1);",
+        "origin": "valid_expect/valid_expect_test.go:33",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect.any(Number);",
+        "origin": "valid_expect/valid_expect_test.go:34",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect.stringContaining(\"x\");",
+        "origin": "valid_expect/valid_expect_test.go:35",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect.resolves.toBe(1);",
+        "origin": "valid_expect/valid_expect_test.go:36",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", () => { expect.toResolve(); });",
+        "origin": "valid_expect/valid_expect_test.go:37",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect(value, \"message\").toBe(1);",
+        "origin": "valid_expect/valid_expect_test.go:41",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect(value, `msg ${x}`).toBe(1);",
+        "origin": "valid_expect/valid_expect_test.go:42",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { await expect.poll(() => value, { timeout: 1 }).toBe(1); });",
+        "origin": "valid_expect/valid_expect_test.go:43",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { await expect.element(locator, { timeout: 1 }).toBeVisible(); });",
+        "origin": "valid_expect/valid_expect_test.go:44",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect(value).to.be.ok;",
+        "origin": "valid_expect/valid_expect_test.go:47",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect(value).to.be.a(\"string\");",
+        "origin": "valid_expect/valid_expect_test.go:48",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect(spy).to.have.been.called;",
+        "origin": "valid_expect/valid_expect_test.go:49",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { await expect(p).resolves.toBe(1); });",
+        "origin": "valid_expect/valid_expect_test.go:52",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", () => { return expect(p).rejects.toThrow(); });",
+        "origin": "valid_expect/valid_expect_test.go:53",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { await expect(p).resolves.to.be.true; });",
+        "origin": "valid_expect/valid_expect_test.go:54",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", () => { return expect(p).resolves.to.be.true; });",
+        "origin": "valid_expect/valid_expect_test.go:55",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", () => expect(p).resolves.to.be.true);",
+        "origin": "valid_expect/valid_expect_test.go:56",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { await (expect(p).resolves.toBe(1)); });",
+        "origin": "valid_expect/valid_expect_test.go:61",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", () => { return (expect(p).resolves.toBe(1)); });",
+        "origin": "valid_expect/valid_expect_test.go:62",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", () => { return (condition ? expect(p).resolves.toBe(1) : expect(q).toBe(1)); });",
+        "origin": "valid_expect/valid_expect_test.go:63",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { await ((expect(p).resolves.to.be.true)); });",
+        "origin": "valid_expect/valid_expect_test.go:64",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { await Promise.all([(expect(p).resolves.toBe(1)), expect(q).resolves.toBe(2)]); });",
+        "origin": "valid_expect/valid_expect_test.go:65",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { await (expect(p).resolves.toBe(1)).then(() => {}); });",
+        "origin": "valid_expect/valid_expect_test.go:66",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { await expect(p).resolves.to.be.a(\"string\").that.contains(\"x\"); });",
+        "origin": "valid_expect/valid_expect_test.go:67",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { await expect(p).resolves.to.be.an(\"object\").that.is.ok; });",
+        "origin": "valid_expect/valid_expect_test.go:68",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", () => { return expect(p).resolves.to.be.a(\"string\").that.contains(\"x\"); });",
+        "origin": "valid_expect/valid_expect_test.go:69",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "expect(value).not.toBe(1);",
+        "origin": "valid_expect/valid_expect_test.go:70",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", async () => { await expect.poll(() => value).toBe(1); });",
+        "origin": "valid_expect/valid_expect_test.go:71",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "test(\"t\", () => { expect.poll(() => value).toBe(1); });",
+        "origin": "valid_expect/valid_expect_test.go:75",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "import { expect } from \"vitest\"; expect(1);",
+        "origin": "valid_expect/valid_expect_test.go:83",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      },
+      {
+        "text": "const expect = () => {}; expect(1);",
+        "origin": "valid_expect/valid_expect_test.go:84",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "text": "expect().toBe(1);",
+        "origin": "valid_expect/valid_expect_test.go:88",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "notEnoughArgs",
+            "column": 7,
+            "endColumn": 8,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "expect(1, 2, 3).toBe(1);",
+        "origin": "valid_expect/valid_expect_test.go:94",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "tooManyArgs",
+            "column": 11,
+            "endColumn": 14,
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "expect(value, 123).toBe(1);",
+        "origin": "valid_expect/valid_expect_test.go:100",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "tooManyArgs",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "expect(value);",
+        "origin": "valid_expect/valid_expect_test.go:111",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "matcherNotFound",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "expect(value).toBe;",
+        "origin": "valid_expect/valid_expect_test.go:117",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "matcherNotCalled",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "expect(value).resolves;",
+        "origin": "valid_expect/valid_expect_test.go:123",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "matcherNotFound",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "expect(value).foo.toBe(1);",
+        "origin": "valid_expect/valid_expect_test.go:129",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "modifierUnknown",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"t\", async () => { expect(p).resolves.toBe(1); });",
+        "origin": "valid_expect/valid_expect_test.go:137",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "asyncMustBeAwaited",
+            "suggestions": []
+          }
+        ],
+        "expectedOutput": "test(\"t\", async () => { await expect(p).resolves.toBe(1); });"
+      },
+      {
+        "text": "test(\"t\", async () => { expect(p).rejects.toThrow(); });",
+        "origin": "valid_expect/valid_expect_test.go:144",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "asyncMustBeAwaited",
+            "suggestions": []
+          }
+        ],
+        "expectedOutput": "test(\"t\", async () => { await expect(p).rejects.toThrow(); });"
+      },
+      {
+        "text": "test(\"t\", async () => { expect(p).resolves.to.be.true; });",
+        "origin": "valid_expect/valid_expect_test.go:151",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "asyncMustBeAwaited",
+            "suggestions": []
+          }
+        ],
+        "expectedOutput": "test(\"t\", async () => { await expect(p).resolves.to.be.true; });"
+      },
+      {
+        "text": "test(\"t\", async () => { (expect(p).resolves.toBe(1)); });",
+        "origin": "valid_expect/valid_expect_test.go:158",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "asyncMustBeAwaited",
+            "suggestions": []
+          }
+        ],
+        "expectedOutput": "test(\"t\", async () => { (await expect(p).resolves.toBe(1)); });"
+      },
+      {
+        "text": "test(\"t\", async () => { expect(p).resolves.to.be.a(\"string\").that.contains(\"x\"); });",
+        "origin": "valid_expect/valid_expect_test.go:175",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "asyncMustBeAwaited",
+            "suggestions": []
+          }
+        ],
+        "expectedOutput": "test(\"t\", async () => { await expect(p).resolves.to.be.a(\"string\").that.contains(\"x\"); });"
+      },
+      {
+        "text": "test(\"t\", async () => { const all = Promise.all([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]); });",
+        "origin": "valid_expect/valid_expect_test.go:184",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "promisesWithAsyncAssertionsMustBeAwaited",
+            "suggestions": []
+          }
+        ],
+        "expectedOutput": "test(\"t\", async () => { const all = await Promise.all([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]); });"
+      },
+      {
+        "text": "test(\"t\", async () => { Promise.all([(expect(p).resolves.toBe(1)), expect(q).resolves.toBe(2)]); });",
+        "origin": "valid_expect/valid_expect_test.go:191",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "promisesWithAsyncAssertionsMustBeAwaited",
+            "suggestions": []
+          }
+        ],
+        "expectedOutput": "test(\"t\", async () => { await Promise.all([(expect(p).resolves.toBe(1)), expect(q).resolves.toBe(2)]); });"
+      },
+      {
+        "text": "test(\"t\", async () => { Promise.all(([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)])); });",
+        "origin": "valid_expect/valid_expect_test.go:198",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "promisesWithAsyncAssertionsMustBeAwaited",
+            "suggestions": []
+          }
+        ],
+        "expectedOutput": "test(\"t\", async () => { await Promise.all(([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)])); });"
+      },
+      {
+        "text": "import { expect as check } from \"@rstest/core\"; check(1);",
+        "origin": "valid_expect/valid_expect_test.go:230",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "matcherNotFound",
+            "suggestions": []
+          }
+        ]
+      },
+      {
+        "text": "test(\"t\", ({ expect }) => { expect(1); });",
+        "origin": "valid_expect/valid_expect_test.go:236",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "target": "esnext",
+          "module": "commonjs",
+          "strict": true,
+          "esModuleInterop": true,
+          "lib": [
+            "es2015",
+            "es2017",
+            "esnext",
+            "DOM"
+          ],
+          "moduleResolution": "Node10",
+          "allowJs": false
+        },
+        "expected": [
+          {
+            "messageId": "matcherNotFound",
+            "suggestions": []
+          }
+        ]
+      }
+    ],
+    "excludedNonDefaultOptions": [
+      {
+        "origin": "valid_expect/valid_expect_test.go:76",
+        "optionsSource": "[]any{map[string]any{\"maxArgs\": 2}}}",
+        "text": "expect(1, 2).toBe(1);"
+      },
+      {
+        "origin": "valid_expect/valid_expect_test.go:77",
+        "optionsSource": "[]any{map[string]any{\"asyncMatchers\": []any{\"toResolveEventually\"}}},\n\t\t\t}",
+        "text": "test(\"t\", async () => { await expect(p).toResolveEventually(); });"
+      },
+      {
+        "origin": "valid_expect/valid_expect_test.go:167",
+        "optionsSource": "[]any{map[string]any{\"alwaysAwait\": true}},\n\t\t\t\tErrors: []rule_tester.InvalidTestCaseError{\n\t\t\t\t\t{MessageId: \"asyncMustBeAwaited\"},\n\t\t\t\t},\n\t\t\t\tOutput: []string{`test(\"t\", async () => { await (expect(p).resolves.toBe(1)); });`},\n\t\t\t}",
+        "text": "test(\"t\", () => { return (expect(p).resolves.toBe(1)); });"
+      },
+      {
+        "origin": "valid_expect/valid_expect_test.go:205",
+        "optionsSource": "[]any{map[string]any{\"alwaysAwait\": true}},\n\t\t\t\tErrors: []rule_tester.InvalidTestCaseError{\n\t\t\t\t\t{MessageId: \"asyncMustBeAwaited\"},\n\t\t\t\t},\n\t\t\t\tOutput: []string{`test(\"t\", async () => { await expect(p).resolves.toBe(1); });`},\n\t\t\t}",
+        "text": "test(\"t\", () => { return expect(p).resolves.toBe(1); });"
+      },
+      {
+        "origin": "valid_expect/valid_expect_test.go:213",
+        "optionsSource": "[]any{map[string]any{\"minArgs\": 2}},\n\t\t\t\tErrors: []rule_tester.InvalidTestCaseError{\n\t\t\t\t\t{MessageId: \"notEnoughArgs\"},\n\t\t\t\t},\n\t\t\t}",
+        "text": "expect(value).toBe(1);"
+      },
+      {
+        "origin": "valid_expect/valid_expect_test.go:220",
+        "optionsSource": "[]any{map[string]any{\"asyncMatchers\": []any{\"toResolveEventually\"}}},\n\t\t\t\tErrors: []rule_tester.InvalidTestCaseError{\n\t\t\t\t\t{MessageId: \"asyncMustBeAwaited\"},\n\t\t\t\t},\n\t\t\t\tOutput: []string{`test(\"t\", async () => { await expect(p).toResolveEventually(); });`},\n\t\t\t}",
+        "text": "test(\"t\", () => { expect(p).toResolveEventually(); });"
+      }
+    ],
+    "baselineSkips": []
+  }
+]

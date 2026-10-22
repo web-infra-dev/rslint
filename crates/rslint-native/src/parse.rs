@@ -2,7 +2,7 @@
 //! lang derivation lives here (Rust-side) as the single source of truth; the JS side
 //! only forwards the `jsx` flag and `sourceType`.
 
-use napi::bindgen_prelude::{Uint32Array, Uint8Array};
+use napi::bindgen_prelude::{Uint8Array, Uint32Array};
 use napi_derive::napi;
 use oxc_allocator::Allocator;
 use oxc_ast_visit::utf8_to_utf16::Utf8ToUtf16;

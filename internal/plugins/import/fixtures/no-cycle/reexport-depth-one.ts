@@ -1,1 +1,0 @@
-export { rootValue } from '../file';

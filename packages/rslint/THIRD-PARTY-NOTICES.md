@@ -868,7 +868,8 @@ SOFTWARE.
 
 https://github.com/oxc-project/tsrs
 
-The experimental native lint engine links the unmodified pinned compiler.
+The experimental native lint engine links this compiler with the local Rust
+patches documented in scripts/tsrs/rust-compiler-patches. The upstream license and notice follow.
 
 ```text
 tsrs

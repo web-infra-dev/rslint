@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "status": "rsbuild-workload-source-universe-diagnostics-and-measurement-complete",
+  "compiler": {
+    "repository": "https://github.com/oxc-project/tsrs.git",
+    "revision": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+    "typescriptReference": "b85298b6a81f772d080b0455de0ca9d744cd6fd6",
+    "reportedVersionChanged": false
+  },
+  "libraries": {
+    "repository": "https://github.com/microsoft/TypeScript.git",
+    "revision": "1f70213d4922b434345f639b441681e470c7cfc1",
+    "count": 108,
+    "bytes": 3785075,
+    "manifest": "vendor/typescript-libs/manifest.json",
+    "manifestSha256": "027732b6497c20939bc0398a49b8fcfacfc45bcd6c602bd56e410752bd21d393",
+    "orderedAliasCount": 107,
+    "orderedAliasSha256": "5a439d0e2f446357017e1206501509ce11ac39b78f143653f5af7bcb56afd412",
+    "licenseFiles": [
+      "vendor/typescript-libs/LICENSE.txt",
+      "vendor/typescript-libs/NOTICE.txt",
+      "vendor/typescript-libs/CopyrightNotice.txt"
+    ]
+  },
+  "rustPatches": [
+    {
+      "path": "scripts/tsrs/rust-compiler-patches/0001-baseline-library-map.patch",
+      "sha256": "a6725f0f13ffed4072d51c2b3519084c18aab465b68a7751dee7d9f169545d93",
+      "scope": "Exact baseline LIB_MAP order and values, target option acceptance and default target library selection."
+    },
+    {
+      "path": "scripts/tsrs/rust-compiler-patches/0002-single-threaded-library-classification.patch",
+      "sha256": "c110efa9d66e38acb5b121f4704cd4cb211cbd6eb23ea8447314b1eab5f4cd42",
+      "scope": "Use the original LIFO loader order for every single-threaded Program, preserving external-library classification."
+    }
+  ],
+  "restoredAliases": {
+    "esnext.array": "lib.esnext.array.d.ts",
+    "esnext.collection": "lib.esnext.collection.d.ts",
+    "esnext.error": "lib.esnext.error.d.ts",
+    "esnext.typedarrays": "lib.esnext.typedarrays.d.ts",
+    "esnext.iterator": "lib.es2025.iterator.d.ts"
+  },
+  "removedLibraryOptions": [
+    "es2026",
+    "es2026.array",
+    "es2026.collection",
+    "es2026.error",
+    "es2026.iterator",
+    "es2026.json",
+    "es2026.math",
+    "es2026.typedarrays"
+  ],
+  "removedTargetOptions": ["es2026"],
+  "preparation": {
+    "script": "scripts/tsrs/prepare-rust-compiler.mjs",
+    "requires": ["Node.js", "Git"],
+    "productBuildRequiresGo": false,
+    "writesWorkspaceCargoConfig": false,
+    "sourceCacheOutsideConsumingRepository": true,
+    "reusesUncommittedSources": false,
+    "embedsResourcesInRustArtifact": true,
+    "patchesAllTsrsPackagesToOneGraph": true
+  },
+  "verification": {
+    "allVendorFilesMatchPinnedGitObjects": true,
+    "orderedAliasesMatchPinnedGitObjects": true,
+    "allLibReferenceDirectivesResolve": true,
+    "preparedGraphBuildPassed": true,
+    "fourUnsafeCallsRestored": true,
+    "completeRsbuildSourceUniversePassed": true,
+    "completeRsbuildDiagnosticsPassed": true,
+    "performanceMeasured": true,
+    "preparedGraphIntegrityPassed": true,
+    "modifiedPreparedGraphRejected": true,
+    "preparedFingerprint": "67ddffebeaa754ec2e481caa64501f9c4a8c1ba0924574bc4e664deb0b93957b",
+    "nativeAddonSha256": "0a8473a307f051c1065baba7d8b2ee15a0654febe70c055f0e838c9fa78b5218",
+    "artifactContext": "Historical compiler-compatibility validation artifact. The final measured candidate and its evidence are identified in rsbuild-performance-fixed.json."
+  },
+  "limitations": [
+    "Only default declaration resources, library aliases and target acceptance are aligned; parser, binder and checker remain the pinned Rust compiler.",
+    "Default-library changes require rebuilding the Rust artifact and rerunning affected rule and source-universe comparisons.",
+    "The single-threaded loader uses a tracked compatibility patch; concurrent loading retains the pinned compiler algorithm. Full source-graph and rule verification must use the measured thread setting."
+  ]
+}

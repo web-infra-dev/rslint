@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "scope": "Attribution ablation only. Disabling the original backend's cache is not the accepted performance baseline, and does not remove any candidate defects.",
+  "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+  "projectCommit": "e7d65898ce92d5f5d78afb0d93b4670b5e2a469d",
+  "manifestSha256": "c09ae5c1d3a77875817f3f1e8dfd35fc788f9921f324699240476f73c9d697f6",
+  "changedEnvironmentOnly": {
+    "RSLINT_DISABLE_PARSE_CACHE": "1"
+  },
+  "warmupsPerMode": 1,
+  "measuredSamplesPerMode": 3,
+  "summary": {
+    "default": {
+      "wall_seconds": {
+        "median": 4.9029182079999885,
+        "min": 4.647897583000002,
+        "max": 5.012638417000005
+      },
+      "sampled_tree_peak_rss_bytes": {
+        "median": 918913024,
+        "min": 835960832,
+        "max": 1014726656
+      }
+    },
+    "parse-cache-disabled": {
+      "wall_seconds": {
+        "median": 15.753594583000009,
+        "min": 15.044160167000001,
+        "max": 15.882365958000005
+      },
+      "sampled_tree_peak_rss_bytes": {
+        "median": 3711827968,
+        "min": 3683401728,
+        "max": 3718758400
+      }
+    }
+  },
+  "samples": [
+    {
+      "mode": "default",
+      "phase": "warmup",
+      "repetition": 0,
+      "wall_seconds": 5.88469625,
+      "sampled_tree_peak_rss_bytes": 945848320,
+      "exit_code": 0,
+      "max_sample_gap_seconds": 0.006533416999999986
+    },
+    {
+      "mode": "parse-cache-disabled",
+      "phase": "warmup",
+      "repetition": 0,
+      "wall_seconds": 16.194030125,
+      "sampled_tree_peak_rss_bytes": 3593027584,
+      "exit_code": 0,
+      "max_sample_gap_seconds": 0.005311292000000023
+    },
+    {
+      "mode": "parse-cache-disabled",
+      "phase": "measurement",
+      "repetition": 1,
+      "wall_seconds": 15.882365958000005,
+      "sampled_tree_peak_rss_bytes": 3718758400,
+      "exit_code": 0,
+      "max_sample_gap_seconds": 0.0050309159999955
+    },
+    {
+      "mode": "default",
+      "phase": "measurement",
+      "repetition": 1,
+      "wall_seconds": 4.647897583000002,
+      "sampled_tree_peak_rss_bytes": 835960832,
+      "exit_code": 0,
+      "max_sample_gap_seconds": 0.0029809580000019764
+    },
+    {
+      "mode": "default",
+      "phase": "measurement",
+      "repetition": 2,
+      "wall_seconds": 5.012638417000005,
+      "sampled_tree_peak_rss_bytes": 918913024,
+      "exit_code": 0,
+      "max_sample_gap_seconds": 0.004293375000003152
+    },
+    {
+      "mode": "parse-cache-disabled",
+      "phase": "measurement",
+      "repetition": 2,
+      "wall_seconds": 15.044160167000001,
+      "sampled_tree_peak_rss_bytes": 3683401728,
+      "exit_code": 0,
+      "max_sample_gap_seconds": 0.0041898749999944584
+    },
+    {
+      "mode": "parse-cache-disabled",
+      "phase": "measurement",
+      "repetition": 3,
+      "wall_seconds": 15.753594583000009,
+      "sampled_tree_peak_rss_bytes": 3711827968,
+      "exit_code": 0,
+      "max_sample_gap_seconds": 0.006350249999997004
+    },
+    {
+      "mode": "default",
+      "phase": "measurement",
+      "repetition": 3,
+      "wall_seconds": 4.9029182079999885,
+      "sampled_tree_peak_rss_bytes": 1014726656,
+      "exit_code": 0,
+      "max_sample_gap_seconds": 0.0037466250000051105
+    }
+  ],
+  "allOutputsEmpty": true,
+  "allCommandClocksConsistent": true,
+  "fixVerification": [
+    {
+      "name": "prepared-unit",
+      "exit_code": 0,
+      "seconds": 76.561190792
+    },
+    {
+      "name": "regex",
+      "exit_code": 0,
+      "seconds": 67.47915337500001
+    },
+    {
+      "name": "native-build",
+      "exit_code": 0,
+      "seconds": 79.28848491599999
+    },
+    {
+      "name": "native-test",
+      "exit_code": 0,
+      "seconds": 1.1291201250000142
+    },
+    {
+      "name": "sentinel129",
+      "exit_code": 0,
+      "seconds": 42.57706704099999
+    }
+  ],
+  "oldRustAddonSha256": "0a8473a307f051c1065baba7d8b2ee15a0654febe70c055f0e838c9fa78b5218",
+  "newRustAddonSha256": "362a51131dff5ce5a50070939898254f505339f2a2dbe18f09f414fce7535733",
+  "rustSharedParseCacheImplemented": false,
+  "newFormalPerformanceValidated": false
+}

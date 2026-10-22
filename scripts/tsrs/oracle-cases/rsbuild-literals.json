@@ -1,0 +1,178 @@
+[
+  {
+    "rule": "no-octal",
+    "valid": ["0;", "0.1;", "0.5e1;", "0x1234;", "0o17;", "0b101;", "0n;"],
+    "invalid": [
+      {
+        "text": "077;",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      },
+      {
+        "text": "/* leading */\r\n  -077;",
+        "extension": ".js",
+        "expectSyntaxErrors": true,
+        "expectedMessages": [
+          {
+            "ruleId": "TypeScript(TS1121)",
+            "severity": 2,
+            "message": "Octal literals are not allowed. Use the syntax '-0o77'.",
+            "line": 2,
+            "column": 3,
+            "endLine": 2,
+            "endColumn": 7
+          }
+        ]
+      },
+      {
+        "text": "08;",
+        "extension": ".js",
+        "expectSyntaxErrors": true,
+        "expectedMessages": [
+          {
+            "ruleId": "TypeScript(TS1489)",
+            "severity": 2,
+            "message": "Decimals with leading zeros are not allowed.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 3
+          }
+        ]
+      },
+      {
+        "text": "09.1;",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      },
+      {
+        "text": "019e1;",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      },
+      {
+        "text": "00;",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      }
+    ],
+    "rulePositiveEvidence": "Parsed-AST unit tests; production syntax checking prevents no-octal from executing on every legacy octal input."
+  },
+  {
+    "rule": "no-nonoctal-decimal-escape",
+    "valid": [
+      {
+        "text": "'8';",
+        "extension": ".js"
+      },
+      {
+        "text": "'\\\\8';",
+        "extension": ".js"
+      },
+      {
+        "text": "'\\\\9';",
+        "extension": ".js"
+      },
+      {
+        "text": "String.raw`\\8`;",
+        "extension": ".js"
+      },
+      {
+        "text": "'\\\\\\\\\\\\8';",
+        "extension": ".js"
+      },
+      {
+        "text": "const element = <div title=\"\\\\8\" />;",
+        "extension": ".tsx"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "'\\8';",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      },
+      {
+        "text": "'\\9';",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      },
+      {
+        "text": "'\\0\\8\\9';",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      },
+      {
+        "text": "'\\8\\0\\9';",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      },
+      {
+        "text": "'\\0 \\8';",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      },
+      {
+        "text": "'\\01\\8';",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      },
+      {
+        "text": "'\\\\\\8';",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      },
+      {
+        "text": "﻿'😀\\0\\8';",
+        "extension": ".js",
+        "expectSyntaxErrors": true,
+        "expectedMessages": [
+          {
+            "ruleId": "TypeScript(TS1488)",
+            "severity": 2,
+            "message": "Escape sequence '\\8' is not allowed.",
+            "line": 1,
+            "column": 6,
+            "endLine": 1,
+            "endColumn": 8
+          }
+        ]
+      },
+      {
+        "text": "'\\\r\n\\9';",
+        "extension": ".js",
+        "expectSyntaxErrors": true
+      },
+      {
+        "text": "const element = <div title=\"\\8\" />;",
+        "extension": ".tsx"
+      },
+      {
+        "text": "﻿const element = <div title=\"😀\\0\\8\" />;",
+        "extension": ".tsx"
+      }
+    ]
+  },
+  {
+    "rule": "no-empty-character-class",
+    "valid": [
+      "const re = /[^]/;",
+      "const re = /[[]/;",
+      "const re = /\\[]/;",
+      "const re = /[\\]]/;",
+      "const re = /[[^]]/v;",
+      "const re = /[\\q{ab|cd}]/v;",
+      "const re = new RegExp('[]');",
+      "const re = RegExp('[]');"
+    ],
+    "invalid": [
+      "const re = /[]/;",
+      "const re = /[][]/;",
+      "const re = /\\[[]/;",
+      "const re = /[[]]/v;",
+      "const re = /[a--[]]/v;",
+      "const re = /[[]&&b]/v;",
+      "const re = /[a[[b[]c]]d]/v;"
+    ]
+  }
+]

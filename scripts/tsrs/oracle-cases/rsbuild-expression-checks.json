@@ -1,0 +1,2997 @@
+[
+  {
+    "rule": "no-extra-boolean-cast",
+    "valid": [
+      {
+        "text": "var foo = !!bar;",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:27"
+      },
+      {
+        "text": "function foo() { return !!bar; }",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:28"
+      },
+      {
+        "text": "var foo = Boolean(bar);",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:30"
+      },
+      {
+        "text": "if (foo) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:32"
+      },
+      {
+        "text": "for(!!foo;;) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:34"
+      },
+      {
+        "text": "var x = new Boolean(foo);",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:36"
+      },
+      {
+        "text": "if (new Boolean(foo)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:40"
+      },
+      {
+        "text": "while (new Boolean(foo)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:41"
+      },
+      {
+        "text": "!new Boolean(foo)",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:42"
+      },
+      {
+        "text": "var x = Boolean;",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:44"
+      },
+      {
+        "text": "if (!foo) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:46"
+      },
+      {
+        "text": "if (Foo(bar)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:48"
+      },
+      {
+        "text": "if (x || !!y) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:50"
+      },
+      {
+        "text": "if (x && Boolean(y)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:51"
+      },
+      {
+        "text": "if (x ? !!y : z) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:53"
+      },
+      {
+        "text": "if (x ?? !!y) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:54"
+      },
+      {
+        "text": "if ((x, !!y, z)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:55"
+      },
+      {
+        "text": "var x = (!!foo);",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:63"
+      },
+      {
+        "text": "if ((Boolean)(x)) {}",
+        "origin": "Rust migration expression regressions (frozen helper contracts)"
+      },
+      {
+        "text": "if (!( !x)) {}",
+        "origin": "Rust migration expression regressions (frozen helper contracts)"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "if (!!foo) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:69",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 5
+          }
+        ],
+        "outputSteps": [
+          "if (foo) {}"
+        ]
+      },
+      {
+        "text": "while (!!foo) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:77",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 8
+          }
+        ],
+        "outputSteps": [
+          "while (foo) {}"
+        ]
+      },
+      {
+        "text": "do {} while (!!foo)",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:85",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 14
+          }
+        ],
+        "outputSteps": [
+          "do {} while (foo)"
+        ]
+      },
+      {
+        "text": "for (;!!foo;) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:93",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 7
+          }
+        ],
+        "outputSteps": [
+          "for (;foo;) {}"
+        ]
+      },
+      {
+        "text": "if (Boolean(foo)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:101",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 5
+          }
+        ],
+        "outputSteps": [
+          "if (foo) {}"
+        ]
+      },
+      {
+        "text": "while (Boolean(foo)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:109",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 8
+          }
+        ],
+        "outputSteps": [
+          "while (foo) {}"
+        ]
+      },
+      {
+        "text": "!Boolean(foo)",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:117",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 2
+          }
+        ],
+        "outputSteps": [
+          "!foo"
+        ]
+      },
+      {
+        "text": "!!foo ? bar : baz",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:125",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "outputSteps": [
+          "foo ? bar : baz"
+        ]
+      },
+      {
+        "text": "!!!foo",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:133",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 2
+          }
+        ],
+        "outputSteps": [
+          "!foo"
+        ]
+      },
+      {
+        "text": "Boolean(!!foo)",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:141",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 9
+          }
+        ],
+        "outputSteps": [
+          "Boolean(foo)"
+        ]
+      },
+      {
+        "text": "new Boolean(Boolean(foo))",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:151",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 13
+          }
+        ],
+        "outputSteps": [
+          "new Boolean(foo)"
+        ]
+      },
+      {
+        "text": "new Boolean(!!foo)",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:160",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 13
+          }
+        ],
+        "outputSteps": [
+          "new Boolean(foo)"
+        ]
+      },
+      {
+        "text": "if ((!!foo)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:168",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 6
+          }
+        ],
+        "outputSteps": [
+          "if ((foo)) {}"
+        ]
+      },
+      {
+        "text": "if ((Boolean(foo))) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:175",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 6
+          }
+        ],
+        "outputSteps": [
+          "if ((foo)) {}"
+        ]
+      },
+      {
+        "text": "if (((!!foo))) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:183",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 7
+          }
+        ],
+        "outputSteps": [
+          "if (((foo))) {}"
+        ]
+      },
+      {
+        "text": "!Boolean()",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:191",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 2
+          }
+        ],
+        "outputSteps": [
+          "true"
+        ]
+      },
+      {
+        "text": "if (Boolean()) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:202",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 5
+          }
+        ],
+        "outputSteps": [
+          "if (false) {}"
+        ]
+      },
+      {
+        "text": "if (Boolean(...args)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:210",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 5
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "if (Boolean(a, b)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:218",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 5
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "if (!!/* keep */foo) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:226",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 5
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "if (Boolean(/* keep */foo)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:233",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 5
+          }
+        ],
+        "outputSteps": null
+      },
+      {
+        "text": "function f(){return!Boolean()}",
+        "origin": "Rust migration expression regressions (frozen helper contracts)",
+        "expected": [
+          {
+            "messageId": "unexpectedCall"
+          }
+        ],
+        "outputSteps": [
+          "function f(){return true}"
+        ]
+      },
+      {
+        "text": "if (!!(/\\/\\//.test(x))) {}",
+        "origin": "Rust migration expression regressions (frozen helper contracts)",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation"
+          }
+        ],
+        "outputSteps": [
+          "if (/\\/\\//.test(x)) {}"
+        ]
+      },
+      {
+        "text": "if (Boolean('/* string */')) {}",
+        "origin": "Rust migration expression regressions (frozen helper contracts)",
+        "expected": [
+          {
+            "messageId": "unexpectedCall"
+          }
+        ],
+        "outputSteps": [
+          "if ('/* string */') {}"
+        ]
+      },
+      {
+        "text": "if (Boolean(`${x /* comment */}`)) {}",
+        "origin": "Rust migration expression regressions (frozen helper contracts)",
+        "expected": [
+          {
+            "messageId": "unexpectedCall"
+          }
+        ]
+      },
+      {
+        "text": "function f(Boolean:any){if(Boolean(x)){}}",
+        "origin": "Rust migration expression regressions (frozen helper contracts)",
+        "expected": [
+          {
+            "messageId": "unexpectedCall"
+          }
+        ],
+        "outputSteps": [
+          "function f(Boolean:any){if(x){}}"
+        ]
+      }
+    ],
+    "scopeNote": "Frozen e0a29 default options. Expected fields retain frozen assertions; public API results use stable source order. Nondefault options are recorded separately; differential oracle compares all diagnostics and fixes.",
+    "notAdmittedCases": [
+      {
+        "text": "if (x ?? !!y) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:57",
+        "category": "valid",
+        "reason": "Nondefault options: []any{enforceLogicalOperands}"
+      },
+      {
+        "text": "if (!!x ?? y) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:59",
+        "category": "valid",
+        "reason": "Nondefault options: []any{enforceInnerExpressions}"
+      },
+      {
+        "text": "if ((Boolean(a), b)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:61",
+        "category": "valid",
+        "reason": "Nondefault options: []any{enforceInnerExpressions}"
+      },
+      {
+        "text": "if (x || !!y) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:242",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 10
+          }
+        ],
+        "outputSteps": [
+          "if (x || y) {}"
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{enforceLogicalOperands}"
+      },
+      {
+        "text": "while (x && Boolean(y)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:251",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 13
+          }
+        ],
+        "outputSteps": [
+          "while (x && y) {}"
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{enforceLogicalOperands}"
+      },
+      {
+        "text": "if (a || (b && !!c)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:260",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 16
+          }
+        ],
+        "outputSteps": [
+          "if (a || (b && c)) {}"
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{enforceLogicalOperands}"
+      },
+      {
+        "text": "if (Boolean(a) || b) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:269",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 5
+          }
+        ],
+        "outputSteps": [
+          "if (a || b) {}"
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{enforceLogicalOperands}"
+      },
+      {
+        "text": "if (x ?? !!y) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:279",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 10
+          }
+        ],
+        "outputSteps": [
+          "if (x ?? y) {}"
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{enforceInnerExpressions}"
+      },
+      {
+        "text": "if (cond ? Boolean(a) : b) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:288",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 12
+          }
+        ],
+        "outputSteps": [
+          "if (cond ? a : b) {}"
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{enforceInnerExpressions}"
+      },
+      {
+        "text": "if (cond ? a : !!b) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:297",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 16
+          }
+        ],
+        "outputSteps": [
+          "if (cond ? a : b) {}"
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{enforceInnerExpressions}"
+      },
+      {
+        "text": "if ((a, b, Boolean(c))) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:306",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 12
+          }
+        ],
+        "outputSteps": [
+          "if ((a, b, c)) {}"
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{enforceInnerExpressions}"
+      },
+      {
+        "text": "if (x || !!y) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:315",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 10
+          }
+        ],
+        "outputSteps": [
+          "if (x || y) {}"
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{enforceInnerExpressions}"
+      },
+      {
+        "text": "if (a ? (b || !!c) : d) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:324",
+        "expected": [
+          {
+            "messageId": "unexpectedNegation",
+            "line": 1,
+            "column": 15
+          }
+        ],
+        "outputSteps": [
+          "if (a ? (b || c) : d) {}"
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{enforceInnerExpressions}"
+      },
+      {
+        "text": "if (a && Boolean(b ?? c)) {}",
+        "origin": "internal/rules/no_extra_boolean_cast/no_extra_boolean_cast_test.go:334",
+        "expected": [
+          {
+            "messageId": "unexpectedCall",
+            "line": 1,
+            "column": 10
+          }
+        ],
+        "outputSteps": [
+          "if (a && (b ?? c)) {}"
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{enforceLogicalOperands}"
+      }
+    ]
+  },
+  {
+    "rule": "prefer-rest-params",
+    "valid": [
+      {
+        "text": "arguments;",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:18"
+      },
+      {
+        "text": "function foo(arguments: any) { arguments; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:19"
+      },
+      {
+        "text": "function foo() { var arguments: any; arguments; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:20"
+      },
+      {
+        "text": "var foo = () => arguments;",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:21"
+      },
+      {
+        "text": "function foo(...args: any[]) { args; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:22"
+      },
+      {
+        "text": "function foo() { arguments.length; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:23"
+      },
+      {
+        "text": "function foo() { arguments.callee; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:24"
+      },
+      {
+        "text": "function foo() { if (true) { var arguments: any = []; } arguments; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:26"
+      },
+      {
+        "text": "function foo() { { let arguments: any = 1; arguments; } }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:28"
+      },
+      {
+        "text": "function foo() { { const arguments: any = 1; arguments; } }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:30"
+      },
+      {
+        "text": "function foo() { for (let arguments of []) { arguments; } }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:32"
+      },
+      {
+        "text": "function foo() { for (let arguments in {}) { arguments; } }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:34"
+      },
+      {
+        "text": "function foo() { try {} catch(arguments) { arguments; } }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:36"
+      },
+      {
+        "text": "var foo = function arguments() { };",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:39"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "function foo() { arguments; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:44",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "function foo() { arguments[0]; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:50",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "function foo() { arguments[1]; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:56",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "function foo() { arguments[Symbol.iterator]; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:63",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "text": "function foo() { var x = arguments; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:70",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "function foo() { { let arguments: any = 1; } arguments; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:77",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 46
+          }
+        ]
+      },
+      {
+        "text": "function foo() { var f = () => arguments; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:84",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 32
+          }
+        ]
+      },
+      {
+        "text": "var foo = function() { arguments; };",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:91",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "text": "class C { constructor() { arguments; } }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:98",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "text": "function foo({ arguments: a }: any) { arguments; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:105",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 39
+          }
+        ]
+      },
+      {
+        "text": "var foo = function arguments() { arguments; };",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:112",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 34
+          }
+        ]
+      },
+      {
+        "text": "function foo() { try {} catch(arguments) {} arguments; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:119",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 45
+          }
+        ]
+      },
+      {
+        "text": "function foo() { var x = { arguments }; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:126",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 28
+          }
+        ]
+      },
+      {
+        "text": "var obj = { method() { arguments; } };",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:133",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "text": "var obj = { get x() { arguments; } };",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:140",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "var obj = { set x(v: any) { arguments; } };",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:147",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "function foo() { var f = () => () => arguments; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:154",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "text": "function foo() { typeof arguments; }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:161",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "function foo() { bar(...arguments); }",
+        "origin": "internal/rules/prefer_rest_params/prefer_rest_params_test.go:168",
+        "expected": [
+          {
+            "messageId": "preferRestParams",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      }
+    ],
+    "scopeNote": "Frozen e0a29 default options. Expected fields retain frozen assertions; public API results use stable source order. Nondefault options are recorded separately; differential oracle compares all diagnostics and fixes."
+  },
+  {
+    "rule": "prefer-spread",
+    "valid": [
+      {
+        "text": "obj.foo.apply(\\u006fbj, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:19"
+      },
+      {
+        "text": "foo.apply(obj, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:21"
+      },
+      {
+        "text": "obj.foo.apply(null, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:22"
+      },
+      {
+        "text": "obj.foo.apply(otherObj, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:23"
+      },
+      {
+        "text": "a.b(x, y).c.foo.apply(a.b(x, z).c, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:24"
+      },
+      {
+        "text": "a.b.foo.apply(a.b.c, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:25"
+      },
+      {
+        "text": "foo.apply(undefined, [1, 2]);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:26"
+      },
+      {
+        "text": "foo.apply(null, [1, 2]);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:27"
+      },
+      {
+        "text": "obj.foo.apply(obj, [1, 2]);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:28"
+      },
+      {
+        "text": "var apply; foo[apply](null, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:29"
+      },
+      {
+        "text": "foo.apply();",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:30"
+      },
+      {
+        "text": "obj.foo.apply();",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:31"
+      },
+      {
+        "text": "obj.foo.apply(obj, ...args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:32"
+      },
+      {
+        "text": "(a?.b).c.foo.apply(a?.b.c, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:34"
+      },
+      {
+        "text": "a?.b.c.foo.apply((a?.b).c, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:35"
+      },
+      {
+        "text": "class C { #apply; foo() { foo.#apply(undefined, args); } }",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:38"
+      },
+      {
+        "text": "obj.foo.apply(this, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:42"
+      },
+      {
+        "text": "class C { m(args: any) { this.foo.apply(that, args); } }",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:44"
+      },
+      {
+        "text": "class C extends B { m(args: any) { super.foo.apply(this, args); } }",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:46"
+      },
+      {
+        "text": "(obj as any).foo.apply(obj, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:48"
+      },
+      {
+        "text": "[1, 2].concat.apply([1, 3], args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:50"
+      },
+      {
+        "text": "[0x1].concat.apply([1], args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:52"
+      },
+      {
+        "text": "[a,].concat.apply([a], args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:54"
+      },
+      {
+        "text": "outer(inner(x)).m.apply(outer(inner(y)).m, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:56"
+      },
+      {
+        "text": "foo[getKey()](null, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:58"
+      },
+      {
+        "text": "foo[\"#apply\"](null, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:62"
+      },
+      {
+        "text": "foo.bind(null, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:64"
+      },
+      {
+        "text": "foo.APPLY(null, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:66"
+      },
+      {
+        "text": "foo.apply(null, ([1, 2]));",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:71"
+      },
+      {
+        "text": "foo.apply(null, (([\n/* x */\n])));",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:73"
+      },
+      {
+        "text": "obj.m.apply(\\u006fbj,args)",
+        "origin": "Rust migration expression regressions (frozen helper contracts)"
+      },
+      {
+        "text": "(<p>&amp;</p>).m.apply(<p>&#38;</p>,args)",
+        "origin": "Rust migration expression regressions (frozen helper contracts)",
+        "extension": ".tsx"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "obj.foo.apply(\\u006fbj, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:79",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "preferSpread"
+          }
+        ]
+      },
+      {
+        "text": "foo.apply(undefined, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:88",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "message": "Use the spread operator instead of '.apply()'.",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 27
+          }
+        ]
+      },
+      {
+        "text": "foo.apply(void 0, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:98",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "foo.apply(null, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:104",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "obj.foo.apply(obj, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:110",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "a.b.c.foo.apply(a.b.c, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:116",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "a.b(x, y).c.foo.apply(a.b(x, y).c, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:122",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[].concat.apply([ ], args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:129",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[].concat.apply([\n/*empty*/\n], args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:135",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "foo.apply?.(undefined, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:142",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "foo?.apply(undefined, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:148",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "foo?.apply?.(undefined, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:154",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(foo?.apply)(undefined, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:160",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(foo?.apply)?.(undefined, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:166",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(obj?.foo).apply(obj, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:172",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "a?.b.c.foo.apply(a?.b.c, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:178",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(a?.b.c).foo.apply(a?.b.c, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:184",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(a?.b).c.foo.apply((a?.b).c, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:190",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "class C { #foo; foo() { obj.#foo.apply(obj, args); } }",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:198",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "class C { m(args: any) { this.foo.apply(this, args); } }",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:207",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "text": "a.b().c.foo.apply(a.b().c, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:214",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "getFn().apply(undefined, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:221",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "foo[\"apply\"](null, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:228",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "obj[\"foo\"].apply(obj, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:234",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "foo[`apply`](null, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:241",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "obj\n  .foo\n  .apply(obj, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:249",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1,
+            "endLine": 3,
+            "endColumn": 20
+          }
+        ]
+      },
+      {
+        "text": "obj /* x */ . foo . apply(obj, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:259",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "foo.apply<any>(undefined, args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:266",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[1, 2].concat.apply([1, 2], args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:273",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[a,].concat.apply([a,], args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:280",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "[].concat.apply([\n/* comment */\n], args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:287",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "(new Foo()).bar.apply(new Foo(), args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:295",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "wrap(foo.apply(null, args));",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:302",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 6
+          }
+        ]
+      },
+      {
+        "text": "outer(inner(x)).m.apply(outer(inner(x)), args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:311",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "foo.apply((null), args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:319",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "obj.foo.apply((obj), args);",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:326",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "foo.apply(null, (args));",
+        "origin": "internal/rules/prefer_spread/prefer_spread_test.go:334",
+        "expected": [
+          {
+            "messageId": "preferSpread",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "obj.m.apply(\\u006fbj,args)",
+        "origin": "Rust migration expression regressions (frozen helper contracts)",
+        "extension": ".js",
+        "expected": [
+          {
+            "messageId": "preferSpread"
+          }
+        ]
+      },
+      {
+        "text": "(<p>&amp;</p>).m.apply(<p>&#38;</p>,args)",
+        "origin": "Rust migration expression regressions (frozen helper contracts)",
+        "extension": ".jsx",
+        "expected": [
+          {
+            "messageId": "preferSpread"
+          }
+        ]
+      },
+      {
+        "text": "(<p>&#x10000;</p>).m.apply(<p>&#0;</p>,args)",
+        "origin": "Rust migration expression regressions (frozen helper contracts)",
+        "extension": ".jsx",
+        "expected": [
+          {
+            "messageId": "preferSpread"
+          }
+        ]
+      }
+    ],
+    "scopeNote": "Frozen e0a29 default options. Expected fields retain frozen assertions; public API results use stable source order. Nondefault options are recorded separately; differential oracle compares all diagnostics and fixes."
+  },
+  {
+    "rule": "use-isnan",
+    "valid": [
+      {
+        "text": "var x = NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:22"
+      },
+      {
+        "text": "isNaN(NaN) === true;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:23"
+      },
+      {
+        "text": "Number.isNaN(NaN) === true;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:24"
+      },
+      {
+        "text": "isNaN(123);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:25"
+      },
+      {
+        "text": "Number.isNaN(123);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:26"
+      },
+      {
+        "text": "NaN + 1;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:29"
+      },
+      {
+        "text": "1 + NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:30"
+      },
+      {
+        "text": "NaN - 1;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:31"
+      },
+      {
+        "text": "NaN * 2;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:32"
+      },
+      {
+        "text": "2 / NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:33"
+      },
+      {
+        "text": "Number.NaN + 1;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:34"
+      },
+      {
+        "text": "var q; if (q = NaN) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:37"
+      },
+      {
+        "text": "x === Nan;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:40"
+      },
+      {
+        "text": "x === nan;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:41"
+      },
+      {
+        "text": "x === NAN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:42"
+      },
+      {
+        "text": "x === Number.Nan;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:43"
+      },
+      {
+        "text": "x === window.NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:44"
+      },
+      {
+        "text": "x === globalThis.NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:45"
+      },
+      {
+        "text": "x === Math.NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:46"
+      },
+      {
+        "text": "x === Number[NaN];",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:47"
+      },
+      {
+        "text": "x === Number.NaN.toString();",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:48"
+      },
+      {
+        "text": "const NaN = 0; x === NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:51"
+      },
+      {
+        "text": "function f(NaN: number) { return x === NaN; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:52"
+      },
+      {
+        "text": "const Number = { NaN: 0 }; x === Number.NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:53"
+      },
+      {
+        "text": "const f = function NaN() { return x === NaN; };",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:54"
+      },
+      {
+        "text": "namespace Number { export const NaN = 0; } x === Number.NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:55"
+      },
+      {
+        "text": "const C = class Number { method() { return x === Number.NaN; } };",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:56"
+      },
+      {
+        "text": "function f(NaN: number) { switch (NaN) { case NaN: break; } }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:57"
+      },
+      {
+        "text": "x === (NaN, 1);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:64"
+      },
+      {
+        "text": "x === (NaN, a);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:65"
+      },
+      {
+        "text": "x === (a, NaN, 1);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:66"
+      },
+      {
+        "text": "x === (Number.NaN, 1);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:67"
+      },
+      {
+        "text": "x === (a, (b, NaN));",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:70"
+      },
+      {
+        "text": "x === (a, (b, Number.NaN));",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:71"
+      },
+      {
+        "text": "switch(foo) { case bar: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:84"
+      },
+      {
+        "text": "switch(true) { case true: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:85"
+      },
+      {
+        "text": "switch(Nan) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:86"
+      },
+      {
+        "text": "switch('NaN') {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:87"
+      },
+      {
+        "text": "switch(foo(NaN)) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:88"
+      },
+      {
+        "text": "switch(foo.NaN) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:89"
+      },
+      {
+        "text": "switch((NaN, 1)) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:90"
+      },
+      {
+        "text": "switch((Number.NaN, 1)) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:91"
+      },
+      {
+        "text": "switch(foo) { case Nan: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:94"
+      },
+      {
+        "text": "switch(foo) { case 'NaN': break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:95"
+      },
+      {
+        "text": "switch(foo) { case foo(NaN): break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:96"
+      },
+      {
+        "text": "switch(foo) { case foo.NaN: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:97"
+      },
+      {
+        "text": "switch(foo) { case bar: NaN; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:98"
+      },
+      {
+        "text": "switch(foo) { default: NaN; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:99"
+      },
+      {
+        "text": "switch(foo) { case (NaN, 1): break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:100"
+      },
+      {
+        "text": "foo.indexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:103"
+      },
+      {
+        "text": "foo.lastIndexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:104"
+      },
+      {
+        "text": "function f({Number}){return Number.NaN===x}",
+        "origin": "Rust migration expression regressions (frozen helper contracts)"
+      },
+      {
+        "text": "x === (NaN as number)",
+        "origin": "Rust migration expression regressions (frozen helper contracts)"
+      }
+    ],
+    "invalid": [
+      {
+        "text": "123 == NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:194",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "123 === NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:198",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "NaN === \"abc\";",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:202",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "NaN == \"abc\";",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:206",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "123 != NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:210",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "123 !== NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:214",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "NaN < \"abc\";",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:218",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "\"abc\" < NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:222",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "NaN > \"abc\";",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:226",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "\"abc\" >= NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:230",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "NaN <= \"abc\";",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:234",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "123 === Number.NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:242",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "Number.NaN === \"abc\";",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:246",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === Number['NaN'];",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:250",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x !== Number['NaN'];",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:254",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === Number?.NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:258",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === Number?.['NaN'];",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:262",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === Number[`NaN`];",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:267",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === (Number).NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:271",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "{\n  const NaN = 0;\n  x === NaN;\n}\nx === NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:275",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 5,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "interface Number {} x === Number.NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:283",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN"
+          }
+        ]
+      },
+      {
+        "text": "x = (foo, NaN) === 1;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:291",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "x = 1 === (foo, NaN);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:295",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "x = (a, b, NaN) === 1;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:299",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "x = (a, Number.NaN) === 1;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:303",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "x = (a, Number['NaN']) === 1;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:307",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "x = (1, 2) === NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:311",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "x === (a, (NaN));",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:316",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === (a, ((NaN)));",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:320",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === (a, (Number.NaN));",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:324",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === (doStuff(), NaN);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:329",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === (NaN);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:337",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === ((NaN));",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:341",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "((x)) === ((NaN));",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:345",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "x === ((a, NaN));",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:349",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "NaN === NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:357",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "NaN == Number.NaN;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:361",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(NaN) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:369",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(Number.NaN) { case 1: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:373",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(Number['NaN']) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:377",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(Number?.NaN) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:381",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch((a, NaN)) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:385",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch((a, b, NaN)) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:389",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch((NaN)) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:393",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(((NaN))) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:397",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch((doStuff(), NaN)) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:401",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch((doStuff(), Number.NaN)) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:405",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case NaN: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:413",
+        "expected": [
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case Number.NaN: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:417",
+        "expected": [
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case Number['NaN']: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:421",
+        "expected": [
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case Number?.NaN: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:425",
+        "expected": [
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case (NaN): break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:429",
+        "expected": [
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case ((NaN)): break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:433",
+        "expected": [
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case (a, NaN): break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:437",
+        "expected": [
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case (a, Number.NaN): break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:441",
+        "expected": [
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case NaN: case Number.NaN: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:447",
+        "expected": [
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 15
+          },
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case NaN: break; case Number['NaN']: break; case bar: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:454",
+        "expected": [
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 15
+          },
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 32
+          }
+        ]
+      },
+      {
+        "text": "switch(NaN) { case NaN: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:463",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          },
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "switch(Number.NaN) { case Number.NaN: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:470",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 1
+          },
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "text": "switch(foo) { case bar: switch(NaN) { case NaN: break; } break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:479",
+        "expected": [
+          {
+            "messageId": "switchNaN",
+            "line": 1,
+            "column": 25
+          },
+          {
+            "messageId": "caseNaN",
+            "line": 1,
+            "column": 39
+          }
+        ]
+      },
+      {
+        "text": "if (NaN === x) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:633",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "text": "while (x !== NaN) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:637",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "for (; NaN < x;) {}",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:641",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 8
+          }
+        ]
+      },
+      {
+        "text": "var t = x === NaN ? 'yes' : 'no';",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:645",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "text": "var u = [NaN === 1];",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:649",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 10
+          }
+        ]
+      },
+      {
+        "text": "var v = { key: NaN === 1 };",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:653",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "text": "function f() { return NaN === x; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:657",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "text": "var g = () => NaN === x;",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:661",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "text": "var h = function() { return x === NaN; };",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:665",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "text": "console.log(NaN === 1);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:669",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "text": "void (NaN === x);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:673",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "text": "!(NaN === x);",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:677",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN",
+            "line": 1,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "text": "type Number = {NaN:0}; x === Number['NaN'];",
+        "origin": "Rust migration expression regressions (frozen helper contracts)",
+        "expected": [
+          {
+            "messageId": "comparisonWithNaN"
+          }
+        ]
+      }
+    ],
+    "scopeNote": "Frozen e0a29 default options. Expected fields retain frozen assertions; public API results use stable source order. Nondefault options are recorded separately; differential oracle compares all diagnostics and fixes.",
+    "notAdmittedCases": [
+      {
+        "text": "function f(Number: any) { values.indexOf(Number.NaN); }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:59",
+        "category": "valid",
+        "reason": "Nondefault options: map[string]interface{}{\"enforceForIndexOf\":true}"
+      },
+      {
+        "text": "switch(NaN) { case foo: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:75",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForSwitchCase\":false}}"
+      },
+      {
+        "text": "switch(foo) { case NaN: break; }",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:79",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForSwitchCase\":false}}"
+      },
+      {
+        "text": "foo.indexOf(bar)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:108",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.lastIndexOf(bar)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:112",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf(NaN, 0, extra)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:116",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.lastIndexOf(NaN, 0, extra)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:120",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf(a, NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:124",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf()",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:128",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf(Nan)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:132",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf((NaN, 1))",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:136",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf((Number.NaN, 1))",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:140",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf((a, (b, NaN)))",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:146",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "indexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:152",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "lastIndexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:156",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.IndexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:162",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.bar(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:166",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo[indexOf](NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:172",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "new foo.indexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:178",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf.call(arr, NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:184",
+        "category": "valid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:490",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.lastIndexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:495",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo['indexOf'](NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:500",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo['lastIndexOf'](NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:505",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo[`indexOf`](NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:510",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo[`lastIndexOf`](NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:515",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo?.indexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:520",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo?.lastIndexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:525",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf?.(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:530",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo?.indexOf?.(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:535",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "(foo?.indexOf)(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:540",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "((foo.indexOf))(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:545",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo().indexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:550",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.bar.indexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:555",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.bar.baz.lastIndexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:560",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "(a || b).indexOf(NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:565",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf(Number.NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:574",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf(Number['NaN'])",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:579",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf(Number?.NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:584",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf((a, NaN))",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:589",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf((a, Number.NaN))",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:594",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf((NaN))",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:599",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf(NaN, 1)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:604",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf(NaN, b)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:609",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.lastIndexOf(NaN, NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:614",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.indexOf(Number.NaN, 1)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:619",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      },
+      {
+        "text": "foo.lastIndexOf(Number.NaN)",
+        "origin": "internal/rules/use_isnan/use_isnan_test.go:624",
+        "expected": [
+          {
+            "messageId": "indexOfNaN",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "category": "invalid",
+        "reason": "Nondefault options: []any{map[string]interface{}{\"enforceForIndexOf\":true}}"
+      }
+    ]
+  }
+]

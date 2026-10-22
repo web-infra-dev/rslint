@@ -25,6 +25,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 BASELINE = "e0a29f751d4def86d27931759098f27748fa3003"
 CATALOG = HERE / "rust-migration-catalog.json"
+REFERENCE_REVIEW = "scripts/tsrs/rust-migration-reference-review.json"
 
 
 # Bounded metadata reader from inventory.py, kept here so the final tool has
@@ -541,20 +542,64 @@ def inspect_data(path, data, origin, depth=0):
         return findings
     if suffix not in {".go", ".md", ".mdx", ".json"} and re.search(r"(?m)^package\s+[A-Za-z_]\w*\s*$", text) and re.search(r"(?m)^(?:func\s+(?:\(|[A-Za-z_])|import\s*\()", text):
         add("go_source_disguised_extension")
-    # The detector and immutable oracle catalog are evidence, not build inputs.
-    evidence_only = path in {"scripts/tsrs/rust-migration-inventory.py", "scripts/tsrs/rust-migration-catalog.json"}
-    if not evidence_only and (suffix in CODE_EXTENSIONS or name in {"Makefile", "Dockerfile"}):
+    if suffix in CODE_EXTENSIONS or name in {"Makefile", "Dockerfile"}:
         for number, line in enumerate(text.splitlines(), 1):
-            match = BUILD_REF.search(line)
-            if match:
-                add("go_build_or_runtime_reference", line=number, token=match.group())
+            for match in BUILD_REF.finditer(line):
+                add("go_build_or_runtime_reference", line=number,
+                    line_sha256=sha(line.encode("utf-8")), token=match.group())
     if suffix in {".patch", ".diff"} and re.search(r"(?m)^\+\+\+ (?:b/)?[^\n]+\.go(?:\s|$)", text):
         add("go_source_patch")
     return findings
 
 
+def reference_review(repo):
+    """Load reviewed *lines*, never executable-path or URL exclusions.
+
+    Both the complete UTF-8 line (excluding its line terminator) and the whole
+    file are pinned. A moved/edited line or any file edit invalidates its review.
+    Metadata is itself scanned as candidate source. No review applies to release
+    artifacts, source/manifest signatures, archives, or submodules.
+    """
+    path = repo / REFERENCE_REVIEW
+    if not path.exists():
+        return {}, None
+    data = path.read_bytes()
+    document = json.loads(data)
+    if document.get("schema_version") != 1 or not isinstance(document.get("files"), list):
+        raise ValueError("invalid reference review schema")
+    result = {}
+    categories = {"source_attribution", "fixture_text", "negative_assertion",
+                  "external_oracle_metadata", "detector_test_or_pattern"}
+    for entry in document["files"]:
+        name = entry.get("path")
+        pure = PurePosixPath(name) if isinstance(name, str) else None
+        if (not pure or pure.is_absolute() or ".." in pure.parts
+                or str(pure) != name or name in result):
+            raise ValueError("invalid or duplicate reviewed path")
+        if not re.fullmatch(r"[0-9a-f]{64}", entry.get("sha256", "")):
+            raise ValueError("invalid reviewed file digest: " + name)
+        lines = {}
+        for row in entry.get("lines", []):
+            numbers = row.get("line_numbers", [])
+            if (not isinstance(row.get("reason"), str) or not row["reason"].strip()
+                    or row.get("category") not in categories
+                    or not re.fullmatch(r"[0-9a-f]{64}", row.get("sha256", ""))
+                    or not numbers):
+                raise ValueError("invalid reviewed line: " + name)
+            for number in numbers:
+                if type(number) is not int or number <= 0 or number in lines:
+                    raise ValueError("invalid or duplicate reviewed line number: " + name)
+                lines[number] = row
+        if not lines:
+            raise ValueError("empty reviewed path: " + name)
+        result[name] = dict(sha256=entry["sha256"], lines=lines)
+    return result, sha(data)
+
+
 def audit(repo, artifact_roots):
-    findings, checked, errors = [], [], []
+    findings, checked, errors, reviewed = [], [], [], []
+    review, review_sha256 = reference_review(repo)
+    seen_reviews = set()
     entries = git(repo, "ls-files", "--cached", "--others", "--exclude-standard", "-z").decode().split("\0")
     stages = git(repo, "ls-files", "--stage", "-z").decode().split("\0")
     submodules = [item.split("\t", 1)[1] for item in stages if item.startswith("160000 ")]
@@ -579,7 +624,28 @@ def audit(repo, artifact_roots):
             errors.append(dict(path=path, reason="file is unreadable"))
             continue
         checked.append(dict(path=path, sha256=sha(data)))
-        findings.extend(inspect_data(path, data, "candidate"))
+        approved = review.get(path)
+        if approved:
+            seen_reviews.add(path)
+            actual_lines = data.decode("utf-8").splitlines()
+            valid = approved["sha256"] == sha(data)
+            for number, row in approved["lines"].items():
+                valid = (valid and number <= len(actual_lines)
+                         and sha(actual_lines[number - 1].encode("utf-8")) == row["sha256"]
+                         and bool(BUILD_REF.search(actual_lines[number - 1])))
+            if not valid:
+                errors.append(dict(path=path, reason="reviewed reference file or line changed; explicit re-review required"))
+                approved = None
+        for finding in inspect_data(path, data, "candidate"):
+            line = approved["lines"].get(finding.get("line")) if approved else None
+            if (finding["kind"] == "go_build_or_runtime_reference" and line
+                    and line["sha256"] == finding["line_sha256"]):
+                reviewed.append(dict(**finding, category=line["category"], reason=line["reason"],
+                                     file_sha256=approved["sha256"]))
+            else:
+                findings.append(finding)
+    for path in sorted(set(review) - seen_reviews):
+        errors.append(dict(path=path, reason="reviewed reference file is absent from inspected source"))
     products = []
     for index, root in enumerate(artifact_roots):
         label = "artifact-" + str(index + 1)
@@ -601,7 +667,7 @@ def audit(repo, artifact_roots):
     if artifact_roots and not products:
         errors.append(dict(path="release_artifacts", reason="empty product selection"))
     counts = dict(sorted(collections.Counter(row["kind"] for row in findings).items()))
-    return dict(schema_version=1, scope="tracked and nonignored untracked working-tree files plus explicitly selected release artifacts; Git history and ignored build caches are not candidate source", source_files=len(checked), source_manifest_sha256=sha(json.dumps(checked, sort_keys=True).encode()), artifact_files=products, counts=counts, findings=findings, errors=errors, zero_go_gate_passed=not findings and not errors and bool(products), limitations=["This gate cannot establish semantic compatibility or absence of dynamically constructed downloads and commands. Runtime process evidence and clean Rust/Node-only builds remain separate required gates.", "No product absence verdict is granted without explicit nonempty --artifact-root selection.", "The detector itself and the frozen catalog may contain oracle command strings; neither executes them."])
+    return dict(schema_version=2, scope="tracked and nonignored untracked working-tree files plus explicitly selected release artifacts; Git history and ignored build caches are not candidate source", source_files=len(checked), source_manifest_sha256=sha(json.dumps(checked, sort_keys=True).encode()), artifact_files=products, counts=counts, findings=findings, errors=errors, reviewed_references=reviewed, reference_review_sha256=review_sha256, zero_go_gate_passed=not findings and not errors and bool(products), limitations=["This gate cannot establish semantic compatibility or absence of dynamically constructed downloads and commands. Runtime process evidence and clean Rust/Node-only builds remain separate required gates.", "No product absence verdict is granted without explicit nonempty --artifact-root selection.", "Reviewed non-executable reference lines are reported separately with exact path, line number, line and file digests, category and reason. No whole-path, test-directory or URL exclusion applies."])
 
 
 def self_test():
@@ -638,6 +704,48 @@ def self_test():
         assert not audit(root, [product])["zero_go_gate_passed"]
         git(root, "rm", "--cached", "--quiet", "untracked.go")
         assert audit(root, [product])["zero_go_gate_passed"]
+        # Exact reviewed prose is admitted, but not a changed line, an appended
+        # invocation in the same file, a copied path, or matching product bytes.
+        fixture = root / "fixture.test.ts"
+        source = b'const text = "Now go build something great.";\n'
+        fixture.write_bytes(source)
+        review_path = root / REFERENCE_REVIEW
+        review_path.parent.mkdir(parents=True)
+        write_json(review_path, dict(schema_version=1, files=[dict(
+            path="fixture.test.ts", sha256=sha(source), lines=[dict(
+                line_numbers=[1], sha256=sha(source.rstrip(b"\n")),
+                category="fixture_text", reason="A literal fixture sentence.")])]))
+        result = audit(root, [product])
+        assert result["zero_go_gate_passed"]
+        assert len(result["reviewed_references"]) == 1
+        assert result["reviewed_references"][0]["line"] == 1
+        fixture.write_bytes(source.replace(b"great", b"else"))
+        result = audit(root, [product])
+        assert not result["zero_go_gate_passed"] and result["errors"]
+        assert result["counts"]["go_build_or_runtime_reference"] == 1
+        fixture.write_bytes(source + b'child_process.execSync("go build ./cmd");\n')
+        result = audit(root, [product])
+        assert not result["zero_go_gate_passed"]
+        assert result["counts"]["go_build_or_runtime_reference"] == 2
+        # Updating only the file digest does not approve any newly added line.
+        document = json.loads(review_path.read_text())
+        document["files"][0]["sha256"] = sha(fixture.read_bytes())
+        write_json(review_path, document)
+        result = audit(root, [product])
+        assert not result["zero_go_gate_passed"] and not result["errors"]
+        assert result["counts"]["go_build_or_runtime_reference"] == 1
+        document["files"][0]["sha256"] = sha(source)
+        write_json(review_path, document)
+        fixture.write_bytes(source)
+        copy = root / "other.test.ts"
+        copy.write_bytes(source)
+        assert audit(root, [product])["counts"]["go_build_or_runtime_reference"] == 1
+        copy.unlink()
+        assert audit(root, [fixture])["counts"]["go_build_or_runtime_reference"] == 1
+        # Source signatures cannot be approved even with matching review hashes.
+        fixture.write_bytes(b"package hidden\nfunc run() {}\n" + source)
+        assert "go_source_disguised_extension" in audit(root, [product])["counts"]
+        fixture.write_bytes(source)
         (root / "broken-link").symlink_to("missing-target")
         assert not audit(root, [product])["zero_go_gate_passed"]
     print("Rust migration inventory self-test passed")

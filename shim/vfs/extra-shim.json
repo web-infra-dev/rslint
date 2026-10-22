@@ -1,7 +1,0 @@
-{
-  "IgnoreFunctions": [
-    "GetPatternFromSpec",
-    "GetRegularExpressionForWildcard",
-    "GetRegularExpressionsForWildcards"
-  ]
-}

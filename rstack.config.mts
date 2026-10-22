@@ -5,11 +5,13 @@ define.fmt({
   ignorePatterns: [
     '.vscode/',
     '.agents/skills/create-draft-release-notes',
-    'typescript-go/',
+    // Immutable compiler resources and frozen oracle inputs retain their source bytes.
+    'vendor/typescript-libs/',
+    'scripts/tsrs/oracle-cases/',
+    'packages/rslint-api/src/ast-compat/',
     'packages/rslint-test-tools/tests/typescript-eslint/fixtures',
     'packages/rslint-test-tools/tests/typescript-eslint/rules',
     'binaries/',
-    'internal/**/rules/**/*.md',
     'website/releases.json',
     'packages/vscode-extension/__tests__/fixtures-monorepo/packages/broken/',
   ],

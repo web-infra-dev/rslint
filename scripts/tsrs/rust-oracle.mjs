@@ -138,6 +138,7 @@ function normalize(results) {
             (a.endColumn ?? 0) - (b.endColumn ?? 0) ||
             a.ruleId.localeCompare(b.ruleId),
         ),
+      ...(file.output === undefined ? {} : { output: file.output }),
     }))
     .sort((a, b) => a.filePath.localeCompare(b.filePath));
 }
@@ -203,6 +204,76 @@ try {
       .length,
     0,
   );
+  // Fix execution is checked separately so diagnostic-only coverage is never
+  // confused with complete automatic-fix compatibility for the catalog.
+  const fixNames = [
+    '@typescript-eslint/no-extra-non-null-assertion',
+    '@typescript-eslint/no-non-null-asserted-optional-chain',
+    '@typescript-eslint/no-unsafe-unary-minus',
+    'no-debugger',
+  ];
+  const fixRules = rules.filter((rule) => fixNames.includes(rule.name));
+  const fixLinter = new Rslint({
+    cwd,
+    fix: true,
+    overrideConfigFile: true,
+    overrideConfig: [
+      {
+        ...config[0],
+        rules: Object.fromEntries(
+          fixRules.map(({ name, severity }) => [name, severity]),
+        ),
+      },
+    ],
+  });
+  let fixedExpected;
+  try {
+    fixedExpected = await fixLinter.lintFiles(Object.keys(sources));
+  } finally {
+    await fixLinter.close();
+  }
+  const fixedActual = JSON.parse(
+    binding.lintTsrsSync(
+      JSON.stringify({ ...request, rules: fixRules, fix: true }),
+    ),
+  );
+  for (const file of fixedActual.files)
+    assert.deepEqual(
+      file.appliedRules,
+      fixRules.map((rule) => rule.name),
+    );
+  report.autofix = {
+    rules: fixRules,
+    baseline: normalize(fixedExpected),
+    candidate: normalize(fixedActual.files),
+  };
+  assert.deepEqual(report.autofix.candidate, report.autofix.baseline);
+  const fixedAssertion = report.autofix.candidate.find(
+    (file) => file.filePath === 'assertions.ts',
+  );
+  assert.equal(
+    fixedAssertion.output,
+    sources['assertions.ts'].replace('value!!', 'value!'),
+  );
+  assert(
+    fixedAssertion.messages.some(
+      (message) =>
+        message.ruleId ===
+        '@typescript-eslint/no-non-null-asserted-optional-chain',
+    ),
+  );
+  assert(
+    !fixedAssertion.messages.some(
+      (message) =>
+        message.ruleId === '@typescript-eslint/no-extra-non-null-assertion',
+    ),
+  );
+  assert.equal(
+    report.autofix.candidate.filter((file) => 'output' in file).length,
+    1,
+  );
+  for (const [name, source] of Object.entries(sources))
+    assert.equal(fs.readFileSync(path.join(cwd, name), 'utf8'), source);
   report.status = 'passed';
 } catch (error) {
   report.status = 'failed';

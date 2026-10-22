@@ -10,10 +10,7 @@ import {
 
 export default defineConfig([
   globalIgnores([
-    'typescript-go/**',
-
-    // Release CI artifacts (downloaded binaries + tsgo lib files copied
-    // into the npm publish shells) — keep in sync with rstack.config.mts
+    // Generated Rust addon artifacts and npm publish shells.
     'binaries/**',
     'npm/**',
 
@@ -26,9 +23,7 @@ export default defineConfig([
     'packages/vscode-extension/__tests__/**',
 
     // Files that need special handling
-    'packages/rslint-wasm/src/worker.ts',
     'packages/rule-tester/src/index.ts',
-    'packages/rslint-wasm/wasm_exec.js',
   ]),
   // Start from recommended preset, then override rules and parserOptions
   js.configs.recommended,
@@ -47,6 +42,12 @@ export default defineConfig([
         { assertFunctionNames: ['expect', 'assert', 'runExitFixture'] },
       ],
     },
+  },
+  {
+    // This addon test deliberately uses Node's runner with subprocess APIs
+    // disabled, proving the Rust binding works without a toolchain or service.
+    files: ['crates/rslint-native/tests/rust-lint.test.mjs'],
+    rules: { 'rstest/no-import-node-test': 'off' },
   },
   {
     rules: {

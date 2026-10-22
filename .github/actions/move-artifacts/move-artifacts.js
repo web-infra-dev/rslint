@@ -1,142 +1,89 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
-function findBinaries(dir = 'binaries', suffix) {
-  const files = [];
+const tuples = [
+  'darwin-arm64',
+  'darwin-x64',
+  'linux-arm64-gnu',
+  'linux-arm64-musl',
+  'linux-x64-gnu',
+  'linux-x64-musl',
+  'win32-arm64-msvc',
+  'win32-x64-msvc',
+];
 
-  if (!fs.existsSync(dir)) {
-    return files;
-  }
-
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-
-    if (entry.isDirectory()) {
-      // Look for files ending with the suffix in subdirectories
-      const subEntries = fs.readdirSync(fullPath, { withFileTypes: true });
-      for (const subEntry of subEntries) {
-        if (subEntry.isFile() && subEntry.name.includes(suffix)) {
-          files.push(path.join(fullPath, subEntry.name));
-        }
-      }
-    }
-  }
-
-  return files;
+function filesIn(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) return filesIn(file);
+    if (!entry.isFile())
+      throw new Error(`Artifact must be a regular file: ${file}`);
+    return [file];
+  });
 }
 
-function requireArtifact(files, filename) {
-  const matches = files.filter(
-    (file) => path.basename(file) === filename && fs.existsSync(file),
-  );
-  if (matches.length !== 1) {
-    throw new Error(
-      `Expected exactly one ${filename} artifact, found ${matches.length}`,
-    );
-  }
-  const file = matches[0];
-  const stat = fs.statSync(file);
-  if (!stat.isFile() || stat.size === 0) {
-    throw new Error(`Empty or invalid artifact: ${file}`);
-  }
-  return file;
-}
-
-async function moveArtifacts() {
-  console.log('Starting artifact move process...');
-
-  try {
-    // Move Go CLI binaries into the @rslint/native-{tuple} subpackages (flat,
-    // alongside the .node). Artifacts are named `{platform}-rslint`. Linux
-    // binaries are built with cgo disabled, so one build serves both glibc and
-    // musl — it's copied into both the -gnu and -musl tuple dirs.
-    const platformToTuples = {
-      'darwin-arm64': ['darwin-arm64'],
-      'darwin-x64': ['darwin-x64'],
-      'linux-arm64': ['linux-arm64-gnu', 'linux-arm64-musl'],
-      'linux-x64': ['linux-x64-gnu', 'linux-x64-musl'],
-      'win32-arm64': ['win32-arm64-msvc'],
-      'win32-x64': ['win32-x64-msvc'],
-    };
-
-    const rslintFiles = findBinaries('binaries', '-rslint');
-    console.log(`Found ${rslintFiles.length} rslint binary files`);
-    const nativeFiles = findBinaries('binaries', 'rslint.').filter((file) =>
-      file.endsWith('.node'),
-    );
-    // Validate this run's complete input before touching package outputs.
-    // A previous local build must not conceal a missing or duplicate artifact.
-    const goArtifacts = Object.entries(platformToTuples).map(
-      ([platform, tuples]) => ({
-        file: requireArtifact(rslintFiles, `${platform}-rslint`),
-        tuples,
-        binName: platform.startsWith('win32-') ? 'rslint.exe' : 'rslint',
-      }),
-    );
-    const nodeArtifacts = Object.values(platformToTuples)
-      .flat()
-      .map((tuple) => ({
-        file: requireArtifact(nativeFiles, `rslint.${tuple}.node`),
-        tuple,
-      }));
-    const ruleSchemasSrc = requireArtifact(
-      [path.join('binaries', 'rule-schemas', 'rule-schemas.json')],
-      'rule-schemas.json',
-    );
-
-    for (const { file, tuples, binName } of goArtifacts) {
-      console.log(`Processing ${file}`);
-      for (const tuple of tuples) {
-        const targetDir = path.join('npm', 'rslint', tuple);
-        const targetFile = path.join(targetDir, binName);
-        fs.mkdirSync(targetDir, { recursive: true });
-        fs.copyFileSync(file, targetFile);
-        fs.chmodSync(targetFile, 0o755); // Make executable
-        console.log(`Copied ${file} to ${targetFile}`);
-      }
+function moveArtifacts() {
+  const files = filesIn('binaries');
+  const names = new Set(tuples.map((tuple) => `rslint.${tuple}.node`));
+  for (const file of files) {
+    if (!names.has(path.basename(file))) {
+      throw new Error(`Unexpected release artifact: ${file}`);
     }
-
-    // Move napi `.node` parser binaries into the @rslint/native-{tuple}
-    // subpackages (flat, alongside the Go binary). Artifacts are named
-    // `rslint.{tuple}.node`; target is `npm/rslint/{tuple}/` (libc suffix kept
-    // so gnu/musl stay separate). Not chmod'd — a `.node` is dlopen'd.
-    console.log(`Found ${nodeArtifacts.length} napi .node files`);
-
-    for (const { file, tuple } of nodeArtifacts) {
-      console.log(`Processing ${file}`);
-      const filename = path.basename(file); // rslint.linux-x64-gnu.node
-      const targetDir = path.join('npm', 'rslint', tuple);
-      const targetFile = path.join(targetDir, filename);
-
-      fs.mkdirSync(targetDir, { recursive: true });
-      fs.copyFileSync(file, targetFile);
-
-      console.log(`Copied ${file} to ${targetFile}`);
+  }
+  // Validate the complete run before replacing any package outputs. Missing,
+  // duplicate or stale process/service artifacts must never be hidden by a
+  // previous local build.
+  const artifacts = tuples.map((tuple) => {
+    const filename = `rslint.${tuple}.node`;
+    const matches = files.filter((file) => path.basename(file) === filename);
+    if (matches.length !== 1) {
+      throw new Error(
+        `Expected exactly one ${filename}, found ${matches.length}`,
+      );
     }
-
-    // Move the rule options JSON Schema dump (a single, platform-independent
-    // artifact named `rule-schemas`, uploaded once from the `build` job's
-    // linux-amd64 leg) to the fixed path
-    // the generate-rule-option-types rslib plugin reads — see
-    // packages/rslint/rstack.config.ts's onAfterBuild hook, which runs during
-    // publish-npm's `build:js` step.
-    const ruleSchemasTarget = path.join(
-      'packages',
+    const contents = fs.readFileSync(matches[0]);
+    const header = contents.subarray(0, 4).toString('hex');
+    const valid = tuple.startsWith('darwin-')
+      ? ['cffaedfe', 'feedfacf'].includes(header)
+      : tuple.startsWith('linux-')
+        ? header === '7f454c46'
+        : contents.subarray(0, 2).toString() === 'MZ';
+    if (!valid) throw new Error(`Invalid native addon: ${matches[0]}`);
+    const directory = path.join('npm', 'rslint', tuple);
+    const metadata = JSON.parse(
+      fs.readFileSync(path.join(directory, 'package.json'), 'utf8'),
+    );
+    if (
+      metadata.name !== `@rslint/native-${tuple}` ||
+      metadata.exports['.'] !== `./${filename}`
+    ) {
+      throw new Error(`Native package metadata does not match ${tuple}`);
+    }
+    for (const legacy of [
       'rslint',
-      'rule-schemas.json',
-    );
-    fs.copyFileSync(ruleSchemasSrc, ruleSchemasTarget);
-    console.log(`Copied ${ruleSchemasSrc} to ${ruleSchemasTarget}`);
-
-    console.log('Artifact move process completed successfully!');
-  } catch (error) {
-    console.error('Error:', error.message);
-    process.exit(1);
+      'rslint.exe',
+      'rslint-tsrs-service',
+      'rslint-tsrs-service.exe',
+    ]) {
+      if (fs.existsSync(path.join(directory, legacy))) {
+        throw new Error(
+          `Unexpected legacy executable in ${directory}: ${legacy}`,
+        );
+      }
+    }
+    return { source: matches[0], target: path.join(directory, filename) };
+  });
+  for (const { source, target } of artifacts) {
+    fs.copyFileSync(source, target);
+    console.log(`Copied ${source} to ${target}`);
   }
 }
 
-moveArtifacts();
+try {
+  moveArtifacts();
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}

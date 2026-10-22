@@ -11,8 +11,8 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::sync::{
-    atomic::{AtomicU32, Ordering},
     Arc, Mutex, OnceLock,
+    atomic::{AtomicU32, Ordering},
 };
 
 use crate::NativeResult;
@@ -595,13 +595,17 @@ mod tests {
     fn rejects_invalid_and_replayed_leases() {
         let mut arena = configured_arena();
         let config = test_configuration();
-        assert!(arena
-            .register(vec![batch(config.slot_count, 1, 1)])
-            .is_err());
+        assert!(
+            arena
+                .register(vec![batch(config.slot_count, 1, 1)])
+                .is_err()
+        );
         assert!(arena.register(vec![batch(0, 0, 1)]).is_err());
-        assert!(arena
-            .register(vec![batch(0, 1, config.slot_size + 1)])
-            .is_err());
+        assert!(
+            arena
+                .register(vec![batch(0, 1, config.slot_size + 1)])
+                .is_err()
+        );
         assert!(arena.register(vec![batch(0, 1, 8)]).is_err()); // no producer publication
         arena.mapping.as_ref().unwrap().publish_for_test(0, 1);
         let id = arena.register(vec![batch(0, 1, 8)]).unwrap();
@@ -704,15 +708,17 @@ mod tests {
             },
         )
         .unwrap();
-        assert!(with_bytes(
-            SharedBytes {
-                lease,
-                offset: config.slot_size,
-                length: 1
-            },
-            |_| Ok(()),
-        )
-        .is_err());
+        assert!(
+            with_bytes(
+                SharedBytes {
+                    lease,
+                    offset: config.slot_size,
+                    length: 1
+                },
+                |_| Ok(()),
+            )
+            .is_err()
+        );
         assert!(arena.release(lease));
     }
 
@@ -737,9 +743,11 @@ mod tests {
             assert!(arena.slots.is_empty());
         }
         let occupied = arena.register(vec![batch(2, 1, 0)]).unwrap();
-        assert!(arena
-            .register(vec![batch(0, 1, 5), batch(2, 2, 0)])
-            .is_err());
+        assert!(
+            arena
+                .register(vec![batch(0, 1, 5), batch(2, 2, 0)])
+                .is_err()
+        );
         assert!(!arena.slots.contains_key(&0));
         assert_eq!(arena.slots[&2].lease, occupied);
         let lease = arena
@@ -793,15 +801,17 @@ mod tests {
             assert!(lease.bytes(u32::MAX, 1).is_err());
         }
         assert!(arena.release(id));
-        assert!(with_bytes(
-            SharedBytes {
-                lease: id,
-                offset: 8,
-                length: 0
-            },
-            |_| Ok(())
-        )
-        .is_err());
+        assert!(
+            with_bytes(
+                SharedBytes {
+                    lease: id,
+                    offset: 8,
+                    length: 0
+                },
+                |_| Ok(())
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -830,15 +840,17 @@ mod tests {
                 assert!(!arena.release(id));
                 assert_eq!(arena.slots[&0].lease, id);
                 assert_eq!(arena.slots[&2].lease, id);
-                assert!(with_bytes(
-                    SharedBytes {
-                        lease: id,
-                        offset: 0,
-                        length: 0
-                    },
-                    |_| Ok(())
-                )
-                .is_err());
+                assert!(
+                    with_bytes(
+                        SharedBytes {
+                            lease: id,
+                            offset: 0,
+                            length: 0
+                        },
+                        |_| Ok(())
+                    )
+                    .is_err()
+                );
                 let mapping = arena.mapping.as_ref().unwrap();
                 mapping.publish_for_test(0, 2);
                 mapping.publish_for_test(2, 2);
@@ -928,15 +940,17 @@ mod tests {
             .unwrap();
         assert_ne!(old, current);
         assert!(!arena.release(old));
-        assert!(with_bytes(
-            SharedBytes {
-                lease: old,
-                offset: 0,
-                length: 1
-            },
-            |_| Ok(())
-        )
-        .is_err());
+        assert!(
+            with_bytes(
+                SharedBytes {
+                    lease: old,
+                    offset: 0,
+                    length: 1
+                },
+                |_| Ok(())
+            )
+            .is_err()
+        );
         with_bytes(
             SharedBytes {
                 lease: current,

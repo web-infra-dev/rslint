@@ -47,3 +47,7 @@ runs:
         workspaces: ${{ inputs.cache-workspaces }}
         cache-bin: ${{ inputs.cache-bin }}
         cache-on-failure: true
+
+    - name: Prepare pinned compiler sources
+      shell: bash
+      run: node scripts/tsrs/prepare-rust-compiler.mjs

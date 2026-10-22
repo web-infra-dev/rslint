@@ -1,0 +1,110 @@
+[
+  {
+    "rule": "@typescript-eslint/no-for-in-array",
+    "valid": [
+      "for (const key of [1, 2]) {}",
+      "for (const key in { a: 1 }) {}",
+      "declare const a: { [key: number]: string }; for (const key in a) {}",
+      "declare const a: { [key: number]: string; length: string }; for (const key in a) {}",
+      "declare const a: any; for (const key in a) {}",
+      "function run<T>(a: T) { for (const key in a) {} }"
+    ],
+    "invalid": [
+      "for (const key in [1, 2]) {}",
+      "declare const a: readonly [number, string]; for (const key in a) {}",
+      "declare const a: string[] | { a: number }; for (const key in a) {}",
+      "declare const a: number[] & { tag: string }; for (const key in a) {}",
+      "declare const a: { [key: number]: string; length: number }; for (const key in a) {}",
+      "function run<T extends any[]>(a: T) { for (const key in a) {} }",
+      "for (const key\n in (([1, 2]))\n )\n /* body */ {}",
+      "for (const key in 'text') {}"
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-array-delete",
+    "valid": [
+      "declare const a: { key: number }; delete a['key'];",
+      "declare const a: number[] | { 0: number }; delete a[0];",
+      "declare const a: any; delete a[0];",
+      "declare const a: unknown; delete a[0];",
+      "declare const a: never; delete a[0];",
+      "declare const a: number[]; delete a.length;"
+    ],
+    "invalid": [
+      "declare const a: number[]; delete a[0];",
+      "declare const a: number[] | string[]; delete a[0];",
+      "declare const a: number[] & { tag: string }; delete a[0];",
+      "declare const a: readonly [number, string]; delete a[0];",
+      "function run<T extends any[]>(a: T) { delete a[0]; }",
+      "declare const a: number[]; delete /* 😀 */ (a /* left */ [ /* middle */ 0 /* right */ ]);",
+      "delete [1, 2, 3][(foo(), 1)];",
+      "declare const a: number[]; delete a?.[0];"
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/restrict-plus-operands",
+    "valid": [
+      "const value = 1 + 2;",
+      "const value = 1n + 2n;",
+      "const value = 'a' + 'b';",
+      "const value = 'a' + 2;",
+      "const value = 'a' + 2n;",
+      "const value = 'a' + /a/;",
+      "const value = 'a' + true + null + undefined;",
+      "function run(a: any) { return a + 2; }",
+      "function run<T>(a: T) { return a + 'a'; }",
+      "function run<T extends string>(a: T) { return a + 'a'; }",
+      "function run(a: string & { escaped: true }) { return a + 'a'; }",
+      "function run(a: string | number) { return a + 'a'; }"
+    ],
+    "invalid": [
+      "const value = 1 + 2n;",
+      "const value = 1n + 2;",
+      "const value = [] + {};",
+      "const value = 1 + /a/;",
+      "function run(a: unknown) { return (a) + 'a'; }",
+      "function run(a: never) { return a + 'a'; }",
+      "function run(a: symbol) { return a + 'a'; }",
+      "function run(a: number | bigint) { return a + 1; }",
+      "function run(a: string | { a: 1 } | { b: 2 }) { return a + 'a'; }",
+      "function run(a: { a: 1 } & { b: 2 }) { return a + 'a'; }",
+      "let value = 1; value += 2n;"
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/only-throw-error",
+    "valid": [
+      "throw new Error('message');",
+      "throw new TypeError('message');",
+      "class Error {} throw new Error();",
+      "class Derived extends Error {} throw new Derived();",
+      "interface Derived extends Error { code: string }; declare const error: Derived; throw error;",
+      "declare const error: Error | TypeError; throw error;",
+      "declare const error: Error & { code: string }; throw error;",
+      "function run<T extends Error>(error: T) { throw error; }",
+      "function run(error: any) { throw error; }",
+      "function run(error: unknown) { throw error; }",
+      "try {} catch (error) { throw error; }",
+      "Promise.resolve().catch((error: string) => { throw error; });",
+      "Promise.resolve().then(() => {}, (error: string) => { throw error; });",
+      "Promise.resolve()['catch']((error: string) => { throw error; });",
+      "const thenable = { then(callback: () => unknown) {}, catch(callback: (error: string) => void) {} }; thenable.catch(error => { throw error; });"
+    ],
+    "invalid": [
+      "throw undefined;",
+      "throw 'message';",
+      "throw null;",
+      "throw 1;",
+      "throw { message: 'text', name: 'Error' };",
+      "export {}; class Error {} throw new Error();",
+      "class Fake implements Error { name = ''; message = ''; } throw new Fake();",
+      "declare const error: Error | string; throw error;",
+      "function run<T>(error: T) { throw error; }",
+      "function run<T extends number>(error: T) { throw error; }",
+      "Promise.resolve().then((error: string) => { throw error; });",
+      "Promise.resolve().catch(function (error: string) { throw error; });",
+      "Promise.resolve().catch((...error: string[]) => { throw error; });",
+      "const object = { catch(callback: (error: string) => void) {} }; object.catch(error => { throw error; });"
+    ]
+  }
+]

@@ -1,0 +1,216 @@
+[
+  {
+    "rule": "@typescript-eslint/no-empty-object-type",
+    "valid": [
+      "interface Foo { x: number }",
+      "interface Foo<T> { x: T }",
+      "interface Both extends Left, Right {}",
+      "let value: { a: number; b: string };",
+      "type T = number & {};",
+      "type T = {} & number;",
+      "type T = ({} & X);",
+      "type T = (X & {});",
+      "type Brand<T, B> = T & { readonly __brand: B };",
+      "type T<K extends string> = { [P in K]: number };",
+      "const literal = {};",
+      "let value: object; let other: Object;"
+    ],
+    "invalid": [
+      "interface Foo {}",
+      "interface Foo<T> {}",
+      "interface Foo extends Bar {}",
+      "interface Foo<T> extends Bar<T> {}",
+      "interface Base extends Array<number | {}> {}",
+      "export interface Foo {}",
+      "export /* keep */ interface Foo {}",
+      "export declare /* keep */ interface Foo {}",
+      "export default interface Foo {}",
+      "export default interface Foo extends Bar {}",
+      "interface Foo< /*a*/ T, /*b*/ > {}",
+      "interface Foo<\n T extends Bar = Bar,\n U = string,\n> extends Parent<T, U> {}",
+      "interface Foo {} interface Foo { x: number; }",
+      "interface Foo {} class Foo { x = 1; }",
+      "class Foo { x = 1; } interface Foo {}",
+      "namespace A { export interface Foo {} } namespace B { export interface Foo {} }",
+      "interface Foo {} namespace Nested { export interface Foo { x: number; } }",
+      "type Foo = {};",
+      "let value: {};",
+      "type Foo<T> = T | {};",
+      "type Foo = {} | null;",
+      "type Foo = ({});",
+      "type Foo = X & ({});",
+      "type Foo = { inner: {} };",
+      "type Foo = Record<string, {}>;",
+      "interface Foo { empty: {} }",
+      {
+        "text": "interface Foo {}",
+        "extension": ".d.ts"
+      },
+      {
+        "text": "export interface Foo<T> {}",
+        "extension": ".mts"
+      },
+      {
+        "text": "export interface Foo<T> {}",
+        "extension": ".cts"
+      }
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-namespace",
+    "valid": [
+      "declare module \"foo\" { export const bar: string; }",
+      "module \"foo\" {}",
+      "export {}; declare global { interface Window { foo: string; } }",
+      "export const value = 1; export function test() { return value; }",
+      "const namespace = \"allowed identifier\";",
+      {
+        "text": "namespace Test { export const value: number; }",
+        "extension": ".d.ts"
+      },
+      {
+        "text": "declare namespace Outer { namespace Inner {} }",
+        "extension": ".d.ts"
+      },
+      {
+        "text": "namespace Test { export const value: number; }",
+        "extension": ".d.cts"
+      },
+      {
+        "text": "namespace Test { export const value: number; }",
+        "extension": ".d.mts"
+      }
+    ],
+    "invalid": [
+      "namespace Test {}",
+      "module Test {}",
+      "namespace A.B.C {}",
+      "module A.B.C {}",
+      "declare namespace Test { export const value: number; }",
+      "export namespace Test { export const value = 1; }",
+      "namespace Outer { export namespace Inner {} }",
+      "declare namespace Outer { namespace Inner {} }",
+      "declare module \"foo\" { namespace Inner {} }",
+      "export {}; declare global { namespace Inner {} }",
+      "/* leading */ namespace Test {}",
+      {
+        "text": "export namespace Test {}",
+        "extension": ".mts"
+      },
+      {
+        "text": "export namespace Test {}",
+        "extension": ".cts"
+      }
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-this-alias",
+    "valid": [
+      "const self = foo(this);",
+      "const value = this as unknown;",
+      "const value = this!;",
+      "const value = this satisfies unknown;",
+      "const value = <unknown>this;",
+      "function fn(value = this) {}",
+      "class Example { value = this; }",
+      "object.value = this;",
+      "let value; value = foo(this); value = this as unknown; value = this!;",
+      "let value; ({ value } = this); [value] = this;",
+      "let value; (value as unknown) = this;",
+      "const { props, state } = this;",
+      "const [foo, bar] = this;",
+      "setTimeout(() => { this.doWork(); });",
+      "const self = (() => this);"
+    ],
+    "invalid": [
+      "const self = this;",
+      "const asThis: this = this;",
+      "const self = (((this)));",
+      "const /* leading */ self = this;",
+      "const \\u0074hat = this;",
+      "let that; that = this;",
+      "let that; ((that)) = this;",
+      "let that = 1; that += this;",
+      "let that; that ||= this; that &&= this; that ??= this;",
+      "let that; that = (this);",
+      "var unscoped = this; let mutable = this; const scoped = this;",
+      "class Test { method() { const self: this = this; } }",
+      {
+        "text": "const self = this;",
+        "extension": ".js"
+      },
+      {
+        "text": "const View = () => { const self = this; return <div />; };",
+        "extension": ".tsx"
+      },
+      "const emoji = \"😀\"; const self: unknown = this;"
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-array-constructor",
+    "valid": [
+      "new Array(x);",
+      "Array(x);",
+      "new Array(9);",
+      "Array(9);",
+      "new foo.Array();",
+      "foo.Array();",
+      "new Array.foo();",
+      "Array.foo();",
+      "new Array<Foo>(1, 2, 3);",
+      "new Array<Foo>();",
+      "Array<Foo>(1, 2, 3);",
+      "Array<Foo>();",
+      "Array?.(x);",
+      "foo?.Array();",
+      "Array?.foo();",
+      "foo.Array?.();",
+      "Array.foo?.();",
+      "Array?.<Foo>();",
+      "const value = \"Array()\"; service.method();",
+      "/* Array */ service.method(a, b); new Other();",
+      "TypedArray(); new ArrayLike(a, b);",
+      "service[\"\\u0041rray\"]();",
+      "Array(...values);",
+      "Array!();",
+      "(Array!)();",
+      "(Array as any)();",
+      "(Array satisfies ((...args: unknown[]) => unknown))();",
+      "(Array)(value);",
+      "new (Array)(value);",
+      "new (Arr\\u0061y)(...values);",
+      "(Arr\\u0061y)?.<string>();",
+      "new (Arr\\u0061y)<string>(a, b);"
+    ],
+    "invalid": [
+      "new Array();",
+      "Array();",
+      "Array?.();",
+      "new Array(x, y);",
+      "Array(x, y);",
+      "Array?.(x, y);",
+      "new Array(0, 1, 2);",
+      "new Array;",
+      "Array((x), y);",
+      "Array(foo(), bar());",
+      "(Array)();",
+      "new ((Array))();",
+      "Arr\\u0061y();",
+      "new (Arr\\u0061y)(x, y);",
+      "Array(/* retained */);",
+      "new Array( /*a*/ first, /*b*/ second, /*c*/ );",
+      "/*before*/ new /*callee*/ Array /*open*/ (first, second);",
+      "function f(Array: Function) { Array(); }",
+      "const Array = () => 1; Array();",
+      "const emoji = \"😀\"; Array();",
+      {
+        "text": "Array(); new Array(1, 2);",
+        "extension": ".js"
+      },
+      {
+        "text": "const View = () => <div>{Array()}</div>;",
+        "extension": ".tsx"
+      }
+    ]
+  }
+]

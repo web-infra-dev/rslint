@@ -14,8 +14,8 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsgo -b tsconfig.build.json --force",
-    "dev": "tsgo -b tsconfig.build.json --force --watch",
+    "build": "tsc -b tsconfig.build.json --force",
+    "dev": "tsc -b tsconfig.build.json --force --watch",
     "test": "rs test --testTimeout=0 --passWithNoTests",
     "test:update": "rs test -u --testTimeout=0 --passWithNoTests"
   },
@@ -33,8 +33,7 @@
   "description": "Rule testing utilities for rslint",
   "devDependencies": {
     "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "@typescript/native-preview": "catalog:"
+    "typescript": "catalog:"
   },
   "dependencies": {
     "@rslint/core": "workspace:*"

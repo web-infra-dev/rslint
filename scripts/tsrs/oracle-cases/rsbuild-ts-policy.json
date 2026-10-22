@@ -1,0 +1,257 @@
+[
+  {
+    "rule": "@typescript-eslint/ban-ts-comment",
+    "valid": [
+      "const c = \"// @ts-ignore\";",
+      "const c = \"/* @ts-expect-error */\";",
+      "const c = `// @ts-ignore`;",
+      "const r = /\\/\\/ @ts-ignore/;",
+      "// just a comment containing @ts-ignore somewhere",
+      "// @ts-expect-error abc",
+      "// @ts-expect-error: some valid reason",
+      "// @ts-expect-error áb́ć",
+      "// @ts-expect-error 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦",
+      "// @ts-expect-error 🇦🇺🇳🇿🇨🇦",
+      "// @ts-expect-error1",
+      "// @ts-ignore_",
+      "// @ts-ignored",
+      "// @ts-ignoreFoo",
+      "// @ts-ignore",
+      "//\u000b@ts-ignore",
+      "/* @ts-expect-error not on the last line\n */",
+      "/*\n @ts-ignore\n*/",
+      "/* @ts-ignore\n * not on the last line */",
+      "/** @ts-nocheck */",
+      "//// @ts-nocheck",
+      "// @ts-check",
+      "/* @ts-expect-error abc */",
+      "const a = 1;\n// @ts-nocheck\nconst b: string = a;",
+      "// @ts-check with a no-op // @ts-ignore",
+      {
+        "text": "const View = () => <div>// @ts-ignore</div>;",
+        "extension": ".tsx"
+      },
+      {
+        "text": "const View = () => <>/* @ts-ignore */</>;",
+        "extension": ".tsx"
+      }
+    ],
+    "invalid": [
+      "// @ts-expect-error",
+      "/// @ts-expect-error",
+      "//// @ts-expect-error x",
+      "/* @ts-expect-error */",
+      "/*\n@ts-expect-error */",
+      "/**\n * @ts-expect-error */",
+      "// @ts-expect-error ab",
+      "// @ts-expect-error áb́",
+      "// @ts-expect-error 👨‍👩‍👧‍👦👨‍👩‍👧‍👦",
+      "// @ts-expect-error 🇦🇺🇨🇦",
+      "// @ts-expect-error ab﻿",
+      "// @ts-expect-errora",
+      "// @ts-ignore",
+      "/// @ts-ignore because",
+      "////// @ts-ignore",
+      "/* @ts-ignore */",
+      "/*\n * @ts-ignore reason */",
+      "// @ts-ignore repeat @ts-ignore",
+      "// @ts-ignoreλ",
+      "// @ts-ignore-",
+      "// @ts-nocheck",
+      "/// @ts-nocheck",
+      "// header\n/* license */\n// @ts-nocheck\nconst value = 1;",
+      "#!/usr/bin/env node\n// @ts-ignore\nfoo();",
+      "const emoji = \"😀\"; // @ts-ignore",
+      {
+        "text": "const View = () => <div>{/* @ts-ignore */}</div>;",
+        "extension": ".tsx"
+      },
+      {
+        "text": "// @ts-ignore\nconst a = 1;",
+        "extension": ".js"
+      },
+      {
+        "text": "// @ts-expect-error x\ndeclare const value: number;",
+        "extension": ".d.ts"
+      }
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-require-imports",
+    "valid": [
+      "import { l } from 'lib';",
+      "var lib3 = load('not_an_import');",
+      "import lib9 = lib2.anotherSubImport;",
+      "import { createRequire } from 'module'; const require = createRequire(); require('package');",
+      "function load(require: (id: string) => unknown) { return require('package'); }",
+      "function load({ require }: { require: Function }) { return require('package'); }",
+      "try { run(); } catch (require) { require('package'); }",
+      "import require from 'custom-loader'; require('package');",
+      "import { require } from 'custom-loader'; require('package');",
+      "import type { require } from 'custom-loader'; require('package');",
+      "function require(id: string) { return id; } require('package');",
+      "{ require('package'); const require = customRequire; }",
+      "const loader = function require() { return require('package'); };",
+      "const Loader = class require { static load() { return require('package'); } };",
+      "const require = customRequire; function load(value = require('package')) { return value; }",
+      "function load(require = require('package')) { return require; }",
+      "function load() { if (true) { var require = customRequire; } require('package'); }",
+      "class Loader { static { var require = customRequire; require('package'); } }",
+      "(require)('package');",
+      "require!('package');",
+      "module.require('package');",
+      "globalThis.require('package');",
+      "declare const require: Function; require('package');",
+      {
+        "text": "const require = customRequire; require('package');",
+        "extension": ".js"
+      }
+    ],
+    "invalid": [
+      "var lib = require('lib');",
+      "require?.('lib');",
+      "require();",
+      "require(variable);",
+      "require(`pkg`);",
+      "import lib = require('lib');",
+      "export import lib = require('lib');",
+      "function load(require: Function) { require('local'); } require('global');",
+      "{ const require = customRequire; require('local'); } require('global');",
+      "try { run(); } catch(require) { require('local'); } require('global');",
+      "class C { static { var require = customRequire; require('local'); } } require('global');",
+      "function load(value = require('global')) { const require = customRequire; return value; }",
+      "interface require {} require('package');",
+      "type require = number; require('package');",
+      "export {}; declare global { function require(id: string): unknown; } require('package');",
+      "declare module 'loader' { function require(id: string): unknown; } require('package');",
+      "function load() { require('package'); }",
+      "const emoji = '😀'; const value = require('pkg');",
+      {
+        "text": "const value = require('pkg');",
+        "extension": ".js"
+      },
+      {
+        "text": "const value = require('pkg');",
+        "extension": ".cts"
+      }
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/no-unused-expressions",
+    "valid": [
+      "function f() {}",
+      "a = b;",
+      "new a;",
+      "{}",
+      "f(); g();",
+      "i++; --i;",
+      "delete foo.bar;",
+      "void new C;",
+      "\"use strict\";",
+      "\"directive one\"; \"directive two\"; f();",
+      "function foo() { \"use strict\"; return true; }",
+      "const foo = () => { \"use strict\"; return true; };",
+      "namespace Foo { \"use strict\"; export class Bar {} }",
+      "class C { static { \"use strict\"; } }",
+      "function* foo() { yield 0; }",
+      "async function foo() { await 5; }",
+      "import('./foo');",
+      "func?.(\"foo\");",
+      "obj?.foo(\"bar\");",
+      "a?.['b']?.c();",
+      "a += 1; a &&= b; a ||= b; a ??= b;",
+      "foo() as any;",
+      "foo()!;",
+      "<any>foo();",
+      "declare const foo: string; foo satisfies string;",
+      "(foo satisfies string)!;",
+      "declare function getSet(): Set<unknown>; getSet()<string>();",
+      {
+        "text": "<div />; <><span /></>;",
+        "extension": ".tsx"
+      },
+      {
+        "text": "\"use strict\"; const value = 1;",
+        "extension": ".js"
+      }
+    ],
+    "invalid": [
+      "0;",
+      "a;",
+      "f(), 0;",
+      "{ 0; }",
+      "[];",
+      "a && b();",
+      "a() || false;",
+      "a || (b = c);",
+      "a ?? b();",
+      "`untagged template literal`;",
+      "tag`tagged template literal`;",
+      "a ? b() : c();",
+      "foo.bar;",
+      "!a;",
+      "+a;",
+      "~a;",
+      "typeof a;",
+      "/regex/;",
+      "this;",
+      "null;",
+      "true;",
+      "1n;",
+      "({a: 1});",
+      "(function () {});",
+      "(() => {});",
+      "(class {});",
+      "\"directive one\"; f(); \"directive two\";",
+      "function foo() { f(); \"late directive\"; }",
+      "{ \"not a directive\"; }",
+      "class C { static { f(); \"late directive\"; } }",
+      "namespace Foo { f(); \"late directive\"; }",
+      "(\"not a directive\");",
+      "foo!;",
+      "<any>foo;",
+      "foo as any;",
+      "(foo as string)!;",
+      "(foo)<string>;",
+      "const emoji = \"😀\"; foo;"
+    ]
+  },
+  {
+    "rule": "@typescript-eslint/triple-slash-reference",
+    "valid": [
+      "/// <reference lib=\"es2022\" />\n",
+      "/// <reference types=\"foo\" />\n",
+      "const value = 1;\n/// <reference path=\"foo\" />\n",
+      "//// <reference path=\"four-slashes\" />\n",
+      "/* /// <reference path=\"block\" /> */",
+      "const value = '/// <reference path=\"string\" />';",
+      "const value = `/// <reference path=\"template\" />`;",
+      "/// <Reference path=\"uppercase\" />\n",
+      "/// <reference types=\"foo\" />\nimport foo = ns.foo;",
+      "/// <reference types=\"foo\" />\nimport('foo'); require('foo'); export * from 'foo';",
+      "/// <reference types=\" foo \" />\nimport 'foo';",
+      "/// <reference types=\"f\\u006fo\" />\nimport 'foo';",
+      "/// <reference types=\"foo\" />\nimport 'bar';"
+    ],
+    "invalid": [
+      "/// <reference path=\"foo\" />\n",
+      "/// <reference types=\"foo\" />\nimport 'foo';",
+      "/// <reference types=\"foo\" />\nimport foo = require('foo');",
+      "/// <reference types=\"foo\" />\nimport type { Foo } from 'foo';",
+      "/// <reference types=\"foo\" />\nimport { Foo } from 'f\\u006fo';",
+      "/// <reference types=\"foo\" />\nimport 'foo'; import type { Foo } from 'foo';",
+      "/// <reference path=\"foo\" />\n/// <reference types=\"foo\" />\n/// <reference lib=\"es2022\" />\nimport 'foo';",
+      "/* license */\n// ordinary comment\n/// <reference path=\"foo\" />\nconst value = 1;",
+      "#!/usr/bin/env node\n/// <reference path=\"foo\" />\n",
+      "\t/// <reference path=\"foo\" />\r\nconst value = 1;\r\n",
+      {
+        "text": "/// <reference path=\"foo\" />\ndeclare const x: number;",
+        "extension": ".d.ts"
+      },
+      {
+        "text": "/// <reference path=\"foo\" />\nconst x = 1;",
+        "extension": ".js"
+      }
+    ]
+  }
+]

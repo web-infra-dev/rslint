@@ -1,0 +1,551 @@
+{
+  "schemaVersion": 1,
+  "status": "complete",
+  "projectCommit": "e7d65898ce92d5f5d78afb0d93b4670b5e2a469d",
+  "baselineCommit": "e0a29f751d4def86d27931759098f27748fa3003",
+  "compilerCommit": "280b426b89cd4ecd6153cf48228826bd60a99c61",
+  "libraryCommit": "1f70213d4922b434345f639b441681e470c7cfc1",
+  "candidateArtifactSHA256": "4b167a98e3b6162511c49b5dc8a79ebf05965475af00176bb4c07755443ae08c",
+  "identitySHA256": "66bf0a58f305887df3778d014f23c28ebf5d0fe57c745a8fc73827bac0a35c67",
+  "proofSHA256": "edfd19c6f50208bc827cc2614ce1321f2726893d99cf1743875c3acaa908a377",
+  "supplementSHA256": "7743a892aa97de1142d6d24bb3df24d2c66ed441558791cc9e4eb5e14a7b7c69",
+  "manifestSHA256": "c09ae5c1d3a77875817f3f1e8dfd35fc788f9921f324699240476f73c9d697f6",
+  "files": 2394,
+  "rules": 129,
+  "plans": 33,
+  "ruleFilePairs": 221014,
+  "typedRuleFilePairs": 31461,
+  "typedFiles": 1232,
+  "warmupsPerSidePerScope": 2,
+  "measurementsPerSidePerScope": 7,
+  "conditions": {
+    "CI": "true",
+    "NODE_DISABLE_COMPILE_CACHE": "1",
+    "GOMAXPROCS": "1",
+    "RAYON_NUM_THREADS": "1",
+    "GOMEMLIMIT": "4GiB"
+  },
+  "memoryMethod": "maximum sampled sum of contemporaneous RSS observations of root and descendants; includes known reparented descendants and the private process group; shared pages may be counted repeatedly; excludes harness; short-lived detached processes and peaks between samples may be missed; never sum individual process peaks",
+  "powerReview": {
+    "status": "passed",
+    "rawMatchingLines": 40,
+    "assertionLines": 40,
+    "actualSleepWakeThermalEvents": 0,
+    "powerHistorySHA256": "4dca1129c62d59a7f6726ddf9b4563eca476a44b00845c6944d5a9a9c873c430",
+    "all36ClockChecksPass": true,
+    "note": "All matching pmset rows have category Assertions, including MaintenanceWake assertion creation/release. These are power assertions, not actual Sleep/Wake/Thermal transitions. No clock guard was relaxed. Background activity remains."
+  },
+  "measurementWindow": {
+    "startedLocal": "2026-10-22 18:54:26",
+    "endedLocal": "2026-10-22 19:05:00"
+  },
+  "candidateSourceManifestSHA256": "f8dbfc3125d088b72a6be802873fa3b8194b41092b2676accd72cbf2a37a54b9",
+  "sampling": {
+    "requestedIntervalMs": 2,
+    "maximumGapMs": 54.3538329999933,
+    "maximumWallObservationUncertaintyMs": 41.0734579999712,
+    "oneMinuteLoadAtStartRange": [2.7470703125, 6.861328125]
+  },
+  "summaries": [
+    {
+      "scope": "full",
+      "baselineWall": {
+        "count": 7,
+        "median": 5.056000541000003,
+        "mad": 0.0743403760000092,
+        "min": 4.873882124999994,
+        "max": 5.2132472920000055
+      },
+      "candidateWall": {
+        "count": 7,
+        "median": 3.2990508749999776,
+        "mad": 0.15689612500000294,
+        "min": 2.932898709,
+        "max": 3.537628834000003
+      },
+      "baselineRssMiB": {
+        "count": 7,
+        "median": 887.15625,
+        "mad": 38.78125,
+        "min": 793.734375,
+        "max": 992.796875
+      },
+      "candidateRssMiB": {
+        "count": 7,
+        "median": 596.328125,
+        "mad": 16.984375,
+        "min": 579.34375,
+        "max": 644.625
+      },
+      "wallComparison": {
+        "candidate_minus_baseline": -1.7569496660000254,
+        "candidate_change_percent": -34.74979189089498,
+        "reduction_percent": 34.74979189089498,
+        "candidate_over_baseline": 0.6525020810910502,
+        "baseline_over_candidate": 1.5325621618369367,
+        "heuristic_noise_threshold": 0.6937095030000364,
+        "directional_signal": "lower",
+        "signal_method": "median difference greater than 3*(baseline MAD+candidate MAD); heuristic, not a confidence interval",
+        "paired_candidate_over_baseline": {
+          "count": 7,
+          "median": 0.6545273850852686,
+          "mad": 0.024057120090358763,
+          "min": 0.5768184829161891,
+          "max": 0.7090748014345924
+        }
+      },
+      "rssComparison": {
+        "candidate_minus_baseline": -304955392,
+        "candidate_change_percent": -32.782063475289725,
+        "reduction_percent": 32.782063475289725,
+        "candidate_over_baseline": 0.6721793652471028,
+        "baseline_over_candidate": 1.4876981527577624,
+        "heuristic_noise_threshold": 175423488,
+        "directional_signal": "lower",
+        "signal_method": "median difference greater than 3*(baseline MAD+candidate MAD); heuristic, not a confidence interval",
+        "paired_candidate_over_baseline": {
+          "count": 7,
+          "median": 0.6828864004714896,
+          "mad": 0.04373306481436057,
+          "min": 0.6071324079191184,
+          "max": 0.7525440510460405
+        }
+      }
+    },
+    {
+      "scope": "engine",
+      "baselineWall": {
+        "count": 7,
+        "median": 5.118619082999999,
+        "mad": 0.18429637499997398,
+        "min": 4.667715457999975,
+        "max": 5.415552250000019
+      },
+      "candidateWall": {
+        "count": 7,
+        "median": 3.2732897500000036,
+        "mad": 0.12022170799997411,
+        "min": 3.073489792000032,
+        "max": 3.4927319999999895
+      },
+      "baselineRssMiB": {
+        "count": 7,
+        "median": 823.46875,
+        "mad": 17.71875,
+        "min": 786.15625,
+        "max": 895.859375
+      },
+      "candidateRssMiB": {
+        "count": 7,
+        "median": 592.484375,
+        "mad": 6.75,
+        "min": 576.078125,
+        "max": 609.65625
+      },
+      "wallComparison": {
+        "candidate_minus_baseline": -1.8453293329999951,
+        "candidate_change_percent": -36.051311947175726,
+        "reduction_percent": 36.051311947175726,
+        "candidate_over_baseline": 0.6394868805282428,
+        "baseline_over_candidate": 1.5637537382689672,
+        "heuristic_noise_threshold": 0.9135542489998443,
+        "directional_signal": "lower",
+        "signal_method": "median difference greater than 3*(baseline MAD+candidate MAD); heuristic, not a confidence interval",
+        "paired_candidate_over_baseline": {
+          "count": 7,
+          "median": 0.6573717579757659,
+          "mad": 0.030967504032646143,
+          "min": 0.5926963059949265,
+          "max": 0.7078442588153422
+        }
+      },
+      "rssComparison": {
+        "candidate_minus_baseline": -242204672,
+        "candidate_change_percent": -28.050168874046527,
+        "reduction_percent": 28.050168874046527,
+        "candidate_over_baseline": 0.7194983112595348,
+        "baseline_over_candidate": 1.3898573274611672,
+        "heuristic_noise_threshold": 76972032,
+        "directional_signal": "lower",
+        "signal_method": "median difference greater than 3*(baseline MAD+candidate MAD); heuristic, not a confidence interval",
+        "paired_candidate_over_baseline": {
+          "count": 7,
+          "median": 0.7276953436302228,
+          "mad": 0.025792751134653735,
+          "min": 0.6430452603122002,
+          "max": 0.7566320198572758
+        }
+      }
+    }
+  ],
+  "rawSamples": [
+    {
+      "scope": "full",
+      "backend": "baseline",
+      "phase": "warmup",
+      "round": 1,
+      "wallSeconds": 5.114767208,
+      "peakTreeRssMiB": 798.890625,
+      "exitCode": 0,
+      "clockSkewSeconds": 5.8079902832020025e-5
+    },
+    {
+      "scope": "full",
+      "backend": "candidate",
+      "phase": "warmup",
+      "round": 1,
+      "wallSeconds": 2.903908666999996,
+      "peakTreeRssMiB": 579.546875,
+      "exitCode": 0,
+      "clockSkewSeconds": 3.289423352725862e-5
+    },
+    {
+      "scope": "full",
+      "backend": "candidate",
+      "phase": "warmup",
+      "round": 2,
+      "wallSeconds": 2.966440375000005,
+      "peakTreeRssMiB": 578.75,
+      "exitCode": 0,
+      "clockSkewSeconds": 3.41228946538763e-5
+    },
+    {
+      "scope": "full",
+      "backend": "baseline",
+      "phase": "warmup",
+      "round": 2,
+      "wallSeconds": 5.076234624999998,
+      "peakTreeRssMiB": 883.171875,
+      "exitCode": 0,
+      "clockSkewSeconds": 5.7091522222663116e-5
+    },
+    {
+      "scope": "full",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 1,
+      "wallSeconds": 5.084612917000001,
+      "peakTreeRssMiB": 848.375,
+      "exitCode": 0,
+      "clockSkewSeconds": 5.6428382691819934e-5
+    },
+    {
+      "scope": "full",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 1,
+      "wallSeconds": 2.932898709,
+      "peakTreeRssMiB": 579.34375,
+      "exitCode": 0,
+      "clockSkewSeconds": 3.356494885053962e-5
+    },
+    {
+      "scope": "full",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 2,
+      "wallSeconds": 2.967637417000006,
+      "peakTreeRssMiB": 583.625,
+      "exitCode": 0,
+      "clockSkewSeconds": 3.40113369077244e-5
+    },
+    {
+      "scope": "full",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 2,
+      "wallSeconds": 5.056000541000003,
+      "peakTreeRssMiB": 961.28125,
+      "exitCode": 0,
+      "clockSkewSeconds": 5.5950149899786084e-5
+    },
+    {
+      "scope": "full",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 3,
+      "wallSeconds": 5.130340917000012,
+      "peakTreeRssMiB": 852.171875,
+      "exitCode": 0,
+      "clockSkewSeconds": 5.7302360346511705e-5
+    },
+    {
+      "scope": "full",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 3,
+      "wallSeconds": 3.3579486249999775,
+      "peakTreeRssMiB": 641.296875,
+      "exitCode": 0,
+      "clockSkewSeconds": 3.848670215234051e-5
+    },
+    {
+      "scope": "full",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 4,
+      "wallSeconds": 3.537628834000003,
+      "peakTreeRssMiB": 595.671875,
+      "exitCode": 0,
+      "clockSkewSeconds": 4.027377320880987e-5
+    },
+    {
+      "scope": "full",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 4,
+      "wallSeconds": 5.2132472920000055,
+      "peakTreeRssMiB": 793.734375,
+      "exitCode": 0,
+      "clockSkewSeconds": 5.867384339808268e-5
+    },
+    {
+      "scope": "full",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 5,
+      "wallSeconds": 4.989927666,
+      "peakTreeRssMiB": 887.15625,
+      "exitCode": 0,
+      "clockSkewSeconds": 5.523300953313992e-5
+    },
+    {
+      "scope": "full",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 5,
+      "wallSeconds": 3.2567113749999805,
+      "peakTreeRssMiB": 644.625,
+      "exitCode": 0,
+      "clockSkewSeconds": 3.750940686586546e-5
+    },
+    {
+      "scope": "full",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 6,
+      "wallSeconds": 3.2990508749999776,
+      "peakTreeRssMiB": 596.328125,
+      "exitCode": 0,
+      "clockSkewSeconds": 3.8095291500894746e-5
+    },
+    {
+      "scope": "full",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 6,
+      "wallSeconds": 4.942134834000001,
+      "peakTreeRssMiB": 891.0625,
+      "exitCode": 0,
+      "clockSkewSeconds": 5.443592834808442e-5
+    },
+    {
+      "scope": "full",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 7,
+      "wallSeconds": 4.873882124999994,
+      "peakTreeRssMiB": 992.796875,
+      "exitCode": 0,
+      "clockSkewSeconds": 5.462367249720046e-5
+    },
+    {
+      "scope": "full",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 7,
+      "wallSeconds": 3.4559469999999806,
+      "peakTreeRssMiB": 641.59375,
+      "exitCode": 0,
+      "clockSkewSeconds": 3.8661987332488934e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "candidate",
+      "phase": "warmup",
+      "round": 1,
+      "wallSeconds": 3.5960806250000132,
+      "peakTreeRssMiB": 579.890625,
+      "exitCode": 0,
+      "clockSkewSeconds": 4.020420834649485e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "baseline",
+      "phase": "warmup",
+      "round": 1,
+      "wallSeconds": 4.3681834999999865,
+      "peakTreeRssMiB": 887.40625,
+      "exitCode": 0,
+      "clockSkewSeconds": 4.852887002471107e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "baseline",
+      "phase": "warmup",
+      "round": 2,
+      "wallSeconds": 5.091290291000007,
+      "peakTreeRssMiB": 810.84375,
+      "exitCode": 0,
+      "clockSkewSeconds": 5.7891929827746935e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "candidate",
+      "phase": "warmup",
+      "round": 2,
+      "wallSeconds": 3.1589700419999645,
+      "peakTreeRssMiB": 595.546875,
+      "exitCode": 0,
+      "clockSkewSeconds": 3.565664638927046e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 1,
+      "wallSeconds": 3.1530680420000294,
+      "peakTreeRssMiB": 592.359375,
+      "exitCode": 0,
+      "clockSkewSeconds": 0.0011298131404942069
+    },
+    {
+      "scope": "engine",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 1,
+      "wallSeconds": 4.667715457999975,
+      "peakTreeRssMiB": 786.15625,
+      "exitCode": 0,
+      "clockSkewSeconds": 0.0007200825504583008
+    },
+    {
+      "scope": "engine",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 2,
+      "wallSeconds": 5.415552250000019,
+      "peakTreeRssMiB": 895.859375,
+      "exitCode": 0,
+      "clockSkewSeconds": 0.0002936881103323685
+    },
+    {
+      "scope": "engine",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 2,
+      "wallSeconds": 3.4045865830000253,
+      "peakTreeRssMiB": 576.078125,
+      "exitCode": 0,
+      "clockSkewSeconds": 9.818476900136375e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 3,
+      "wallSeconds": 3.226958207999985,
+      "peakTreeRssMiB": 576.46875,
+      "exitCode": 0,
+      "clockSkewSeconds": 6.270720695056298e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 3,
+      "wallSeconds": 4.688034500000015,
+      "peakTreeRssMiB": 850.359375,
+      "exitCode": 0,
+      "clockSkewSeconds": 7.088498705343227e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 4,
+      "wallSeconds": 5.118619082999999,
+      "peakTreeRssMiB": 840.6875,
+      "exitCode": 0,
+      "clockSkewSeconds": 6.829827879073491e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 4,
+      "wallSeconds": 3.364835625000012,
+      "peakTreeRssMiB": 592.484375,
+      "exitCode": 0,
+      "clockSkewSeconds": 4.336099243573699e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 5,
+      "wallSeconds": 3.4927319999999895,
+      "peakTreeRssMiB": 596.203125,
+      "exitCode": 0,
+      "clockSkewSeconds": 4.4940261830106465e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 5,
+      "wallSeconds": 4.934322708000025,
+      "peakTreeRssMiB": 812.171875,
+      "exitCode": 0,
+      "clockSkewSeconds": 6.205260484648534e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 6,
+      "wallSeconds": 5.185606457999995,
+      "peakTreeRssMiB": 823.46875,
+      "exitCode": 0,
+      "clockSkewSeconds": 6.427644348150352e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 6,
+      "wallSeconds": 3.073489792000032,
+      "peakTreeRssMiB": 599.234375,
+      "exitCode": 0,
+      "clockSkewSeconds": 3.894034557561099e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "candidate",
+      "phase": "measurement",
+      "round": 7,
+      "wallSeconds": 3.2732897500000036,
+      "peakTreeRssMiB": 609.65625,
+      "exitCode": 0,
+      "clockSkewSeconds": 4.1122871607512934e-5
+    },
+    {
+      "scope": "engine",
+      "backend": "baseline",
+      "phase": "measurement",
+      "round": 7,
+      "wallSeconds": 5.262731207999991,
+      "peakTreeRssMiB": 805.75,
+      "exitCode": 0,
+      "clockSkewSeconds": 6.561169436736236e-5
+    }
+  ],
+  "notes": [
+    "Original optimized Go default cache preserved; no RSLINT_DISABLE_PARSE_CACHE ablation substituted.",
+    "Complete Rsbuild Rstack rs lint Node-expanded command and separate rslint stage. pnpm launcher excluded on both sides.",
+    "New process per run, warm OS/dependency caches; request-local Rust cache is rebuilt each invocation. Single-threaded CLI, optimized release builds.",
+    "No source/artifact changes across build/test/proof/measurement. New shared parse+bind cache, generation-local FS cache, kind dispatch, invocation-local JS path coordinates and single CLI admission preserve full workload and outputs.",
+    "129 configured oracle inputs include128 genuine rule-positive cases; no-octal positive is blocked identically by baseline/candidate parser and not counted as a rule hit.",
+    "This is end-to-end rslint performance on the pinned workload, not an intrinsic compiler-only or theoretical tsrs limit."
+  ]
+}
