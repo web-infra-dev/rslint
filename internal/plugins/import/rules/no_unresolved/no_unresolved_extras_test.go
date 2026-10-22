@@ -176,10 +176,14 @@ func TestNoUnresolvedTypeScriptFallback(t *testing.T) {
 			// A later paths target is tried when an earlier one is missing.
 			{Code: `import '~/logo.svg';`, FileName: fileName, Settings: typescript},
 			{Code: `import './legacy.js'; import 'pkg/dist/reset.css'; import 'exported/style.css';`, FileName: fileName, Settings: typescript},
+			// The query is dropped before paths are matched and substituted.
+			{Code: `import '@icons/logo?raw'; import 'theme?inline';`, FileName: fileName, Settings: typescript},
 		},
 		[]rule_tester.InvalidTestCase{
 			// Package exports still restrict which files can be imported.
 			{Code: missing, FileName: fileName, Settings: typescript, Errors: unresolvedErrors(missing, "@/missing.css", "./missing.css", "pkg/missing.css", "exported/private/hidden.css")},
+			// Substituting `ghost?raw` would yield `ghost?raw.svg` and resolve ghost.ts.
+			{Code: `import '@icons/ghost?raw';`, FileName: fileName, Settings: typescript, Errors: unresolvedErrors(`import '@icons/ghost?raw';`, "@icons/ghost?raw")},
 		})
 }
 

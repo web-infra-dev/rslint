@@ -25,7 +25,7 @@ module.exports = 1;
 -- node_modules/_stream_readable/index.js --
 module.exports = 1;
 -- typescript-fallback/tsconfig.json --
-{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","paths":{"@/*":["./src/*"],"~/*":["./missing/*","./src/*"]}},"include":["src"]}
+{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","paths":{"@/*":["./src/*"],"~/*":["./missing/*","./src/*"],"@icons/*":["./src/*.svg"],"theme":["./src/theme.css"]}},"include":["src"]}
 -- typescript-fallback/src/style.css --
 .example { color: red; }
 -- typescript-fallback/src/logo.svg --
@@ -34,6 +34,10 @@ module.exports = 1;
 export const value = 1;
 -- typescript-fallback/src/util.ts --
 export const value = 1;
+-- typescript-fallback/src/ghost.ts --
+export const value = 1;
+-- typescript-fallback/src/theme.css --
+.theme { color: red; }
 -- typescript-fallback/node_modules/pkg/package.json --
 {"name":"pkg","main":"index.js"}
 -- typescript-fallback/node_modules/pkg/dist/reset.css --
