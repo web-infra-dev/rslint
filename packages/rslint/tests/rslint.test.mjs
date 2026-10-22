@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { convertPathToPattern } from 'tinyglobby';
+import { compileGlobExclusions } from '../src/api/glob-exclusions.js';
 import {
   writeFile,
   rm,
@@ -465,6 +466,7 @@ describe('Rslint class', () => {
   test('lintFiles uses the same glob syntax for expansion and scan entries', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), '[rslint-api-braces]-'));
     const absolutePattern = convertPathToPattern(tmp.split(path.sep).join('/'));
+    const ancestorExclusion = `!${convertPathToPattern(path.dirname(tmp))}/**/*.ts`;
     const config = [
       { ignores: ['rslint.config.mjs'] },
       { rules: { 'no-debugger': 'error' } },
@@ -479,6 +481,7 @@ describe('Rslint class', () => {
         'comma,dir',
         '!dir',
         '!!src',
+        'skip.ts',
       ];
       for (const directory of directories) {
         await mkdir(path.join(tmp, directory, '.git'), { recursive: true });
@@ -519,6 +522,15 @@ describe('Rslint class', () => {
             ['comma,dir/one.ts', ['comma,dir/one.ts']],
             ['src/**/*.ts', ['src/control.ts']],
             [['src/control.ts', `!${absolutePattern}/src/*.ts`], []],
+            [['src/control.ts', ancestorExclusion], []],
+            [['src/*.ts', ancestorExclusion], []],
+            [['src/control.ts', 'src/*.ts', ancestorExclusion], []],
+            [['src/control.ts', 'src/*.ts', '!src'], []],
+            [['skip.ts/one.ts', 'skip.ts/*.ts', '!*.ts'], []],
+            [
+              [String.raw`\!dir/*.ts`, 'src/*.ts', '!./!dir'],
+              ['src/control.ts'],
+            ],
             ['', []],
             [['', 'src/*.ts'], ['src/control.ts']],
             ['./!src', ['control.ts']],
@@ -557,6 +569,35 @@ describe('Rslint class', () => {
       }
     } finally {
       await cleanupTempDir(tmp);
+    }
+  });
+
+  test('lintFiles exclusions preserve Windows volume roots and glob escapes', () => {
+    for (const [cwd, pattern, file, excluded] of [
+      ['C:/project', 'C:/../project/*.ts', 'C:/project/a.ts', true],
+      [
+        '//server/share/project',
+        '//SERVER/SHARE/../project/*.ts',
+        '//server/share/project/a.ts',
+        true,
+      ],
+      ['C:/project', 'D:/../project/*.ts', 'C:/project/a.ts', false],
+      [
+        '//server/share/project',
+        '//server/other/../project/*.ts',
+        '//server/share/project/a.ts',
+        false,
+      ],
+      ['C:/project', 'c:/Project/*.ts', 'C:/project/a.ts', false],
+      [
+        'C:/[project]',
+        String.raw`c:/\[project\]/*.ts`,
+        'C:/[project]/a.ts',
+        true,
+      ],
+    ]) {
+      const exclusions = compileGlobExclusions([pattern], cwd, path.win32);
+      expect(exclusions.matches(file)).toBe(excluded);
     }
   });
 

@@ -17,6 +17,7 @@ import path from 'node:path';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { convertPathToPattern, glob } from 'tinyglobby';
 import picomatch from 'picomatch';
+import { compileGlobExclusions } from './glob-exclusions.js';
 
 import { RSLintService } from '../service/service.js';
 import { NodeRslintService } from '../internal/node.js';
@@ -209,63 +210,12 @@ function staticGlobRoot(pattern: string, cwd: string): string | undefined {
   );
 }
 
-function normalizeGlobPattern(pattern: string): string {
-  let normalized = pattern;
-  if (normalized.endsWith('/') && normalized !== '/') {
-    normalized = normalized.slice(0, -1);
-  }
-  if (path.sep === '\\') {
-    // Windows volumes are case insensitive; directory and file globs are not.
-    normalized = normalized.replace(
-      /^(?:[a-z]:|\/\/[^/]+\/[^/]+)(?=\/|$)/i,
-      (volume) => volume.toLowerCase(),
-    );
-  }
-  return path.posix.normalize(normalized);
-}
-
-function matchesExcludedLiteral(
-  filePath: string,
-  patterns: readonly string[],
-  cwd: string,
-): boolean {
-  const relativeCandidate = path
-    .relative(cwd, filePath)
-    .split(path.sep)
-    .join('/');
-  for (const rawPattern of patterns) {
-    let pattern = rawPattern;
-    if (pattern.startsWith('!')) {
-      if (pattern[1] === '(') continue;
-      if (pattern[1] === '!' && pattern[2] !== '(') continue;
-      pattern = pattern.slice(1);
-    }
-    // Match absolute patterns directly, preserving their glob escapes instead
-    // of passing them through filesystem path operations.
-    const candidate = path.isAbsolute(pattern)
-      ? normalizeGlobPattern(filePath.split(path.sep).join('/'))
-      : relativeCandidate;
-    pattern = normalizeGlobPattern(pattern);
-    const expandedPatterns = pattern.endsWith('*')
-      ? [pattern]
-      : [pattern, path.posix.join(pattern, '**')];
-    if (picomatch(expandedPatterns, { dot: true, nocase: false })(candidate)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 async function classifyLintPatterns(
   patterns: string[],
   cwd: string,
 ): Promise<ClassifiedLintPatterns> {
   const literalFilePatterns: string[] = [];
   const scanPatterns = new Map<string, string[]>();
-  const excludedLiteralPatterns = [
-    ...DEFAULT_LINT_GLOB_IGNORES,
-    ...patterns.filter((pattern) => globPatternRole(pattern) === 'ignore'),
-  ];
 
   for (const pattern of patterns) {
     if (globPatternRole(pattern) !== 'match') continue;
@@ -305,9 +255,7 @@ async function classifyLintPatterns(
         matches.push(`${convertPathToPattern(relative)}/**/*`);
         scanPatterns.set(absolute, matches);
       } else if (info.isFile()) {
-        if (!matchesExcludedLiteral(absolute, excludedLiteralPatterns, cwd)) {
-          literalFilePatterns.push(absolute);
-        }
+        literalFilePatterns.push(absolute);
       }
     } catch {
       // tinyglobby will omit a missing literal from the match set.
@@ -429,12 +377,21 @@ export class Rslint {
       globs,
       this.#cwd,
     );
+    const exclusions = compileGlobExclusions(
+      [
+        ...DEFAULT_LINT_GLOB_IGNORES,
+        ...globs
+          .filter((pattern) => globPatternRole(pattern) === 'ignore')
+          .map((pattern) => pattern.slice(1)),
+      ],
+      this.#cwd,
+    );
     const globOptions = {
       cwd: this.#cwd,
       absolute: true,
       onlyFiles: true,
       dot: true,
-      ignore: DEFAULT_LINT_GLOB_IGNORES,
+      ignore: exclusions.ignore,
     } as const;
     // stat() already established each literal as a file. Keep its caller
     // spelling directly, including file symlinks, without a second glob crawl.
@@ -444,17 +401,15 @@ export class Rslint {
       string,
       { filePath: string; explicit: boolean; scanDirectories: string[] }
     >();
-    const exclusions = globs.filter(
-      (pattern) => globPatternRole(pattern) !== 'match',
-    );
     // Keep each static root's actual matches. A file matched by an outer glob
     // cannot borrow an unrelated inner glob's independent scan entry.
     for (const [directory, patterns] of scanPatterns) {
-      const matched = await glob([...patterns, ...exclusions], {
+      const matched = await glob(patterns, {
         ...globOptions,
         followSymbolicLinks: false,
       });
       for (const file of matched) {
+        if (exclusions.matches(file)) continue;
         const normalized = path.normalize(file);
         const key = nativePathIdentity.key(normalized);
         const entry = filesByIdentity.get(key) ?? {
@@ -467,6 +422,7 @@ export class Rslint {
       }
     }
     for (const file of literalMatches) {
+      if (exclusions.matches(file)) continue;
       const normalized = path.normalize(file);
       const key = nativePathIdentity.key(normalized);
       // Preserve the spelling of a literal target over an overlapping glob.

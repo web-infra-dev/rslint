@@ -1810,8 +1810,10 @@ Other invariants:
   plugin host or sending API requests. Its realpath memo is bounded to one API
   call and is not a persistent cache. Canonical target paths resolved during
   that plan are sent with the request so Go does not repeat the same realpath
-  work. Literal exclusions preserve glob escapes and match absolute patterns
-  against absolute candidates; this filtering does not select config owners.
+  work. Literal files and glob results share one compiled exclusion matcher,
+  preserving glob escapes and Windows volume roots. Absolute patterns match
+  absolute candidates; equivalent cwd-relative patterns also prune the glob
+  walk. This filtering does not select config owners.
 - LSP uses a different orchestration model and keeps session access on its main
   dispatch loop. Its Program-source lookup follows the same exact lexical and
   canonical filesystem identity rules as CLI/API binding, including
