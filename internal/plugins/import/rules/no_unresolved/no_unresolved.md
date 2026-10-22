@@ -2,9 +2,7 @@
 
 ## Rule Details
 
-Report imports whose module cannot be resolved. The rule checks ES imports,
-re-exports, and dynamic `import()` calls with string literals. It ignores explicit
-`import type` and `export type` declarations.
+Report imports whose module cannot be resolved. The rule checks ES imports, re-exports, and dynamic `import()` calls with string literals. It ignores explicit `import type` and `export type` declarations.
 
 Examples of **incorrect** code for this rule, when the target does not exist:
 
@@ -34,8 +32,7 @@ The rule does not provide automatic fixes or suggestions.
 | `caseSensitive` | `true` | On a filesystem that ignores case, check the spelling of resolved paths below the working directory. |
 | `caseSensitiveStrict` | `false` | Also check the working directory and its ancestors, even if `caseSensitive` is disabled. |
 
-The `ignore` option is separate from `settings['import/ignore']`: a module can
-exist even when other import rules cannot parse its contents.
+The `ignore` option is separate from `settings['import/ignore']`: a module can exist even when other import rules cannot parse its contents.
 
 ```javascript
 export default [
@@ -54,17 +51,11 @@ export default [
 
 ## Resolution settings
 
-The default `node` resolver checks runtime files, including JSON and native
-modules. It tries `.mjs`, `.js`, `.json`, and `.node` extensions. For packages,
-it tries the `module`, `jsnext:main`, and `main` fields in that order, then falls
-back to index files.
-It does not treat an installed `@types` package as a runtime module.
-`import/core-modules` exempts exact module names, such as `electron`.
+Without `import/resolver` or `import/resolve`, imports are resolved as with `['node', 'typescript']`. Imports the `node` resolver cannot find fall back to the `typescript` resolver, which follows the TypeScript project, including `paths` aliases, `.js` imports of `.ts` files, and package `exports`. The `typescript` resolver also accepts a module that only has a declaration file, such as an installed `@types` package.
 
-`import/resolver` accepts `node`, an object containing Node options, or an array
-of resolvers tried in order. Node options include `extensions`, `paths`,
-`moduleDirectory`, and `preserveSymlinks`. The legacy `import/resolve` setting
-supplies Node options when `import/resolver` is absent.
+The `node` resolver checks runtime files, including JSON and native modules. It tries `.mjs`, `.js`, `.json`, and `.node` extensions. For packages, it tries the `module`, `jsnext:main`, and `main` fields in that order, then falls back to index files. It does not treat an installed `@types` package as a runtime module. `import/core-modules` exempts exact module names, such as `electron`.
+
+`import/resolver` accepts `node`, `typescript`, an object containing resolver options, or an array of resolvers tried in order. Node options include `extensions`, `paths`, `moduleDirectory`, and `preserveSymlinks`. The legacy `import/resolve` setting supplies Node options and selects only the `node` resolver when `import/resolver` is absent.
 
 ```javascript
 export default [
@@ -81,20 +72,11 @@ export default [
 
 ## Differences from upstream
 
-- Supported resolvers are `node` and `typescript`, also accepted as
-  `eslint-import-resolver-node` and `eslint-import-resolver-typescript`.
-  For example, `settings['import/resolver'] = 'webpack'` reports a resolver error
-  and unresolved imports. For bundler aliases, use `typescript` with matching
-  `paths` in `tsconfig.json`, or exclude those imports with the `ignore` option.
-- The `typescript` resolver follows the TypeScript project selected by rslint.
-  Its `project`, `alwaysTryTypes`, and other resolver-specific options have no
-  effect. For example, `{ typescript: { project: 'tsconfig.app.json' } }` does not
-  select that config; use `languageOptions.parserOptions.project` instead.
-- If an `import/resolver` object contains several resolver names, they are tried
-  alphabetically. Use an array, such as `['typescript', 'node']`, to choose the
-  order explicitly.
-- Babel's experimental `export value from './module'` syntax is not supported.
-  Use `export { default as value } from './module'` instead.
+- Without resolver settings, upstream uses only the `node` resolver, so TypeScript `paths` aliases, `.js` imports of `.ts` files and packages that only declare `exports` are reported. Set `'import/resolver': 'node'` to keep that behavior.
+- Supported resolvers are `node` and `typescript`, also accepted as `eslint-import-resolver-node` and `eslint-import-resolver-typescript`. For example, `settings['import/resolver'] = 'webpack'` reports a resolver error and unresolved imports. For bundler aliases, use `typescript` with matching `paths` in `tsconfig.json`, or exclude those imports with the `ignore` option.
+- The `typescript` resolver follows the TypeScript project selected by rslint. Its `project`, `alwaysTryTypes`, and other resolver-specific options have no effect. For example, `{ typescript: { project: 'tsconfig.app.json' } }` does not select that config; use `languageOptions.parserOptions.project` instead.
+- If an `import/resolver` object contains several resolver names, they are tried alphabetically. Use an array, such as `['typescript', 'node']`, to choose the order explicitly.
+- Babel's experimental `export value from './module'` syntax is not supported. Use `export { default as value } from './module'` instead.
 
 ## Original Documentation
 

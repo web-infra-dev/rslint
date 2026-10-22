@@ -95,7 +95,7 @@ func TestNoInternalModulesResolverAndInvalidPatterns(t *testing.T) {
 	runInternalTests(t, []rule_tester.ValidTestCase{
 		// Scope-like segments do not count toward the default depth check.
 		{Code: `import "@alias/internal";`, Settings: typescript},
-		{Code: `import "alias/internal";`},
+		{Code: `import "alias/internal";`, Settings: map[string]any{"import/resolver": "node"}},
 		{Code: `import "alias/internal";`, Settings: typescript, Options: map[string]any{"allow": []any{"**/plugin2/internal.js"}}},
 		{Code: `import "./plugin2/internal";`, Options: map[string]any{"forbid": []any{"", "#comment"}}},
 		{Code: `/** @type {import("./plugin2/internal").Value} */ let value;`},

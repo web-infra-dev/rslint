@@ -24,3 +24,17 @@ import 'dependency';
 module.exports = 1;
 -- node_modules/_stream_readable/index.js --
 module.exports = 1;
+-- default-resolver/tsconfig.json --
+{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","paths":{"@/*":["./src/*"]}},"include":["src"]}
+-- default-resolver/src/util.ts --
+export const value = 1;
+-- default-resolver/src/style.css --
+.example { color: red; }
+-- default-resolver/src/types-only.d.ts --
+export declare const value: number;
+-- default-resolver/node_modules/exports-only/package.json --
+{"exports":{".":{"types":"./dist/index.d.ts","default":"./dist/index.js"}}}
+-- default-resolver/node_modules/exports-only/dist/index.d.ts --
+export declare const value: number;
+-- default-resolver/node_modules/exports-only/dist/index.js --
+export const value = 1;

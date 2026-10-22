@@ -152,7 +152,7 @@ func TestNoUnresolvedExtras(t *testing.T) {
 	add(`const el = <C value={import('jsx')} />;`, nil, nil, "jsx")
 	invalid[len(invalid)-1].FileName = "element.tsx"
 	add(`import 'ignored-by-setting';`, nil, map[string]any{"import/ignore": []any{".*"}}, "ignored-by-setting")
-	add(`import './only-types'; import 'only-types-package'; import 'fs/not-a-builtin';`, nil, nil, "./only-types", "only-types-package", "fs/not-a-builtin")
+	add(`import './only-types'; import 'only-types-package'; import 'fs/not-a-builtin';`, nil, map[string]any{"import/resolver": "node"}, "./only-types", "only-types-package", "fs/not-a-builtin")
 	add(`import 'exact/subpath';`, nil, map[string]any{"import/core-modules": []any{"exact"}}, "exact/subpath")
 	add(`import './bar';`, nil, map[string]any{"import/resolver": map[string]any{"node": map[string]any{"extensions": []any{}}}}, "./bar")
 	add(`import './bar';`, nil, map[string]any{"import/resolver": []any{"node", map[string]any{"node": map[string]any{"extensions": []any{}}}}}, "./bar")
@@ -160,6 +160,29 @@ func TestNoUnresolvedExtras(t *testing.T) {
 	add(`import './jsx/MyUncoolComponent.jsx';`, map[string]any{"caseSensitive": false}, nil, "./jsx/MyUncoolComponent.jsx")
 	add(`import 'missing'; require('checked');`, map[string]any{"esmodule": false, "commonjs": true}, nil, "checked")
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &no_unresolved.NoUnresolvedRule, valid, invalid)
+}
+
+// Without resolver settings, node resolves first and the TypeScript project
+// covers aliases, `.js` -> `.ts` imports and `exports`-only packages.
+func TestNoUnresolvedDefaultResolver(t *testing.T) {
+	root := unresolvedRoot(t, false)
+	const fileName = "default-resolver/src/input.ts"
+	const tsconfig = "default-resolver/tsconfig.json"
+	code := `import '@/util'; import './util.js'; import 'exports-only'; import './style.css';`
+	node := map[string]any{"import/resolver": "node"}
+	rule_tester.RunRuleTester(root, tsconfig, t, &no_unresolved.NoUnresolvedRule,
+		[]rule_tester.ValidTestCase{
+			{Code: code, FileName: fileName},
+			{Code: code, FileName: fileName, Settings: map[string]any{"import/resolver": false}},
+			// Declarations satisfy the TypeScript resolver, as they do upstream.
+			{Code: `import './types-only';`, FileName: fileName},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: `import '@/missing'; import './missing.js';`, FileName: fileName, Errors: unresolvedErrors(`import '@/missing'; import './missing.js';`, "@/missing", "./missing.js")},
+			{Code: code, FileName: fileName, Settings: node, Errors: unresolvedErrors(code, "@/util", "./util.js", "exports-only")},
+			{Code: code, FileName: fileName, Settings: map[string]any{"import/resolve": map[string]any{}}, Errors: unresolvedErrors(code, "@/util", "./util.js", "exports-only")},
+			{Code: `import './types-only';`, FileName: fileName, Settings: node, Errors: unresolvedErrors(`import './types-only';`, "./types-only")},
+		})
 }
 
 func TestNoUnresolvedIgnoreValidation(t *testing.T) {
