@@ -17,6 +17,7 @@ type typeCheckRequest struct {
 	Programs       []*program.Program
 	SingleThreaded bool
 	OnDiagnostic   DiagnosticHandler
+	ProjectSources bool
 }
 
 // runTypeCheckAcrossPrograms runs program-scoped semantic diagnostics
@@ -50,7 +51,7 @@ func runTypeCheckAcrossPrograms(req typeCheckRequest) {
 		programIndex := i
 		program := prog
 		wg.Queue(func() {
-			collected[programIndex] = runTypeCheckForProgram(program)
+			collected[programIndex] = runTypeCheckForProgram(program, req.ProjectSources)
 		})
 	}
 	wg.RunAndWait()
@@ -78,7 +79,7 @@ type collectedTypeCheckDiagnostic struct {
 	ruleDiagnostic rule.RuleDiagnostic
 }
 
-func runTypeCheckForProgram(prog *program.Program) []collectedTypeCheckDiagnostic {
+func runTypeCheckForProgram(prog *program.Program, projectSources bool) []collectedTypeCheckDiagnostic {
 	ctx := context.Background()
 	diags := prog.NoEmitDiagnostics(ctx)
 	collected := make([]collectedTypeCheckDiagnostic, 0, len(diags))
@@ -106,9 +107,13 @@ func runTypeCheckForProgram(prog *program.Program) []collectedTypeCheckDiagnosti
 		// type-check is meant to be a transparent passthrough of tsc.
 
 		message := flattenDiagnosticMessage(d)
+		diagnostic := newTypeScriptDiagnostic(file, d, message)
+		if projectSources {
+			diagnostic.SourceFile = diagnosticTextSource(file)
+		}
 		collected = append(collected, collectedTypeCheckDiagnostic{
 			key:            typeCheckDedupeKeyForDiagnostic(prog, d),
-			ruleDiagnostic: newTypeScriptDiagnostic(file, d, message),
+			ruleDiagnostic: diagnostic,
 		})
 	}
 	return collected

@@ -102,6 +102,21 @@ func TestPipelineReleasesGenerationOnPreparationFailureAndPanic(t *testing.T) {
 }
 
 func TestPipelineRejectsInvalidGenerationPortsBeforeExecution(t *testing.T) {
+	t.Run("complete Programs require an ordinary lint request", func(t *testing.T) {
+		acquired := false
+		provider := GenerationProviderFunc(func(context.Context, SourceSnapshot) (Generation, ReleaseFunc, error) {
+			acquired = true
+			return Generation{}, nil, nil
+		})
+		request := NewAutofixRequest(provider, ObservationPolicy{
+			ProgramExecution: ProgramComplete,
+			Demand:           ArtifactDemand{Native: rule.EditDemandAutofix},
+		}, AutofixPolicy{}, nil)
+		if _, err := RunPipeline(context.Background(), request); err == nil || acquired {
+			t.Fatalf("autofix accepted interleaved computation: error=%v acquired=%t", err, acquired)
+		}
+	})
+
 	t.Run("nil provider function", func(t *testing.T) {
 		_, err := RunPipeline(context.Background(), NewLintRequest(
 			GenerationProviderFunc(nil),

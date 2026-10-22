@@ -197,12 +197,29 @@ func (p PluginFailurePolicy) valid() bool {
 	return p <= PluginDiscardOnFailure
 }
 
+// ProgramExecution controls the native/type-check computation boundary.
+type ProgramExecution uint8
+
+const (
+	// ProgramPhases joins all native tasks before starting program diagnostics.
+	// This is the compatibility default for API, autofix, and editor requests.
+	ProgramPhases ProgramExecution = iota
+	// ProgramComplete runs each Program's diagnostics after its native workers
+	// join. Native progress retains capacity for the pending diagnostics until
+	// the task completes. Other Programs may still be linting; diagnostics are
+	// buffered in input order and reported only after all native reports. This
+	// is an explicit opt-in for non-mutating batch requests whose rules permit
+	// that interleaving.
+	ProgramComplete
+)
+
 // ObservationPolicy contains only producer and scheduling semantics shared by
 // integrations; it does not name CLI, API, or LSP entrypoints.
 type ObservationPolicy struct {
-	Demand        ArtifactDemand
-	Plugin        PluginExecution
-	PluginFailure PluginFailurePolicy
+	Demand           ArtifactDemand
+	Plugin           PluginExecution
+	PluginFailure    PluginFailurePolicy
+	ProgramExecution ProgramExecution
 }
 
 // DeferredPluginRun is a single-use, generation-detached enrichment task. It
@@ -348,6 +365,12 @@ func (r PipelineRequest) validate() error {
 	}
 	if !r.policy.PluginFailure.valid() {
 		return errors.New("linter pipeline: plugin failure policy is invalid")
+	}
+	if r.policy.ProgramExecution > ProgramComplete {
+		return errors.New("linter pipeline: program execution policy is invalid")
+	}
+	if r.policy.ProgramExecution == ProgramComplete && r.kind != pipelineRequestLint {
+		return errors.New("linter pipeline: complete Program execution requires a non-mutating batch request")
 	}
 	if r.policy.Plugin == pluginProgressiveAfterNative && r.kind != pipelineRequestProgressiveLint {
 		return errors.New("linter pipeline: progressive execution requires a progressive request")

@@ -25,6 +25,7 @@ func prepareNativeObservation(
 	demand rule.EditDemand,
 	lintedFiles []LintedFile,
 	preserveSourceIdentity bool,
+	programExecution ProgramExecution,
 ) (*nativeObservationWork, error) {
 	native := generation.Native
 	options := RunLinterOptions{
@@ -38,7 +39,7 @@ func prepareNativeObservation(
 	if plan == nil {
 		options.TypeCheckOnlyPrograms = native.Programs
 	}
-	execution, err := prepareLintExecution(options)
+	execution, err := prepareLintExecution(options, programExecution, !preserveSourceIdentity)
 	if err != nil {
 		return nil, err
 	}

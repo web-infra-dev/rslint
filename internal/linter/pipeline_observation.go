@@ -84,7 +84,7 @@ func prepareObservation(
 	if len(pluginWork.inputs) > 0 && policy.Plugin != pluginProgressiveAfterNative && dispatcher == nil {
 		return preparedObservation{}, errors.New("linter pipeline: joined plugin work requires a dispatcher")
 	}
-	nativeWork, err := prepareNativeObservation(generation, plan, policy.Demand.Native, lintedFiles, planChanges)
+	nativeWork, err := prepareNativeObservation(generation, plan, policy.Demand.Native, lintedFiles, planChanges, policy.ProgramExecution)
 	if err != nil {
 		return preparedObservation{}, err
 	}
