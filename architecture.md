@@ -1519,10 +1519,23 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      `min(GOMAXPROCS, selected file count)` workers.
    - `--singleThreaded` resolves the same slots serially in Program/file order.
 
-2. **Linter work group** (`RunLinter()` via `core.NewWorkGroup`)
+2. **Native lint scheduling** (`RunLinter()`)
    - Schedules one task per rslint Program; checker-capable work retains
      checker-exclusive shards, while sufficiently large checker-free Programs
      use bounded file chunks.
+   - When the Program count exceeds `GOMAXPROCS`, one dispatcher reserves
+     estimated unfinished shards before starting each Program, then corrects
+     the reservation after checker grouping. Each completed shard returns
+     capacity immediately, allowing another Program to start before its
+     predecessor finishes. Smaller Program sets keep the direct work group.
+   - Both the shard budget and active Program limit are `GOMAXPROCS`. A whole
+     Program may cross the shard budget to preserve its existing checker
+     parallelism. The budget controls scheduling, not bytes or checker count.
+   - Only the dispatcher waits for capacity. Program completion joins every
+     entered shard before returning unstarted reservations and releasing its
+     slot, including on panic or abnormal worker exit. Execution consumes
+     private task slots; shared plans, Programs and checker caches stay valid.
+     Program-wide type checking starts after the native phase joins.
    - `--singleThreaded` collapses the work group to serial execution.
 
 3. **Type-check work group** (`runTypeCheckAcrossPrograms`)
