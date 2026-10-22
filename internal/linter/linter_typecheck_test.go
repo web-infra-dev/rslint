@@ -645,6 +645,35 @@ func TestTypeCheckDedupeSurvivorUsesProgramOrder(t *testing.T) {
 	}
 }
 
+func TestCompleteProgramsPreservesDuplicateInputsAndReusablePlan(t *testing.T) {
+	raw, paths := createTestProgramWithFilesAndCompilerOptions(t,
+		map[string]string{"source.ts": `export const value: number = "wrong";`}, `{}`)
+	first := lintprogram.NewFromCompiler(raw)
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{first, first, lintprogram.NewFromCompiler(raw)},
+		TargetsByProgram: [][]string{{paths["source.ts"]}, nil, {paths["source.ts"]}},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{Name: "type-query", RequiresTypeInfo: true, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+				return rule.RuleListeners{ast.KindIdentifier: func(node *ast.Node) { ctx.TypeChecker.GetTypeAtLocation(node) }}
+			}}}
+		},
+	})
+	for _, mode := range []ProgramExecution{ProgramComplete, ProgramPhases, ProgramComplete} {
+		var diagnostics []rule.RuleDiagnostic
+		execution, err := prepareLintExecution(RunLinterOptions{
+			LintPlan: plan, TypeCheck: true,
+			Consumer: rule.DiagnosticConsumer{Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},
+		}, mode, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		execution.run(rule.DiagnosticConsumer{Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }})
+		if len(diagnostics) != 1 || diagnostics[0].SourceFile != raw.GetSourceFile(paths["source.ts"]) || len(plan.programs) != 3 {
+			t.Fatalf("mode %d changed dedupe, source identity, or the reusable input plan: %+v", mode, diagnostics)
+		}
+	}
+}
+
 func TestTypeCheckFilesystemPathIDIsStableAcrossSymlinkAliases(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{"a.ts": "export const value = 1;"})
 	sourceProgram := lintprogram.NewFromCompiler(program)

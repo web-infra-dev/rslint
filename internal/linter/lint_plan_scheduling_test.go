@@ -41,6 +41,105 @@ func TestPreparedRuleSetsPublishCompleteConcurrentViews(t *testing.T) {
 	}
 }
 
+func TestCompleteProgramsJoinsBorrowersBeforeRethrowing(t *testing.T) {
+	previousProcs := runtime.GOMAXPROCS(2)
+	defer runtime.GOMAXPROCS(previousProcs)
+	for _, abnormalExit := range []bool{false, true} {
+		t.Run(fmt.Sprintf("goexit=%t", abnormalExit), func(t *testing.T) {
+			started := make(chan struct{})
+			failed := make(chan struct{})
+			resume := make(chan struct{})
+			var resumeOnce sync.Once
+			unblock := func() { resumeOnce.Do(func() { close(resume) }) }
+			defer unblock()
+			marker := new(int)
+			done := make(chan any, 1)
+			go func() {
+				defer func() { done <- recover() }()
+				runWithProgramAdmission([]int{1, 1, 1}, 2, func(index int, reservation *programReservation) {
+					reservation.retainUntilClose(1)
+					reservation.ready(1)
+					reservation.done()
+					switch index {
+					case 0:
+						close(started)
+						<-resume
+					case 1:
+						<-started
+						defer close(failed)
+						if abnormalExit {
+							runtime.Goexit()
+						}
+						panic(marker)
+					}
+				})
+			}()
+			// The signal precedes admission observing the worker's exit, so
+			// another task may start before the failure is recorded.
+			<-failed
+			select {
+			case <-done:
+				t.Fatal("abnormal exit escaped before the other borrower joined")
+			default:
+			}
+			unblock()
+			value := <-done
+			if value == nil || (!abnormalExit && value != marker) {
+				t.Fatalf("panic = %v, want original panic or abnormal-worker panic", value)
+			}
+		})
+	}
+}
+
+func TestCompleteProgramsRetainsCapacityAfterNativeJoins(t *testing.T) {
+	for _, shards := range []int{0, 3} {
+		t.Run(fmt.Sprintf("native-shards=%d", shards), func(t *testing.T) {
+			nativeJoined := make(chan struct{})
+			nextEntered := make(chan struct{})
+			release := make(chan struct{})
+			var releaseOnce sync.Once
+			unblock := func() { releaseOnce.Do(func() { close(release) }) }
+			finished := make(chan struct{})
+			t.Cleanup(func() {
+				unblock()
+				joinProgramAdmissionTestWorker(t, finished)
+			})
+			go func() {
+				defer close(finished)
+				runWithProgramAdmission([]int{max(shards, 2), 1}, 2, func(index int, reservation *programReservation) {
+					if index == 1 {
+						close(nextEntered)
+						return
+					}
+					reservation.retainUntilClose(2)
+					reservation.ready(shards)
+					for range shards {
+						reservation.done()
+					}
+					close(nativeJoined)
+					<-release // Program diagnostics still borrow the admitted capacity.
+				})
+			}()
+			select {
+			case <-nativeJoined:
+			case <-time.After(5 * time.Second):
+				t.Fatal("native shards did not join")
+			}
+			select {
+			case <-nextEntered:
+				t.Fatal("native completion returned capacity still needed by program diagnostics")
+			case <-time.After(20 * time.Millisecond):
+			}
+			unblock()
+			select {
+			case <-nextEntered:
+			case <-time.After(5 * time.Second):
+				t.Fatal("completed diagnostics did not return capacity")
+			}
+		})
+	}
+}
+
 func TestCheckerFreeLintWorkerCountKeepsSmallSetsSerial(t *testing.T) {
 	tests := []struct {
 		files int

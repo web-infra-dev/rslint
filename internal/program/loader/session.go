@@ -65,6 +65,23 @@ func (s *Session) InvalidateSourceSnapshots() {
 	}
 }
 
+// ReleaseBuildCache ends an AST reuse window after all construction and target
+// binding have joined. It drops only construction references, never published
+// Programs, their sources, or the Session's source/metadata snapshots.
+//
+// Reusing the Session remains supported: later builds repopulate the AST index
+// from the same frozen text, or from a new source generation after explicit
+// invalidation. Callers that want AST reuse across builds simply keep the cache.
+// Like construction itself, this method must not overlap another Session build.
+func (s *Session) ReleaseBuildCache() {
+	if s == nil || s.context == nil {
+		return
+	}
+	s.initialPrograms = nil
+	s.initialProgramsSet = false
+	s.context.retainOnlySourceFiles(nil)
+}
+
 func (s *Session) retainCompilerPrograms(current []*compiler.Program) {
 	if s == nil || s.context == nil {
 		return

@@ -151,6 +151,67 @@ func TestPipelineReclaimsCompletedProgramWhileOtherConsumersRun(t *testing.T) {
 	}
 }
 
+func TestPipelineCompletesTypeCheckBeforeReleasingProgram(t *testing.T) {
+	var completedProgram weak.Pointer[compiler.Program]
+	var completedSource weak.Pointer[ast.SourceFile]
+	blocked := make(chan struct{})
+	resume := make(chan struct{})
+	var resumeOnce sync.Once
+	unblock := func() { resumeOnce.Do(func() { close(resume) }) }
+	defer unblock()
+	provider := GenerationProviderFunc(func(context.Context, SourceSnapshot) (Generation, ReleaseFunc, error) {
+		completed, paths := createTestProgramWithFilesAndCompilerOptions(t,
+			map[string]string{"completed.ts": `export const value: number = "wrong";`}, `{}`)
+		other, otherPaths := createTestProgramWithFilesAndCompilerOptions(t,
+			map[string]string{"other.ts": `export const value = 1;`}, `{}`)
+		completedProgram = weak.Make(completed)
+		completedSource = weak.Make(completed.GetSourceFile(paths["completed.ts"]))
+		return Generation{Native: NativeGeneration{
+			Programs: wrapTestPrograms(other, completed),
+			// The zero-target Program must still run type checking. The
+			// serial work group visits the last queued Program first.
+			TargetsByProgram: [][]string{{otherPaths["other.ts"]}, nil},
+			TypeCheck:        true, SingleThreaded: true,
+			RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{Name: "native/wait", Run: func(rule.RuleContext) rule.RuleListeners {
+					close(blocked)
+					<-resume
+					return nil
+				}}}
+			},
+		}}, nil, nil
+	})
+	type outcome struct {
+		result PipelineResult
+		err    error
+	}
+	done := make(chan outcome, 1)
+	t.Cleanup(func() { unblock(); <-done })
+	go func() {
+		defer close(done)
+		result, err := RunPipeline(context.Background(), NewLintRequest(provider, ObservationPolicy{ProgramExecution: ProgramComplete}, nil))
+		done <- outcome{result, err}
+	}()
+	select {
+	case <-blocked:
+	case got := <-done:
+		t.Fatalf("pipeline ended before the other Program blocked: %v", got.err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for completedProgram.Value() != nil || completedSource.Value() != nil {
+		if time.Now().After(deadline) {
+			t.Fatal("completed type-check task or its buffered diagnostic retained the Program/AST")
+		}
+		runtime.GC()
+		runtime.Gosched()
+	}
+	unblock()
+	got := <-done
+	if got.err != nil || len(got.result.Observation.Native.Diagnostics) != 1 || got.result.Observation.Native.Diagnostics[0].RuleName != "TypeScript(TS2322)" {
+		t.Fatalf("zero-target Program diagnostics/error = %+v/%v", got.result.Observation.Native.Diagnostics, got.err)
+	}
+}
+
 func TestConcurrentPipelineJoinsPluginBatchesBeforeReleaseOnPanic(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	panicPath := tspath.ResolvePath(root, "panic.ts")

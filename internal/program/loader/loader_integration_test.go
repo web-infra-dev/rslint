@@ -165,6 +165,58 @@ func TestBuildProjectsOwnsCacheAndPreservesItAcrossBindings(t *testing.T) {
 	}
 }
 
+func TestSessionReleaseBuildCachePreservesSnapshotsAndReuse(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	path := tspath.ResolvePath(dir, "source.ts")
+	original := `export const value: number = "wrong";`
+	replacement := `export const value: number = 1;`
+	writeProgramTestFiles(t, dir, map[string]string{
+		"source.ts": original, "tsconfig.json": `{"files":["source.ts"]}`,
+	})
+	fsys := bundled.WrapFS(osvfs.FS())
+	session := NewSession(fsys)
+	request := ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig.json")}, Scope: AllDeclared, SingleThreaded: true}
+	load := func() *lintprogram.Program {
+		t.Helper()
+		set, err := session.BuildProjects(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		binding, err := session.LoadCLI(set, target.Plan{Files: []target.File{testLintTarget(fsys, dir, path)}}, dir, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return binding.Programs[0]
+	}
+	first := load()
+	source := first.GetSourceFile(path)
+	if err := os.WriteFile(path, []byte(replacement), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	session.ReleaseBuildCache()
+	second := load()
+	if second.GetSourceFile(path) == source || second.GetSourceFile(path).Text() != original {
+		t.Fatal("releasing AST reuse must allow a fresh parse without invalidating frozen source text")
+	}
+	if first.GetSourceFile(path) != source || source.Text() != original {
+		t.Fatal("releasing construction references invalidated a published Program")
+	}
+	session.InvalidateSourceSnapshots()
+	third := load()
+	if third.GetSourceFile(path).Text() != replacement || source.Text() != original {
+		t.Fatal("Session reuse did not separate the new source generation from published sources")
+	}
+	for _, prog := range []*lintprogram.Program{first, second} {
+		found := false
+		for _, diagnostic := range prog.NoEmitDiagnostics(context.Background()) {
+			found = found || diagnostic.Code() == 2322
+		}
+		if !found {
+			t.Fatal("published Program lost its type-check capability after cache release and Session reuse")
+		}
+	}
+}
+
 func TestBuildProjectsSeparatesProjectPolicies(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
 	config := rslintconfig.RslintConfig{

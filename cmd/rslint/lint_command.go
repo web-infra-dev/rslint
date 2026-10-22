@@ -430,6 +430,11 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 
+	// Construction and binding are complete. Execution needs the published
+	// Programs, not the cross-project AST reuse index. Session reuse remains an
+	// explicit loader concern; CLI fix rounds construct fresh Sessions below.
+	programSession.ReleaseBuildCache()
+
 	// Rebuild ts-go Programs against a caller-supplied immutable VFS generation
 	// and bind the original stable target plan again. A target can move between
 	// rslint Programs when in-memory fixes change the import graph.
@@ -438,7 +443,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		if err != nil {
 			return loader.LoadResult{}, err
 		}
-		return session.LoadCLI(rebuilt, targetPlan, currentDirectory, singleThreaded)
+		binding, err := session.LoadCLI(rebuilt, targetPlan, currentDirectory, singleThreaded)
+		if err != nil {
+			return loader.LoadResult{}, err
+		}
+		session.ReleaseBuildCache()
+		return binding, nil
 	}
 
 	// The command owns config/target/Program construction and physical writes.
@@ -550,6 +560,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			dispatch,
 		)
 	} else {
+		observationPolicy.ProgramExecution = linter.ProgramComplete
 		pipelineRequest = linter.NewLintRequest(provider, observationPolicy, dispatch)
 	}
 	pipelineResult, err := linter.RunPipeline(ctx, pipelineRequest)

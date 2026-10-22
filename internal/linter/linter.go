@@ -455,7 +455,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 //
 // See RunLinterOptions for each field's zero-value semantics.
 func RunLinter(opts RunLinterOptions) (*LintResult, error) {
-	execution, err := prepareLintExecution(opts)
+	execution, err := prepareLintExecution(opts, ProgramPhases, false)
 	if err != nil {
 		return nil, err
 	}

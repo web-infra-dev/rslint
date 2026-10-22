@@ -15,24 +15,32 @@ import (
 // producer slices are borrowed only during preparation, never during execution.
 // Closing a task drops our references without modifying its Program or ASTs.
 type lintExecution struct {
-	programs          []*programLintPlan
-	typeCheckPrograms []*program.Program
-	options           programRunOptions
+	programs                []*programLintPlan
+	typeCheckPrograms       []*program.Program
+	options                 programRunOptions
+	completePrograms        bool
+	typeCheck               bool
+	projectTypeCheckSources bool
 }
 
-func prepareLintExecution(opts RunLinterOptions) (*lintExecution, error) {
+func prepareLintExecution(opts RunLinterOptions, mode ProgramExecution, projectTypeCheckSources bool) (*lintExecution, error) {
 	if !opts.Consumer.Demand.IsValid() {
 		return nil, errors.New("linter: invalid native edit demand")
 	}
 	if opts.LintPlan != nil && opts.TypeCheckOnlyPrograms != nil {
 		return nil, errTypeCheckOnlyProgramsWithPlan
 	}
-	execution := &lintExecution{options: programRunOptions{
-		Cwd:                  opts.Cwd,
-		CollectExecutedRules: true,
-		SingleThreaded:       opts.SingleThreaded,
-		Timing:               opts.Timing,
-	}}
+	execution := &lintExecution{
+		completePrograms:        mode == ProgramComplete,
+		typeCheck:               opts.TypeCheck,
+		projectTypeCheckSources: projectTypeCheckSources,
+		options: programRunOptions{
+			Cwd:                  opts.Cwd,
+			CollectExecutedRules: true,
+			SingleThreaded:       opts.SingleThreaded,
+			Timing:               opts.Timing,
+		},
+	}
 	if opts.LintPlan != nil {
 		if err := validateProgramsInPlan(opts.LintPlan); err != nil {
 			return nil, err
@@ -43,7 +51,7 @@ func prepareLintExecution(opts RunLinterOptions) (*lintExecution, error) {
 			// immutable shared content, including when a caller reuses the plan.
 			task := plan
 			execution.programs[index] = &task
-			if opts.TypeCheck && plan.program.CanProvideProgramDiagnostics() {
+			if opts.TypeCheck && !execution.completePrograms && plan.program.CanProvideProgramDiagnostics() {
 				execution.typeCheckPrograms = append(execution.typeCheckPrograms, plan.program)
 			}
 		}
@@ -76,25 +84,52 @@ func (e *lintExecution) close() {
 	e.typeCheckPrograms = nil
 }
 
+func (e *lintExecution) typeCheckWork(source *program.Program) int {
+	if e.completePrograms && e.typeCheck && source.CanProvideProgramDiagnostics() {
+		return programCheckerHint(source)
+	}
+	return 0
+}
+
 func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 	defer e.close()
 	result := &LintResult{ExecutedRules: make(map[string]struct{})}
 	programResults := make([]programLintResult, len(e.programs))
+	var typeResults [][]collectedTypeCheckDiagnostic
+	if e.completePrograms && e.typeCheck {
+		typeResults = make([][]collectedTypeCheckDiagnostic, len(e.programs))
+	}
 	if len(e.programs) > 0 {
 		runProgram := func(index int, reservation *programReservation) {
 			task := e.programs[index]
 			e.programs[index] = nil
 			defer func() { *task = programLintPlan{} }()
+			typeCheckWork := e.typeCheckWork(task.program)
+			reservation.retainUntilClose(typeCheckWork)
 			options := e.options
 			options.reservation = reservation
 			programResults[index] = runLintRulesInProgram(task, options, consumer)
+			// Native shards have joined and released their checker locks. Their
+			// progress cannot return the capacity reserved for these diagnostics.
+			if typeCheckWork > 0 {
+				typeResults[index] = runTypeCheckForProgram(task.program, e.projectTypeCheckSources)
+			}
 		}
 		budget := runtime.GOMAXPROCS(0)
-		if !e.options.SingleThreaded && len(e.programs) > budget {
-			estimates := make([]int, len(e.programs))
+		needsAdmission := len(e.programs) > budget
+		var estimates []int
+		if !e.options.SingleThreaded && (needsAdmission || typeResults != nil) {
+			estimates = make([]int, len(e.programs))
+			total, typeCheckWork := 0, 0
 			for index, task := range e.programs {
-				estimates[index] = estimateProgramLintShards(task, budget)
+				following := e.typeCheckWork(task.program)
+				estimates[index] = max(estimateProgramLintShards(task, budget), following)
+				total += estimates[index]
+				typeCheckWork += following
 			}
+			needsAdmission = needsAdmission || (typeCheckWork > 0 && total > budget)
+		}
+		if !e.options.SingleThreaded && needsAdmission {
 			runWithProgramAdmission(estimates, budget, runProgram)
 		} else {
 			work := newLintWorkGroup(e.options.SingleThreaded)
@@ -112,8 +147,12 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 		}
 	}
 
-	// Keep the native/type-check phase barrier. Only capable Programs retain
-	// this second borrow, and type-check consumes its own private input slots.
+	// Even when computation is interleaved, type diagnostics follow every
+	// native report and choose dedupe survivors in original Program order.
+	emitDeduplicatedTypeCheckDiagnostics(typeResults, consumer.Report)
+
+	// Phased execution retains its second borrow. Type-check-only also uses
+	// this path, without imposing native scheduling on its independent work.
 	programs := e.typeCheckPrograms
 	e.typeCheckPrograms = nil
 	if len(programs) > 0 {
@@ -121,6 +160,7 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 			Programs:       programs,
 			SingleThreaded: e.options.SingleThreaded,
 			OnDiagnostic:   consumer.Report,
+			ProjectSources: e.projectTypeCheckSources,
 		})
 	}
 	return result
@@ -144,16 +184,21 @@ func estimateProgramLintShards(plan *programLintPlan, maxWorkers int) int {
 	if capable == 0 {
 		return max(1, checkerFreeLintWorkerCount(plain, maxWorkers))
 	}
-	// Match the compiler pool's default shape without making it a contract.
-	checkers := 4
-	if configured := plan.program.Options().Checkers; configured != nil {
-		checkers = max(1, *configured)
-	}
-	shards := min(capable, checkers)
+	shards := min(capable, programCheckerHint(plan.program))
 	if plain > 0 {
 		shards++
 	}
 	return shards
+}
+
+// programCheckerHint reads immutable options without creating or locking a
+// checker. The pool's default shape is a scheduling hint, not a contract.
+func programCheckerHint(source *program.Program) int {
+	checkers := 4
+	if configured := source.Options().Checkers; configured != nil {
+		checkers = max(1, *configured)
+	}
+	return checkers
 }
 
 // programAdmission reserves unfinished shards before a Program can create
@@ -170,6 +215,7 @@ type programAdmission struct {
 type programReservation struct {
 	admission *programAdmission
 	remaining int // protected by admission.mu
+	retained  int // minimum capacity until close, protected by admission.mu
 }
 
 func runWithProgramAdmission(estimates []int, limit int, run func(int, *programReservation)) {
@@ -227,6 +273,7 @@ func (r *programReservation) ready(shards int) {
 	a := r.admission
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	shards = max(shards, r.retained)
 	a.shards += shards - r.remaining
 	r.remaining = shards
 	a.notify()
@@ -239,13 +286,33 @@ func (r *programReservation) done() {
 	a := r.admission
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	r.remaining--
-	a.shards--
+	if r.remaining > r.retained {
+		r.remaining--
+		a.shards--
+	}
 	a.notify()
 }
 
-// close runs after all entered shards join. It returns any reservation for
-// work skipped by an abnormal exit, and only then releases the Program slot.
+// retainUntilClose preserves capacity for work following the native shards.
+// The initial estimate includes this hint before admission; native progress
+// returns only capacity above it. A nil reservation keeps direct execution.
+func (r *programReservation) retainUntilClose(work int) {
+	if r == nil || work == 0 {
+		return
+	}
+	a := r.admission
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	r.retained = max(r.retained, work)
+	if r.remaining < r.retained {
+		a.shards += r.retained - r.remaining
+		r.remaining = r.retained
+	}
+}
+
+// close runs after native shards and any following diagnostics join. It
+// returns retained capacity and work skipped by an abnormal exit, and only
+// then releases the Program slot.
 func (r *programReservation) close() {
 	a := r.admission
 	a.mu.Lock()
