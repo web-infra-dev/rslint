@@ -165,6 +165,11 @@ var typescriptFallbackOptions = moduleresolver.Options{
 }
 
 func (r *ImportResolver) resolveTypeScriptFallback(name string) (string, bool) {
+	// Upstream drops the query before matching paths, so `@icons/x?raw`
+	// substitutes `x` rather than `x?raw`.
+	if i := strings.LastIndex(name, "?"); i >= 0 {
+		name = name[:i]
+	}
 	p := r.ctx.Program()
 	fileName := r.ctx.SourceFile.FileName()
 	directory := p.FS().Realpath(tspath.GetDirectoryPath(fileName))
