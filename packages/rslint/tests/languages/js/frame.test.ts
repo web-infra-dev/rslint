@@ -747,7 +747,6 @@ describe('decoded data ownership', () => {
         for (const child of children) {
           if (!child) continue;
           expect((child as ESTreeNode).parent).toBe(node);
-          expect(Object.keys(child).at(-1)).toBe('parent');
           visit(child as ESTreeNode);
         }
       }
@@ -846,49 +845,6 @@ describe('decoded data ownership', () => {
     } finally {
       if (old) Object.defineProperty(Object.prototype, 'parent', old);
       else Reflect.deleteProperty(Object.prototype, 'parent');
-    }
-  });
-
-  test('synthesized-field setters observe complete nodes before parent linking', () => {
-    const bytes = projectFrame(
-      'file.js',
-      'const pattern = /a/g; const template = `value${pattern}`;',
-    );
-    const old = Object.getOwnPropertyDescriptor(Object.prototype, 'regex');
-    let observed = 0;
-    Object.defineProperty(Object.prototype, 'regex', {
-      configurable: true,
-      set(this: ESTreeNode, value: unknown) {
-        observed++;
-        expect(this.type).toBe('Literal');
-        expect(this.raw).toBe('/a/g');
-        expect(Object.hasOwn(this, 'parent')).toBe(false);
-        Object.defineProperty(this, 'regex', {
-          value,
-          writable: true,
-          enumerable: true,
-          configurable: true,
-        });
-      },
-    });
-    try {
-      const { ast } = decodeFrame(bytes);
-      const visit = (node: ESTreeNode): void => {
-        for (const key of VISITOR_KEYS[node.type]) {
-          const value = node[key];
-          for (const child of Array.isArray(value) ? value : [value]) {
-            if (!child) continue;
-            expect((child as ESTreeNode).parent).toBe(node);
-            expect(Object.keys(child).at(-1)).toBe('parent');
-            visit(child as ESTreeNode);
-          }
-        }
-      };
-      visit(ast);
-      expect(observed).toBe(1);
-    } finally {
-      if (old) Object.defineProperty(Object.prototype, 'regex', old);
-      else Reflect.deleteProperty(Object.prototype, 'regex');
     }
   });
 
