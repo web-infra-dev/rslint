@@ -18,8 +18,10 @@ import (
 
 func main() {
 	var input struct {
-		FilePath, Text, SourceType string
-		TextBytes                  []byte
+		FilePath   string `json:"filePath"`
+		Text       string `json:"text"`
+		SourceType string `json:"sourceType"`
+		TextBytes  []byte `json:"textBytes"`
 	}
 	if err := json.NewDecoder(os.Stdin).Decode(&input); err != nil {
 		panic(err)
