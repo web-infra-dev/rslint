@@ -9,9 +9,8 @@
     "url": "https://github.com/web-infra-dev/rslint"
   },
   "scripts": {
-    "build": "pnpm run build:compiler && rs lib",
-    "build:compiler": "go build -o ../../typescript-go/built/local/ ../../typescript-go/tsc/cmd/tsc",
-    "compile": "pnpm run build:compiler && node ../../typescript-go/packages/typescript/bin/tsc -p tsconfig.build.json"
+    "build": "rs lib",
+    "compile": "tsc -p tsconfig.build.json"
   },
   "keywords": [],
   "author": "",
@@ -19,7 +18,7 @@
   "packageManager": "pnpm@10.34.4",
   "devDependencies": {
     "@types/node": "catalog:",
-    "@typescript/native-preview": "catalog:"
+    "typescript": "7.1.0-beta"
   },
   "publishConfig": {
     "access": "public"

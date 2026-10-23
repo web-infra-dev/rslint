@@ -363,14 +363,10 @@ jobs:
           name: ci-test-rule-schemas-windows
           path: packages/rslint
 
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: 1.27.0
-          cache-name: ci-test-vscode-windows
-
-      # The downloaded rslint.exe serves extension tests. The API declaration
-      # build separately compiles the pinned TypeScript compiler.
+      # build:js only - skip @rslint/core's build:bin, which invokes `go
+      # build` directly. The host rslint.exe was already built on the
+      # self-hosted Windows runner and downloaded above; this job has no Go
+      # toolchain set up and shouldn't need one.
       - name: Build
         shell: bash
         run: |

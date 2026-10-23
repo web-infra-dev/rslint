@@ -135,7 +135,7 @@ func (host *rootProjectReferenceHost) GetResolvedProjectReference(fileName tspat
 	if path == host.rootPath {
 		return host.root
 	}
-	return host.CompilerHost.GetResolvedProjectReference(pathutil.File(fileName.AsString()), path)
+	return host.CompilerHost.GetResolvedProjectReference(fileName, path)
 }
 
 func createProgramFromParsedConfigLenient(singleThreaded bool, config *tsoptions.ParsedCommandLine, host compiler.CompilerHost, useSourceOfProjectReference bool) (*compiler.Program, error) {

@@ -151,7 +151,8 @@ module/import/linkname paths use `github.com/microsoft/TypeScript/tsc`.
 `packages/rslint-api` imports the JS AST API from the same checkout's
 `packages/typescript` sources. The tsgo release workflow copies that compiler's
 bundled standard libraries through the upstream `lib` build task.
-The API declaration build also compiles and uses this checkout's native compiler.
+The API declaration build uses the published TypeScript compiler matching this
+checkout's release.
 `internal/compilerhost` pairs TypeScript's directory-independent host with the
 base directory required by rslint's source-only builders. Compiler-backed
 Programs take their base directory from the parsed configuration. The
