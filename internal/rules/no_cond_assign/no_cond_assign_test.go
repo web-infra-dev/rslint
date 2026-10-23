@@ -401,14 +401,14 @@ func runNoCondAssign(t *testing.T, code string, options []any, demand rule.EditD
 	host := utils.CreateCompilerHost(root.Dir, fs)
 	compilerProgram, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", host)
 	assert.NilError(t, err)
-	sourceFile := compilerProgram.GetSourceFile(fileName)
+	sourceFile := compilerProgram.GetSourceFile(tspath.ToRootedFilePath(fileName, compilerProgram.GetCurrentDirectory()))
 	assert.Assert(t, sourceFile != nil)
 
 	var diagnostics []rule.RuleDiagnostic
 	programs := []*lintprogram.Program{lintprogram.NewFromCompiler(compilerProgram)}
 	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 		Programs:         programs,
-		TargetsByProgram: [][]string{{sourceFile.FileName()}},
+		TargetsByProgram: [][]string{{sourceFile.FileName().AsString()}},
 		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{

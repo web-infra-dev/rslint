@@ -583,7 +583,7 @@ func lintPreserveCaughtErrorWithDemand(
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:         lintprogram.NewFromCompiler(program),
-		File:            sourceFile.FileName(),
+		File:            sourceFile.FileName().AsString(),
 		HasTypeInfo:     true,
 		GetRulesForFile: preserveCaughtErrorConfiguredRules(options),
 		Consumer: rule.DiagnosticConsumer{
@@ -618,7 +618,7 @@ func createPreserveCaughtErrorProgram(t testing.TB, fileName string, code string
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, program.GetCurrentDirectory()))
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", fileName)
 	}

@@ -302,7 +302,7 @@ func lintPreferNodeProtocolWithDemand(
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:     lintprogram.NewFromCompiler(program),
-		File:        sourceFile.FileName(),
+		File:        sourceFile.FileName().AsString(),
 		HasTypeInfo: true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
@@ -343,7 +343,7 @@ func createPreferNodeProtocolProgram(t testing.TB, fileName, code string) (*comp
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, program.GetCurrentDirectory()))
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", fileName)
 	}

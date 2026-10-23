@@ -51,12 +51,12 @@ undeclaredName123;
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)
 	}
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(filePath, program.GetCurrentDirectory()))
 	if sourceFile == nil {
 		t.Fatalf("source file not found for %s", filePath)
 		return
 	}
-	if program.GetSourceFile(crossFilePath) == nil || program.GetSourceFile(ambientPath) == nil {
+	if program.GetSourceFile(tspath.ToRootedFilePath(crossFilePath, program.GetCurrentDirectory())) == nil || program.GetSourceFile(tspath.ToRootedFilePath(ambientPath, program.GetCurrentDirectory())) == nil {
 		t.Fatal("checker-invariance fixture did not include cross-file declarations")
 	}
 

@@ -375,7 +375,7 @@ func createNoUnnecessaryArrayFlatDepthProgram(
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sourceFile := compilerProgram.GetSourceFile(fileName)
+	sourceFile := compilerProgram.GetSourceFile(tspath.ToRootedFilePath(fileName, compilerProgram.GetCurrentDirectory()))
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", fileName)
 	}
@@ -390,7 +390,7 @@ func lintNoUnnecessaryArrayFlatDepthWithDemand(
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:     program.NewFromCompiler(compilerProgram),
-		File:        sourceFile.FileName(),
+		File:        sourceFile.FileName().AsString(),
 		HasTypeInfo: true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{

@@ -588,7 +588,7 @@ func runAwaitThenableWithDemand(t *testing.T, code string, demand rule.EditDeman
 	if err != nil {
 		t.Fatal(err)
 	}
-	source := program.GetSourceFile(fileName)
+	source := program.GetSourceFile(tspath.ToRootedFilePath(fileName, program.GetCurrentDirectory()))
 	if source == nil {
 		t.Fatal("missing edit-demand source")
 	}

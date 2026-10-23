@@ -470,7 +470,7 @@ declare global { interface Array<T> { item: T; } }`,
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: lintprogram.NewFromCompiler(program),
-					File:    sourceFile.FileName(),
+					File:    sourceFile.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{
 							Name:     ConsistentTypeDefinitionsRule.Name,
@@ -693,7 +693,7 @@ func lintConsistentTypeDefinitions(
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: lintprogram.NewFromCompiler(program),
-		File:    sourceFile.FileName(),
+		File:    sourceFile.FileName().AsString(),
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     ConsistentTypeDefinitionsRule.Name,

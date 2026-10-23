@@ -20,7 +20,7 @@ func parseStatements(t *testing.T, code string) []*ast.Node {
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sf := program.GetSourceFile(fileName)
+	sf := program.GetSourceFile(tspath.ToRootedFilePath(fileName, program.GetCurrentDirectory()))
 	if sf == nil || sf.Statements == nil {
 		t.Fatal("source file has no statements")
 	}

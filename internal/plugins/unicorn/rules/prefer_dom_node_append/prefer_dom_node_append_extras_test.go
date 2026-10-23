@@ -99,7 +99,7 @@ func TestPreferDomNodeAppendArtifactsFollowDemand(t *testing.T) {
 			for index, demand := range demands {
 				var found []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
+					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: prefer_dom_node_append.PreferDomNodeAppendRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return prefer_dom_node_append.PreferDomNodeAppendRule.Run(ctx, nil)

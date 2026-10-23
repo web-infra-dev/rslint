@@ -158,7 +158,7 @@ func TestPreferGlobalNumberConstantsArtifactsFollowDemand(t *testing.T) {
 			for index, demand := range demands {
 				var found []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
+					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: prefer_global_number_constants.PreferGlobalNumberConstantsRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return prefer_global_number_constants.PreferGlobalNumberConstantsRule.Run(ctx, nil)
@@ -216,7 +216,7 @@ func TestPreferGlobalNumberConstantsPresetComposition(t *testing.T) {
 		}
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program: lintprogram.NewFromCompiler(program), File: file.FileName(),
+			Program: lintprogram.NewFromCompiler(program), File: file.FileName().AsString(),
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{
 					{Name: prefer_global_number_constants.PreferGlobalNumberConstantsRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {

@@ -489,8 +489,8 @@ func TestNoNativeCheckerInvariant(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file := program.GetSourceFile(filePath)
-	if file == nil || program.GetSourceFile(crossFilePath) == nil || program.GetSourceFile(ambientPath) == nil {
+	file := program.GetSourceFile(tspath.ToRootedFilePath(filePath, program.GetCurrentDirectory()))
+	if file == nil || program.GetSourceFile(tspath.ToRootedFilePath(crossFilePath, program.GetCurrentDirectory())) == nil || program.GetSourceFile(tspath.ToRootedFilePath(ambientPath, program.GetCurrentDirectory())) == nil {
 		t.Fatal("checker fixture must include the linted file and both external declarations")
 	}
 	checker, done := program.GetTypeChecker(t.Context())

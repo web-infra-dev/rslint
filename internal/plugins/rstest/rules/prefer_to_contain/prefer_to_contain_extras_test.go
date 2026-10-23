@@ -306,7 +306,7 @@ func TestPreferToContainEditDemand(t *testing.T) {
 		t.Helper()
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(), HasTypeInfo: true,
+			Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName().AsString(), HasTypeInfo: true,
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{Name: PreferToContainRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 					return PreferToContainRule.Run(ctx, nil)
