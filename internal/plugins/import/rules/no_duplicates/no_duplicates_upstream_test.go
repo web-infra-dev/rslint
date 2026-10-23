@@ -385,10 +385,11 @@ func TestNoDuplicatesRule(t *testing.T) {
 					{MessageId: "noDuplicates", Line: 1, Column: 48},
 				},
 			},
-			// 32: Inline type + type-only without prefer-inline → grouped as namedTypes
+			// 32: Inline type + type-only without prefer-inline → grouped as namedTypes.
+			// Upstream merges `y` as a value import; the fix keeps it type-only.
 			{
 				Code:   `import {type x} from './foo'; import type {y} from './foo'`,
-				Output: []string{`import {type x,y} from './foo'; `},
+				Output: []string{`import {type x,type y} from './foo'; `},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noDuplicates", Line: 1, Column: 22},
 					{MessageId: "noDuplicates", Line: 1, Column: 52},

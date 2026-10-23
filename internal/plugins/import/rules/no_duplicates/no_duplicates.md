@@ -93,6 +93,19 @@ import { x } from '@files/text.js';
 import { y } from './text.js';
 ```
 
+The autofix keeps type-only specifiers type-only and value specifiers importable at runtime, with or without `prefer-inline`. When an `import type` declaration is merged with an import that binds values or uses inline `type` specifiers, the result uses the inline form:
+
+```typescript
+import type { A } from './foo';
+import { type B, C } from './foo';
+// is fixed to
+import { type A, type B, C } from './foo';
+```
+
+Specifiers merged from `import type` into an inline import receive `type`, so `import { type B, C } from './foo'` followed by `import type { A } from './foo'` is fixed to `import { type B, C, type A } from './foo'`.
+
+The autofix is not offered when a type-only default import such as `import type D from './foo'` would share a statement with other bindings. A bare import such as `import './foo'` is not removed when the merged import would have no value binding, because TypeScript may then elide that import and its side effects.
+
 ## Original Documentation
 
 - [eslint-plugin-import: no-duplicates](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-duplicates.md)
