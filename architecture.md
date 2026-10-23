@@ -1768,7 +1768,9 @@ It contains no AST pointers and is discarded when the builder resets.
 
 The frame contains the final ESTree schema, UTF-16 node/token/comment offsets,
 UTF-16 literal strings, numeric values, the BOM-stripped UTF-8 source, and an
-explicit original-BOM flag. Go and Node ship together and use one private
+explicit original-BOM flag. If source bytes are not valid UTF-8, Node preserves
+the compiler's code units and original byte offsets for diagnostics and edits;
+the decoded text and position map own their storage. Go and Node ship together and use one private
 format, without per-frame version negotiation or schema fingerprints. The schema
 contract is checked by the existing conformance suites. Go preserves source
 ranges, authored modifiers and binding contexts while excluding compiler-created

@@ -554,7 +554,7 @@ export function lintFile(
   // ~60% of files on a clean codebase), every byte of that map is
   // unused. Gate the build on having something to convert.
   if (filteredDiagnostics.length > 0) {
-    const u16ToByte = buildUtf16ToByteMap(sourceText);
+    const u16ToByte = parsed.utf16ToByte ?? buildUtf16ToByteMap(sourceText);
     // `u16ToByte` indexes from 0 to `sourceText.length` inclusive (the
     // sentinel at `[length]` is the total byte count for one-past-end
     // `endPos`). Clamp every offset before lookup so a plugin that

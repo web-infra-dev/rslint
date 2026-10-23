@@ -17,9 +17,15 @@ import (
 )
 
 func main() {
-	var input struct{ FilePath, Text, SourceType string }
+	var input struct {
+		FilePath, Text, SourceType string
+		TextBytes                  []byte
+	}
 	if err := json.NewDecoder(os.Stdin).Decode(&input); err != nil {
 		panic(err)
+	}
+	if input.TextBytes != nil {
+		input.Text = string(input.TextBytes)
 	}
 	cwd, err := os.Getwd()
 	if err != nil {

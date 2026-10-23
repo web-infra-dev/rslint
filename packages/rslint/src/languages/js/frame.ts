@@ -140,6 +140,8 @@ export function checkFrameCancellation(flag?: Int32Array): void {
 export interface DecodedFrame {
   ast: ESTreeNode;
   text: string;
+  /** Original byte positions when source decoding replaces invalid bytes. */
+  utf16ToByte?: number[];
   hasBOM: boolean;
   lineStarts: number[];
   tokenTypes: Uint8Array;
@@ -151,6 +153,75 @@ export interface DecodedFrame {
     start: number;
     end: number;
   }>;
+}
+
+function decodeCompilerSource(
+  bytes: Uint8Array,
+  cancelFlag?: Int32Array,
+): Pick<DecodedFrame, 'text' | 'utf16ToByte'> {
+  // Match the compiler's code units: each invalid byte becomes U+FFFD,
+  // while WTF-8 preserves lone surrogates. Keep original byte positions;
+  // re-encoding replacement characters would shift diagnostics and edits.
+  const utf16ToByte: number[] = [],
+    units: number[] = [],
+    chunks: string[] = [];
+  const continuation = (value: number): boolean =>
+    value >= 0x80 && value <= 0xbf;
+  let checkAt = 0;
+  for (let offset = 0; offset < bytes.length;) {
+    if (offset >= checkAt) {
+      checkFrameCancellation(cancelFlag);
+      checkAt = offset + 4096;
+    }
+    const first = bytes[offset],
+      second = bytes[offset + 1],
+      third = bytes[offset + 2],
+      fourth = bytes[offset + 3];
+    let code = first,
+      width = 1;
+    if (first >= 0xc2 && first <= 0xdf && continuation(second)) {
+      code = ((first & 0x1f) << 6) | (second & 0x3f);
+      width = 2;
+    } else if (
+      first >= 0xe0 &&
+      first <= 0xef &&
+      continuation(second) &&
+      continuation(third) &&
+      (first !== 0xe0 || second >= 0xa0)
+    ) {
+      code = ((first & 0xf) << 12) | ((second & 0x3f) << 6) | (third & 0x3f);
+      width = 3;
+    } else if (
+      first >= 0xf0 &&
+      first <= 0xf4 &&
+      continuation(second) &&
+      continuation(third) &&
+      continuation(fourth) &&
+      (first !== 0xf0 || second >= 0x90) &&
+      (first !== 0xf4 || second <= 0x8f)
+    ) {
+      code =
+        ((first & 7) << 18) |
+        ((second & 0x3f) << 12) |
+        ((third & 0x3f) << 6) |
+        (fourth & 0x3f);
+      width = 4;
+    } else if (first >= 0x80) code = 0xfffd;
+    utf16ToByte.push(offset);
+    if (code > 0xffff) {
+      units.push(0xd800 + ((code - 0x10000) >> 10));
+      utf16ToByte.push(offset);
+      units.push(0xdc00 + ((code - 0x10000) & 0x3ff));
+    } else units.push(code);
+    offset += width;
+    if (units.length >= 4096) {
+      chunks.push(String.fromCharCode(...units));
+      units.length = 0;
+    }
+  }
+  chunks.push(String.fromCharCode(...units));
+  utf16ToByte.push(bytes.length);
+  return { text: chunks.join(''), utf16ToByte };
 }
 
 export function decodeFrame(
@@ -209,7 +280,15 @@ export function decodeFrame(
     const encoded = view.getInt32(strings + offset, true);
     offset = encoded < 0 ? offset + 8 : align4(offset + 4 + encoded * 2);
   }
-  const text = decoder.decode(bytes.subarray(source));
+  let text: string, utf16ToByte: number[] | undefined;
+  try {
+    text = decoder.decode(bytes.subarray(source));
+  } catch {
+    ({ text, utf16ToByte } = decodeCompilerSource(
+      bytes.subarray(source),
+      cancelFlag,
+    ));
+  }
   const lineStarts = buildLineStartOffsets(text);
   const typeAt = (index: number): number =>
     view.getUint16(types + index * 2, true);
@@ -405,6 +484,7 @@ export function decodeFrame(
   return {
     ast: nodes[root],
     text,
+    utf16ToByte,
     hasBOM: flags === 1,
     lineStarts,
     tokenTypes,

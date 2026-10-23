@@ -2640,7 +2640,7 @@ func TestHandleLint_ConfigDiscoveryAllCandidatesFail(t *testing.T) {
 func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 	dir := t.TempDir()
 	pluginConfigDirectory := filepath.Join(dir, "authored-config")
-	target := filepath.Join(dir, "input.js")
+	target := tspath.NormalizePath(filepath.Join(dir, "input.js"))
 	const source = "const bad = 1;\n"
 	config := json.RawMessage(`[{
 		"plugins": ["community"],
@@ -2672,7 +2672,7 @@ func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 		}
 		// Assert the same bytes as a direct projection of this generation.
 		var builder estree.Builder
-		syntax := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: target, Path: tspath.Path(tspath.NormalizePath(target))}, strings.TrimPrefix(wantText, "\ufeff"), core.GetScriptKindFromFileName(target))
+		syntax := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: target, Path: tspath.Path(target)}, strings.TrimPrefix(wantText, "\ufeff"), core.GetScriptKindFromFileName(target))
 		expectedFrame, frameErr := builder.Build(context.Background(), syntax, estree.Options{SourceType: "module", HasBOM: strings.HasPrefix(wantText, "\ufeff")})
 		if frameErr != nil || !reflect.DeepEqual(attachments, []ipc.Attachment{ipc.Bytes(expectedFrame)}) {
 			t.Fatal("plugin frame did not freeze the generation")

@@ -545,6 +545,87 @@ test('parenthesized constructor instantiation retains its own type arguments', (
 });
 
 describe('decoded data ownership', () => {
+  test('invalid source bytes preserve compiler code units and original fix offsets', () => {
+    for (const [invalid, value] of [
+      [Buffer.from([0x80]), '\ufffd'],
+      [Buffer.from([0xe2, 0x82]), '\ufffd\ufffd'],
+      [Buffer.from([0xed, 0xa0, 0x80]), '\ud800'],
+    ] as const) {
+      const prefix = Buffer.from('/* café 😀 ');
+      const source = Buffer.concat([
+        prefix,
+        invalid,
+        Buffer.from(' */ const bad = "'),
+        invalid,
+        Buffer.from('";\n'),
+      ]);
+      const expected = `/* café 😀 ${value} */ const bad = "${value}";\n`;
+      const frame = projectFrame('file.js', source);
+      const decoded = decodeFrame(frame);
+      expect(decoded.text).toBe(expected);
+      const declaration = (decoded.ast.body as ESTreeNode[])[0];
+      const binding = (declaration.declarations as ESTreeNode[])[0];
+      expect((binding.init as ESTreeNode).value).toBe(value);
+      let observed = '';
+      const result = lintFrame(
+        {
+          filePath: 'file.js',
+          frame,
+          rules: { 'probe/rename': { options: [] } },
+          collectFixes: true,
+          suggestionsMode: 'off',
+        },
+        {
+          plugins: [],
+          rules: new Map([
+            [
+              'probe/rename',
+              {
+                meta: { fixable: 'code' },
+                create(ctx: RuleContext) {
+                  observed = ctx.sourceCode.text;
+                  expect(ctx.sourceCode.getAllComments()[0].value).toBe(
+                    ` café 😀 ${value} `,
+                  );
+                  return {
+                    'Identifier[name="bad"]'(node: ESTreeNode) {
+                      expect(ctx.sourceCode.getText(node)).toBe('bad');
+                      ctx.report({
+                        node,
+                        message: 'rename',
+                        fix: (fixer) => fixer.replaceText(node, 'good'),
+                      });
+                    },
+                  };
+                },
+              },
+            ],
+          ]),
+        },
+      );
+      expect(result.parseError).toBeUndefined();
+      expect(result.ruleErrors).toBeUndefined();
+      expect(observed).toBe(expected);
+      const start = source.indexOf('bad');
+      expect(result.diagnostics).toHaveLength(1);
+      expect(result.diagnostics[0].startPos).toBe(start);
+      expect(result.diagnostics[0].endPos).toBe(start + 3);
+      expect(result.fixes).toEqual([
+        { range: [start, start + 3], text: 'good' },
+      ]);
+      const applied = Buffer.concat([
+        source.subarray(0, start),
+        Buffer.from('good'),
+        source.subarray(start + 3),
+      ]);
+      expect(applied.subarray(0, start)).toEqual(source.subarray(0, start));
+      expect(applied.subarray(start + 4)).toEqual(source.subarray(start + 3));
+      frame.fill(0);
+      expect(decoded.text).toBe(expected);
+      expect(decoded.utf16ToByte?.[expected.indexOf('bad')]).toBe(start);
+    }
+  });
+
   test('literal values materialize as JavaScript RegExp, BigInt and UTF-16 strings', () => {
     const { ast } = projectSyntax(
       'file.js',
