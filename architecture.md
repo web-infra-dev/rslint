@@ -1781,7 +1781,10 @@ policy remain in their existing owners.
 For source with invalid UTF-8, a compound plugin edit keeps its single atomic
 range and carries replacement fragments: frozen-source byte ranges and new
 text. The Go plugin-result adapter copies the original ranges from that same
-generation's text, preserving untouched bytes through JSON transport. Node
+generation's text, preserving untouched bytes through JSON transport. The Node
+result adapter creates owned wire fixes from the plugin's range and text plus locally
+recorded source fragments; plugin fix objects and their extra metadata remain
+outside the private format. Node
 normalizes new replacement text before returning results,
 replacing unpaired surrogates with U+FFFD as Node does when encoding a string
 as UTF-8. All result transports carry the same Unicode text, without a

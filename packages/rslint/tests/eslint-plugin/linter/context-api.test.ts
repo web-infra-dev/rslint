@@ -20,6 +20,7 @@ import { Linter } from 'eslint';
 import { lintFile } from '../project-frame.js';
 import type { LoadedPlugins } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
 import type { RuleContext } from '../../../src/eslint-plugin/linter/context.js';
+import type { ESTreeNode } from '../../../src/languages/js/types.js';
 import { CONFORMANCE_CASES } from '../../languages/js/conformance-cases.js';
 import { referenceParser } from '../../languages/js/conformance-oracle.js';
 
@@ -173,6 +174,53 @@ describe('systematic SourceCode, diagnostic and fix conformance', () => {
 interface Observation<T = unknown> {
   value: T;
 }
+
+test('shared frozen fixes keep plugin metadata outside the wire result', () => {
+  const text = '// 😀\nconst value = "old";';
+  let pluginFix: { range: [number, number]; text: string } | undefined;
+  const rule = {
+    meta: { fixable: 'code' as const, hasSuggestions: true },
+    create(ctx: RuleContext) {
+      return {
+        Literal(node: ESTreeNode) {
+          if (node.value !== 'old') return;
+          pluginFix = Object.assign(
+            { range: [...node.range] as [number, number], text: '"new"' },
+            { parts: [{ text: '"metadata"' }] },
+          );
+          Object.freeze(pluginFix.range);
+          Object.freeze(pluginFix);
+          const fix = () => pluginFix!;
+          ctx.report({
+            node,
+            message: 'replace',
+            fix,
+            suggest: [{ desc: 'replace', fix }],
+          });
+        },
+      };
+    },
+  };
+  const result = lintFile(
+    {
+      filePath: '/input.js',
+      text,
+      rules: { 'probe/edit': { options: [] } },
+      collectFixes: true,
+      suggestionsMode: 'eager',
+    },
+    { plugins: [], rules: new Map([['probe/edit', rule]]) },
+  );
+  const start = text.indexOf('"old"');
+  const byteStart = Buffer.byteLength(text.slice(0, start));
+  const expected = [{ range: [byteStart, byteStart + 5], text: '"new"' }];
+  expect(result.ruleErrors ?? []).toEqual([]);
+  expect(result.diagnostics).toHaveLength(1);
+  expect(result.fixes).toEqual(expected);
+  expect(result.diagnostics[0].fixes).toEqual(expected);
+  expect(result.diagnostics[0].suggestions?.[0].fixes).toEqual(expected);
+  expect(pluginFix?.range).toEqual([start, start + 5]);
+});
 
 function loadWithRule(create: (ctx: RuleContext) => unknown): LoadedPlugins {
   return {

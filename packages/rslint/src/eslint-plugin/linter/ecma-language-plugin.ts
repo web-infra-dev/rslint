@@ -584,7 +584,7 @@ export function lintFile(
       return Math.trunc(pos);
     };
     const toByte = (pos: number): number => u16ToByte[clamp(pos)];
-    const convertFix = (fix: DiagnosticFix): void => {
+    const convertFix = (fix: DiagnosticFix): DiagnosticFix => {
       const sourceParts = takeFixParts(fix);
       let start = clamp(fix.range[0]),
         end = clamp(fix.range[1]);
@@ -594,15 +594,18 @@ export function lintFile(
         offset > 0 && u16ToByte[offset] === u16ToByte[offset - 1];
       const prefix = splitScalar(start) ? sourceText[--start] : '';
       const suffix = splitScalar(end) ? sourceText[end++] : '';
+      let parts: FixTextPart[] | undefined;
       if (parsed.utf16ToByte && sourceParts) {
         // Source spans are copied by Go from the exact frozen bytes. Only
         // partial scalar edges become text; adjacent text stays one string
         // so independently emitted surrogate halves combine before encoding.
-        const parts: FixTextPart[] = [];
+        const sourceFragments: FixTextPart[] = [];
         let pending = prefix;
         const flush = (): void => {
           if (pending)
-            parts.push({ text: pending.replace(UNPAIRED_SURROGATE, '\ufffd') });
+            sourceFragments.push({
+              text: pending.replace(UNPAIRED_SURROGATE, '\ufffd'),
+            });
           pending = '';
         };
         for (const part of sourceParts) {
@@ -617,37 +620,43 @@ export function lintFile(
           const trailing = to > from && splitScalar(to) ? sourceText[--to] : '';
           if (from < to) {
             flush();
-            parts.push({ sourceRange: [u16ToByte[from], u16ToByte[to]] });
+            sourceFragments.push({
+              sourceRange: [u16ToByte[from], u16ToByte[to]],
+            });
           }
           pending += trailing;
         }
         pending += suffix;
         flush();
-        fix.parts = parts;
+        parts = sourceFragments;
       }
       // Go consumes UTF-8 replacement text. Normalize after concatenation,
       // matching Node's string encoding without passing lone surrogates
       // through JSON transports with different Unicode admission rules.
-      fix.text = (prefix + fix.text + suffix).replace(
+      const text = (prefix + fix.text + suffix).replace(
         UNPAIRED_SURROGATE,
         '\ufffd',
       );
-      fix.range = [u16ToByte[start], u16ToByte[end]];
+      const range: [number, number] = [u16ToByte[start], u16ToByte[end]];
+      // Plugin fixes may be frozen, shared or carry arbitrary metadata.
+      // Only framework-owned source fragments belong in the wire result.
+      return parts ? { range, text, parts } : { range, text };
     };
     for (const d of filteredDiagnostics) {
       d.startPos = toByte(d.startPos);
       d.endPos = toByte(d.endPos);
       if (d.fixes && d.fixes.length > 0) {
-        for (const f of d.fixes) {
-          convertFix(f);
-          result.fixes.push(f);
+        for (let i = 0; i < d.fixes.length; i++) {
+          const fix = convertFix(d.fixes[i]);
+          d.fixes[i] = fix;
+          result.fixes.push(fix);
         }
       }
       if (d.suggestions && d.suggestions.length > 0) {
         for (const s of d.suggestions) {
           if (s.fixes) {
-            for (const f of s.fixes) {
-              convertFix(f);
+            for (let i = 0; i < s.fixes.length; i++) {
+              s.fixes[i] = convertFix(s.fixes[i]);
             }
           }
         }
