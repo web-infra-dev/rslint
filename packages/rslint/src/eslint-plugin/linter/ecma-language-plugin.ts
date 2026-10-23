@@ -44,11 +44,19 @@ import {
   type RuleContext,
 } from './context.js';
 import { createSourceCode } from '../source-code/source-code.js';
-import type { Diagnostic, SuggestionsMode } from './diagnostic-builder.js';
+import {
+  takeFixParts,
+  type Diagnostic,
+  type DiagnosticFix,
+  type FixTextPart,
+  type SuggestionsMode,
+} from './diagnostic-builder.js';
 import type { ESTreeNode, GlobalsConfig } from '../../languages/js/types.js';
 import type { LoadedPlugins } from '../plugin/plugin-loader.js';
 import type { Fix } from './fixer.js';
 import { applyDisableDirectives } from './apply-disable-directives.js';
+
+const UNPAIRED_SURROGATE = /[\uD800-\uDFFF]/u;
 
 /**
  * Per-file rule resolution. The worker has already picked the right
@@ -575,12 +583,69 @@ export function lintFile(
       return Math.trunc(pos);
     };
     const toByte = (pos: number): number => u16ToByte[clamp(pos)];
+    const encodeText = (text: string): FixTextPart =>
+      !UNPAIRED_SURROGATE.test(text)
+        ? { text }
+        : {
+            text,
+            textUTF16: Array.from({ length: text.length }, (_, index) =>
+              text.charCodeAt(index),
+            ),
+          };
+    const convertFix = (fix: DiagnosticFix): void => {
+      const sourceParts = takeFixParts(fix);
+      let start = clamp(fix.range[0]),
+        end = clamp(fix.range[1]);
+      if (parsed.utf16ToByte) {
+        // Source spans are copied by Go from the exact frozen bytes. Only
+        // partial scalar edges become text; adjacent text stays one string
+        // so independently emitted surrogate halves combine as in JS.
+        const splitScalar = (offset: number): boolean =>
+          offset > 0 && u16ToByte[offset] === u16ToByte[offset - 1];
+        const prefix = splitScalar(start) ? sourceText[--start] : '';
+        const suffix = splitScalar(end) ? sourceText[end++] : '';
+        if (sourceParts || prefix || suffix) {
+          const parts: FixTextPart[] = [];
+          let pending = prefix;
+          const flush = (): void => {
+            if (pending) parts.push(encodeText(pending));
+            pending = '';
+          };
+          for (const part of sourceParts ?? [fix.text]) {
+            if (typeof part === 'string') {
+              pending += part;
+              continue;
+            }
+            let from = clamp(part[0]),
+              to = clamp(part[1]);
+            if (from === to) continue;
+            if (splitScalar(from)) pending += sourceText[from++];
+            const trailing =
+              to > from && splitScalar(to) ? sourceText[--to] : '';
+            if (from < to) {
+              flush();
+              parts.push({ sourceRange: [u16ToByte[from], u16ToByte[to]] });
+            }
+            pending += trailing;
+          }
+          pending += suffix;
+          flush();
+          fix.parts = parts;
+          fix.text = prefix + fix.text + suffix;
+        }
+      }
+      fix.range = [u16ToByte[start], u16ToByte[end]];
+      if (!fix.parts && UNPAIRED_SURROGATE.test(fix.text))
+        fix.textUTF16 = Array.from({ length: fix.text.length }, (_, index) =>
+          fix.text.charCodeAt(index),
+        );
+    };
     for (const d of filteredDiagnostics) {
       d.startPos = toByte(d.startPos);
       d.endPos = toByte(d.endPos);
       if (d.fixes && d.fixes.length > 0) {
         for (const f of d.fixes) {
-          f.range = [toByte(f.range[0]), toByte(f.range[1])];
+          convertFix(f);
           result.fixes.push(f);
         }
       }
@@ -588,7 +653,7 @@ export function lintFile(
         for (const s of d.suggestions) {
           if (s.fixes) {
             for (const f of s.fixes) {
-              f.range = [toByte(f.range[0]), toByte(f.range[1])];
+              convertFix(f);
             }
           }
         }

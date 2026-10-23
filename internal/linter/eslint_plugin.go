@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -78,8 +79,16 @@ const (
 )
 
 type EslintPluginFix struct {
-	Range [2]int `json:"range"`
-	Text  string `json:"text"`
+	Range     [2]int                `json:"range"`
+	Text      string                `json:"text"`
+	TextUTF16 []uint16              `json:"textUTF16,omitempty"`
+	Parts     []EslintPluginFixPart `json:"parts,omitempty"`
+}
+
+type EslintPluginFixPart struct {
+	SourceRange *[2]int  `json:"sourceRange,omitempty"`
+	Text        string   `json:"text,omitempty"`
+	TextUTF16   []uint16 `json:"textUTF16,omitempty"`
 }
 
 type EslintPluginSuggestion struct {
@@ -894,8 +903,8 @@ func applyEslintPluginResults(
 				SourceFile:  tsf,
 				FilePath:    f.Path,
 				Severity:    sev,
-				FixesPtr:    rebuildEslintPluginFixes(d.Fixes, clamp),
-				Suggestions: rebuildEslintPluginSuggestions(d.Suggestions, clamp),
+				FixesPtr:    rebuildEslintPluginFixes(d.Fixes, text, clamp),
+				Suggestions: rebuildEslintPluginSuggestions(d.Suggestions, text, clamp),
 			}
 			onDiagnostic(rd)
 		}
@@ -938,23 +947,47 @@ func NewEslintPluginErrorDiagnostic(path, ruleName, msg string) rule.RuleDiagnos
 	return makeEslintPluginErrorDiagnostic(path, newTextSourceFile(""), ruleName, msg)
 }
 
-func rebuildEslintPluginFixes(fixes []EslintPluginFix, clamp func(int) int) *[]rule.RuleFix {
+func rebuildEslintPluginFixes(fixes []EslintPluginFix, source string, clamp func(int) int) *[]rule.RuleFix {
 	if len(fixes) == 0 {
 		return nil
 	}
 	out := make([]rule.RuleFix, 0, len(fixes))
 	for _, fx := range fixes {
-		start := clamp(fx.Range[0])
-		end := clamp(fx.Range[1])
-		if end < start {
-			end = start
-		}
-		out = append(out, rule.RuleFix{Text: fx.Text, Range: core.NewTextRange(start, end)})
+		out = append(out, rebuildEslintPluginFix(fx, source, clamp))
 	}
 	return &out
 }
 
-func rebuildEslintPluginSuggestions(suggestions []EslintPluginSuggestion, clamp func(int) int) *[]rule.RuleSuggestion {
+func rebuildEslintPluginFix(fix EslintPluginFix, source string, clamp func(int) int) rule.RuleFix {
+	start := clamp(fix.Range[0])
+	end := max(start, clamp(fix.Range[1]))
+	var text string
+	if len(fix.Parts) > 0 {
+		// A merged fix remains atomic, but its untouched gaps must come from
+		// the frozen source: JSON text cannot preserve arbitrary source bytes.
+		var builder strings.Builder
+		for _, part := range fix.Parts {
+			if part.SourceRange != nil {
+				builder.WriteString(source[part.SourceRange[0]:part.SourceRange[1]])
+			} else {
+				builder.WriteString(eslintPluginFixText(part.Text, part.TextUTF16))
+			}
+		}
+		text = builder.String()
+	} else {
+		text = eslintPluginFixText(fix.Text, fix.TextUTF16)
+	}
+	return rule.RuleFix{Text: text, Range: core.NewTextRange(start, end)}
+}
+
+func eslintPluginFixText(text string, units []uint16) string {
+	if units != nil {
+		return ecmascript.StringFromCodeUnits(units)
+	}
+	return text
+}
+
+func rebuildEslintPluginSuggestions(suggestions []EslintPluginSuggestion, source string, clamp func(int) int) *[]rule.RuleSuggestion {
 	if len(suggestions) == 0 {
 		return nil
 	}
@@ -962,12 +995,7 @@ func rebuildEslintPluginSuggestions(suggestions []EslintPluginSuggestion, clamp 
 	for _, s := range suggestions {
 		fixes := []rule.RuleFix{}
 		for _, fx := range s.Fixes {
-			start := clamp(fx.Range[0])
-			end := clamp(fx.Range[1])
-			if end < start {
-				end = start
-			}
-			fixes = append(fixes, rule.RuleFix{Text: fx.Text, Range: core.NewTextRange(start, end)})
+			fixes = append(fixes, rebuildEslintPluginFix(fx, source, clamp))
 		}
 		out = append(out, rule.RuleSuggestion{
 			Message:  rule.RuleMessage{Id: s.MessageId, Description: s.Desc},

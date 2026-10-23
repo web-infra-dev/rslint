@@ -905,6 +905,69 @@ func TestDispatchEslintPlugin_FixAndSuggestionsRebuilt(t *testing.T) {
 	if len(sgFixes) != 1 || sgFixes[0].Text != "z" || sgFixes[0].Range.Pos() != 6 || sgFixes[0].Range.End() != 7 {
 		t.Errorf("suggestion fix not rebuilt correctly: %+v", sgFixes)
 	}
+
+	checkLosslessFix := func(t *testing.T, source, fixJSON, want string) {
+		t.Helper()
+		input := []EslintPluginFileInput{{
+			Path: "/a.ts", ConfigKey: "/cfg", Text: &source,
+			Rules: []rule.ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)},
+		}}
+		dispatch := EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			payload := `{"results":[{"filePath":"/a.ts","diagnostics":[{"ruleName":"uc/x","fixes":[` + fixJSON + `],"suggestions":[{"desc":"alternative","fixes":[` + fixJSON + `]}]}]}]}`
+			var result EslintPluginLintResult
+			if err := json.Unmarshal([]byte(payload), &result); err != nil {
+				return nil, err
+			}
+			return &result, nil
+		})
+		var diagnostics []rule.RuleDiagnostic
+		if err := testDispatchEslintPluginRules(context.Background(), dispatch, input, true, SuggestionsModeEager, nil, func(d rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, d)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if len(diagnostics) != 1 {
+			t.Fatalf("diagnostics = %+v", diagnostics)
+		}
+		diagnostic := diagnostics[0]
+		fixes := diagnostic.Fixes()
+		if len(fixes) != 1 || fixes[0].Range.Pos() != 0 || fixes[0].Range.End() != len(source) {
+			t.Fatalf("merged fix lost its atomic range: %+v", fixes)
+		}
+		if output, unapplied, fixed := ApplyRuleFixes(source, diagnostics); output != want || len(unapplied) != 0 || !fixed {
+			t.Fatalf("fixed = %q, unapplied = %d, applied = %v; want %q", output, len(unapplied), fixed, want)
+		}
+		if diagnostic.Suggestions == nil || len(*diagnostic.Suggestions) != 1 {
+			t.Fatalf("suggestions = %+v", diagnostic.Suggestions)
+		}
+		suggestion := (*diagnostic.Suggestions)[0]
+		if !reflect.DeepEqual(suggestion.Fixes(), fixes) {
+			t.Fatalf("suggestion fix = %+v, want %+v", suggestion.Fixes(), fixes)
+		}
+		if output, _, fixed := ApplyRuleFixes(source, []rule.RuleSuggestion{suggestion}); output != want || !fixed {
+			t.Fatalf("suggestion output = %q, applied = %v; want %q", output, fixed, want)
+		}
+	}
+	for _, tc := range []struct {
+		name string
+		gap  string
+	}{
+		{"invalid byte", "\x80"},
+		{"truncated sequence", "\xe2\x82"},
+		{"surrogate bytes", "\xed\xa0\x80"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source := "a/*" + tc.gap + "*/b"
+			fixJSON := fmt.Sprintf(`{"range":[0,%d],"text":"A/*\ufffd*/B","parts":[{"text":"A"},{"sourceRange":[1,%d]},{"text":"B"}]}`, len(source), len(source)-1)
+			checkLosslessFix(t, source, fixJSON, "A/*"+tc.gap+"*/B")
+		})
+	}
+	t.Run("surrogate replacement", func(t *testing.T) {
+		checkLosslessFix(t, "a", `{"range":[0,1],"text":"\ud800","textUTF16":[55296]}`, "\xed\xa0\x80")
+	})
+	t.Run("surrogate replacement part", func(t *testing.T) {
+		checkLosslessFix(t, "ab", `{"range":[0,2],"text":"\udc00b","parts":[{"text":"\udc00","textUTF16":[56320]},{"sourceRange":[1,2]}]}`, "\xed\xb0\x80b")
+	})
 }
 
 // TestDispatchEslintPlugin_EmitsInBatchOrderDespiteOutOfOrderCompletion pins the

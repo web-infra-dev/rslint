@@ -1778,6 +1778,13 @@ JSDoc syntax. SourceType, ecmaVersion,
 syntax-error admission, rule selection, reporting, disable directives and fix
 policy remain in their existing owners.
 
+For source with invalid UTF-8, a compound plugin edit keeps its single atomic
+range and carries replacement fragments: frozen-source byte ranges and new
+text. The Go plugin-result adapter copies the original ranges from that same
+generation's text, preserving untouched bytes through JSON transport. New text
+with unpaired surrogates uses UTF-16 code units. Autofixes and suggestions share
+this reconstruction; neither path retains transport bytes or native syntax.
+
 The plugin SDK's SourceCode queries the owned token columns through private
 views. Individual and bounded queries construct only visited token objects;
 comments use their own projected data and token offsets. A per-file indexed

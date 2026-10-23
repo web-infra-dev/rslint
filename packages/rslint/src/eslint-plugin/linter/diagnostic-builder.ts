@@ -59,7 +59,29 @@ function interpolateMessage(
 export interface SuggestionDescriptor {
   messageId?: string;
   desc?: string;
-  fixes: Fix[] | null;
+  fixes: DiagnosticFix[] | null;
+}
+
+/** Private replacement fragments for the matching Go result adapter. */
+export interface FixTextPart {
+  sourceRange?: [number, number];
+  text?: string;
+  textUTF16?: number[];
+}
+
+export interface DiagnosticFix extends Fix {
+  parts?: FixTextPart[];
+  textUTF16?: number[];
+}
+
+type SourceFixPart = string | [number, number];
+const fixParts = new WeakMap<Fix, SourceFixPart[]>();
+
+/** Drain merge provenance before returning independently owned wire results. */
+export function takeFixParts(fix: Fix): SourceFixPart[] | undefined {
+  const parts = fixParts.get(fix);
+  fixParts.delete(fix);
+  return parts;
 }
 
 /** A single diagnostic emitted by a rule call to `context.report`. */
@@ -79,7 +101,7 @@ export interface Diagnostic {
    */
   startPos: number;
   endPos: number;
-  fixes?: Fix[];
+  fixes?: DiagnosticFix[];
   suggestions?: SuggestionDescriptor[];
 }
 
@@ -582,6 +604,7 @@ function mergeFixes(fixes: Fix[], text: string): Fix[] | undefined {
   const start = sorted[0].range[0];
   const end = sorted[sorted.length - 1].range[1];
   let merged = '';
+  const parts: SourceFixPart[] = [];
   let lastPos = start;
   for (const f of sorted) {
     // Overlap detection, mirroring ESLint's `fix.range[0] >= lastPos`
@@ -600,12 +623,18 @@ function mergeFixes(fixes: Fix[], text: string): Fix[] | undefined {
     }
     // Splice the untouched original source between the previous fix's
     // end and this fix's start (empty for adjacent fixes).
-    merged += text.slice(lastPos, f.range[0]);
-    merged += f.text;
-    lastPos = f.range[1];
+    const [fixStart, fixEnd] = f.range;
+    const replacement = f.text;
+    merged += text.slice(lastPos, fixStart);
+    if (lastPos < fixStart) parts.push([lastPos, fixStart]);
+    merged += replacement;
+    parts.push(replacement);
+    lastPos = fixEnd;
   }
   merged += text.slice(lastPos, end);
-  return [{ range: [start, end], text: merged }];
+  const fix: Fix = { range: [start, end], text: merged };
+  fixParts.set(fix, parts);
+  return [fix];
 }
 
 function isFix(x: unknown): x is Fix {

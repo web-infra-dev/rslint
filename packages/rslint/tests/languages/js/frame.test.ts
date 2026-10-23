@@ -620,6 +620,60 @@ describe('decoded data ownership', () => {
       ]);
       expect(applied.subarray(0, start)).toEqual(source.subarray(0, start));
       expect(applied.subarray(start + 4)).toEqual(source.subarray(start + 3));
+      const wrapped = lintFrame(
+        {
+          filePath: 'file.js',
+          frame,
+          rules: { 'probe/wrap': { options: [] } },
+          collectFixes: true,
+          suggestionsMode: 'eager',
+        },
+        {
+          plugins: [],
+          rules: new Map([
+            [
+              'probe/wrap',
+              {
+                meta: { fixable: 'code', hasSuggestions: true },
+                create(ctx: RuleContext) {
+                  return {
+                    VariableDeclaration(node: ESTreeNode) {
+                      ctx.report({
+                        node,
+                        message: 'wrap',
+                        fix: (fixer) => [
+                          fixer.insertTextBefore(node, '{'),
+                          fixer.insertTextAfter(node, '}'),
+                        ],
+                        suggest: [
+                          {
+                            desc: 'wrap',
+                            fix: function* (fixer) {
+                              yield fixer.insertTextBefore(node, '{');
+                              yield fixer.insertTextAfter(node, '}');
+                            },
+                          },
+                        ],
+                      });
+                    },
+                  };
+                },
+              },
+            ],
+          ]),
+        },
+      );
+      expect(wrapped.ruleErrors).toBeUndefined();
+      expect(wrapped.fixes).toHaveLength(1);
+      const parts = [
+        { text: '{' },
+        { sourceRange: [source.indexOf('const'), source.indexOf(';') + 1] },
+        { text: '}' },
+      ];
+      expect(wrapped.diagnostics[0].fixes?.[0].parts).toEqual(parts);
+      expect(wrapped.diagnostics[0].suggestions?.[0].fixes?.[0].parts).toEqual(
+        parts,
+      );
       frame.fill(0);
       expect(decoded.text).toBe(expected);
       expect(decoded.utf16ToByte?.[expected.indexOf('bad')]).toBe(start);
