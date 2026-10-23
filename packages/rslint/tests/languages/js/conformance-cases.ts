@@ -298,6 +298,7 @@ add('modules', [
   '// enum comment\nexport enum E {\n A,\n B = 1,\n C = "text",\n}',
   'const enum E {}',
   'declare enum E {}',
+  'namespace A.B { "use strict"; "second"; run(); "late"; namespace Inner { "nested"; ("parenthesized"); "late"; } { "block"; } class C { static { "static"; "second"; run(); "late"; } } }',
 ]);
 
 add('statements', [

@@ -43,7 +43,7 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 	case ast.KindBlock:
 		return p.addNode("BlockStatement", node, p.convertStatements(node.AsBlock().Statements, node.Parent != nil && ast.IsFunctionLike(node.Parent)))
 	case ast.KindModuleBlock:
-		return p.addNode("TSModuleBlock", node, p.convertStatements(node.AsModuleBlock().Statements, false))
+		return p.addNode("TSModuleBlock", node, p.convertStatements(node.AsModuleBlock().Statements, true))
 	case ast.KindEmptyStatement:
 		return p.addNode("EmptyStatement", node)
 	case ast.KindDebuggerStatement:
@@ -359,7 +359,7 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 		return p.convertPropertyDefinition(node)
 	case ast.KindClassStaticBlockDeclaration:
 		body := node.AsClassStaticBlockDeclaration().Body
-		return p.addNode("StaticBlock", node, p.convertStatements(body.AsBlock().Statements, false))
+		return p.addNode("StaticBlock", node, p.convertStatements(body.AsBlock().Statements, !p.isJavaScriptFile()))
 
 	case ast.KindDecorator:
 		return p.addNode("Decorator", node, nodeValue(p.convert(node.AsDecorator().Expression, false)))
@@ -642,8 +642,8 @@ func (p *estreeProjector) convertStatements(list *ast.NodeList, prologue bool) u
 	}
 	ids := make([]uint32, 0, len(list.Nodes))
 	for _, statement := range list.Nodes {
-		// Only source files and function bodies admit directives. Advance the
-		// prologue once instead of rescanning every preceding string statement.
+		// Advance the prologue once instead of rescanning every preceding
+		// string statement.
 		prologue = prologue && statement.Kind == ast.KindExpressionStatement &&
 			statement.AsExpressionStatement().Expression.Kind == ast.KindStringLiteral
 		var id uint32
