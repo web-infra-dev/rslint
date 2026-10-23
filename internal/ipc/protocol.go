@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"math"
 	"strings"
 )
 
@@ -14,7 +15,8 @@ import (
 
 const (
 	FrameHeaderSize = 4
-	MaxFrameSize    = 256 * 1024 * 1024
+	// The wire length is uint32 and the body must fit a Go slice.
+	MaxFrameSize = min(math.MaxUint32, math.MaxInt)
 
 	MemoryVersion           uint32 = 1
 	MemorySlotCount                = 16

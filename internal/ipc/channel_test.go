@@ -4,13 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -336,85 +334,6 @@ func TestChannelRejectsMalformedDeferredRelease(t *testing.T) {
 		default:
 			t.Fatalf("malformed release did not close channel: %+v", message)
 		}
-	}
-}
-
-func TestChannelOversizedInlineFrameRollsBackAndRemainsUsable(t *testing.T) {
-	for _, shared := range []bool{false, true} {
-		t.Run(strconv.FormatBool(shared), func(t *testing.T) {
-			client, peer := newChannelPair(t)
-			pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+MemorySlotSize)}}
-			if shared {
-				for i := 1; i < MemorySlotCount; i++ {
-					pool.slots[i].busy = true
-				}
-				client.memory, client.memoryInitialized = pool, true
-			}
-			client.Start()
-			// Reuse one input buffer to exceed the wire cap without allocating
-			// a >256 MiB test input or letting JSON allocate that rejected frame.
-			chunk := Bytes(make([]byte, 2*1024*1024))
-			values := make([]Attachment, 110)
-			for i := range values {
-				values[i] = chunk
-			}
-			if _, err := client.SendRequest(context.Background(), "oversized", nil, values...); err == nil || !strings.Contains(err.Error(), "frame cap") {
-				t.Fatalf("oversized inline bytes were not rejected: %v", err)
-			}
-			client.mu.Lock()
-			closed, pending, published := client.closed, len(client.pending), len(client.published)
-			client.mu.Unlock()
-			if closed || pending != 0 || published != 0 || pool.slots[0].busy {
-				t.Fatalf("rejected frame retained storage or closed channel: closed=%v pending=%d published=%d busy=%v", closed, pending, published, pool.slots[0].busy)
-			}
-			peerDone := make(chan error, 1)
-			go func() {
-				request, err := ReadFrame(peer.reader)
-				if err != nil {
-					peerDone <- err
-					return
-				}
-				if request.Kind != "ordinary" {
-					peerDone <- errors.New("rejected frame reached the peer")
-					_ = client.Close()
-					return
-				}
-				response := &Message{Kind: KindResponse, ID: request.ID}
-				if request.Transport != nil {
-					response.Transport = &TransportMetadata{Released: request.Transport.Batches}
-				}
-				peerDone <- peer.writeFrame(response)
-			}()
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			if _, err := client.SendRequest(ctx, "ordinary", nil, Text("still works")); err != nil {
-				t.Fatal(err)
-			}
-			if err := <-peerDone; err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
-func TestFrameAttachmentPreflightMatchesJSONTextEncoding(t *testing.T) {
-	for _, text := range []string{"", "<>&", "\x00\x01\b\f\n\r\t\"\\", "café😀\u2028\u2029", string([]byte{0xff, 0xfe, 'x'})} {
-		encoded, err := marshalJSON(text)
-		if err != nil {
-			t.Fatal(err)
-		}
-		contents := len(encoded) - 2
-		if consumeJSONText(text, contents) != 0 || contents > 0 && consumeJSONText(text, contents-1) >= 0 {
-			t.Fatalf("preflight differs from JSON encoding for %q: %q", text, encoded)
-		}
-	}
-	text := Text(strings.Repeat("\x00", 1024*1024))
-	msg := &Message{Kind: "escaped", ID: 1}
-	for range 43 {
-		msg.Attachments = append(msg.Attachments, text.inline())
-	}
-	if err := preflightAttachments(msg); err == nil {
-		t.Fatal("JSON escaping expansion bypassed the frame cap")
 	}
 }
 
@@ -925,21 +844,6 @@ func TestNewMessage_NilContainerPayloadOmitted(t *testing.T) {
 				t.Errorf("data present = %v, want %v (Data=%q)", gotData, tc.wantData, msg.Data)
 			}
 		})
-	}
-}
-
-func TestReadFrame_CapExceeded(t *testing.T) {
-	var buf bytes.Buffer
-	// A length header beyond the cap must be rejected before allocating.
-	if err := binary.Write(&buf, binary.LittleEndian, uint32(MaxFrameSize+1)); err != nil {
-		t.Fatal(err)
-	}
-	_, err := ReadFrame(bufio.NewReader(&buf))
-	if err == nil {
-		t.Fatal("expected frame-cap error")
-	}
-	if !strings.Contains(err.Error(), "exceeds cap") {
-		t.Fatalf("expected cap error, got %v", err)
 	}
 }
 

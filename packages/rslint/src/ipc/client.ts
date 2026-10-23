@@ -36,6 +36,7 @@
  */
 
 import type { Readable, Writable } from 'node:stream';
+import { constants as bufferConstants } from 'node:buffer';
 import {
   receiveAttachments,
   type ReceivedAttachments,
@@ -54,7 +55,10 @@ import type {
 
 // Framing is the fixed wire format, independent of the runtime storage layout.
 const HEADER_BYTES = 4;
-const MAX_FRAME_BYTES = 256 * 1024 * 1024;
+const MAX_FRAME_BYTES = Math.min(
+  0xffff_ffff,
+  bufferConstants.MAX_LENGTH - HEADER_BYTES,
+);
 const RESPONSE_KIND = 'response';
 const ERROR_KIND = 'error';
 const TRANSPORT_CONFIG_KIND = 'transportConfig';
@@ -488,19 +492,11 @@ export class IpcClient {
 
     while (!this.closed && this.bufferedBytes >= HEADER_BYTES) {
       const len = this.peekHeaderLen();
-      // Symmetric to Go's `maxFrameSize = 256 MiB` in
-      // internal/ipc/frame.go. A frame length that exceeds the
-      // cap usually means a stream desync (someone wrote unframed bytes
-      // into stdout, header bytes shifted by N). Without this guard we
-      // would accumulate N GiB chasing a phantom payload and OOM the
-      // worker. Surface as a stream-fatal error so the caller can tear
-      // the connection down rather than hang. Fires SYNCHRONOUSLY on the
-      // header alone, before any body bytes arrive.
+      // The complete frame must fit the runtime's Buffer representation.
       if (len > MAX_FRAME_BYTES) {
         this.onStreamError(
           new Error(
-            `ipc-client: frame length ${len} exceeds cap ${MAX_FRAME_BYTES} ` +
-              `(likely stream desync). Connection will be closed.`,
+            `ipc-client: frame length ${len} exceeds representable maximum ${MAX_FRAME_BYTES}`,
           ),
         );
         return;
@@ -518,10 +514,16 @@ export class IpcClient {
       try {
         msg = JSON.parse(body.toString('utf8')) as WireMessage;
       } catch (err) {
+        // A runtime representation failure cannot be recovered by skipping a
+        // valid request: its peer would otherwise wait forever for a response.
+        if (!(err instanceof SyntaxError)) {
+          this.onStreamError(err as Error);
+          return;
+        }
         // Malformed frame — log and skip; framing is intact (we already
         // consumed the body), so subsequent frames decode normally.
         process.stderr.write(
-          `rslint: malformed JSON in frame (len=${len}): ${(err as Error).message}\n`,
+          `rslint: malformed JSON in frame (len=${len}): ${err.message}\n`,
         );
         continue;
       }
@@ -799,7 +801,7 @@ export function encodeFrame<T = unknown>(msg: WireFrame<T>): Buffer {
   const length = Buffer.byteLength(body, 'utf8');
   if (length > MAX_FRAME_BYTES) {
     throw new Error(
-      `ipc-client: frame length ${length} exceeds cap ${MAX_FRAME_BYTES}`,
+      `ipc-client: frame length ${length} exceeds representable maximum ${MAX_FRAME_BYTES}`,
     );
   }
   const out = Buffer.allocUnsafe(HEADER_BYTES + length);
@@ -821,15 +823,9 @@ export function decodeFrame(
 ): { msg: WireMessage; consumed: number } | null {
   if (buf.length < HEADER_BYTES) return null;
   const len = buf.readUInt32LE(0);
-  // Enforce the same cap as the streaming path (ipc-client.ts:290).
-  // Without this guard an attacker who can write to a buffer this
-  // helper consumes (test harnesses that wire arbitrary streams, or
-  // callers that misuse decodeFrame on untrusted input) could pin
-  // arbitrary memory via a 4 GiB header.
   if (len > MAX_FRAME_BYTES) {
     throw new Error(
-      `ipc-client: frame length ${len} exceeds cap ${MAX_FRAME_BYTES} ` +
-        `(possible stream desync or malicious peer)`,
+      `ipc-client: frame length ${len} exceeds representable maximum ${MAX_FRAME_BYTES}`,
     );
   }
   if (buf.length < HEADER_BYTES + len) return null;

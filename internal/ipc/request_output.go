@@ -74,11 +74,11 @@ func (o *RequestOutput) Allocate(size int) []byte {
 	if o.closed || o.published {
 		panic(errors.New("ipc: output is no longer writable"))
 	}
-	if size < 0 || size > MaxFrameSize {
+	if size < 0 {
 		panic(errors.New("ipc: invalid output size"))
 	}
 	p := o.pool
-	if p == nil || size == 0 {
+	if p == nil || size == 0 || size > MemorySlotCount*MemorySlotSize {
 		return make([]byte, size)
 	}
 	p.mu.Lock()
