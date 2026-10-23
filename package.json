@@ -44,7 +44,7 @@
     "@types/react": "catalog:",
     "ajv": "catalog:",
     "rstack": "catalog:",
-    "typescript": "7.1.0-beta",
+    "typescript": "catalog:typescript7",
     "zx": "catalog:"
   },
   "packageManager": "pnpm@10.34.4",

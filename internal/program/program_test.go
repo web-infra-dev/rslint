@@ -20,7 +20,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
-	"github.com/web-infra-dev/rslint/internal/compilerhost"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
@@ -300,7 +299,7 @@ func TestRootProgramCachesSyntacticDiagnosticsDuringConstruction(t *testing.T) {
 }
 
 type typedNilCompilerHost struct {
-	compilerhost.Host
+	utils.CompilerHost
 }
 
 type caseInsensitiveFS struct {
@@ -316,7 +315,7 @@ type typedNilFS struct {
 }
 
 type typedNilFSCompilerHost struct {
-	compilerhost.Host
+	utils.CompilerHost
 }
 
 func (*typedNilFSCompilerHost) FS() vfs.FS {

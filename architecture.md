@@ -153,15 +153,15 @@ module/import/linkname paths use `github.com/microsoft/TypeScript/tsc`.
 bundled standard libraries through the upstream `lib` build task.
 The API declaration build uses the published TypeScript compiler matching this
 checkout's release.
-`internal/compilerhost` pairs TypeScript's directory-independent host with the
-base directory required by rslint's source-only builders. Compiler-backed
+The compiler helpers in `internal/utils` retain the explicit base directory
+required by rslint's source-only builders. Compiler-backed
 Programs take their base directory from the parsed configuration. The
 `internal/utils/pathutil` adapters keep configuration and wire paths as strings
 while passing normalized rooted file/directory paths into the compiler and VFS;
 `PathKey` values are used only for identity. Module-source lookup retains the
 complete upstream resolution result, including its path key and redirects.
 See [the compiler dependency guide](./CONTRIBUTING.md#typescript-compiler-dependency)
-for the pinned revision, migration rationale, and update workflow.
+for the pinned revision and update workflow.
 
 Rule-facing string and matching helpers belong under `internal/utils/`:
 `ecmascript` owns JavaScript string values and UTF-16 conversion,

@@ -14,7 +14,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	"github.com/web-infra-dev/rslint/internal/compilerhost"
 	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
@@ -22,8 +21,11 @@ import (
 // RootFileNames are parsed exactly; imports may resolve to paths, but the
 // source Program does not recursively materialize an import closure.
 type RootOptions struct {
-	RootFileNames   []string
-	Host            compilerhost.Host
+	RootFileNames []string
+	Host          interface {
+		compiler.CompilerHost
+		GetCurrentDirectory() tspath.RootedDirectoryPath
+	}
 	CompilerOptions *core.CompilerOptions
 	SingleThreaded  bool
 }
@@ -66,6 +68,12 @@ type parsedResult struct {
 	err                  error
 }
 
+func (backend *parsedBackend) FS() vfs.FS { return backend.fs }
+
+func (backend *parsedBackend) GetCurrentDirectory() tspath.RootedDirectoryPath {
+	return pathutil.Directory(backend.currentDirectory)
+}
+
 // NewFromRoots parses, resolves direct imports for, and binds one immutable
 // source universe. The returned Program owns its source-file slice
 // and AST generation; callers must build a new Program after source changes.
@@ -91,11 +99,11 @@ func NewFromRoots(opts RootOptions) (*Program, error) {
 		fs:               fs,
 		currentDirectory: currentDirectory,
 		options:          opts.CompilerOptions,
-		resolver:         module.NewResolver(module.ResolverOptions{Host: opts.Host, CompilerOptions: opts.CompilerOptions}),
 		metadataByPath:   make(map[tspath.PathKey]ast.SourceFileMetaData, len(rootFileNames)),
 		sourcesByPath:    make(map[tspath.PathKey]*ast.SourceFile, len(rootFileNames)),
 		resolvedModules:  make(map[tspath.PathKey]module.ModeAwareCache[*module.ResolvedModule], len(rootFileNames)),
 	}
+	backend.resolver = module.NewResolver(module.ResolverOptions{Host: backend, CompilerOptions: opts.CompilerOptions})
 	results := make([]parsedResult, len(rootFileNames))
 
 	parse := func(index int) {
@@ -227,11 +235,11 @@ func NewFromBoundSources(
 		fs:               fs,
 		currentDirectory: currentDirectory,
 		options:          options,
-		resolver:         module.NewResolver(module.ResolverOptions{Host: compilerhost.WithDirectory(host, typeScript.GetCurrentDirectory()), CompilerOptions: options}),
 		metadataByPath:   make(map[tspath.PathKey]ast.SourceFileMetaData, len(files)),
 		sourcesByPath:    make(map[tspath.PathKey]*ast.SourceFile, len(files)),
 		resolvedModules:  make(map[tspath.PathKey]module.ModeAwareCache[*module.ResolvedModule], len(files)),
 	}
+	backend.resolver = module.NewResolver(module.ResolverOptions{Host: backend, CompilerOptions: options})
 	normalized, err := normalizeSourceFiles(files)
 	if err != nil {
 		return nil, err

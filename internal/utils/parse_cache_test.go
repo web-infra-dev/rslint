@@ -22,7 +22,6 @@ import (
 	"github.com/zeebo/xxh3"
 
 	"github.com/web-infra-dev/rslint/internal/api"
-	"github.com/web-infra-dev/rslint/internal/compilerhost"
 	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
@@ -325,7 +324,7 @@ func TestCachingHost_SourceSnapshotReadOnceAcrossPrograms(t *testing.T) {
 	cache := &ParseCache{}
 	build := func() *compiler.Program {
 		t.Helper()
-		host := compilerhost.WithDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
+		host := WithCompilerHostDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
 		program, err := CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
 			NoLib:     core.TSTrue,
 			NoResolve: core.TSTrue,
@@ -468,7 +467,7 @@ func TestCachingHost_OverlaySymlinkAliasesWithSharedPathAreNotMerged(t *testing.
 	}
 
 	cache := &ParseCache{}
-	host := compilerhost.WithDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
+	host := WithCompilerHostDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
 	canonicalOpts := testParseOpts(canonicalPath, ast.ExternalModuleIndicatorOptions{})
 	aliasOpts := testParseOpts(aliasPath, ast.ExternalModuleIndicatorOptions{})
 	// Exercise the strongest alias collision: compiler identity has already
@@ -612,7 +611,7 @@ func TestParseCache_RetainOnlyKeepsLivePrograms(t *testing.T) {
 	}
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	cache := &ParseCache{}
-	host := compilerhost.WithDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
+	host := WithCompilerHostDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
 
 	progA, err := CreateProgramFromOptions(false, &core.CompilerOptions{},
 		[]string{filepath.Join(tmpDir, "a.ts"), filepath.Join(tmpDir, "shared.ts")}, host)
@@ -972,7 +971,7 @@ func TestCachingHost_ReadFileFailureNotCached(t *testing.T) {
 	tmpDir := t.TempDir()
 	fs := newReadCountingFS(bundled.WrapFS(osvfs.FS())) // no cachedvfs: exists-cache would hide the file's later appearance
 	cache := &ParseCache{}
-	host := compilerhost.WithDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
+	host := WithCompilerHostDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
 
 	target := filepath.Join(tmpDir, "late.ts")
 	opts := testParseOpts(tspath.NormalizePath(target), ast.ExternalModuleIndicatorOptions{})

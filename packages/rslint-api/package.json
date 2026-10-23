@@ -18,7 +18,7 @@
   "packageManager": "pnpm@10.34.4",
   "devDependencies": {
     "@types/node": "catalog:",
-    "typescript": "7.1.0-beta"
+    "typescript": "catalog:typescript7"
   },
   "publishConfig": {
     "access": "public"

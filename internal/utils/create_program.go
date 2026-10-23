@@ -15,7 +15,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	"github.com/web-infra-dev/rslint/internal/compilerhost"
 	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
@@ -30,9 +29,26 @@ func (e *SyntacticError) Error() string {
 	return e.msg
 }
 
-func CreateCompilerHost(cwd string, fs vfs.FS) compilerhost.Host {
+// CompilerHost adds the explicit base directory used by source-only builders.
+type CompilerHost interface {
+	compiler.CompilerHost
+	GetCurrentDirectory() tspath.RootedDirectoryPath
+}
+
+type compilerHost struct {
+	compiler.CompilerHost
+	directory tspath.RootedDirectoryPath
+}
+
+func (host *compilerHost) GetCurrentDirectory() tspath.RootedDirectoryPath { return host.directory }
+
+func WithCompilerHostDirectory(host compiler.CompilerHost, directory tspath.RootedDirectoryPath) CompilerHost {
+	return &compilerHost{CompilerHost: host, directory: directory}
+}
+
+func CreateCompilerHost(cwd string, fs vfs.FS) CompilerHost {
 	defaultLibraryPath := bundled.LibPath()
-	return compilerhost.WithDirectory(compiler.NewCompilerHost(fs, defaultLibraryPath, nil, nil, nil), pathutil.Directory(cwd))
+	return WithCompilerHostDirectory(compiler.NewCompilerHost(fs, defaultLibraryPath, nil, nil, nil), pathutil.Directory(cwd))
 }
 
 func configNotFoundError(resolvedConfigPath string) error {
@@ -77,7 +93,7 @@ func CreateProgramLenient(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPa
 
 // CreateProgramFromOptions creates a program from in-memory compiler options and root file names,
 // without requiring a tsconfig file on disk.
-func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host compilerhost.Host) (*compiler.Program, error) {
+func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host CompilerHost) (*compiler.Program, error) {
 	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, pathutil.ResolveFiles(rootFileNames, host.GetCurrentDirectory()), nil, host.GetCurrentDirectory(), host.FS().CaseSensitivity())
 
 	return createProgramFromConfig(singleThreaded, configParseResult, host, false)
@@ -86,7 +102,7 @@ func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.Compile
 // CreateProgramFromOptionsLenient creates a Program like
 // CreateProgramFromOptions but leaves syntax-diagnostic admission to its
 // caller.
-func CreateProgramFromOptionsLenient(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host compilerhost.Host) (*compiler.Program, error) {
+func CreateProgramFromOptionsLenient(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host CompilerHost) (*compiler.Program, error) {
 	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, pathutil.ResolveFiles(rootFileNames, host.GetCurrentDirectory()), nil, host.GetCurrentDirectory(), host.FS().CaseSensitivity())
 
 	return CreateProgramFromParsedConfigLenient(singleThreaded, configParseResult, host)

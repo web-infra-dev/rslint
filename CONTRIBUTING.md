@@ -57,30 +57,11 @@ The existing pre-commit hook runs `rs staged`. Install it through `pnpm run prep
 
 ## TypeScript compiler dependency
 
-The `typescript-go/` submodule tracks [microsoft/TypeScript](https://github.com/microsoft/TypeScript). The Go compiler lives under `typescript-go/tsc/`, and its JS AST API lives under `typescript-go/packages/typescript/`. Existing checkouts must run `git submodule sync -- typescript-go` before updating the submodule to pick up the new remote URL.
+The `typescript-go/` submodule pins [TypeScript 7.1 Beta](https://github.com/microsoft/TypeScript/releases/tag/v7.1-beta) (`3e9236361fa9`). The Go compiler lives under `typescript-go/tsc/`; `@rslint/api` exports its JS AST API from the same checkout. `go.work` resolves the compiler module, `github.com/microsoft/TypeScript/tsc`, locally.
 
-The compiler is pinned to the **TypeScript 7.1 Beta** release, checked on **2026-10-23**:
+API declaration builds and root type checking use `typescript@7.1.0-beta`, whose `gitHead` matches the submodule. Legacy JavaScript compiler API consumers retain TypeScript 6. Versions are managed in `pnpm-workspace.yaml`.
 
-| Reference                     | Commit                                                                                                                                |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Selected release, `v7.1-beta` | [`3e9236361fa97a9e6c685f4833ac457ae2d8c50a`](https://github.com/microsoft/TypeScript/releases/tag/v7.1-beta)                          |
-| Previous TypeScript main      | [`1f70213d4922b434345f639b441681e470c7cfc1`](https://github.com/microsoft/TypeScript/commit/1f70213d4922b434345f639b441681e470c7cfc1) |
-
-The Go compiler module and all shim module/import/linkname paths use `github.com/microsoft/TypeScript/tsc`. `go.work` resolves the compiler to `typescript-go/tsc`. Both `@rslint/api` and the Go encoder use this same pinned checkout so that AST layouts and enum values stay aligned.
-
-API declaration builds and root type checking use the published `typescript@7.1.0-beta` compiler, whose `gitHead` matches the submodule commit. Rslib selects its native declaration backend automatically; these commands do not need to build Go. API exports still come from the pinned checkout. The declaration build uses upstream's `es2022` library baseline; adding `esnext` changes the required generator methods. The TypeScript `6.0.3` catalog entry remains for tools that consume the legacy JavaScript compiler API.
-
-The 7.1 integration uses rooted file/directory paths and `PathKey` identities. Rslint's configuration and wire paths remain strings; `internal/utils/pathutil` converts them at the compiler/VFS boundary. Never reconstruct a filesystem path from a case-folded key. `internal/compilerhost` retains the base directory for rslint's source-only builders, while compiler-backed Programs use their parsed configuration's base directory. Module lookups pass the complete resolution result, including its resolved path key, to preserve package and project-reference redirects.
-
-TypeScript's LSP URI decoding now preserves Windows drive spelling. Rslint compares compiler option values with upstream `CompilerOptions.Equals`, normalizing absolute drive letters on copies of rooted option paths. This keeps equivalent Session Programs reusable without changing their filesystem paths or mutable collection storage.
-
-Source-file caches now use `SourceFile.GetOrComputeData`. Symbol fields are accessed through upstream methods. The shim generator mirrors private scalar and generic values and keeps private pointers opaque, including recursive structures; its tests and the checker mirror layout test guard those unsafe accessors. Compiler compatibility fixtures cover source-phase imports and import attributes on ambient modules. These syntax additions and updated standard libraries can affect type-aware diagnostics; upgrading the compiler does not add content-mapper target discovery to rslint. The Rust client uses `proto::SymbolId` (`u64`) for compiler symbol identities, including module exports and semantic maps; type IDs, file indexes, and source positions remain `u32`. The binary AST protocol advances from 8 to 9, with its header growing from 44 to 64 bytes. The decoder in `@rslint/api` updates with the submodule; independent decoders must also update. Use matching server, Rust client and JS API versions.
-
-Source-phase imports must retain their phase during lint fixes. `import/no-duplicates` groups them separately from evaluation-phase imports, and `@typescript-eslint/consistent-type-imports` preserves them. Test new import syntax with both diagnostic and fix consumers.
-
-Distributed conditional types now wrap their type parameters with a constraint pointing at the original parameter. `no-unnecessary-type-parameters` unwraps that representation before counting uses. The new VFS directory walker omits broken symlinks and special entries; `node/file-extension-in-import` retains those entries for host directories whose filesystem identity matches the VFS, so extension-removal fixes still reject ambiguous targets.
-
-The pinned compiler rejects network roots, including UNC paths such as `//server/share/file.ts`, with TS5116. Rslint propagates that error when constructing compiler-backed Programs, including lenient Programs, so these files cannot silently disappear from a lint run. Use a local filesystem path for projects requiring compiler-backed analysis. Path identity helpers still preserve UNC spelling independently of compiler admission.
+Use matching server, Rust client and JS API versions: binary AST protocol 9 has a 64-byte header, and compiler symbol IDs are 64-bit. Independent decoders must update. Compiler-backed analysis rejects UNC/network paths with TS5116; use local filesystem paths.
 
 To select a future upstream revision and refresh its integration:
 

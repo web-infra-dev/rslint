@@ -13,7 +13,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	"github.com/web-infra-dev/rslint/internal/compilerhost"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
@@ -94,19 +93,17 @@ func (c *buildContext) compilerFS() vfs.FS {
 // newCompilerHostWithCache returns a host wired to every cache owned by the context.
 // Project-reference configs are registered before ts-go reads them; extended
 // configs are registered by programExtendedConfigCache.
-func (c *buildContext) newCompilerHostWithCache(cwd string) compilerhost.Host {
-	host := c.newCompilerHost(cwd)
-	return compilerhost.WithDirectory(utils.WithParseCache(host, c.parseCache), host.GetCurrentDirectory())
+func (c *buildContext) newCompilerHostWithCache(cwd string) utils.CompilerHost {
+	return utils.WithCompilerHostDirectory(utils.WithParseCache(c.newCompilerHost(), c.parseCache), pathutil.Directory(cwd))
 }
 
 // newTransientCompilerHost shares source snapshots with Program construction
 // without publishing its bound ASTs into the project-owned parse cache.
-func (c *buildContext) newTransientCompilerHost(cwd string) compilerhost.Host {
-	host := c.newCompilerHost(cwd)
-	return compilerhost.WithDirectory(utils.WithSourceSnapshots(host, c.parseCache), host.GetCurrentDirectory())
+func (c *buildContext) newTransientCompilerHost(cwd string) utils.CompilerHost {
+	return utils.WithCompilerHostDirectory(utils.WithSourceSnapshots(c.newCompilerHost(), c.parseCache), pathutil.Directory(cwd))
 }
 
-func (c *buildContext) newCompilerHost(cwd string) compilerhost.Host {
+func (c *buildContext) newCompilerHost() compiler.CompilerHost {
 	host := compiler.NewCompilerHost(c.compilerFS(), bundled.LibPath(), c.extendedConfigCacheInterface(), nil, nil)
 	if c.metadataFS != nil {
 		host = &programBuildCompilerHost{
@@ -114,7 +111,7 @@ func (c *buildContext) newCompilerHost(cwd string) compilerhost.Host {
 			context:      c,
 		}
 	}
-	return compilerhost.WithDirectory(host, pathutil.Directory(cwd))
+	return host
 }
 
 // createProjectProgram creates a tsconfig-backed Program and preserves the
@@ -136,12 +133,11 @@ func (c *buildContext) parseConfig(cwd string, tsconfigPath string) (*tsoptions.
 	}
 	c.registerTSConfig(resolvedConfigPath)
 
-	host := c.newCompilerHost(cwd)
 	config, _ := tsoptions.GetParsedCommandLineOfConfigFile(
 		pathutil.File(resolvedConfigPath),
 		&core.CompilerOptions{},
 		nil,
-		host.FS(),
+		c.compilerFS(),
 		c.extendedConfigCacheInterface(),
 	)
 	return config, nil
