@@ -766,21 +766,6 @@ func (p *estreeProjector) unsupported(node *ast.Node) uint32 {
 	panic(fmt.Errorf("ESTree projection: unsupported syntax %s at byte %d", node.Kind, node.Pos()))
 }
 
-func (p *estreeProjector) unwrapChain(id uint32) uint32 {
-	if id == 0 || int(id) > len(p.nodes) {
-		return id
-	}
-	record := p.nodes[id-1]
-	if schemas[record.typeID].name != "ChainExpression" {
-		return id
-	}
-	value := p.values[record.valueStart]
-	if value>>tagShift == tagNode {
-		return value & payloadMask
-	}
-	return id
-}
-
 func (p *estreeProjector) wrapOptionalChain(node *ast.Node, id uint32, chain bool) uint32 {
 	if !chain && node.Flags&ast.NodeFlagsOptionalChain == 0 {
 		return id
@@ -1598,15 +1583,25 @@ func (p *estreeProjector) convertJsxExpression(node *ast.Node) uint32 {
 
 func (p *estreeProjector) convertChainOperand(node *ast.Node) (uint32, bool) {
 	id := p.convert(node, false)
-	if node != nil && node.Kind == ast.KindParenthesizedExpression {
+	if id == 0 || node.Kind == ast.KindParenthesizedExpression {
 		return id, false
 	}
 	// A terminal non-null assertion may lack tsgo's optional-chain flag.
 	// Preserve the converted operand's chain until the outer expression wraps
 	// it; parentheses remain an explicit boundary for short-circuiting.
-	expression := p.unwrapChain(id)
-	return expression, expression != id
+	record := p.nodes[id-1]
+	if schemas[record.typeID].name != "ChainExpression" {
+		return id, false
+	}
+	expression := p.values[record.valueStart] & payloadMask
+	// The wrapper is the last record emitted by convert and has no users yet.
+	// Its parent consumes the inner expression, so reclaim it before proceeding.
+	p.nodes = p.nodes[:id-1]
+	p.values = p.values[:record.valueStart]
+	p.frameBytes -= 14 + 4 // Node columns and the single expression field.
+	return expression, true
 }
+
 func (p *estreeProjector) templateCooked(node *ast.Node) uint32 {
 	if node.TemplateLiteralLikeData().TemplateFlags&ast.TokenFlagsContainsInvalidEscape != 0 {
 		return nullValue()

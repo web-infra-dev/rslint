@@ -4,6 +4,7 @@ import (
 	"context"
 
 	api "github.com/web-infra-dev/rslint/internal/api"
+	"github.com/web-infra-dev/rslint/internal/api/plugin"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
@@ -21,7 +22,7 @@ func (h *Handler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
 func (h *Handler) HandleLintWithContext(ctx context.Context, req api.LintRequest, requester api.Requester) (*api.LintResponse, error) {
 	var dispatch linter.EslintPluginDispatcher
 	if requester != nil {
-		dispatch = NewPluginDispatcher(requester)
+		dispatch = plugin.NewDispatcher(requester)
 	}
 	return h.handleLint(ctx, req, dispatch, requester)
 }

@@ -149,24 +149,33 @@ func TestSupportedSyntaxAndFrameOwnership(t *testing.T) {
 	}
 }
 
-func TestProjectionLongCommaSequence(t *testing.T) {
+func TestProjectionExpressionChains(t *testing.T) {
 	const count = 6000
-	text := strings.Repeat("a,", count-1) + "a;"
-	var builder Builder
-	data, err := builder.Build(context.Background(), source("/sequence.js", text), Options{SourceType: "module"})
-	if err != nil {
-		t.Fatal(err)
+	for _, fixture := range []struct {
+		name, text, wrapper string
+		maxListWords        int
+	}{
+		{"comma", strings.Repeat("a,", count-1) + "a;", "SequenceExpression", count + 8},
+		{"optional", "a" + strings.Repeat("?.b", count) + ";", "ChainExpression", 8},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			var builder Builder
+			data, err := builder.Build(context.Background(), source("/chain.js", fixture.text), Options{SourceType: "module"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			wrappers := 0
+			for _, node := range builder.p.nodes {
+				if node.typeID == typeIDs[fixture.wrapper] {
+					wrappers++
+				}
+			}
+			if wrappers != 1 || len(builder.p.lists) > fixture.maxListWords {
+				t.Fatalf("chain retained intermediate records: wrappers=%d, list words=%d", wrappers, len(builder.p.lists))
+			}
+			t.Logf("source=%d bytes, frame=%d bytes, nodes=%d, list words=%d", len(fixture.text), len(data), len(builder.p.nodes), len(builder.p.lists))
+		})
 	}
-	sequences := 0
-	for _, node := range builder.p.nodes {
-		if node.typeID == typeIDs["SequenceExpression"] {
-			sequences++
-		}
-	}
-	if sequences != 1 || len(builder.p.lists) > count+8 {
-		t.Fatalf("sequence retained intermediate records: nodes=%d, list words=%d", sequences, len(builder.p.lists))
-	}
-	t.Logf("source=%d bytes, frame=%d bytes, nodes=%d, list words=%d", len(text), len(data), len(builder.p.nodes), len(builder.p.lists))
 }
 
 func TestProjectionCancellationAndFailure(t *testing.T) {

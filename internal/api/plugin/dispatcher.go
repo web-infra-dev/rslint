@@ -1,4 +1,5 @@
-package server
+// Package plugin adapts reverse plugin RPC requests for CLI and API hosts.
+package plugin
 
 import (
 	"context"
@@ -8,9 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
-// NewPluginDispatcher connects CLI/API plugin batches to their channel-owned
+// NewDispatcher connects CLI/API plugin batches to their channel-owned
 // output. LSP uses the linter's owned-frame adapter over its JSON-RPC route.
-func NewPluginDispatcher(requester api.Requester) linter.EslintPluginDispatcher {
+func NewDispatcher(requester api.Requester) linter.EslintPluginDispatcher {
 	return apiPluginDispatcher{requester: requester}
 }
 

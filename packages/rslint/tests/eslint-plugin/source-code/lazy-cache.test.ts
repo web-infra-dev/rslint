@@ -146,61 +146,6 @@ describe('singular token queries share mutable objects with full streams', () =>
     expect(sc.getLastToken(program)).toBe(stream.at(-1));
   });
 
-  test.each(['value', 'setter', 'readonly'] as const)(
-    'sparse token cache ignores inherited numeric %s properties',
-    (kind) => {
-      const sc = makeSource('const alpha = 1;');
-      const program = mkNode('Program', 0, sc.text.length);
-      const first = sc.getFirstToken(program)!;
-      const fake = {
-        type: 'Identifier',
-        value: 'inherited',
-        range: [6, 11] as [number, number],
-        loc: {
-          start: { line: 1, column: 6 },
-          end: { line: 1, column: 11 },
-        },
-      };
-      const old = Object.getOwnPropertyDescriptor(Array.prototype, '1');
-      let calls = 0;
-      let next: ReturnType<typeof sc.getTokenAfter> = null;
-      let tokens: ReturnType<typeof sc.getTokens> = [];
-      Object.defineProperty(Array.prototype, '1', {
-        configurable: true,
-        ...(kind === 'setter'
-          ? {
-              get: () => undefined,
-              set: () => {
-                calls++;
-              },
-            }
-          : { value: fake, writable: kind === 'value' }),
-      });
-      try {
-        next = sc.getTokenAfter(first);
-        tokens = sc.tokensAndComments as typeof tokens;
-      } finally {
-        if (old) Object.defineProperty(Array.prototype, '1', old);
-        else Reflect.deleteProperty(Array.prototype, '1');
-      }
-      expect(calls).toBe(0);
-      expect(next!.value).toBe('alpha');
-      expect(tokens.map((token) => token.value)).toEqual([
-        'const',
-        'alpha',
-        '=',
-        '1',
-        ';',
-      ]);
-      expect(tokens[0]).toBe(first);
-      expect(tokens[1]).toBe(next);
-      expect(Object.getPrototypeOf(sc.tokensAndComments)).toBe(Array.prototype);
-      expect(sc.tokensAndComments.map((token) => token.value)).toEqual(
-        tokens.map((token) => token.value),
-      );
-    },
-  );
-
   test('filters and comment streams reuse tokens returned by singular queries', () => {
     const sc = makeSource('const first = 1; /* gap */ const second = 2;');
     const program = mkNode('Program', 0, sc.text.length);

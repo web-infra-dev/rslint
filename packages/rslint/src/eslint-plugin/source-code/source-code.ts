@@ -465,9 +465,6 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
             tokens[i] ??
             buildToken(pt.types[i], pt.starts[i], pt.ends[i], text, getLso());
         }
-        // Publish an ordinary, fully populated array only after the private
-        // sparse cache no longer has holes exposed to inherited indices.
-        Object.setPrototypeOf(tokens, Array.prototype);
         _tokens = tokens;
         _tokenCache = null;
       } else {
@@ -531,11 +528,8 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       text,
       getLso(),
     );
-    // Holes are private cache misses, never inherited tokens or setters.
-    (_tokenCache ??= Object.setPrototypeOf(
-      new Array<Token | undefined>(pt.types.length),
-      null,
-    ))[index] = token;
+    (_tokenCache ??= new Array<Token | undefined>(pt.types.length))[index] =
+      token;
     return token;
   };
   const mergedIndices = (): number[] => {

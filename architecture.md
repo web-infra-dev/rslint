@@ -109,7 +109,8 @@ The directory map below folds the high-level module relationships into the packa
 | `cmd/tsgo/`                          | ts-go semantic inspection/export tool                                                                                          | Talks directly to `typescript-go` and bypasses the lint framework; consumed by `packages/tsgo` and `crates/tsgo-client`                                                                                                                                                                                                                                                                                                                                         |
 | `internal/ipc/`                      | Generic framed requests and bounded text/binary attachment transport                                                           | Owns request matching, shared-memory publication, acknowledgements and private platform backends. Application message structures and decoding belong to their consumers; IPC imports no linter or plugin implementation. Node uses `packages/rslint/src/ipc`, and Rust provides byte access through `memory_transport`                                                                                                                                          |
 | `internal/api/`                      | stdio IPC protocol, wire types, and generic bidirectional service for JS/WASM integration                                      | Defines the stable request/response boundary used by `packages/rslint`, `packages/rslint-wasm`, and `internal/api/server`; it does not import concrete lint, config, Program-loader, or command implementations                                                                                                                                                                                                                                                 |
-| `internal/api/server/`               | Concrete rslint API request handlers                                                                                           | Implements lint and AST-inspection requests over `internal/api`, owns API-specific paths, request-overlay generation adapters, reverse config/plugin adapters, and structured response projection; it delegates lint planning, execution, and in-memory fix application to `internal/linter`                                                                                                                                                                    |
+| `internal/api/server/`               | Concrete rslint API request handlers                                                                                           | Implements lint and AST-inspection requests over `internal/api`, owns API-specific paths, request-overlay generation adapters, reverse config adapters, and structured response projection; it delegates lint planning, execution, and in-memory fix application to `internal/linter`                                                                                                                                                                           |
+| `internal/api/plugin/`               | Reverse plugin RPC adapter shared by CLI and API hosts                                                                         | Connects the linter batch interface to API requests and channel-owned output bytes. CLI and API handlers compose it directly; language projection and generic IPC import none of its plugin policy.                                                                                                                                                                                                                                                             |
 | `internal/config/`                   | Configuration models, authored path-space snapshots, matching/merging, project-path resolution, and configured-rule evaluation | Owns the shared extension/default-exclude policy, the `GlobalIgnoreMatcher` consumed by config-candidate discovery, and the `TargetMatcher` consumed by lint-target planning; both matchers share the private config-target resolver. File resolvers receive an immutable `internal/rule.Catalog` explicitly and convert merged rule settings into execution descriptors without owning target walking, module loading, or config ownership                     |
 | `internal/config/lint/`              | Effective config and rule resolution for already-selected lint targets                                                         | Joins the immutable target/source binding returned by `internal/program/loader` to the owning config's `FileConfigResolver`. CLI and API use the same resolver; it cannot discover targets, infer a different owner, construct Programs, or execute rules                                                                                                                                                                                                       |
 | `internal/config/target/`            | Lint-target planning, explicit-file outcomes, directory walking, canonical deduplication, and config-owner routing             | Imports the parent config model and matching policy through `PathIdentity`, `PathSpaceSnapshot`, and `TargetMatcher`. It also owns exact-first source-path lookup in immutable source-to-target maps. CLI, API, LSP, `internal/config/lint`, and `internal/program/loader` consume `File`, `Plan`, `OwnerIndex`, or that lookup; the parent config package never imports this child package                                                                     |
@@ -1743,6 +1744,8 @@ values, token classifications, optional fields and template raw values; it
 does not change syntax admission, rule execution or diagnostic/fix policy.
 Unparenthesized comma chains produce one final expression list, without
 encoding intermediate prefixes. Parentheses retain nested sequences.
+Optional-chain operands reclaim replaced wrappers before encoding; parentheses
+preserve their separate short-circuit boundaries.
 Directive prologues advance once per statement list. Token classification uses
 the projection's JSX name context rather than walking each identifier's ancestors.
 Long trivia runs share a per-file token-start index, avoiding repeated scans
@@ -1944,8 +1947,9 @@ fields together, including non-root nodes' final parent slots. Parents are
 assigned after all fields are complete, in the existing traversal order.
 Constructors are cached by present-field shape, with at most eight variants per
 schema and a generic constructor for additional shapes. They retain schema
-constants only and preserve the ordinary Object prototype, mutable data properties, absent
-optional fields and inherited setter behavior. String offsets are indexed once,
+constants only. Nodes and arrays use their ordinary JavaScript prototypes,
+with mutable own fields and absent optional fields. Materialization does not
+adapt to changes to global prototypes. String offsets are indexed once,
 and decoding uses one temporary byte view for the string table instead of a
 Buffer wrapper per string. Tagged words use signed reads to avoid boxed unsigned
 magnitudes while preserving their tag and payload bits. No record-validation
@@ -1957,10 +1961,7 @@ Existing scope, listener,
 SourceCode, report and fix execution consumes this final tree.
 SourceCode's private comment-aware token index reserves the known stream size
 and keeps the actual merge length, avoiding repeated backing-array growth.
-Private node tables and sparse token caches have no array prototype. AST lists
-and fully materialized token arrays gain the ordinary Array prototype after
-their own entries are filled, so inherited numeric properties cannot supply or
-discard syntax data during construction.
+Node tables, AST lists and sparse token caches use ordinary arrays.
 Token objects, identity, public arrays, range mutations and filter callbacks
 retain their existing behavior.
 Listener dispatch uses one callback and a private reversed-ancestor buffer per

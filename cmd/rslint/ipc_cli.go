@@ -49,7 +49,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
-	"github.com/web-infra-dev/rslint/internal/api/server"
+	"github.com/web-infra-dev/rslint/internal/api/plugin"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
@@ -411,7 +411,7 @@ func runCLI(args []string) int {
 	// Reverse dispatcher: send each plugin-lint batch back to the Node host
 	// over the IPC channel and decode its result. Runs concurrently with the
 	// native lint pass (handleLintCommand awaits it before output / --fix).
-	dispatch := server.NewPluginDispatcher(ch)
+	dispatch := plugin.NewDispatcher(ch)
 
 	// Hold the --timing table until Node confirms that its real stdout sink has
 	// completed every forwarded write. Draining the Go pipe alone is not a

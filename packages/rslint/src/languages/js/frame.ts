@@ -8,7 +8,6 @@ import type { ESTreeNode } from './types.js';
 const HEADER = 40;
 const MASK = 0x1fffffff;
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
-const defineOwnProperty = Object.defineProperty;
 // Structural fields use the canonical visitor order. Wire node IDs already
 // provide identity; materialization needs no second object-to-ID index.
 const CHILD_FIELDS = FRAME_SCHEMAS.map(([type, fields]) =>
@@ -32,20 +31,6 @@ function makeNodeConstructor(
   fields: readonly string[],
   fixed = false,
 ): NodeConstructor {
-  const slot: PropertyDescriptor & { __proto__: null } = {
-    __proto__: null,
-    value: undefined,
-    writable: true,
-    enumerable: true,
-    configurable: true,
-  };
-  const own = (node: FrameNode, key: string, value: unknown): void => {
-    if (key in Object.prototype) {
-      slot.value = value;
-      defineOwnProperty(node, key, slot);
-      slot.value = undefined;
-    } else node[key] = value;
-  };
   function Node(
     this: FrameNode,
     start: number,
@@ -54,21 +39,21 @@ function makeNodeConstructor(
     view: DataView,
     base: number,
   ): void {
-    own(this, 'type', type);
-    own(this, 'start', start);
-    own(this, 'end', end);
-    own(this, 'range', [start, end]);
-    own(this, 'loc', {
+    this.type = type;
+    this.start = start;
+    this.end = end;
+    this.range = [start, end];
+    this.loc = {
       start: offsetToLineColumn(start, lineStarts),
       end: offsetToLineColumn(end, lineStarts),
-    });
+    };
     for (let index = 0; index < fields.length; index++) {
       if (
         fixed ||
         (fields[index][0] !== '$' &&
           view.getInt32(base + index * 4, true) >>> 29 !== 7)
       )
-        own(this, fields[index], undefined);
+        this[fields[index]] = undefined;
     }
   }
   // Plugins receive ordinary objects with the usual Object prototype.
@@ -108,12 +93,11 @@ function constructorFor(
   }
   const extra =
     (type === 'Literal' &&
-      !('regex' in Object.prototype) &&
       view.getInt32(base + fields.indexOf('$regexPattern') * 4, true) >>> 29 ===
         3 &&
       view.getInt32(base + fields.indexOf('$regexFlags') * 4, true) >>> 29 ===
         3) ||
-    (type === 'TemplateElement' && !('value' in Object.prototype));
+    type === 'TemplateElement';
   if (parentSlot) mask |= 1 << fields.length;
   if (extra) mask |= 1 << (fields.length + 1);
   const variants = NODE_VARIANTS[typeID];
@@ -273,7 +257,6 @@ export function decodeFrame(
   // owned-string cache replace a per-file hash table of record boundaries.
   const stringOffsets = new Uint32Array(stringCount);
   const stringCache = new Array<string | undefined>(stringCount);
-  Object.setPrototypeOf(stringCache, null);
   for (let offset = 0, index = 0; index < stringCount; index++) {
     poll(index);
     stringOffsets[index] = offset;
@@ -292,12 +275,7 @@ export function decodeFrame(
   const lineStarts = buildLineStartOffsets(text);
   const typeAt = (index: number): number =>
     view.getUint16(types + index * 2, true);
-  const reserveParents =
-    !('parent' in Object.prototype) &&
-    !('regex' in Object.prototype) &&
-    !('value' in Object.prototype);
-  // Node IDs are private storage, never inherited array properties.
-  const nodes: FrameNode[] = Object.setPrototypeOf(new Array(count + 1), null);
+  const nodes = new Array<FrameNode>(count + 1);
   const stringData = Buffer.from(
     bytes.buffer,
     bytes.byteOffset,
@@ -344,8 +322,7 @@ export function decodeFrame(
     const start = u32(starts + (id - 1) * 4),
       end = u32(ends + (id - 1) * 4);
     const base = values + u32(valueStarts + (id - 1) * 4) * 4;
-    const parentSlot = reserveParents && id !== root;
-    const Constructor = constructorFor(typeAt(id - 1), view, base, parentSlot);
+    const Constructor = constructorFor(typeAt(id - 1), view, base, id !== root);
     nodes[id] = new Constructor(start, end, lineStarts, view, base);
   }
   const readValue = (encoded: number): unknown => {
@@ -358,17 +335,12 @@ export function decodeFrame(
       case 2: {
         const base = lists + payload * 4,
           length = u32(base),
-          result: Array<ESTreeNode | null> = Object.setPrototypeOf(
-            new Array(length),
-            null,
-          );
+          result = new Array<ESTreeNode | null>(length);
         for (let i = 0; i < length; i++) {
           poll(i);
           const id = u32(base + 4 + i * 4);
           result[i] = id === 0 ? null : nodes[id];
         }
-        // ESTree lists become ordinary arrays after every own entry exists.
-        Object.setPrototypeOf(result, Array.prototype);
         return result;
       }
       case 3:
@@ -422,7 +394,7 @@ export function decodeFrame(
       node.value = { cooked, raw };
     }
   }
-  // Parent setters observe complete nodes, in the original traversal order.
+  // Link complete nodes in the canonical visitor order.
   const stack = [root];
   let visited = 0;
   while (stack.length) {
