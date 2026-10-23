@@ -229,7 +229,7 @@ func hasArgumentsReference(ctx rule.RuleContext, node *ast.Node) bool {
 		if isValueIdentifier(n) && n.Text() == "arguments" {
 			if ctx.TypeChecker != nil {
 				symbol := utils.GetReferenceSymbol(n, ctx.TypeChecker)
-				if symbol != nil && len(symbol.Declarations) > 0 {
+				if symbol != nil && len(symbol.Declarations()) > 0 {
 					return
 				}
 				found = true

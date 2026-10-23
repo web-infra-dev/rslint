@@ -82,7 +82,7 @@ var GroupExportsRule = rule.Rule{
 					return
 				}
 				// Ignore authored locals, but retain tsgo's implicit CommonJS bindings.
-				if symbol := ctx.Refs.ResolveInFile(root); symbol != nil && symbol.Flags&ast.SymbolFlagsModuleExports == 0 {
+				if symbol := ctx.Refs.ResolveInFile(root); symbol != nil && symbol.Flags()&ast.SymbolFlagsModuleExports == 0 {
 					return
 				}
 				collect(node, group{commonJS: true})

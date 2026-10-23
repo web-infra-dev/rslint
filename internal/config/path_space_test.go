@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type pathSpaceTestFS struct {
@@ -18,15 +19,17 @@ type pathSpaceTestFS struct {
 	caseSensitive bool
 }
 
-func (fs *pathSpaceTestFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
-func (fs *pathSpaceTestFS) Realpath(filePath string) string {
-	if realPath := fs.realPaths[filePath]; realPath != "" {
-		return realPath
+func (fs *pathSpaceTestFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(fs.caseSensitive)
+}
+func (fs *pathSpaceTestFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	if realPath := fs.realPaths[filePath.AsString()]; realPath != "" {
+		return pathutil.Path(realPath)
 	}
 	return filePath
 }
 
-func (fs *pathSpaceTestFS) Stat(path string) vfs.FileInfo {
+func (fs *pathSpaceTestFS) Stat(path tspath.RootedPath) vfs.FileInfo {
 	if fs.FS != nil {
 		return fs.FS.Stat(path)
 	}
@@ -55,7 +58,7 @@ func TestFreezeFileIdentityAncestorFallback(t *testing.T) {
 		})
 	}
 	t.Run("existing directory stops ancestor lookup", func(t *testing.T) {
-		directory := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+		directory := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 		file := tspath.ResolvePath(directory, "new.ts")
 		fsys := &pathSpaceTestFS{FS: osvfs.FS(), realPaths: map[string]string{tspath.GetDirectoryPath(directory): "/must-not-resolve"}}
 		if identity := FreezeFileIdentity(file, fsys); identity.CanonicalParentPath != directory || identity.CanonicalPath != file {
@@ -69,14 +72,16 @@ type pathIdentityHookFS struct {
 	realpath func(string) string
 }
 
-func (fsys *pathIdentityHookFS) Realpath(path string) string { return fsys.realpath(path) }
+func (fsys *pathIdentityHookFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	return pathutil.Path(fsys.realpath(path.AsString()))
+}
 
 func TestFreezeFileIdentityAnchorsLeafInPhysicalParent(t *testing.T) {
 	for _, cached := range []bool{false, true} {
 		for _, suffix := range []string{"", "missing/deep"} {
 			for _, leafSymlink := range []bool{false, true} {
 				t.Run(fmt.Sprintf("cached=%t/suffix=%s/leafSymlink=%t", cached, suffix, leafSymlink), func(t *testing.T) {
-					root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+					root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 					first, second := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "second")
 					for _, directory := range []string{first, second} {
 						if err := os.Mkdir(directory, 0o755); err != nil {
@@ -124,7 +129,7 @@ func TestFreezeFileIdentityAnchorsLeafInPhysicalParent(t *testing.T) {
 								t.Fatal(err)
 							}
 						}
-						return hooks.FS.Realpath(path)
+						return hooks.FS.Realpath(pathutil.Path(path)).AsString()
 					}
 					var fsys vfs.FS = hooks
 					if cached {

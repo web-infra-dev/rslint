@@ -57,15 +57,15 @@ func resolveIdentifierViaChecker(ident *ast.Node, tc *checker.Checker) *ast.Node
 	// `const x = <div/>` it's the VariableDeclaration. When ValueDeclaration
 	// is absent (interfaces, type aliases, ambient symbols) we explicitly
 	// don't try to walk `Declarations` — those don't have a JSX value.
-	decl := symbol.ValueDeclaration
+	decl := symbol.ValueDeclaration()
 	if decl == nil {
 		// Fall back to Declarations[0] when ValueDeclaration is missing
 		// but the symbol still has a concrete declaration (e.g. some
 		// shorthand-property bindings).
-		if len(symbol.Declarations) == 0 {
+		if len(symbol.Declarations()) == 0 {
 			return nil
 		}
-		decl = symbol.Declarations[0]
+		decl = symbol.Declarations()[0]
 	}
 	if decl == nil || decl.Kind != ast.KindVariableDeclaration {
 		return nil

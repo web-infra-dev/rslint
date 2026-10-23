@@ -27,7 +27,7 @@ import (
 // to `/private/var/folders/...`, so direct equality fails.
 func programHasFileWithSuffix(program *compiler.Program, suffix string) bool {
 	for _, f := range program.GetSourceFiles() {
-		if strings.HasSuffix(f.FileName(), suffix) {
+		if strings.HasSuffix(f.FileName().AsString(), suffix) {
 			return true
 		}
 	}

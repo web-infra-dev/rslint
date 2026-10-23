@@ -485,7 +485,7 @@ func TestYodaExtras(t *testing.T) {
 func TestYodaExtrasEditDemand(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     tspath.Path("/edit-demand.ts"),
+		PathKey:  tspath.PathKey("/edit-demand.ts"),
 	}, `1 < a`, core.ScriptKindTS)
 
 	run := func(demand rule.EditDemand) rule.RuleDiagnostic {

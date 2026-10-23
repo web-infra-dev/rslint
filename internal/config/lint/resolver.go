@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // Resolver maps Program source paths back to their selected lint targets and
@@ -237,8 +238,8 @@ func normalizeSourceTargetMappings(
 func authoritativePath(filePath string, fsys vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
 	if fsys != nil {
-		if realPath := fsys.Realpath(filePath); realPath != "" {
-			return tspath.NormalizePath(realPath)
+		if realPath := fsys.Realpath(pathutil.Path(filePath)); realPath != "" {
+			return tspath.NormalizePath(realPath.AsString())
 		}
 	}
 	return filePath

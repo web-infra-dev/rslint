@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type canonicalPathVFS struct {
@@ -12,9 +13,9 @@ type canonicalPathVFS struct {
 	canonicalPaths map[string]string
 }
 
-func (fs *canonicalPathVFS) Realpath(filePath string) string {
-	if canonicalPath := fs.canonicalPaths[rslintconfig.ExactPathID(filePath)]; canonicalPath != "" {
-		return canonicalPath
+func (fs *canonicalPathVFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	if canonicalPath := fs.canonicalPaths[rslintconfig.ExactPathID(filePath.AsString())]; canonicalPath != "" {
+		return pathutil.Path(canonicalPath)
 	}
 	return fs.FS.Realpath(filePath)
 }
@@ -40,7 +41,7 @@ func addEquivalentFileContentPaths(fileContents map[string]string, configDirecto
 		entries = append(entries, fileContentEntry{path: filePath, content: content})
 	}
 
-	comparePathOptions := tspath.ComparePathsOptions{
+	comparePathOptions := pathutil.ComparePathsOptions{
 		CurrentDirectory:          currentDirectory,
 		UseCaseSensitiveFileNames: true,
 	}
@@ -54,17 +55,17 @@ func addEquivalentFileContentPaths(fileContents map[string]string, configDirecto
 		fileContents[alias] = content
 	}
 	addDirectoryAlias := func(fromDir string, toDir string, filePath string, content string) {
-		if fromDir == "" || toDir == "" || !tspath.ContainsPath(fromDir, filePath, comparePathOptions) {
+		if fromDir == "" || toDir == "" || !pathutil.ContainsPath(fromDir, filePath, comparePathOptions) {
 			return
 		}
-		relativePath := tspath.GetRelativePathFromDirectory(fromDir, filePath, comparePathOptions)
+		relativePath := pathutil.GetRelativePathFromDirectory(fromDir, filePath, comparePathOptions)
 		if relativePath == "" {
 			return
 		}
 		addAlias(tspath.ResolvePath(toDir, relativePath), content)
 	}
 
-	realConfigDirectory := fs.Realpath(configDirectory)
+	realConfigDirectory := fs.Realpath(pathutil.Path(configDirectory))
 	for _, entry := range entries {
 		// Overlay sources and lint targets share physical ancestry even when
 		// several parent directories have not been created.
@@ -72,9 +73,9 @@ func addEquivalentFileContentPaths(fileContents map[string]string, configDirecto
 		addAlias(tspath.CombinePaths(identity.CanonicalParentPath, tspath.GetBaseFileName(entry.path)), entry.content)
 		addAlias(identity.CanonicalPath, entry.content)
 		addAlias(canonicalPaths[rslintconfig.ExactPathID(entry.path)], entry.content)
-		if realConfigDirectory != "" && tspath.ComparePaths(configDirectory, realConfigDirectory, comparePathOptions) != 0 {
-			addDirectoryAlias(configDirectory, realConfigDirectory, entry.path, entry.content)
-			addDirectoryAlias(realConfigDirectory, configDirectory, entry.path, entry.content)
+		if realConfigDirectory != "" && pathutil.ComparePaths(configDirectory, realConfigDirectory.AsString(), comparePathOptions) != 0 {
+			addDirectoryAlias(configDirectory, realConfigDirectory.AsString(), entry.path, entry.content)
+			addDirectoryAlias(realConfigDirectory.AsString(), configDirectory, entry.path, entry.content)
 		}
 	}
 }

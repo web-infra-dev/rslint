@@ -270,18 +270,18 @@ func isTrackable(
 	isModule bool,
 	exportedSymbols map[*ast.Symbol]bool,
 ) bool {
-	if len(sym.Declarations) == 0 {
+	if len(sym.Declarations()) == 0 {
 		return false
 	}
-	if ctx.Exported.Has(sym.Name) {
-		for _, decl := range sym.Declarations {
-			if ctx.IsExportedGlobalBinding(decl.Symbol(), sym.Name) {
+	if ctx.Exported.Has(sym.Name()) {
+		for _, decl := range sym.Declarations() {
+			if ctx.IsExportedGlobalBinding(decl.Symbol(), sym.Name()) {
 				return false
 			}
 		}
 	}
 	declaredHere := false
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		name := decl.Name()
 		if name == nil {
 			continue
@@ -308,7 +308,7 @@ func isExported(sym *ast.Symbol, exportedSymbols map[*ast.Symbol]bool, root *ast
 	if exportedSymbols[sym] {
 		return true
 	}
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		// `export let x = 1` and `export let { x } = obj` carry the modifier
 		// on the variable statement; climb to it from the declarator or the
 		// binding element.

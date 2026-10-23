@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/iovfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -35,12 +36,12 @@ type symlinkVFS struct {
 	target string
 }
 
-func (f *symlinkVFS) Realpath(path string) string {
-	if path == f.link {
-		return f.target
+func (f *symlinkVFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	if path.AsString() == f.link {
+		return pathutil.Path(f.target)
 	}
-	if rest, linked := strings.CutPrefix(path, f.link+"/"); linked {
-		return f.target + "/" + rest
+	if rest, linked := strings.CutPrefix(path.AsString(), f.link+"/"); linked {
+		return pathutil.Path(f.target + "/" + rest)
 	}
 	return f.FS.Realpath(path)
 }
@@ -48,7 +49,7 @@ func (f *symlinkVFS) Realpath(path string) string {
 // typeOfLastAlias returns the type of the last type alias declared in fileName.
 func typeOfLastAlias(t *testing.T, program *compiler.Program, c *checker.Checker, fileName string) *checker.Type {
 	t.Helper()
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(pathutil.File(fileName))
 	assert.Assert(t, sourceFile != nil, "expected %s in the program", fileName)
 
 	var alias *ast.Node
@@ -72,7 +73,7 @@ func typeOfTestAlias(t *testing.T, program *compiler.Program, c *checker.Checker
 
 func firstVariableInitializer(t *testing.T, program *compiler.Program, fileName string) *ast.Node {
 	t.Helper()
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(pathutil.File(fileName))
 	assert.Assert(t, sourceFile != nil, "expected %s in the program", fileName)
 	for _, statement := range sourceFile.Statements.Nodes {
 		if statement.Kind != ast.KindVariableStatement {
@@ -181,7 +182,7 @@ type CustomType = Custom;`,
 	c, done := program.GetTypeChecker(t.Context())
 	defer done()
 	types := map[string]*checker.Type{}
-	for _, node := range program.GetSourceFile(filePath).Statements.Nodes {
+	for _, node := range program.GetSourceFile(pathutil.File(filePath)).Statements.Nodes {
 		if ast.IsTypeAliasDeclaration(node) {
 			types[node.Name().Text()] = c.GetTypeAtLocation(node.Name())
 		}
@@ -248,7 +249,9 @@ func TestTypeMatchesDeclarationSpecifierDefaultTypeRoots(t *testing.T) {
 // synthetic UNC roots to io/fs, whose paths cannot start with a slash.
 type declarationPathFS struct{ vfs.FS }
 
-func (declarationPathFS) FileExists(string) bool { return false }
+func (declarationPathFS) FileExists(tspath.RootedFilePath) bool {
+	return false
+}
 
 func TestTypeMatchesDeclarationSpecifierPaths(t *testing.T) {
 	for _, test := range []struct {
@@ -314,12 +317,19 @@ func TestTypeMatchesDeclarationSpecifierPaths(t *testing.T) {
 			file := tspath.NormalizePath(test.file)
 			// All reads use exact fixture names; the flag controls the compiler's
 			// path identity without relying on the machine running this test.
-			fs := NewOverlayVFS(declarationPathFS{iovfs.From(fstest.MapFS{}, test.caseSensitive)}, map[string]string{
+			fs := NewOverlayVFS(declarationPathFS{iovfs.From(fstest.MapFS{}, pathutil.CaseSensitivity(test.caseSensitive))}, map[string]string{
 				file: "class Demo {}\ntype Test = Demo;",
 			})
 			program, err := CreateProgramFromOptions(true, &core.CompilerOptions{
-				NoLib: core.TSTrue, Types: []string{}, TypeRoots: test.typeRoots,
+				NoLib: core.TSTrue, Types: []string{}, TypeRoots: pathutil.Directories(test.typeRoots),
 			}, []string{file}, CreateCompilerHost(directory, fs))
+			if strings.HasPrefix(file, "//") {
+				// The pinned compiler rejects network roots with TS5116 rather
+				// than constructing the declaration's type.
+				assert.ErrorContains(t, err, "TS5116")
+				assert.Assert(t, program == nil)
+				return
+			}
 			assert.NilError(t, err)
 			c, done := program.GetTypeChecker(t.Context())
 			defer done()
@@ -365,8 +375,8 @@ func TestTypeMatchesSomeSpecifierFromLinkedWorkspacePackage(t *testing.T) {
 
 	demo := typeOfTestAlias(t, program, c, filePath)
 
-	declaration := ast.GetSourceFileOfNode(checker.Type_symbol(demo).Declarations[0])
-	assert.Assert(t, !strings.Contains(declaration.FileName(), "/node_modules/"),
+	declaration := ast.GetSourceFileOfNode(checker.Type_symbol(demo).Declarations()[0])
+	assert.Assert(t, !strings.Contains(declaration.FileName().AsString(), "/node_modules/"),
 		"expected the declaration to resolve through the link, got %s", declaration.FileName())
 	assert.Equal(t, program.IsSourceFileFromExternalLibrary(declaration), true)
 

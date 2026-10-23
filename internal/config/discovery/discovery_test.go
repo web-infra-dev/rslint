@@ -24,6 +24,7 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type fakeConfigModuleLoader struct {
@@ -68,8 +69,8 @@ type configDiscoveryCandidateFS struct {
 	files map[string]struct{}
 }
 
-func (fs *configDiscoveryCandidateFS) FileExists(path string) bool {
-	_, exists := fs.files[tspath.NormalizePath(path)]
+func (fs *configDiscoveryCandidateFS) FileExists(path tspath.RootedFilePath) bool {
+	_, exists := fs.files[tspath.NormalizePath(path.AsString())]
 	return exists
 }
 
@@ -82,53 +83,53 @@ func (fs *configDiscoveryReadSpyFS) recordMarker(path string) {
 	fs.mu.Unlock()
 }
 
-func (fs *configDiscoveryReadSpyFS) FileExists(path string) bool {
-	fs.recordMarker(path)
+func (fs *configDiscoveryReadSpyFS) FileExists(path tspath.RootedFilePath) bool {
+	fs.recordMarker(path.AsString())
 	return fs.FS.FileExists(path)
 }
 
-func (fs *configDiscoveryReadSpyFS) DirectoryExists(path string) bool {
-	fs.recordMarker(path)
+func (fs *configDiscoveryReadSpyFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	fs.recordMarker(path.AsString())
 	return fs.FS.DirectoryExists(path)
 }
 
-func (fs *configDiscoveryReadSpyFS) ReadFile(path string) (string, bool) {
-	if strings.EqualFold(tspath.GetBaseFileName(path), ".gitignore") {
+func (fs *configDiscoveryReadSpyFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if strings.EqualFold(tspath.GetBaseFileName(path.AsString()), ".gitignore") {
 		fs.mu.Lock()
 		fs.gitignoreReads++
-		fs.gitignorePaths = append(fs.gitignorePaths, tspath.NormalizePath(path))
+		fs.gitignorePaths = append(fs.gitignorePaths, tspath.NormalizePath(path.AsString()))
 		fs.mu.Unlock()
 	}
 	return fs.FS.ReadFile(path)
 }
 
-func (fs *configDiscoveryReadSpyFS) GetAccessibleEntries(path string) vfs.Entries {
+func (fs *configDiscoveryReadSpyFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
 	fs.mu.Lock()
-	fs.accessedDirs = append(fs.accessedDirs, tspath.NormalizePath(path))
+	fs.accessedDirs = append(fs.accessedDirs, tspath.NormalizePath(path.AsString()))
 	fs.mu.Unlock()
 	return fs.FS.GetAccessibleEntries(path)
 }
 
-func (fs *configDiscoveryCaseSensitivityFS) UseCaseSensitiveFileNames() bool {
-	return fs.caseSensitive
+func (fs *configDiscoveryCaseSensitivityFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(fs.caseSensitive)
 }
 
-func (fs *configDiscoveryNoSymlinkMetadataFS) GetAccessibleEntries(path string) vfs.Entries {
+func (fs *configDiscoveryNoSymlinkMetadataFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
 	entries := fs.FS.GetAccessibleEntries(path)
 	entries.Symlinks = nil
 	return entries
 }
 
-func (fs *configDiscoveryRealpathFS) Realpath(path string) string {
-	path = tspath.NormalizePath(path)
+func (fs *configDiscoveryRealpathFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	path = pathutil.Path(tspath.NormalizePath(path.AsString()))
 	fs.mu.Lock()
 	if fs.realpathCalls == nil {
 		fs.realpathCalls = make(map[string]int)
 	}
-	fs.realpathCalls[path]++
+	fs.realpathCalls[path.AsString()]++
 	fs.mu.Unlock()
-	if realPath := fs.realPaths[path]; realPath != "" {
-		return tspath.NormalizePath(realPath)
+	if realPath := fs.realPaths[path.AsString()]; realPath != "" {
+		return pathutil.Path(tspath.NormalizePath(realPath))
 	}
 	return fs.FS.Realpath(path)
 }
@@ -162,8 +163,8 @@ func newConfigDiscoveryConcurrencyFS(fsys vfs.FS, watched ...string) *configDisc
 	}
 }
 
-func (fs *configDiscoveryConcurrencyFS) GetAccessibleEntries(path string) vfs.Entries {
-	if _, watched := fs.watched[tspath.NormalizePath(path)]; !watched {
+func (fs *configDiscoveryConcurrencyFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	if _, watched := fs.watched[tspath.NormalizePath(path.AsString())]; !watched {
 		return fs.FS.GetAccessibleEntries(path)
 	}
 
@@ -1442,7 +1443,7 @@ func TestConfigDiscoveryAutomaticDirectoryTargetKeepsAncestorOwnerGitChain(t *te
 	}
 	unrelatedDir := tspath.ResolvePath(cwd, "unrelated")
 	for _, accessed := range spy.accessedDirs {
-		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+		if accessed == unrelatedDir || pathutil.StartsWithDirectory(accessed, unrelatedDir, true) {
 			t.Fatalf("automatic target walk entered unrelated directory %q", accessed)
 		}
 	}
@@ -1594,7 +1595,7 @@ func TestConfigDiscoveryExplicitConfigTargetProjectionUsesConfigPathSpace(t *tes
 		t.Fatal(err)
 	}
 	externalSpelling := writeDiscoveryFixture(t, externalRoot, "index.ts", "export {};\n")
-	canonicalTarget := discoveryTestFS().Realpath(physicalTarget)
+	canonicalTarget := discoveryTestFS().Realpath(pathutil.Path(physicalTarget))
 
 	for _, test := range []struct {
 		name        string
@@ -1609,7 +1610,7 @@ func TestConfigDiscoveryExplicitConfigTargetProjectionUsesConfigPathSpace(t *tes
 			name:      "canonical target hint does not move an external lexical spelling into the Git root",
 			cwd:       physicalRoot,
 			target:    externalSpelling,
-			canonical: canonicalTarget,
+			canonical: canonicalTarget.AsString(),
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -1897,7 +1898,7 @@ func TestConfigDiscoveryExplicitTargetsSkipUnrelatedGitignoreSubtrees(t *testing
 	}
 	unrelatedDir := tspath.ResolvePath(root, "packages/unrelated")
 	for _, accessed := range spy.accessedDirs {
-		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+		if accessed == unrelatedDir || pathutil.StartsWithDirectory(accessed, unrelatedDir, true) {
 			t.Fatalf("explicit projection entered unrelated directory %q", accessed)
 		}
 	}
@@ -1988,7 +1989,7 @@ func TestConfigDiscoveryExplicitDirectoryUsesConfigBaseAndTargetGitRoot(t *testi
 	}
 	unrelatedDir := tspath.ResolvePath(cwd, "unrelated")
 	for _, accessed := range spy.accessedDirs {
-		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+		if accessed == unrelatedDir || pathutil.StartsWithDirectory(accessed, unrelatedDir, true) {
 			t.Fatalf("explicit target walk entered unrelated directory %q", accessed)
 		}
 	}
@@ -2012,7 +2013,7 @@ func TestConfigDiscoveryExplicitConfigGitignoreMatchesPhysicalInvocationTarget(t
 	if err := os.WriteFile(filepath.Join(aliasWorkspace, ".gitignore"), []byte("ignored.js\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	physicalIgnored = tspath.NormalizePath(discoveryTestFS().Realpath(physicalIgnored))
+	physicalIgnored = tspath.NormalizePath(discoveryTestFS().Realpath(pathutil.Path(physicalIgnored)).AsString())
 	configPath := writeConfigCandidate(t, configRoot, "custom.config.cjs")
 	loader := newFixtureConfigLoader()
 	loader.configs[configPath] = namedConfig("explicit")
@@ -2759,7 +2760,7 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 
 	t.Run("case-only symlink aliases on case-sensitive filesystem are rejected", func(t *testing.T) {
 		fsys := discoveryTestFS()
-		if !fsys.UseCaseSensitiveFileNames() {
+		if !fsys.CaseSensitivity().IsCaseSensitive() {
 			t.Skip("fixture requires a case-sensitive filesystem")
 		}
 		root := discoveryTempDir(t)
@@ -3918,8 +3919,8 @@ type movingDiscoveryDirectoryFS struct {
 	once                 sync.Once
 }
 
-func (fsys *movingDiscoveryDirectoryFS) GetAccessibleEntries(directory string) vfs.Entries {
-	if directory == fsys.first || directory == fsys.alias {
+func (fsys *movingDiscoveryDirectoryFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
+	if directory.AsString() == fsys.first || directory.AsString() == fsys.alias {
 		fsys.once.Do(func() {
 			if err := os.Remove(fsys.alias); err != nil {
 				fsys.t.Fatal(err)
@@ -3987,7 +3988,7 @@ func TestConfigDiscoveryMovedDirectoryRetainsPhysicalTreeAndLexicalOwner(t *test
 			if !found {
 				t.Fatalf("original input disappeared: %+v", plan.Files)
 			}
-			if moved := tspath.NormalizePath(osvfs.FS().Realpath(alias)); moved != second {
+			if moved := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(alias)).AsString()); moved != second {
 				t.Fatalf("attack did not move the directory alias: %s", moved)
 			}
 			if physical, _ := plan.PathSpaces().PhysicalDirectory(alias); physical != first {

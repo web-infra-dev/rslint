@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestNoDeprecatedRule(t *testing.T) {
@@ -238,7 +239,7 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(entryFile)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(entryFile, pathutil.Directory(rootDir.Dir)))
 	if sourceFile == nil {
 		t.Fatalf("failed to resolve entry file: %s", entryFile)
 	}
@@ -247,7 +248,7 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 	programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
 	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 		Programs:         programs,
-		TargetsByProgram: [][]string{{sourceFile.FileName()}},
+		TargetsByProgram: [][]string{{sourceFile.FileName().AsString()}},
 		SingleThreaded:   true,
 		GetRulesForFile: func(_ *ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{

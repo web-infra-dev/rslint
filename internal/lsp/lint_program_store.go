@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // lintProgramStore owns standalone Programs selected for editor linting.
@@ -36,11 +37,11 @@ type lintProgramState struct {
 	program    *compiler.Program
 	tracker    *lintTrackingFS
 	sources    *utils.ProgramSourceLookup
-	dirtyFiles map[tspath.Path]struct{}
+	dirtyFiles map[tspath.PathKey]struct{}
 	// Failed lookups close the gap between a file appearing and the client's
 	// corresponding watcher notification.
-	failedLookups            map[tspath.Path]struct{}
-	selectedSourceIdentities map[tspath.Path]tspath.Path
+	failedLookups            map[tspath.PathKey]struct{}
+	selectedSourceIdentities map[tspath.PathKey]tspath.PathKey
 	metadata                 *lintProjectMetadata
 }
 
@@ -262,7 +263,7 @@ func (r *lintProgramRequest) load(
 			return r.rebuild(configFileName, state.metadata)
 		}
 		updated, newSourceFile, graphReused :=
-			program.UpdateProgram(dirtyPath, program.Host(), nil)
+			program.UpdateProgram(dirtyPath, program.Host(), nil, nil)
 		if updated == nil {
 			return r.rebuild(configFileName, state.metadata)
 		}
@@ -361,9 +362,9 @@ func (r *lintProgramRequest) rebuild(
 			program:                  program,
 			tracker:                  tracker,
 			sources:                  utils.NewProgramSourceLookup(program, r.overlayFS),
-			dirtyFiles:               make(map[tspath.Path]struct{}),
-			failedLookups:            make(map[tspath.Path]struct{}),
-			selectedSourceIdentities: make(map[tspath.Path]tspath.Path),
+			dirtyFiles:               make(map[tspath.PathKey]struct{}),
+			failedLookups:            make(map[tspath.PathKey]struct{}),
+			selectedSourceIdentities: make(map[tspath.PathKey]tspath.PathKey),
 			metadata:                 metadata,
 		}
 		sourceFile := state.sources.SourceFileForTarget(
@@ -417,7 +418,7 @@ func (r *lintProgramRequest) cover(state *lintProgramState) (added bool, safe bo
 	added, safe, err := r.store.coverage.ensure(
 		r.ctx,
 		lookups.seenFiles,
-		state.program.GetCurrentDirectory(),
+		state.program.GetCurrentDirectory().AsString(),
 	)
 	if err != nil || !safe {
 		r.store.coverage.disabled = true
@@ -464,7 +465,7 @@ func (s *lintProgramStore) DidSave(uri lsproto.DocumentUri, open bool) {
 }
 
 func (s *lintProgramStore) DidClose(uri lsproto.DocumentUri) {
-	content, ok := s.server.fs.ReadFile(uriToPath(uri))
+	content, ok := s.server.fs.ReadFile(pathutil.File(uriToPath(uri)))
 	if !ok {
 		s.Invalidate()
 		return
@@ -527,15 +528,15 @@ func (s *lintProgramStore) markContent(
 	if invalidatePossibleNewSource {
 		for configFileName, metadata := range s.projectMetadata {
 			if metadata != nil && metadata.commandLine != nil &&
-				metadata.commandLine.PossiblyMatchesFileName(fileName) {
+				metadata.commandLine.PossiblyMatchesFileName(pathutil.File(fileName)) {
 				delete(s.projectMetadata, configFileName)
 				discarded = true
 			}
 		}
 	}
 	lexicalID := lintProgramLexicalPathID(fileName, s.server.fs)
-	var physicalID tspath.Path
-	physicalPathID := func() tspath.Path {
+	var physicalID tspath.PathKey
+	physicalPathID := func() tspath.PathKey {
 		if physicalID == "" {
 			// An unsaved dependency can live beneath a directory alias even
 			// when its missing suffix cannot be resolved by disk Realpath.
@@ -568,7 +569,7 @@ func (s *lintProgramStore) markContent(
 			continue
 		}
 		if invalidatePossibleNewSource &&
-			(state.program.CommandLine().PossiblyMatchesFileName(fileName) ||
+			(state.program.CommandLine().PossiblyMatchesFileName(pathutil.File(fileName)) ||
 				state.failedLookupMatches(fileName, s.server.fs)) {
 			delete(s.programs, configFileName)
 			discarded = true
@@ -589,10 +590,10 @@ func (s *lintProgramStore) sourceFileForOpen(
 		return sourceFile
 	}
 	if s.server.fs != nil {
-		if realPath := s.server.fs.Realpath(fileName); realPath != "" &&
-			tspath.NormalizePath(realPath) != fileName {
-			realPath = tspath.NormalizePath(realPath)
-			return state.sources.SourceFileForCandidate(realPath, realPath)
+		if realPath := s.server.fs.Realpath(pathutil.Path(fileName)); realPath != "" &&
+			tspath.NormalizePath(realPath.AsString()) != fileName {
+			realPath = pathutil.Path(tspath.NormalizePath(realPath.AsString()))
+			return state.sources.SourceFileForCandidate(realPath.AsString(), realPath.AsString())
 		}
 	}
 	return nil
@@ -607,9 +608,9 @@ func (s *lintProgramStore) markStateSourceContent(
 		return
 	}
 	if sourceFile.Text() == content {
-		delete(state.dirtyFiles, sourceFile.Path())
+		delete(state.dirtyFiles, sourceFile.PathKey())
 	} else {
-		state.dirtyFiles[sourceFile.Path()] = struct{}{}
+		state.dirtyFiles[sourceFile.PathKey()] = struct{}{}
 	}
 }
 
@@ -619,14 +620,14 @@ func (s *lintProgramState) recordFailedLookups(
 ) {
 	caseSensitive := true
 	if fs != nil {
-		caseSensitive = fs.UseCaseSensitiveFileNames()
+		caseSensitive = fs.CaseSensitivity().IsCaseSensitive()
 	}
 	currentDirectory := s.program.GetCurrentDirectory()
 	for _, fileName := range lookups.failedLookups {
 		if fileName != "" {
-			s.failedLookups[tspath.ToPath(
+			s.failedLookups[pathutil.ToPath(
 				fileName,
-				currentDirectory,
+				currentDirectory.AsString(),
 				caseSensitive,
 			)] = struct{}{}
 		}
@@ -636,12 +637,12 @@ func (s *lintProgramState) recordFailedLookups(
 func (s *lintProgramState) failedLookupMatches(fileName string, fs vfs.FS) bool {
 	caseSensitive := true
 	if fs != nil {
-		caseSensitive = fs.UseCaseSensitiveFileNames()
+		caseSensitive = fs.CaseSensitivity().IsCaseSensitive()
 	}
 	currentDirectory := s.program.GetCurrentDirectory()
-	if s.failedLookupPathMatches(tspath.ToPath(
+	if s.failedLookupPathMatches(pathutil.ToPath(
 		fileName,
-		currentDirectory,
+		currentDirectory.AsString(),
 		caseSensitive,
 	)) {
 		return true
@@ -649,26 +650,26 @@ func (s *lintProgramState) failedLookupMatches(fileName string, fs vfs.FS) bool 
 	if fs == nil {
 		return false
 	}
-	realPath := fs.Realpath(fileName)
+	realPath := fs.Realpath(pathutil.Path(fileName))
 	if realPath == "" {
 		return false
 	}
-	return s.failedLookupPathMatches(tspath.ToPath(
-		realPath,
-		currentDirectory,
+	return s.failedLookupPathMatches(pathutil.ToPath(
+		realPath.AsString(),
+		currentDirectory.AsString(),
 		caseSensitive,
 	))
 }
 
-func (s *lintProgramState) failedLookupPathMatches(path tspath.Path) bool {
+func (s *lintProgramState) failedLookupPathMatches(path tspath.PathKey) bool {
 	if _, ok := s.failedLookups[path]; ok {
 		return true
 	}
-	for directory := path.GetDirectoryPath(); directory != ""; {
+	for directory := path.Parent(); directory != ""; {
 		if _, ok := s.failedLookups[directory]; ok {
 			return true
 		}
-		parent := directory.GetDirectoryPath()
+		parent := directory.Parent()
 		if parent == directory {
 			break
 		}
@@ -687,20 +688,20 @@ func (s *lintProgramState) rememberSelectedTarget(
 	}
 	caseSensitive := true
 	if fs != nil {
-		caseSensitive = fs.UseCaseSensitiveFileNames()
+		caseSensitive = fs.CaseSensitivity().IsCaseSensitive()
 	}
 	s.selectedSourceIdentities[lintProgramLexicalPathID(target.Path, fs)] =
-		tspath.Path(lspLexicalPathID(canonicalPath, caseSensitive))
+		tspath.PathKey(lspLexicalPathID(canonicalPath, caseSensitive))
 }
 
-func lintProgramLexicalPathID(fileName string, fs vfs.FS) tspath.Path {
+func lintProgramLexicalPathID(fileName string, fs vfs.FS) tspath.PathKey {
 	caseSensitive := true
 	if fs != nil {
-		caseSensitive = fs.UseCaseSensitiveFileNames()
+		caseSensitive = fs.CaseSensitivity().IsCaseSensitive()
 	}
-	return tspath.Path(lspLexicalPathID(fileName, caseSensitive))
+	return tspath.PathKey(lspLexicalPathID(fileName, caseSensitive))
 }
 
-func sortedLintProgramPaths(values map[tspath.Path]struct{}) []tspath.Path {
+func sortedLintProgramPaths(values map[tspath.PathKey]struct{}) []tspath.PathKey {
 	return slices.Sorted(maps.Keys(values))
 }

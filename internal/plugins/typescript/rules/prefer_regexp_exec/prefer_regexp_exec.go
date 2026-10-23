@@ -163,10 +163,10 @@ func isUndefinedLiteral(ctx rule.RuleContext, node *ast.Node) bool {
 		return true
 	}
 	sym := ctx.TypeChecker.GetSymbolAtLocation(node)
-	if sym == nil || sym.Declarations == nil || len(sym.Declarations) == 0 {
+	if sym == nil || sym.Declarations() == nil || len(sym.Declarations()) == 0 {
 		return true
 	}
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		if decl == nil {
 			return false
 		}
@@ -213,10 +213,10 @@ func resolveStaticArgumentInfo(ctx rule.RuleContext, node *ast.Node, seen map[*a
 		}
 		seen[sym] = true
 		defer delete(seen, sym)
-		if sym.Declarations == nil {
+		if sym.Declarations() == nil {
 			return staticArgInfo{}
 		}
-		for _, decl := range sym.Declarations {
+		for _, decl := range sym.Declarations() {
 			if decl == nil || decl.Kind != ast.KindVariableDeclaration {
 				continue
 			}

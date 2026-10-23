@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestRunLinterRejectsTypeCheckOnlyProgramsWithLintPlan(t *testing.T) {
@@ -112,7 +113,7 @@ func TestPrepareLintPlanContextDoesNotPublishCanceledPlan(t *testing.T) {
 			Programs:         wrapTestPrograms(raw),
 			TargetsByProgram: [][]string{{paths["a.ts"], paths["b.ts"]}},
 			GetRulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
-				switch source.FileName() {
+				switch source.FileName().AsString() {
 				case paths["a.ts"]:
 					<-secondResolverStarted
 					cancel()
@@ -176,7 +177,7 @@ func TestPrepareLintPlanDoesNotReapplyDefaultExclusions(t *testing.T) {
 	target := norm(dir, "node_modules/pkg/exact.ts")
 	writeTestFiles(t, dir, map[string]string{"node_modules/pkg/exact.ts": "export const exact = 1;"})
 	raw := gapProgram(t, dir, []string{target})
-	if raw.GetSourceFile(target) == nil {
+	if raw.GetSourceFile(pathutil.File(target)) == nil {
 		t.Fatalf("fixture Program did not contain %q", target)
 	}
 	var ruleCalls atomic.Int32
@@ -279,7 +280,7 @@ func TestPreparedLintPlanFreezesProgramTypeCapability(t *testing.T) {
 	raw, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const a = 1;",
 	})
-	file := raw.GetSourceFile(paths["a.ts"])
+	file := raw.GetSourceFile(pathutil.File(paths["a.ts"]))
 	if file == nil {
 		t.Fatal("fixture Program did not contain a.ts")
 	}

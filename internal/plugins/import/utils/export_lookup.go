@@ -49,7 +49,7 @@ func (builder *exportBuilder) findExport(link exportLink, name string, settings 
 	}
 	// As with other import rules, dependency parser errors are not translated
 	// into ESLint parser messages. Do not diagnose exports from a partial AST.
-	if !exportExtensionAllowed(settings, file.FileName()) || len(builder.program().SyntacticDiagnostics(context.Background(), file)) != 0 {
+	if !exportExtensionAllowed(settings, file.FileName().AsString()) || len(builder.program().SyntacticDiagnostics(context.Background(), file)) != 0 {
 		return true, nil
 	}
 	if name == defaultExportName && link.NodeDefault {
@@ -187,7 +187,7 @@ func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.Sour
 	if !ok {
 		return exportLink{}
 	}
-	if path != "" && settings.IsIgnoredPath(path) || sourceFile != nil && settings.IsIgnoredPath(sourceFile.FileName()) {
+	if path != "" && settings.IsIgnoredPath(path) || sourceFile != nil && settings.IsIgnoredPath(sourceFile.FileName().AsString()) {
 		return exportLink{}
 	}
 	return exportLink{

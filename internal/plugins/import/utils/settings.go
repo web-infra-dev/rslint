@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // An explicit extension list restricts export inspection; alternate parser
@@ -23,7 +24,7 @@ func exportExtensionAllowed(settings map[string]interface{}, fileName string) bo
 	if settings["import/extensions"] == nil {
 		return true
 	}
-	extension := tspath.GetAnyExtensionFromPath(fileName, nil, false)
+	extension := pathutil.GetAnyExtensionFromPath(fileName, nil, false)
 	if slices.Contains(settingsStringList(settings, "import/extensions"), extension) {
 		return true
 	}
@@ -269,7 +270,7 @@ func (compiled *ModuleSettings) IsExternalResolvedImport(ctx rule.RuleContext, s
 		tspath.PathIsRelative(specifier) || nodeutil.IsAbsolutePath(specifier) {
 		return false
 	}
-	packagePath := ctx.Program().NearestPackageJSONDirectory(tspath.GetDirectoryPath(ctx.SourceFile.FileName()))
+	packagePath := ctx.Program().NearestPackageJSONDirectory(tspath.GetDirectoryPath(ctx.SourceFile.FileName().AsString()))
 	if packagePath == "" {
 		packagePath = ctx.Program().CurrentDirectory()
 	}
@@ -310,8 +311,8 @@ func (compiled *ModuleSettings) IsExternalPathFromPackage(packagePath, resolvedP
 	if compiled == nil || resolvedPath == "" {
 		return false
 	}
-	compareOptions := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: caseSensitive}
-	outsidePackage := packagePath != "" && !tspath.ContainsPath(packagePath, resolvedPath, compareOptions)
+	compareOptions := pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: caseSensitive}
+	outsidePackage := packagePath != "" && !pathutil.ContainsPath(packagePath, resolvedPath, compareOptions)
 	for _, folder := range compiled.externalFolders {
 		folderPath := folder
 		if !tspath.IsRootedDiskPath(folderPath) {
@@ -323,7 +324,7 @@ func (compiled *ModuleSettings) IsExternalPathFromPackage(packagePath, resolvedP
 			}
 			folderPath = tspath.ResolvePath(packagePath, folderPath)
 		}
-		if tspath.ContainsPath(folderPath, resolvedPath, compareOptions) {
+		if pathutil.ContainsPath(folderPath, resolvedPath, compareOptions) {
 			return true
 		}
 		if outsidePackage && !tspath.IsRootedDiskPath(folder) && pathContainsSegment(resolvedPath, folder) {
@@ -347,7 +348,7 @@ func (compiled *ModuleSettings) IsExternalModuleInFolder(sourceProgram *program.
 		fs := sourceProgram.FS()
 		exists := func(directory string) bool {
 			candidate := tspath.ResolvePath(directory, base)
-			return fs.DirectoryExists(candidate) || fs.FileExists(candidate)
+			return fs.DirectoryExists(pathutil.Directory(candidate)) || fs.FileExists(pathutil.File(candidate))
 		}
 		for _, folder := range compiled.externalFolders {
 			if tspath.IsRootedDiskPath(folder) {

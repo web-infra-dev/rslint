@@ -169,7 +169,7 @@ func TestGetReactPragmaFromContextCommentAnnotations(t *testing.T) {
 
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/pragma.tsx",
-				Path:     "/pragma.tsx",
+				PathKey:  "/pragma.tsx",
 			}, testCase.source, core.ScriptKindTSX)
 			ctx := rule.RuleContext{
 				SourceFile: sourceFile,

@@ -860,7 +860,7 @@ func TestConsistentTypeExportsEditDemandAndDirectives(t *testing.T) {
 			for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandSuggestion, rule.EditDemandAutofix, rule.EditDemandAll} {
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program: program, File: file.FileName(), HasTypeInfo: true,
+					Program: program, File: file.FileName().AsString(), HasTypeInfo: true,
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: "@typescript-eslint/consistent-type-exports", Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners { return ConsistentTypeExportsRule.Run(ctx, options) }}}
 					},

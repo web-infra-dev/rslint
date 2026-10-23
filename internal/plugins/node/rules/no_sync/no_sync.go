@@ -151,8 +151,8 @@ func parentRange(source *ast.SourceFile, node *ast.Node) core.TextRange {
 
 func fullTypeName(typ *checker.Type) string {
 	var names []string
-	for symbol := checker.Type_symbol(typ); symbol != nil; symbol = symbol.Parent {
-		if declaration := symbol.ValueDeclaration; declaration != nil &&
+	for symbol := checker.Type_symbol(typ); symbol != nil; symbol = symbol.Parent() {
+		if declaration := symbol.ValueDeclaration(); declaration != nil &&
 			(declaration.Kind == ast.KindSourceFile || declaration.Kind == ast.KindModuleDeclaration) {
 			break
 		}

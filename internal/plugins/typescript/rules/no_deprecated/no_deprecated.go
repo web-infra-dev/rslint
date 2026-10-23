@@ -231,7 +231,7 @@ func jsDocLinkTargetExists(typeChecker *checker.Checker, name *ast.Node) bool {
 		return false
 	}
 	for _, target := range typeChecker.GetRootSymbols(symbol) {
-		if target != nil && (target.ValueDeclaration != nil || len(target.Declarations) > 0) {
+		if target != nil && (target.ValueDeclaration() != nil || len(target.Declarations()) > 0) {
 			return true
 		}
 	}
@@ -397,7 +397,7 @@ func getJsDocDeprecation(typeChecker *checker.Checker, symbol *ast.Symbol) (bool
 	if typeChecker == nil || symbol == nil {
 		return false, ""
 	}
-	for _, decl := range symbol.Declarations {
+	for _, decl := range symbol.Declarations() {
 		if decl == nil {
 			continue
 		}
@@ -409,10 +409,10 @@ func getJsDocDeprecation(typeChecker *checker.Checker, symbol *ast.Symbol) (bool
 			return true, reason
 		}
 	}
-	if symbol.ValueDeclaration != nil {
-		if symbol.ValueDeclaration.Kind != ast.KindBindingElement &&
-			isDeclarationDeprecated(typeChecker, symbol.ValueDeclaration) {
-			reason := deprecatedReasonFromDeclaration(typeChecker, symbol.ValueDeclaration)
+	if symbol.ValueDeclaration() != nil {
+		if symbol.ValueDeclaration().Kind != ast.KindBindingElement &&
+			isDeclarationDeprecated(typeChecker, symbol.ValueDeclaration()) {
+			reason := deprecatedReasonFromDeclaration(typeChecker, symbol.ValueDeclaration())
 			return true, reason
 		}
 	}
@@ -427,14 +427,14 @@ func searchForDeprecationInAliasesChain(
 	if typeChecker == nil || symbol == nil {
 		return false, ""
 	}
-	if symbol.Flags&ast.SymbolFlagsAlias == 0 {
+	if symbol.Flags()&ast.SymbolFlagsAlias == 0 {
 		if checkDeprecationsOfAliasedSymbol {
 			return getJsDocDeprecation(typeChecker, symbol)
 		}
 		return false, ""
 	}
 	targetSymbol := typeChecker.GetAliasedSymbol(symbol)
-	for depth := 0; symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 && depth < maxAliasDeprecationDepth; depth++ {
+	for depth := 0; symbol != nil && symbol.Flags()&ast.SymbolFlagsAlias != 0 && depth < maxAliasDeprecationDepth; depth++ {
 		if symbol == targetSymbol {
 			if checkDeprecationsOfAliasedSymbol {
 				return getJsDocDeprecation(typeChecker, symbol)
@@ -444,7 +444,7 @@ func searchForDeprecationInAliasesChain(
 		if isDeprecated, reason := getJsDocDeprecation(typeChecker, symbol); isDeprecated {
 			return true, reason
 		}
-		if len(symbol.Declarations) == 0 {
+		if len(symbol.Declarations()) == 0 {
 			break
 		}
 		immediateAliasedSymbol := typeChecker.GetImmediateAliasedSymbol(symbol)
@@ -650,7 +650,7 @@ func declarationInCurrentFile(symbol *ast.Symbol, sourceFile *ast.SourceFile) bo
 	if symbol == nil || sourceFile == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil {
 			continue
 		}
@@ -814,12 +814,12 @@ func getCallLikeDeprecation(ctx rule.RuleContext, node *ast.Node) (bool, string,
 		return false, "", resolvedNonDeprecatedSignature
 	}
 	aliasedSymbol := symbol
-	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
+	if symbol.Flags()&ast.SymbolFlagsAlias != 0 {
 		aliasedSymbol = ctx.TypeChecker.GetAliasedSymbol(symbol)
 	}
 	var symbolDeclarationKind ast.Kind
-	if aliasedSymbol != nil && len(aliasedSymbol.Declarations) > 0 && aliasedSymbol.Declarations[0] != nil {
-		symbolDeclarationKind = aliasedSymbol.Declarations[0].Kind
+	if aliasedSymbol != nil && len(aliasedSymbol.Declarations()) > 0 && aliasedSymbol.Declarations()[0] != nil {
+		symbolDeclarationKind = aliasedSymbol.Declarations()[0].Kind
 	}
 	if symbolDeclarationKind != ast.KindMethodDeclaration &&
 		symbolDeclarationKind != ast.KindFunctionDeclaration &&
@@ -1019,7 +1019,7 @@ func getDeprecationReason(
 									return true, reason
 								}
 								if propertySymbol := ctx.TypeChecker.GetSymbolAtLocation(bindingNode); propertySymbol != nil {
-									if propertySymbol.ValueDeclaration != nil && propertySymbol.ValueDeclaration.Kind == ast.KindBindingElement {
+									if propertySymbol.ValueDeclaration() != nil && propertySymbol.ValueDeclaration().Kind == ast.KindBindingElement {
 										propertySymbol = nil
 									}
 									if isDeprecated, reason := searchForDeprecationInAliasesChain(ctx.TypeChecker, propertySymbol, true); isDeprecated {
@@ -1112,7 +1112,7 @@ func isDynamicImportResultIdentifier(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
 			continue
 		}
@@ -1733,7 +1733,7 @@ func bindingElementHasResolvedNonDeprecatedProperty(ctx rule.RuleContext, declar
 	// export alias's own JSDoc here rather than merging tags from the aliased
 	// function's overload declarations. A deprecated re-export still reports,
 	// while an unannotated re-export of mixed overloads does not.
-	if property.Flags&ast.SymbolFlagsAlias != 0 {
+	if property.Flags()&ast.SymbolFlagsAlias != 0 {
 		return !symbolIsDeprecated(ctx.TypeChecker, property)
 	}
 	return !resolvedSymbolIsDeprecated(ctx.TypeChecker, property)
@@ -1798,14 +1798,14 @@ func hasResolvedNonDeprecatedAccessTarget(
 	// through the source-wide fallback.
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
 	if symbol != nil {
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if declaration != nil && declaration.Kind == ast.KindBindingElement &&
 				bindingElementHasResolvedNonDeprecatedProperty(ctx, declaration) {
 				return true
 			}
 		}
-		if symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Kind == ast.KindBindingElement &&
-			bindingElementHasResolvedNonDeprecatedProperty(ctx, symbol.ValueDeclaration) {
+		if symbol.ValueDeclaration() != nil && symbol.ValueDeclaration().Kind == ast.KindBindingElement &&
+			bindingElementHasResolvedNonDeprecatedProperty(ctx, symbol.ValueDeclaration()) {
 			return true
 		}
 	}
@@ -1852,12 +1852,12 @@ func hasResolvedNonDeprecatedTarget(ctx rule.RuleContext, node *ast.Node) bool {
 		}
 		return true
 	}
-	for _, decl := range symbol.Declarations {
+	for _, decl := range symbol.Declarations() {
 		if checkDecl(decl) {
 			return true
 		}
 	}
-	return checkDecl(symbol.ValueDeclaration)
+	return checkDecl(symbol.ValueDeclaration())
 }
 
 func isPropertyAccessName(node *ast.Node) bool {
@@ -2190,7 +2190,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 					reason = deprecatedReasonFromDiagnostic(diagnostic)
 				}
 				if reason == "" && symbol != nil {
-					for _, declaration := range symbol.Declarations {
+					for _, declaration := range symbol.Declarations() {
 						if declaration == nil {
 							continue
 						}
@@ -2294,14 +2294,14 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			if symbol == nil {
 				symbol = ctx.TypeChecker.GetSymbolAtLocation(node)
 			}
-			if symbol != nil && symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Kind == ast.KindBindingElement {
+			if symbol != nil && symbol.ValueDeclaration() != nil && symbol.ValueDeclaration().Kind == ast.KindBindingElement {
 				symbol = nil
 			}
 			message := buildDeprecatedMessage(reportName)
 			if reason != "" {
 				message = buildDeprecatedWithReasonMessage(reportName, reason)
 			} else if symbol != nil {
-				for _, declaration := range symbol.Declarations {
+				for _, declaration := range symbol.Declarations() {
 					if declaration == nil {
 						continue
 					}
@@ -2394,7 +2394,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				}
 				message := buildDeprecatedMessage(nameText)
 				if propertySymbol != nil {
-					for _, declaration := range propertySymbol.Declarations {
+					for _, declaration := range propertySymbol.Declarations() {
 						if reason := deprecatedReasonFromDeclaration(ctx.TypeChecker, declaration); reason != "" {
 							message = buildDeprecatedWithReasonMessage(nameText, reason)
 							break
@@ -2439,7 +2439,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				}
 				message := buildDeprecatedMessage(propertyName)
 				if propertySymbol != nil {
-					for _, declaration := range propertySymbol.Declarations {
+					for _, declaration := range propertySymbol.Declarations() {
 						if reason := deprecatedReasonFromDeclaration(ctx.TypeChecker, declaration); reason != "" {
 							message = buildDeprecatedWithReasonMessage(propertyName, reason)
 							break
@@ -2489,7 +2489,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if reason != "" {
 					message = buildDeprecatedWithReasonMessage(name, reason)
 				} else if propertySymbol != nil {
-					for _, declaration := range propertySymbol.Declarations {
+					for _, declaration := range propertySymbol.Declarations() {
 						if reasonFromDecl := deprecatedReasonFromDeclaration(ctx.TypeChecker, declaration); reasonFromDecl != "" {
 							message = buildDeprecatedWithReasonMessage(name, reasonFromDecl)
 							break

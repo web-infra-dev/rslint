@@ -4,9 +4,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type rootFileAliasFS struct {
@@ -20,16 +22,16 @@ type caseInsensitiveRootFS struct {
 	*rootFileAliasFS
 }
 
-func (*caseInsensitiveRootFS) UseCaseSensitiveFileNames() bool {
-	return false
+func (*caseInsensitiveRootFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
 }
 
-func (fsys *rootFileAliasFS) Realpath(fileName string) string {
+func (fsys *rootFileAliasFS) Realpath(fileName tspath.RootedPath) tspath.RootedPath {
 	fsys.realpathMu.Lock()
-	fsys.realpathCalls[fileName]++
+	fsys.realpathCalls[fileName.AsString()]++
 	fsys.realpathMu.Unlock()
-	if realPath := fsys.realPaths[fileName]; realPath != "" {
-		return realPath
+	if realPath := fsys.realPaths[fileName.AsString()]; realPath != "" {
+		return pathutil.Path(realPath)
 	}
 	return fileName
 }

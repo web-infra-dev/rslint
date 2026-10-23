@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func (s *Server) currentEditorOverlayFSForTarget(
@@ -75,7 +76,7 @@ func frozenLintTargetPhysicalPathID(target target.File, fs vfs.FS) string {
 	}
 	caseSensitive := true
 	if fs != nil {
-		caseSensitive = fs.UseCaseSensitiveFileNames()
+		caseSensitive = fs.CaseSensitivity().IsCaseSensitive()
 	}
 	return lspLexicalPathID(filePath, caseSensitive)
 }
@@ -91,7 +92,7 @@ type frozenLintTargetOverlayFS struct {
 func newFrozenLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target target.File) vfs.FS {
 	caseSensitive := true
 	if baseFS != nil {
-		caseSensitive = baseFS.UseCaseSensitiveFileNames()
+		caseSensitive = baseFS.CaseSensitivity().IsCaseSensitive()
 	}
 	canonicalPath := target.CanonicalPath
 	if canonicalPath == "" {
@@ -107,63 +108,63 @@ func newFrozenLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target
 	}
 }
 
-func (fs *frozenLintTargetOverlayFS) Realpath(filePath string) string {
-	caseSensitive := fs.UseCaseSensitiveFileNames()
-	pathID := lspLexicalPathID(filePath, caseSensitive)
+func (fs *frozenLintTargetOverlayFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	caseSensitive := fs.CaseSensitivity().IsCaseSensitive()
+	pathID := lspLexicalPathID(filePath.AsString(), caseSensitive)
 	if pathID == fs.lexicalPathID || pathID == fs.canonicalPathID {
-		return fs.canonicalPath
+		return pathutil.Path(fs.canonicalPath)
 	}
-	return config.FreezeFileIdentity(filePath, fs.FS).CanonicalPath
+	return pathutil.Path(config.FreezeFileIdentity(filePath.AsString(), fs.FS).CanonicalPath)
 }
 
 // A project can name an unsaved file through a different directory alias than
 // its editor URI. Resolve that alias's existing ancestry before consulting the
 // overlay; the missing suffix cannot be resolved by the disk filesystem alone.
-func (fs *frozenLintTargetOverlayFS) ReadFile(filePath string) (string, bool) {
+func (fs *frozenLintTargetOverlayFS) ReadFile(filePath tspath.RootedFilePath) (string, bool) {
 	if content, ok := fs.FS.ReadFile(filePath); ok {
 		return content, true
 	}
-	if canonical, overlay := fs.overlayPath(filePath); overlay {
-		return fs.FS.ReadFile(canonical)
+	if canonical, overlay := fs.overlayPath(filePath.AsString()); overlay {
+		return fs.FS.ReadFile(pathutil.File(canonical))
 	}
 	return "", false
 }
 
-func (fs *frozenLintTargetOverlayFS) FileExists(filePath string) bool {
+func (fs *frozenLintTargetOverlayFS) FileExists(filePath tspath.RootedFilePath) bool {
 	if fs.FS.FileExists(filePath) {
 		return true
 	}
-	_, overlay := fs.overlayPath(filePath)
+	_, overlay := fs.overlayPath(filePath.AsString())
 	return overlay
 }
 
-func (fs *frozenLintTargetOverlayFS) Stat(filePath string) vfs.FileInfo {
+func (fs *frozenLintTargetOverlayFS) Stat(filePath tspath.RootedPath) vfs.FileInfo {
 	if info := fs.FS.Stat(filePath); info != nil {
 		return info
 	}
-	if canonical, overlay := fs.overlayPath(filePath); overlay {
-		return fs.FS.Stat(canonical)
+	if canonical, overlay := fs.overlayPath(filePath.AsString()); overlay {
+		return fs.FS.Stat(pathutil.Path(canonical))
 	}
 	return nil
 }
 
-func (fs *frozenLintTargetOverlayFS) DirectoryExists(directory string) bool {
+func (fs *frozenLintTargetOverlayFS) DirectoryExists(directory tspath.RootedDirectoryPath) bool {
 	if fs.FS.DirectoryExists(directory) {
 		return true
 	}
-	canonical := fs.Realpath(directory)
+	canonical := fs.Realpath(directory.AsPath())
 	for filePath := range fs.overlayFiles {
-		if relative, within := config.RelativePathWithinConfigRoot(filePath, canonical, fs.UseCaseSensitiveFileNames()); within && relative != "" {
+		if relative, within := config.RelativePathWithinConfigRoot(filePath, canonical.AsString(), fs.CaseSensitivity().IsCaseSensitive()); within && relative != "" {
 			return true
 		}
 	}
 	return false
 }
 
-func (fs *frozenLintTargetOverlayFS) GetAccessibleEntries(directory string) vfs.Entries {
+func (fs *frozenLintTargetOverlayFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
 	entries := fs.FS.GetAccessibleEntries(directory)
-	canonical := fs.Realpath(directory)
-	if canonical == tspath.NormalizePath(directory) {
+	canonical := fs.Realpath(directory.AsPath())
+	if canonical.AsString() == tspath.NormalizePath(directory.AsString()) {
 		return entries
 	}
 	entries.Files = slices.Clone(entries.Files)
@@ -171,7 +172,7 @@ func (fs *frozenLintTargetOverlayFS) GetAccessibleEntries(directory string) vfs.
 	// Project only editor entries. Keep the selected lexical buffer reachable
 	// if its alias moves, and preserve the underlying directory's disk view.
 	for filePath := range fs.overlayFiles {
-		if relative, within := config.RelativePathWithinConfigRoot(filePath, canonical, fs.UseCaseSensitiveFileNames()); within && relative != "" {
+		if relative, within := config.RelativePathWithinConfigRoot(filePath, canonical.AsString(), fs.CaseSensitivity().IsCaseSensitive()); within && relative != "" {
 			name, _, nested := strings.Cut(relative, "/")
 			if nested {
 				if !slices.Contains(entries.Directories, name) {
@@ -195,9 +196,9 @@ func (fs *frozenLintTargetOverlayFS) SourceHasBOM(filePath string) bool {
 }
 
 func (fs *frozenLintTargetOverlayFS) overlayPath(filePath string) (string, bool) {
-	canonical := fs.Realpath(filePath)
-	_, overlay := fs.overlayFiles[utils.NormalizeAbsoluteDrive(tspath.NormalizePath(canonical))]
-	return canonical, overlay
+	canonical := fs.Realpath(pathutil.Path(filePath))
+	_, overlay := fs.overlayFiles[utils.NormalizeAbsoluteDrive(tspath.NormalizePath(canonical.AsString()))]
+	return canonical.AsString(), overlay
 }
 
 func addEditorOverlayTarget(files map[string]string, target target.File, content string) {
@@ -216,14 +217,14 @@ func (s *Server) addEditorOverlayFile(files map[string]string, filePath string, 
 	files[utils.NormalizeAbsoluteDrive(filePath)] = content
 	caseSensitive := true
 	if s.fs != nil {
-		caseSensitive = s.fs.UseCaseSensitiveFileNames()
+		caseSensitive = s.fs.CaseSensitivity().IsCaseSensitive()
 	}
 	if s.fs == nil {
-		return string(tspath.ToPath(filePath, "", caseSensitive))
+		return string(pathutil.ToPath(filePath, "", caseSensitive))
 	}
 	if realPath := config.FreezeFileIdentity(filePath, s.fs).CanonicalPath; realPath != "" {
 		files[utils.NormalizeAbsoluteDrive(realPath)] = content
-		return string(tspath.ToPath(realPath, "", caseSensitive))
+		return string(pathutil.ToPath(realPath, "", caseSensitive))
 	}
-	return string(tspath.ToPath(filePath, "", caseSensitive))
+	return string(pathutil.ToPath(filePath, "", caseSensitive))
 }

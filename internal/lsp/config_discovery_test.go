@@ -23,6 +23,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type configRefreshTestResult struct {
@@ -56,14 +57,14 @@ type configBoundaryIdentityFS struct {
 	realPaths     map[string]string
 }
 
-func (fs *configBoundaryIdentityFS) UseCaseSensitiveFileNames() bool {
-	return fs.caseSensitive
+func (fs *configBoundaryIdentityFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(fs.caseSensitive)
 }
 
-func (fs *configBoundaryIdentityFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
-	if realPath := fs.realPaths[filePath]; realPath != "" {
-		return realPath
+func (fs *configBoundaryIdentityFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
+	if realPath := fs.realPaths[filePath.AsString()]; realPath != "" {
+		return pathutil.Path(realPath)
 	}
 	return filePath
 }
@@ -479,7 +480,7 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	if completed := awaitConfigRefreshResult(t, initial); completed.err != nil {
 		t.Fatalf("explicit initial refresh failed: %v", completed.err)
 	}
-	wantModulePath := tspath.NormalizePath(osvfs.FS().Realpath(configPath))
+	wantModulePath := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(configPath)).AsString())
 	if len(loadRequest.Candidates) != 1 || loadRequest.Candidates[0].ConfigPath != wantModulePath {
 		t.Fatalf("explicit candidates = %+v, want only %q", loadRequest.Candidates, wantModulePath)
 	}
@@ -734,7 +735,7 @@ func TestHandleConfigRefreshPublishesEffectiveProjectErrors(t *testing.T) {
 			if err := os.WriteFile(tspath.ResolvePath(root, "tsconfig.json"), []byte(`{"compilerOptions":{"noLib":true},"files":["source.ts"]}`), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			s.defaultLibraryPath = bundled.LibPath()
+			s.defaultLibraryPath = bundled.LibPath().AsString()
 			if _, err := s.handleInitialize(context.Background(), &lsproto.InitializeParams{}); err != nil {
 				t.Fatal(err)
 			}
@@ -1844,29 +1845,29 @@ type gitObservationGuardFS struct {
 	observations int
 }
 
-func (fsys *gitObservationGuardFS) ReadFile(path string) (string, bool) {
-	if tspath.GetBaseFileName(path) == ".gitignore" {
+func (fsys *gitObservationGuardFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if tspath.GetBaseFileName(path.AsString()) == ".gitignore" {
 		fsys.observations++
 	}
-	if fsys.reject && tspath.GetBaseFileName(path) == ".gitignore" {
+	if fsys.reject && tspath.GetBaseFileName(path.AsString()) == ".gitignore" {
 		panic("Git source read after discovery")
 	}
 	return fsys.FS.ReadFile(path)
 }
-func (fsys *gitObservationGuardFS) DirectoryExists(path string) bool {
-	if tspath.GetBaseFileName(path) == ".git" {
+func (fsys *gitObservationGuardFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	if tspath.GetBaseFileName(path.AsString()) == ".git" {
 		fsys.observations++
 	}
-	if fsys.reject && tspath.GetBaseFileName(path) == ".git" {
+	if fsys.reject && tspath.GetBaseFileName(path.AsString()) == ".git" {
 		panic("Git marker read after discovery")
 	}
 	return fsys.FS.DirectoryExists(path)
 }
-func (fsys *gitObservationGuardFS) FileExists(path string) bool {
-	if tspath.GetBaseFileName(path) == ".git" {
+func (fsys *gitObservationGuardFS) FileExists(path tspath.RootedFilePath) bool {
+	if tspath.GetBaseFileName(path.AsString()) == ".git" {
 		fsys.observations++
 	}
-	if fsys.reject && tspath.GetBaseFileName(path) == ".git" {
+	if fsys.reject && tspath.GetBaseFileName(path.AsString()) == ".git" {
 		panic("Git marker read after discovery")
 	}
 	return fsys.FS.FileExists(path)
@@ -1998,7 +1999,7 @@ func TestConfigRefreshRegistersPhysicalGitWatchesBeforeReadingSources(t *testing
 	previousID := s.gitPolicyWatcherID
 
 	external := tspath.NormalizePath(t.TempDir())
-	physicalExternal := tspath.NormalizePath(fsys.Realpath(external))
+	physicalExternal := tspath.NormalizePath(fsys.Realpath(pathutil.Path(external)).AsString())
 	uri := documentURIFromPath(tspath.ResolvePath(external, "source.ts"))
 	s.documents[uri] = "debugger;"
 	previousObservations := fsys.observations
@@ -2157,7 +2158,7 @@ func TestHandleDidOpenVirtualDirectoryAliasInheritsPhysicalGitPolicy(t *testing.
 		t.Fatal(err)
 	}
 	snapshot := s.documentLintSnapshot(uri)
-	wantParent := tspath.ResolvePath(tspath.NormalizePath(osvfs.FS().Realpath(physical)), "generated/deep")
+	wantParent := tspath.ResolvePath(tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(physical)).AsString()), "generated/deep")
 	if snapshot.unavailable || !snapshot.configResolved || !snapshot.resolvedConfig.GloballyIgnored || snapshot.target.Path != uriToPath(uri) || snapshot.target.CanonicalParentPath != wantParent {
 		t.Fatalf("virtual alias lost its physical Git chain: %+v", snapshot)
 	}

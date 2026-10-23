@@ -22,6 +22,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -35,31 +36,31 @@ type discoveryMockFS struct {
 	caseSensitiveFS bool
 }
 
-func (m *discoveryMockFS) ReadFile(path string) (string, bool) {
-	content, ok := m.files[path]
+func (m *discoveryMockFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	content, ok := m.files[path.AsString()]
 	return content, ok
 }
 
-func (m *discoveryMockFS) GetAccessibleEntries(path string) vfs.Entries {
-	return m.entries[path]
+func (m *discoveryMockFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	return m.entries[path.AsString()]
 }
 
-func (m *discoveryMockFS) Realpath(path string) string {
-	if realpath, ok := m.resolvedPaths[path]; ok {
-		return realpath
+func (m *discoveryMockFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	if realpath, ok := m.resolvedPaths[path.AsString()]; ok {
+		return pathutil.Path(realpath)
 	}
 	return path
 }
 
-func (m *discoveryMockFS) UseCaseSensitiveFileNames() bool {
-	return m.caseSensitiveFS
+func (m *discoveryMockFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(m.caseSensitiveFS)
 }
 
 func setupDiscoveryContentFixture(t *testing.T, files map[string]string) string {
 	t.Helper()
-	tmpDir := osvfs.FS().Realpath(tspath.NormalizePath(t.TempDir()))
+	tmpDir := osvfs.FS().Realpath(pathutil.Path(tspath.NormalizePath(t.TempDir())))
 	for name, content := range files {
-		path := filepath.Join(tmpDir, name)
+		path := filepath.Join(tmpDir.AsString(), name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatalf("mkdir: %v", err)
 		}
@@ -67,17 +68,17 @@ func setupDiscoveryContentFixture(t *testing.T, files map[string]string) string 
 			t.Fatalf("write: %v", err)
 		}
 	}
-	return tspath.NormalizePath(tmpDir)
+	return tspath.NormalizePath(tmpDir.AsString())
 }
 
 // setupDiscoveryFixture creates a temp dir with the given file paths and returns
 // the normalized configDir and a map of short name → normalized absolute path.
 func setupDiscoveryFixture(t *testing.T, files []string) (string, map[string]string) {
 	t.Helper()
-	tmpDir := osvfs.FS().Realpath(tspath.NormalizePath(t.TempDir()))
+	tmpDir := osvfs.FS().Realpath(pathutil.Path(tspath.NormalizePath(t.TempDir())))
 	paths := make(map[string]string, len(files))
 	for _, name := range files {
-		fp := filepath.Join(tmpDir, name)
+		fp := filepath.Join(tmpDir.AsString(), name)
 		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
 			t.Fatalf("mkdir: %v", err)
 		}
@@ -86,7 +87,7 @@ func setupDiscoveryFixture(t *testing.T, files []string) (string, map[string]str
 		}
 		paths[name] = tspath.NormalizePath(fp)
 	}
-	return tspath.NormalizePath(tmpDir), paths
+	return tspath.NormalizePath(tmpDir.AsString()), paths
 }
 
 func TestTargetWalkPreservesFilesBesideDirectoryOnlyGitWildcards(t *testing.T) {
@@ -142,7 +143,7 @@ func TestTargetWalkPreservesFilesBesideDirectoryOnlyGitWildcards(t *testing.T) {
 					}
 					var got []string
 					for _, file := range plan.Files {
-						got = append(got, tspath.GetRelativePathFromDirectory(source, file.Path, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}))
+						got = append(got, pathutil.GetRelativePathFromDirectory(source, file.Path, pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: true}))
 					}
 					sort.Strings(got)
 					if strings.Join(got, ",") != strings.Join(test.want, ",") {
@@ -401,12 +402,14 @@ type caseInsensitiveDiscoveryFS struct {
 	files map[string]bool
 }
 
-func (f *caseInsensitiveDiscoveryFS) UseCaseSensitiveFileNames() bool { return false }
-func (f *caseInsensitiveDiscoveryFS) FileExists(filePath string) bool {
-	return f.files[strings.ToLower(tspath.NormalizePath(filePath))]
+func (f *caseInsensitiveDiscoveryFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
 }
-func (f *caseInsensitiveDiscoveryFS) Realpath(filePath string) string {
-	return strings.ToLower(tspath.NormalizePath(filePath))
+func (f *caseInsensitiveDiscoveryFS) FileExists(filePath tspath.RootedFilePath) bool {
+	return f.files[strings.ToLower(tspath.NormalizePath(filePath.AsString()))]
+}
+func (f *caseInsensitiveDiscoveryFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	return pathutil.Path(strings.ToLower(tspath.NormalizePath(filePath.AsString())))
 }
 
 type fileExistsCountingFS struct {
@@ -414,8 +417,8 @@ type fileExistsCountingFS struct {
 	calls atomic.Int32
 }
 
-func (f *fileExistsCountingFS) FileExists(filePath string) bool {
-	if rslintconfig.IsSupportedLintFile(filePath) {
+func (f *fileExistsCountingFS) FileExists(filePath tspath.RootedFilePath) bool {
+	if rslintconfig.IsSupportedLintFile(filePath.AsString()) {
 		f.calls.Add(1)
 	}
 	return f.FS.FileExists(filePath)
@@ -427,10 +430,10 @@ type realpathCountingFS struct {
 	calls map[string]int
 }
 
-func (f *realpathCountingFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
+func (f *realpathCountingFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
 	f.mu.Lock()
-	f.calls[filePath]++
+	f.calls[filePath.AsString()]++
 	f.mu.Unlock()
 	return f.FS.Realpath(filePath)
 }
@@ -778,8 +781,8 @@ func TestDiscoverLintTargetsFromRoot_WalksEveryRequestedDirectory(t *testing.T) 
 		true,
 	)
 	assert.DeepEqual(t, targets, []File{
-		{PathIdentity: rslintconfig.PathIdentity{Path: firstFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(firstFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(firstDir))}, ConfigDirectory: configDir},
-		{PathIdentity: rslintconfig.PathIdentity{Path: secondFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(secondFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(secondDir))}, ConfigDirectory: configDir},
+		{PathIdentity: rslintconfig.PathIdentity{Path: firstFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(firstFile)).AsString()), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(firstDir)).AsString())}, ConfigDirectory: configDir},
+		{PathIdentity: rslintconfig.PathIdentity{Path: secondFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(secondFile)).AsString()), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(secondDir)).AsString())}, ConfigDirectory: configDir},
 	}, cmpopts.IgnoreFields(File{}, "match"))
 }
 
@@ -889,7 +892,7 @@ func TestDiscoverLintTargetsMultiConfig_PreservesProjectedCanonicalIdentity(t *t
 	)
 	wantPath := tspath.CombinePaths(targetAlias, "x.ts")
 	if len(targets) != 1 || targets[0].Path != wantPath ||
-		targets[0].CanonicalPath != tspath.NormalizePath(osvfs.FS().Realpath(physicalFile)) ||
+		targets[0].CanonicalPath != tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(physicalFile)).AsString()) ||
 		targets[0].ConfigDirectory != configAlias {
 		t.Fatalf("projected target identity = %+v", targets)
 	}
@@ -967,8 +970,8 @@ func TestDiscoverLintTargetsFromRoot_UnionsFilesAndDirectories(t *testing.T) {
 		true,
 	)
 	assert.DeepEqual(t, targets, []File{
-		{PathIdentity: rslintconfig.PathIdentity{Path: directoryFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryRoot))}, ConfigDirectory: configDir},
-		{PathIdentity: rslintconfig.PathIdentity{Path: exactFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(exactFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(filepath.Dir(exactFile)))}, ConfigDirectory: configDir},
+		{PathIdentity: rslintconfig.PathIdentity{Path: directoryFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(directoryFile)).AsString()), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(directoryRoot)).AsString())}, ConfigDirectory: configDir},
+		{PathIdentity: rslintconfig.PathIdentity{Path: exactFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(exactFile)).AsString()), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(filepath.Dir(exactFile))).AsString())}, ConfigDirectory: configDir},
 	}, cmpopts.IgnoreFields(File{}, "match"))
 }
 
@@ -1029,7 +1032,7 @@ func TestDiscoverLintTargetsFromRoot_SkipsIgnoredExternalRootBeforeWalking(t *te
 	)
 	assert.DeepEqual(t, targets, []File{})
 	for _, accessed := range spy.snapshotAccessedDirs() {
-		if pathsEqual(accessed, externalDir, true) || tspath.StartsWithDirectory(accessed, externalDir, true) {
+		if pathsEqual(accessed, externalDir, true) || pathutil.StartsWithDirectory(accessed, externalDir, true) {
 			t.Fatalf("ignored external root was entered: %v", spy.snapshotAccessedDirs())
 		}
 	}
@@ -1066,7 +1069,7 @@ func TestDiscoverLintTargetsFromRoot_SkipsDefaultExcludedScanRoot(t *testing.T) 
 			)
 			assert.DeepEqual(t, targets, []File{})
 			for _, accessed := range spy.snapshotAccessedDirs() {
-				if pathsEqual(accessed, scanRoot, true) || tspath.StartsWithDirectory(accessed, scanRoot, true) {
+				if pathsEqual(accessed, scanRoot, true) || pathutil.StartsWithDirectory(accessed, scanRoot, true) {
 					t.Fatalf("default-excluded scan root was entered: %v", spy.snapshotAccessedDirs())
 				}
 			}
@@ -1154,9 +1157,9 @@ func TestDiscoverLintTargets_FileSymlinkResolvesPhysicalIdentity(t *testing.T) {
 	for _, target := range targets {
 		canonicalByPath[target.Path] = target.CanonicalPath
 	}
-	assert.Equal(t, canonicalByPath[linkPath], tspath.NormalizePath(fsys.FS.Realpath(paths["src/a.ts"])))
+	assert.Equal(t, canonicalByPath[linkPath], tspath.NormalizePath(fsys.FS.Realpath(pathutil.Path(paths["src/a.ts"])).AsString()))
 	assert.Equal(t, fsys.callCount(paths["src/a.ts"]), 0)
-	physicalLink := tspath.CombinePaths(fsys.FS.Realpath(filepath.Dir(linkPath)), filepath.Base(linkPath))
+	physicalLink := tspath.CombinePaths(fsys.FS.Realpath(pathutil.Path(filepath.Dir(linkPath))).AsString(), filepath.Base(linkPath))
 	assert.Assert(t, fsys.callCount(physicalLink) > 0)
 }
 
@@ -1203,7 +1206,7 @@ func TestDiscoverWalkRootsMapsCanonicalDirectoryAlias(t *testing.T) {
 			"/real/pkg": "/real/pkg",
 		},
 	}
-	assert.DeepEqual(t, discoverWalkRoots(rslintconfig.DirectoryIdentity{LexicalPath: "/alias", CanonicalPath: fsys.Realpath("/alias")}, rslintconfig.ResolveDirectoryIdentities([]string{"/real/pkg"}, fsys)), []string{"pkg"})
+	assert.DeepEqual(t, discoverWalkRoots(rslintconfig.DirectoryIdentity{LexicalPath: "/alias", CanonicalPath: fsys.Realpath("/alias").AsString()}, rslintconfig.ResolveDirectoryIdentities([]string{"/real/pkg"}, fsys)), []string{"pkg"})
 }
 
 func TestDiscoverFilesOutsidePrograms_MultipleFilesPatterns(t *testing.T) {
@@ -1521,8 +1524,8 @@ func TestDiscoverLintTargetsMultiConfig_MatchesIgnoresInPhysicalConfigSpace(t *t
 	assert.DeepEqual(t, targets, []File{{
 		PathIdentity: rslintconfig.PathIdentity{
 			Path:                paths["src/keep.ts"],
-			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["src/keep.ts"])),
-			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["src/keep.ts"]))),
+			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(pathutil.Path(paths["src/keep.ts"])).AsString()),
+			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(pathutil.Path(filepath.Dir(paths["src/keep.ts"]))).AsString()),
 		},
 		ConfigDirectory: linkDir,
 	}}, cmpopts.IgnoreFields(File{}, "match"))
@@ -1582,7 +1585,7 @@ func TestDiscoverLintTargetsMultiConfig_PreservesHostAssignedExplicitOwner(t *te
 		t.Fatalf("expected one explicitly assigned target, got %+v", targets)
 	}
 	assert.Equal(t, targets[0].Path, aliasPath)
-	assert.Equal(t, targets[0].CanonicalPath, tspath.NormalizePath(fsys.Realpath(aliasPath)))
+	assert.Equal(t, targets[0].CanonicalPath, tspath.NormalizePath(fsys.Realpath(pathutil.Path(aliasPath)).AsString()))
 	assert.Equal(t, targets[0].ConfigDirectory, rootDir)
 }
 
@@ -1613,16 +1616,16 @@ func TestDiscoverLintTargetsMultiConfig_MergesAutomaticAndHostAssignedFilesForSa
 		{
 			PathIdentity: rslintconfig.PathIdentity{
 				Path:                paths["pkg/automatic.ts"],
-				CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["pkg/automatic.ts"])),
-				CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["pkg/automatic.ts"]))),
+				CanonicalPath:       tspath.NormalizePath(fsys.Realpath(pathutil.Path(paths["pkg/automatic.ts"])).AsString()),
+				CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(pathutil.Path(filepath.Dir(paths["pkg/automatic.ts"]))).AsString()),
 			},
 			ConfigDirectory: childDir,
 		},
 		{
 			PathIdentity: rslintconfig.PathIdentity{
 				Path:                paths["pkg/explicit.ts"],
-				CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["pkg/explicit.ts"])),
-				CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["pkg/explicit.ts"]))),
+				CanonicalPath:       tspath.NormalizePath(fsys.Realpath(pathutil.Path(paths["pkg/explicit.ts"])).AsString()),
+				CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(pathutil.Path(filepath.Dir(paths["pkg/explicit.ts"]))).AsString()),
 			},
 			ConfigDirectory: childDir,
 		},
@@ -1661,8 +1664,8 @@ func TestDiscoverLintTargetsMultiConfig_ExplicitOnlyConfigDoesNotOwnAutomaticFil
 	assert.DeepEqual(t, targets, []File{{
 		PathIdentity: rslintconfig.PathIdentity{
 			Path:                paths["ignored/explicit.ts"],
-			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["ignored/explicit.ts"])),
-			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["ignored/explicit.ts"]))),
+			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(pathutil.Path(paths["ignored/explicit.ts"])).AsString()),
+			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(pathutil.Path(filepath.Dir(paths["ignored/explicit.ts"]))).AsString()),
 		},
 		ConfigDirectory: ignoredDir,
 	}}, cmpopts.IgnoreFields(File{}, "match"))
@@ -1726,7 +1729,7 @@ func TestDiscoverLintTargets_DirectorySymlinkPreservesCanonicalIdentity(t *testi
 		t.Fatalf("expected one target through directory symlink, got %+v", targets)
 	}
 	assert.Equal(t, targets[0].Path, tspath.ResolvePath(linkDir, "index.ts"))
-	assert.Equal(t, targets[0].CanonicalPath, tspath.NormalizePath(fsys.Realpath(paths["real/index.ts"])))
+	assert.Equal(t, targets[0].CanonicalPath, tspath.NormalizePath(fsys.Realpath(pathutil.Path(paths["real/index.ts"])).AsString()))
 }
 
 func TestDiscoverLintTargets_PhysicalConfigFallbackPreservesDirectoryAliasPath(t *testing.T) {
@@ -1749,7 +1752,7 @@ func TestDiscoverLintTargets_PhysicalConfigFallbackPreservesDirectoryAliasPath(t
 		t.Fatalf("expected one target through physical config fallback, got %+v", targets)
 	}
 	assert.Equal(t, targets[0].Path, tspath.ResolvePath(linkDir, "index.ts"))
-	assert.Equal(t, targets[0].CanonicalPath, tspath.NormalizePath(fSys.Realpath(paths["real/sub/index.ts"])))
+	assert.Equal(t, targets[0].CanonicalPath, tspath.NormalizePath(fSys.Realpath(pathutil.Path(paths["real/sub/index.ts"])).AsString()))
 }
 
 func TestDiscoverLintTargetsMultiConfig_AliasAuthoredEntrySelectsNonDefaultExtension(t *testing.T) {
@@ -1788,7 +1791,7 @@ func TestDiscoverLintTargetsMultiConfig_AliasAuthoredEntrySelectsNonDefaultExten
 	wantPath := tspath.CombinePaths(linkDir, "index.TS")
 	if len(targets) != 1 ||
 		targets[0].Path != wantPath ||
-		targets[0].CanonicalPath != tspath.NormalizePath(fSys.Realpath(physicalTarget)) ||
+		targets[0].CanonicalPath != tspath.NormalizePath(fSys.Realpath(pathutil.Path(physicalTarget)).AsString()) ||
 		targets[0].ConfigDirectory != realConfigDir {
 		t.Fatalf("alias-authored target = %+v, want %q owned by %q", targets, wantPath, realConfigDir)
 	}
@@ -2320,9 +2323,9 @@ type spyFS struct {
 	accessedDirs []string
 }
 
-func (s *spyFS) GetAccessibleEntries(path string) vfs.Entries {
+func (s *spyFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
 	s.mu.Lock()
-	s.accessedDirs = append(s.accessedDirs, path)
+	s.accessedDirs = append(s.accessedDirs, path.AsString())
 	s.mu.Unlock()
 	return s.FS.GetAccessibleEntries(path)
 }
@@ -2344,8 +2347,8 @@ type caseInsensitiveSpyFS struct {
 	*spyFS
 }
 
-func (s *caseInsensitiveSpyFS) UseCaseSensitiveFileNames() bool {
-	return false
+func (s *caseInsensitiveSpyFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
 }
 
 func TestDiscoverFilesOutsidePrograms_PrunesNodeModulesAtWalkLevel(t *testing.T) {

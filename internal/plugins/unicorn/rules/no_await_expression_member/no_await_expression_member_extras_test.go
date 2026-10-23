@@ -146,7 +146,7 @@ func TestNoAwaitExpressionMemberEditDemand(t *testing.T) {
 		t.Run(test.code, func(t *testing.T) {
 			t.Parallel()
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/edit-demand.mts", Path: "/edit-demand.mts",
+				FileName: "/edit-demand.mts", PathKey: "/edit-demand.mts",
 			}, test.code, core.ScriptKindTS)
 			var baseline rule.RuleDiagnostic
 			for _, demand := range []rule.EditDemand{

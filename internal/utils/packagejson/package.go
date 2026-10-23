@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // Package is an immutable JSON object from one Program generation.
@@ -26,7 +27,7 @@ func Read(p *program.Program, directory string) *Package {
 	}
 	directory = tspath.ResolvePath(p.CurrentDirectory(), directory)
 	return program.Cached(p, packageKey(directory), func() *Package {
-		text, ok := p.FS().ReadFile(tspath.ResolvePath(directory, "package.json"))
+		text, ok := p.FS().ReadFile(pathutil.File(tspath.ResolvePath(directory, "package.json")))
 		if !ok {
 			return nil
 		}

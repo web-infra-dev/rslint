@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // TestHelpers provides utility functions for rule testing
@@ -136,7 +137,8 @@ func NewProgramHelper(root Root) *ProgramHelper {
 
 // CreateTestProgram creates a TypeScript program from source code
 func (h *ProgramHelper) CreateTestProgram(code string, fileName string, tsconfigPath string) (*compiler.Program, *ast.SourceFile, error) {
-	fs := utils.NewOverlayVFS(h.Root.FS, map[string]string{tspath.ResolvePath(h.Root.Dir, fileName): code})
+	sourceFileName := tspath.ToRootedFilePath(fileName, pathutil.Directory(h.Root.Dir))
+	fs := utils.NewOverlayVFS(h.Root.FS, map[string]string{sourceFileName.AsString(): code})
 	host := utils.CreateCompilerHost(h.Root.Dir, fs)
 
 	program, err := utils.CreateProgram(true, fs, h.Root.Dir, tsconfigPath, host)
@@ -144,7 +146,7 @@ func (h *ProgramHelper) CreateTestProgram(code string, fileName string, tsconfig
 		return nil, nil, err
 	}
 
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(sourceFileName)
 	return program, sourceFile, nil
 }
 

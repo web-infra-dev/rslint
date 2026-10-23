@@ -1325,8 +1325,8 @@ func isExported(varInfo *VariableInfo, sym *ast.Symbol, localExportTargets map[*
 
 		// Declaration merging: if ANY declaration of the symbol is exported,
 		// the variable is considered exported (e.g., `interface Foo {} export const Foo = ...`)
-		if sym != nil && len(sym.Declarations) > 1 {
-			for _, decl := range sym.Declarations {
+		if sym != nil && len(sym.Declarations()) > 1 {
+			for _, decl := range sym.Declarations() {
 				if ast.GetCombinedModifierFlags(decl)&ast.ModifierFlagsExport != 0 {
 					return true
 				}
@@ -1890,7 +1890,7 @@ func symbolForVariable(
 		return ctx.TypeChecker.GetSymbolAtLocation(nameNode)
 	}
 	needsMergedSymbol := globalSourceFile ||
-		len(rawSym.Declarations) > 1 ||
+		len(rawSym.Declarations()) > 1 ||
 		(definition != nil && definition.Kind == ast.KindModuleDeclaration)
 	if !needsMergedSymbol {
 		return rawSym
@@ -1940,7 +1940,7 @@ func classifyReferenceNodes(refs []*ast.Node) referenceInfo {
 // checker semantics intact for its other consumers and replace only these
 // references in this rule. Plain value bindings must still be skipped.
 func withHeritageReferences(ctx rule.RuleContext, info referenceInfo, sym *ast.Symbol, ac *analysisContext) referenceInfo {
-	if ctx.Refs == nil || sym == nil || sym.Flags&scope.ReferenceType.DeclarationMeaning() == 0 {
+	if ctx.Refs == nil || sym == nil || sym.Flags()&scope.ReferenceType.DeclarationMeaning() == 0 {
 		return info
 	}
 	if ac.heritageReferences == nil {
@@ -2225,7 +2225,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	rawSym := binderSymbolForDefinition(nameNode, definition)
 	sym := symbolForVariable(ctx, nameNode, definition, rawSym, ac.globalSourceFile)
 	// For declaration merging (interface + const, etc.), only process once.
-	if sym != nil && len(sym.Declarations) > 1 {
+	if sym != nil && len(sym.Declarations()) > 1 {
 		if ac.seenMergedSymbols[sym] {
 			return
 		}
@@ -2242,8 +2242,8 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	// For declaration merging (e.g., multiple interfaces with same name),
 	// references inside any declaration body are self-references.
 	allDecls := []*ast.Node{definition}
-	if sym != nil && len(sym.Declarations) > 1 {
-		allDecls = sym.Declarations
+	if sym != nil && len(sym.Declarations()) > 1 {
+		allDecls = sym.Declarations()
 	}
 
 	implicitlyUsed := false
@@ -2583,8 +2583,8 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				// declarations outside this file, it's augmenting an existing
 				// namespace (e.g., `declare namespace NodeJS { ... }`).
 				sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
-				if sym != nil && len(sym.Declarations) > 1 {
-					for _, decl := range sym.Declarations {
+				if sym != nil && len(sym.Declarations()) > 1 {
+					for _, decl := range sym.Declarations() {
 						if decl != node {
 							return
 						}

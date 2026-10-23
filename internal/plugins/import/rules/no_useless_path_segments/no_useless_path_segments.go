@@ -106,7 +106,7 @@ var NoUselessPathSegmentsRule = rule.Rule{
 			if strings.HasPrefix(importPath, "./") || !found || resolved == "" {
 				return
 			}
-			expected, err := filepath.Rel(filepath.Dir(ctx.SourceFile.FileName()), resolved)
+			expected, err := filepath.Rel(filepath.Dir(ctx.SourceFile.FileName().AsString()), resolved)
 			if err != nil {
 				return
 			}

@@ -33,7 +33,7 @@ func Collect(file *ast.SourceFile, kinds ReferenceKinds) []Source {
 	if file == nil || kinds == 0 {
 		return nil
 	}
-	cache := ast.GetOrComputeSourceFileData(file, sourceCacheKey, newSourceFileModuleSpecifierCache)
+	cache := file.GetOrComputeData(sourceCacheKey, newSourceFileModuleSpecifierCache)
 	cache.mu.Lock()
 	specifiers, ok := cache.byKinds[kinds]
 	cache.mu.Unlock()

@@ -345,7 +345,7 @@ func TestNoElseReturnEditDemand(t *testing.T) {
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, `function f() { if (a) return 1; else return 2; }`, core.ScriptKindTS)
 	var elseNode *ast.Node
 	var visit func(*ast.Node) bool

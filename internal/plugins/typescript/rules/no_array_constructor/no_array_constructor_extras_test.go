@@ -42,7 +42,7 @@ func TestSourceMayUseArrayConstructor(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/source.ts",
-				Path:     "/source.ts",
+				PathKey:  "/source.ts",
 			}, testCase.code, core.ScriptKindTS)
 			if got := sourceMayUseArrayConstructor(sourceFile); got != testCase.want {
 				t.Fatalf("sourceMayUseArrayConstructor(%q) = %v, want %v", testCase.code, got, testCase.want)
@@ -315,7 +315,7 @@ func TestBuildArrayConstructorFixesRecoveryAST(t *testing.T) {
 	const source = "Array(a, b"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/no-array-constructor-recovery.ts",
-		Path:     "/no-array-constructor-recovery.ts",
+		PathKey:  "/no-array-constructor-recovery.ts",
 	}, source, core.ScriptKindTS)
 
 	var call *ast.Node
@@ -365,7 +365,7 @@ func TestNoArrayConstructorEditDemand(t *testing.T) {
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program:     lintprogram.NewFromCompiler(program),
-			File:        sourceFile.FileName(),
+			File:        sourceFile.FileName().AsString(),
 			HasTypeInfo: true,
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{

@@ -14,6 +14,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/compilerhost"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // RootOptions describes one parser/binder-built source universe.
@@ -21,7 +23,7 @@ import (
 // source Program does not recursively materialize an import closure.
 type RootOptions struct {
 	RootFileNames   []string
-	Host            compiler.CompilerHost
+	Host            compilerhost.Host
 	CompilerOptions *core.CompilerOptions
 	SingleThreaded  bool
 }
@@ -48,12 +50,12 @@ type parsedBackend struct {
 	fs                         vfs.FS
 	currentDirectory           string
 	options                    *core.CompilerOptions
-	resolver                   *module.Resolver
+	resolver                   *module.DefaultResolver
 	files                      []*ast.SourceFile
-	metadataByPath             map[tspath.Path]ast.SourceFileMetaData
-	sourcesByPath              map[tspath.Path]*ast.SourceFile
-	resolvedModules            map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule]
-	syntacticDiagnosticsByPath map[tspath.Path][]*ast.Diagnostic
+	metadataByPath             map[tspath.PathKey]ast.SourceFileMetaData
+	sourcesByPath              map[tspath.PathKey]*ast.SourceFile
+	resolvedModules            map[tspath.PathKey]module.ModeAwareCache[*module.ResolvedModule]
+	syntacticDiagnosticsByPath map[tspath.PathKey][]*ast.Diagnostic
 }
 
 type parsedResult struct {
@@ -78,7 +80,7 @@ func NewFromRoots(opts RootOptions) (*Program, error) {
 	if isNilInterface(fs) {
 		return nil, errors.New("program: root construction requires a filesystem")
 	}
-	currentDirectory := opts.Host.GetCurrentDirectory()
+	currentDirectory := opts.Host.GetCurrentDirectory().AsString()
 	rootFileNames, err := normalizeRootFileNames(opts.RootFileNames, currentDirectory, fs)
 	if err != nil {
 		return nil, err
@@ -89,10 +91,10 @@ func NewFromRoots(opts RootOptions) (*Program, error) {
 		fs:               fs,
 		currentDirectory: currentDirectory,
 		options:          opts.CompilerOptions,
-		resolver:         module.NewResolver(opts.Host, opts.CompilerOptions, "", "", nil),
-		metadataByPath:   make(map[tspath.Path]ast.SourceFileMetaData, len(rootFileNames)),
-		sourcesByPath:    make(map[tspath.Path]*ast.SourceFile, len(rootFileNames)),
-		resolvedModules:  make(map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule], len(rootFileNames)),
+		resolver:         module.NewResolver(module.ResolverOptions{Host: opts.Host, CompilerOptions: opts.CompilerOptions}),
+		metadataByPath:   make(map[tspath.PathKey]ast.SourceFileMetaData, len(rootFileNames)),
+		sourcesByPath:    make(map[tspath.PathKey]*ast.SourceFile, len(rootFileNames)),
+		resolvedModules:  make(map[tspath.PathKey]module.ModeAwareCache[*module.ResolvedModule], len(rootFileNames)),
 	}
 	results := make([]parsedResult, len(rootFileNames))
 
@@ -142,11 +144,11 @@ func NewFromRoots(opts RootOptions) (*Program, error) {
 		if result.err != nil {
 			return nil, result.err
 		}
-		if previous := backend.sourcesByPath[result.file.Path()]; previous != nil {
+		if previous := backend.sourcesByPath[result.file.PathKey()]; previous != nil {
 			if previous != result.file {
 				return nil, fmt.Errorf(
 					"program: source universe contains different ASTs for path %q",
-					result.file.Path(),
+					result.file.PathKey(),
 				)
 			}
 			continue
@@ -159,11 +161,11 @@ func NewFromRoots(opts RootOptions) (*Program, error) {
 
 func normalizeRootFileNames(rootFileNames []string, currentDirectory string, fs vfs.FS) ([]string, error) {
 	normalized := make([]string, 0, len(rootFileNames))
-	seen := make(map[tspath.Path]string, len(rootFileNames))
-	useCaseSensitive := fs.UseCaseSensitiveFileNames()
+	seen := make(map[tspath.PathKey]string, len(rootFileNames))
+	useCaseSensitive := fs.CaseSensitivity().IsCaseSensitive()
 	for _, rootFileName := range rootFileNames {
-		absolute := tspath.GetNormalizedAbsolutePath(rootFileName, currentDirectory)
-		path := tspath.ToPath(absolute, currentDirectory, useCaseSensitive)
+		absolute := pathutil.GetNormalizedAbsolutePath(rootFileName, currentDirectory)
+		path := pathutil.ToPath(absolute, currentDirectory, useCaseSensitive)
 		if previous, duplicate := seen[path]; duplicate {
 			if previous != absolute {
 				return nil, fmt.Errorf(
@@ -218,17 +220,17 @@ func NewFromBoundSources(
 	if isNilInterface(fs) {
 		return nil, errors.New("program: bound-source construction requires a filesystem")
 	}
-	currentDirectory := host.GetCurrentDirectory()
+	currentDirectory := typeScript.GetCurrentDirectory().AsString()
 
 	backend := &parsedBackend{
 		host:             host,
 		fs:               fs,
 		currentDirectory: currentDirectory,
 		options:          options,
-		resolver:         module.NewResolver(host, options, "", "", nil),
-		metadataByPath:   make(map[tspath.Path]ast.SourceFileMetaData, len(files)),
-		sourcesByPath:    make(map[tspath.Path]*ast.SourceFile, len(files)),
-		resolvedModules:  make(map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule], len(files)),
+		resolver:         module.NewResolver(module.ResolverOptions{Host: compilerhost.WithDirectory(host, typeScript.GetCurrentDirectory()), CompilerOptions: options}),
+		metadataByPath:   make(map[tspath.PathKey]ast.SourceFileMetaData, len(files)),
+		sourcesByPath:    make(map[tspath.PathKey]*ast.SourceFile, len(files)),
+		resolvedModules:  make(map[tspath.PathKey]module.ModeAwareCache[*module.ResolvedModule], len(files)),
 	}
 	normalized, err := normalizeSourceFiles(files)
 	if err != nil {
@@ -241,7 +243,7 @@ func NewFromBoundSources(
 		if typeScript.GetSourceFile(file.FileName()) != file {
 			return nil, fmt.Errorf("program: source services do not own source %q", file.FileName())
 		}
-		metadata := backend.sourceFileMetaData(file.FileName())
+		metadata := backend.sourceFileMetaData(file.FileName().AsString())
 		backend.install(
 			file,
 			metadata,
@@ -255,12 +257,12 @@ func NewFromBoundSources(
 
 func normalizeSourceFiles(files []*ast.SourceFile) ([]*ast.SourceFile, error) {
 	normalized := make([]*ast.SourceFile, 0, len(files))
-	seenPaths := make(map[tspath.Path]*ast.SourceFile, len(files))
+	seenPaths := make(map[tspath.PathKey]*ast.SourceFile, len(files))
 	for _, file := range files {
 		if file == nil {
 			continue
 		}
-		path := file.Path()
+		path := file.PathKey()
 		if path == "" {
 			return nil, fmt.Errorf("program: source %q has no Path", file.FileName())
 		}
@@ -277,12 +279,12 @@ func normalizeSourceFiles(files []*ast.SourceFile) ([]*ast.SourceFile, error) {
 }
 
 func (p *parsedBackend) sourceFileMetaData(fileName string) ast.SourceFileMetaData {
-	packageJSONScope := p.resolver.GetPackageScopeForPath(tspath.GetDirectoryPath(fileName))
+	packageJSONScope := p.resolver.GetPackageScopeForPath(pathutil.Directory(tspath.GetDirectoryPath(fileName)))
 	moduleResolutionKind := p.options.GetModuleResolutionKind()
 
 	var packageJSONType, packageJSONDirectory string
 	if packageJSONScope.Exists() {
-		packageJSONDirectory = packageJSONScope.PackageDirectory
+		packageJSONDirectory = packageJSONScope.PackageDirectory.AsDirectoryPath().AsString()
 		if value, ok := packageJSONScope.Contents.Type.GetValue(); ok {
 			hasExplicitFormat := tspath.FileExtensionIsOneOf(fileName, []string{
 				tspath.ExtensionMts,
@@ -300,22 +302,22 @@ func (p *parsedBackend) sourceFileMetaData(fileName string) ast.SourceFileMetaDa
 
 	return ast.SourceFileMetaData{
 		PackageJsonType:      packageJSONType,
-		PackageJsonDirectory: packageJSONDirectory,
-		ImpliedNodeFormat:    ast.GetImpliedNodeFormatForFile(fileName, packageJSONType),
+		PackageJsonDirectory: pathutil.Directory(packageJSONDirectory),
+		ImpliedNodeFormat:    ast.GetImpliedNodeFormatForFile(pathutil.File(fileName), packageJSONType),
 	}
 }
 
 func (p *parsedBackend) parse(rootFileName string) (*ast.SourceFile, ast.SourceFileMetaData) {
-	fileName := tspath.GetNormalizedAbsolutePath(rootFileName, p.currentDirectory)
+	fileName := pathutil.GetNormalizedAbsolutePath(rootFileName, p.currentDirectory)
 	metadata := p.sourceFileMetaData(fileName)
 	file := p.host.GetSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName,
-		Path: tspath.ToPath(
+		FileName: pathutil.File(fileName),
+		PathKey: pathutil.ToPath(
 			fileName,
 			p.currentDirectory,
-			p.fs.UseCaseSensitiveFileNames(),
+			p.fs.CaseSensitivity().IsCaseSensitive(),
 		),
-		ExternalModuleIndicatorOptions: ast.GetExternalModuleIndicatorOptions(fileName, p.options, metadata),
+		ExternalModuleIndicatorOptions: ast.GetExternalModuleIndicatorOptions(pathutil.File(fileName), p.options, metadata),
 	})
 	return file, metadata
 }
@@ -341,7 +343,7 @@ func (p *parsedBackend) resolveImports(
 			continue
 		}
 		mode := compiler.GetModeForUsageLocation(file.FileName(), metadata, moduleName, p.options)
-		resolved, _ := p.resolver.ResolveModuleName(name, file.FileName(), mode, nil)
+		resolved, _, _ := p.resolver.ResolveModuleName(name, file.FileName(), mode, nil)
 		resolutions[module.ModeAwareCacheKey{Name: name, Mode: mode}] = resolved
 	}
 	return resolutions
@@ -353,16 +355,16 @@ func (p *parsedBackend) install(
 	resolvedModules module.ModeAwareCache[*module.ResolvedModule],
 	syntacticDiagnostics []*ast.Diagnostic,
 ) {
-	p.metadataByPath[file.Path()] = metadata
-	p.sourcesByPath[file.Path()] = file
+	p.metadataByPath[file.PathKey()] = metadata
+	p.sourcesByPath[file.PathKey()] = file
 	if resolvedModules != nil {
-		p.resolvedModules[file.Path()] = resolvedModules
+		p.resolvedModules[file.PathKey()] = resolvedModules
 	}
 	if len(syntacticDiagnostics) > 0 {
 		if p.syntacticDiagnosticsByPath == nil {
-			p.syntacticDiagnosticsByPath = make(map[tspath.Path][]*ast.Diagnostic)
+			p.syntacticDiagnosticsByPath = make(map[tspath.PathKey][]*ast.Diagnostic)
 		}
-		p.syntacticDiagnosticsByPath[file.Path()] = syntacticDiagnostics
+		p.syntacticDiagnosticsByPath[file.PathKey()] = syntacticDiagnostics
 	}
 }
 
@@ -376,6 +378,6 @@ func (p *parsedBackend) computeSyntacticDiagnostics(file *ast.SourceFile) []*ast
 }
 
 func (p *parsedBackend) sourceFile(fileName string) *ast.SourceFile {
-	path := tspath.ToPath(fileName, p.currentDirectory, p.fs.UseCaseSensitiveFileNames())
+	path := pathutil.ToPath(fileName, p.currentDirectory, p.fs.CaseSensitivity().IsCaseSensitive())
 	return p.sourcesByPath[path]
 }

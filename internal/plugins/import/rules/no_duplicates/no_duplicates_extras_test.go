@@ -22,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/testutil/embedfs"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestNoDuplicatesRuntimePaths(t *testing.T) {
@@ -47,6 +48,20 @@ func TestNoDuplicatesRuntimePaths(t *testing.T) {
 		options            []any
 		diagnostics        int
 	}{
+		{
+			name: "source phase and evaluation phase stay separate",
+			code: "import source compiled from './coexisting/text.js';\nimport { value } from './coexisting/text.js';\n",
+		},
+		{
+			name: "side effect and source phase stay separate",
+			code: "import './coexisting/text.js';\nimport source compiled from './coexisting/text.js';\n",
+		},
+		{
+			name:        "duplicate source imports preserve the phase",
+			code:        "import source compiled from './coexisting/text.js';\nimport source compiled from './coexisting/text.js';\n",
+			output:      "import source compiled from './coexisting/text.js';\n",
+			diagnostics: 2,
+		},
 		{
 			name:        "normalized existing file",
 			code:        "import { value as first } from './coexisting/text.js';\nimport { value as second } from './coexisting/sub/../text.js';\n",
@@ -403,7 +418,7 @@ func assertNoDuplicatesRuntimeFileResult(t *testing.T, root embedfs.Root, name, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sourceFile := program.GetSourceFile(filePath); sourceFile == nil || sourceFile.Text() != code {
+	if sourceFile := program.GetSourceFile(pathutil.File(filePath)); sourceFile == nil || sourceFile.Text() != code {
 		t.Fatal("test source file was not loaded with the expected content")
 	}
 	var diagnostics []rule.RuleDiagnostic
@@ -467,7 +482,7 @@ func TestNoDuplicatesEditDemand(t *testing.T) {
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program:         lintprogram.NewFromCompiler(program),
-			File:            sourceFile.FileName(),
+			File:            sourceFile.FileName().AsString(),
 			HasTypeInfo:     true,
 			GetRulesForFile: noDuplicatesConfiguredRules,
 			Consumer: rule.DiagnosticConsumer{
@@ -541,7 +556,7 @@ func TestNoDuplicatesEditDemand(t *testing.T) {
 	var unfixableDiagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:         lintprogram.NewFromCompiler(unfixableProgram),
-		File:            unfixableSourceFile.FileName(),
+		File:            unfixableSourceFile.FileName().AsString(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noDuplicatesConfiguredRules,
 		Consumer: rule.DiagnosticConsumer{
@@ -591,7 +606,7 @@ import type { RequireType } from "conditional-package" with { "resolution-mode":
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", filePath)
 		return
@@ -605,7 +620,7 @@ import type { RequireType } from "conditional-package" with { "resolution-mode":
 			t.Fatalf("import on line %d did not resolve", len(resolvedPaths)+1)
 			continue
 		}
-		resolvedPaths = append(resolvedPaths, resolved.ResolvedFileName)
+		resolvedPaths = append(resolvedPaths, resolved.ResolvedFileName.AsString())
 	}
 	if len(resolvedPaths) != 2 || resolvedPaths[0] == resolvedPaths[1] {
 		t.Fatalf("resolution-mode overrides did not select distinct targets: %v", resolvedPaths)
@@ -614,7 +629,7 @@ import type { RequireType } from "conditional-package" with { "resolution-mode":
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:         lintprogram.NewFromCompiler(program),
-		File:            sourceFile.FileName(),
+		File:            sourceFile.FileName().AsString(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noDuplicatesConfiguredRules,
 		Consumer: rule.DiagnosticConsumer{
@@ -657,7 +672,7 @@ func createNoDuplicatesProgram(t testing.TB, fileName string, code string) (*com
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, pathutil.Directory(rootDir.Dir)))
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", fileName)
 	}

@@ -2,9 +2,9 @@
 // submodule pinned by the repository. Avoid `@typescript/native-preview/ast`
 // for type/value re-exports — that npm package's `gitHead` and our
 // submodule HEAD can drift, leaving the bundle with two parallel `Node`
-// definitions and risking SyntaxKind enum-value skew. The npm package is
-// still a devDep, but only as the source of the `tsgo` binary used at
-// build time; nothing it ships ends up in the published dist of @rslint/api.
+// definitions and risking SyntaxKind enum-value skew. Declaration generation
+// also uses the compiler built from this checkout; the npm preview compiler
+// does not contribute code or types to the published dist of @rslint/api.
 //
 // api-extractor (rslib's d.ts bundler) does not follow Node subpath imports
 // declared in the submodule package's own package.json. Without help it

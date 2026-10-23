@@ -1410,7 +1410,7 @@ func TestNoMisleadingCharacterClassGlobalAvailability(t *testing.T) {
 func TestNoMisleadingCharacterClassDefersSuggestions(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, `/[\uD83D\uDC4D]/`, core.ScriptKindTS)
 
 	for _, testCase := range []struct {
@@ -1481,7 +1481,7 @@ func TestSourceMayUseRegExp(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/source-gate.ts",
-				Path:     "/source-gate.ts",
+				PathKey:  "/source-gate.ts",
 			}, testCase.code, core.ScriptKindTS)
 			if got := sourceMayUseRegExp(sourceFile); got != testCase.want {
 				t.Fatalf("sourceMayUseRegExp(%q) = %v, want %v", testCase.code, got, testCase.want)

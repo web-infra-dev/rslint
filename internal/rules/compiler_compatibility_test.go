@@ -20,6 +20,8 @@ import (
 func TestAllRulesCompilerCompatibility(t *testing.T) {
 	const code = `
 export {};
+import source Wasm from './compiler-compatibility.wasm';
+declare module '*' with { type: 'text' } { const text: string; export default text; }
 interface Base<T> { value: T }
 interface Normal extends Base<Array<string>> {}
 class Implemented implements Base<string> { value = ''; }
@@ -40,7 +42,7 @@ function unreachableForOf() { for (const value of (() => { throw 1; })()) { cons
 	if err != nil {
 		t.Fatal(err)
 	}
-	file := compilerProgram.GetSourceFile(fileName)
+	file := compilerProgram.GetSourceFile(tspath.ToRootedFilePath(fileName, host.GetCurrentDirectory()))
 	if file == nil {
 		t.Fatal("compiler compatibility fixture was not included")
 		return
@@ -49,8 +51,16 @@ function unreachableForOf() { for (const value of (() => { throw 1; })()) { cons
 		t.Fatal("fixture has parse diagnostics and would bypass rule execution")
 	}
 	heritageKinds := map[ast.Kind]int{}
+	sourceImports := 0
+	attributedModules := 0
 	var visit func(*ast.Node) bool
 	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindImportClause && node.AsImportClause().PhaseModifier == ast.KindSourceKeyword {
+			sourceImports++
+		}
+		if node.Kind == ast.KindModuleDeclaration && node.AsModuleDeclaration().Attributes != nil {
+			attributedModules++
+		}
 		if node.Parent != nil && node.Parent.Kind == ast.KindHeritageClause {
 			heritageKinds[node.Kind]++
 		}
@@ -59,6 +69,9 @@ function unreachableForOf() { for (const value of (() => { throw 1; })()) { cons
 	file.AsNode().ForEachChild(visit)
 	if heritageKinds[ast.KindTypeReference] != 2 || heritageKinds[ast.KindExpressionWithTypeArguments] != 4 {
 		t.Fatalf("fixture must exercise normal and recovery heritage nodes: %v", heritageKinds)
+	}
+	if sourceImports != 1 || attributedModules != 1 {
+		t.Fatalf("fixture did not exercise TypeScript 7.1 import syntax: source=%d, attributed modules=%d", sourceImports, attributedModules)
 	}
 
 	catalog := rules.All().AllRules()

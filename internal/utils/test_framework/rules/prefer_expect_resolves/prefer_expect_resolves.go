@@ -144,7 +144,7 @@ func strictThenableType(typeChecker *checker.Checker, node *ast.Node, typ *check
 	}
 	apparent := checker.Checker_getApparentType(typeChecker, typ)
 	then := checker.Checker_getPropertyOfType(typeChecker, apparent, "then")
-	if then == nil || then.Flags&ast.SymbolFlagsOptional != 0 {
+	if then == nil || then.Flags()&ast.SymbolFlagsOptional != 0 {
 		return false
 	}
 	thenType := typeChecker.GetTypeOfSymbolAtLocation(then, node)

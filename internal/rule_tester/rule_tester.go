@@ -17,6 +17,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -224,7 +225,8 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)
 
-		fs := utils.NewOverlayVFS(root.FS, map[string]string{tspath.ResolvePath(root.Dir, fileName): code})
+		sourceFileName := tspath.ToRootedFilePath(fileName, pathutil.Directory(root.Dir))
+		fs := utils.NewOverlayVFS(root.FS, map[string]string{sourceFileName.AsString(): code})
 		host := utils.CreateCompilerHost(root.Dir, fs)
 
 		tsconfigPath := tsconfigPath
@@ -235,8 +237,8 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 		program, err := utils.CreateProgram(true, fs, root.Dir, tsconfigPath, host)
 		assert.NilError(t, err, "couldn't create program. code: "+code)
 
-		sourceFile := program.GetSourceFile(fileName)
-		allowedFiles := []string{sourceFile.FileName()}
+		sourceFile := program.GetSourceFile(sourceFileName)
+		allowedFiles := []string{sourceFile.FileName().AsString()}
 		programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
 		lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 			Programs:         programs,

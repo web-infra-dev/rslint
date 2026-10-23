@@ -19,7 +19,7 @@ func ConfiguredNodeVersion(ctx rule.RuleContext, options map[string]any) npmsemv
 		}
 	}
 	if p := ctx.Program(); p != nil {
-		if pkg := packagejson.FindNearestValid(p, ctx.SourceFile.FileName()); pkg != nil {
+		if pkg := packagejson.FindNearestValid(p, ctx.SourceFile.FileName().AsString()); pkg != nil {
 			engines, _ := pkg.Field("engines").(map[string]any)
 			if text, ok := engines["node"].(string); ok {
 				if version, valid := npmsemver.Parse(text); valid {

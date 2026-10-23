@@ -305,7 +305,7 @@ func (state *blockScopedVarState) group(symbol *ast.Symbol, host *ast.Node, name
 	if host != nil && ast.IsFunctionLike(host) && host.Body() != nil {
 		group.functionBodyStart = utils.TrimNodeTextRange(state.ctx.SourceFile, host.Body()).Pos()
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration != nil &&
 			(declaration.Kind == ast.KindClassDeclaration || declaration.Kind == ast.KindClassExpression) {
 			group.mayHaveClassSelf = true
@@ -737,16 +737,16 @@ func groupSupportsMeaning(group *varGroup, meaning ast.SymbolFlags) bool {
 		return false
 	}
 	requested := meaning &^ ast.SymbolFlagsAlias
-	return group.symbol.Flags&requested != 0 ||
+	return group.symbol.Flags()&requested != 0 ||
 		requested&ast.SymbolFlagsType == ast.SymbolFlagsType &&
-			group.symbol.Flags&ast.SymbolFlagsNamespace != 0
+			group.symbol.Flags()&ast.SymbolFlagsNamespace != 0
 }
 
 func symbolHasDefinitionInsideNode(symbol *ast.Symbol, node *ast.Node) bool {
 	if symbol == nil || node == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration != nil && declaration.Pos() >= node.Pos() && declaration.End() <= node.End() {
 			return true
 		}
@@ -1023,10 +1023,10 @@ func methodParameterDecoratorForReference(identifier *ast.Node, function *ast.No
 }
 
 func symbolDefinitionsAreInsideRange(sourceFile *ast.SourceFile, symbol *ast.Symbol, textRange core.TextRange) bool {
-	if len(symbol.Declarations) == 0 {
+	if len(symbol.Declarations()) == 0 {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil {
 			return false
 		}

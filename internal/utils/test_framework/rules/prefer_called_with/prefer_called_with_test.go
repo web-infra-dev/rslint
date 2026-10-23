@@ -11,7 +11,7 @@ import (
 )
 
 func TestPreferCalledWithMessageDataAndEditDemand(t *testing.T) {
-	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.ts", Path: "/test.ts"}, `expect(fn).toBeCalled();`, core.ScriptKindTS)
+	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.ts", PathKey: "/test.ts"}, `expect(fn).toBeCalled();`, core.ScriptKindTS)
 	node := source.Statements.Nodes[0].AsExpressionStatement().Expression
 	accessor := node.AsCallExpression().Expression.AsPropertyAccessExpression().Name()
 	for _, autofix := range []bool{false, true} {
@@ -56,7 +56,7 @@ func TestPreferCalledWithMessageDataAndEditDemand(t *testing.T) {
 }
 
 func TestPreferCalledWithReportWithoutFix(t *testing.T) {
-	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.ts", Path: "/test.ts"}, `expect(fn)[key]();`, core.ScriptKindTS)
+	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.ts", PathKey: "/test.ts"}, `expect(fn)[key]();`, core.ScriptKindTS)
 	node := source.Statements.Nodes[0].AsExpressionStatement().Expression
 	key := node.AsCallExpression().Expression.AsElementAccessExpression().ArgumentExpression
 	for _, accessor := range []*ast.Node{nil, key, node} {

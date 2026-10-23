@@ -258,12 +258,12 @@ func CollectSemanticInFile(program *compiler.Program, tc *checker.Checker, file 
 		if _, exists := semantic.Symtab[symbolID]; !exists {
 			semantic.Symtab[symbolID] = SymbolInfo{
 				Id:         symbolID,
-				Name:       sanitizeSymbolName(symbol.Name),
-				Flags:      int(symbol.Flags),
-				CheckFlags: int(symbol.CheckFlags),
-				Decl:       nodeReference(symbol.ValueDeclaration),
+				Name:       sanitizeSymbolName(symbol.Name()),
+				Flags:      int(symbol.Flags()),
+				CheckFlags: int(symbol.CheckFlags()),
+				Decl:       nodeReference(symbol.ValueDeclaration()),
 			}
-			if symbol.CheckFlags&ast.CheckFlagsInstantiated != 0 {
+			if symbol.CheckFlags()&ast.CheckFlagsInstantiated != 0 {
 				target := tc.GetMergedSymbol(tc.GetTargetSymbol(symbol))
 				if target != nil && target != symbol {
 					semantic.SymbolTargets[symbolID] = recordSymbolInfo(target)
@@ -354,7 +354,7 @@ func CollectSemanticInFile(program *compiler.Program, tc *checker.Checker, file 
 
 					// A merged symbol can contain both a local value and an imported type.
 					// Value references must keep the local symbol instead of resolving the alias.
-					if symbol.Flags&ast.SymbolFlagsAlias != 0 && symbol.Flags&ast.SymbolFlagsValue == 0 {
+					if symbol.Flags()&ast.SymbolFlagsAlias != 0 && symbol.Flags()&ast.SymbolFlagsValue == 0 {
 						if aliasedSymbol := getAliasedSymbol(tc, symbol); aliasedSymbol != nil {
 							aliased_id := ast.GetSymbolId(aliasedSymbol)
 							if aliased_id != sym_id {
@@ -374,7 +374,7 @@ func CollectSemanticInFile(program *compiler.Program, tc *checker.Checker, file 
 				node.Parent.ModuleSpecifier() == node {
 				resolved := program.GetResolvedModuleFromModuleSpecifier(file, node)
 				if resolved != nil && resolved.IsResolved() {
-					if target := program.GetSourceFileForResolvedModule(resolved.ResolvedFileName); target != nil {
+					if target := program.GetSourceFileForResolvedModule(resolved); target != nil {
 						if targetID, ok := sourceFileIds[target]; ok {
 							semantic.Node2module[key] = targetID
 						}

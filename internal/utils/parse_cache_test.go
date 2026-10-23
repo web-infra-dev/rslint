@@ -22,6 +22,8 @@ import (
 	"github.com/zeebo/xxh3"
 
 	"github.com/web-infra-dev/rslint/internal/api"
+	"github.com/web-infra-dev/rslint/internal/compilerhost"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type readCountingFS struct {
@@ -34,9 +36,9 @@ func newReadCountingFS(base vfs.FS) *readCountingFS {
 	return &readCountingFS{FS: base, reads: make(map[string]int)}
 }
 
-func (f *readCountingFS) ReadFile(path string) (string, bool) {
+func (f *readCountingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	f.mu.Lock()
-	f.reads[path]++
+	f.reads[path.AsString()]++
 	f.mu.Unlock()
 	return f.FS.ReadFile(path)
 }
@@ -64,19 +66,19 @@ func newMemoryReadFS(contents map[string]string) *memoryReadFS {
 	}
 }
 
-func (f *memoryReadFS) ReadFile(path string) (string, bool) {
+func (f *memoryReadFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.reads[path]++
-	text, ok := f.contents[path]
+	f.reads[path.AsString()]++
+	text, ok := f.contents[path.AsString()]
 	return text, ok
 }
 
-func (f *memoryReadFS) Realpath(path string) string {
+func (f *memoryReadFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if realpath := f.realPaths[path]; realpath != "" {
-		return realpath
+	if realpath := f.realPaths[path.AsString()]; realpath != "" {
+		return pathutil.Path(realpath)
 	}
 	return path
 }
@@ -100,7 +102,7 @@ type valueReadFS struct {
 	source *memoryReadFS
 }
 
-func (f valueReadFS) ReadFile(path string) (string, bool) {
+func (f valueReadFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	return f.source.ReadFile(path)
 }
 
@@ -114,8 +116,8 @@ type divergentConcurrentFS struct {
 	release    chan struct{}
 }
 
-func (f *divergentConcurrentFS) ReadFile(path string) (string, bool) {
-	if path != f.path {
+func (f *divergentConcurrentFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if path.AsString() != f.path {
 		return "", false
 	}
 	f.mu.Lock()
@@ -155,8 +157,8 @@ type panicOnceSourceFS struct {
 	release chan struct{}
 }
 
-func (f *panicOnceSourceFS) ReadFile(path string) (string, bool) {
-	if path != f.path {
+func (f *panicOnceSourceFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if path.AsString() != f.path {
 		return f.FS.ReadFile(path)
 	}
 	f.mu.Lock()
@@ -177,8 +179,8 @@ func (f *panicOnceSourceFS) readCount() int {
 	return f.reads
 }
 
-func (f *blockingGenerationFS) ReadFile(path string) (string, bool) {
-	if path != f.path {
+func (f *blockingGenerationFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if path.AsString() != f.path {
 		return "", false
 	}
 	f.mu.Lock()
@@ -201,8 +203,8 @@ func (f *blockingGenerationFS) setText(text string) {
 
 func testParseOpts(fileName string, emi ast.ExternalModuleIndicatorOptions) ast.SourceFileParseOptions {
 	return ast.SourceFileParseOptions{
-		FileName:                       fileName,
-		Path:                           tspath.ToPath(fileName, "", true),
+		FileName:                       pathutil.File(fileName),
+		PathKey:                        pathutil.ToPath(fileName, "", true),
 		ExternalModuleIndicatorOptions: emi,
 	}
 }
@@ -323,7 +325,7 @@ func TestCachingHost_SourceSnapshotReadOnceAcrossPrograms(t *testing.T) {
 	cache := &ParseCache{}
 	build := func() *compiler.Program {
 		t.Helper()
-		host := WithParseCache(CreateCompilerHost(tmpDir, fs), cache)
+		host := compilerhost.WithDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
 		program, err := CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
 			NoLib:     core.TSTrue,
 			NoResolve: core.TSTrue,
@@ -336,8 +338,8 @@ func TestCachingHost_SourceSnapshotReadOnceAcrossPrograms(t *testing.T) {
 
 	firstProgram := build()
 	secondProgram := build()
-	first := firstProgram.GetSourceFile(fileName)
-	second := secondProgram.GetSourceFile(fileName)
+	first := firstProgram.GetSourceFile(pathutil.File(fileName))
+	second := secondProgram.GetSourceFile(pathutil.File(fileName))
 	if first == nil || second == nil {
 		t.Fatal("shared source must be present in both Programs")
 	}
@@ -349,7 +351,7 @@ func TestCachingHost_SourceSnapshotReadOnceAcrossPrograms(t *testing.T) {
 	}
 
 	cache.InvalidateSourceSnapshots()
-	third := build().GetSourceFile(fileName)
+	third := build().GetSourceFile(pathutil.File(fileName))
 	if got := fs.readCount(fileName); got != 2 {
 		t.Fatalf("new generation must read source again, reads = %d", got)
 	}
@@ -461,17 +463,17 @@ func TestCachingHost_OverlaySymlinkAliasesWithSharedPathAreNotMerged(t *testing.
 			aliasPath:     "export const fromAliasOverlay = true;\n",
 		},
 	))
-	if aliasRealpath, canonicalRealpath := fs.Realpath(aliasPath), fs.Realpath(canonicalPath); aliasRealpath != canonicalRealpath {
+	if aliasRealpath, canonicalRealpath := fs.Realpath(pathutil.Path(aliasPath)), fs.Realpath(pathutil.Path(canonicalPath)); aliasRealpath != canonicalRealpath {
 		t.Fatalf("fixture aliases do not share a realpath: %q != %q", aliasRealpath, canonicalRealpath)
 	}
 
 	cache := &ParseCache{}
-	host := WithParseCache(CreateCompilerHost(tmpDir, fs), cache)
+	host := compilerhost.WithDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
 	canonicalOpts := testParseOpts(canonicalPath, ast.ExternalModuleIndicatorOptions{})
 	aliasOpts := testParseOpts(aliasPath, ast.ExternalModuleIndicatorOptions{})
 	// Exercise the strongest alias collision: compiler identity has already
 	// canonicalized Path, while FileName still names the distinct overlays.
-	aliasOpts.Path = canonicalOpts.Path
+	aliasOpts.PathKey = canonicalOpts.PathKey
 
 	canonical := host.GetSourceFile(canonicalOpts)
 	alias := host.GetSourceFile(aliasOpts)
@@ -610,7 +612,7 @@ func TestParseCache_RetainOnlyKeepsLivePrograms(t *testing.T) {
 	}
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	cache := &ParseCache{}
-	host := WithParseCache(CreateCompilerHost(tmpDir, fs), cache)
+	host := compilerhost.WithDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
 
 	progA, err := CreateProgramFromOptions(false, &core.CompilerOptions{},
 		[]string{filepath.Join(tmpDir, "a.ts"), filepath.Join(tmpDir, "shared.ts")}, host)
@@ -627,7 +629,7 @@ func TestParseCache_RetainOnlyKeepsLivePrograms(t *testing.T) {
 		t.Helper()
 		want := tspath.NormalizePath(filepath.Join(tmpDir, name))
 		for _, sf := range p.GetSourceFiles() {
-			if tspath.NormalizePath(sf.FileName()) == want {
+			if tspath.NormalizePath(sf.FileName().AsString()) == want {
 				return sf
 			}
 		}
@@ -643,7 +645,7 @@ func TestParseCache_RetainOnlyKeepsLivePrograms(t *testing.T) {
 
 	// Sweep with both programs live: every program file keeps its pointer.
 	cache.RetainOnly([]*compiler.Program{progA, progB})
-	bText, _ := fs.ReadFile(filepath.Join(tmpDir, "b.ts"))
+	bText, _ := fs.ReadFile(pathutil.File(filepath.Join(tmpDir, "b.ts")))
 	bOpts := findFile(progB, "b.ts").ParseOptions()
 	if got := cache.acquire(bOpts, bText); got != findFile(progB, "b.ts") {
 		t.Fatal("live entry must keep its pointer across RetainOnly")
@@ -659,7 +661,7 @@ func TestParseCache_RetainOnlyKeepsLivePrograms(t *testing.T) {
 		t.Fatal("entry only referenced by the dropped program must be evicted")
 	}
 	assertParseEquivalent(t, oldB, newB)
-	sharedText, _ := fs.ReadFile(filepath.Join(tmpDir, "shared.ts"))
+	sharedText, _ := fs.ReadFile(pathutil.File(filepath.Join(tmpDir, "shared.ts")))
 	if got := cache.acquire(sharedA.ParseOptions(), sharedText); got != sharedA {
 		t.Fatal("entry referenced by a live program must survive the sweep")
 	}
@@ -765,7 +767,7 @@ func TestParseCache_PanicReleasesConcurrentParseMiss(t *testing.T) {
 	key := project.NewParseCacheKey(
 		opts,
 		xxh3.HashString128(text),
-		core.GetScriptKindFromFileName(fileName),
+		core.GetScriptKindFromFileName(pathutil.File(fileName)),
 	)
 	reference := new(ParseCache).acquire(opts, text)
 	cache := &ParseCache{}
@@ -970,7 +972,7 @@ func TestCachingHost_ReadFileFailureNotCached(t *testing.T) {
 	tmpDir := t.TempDir()
 	fs := newReadCountingFS(bundled.WrapFS(osvfs.FS())) // no cachedvfs: exists-cache would hide the file's later appearance
 	cache := &ParseCache{}
-	host := WithParseCache(CreateCompilerHost(tmpDir, fs), cache)
+	host := compilerhost.WithDirectory(WithParseCache(CreateCompilerHost(tmpDir, fs), cache), pathutil.Directory(tmpDir))
 
 	target := filepath.Join(tmpDir, "late.ts")
 	opts := testParseOpts(tspath.NormalizePath(target), ast.ExternalModuleIndicatorOptions{})
@@ -985,7 +987,7 @@ func TestCachingHost_ReadFileFailureNotCached(t *testing.T) {
 		t.Fatal("file appeared but GetSourceFile still returns nil (negative caching?)")
 	}
 	// Compiler hosts and vfs use TypeScript-normalized paths on every platform.
-	if got := fs.readCount(opts.FileName); got != 2 {
+	if got := fs.readCount(opts.FileName.AsString()); got != 2 {
 		t.Fatalf("failed reads must be retried, reads = %d, want 2", got)
 	}
 }

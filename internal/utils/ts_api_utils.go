@@ -168,7 +168,7 @@ func CollectAllCallSignatures(typeChecker *checker.Checker, t *checker.Type) []*
 }
 
 func IsSymbolFlagSet(symbol *ast.Symbol, flag ast.SymbolFlags) bool {
-	return symbol != nil && symbol.Flags&flag != 0
+	return symbol != nil && symbol.Flags()&flag != 0
 }
 
 func IsCallback(
@@ -178,7 +178,7 @@ func IsCallback(
 ) bool {
 	t := checker.Checker_getApparentType(typeChecker, typeChecker.GetTypeOfSymbolAtLocation(param, node))
 
-	if param.ValueDeclaration != nil && ast.IsParameterDeclaration(param.ValueDeclaration) && param.ValueDeclaration.AsParameterDeclaration().DotDotDotToken != nil {
+	if param.ValueDeclaration() != nil && ast.IsParameterDeclaration(param.ValueDeclaration()) && param.ValueDeclaration().AsParameterDeclaration().DotDotDotToken != nil {
 		t = checker.Checker_getIndexTypeOfType(typeChecker, t, checker.Checker_numberType(typeChecker))
 		if t == nil {
 			return false

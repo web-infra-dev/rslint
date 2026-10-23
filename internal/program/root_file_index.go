@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // RootFileIndex identifies files selected directly by a parsed TypeScript
@@ -22,7 +23,7 @@ type RootFileIndex struct {
 func NewRootFileIndex(fileNames []string, fsys vfs.FS) *RootFileIndex {
 	useCaseSensitive := true
 	if fsys != nil {
-		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
+		useCaseSensitive = fsys.CaseSensitivity().IsCaseSensitive()
 	}
 	exactRoots := make(map[string]struct{}, len(fileNames))
 	for _, rootFileName := range fileNames {
@@ -37,14 +38,14 @@ func NewRootFileIndex(fileNames []string, fsys vfs.FS) *RootFileIndex {
 }
 
 func rootFilePathID(filePath string, useCaseSensitive bool) string {
-	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", useCaseSensitive))
+	return string(pathutil.ToPath(tspath.NormalizePath(filePath), "", useCaseSensitive))
 }
 
 func rootFileCanonicalPathID(filePath string, fsys vfs.FS, useCaseSensitive bool) string {
 	filePath = tspath.NormalizePath(filePath)
 	if fsys != nil {
-		if realPath := fsys.Realpath(filePath); realPath != "" {
-			filePath = tspath.NormalizePath(realPath)
+		if realPath := fsys.Realpath(pathutil.Path(filePath)); realPath != "" {
+			filePath = tspath.NormalizePath(realPath.AsString())
 		}
 	}
 	return rootFilePathID(filePath, useCaseSensitive)

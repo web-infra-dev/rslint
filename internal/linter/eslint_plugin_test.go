@@ -24,6 +24,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func pluginRule(name string, opts []any, sev rule.DiagnosticSeverity) rule.ConfiguredRule {
@@ -1043,8 +1044,8 @@ func TestBuildEslintPluginFileInputsUsesPreparedPlan(t *testing.T) {
 		"native.ts": "export const native = 1;\n",
 		"plugin.ts": "export const plugin = 1;\n",
 	})
-	nativeFile := compilerProgram.GetSourceFile(paths["native.ts"])
-	pluginFile := compilerProgram.GetSourceFile(paths["plugin.ts"])
+	nativeFile := compilerProgram.GetSourceFile(pathutil.File(paths["native.ts"]))
+	pluginFile := compilerProgram.GetSourceFile(pathutil.File(paths["plugin.ts"]))
 	if nativeFile == nil || pluginFile == nil {
 		t.Fatalf("prepared plan fixtures are missing: native=%v plugin=%v", nativeFile != nil, pluginFile != nil)
 	}

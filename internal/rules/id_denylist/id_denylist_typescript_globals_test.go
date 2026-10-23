@@ -85,7 +85,7 @@ func TestConstructorNameRangeHandlesEscapedKeywordToken(t *testing.T) {
 	const source = `class C { constr\u0075ctor() {} }`
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/escaped-constructor.ts",
-		Path:     tspath.Path("/escaped-constructor.ts"),
+		PathKey:  tspath.PathKey("/escaped-constructor.ts"),
 	}, source, core.ScriptKindTS)
 	var constructor *ast.Node
 	var visit func(*ast.Node) bool

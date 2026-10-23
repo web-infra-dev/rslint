@@ -13,7 +13,7 @@ func TestEngineIsSharedAcrossRules(t *testing.T) {
 	const code = "setup();\nbeforeAll(connect);\ntest('works', run);"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/padding.ts",
-		Path:     "/padding.ts",
+		PathKey:  "/padding.ts",
 	}, code, core.ScriptKindTS)
 	cache := rule.NewFileCache()
 	ctx := rule.RuleContext{SourceFile: sourceFile}.WithFileCache(cache)

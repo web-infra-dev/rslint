@@ -89,7 +89,7 @@ func (ctx *RuleContext) IsGlobalScopeBinding(symbol *ast.Symbol, name string) bo
 		// source goal as the fallback, including the JS-only CommonJS wrapper.
 		sourceType := ctx.LanguageOptions.EffectiveSourceType()
 		if sourceType == "module" ||
-			(sourceType == "commonjs" && isJavaScriptSourceExtension(ctx.SourceFile.FileName())) {
+			(sourceType == "commonjs" && isJavaScriptSourceExtension(ctx.SourceFile.FileName().AsString())) {
 			return false
 		}
 	}
@@ -101,7 +101,7 @@ func (ctx *RuleContext) IsGlobalScopeBinding(symbol *ast.Symbol, name string) bo
 		local := locals[name]
 		// A named default export's export facet is stored under "default",
 		// while its paired local retains name in this table.
-		if local == symbol || (local != nil && local.ExportSymbol == symbol) {
+		if local == symbol || (local != nil && local.ExportSymbol() == symbol) {
 			return true
 		}
 	}

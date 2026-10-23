@@ -30,6 +30,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // newTestServer creates a minimal Server for handler unit tests.
@@ -1385,8 +1386,10 @@ func TestDocumentURIFromPath_WindowsDriveRoundTrip(t *testing.T) {
 	if uri != "file:///C:/Users/Test%20User/project/index.ts" {
 		t.Fatalf("documentURIFromPath(%q) = %q", filePath, uri)
 	}
-	if got := uriToPath(uri); got != uri.FileName() {
-		t.Fatalf("uriToPath(%q) = %q, want tsgo filename %q", uri, got, uri.FileName())
+	if got := uriToPath(uri); got != "c:/Users/Test User/project/index.ts" {
+		t.Fatalf("uriToPath(%q) = %q, want normalized drive spelling", uri, got)
+	} else if config.ExactPathID(got) != config.ExactPathID(uri.FileName().AsString()) {
+		t.Fatalf("rslint and TypeScript disagree on the identity of %q", uri)
 	}
 }
 
@@ -1661,8 +1664,8 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 					cfg,
 					target.File{
 						PathIdentity: config.PathIdentity{
-							Path:          targetPath,
-							CanonicalPath: targetPath,
+							Path:          targetPath.AsString(),
+							CanonicalPath: targetPath.AsString(),
 						},
 						ConfigDirectory: dir,
 					},
@@ -1700,22 +1703,24 @@ type exactCaseLSPProgramFS struct {
 	files map[string]string
 }
 
-func (fs *exactCaseLSPProgramFS) UseCaseSensitiveFileNames() bool { return false }
-func (fs *exactCaseLSPProgramFS) FileExists(filePath string) bool {
-	if _, ok := fs.files[tspath.NormalizePath(filePath)]; ok {
+func (fs *exactCaseLSPProgramFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
+}
+func (fs *exactCaseLSPProgramFS) FileExists(filePath tspath.RootedFilePath) bool {
+	if _, ok := fs.files[tspath.NormalizePath(filePath.AsString())]; ok {
 		return true
 	}
 	return fs.FS.FileExists(filePath)
 }
-func (fs *exactCaseLSPProgramFS) ReadFile(filePath string) (string, bool) {
-	if content, ok := fs.files[tspath.NormalizePath(filePath)]; ok {
+func (fs *exactCaseLSPProgramFS) ReadFile(filePath tspath.RootedFilePath) (string, bool) {
+	if content, ok := fs.files[tspath.NormalizePath(filePath.AsString())]; ok {
 		return content, true
 	}
 	return fs.FS.ReadFile(filePath)
 }
-func (fs *exactCaseLSPProgramFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
-	if _, ok := fs.files[filePath]; ok {
+func (fs *exactCaseLSPProgramFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
+	if _, ok := fs.files[filePath.AsString()]; ok {
 		return filePath
 	}
 	return fs.FS.Realpath(filePath)
@@ -1738,7 +1743,7 @@ func TestSourceFileForPath_RejectsCaseFoldedDifferentFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
 	}
-	if source := program.GetSourceFile(lower); source == nil || source.FileName() != upper {
+	if source := program.GetSourceFile(pathutil.File(lower)); source == nil || source.FileName().AsString() != upper {
 		t.Fatalf("fixture must exercise case-folded Program lookup, got %v", source)
 	}
 	if source := sourceFileForPath(program, lower, fsys); source != nil {
@@ -1770,8 +1775,8 @@ func TestSourceFileForPath_FindsProgramFileSymlinkFromRealTarget(t *testing.T) {
 	}
 	sourceName := ""
 	for _, sourceFile := range program.GetSourceFiles() {
-		if sourceFile.FileName() == linkedPath || sourceFile.FileName() == realTarget {
-			sourceName = sourceFile.FileName()
+		if sourceFile.FileName().AsString() == linkedPath || sourceFile.FileName().AsString() == realTarget {
+			sourceName = sourceFile.FileName().AsString()
 			break
 		}
 	}
@@ -1781,7 +1786,7 @@ func TestSourceFileForPath_FindsProgramFileSymlinkFromRealTarget(t *testing.T) {
 	if sourceName == realTarget {
 		t.Skip("compiler canonicalized the file symlink before Program lookup")
 	}
-	if source := sourceFileForPath(program, realTarget, fsys); source == nil || source.FileName() != sourceName {
+	if source := sourceFileForPath(program, realTarget, fsys); source == nil || source.FileName().AsString() != sourceName {
 		t.Fatalf("real target did not bind to Program source %q: %v", sourceName, source)
 	}
 }
@@ -1819,7 +1824,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	s := NewServer(&ServerOptions{
 		Cwd:                dir,
 		FS:                 fsys,
-		DefaultLibraryPath: bundled.LibPath(),
+		DefaultLibraryPath: bundled.LibPath().AsString(),
 	})
 	s.backgroundCtx = ctx
 	s.initializeParams = &lsproto.InitializeParams{}
@@ -1870,7 +1875,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	if !hasTypeInfo {
 		t.Fatal("expected source to have type information")
 	}
-	if got := lspFilesystemPathID(program.Options().ConfigFilePath, fsys); got != lspFilesystemPathID(secondConfig, fsys) {
+	if got := lspFilesystemPathID(program.Options().ConfigFilePath.AsString(), fsys); got != lspFilesystemPathID(secondConfig, fsys) {
 		t.Fatalf("expected first declared containing project %q, got %q", secondConfig, program.Options().ConfigFilePath)
 	}
 
@@ -1891,10 +1896,10 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	if !directHasTypeInfo {
 		t.Fatal("direct project lost type information")
 	}
-	if got := lspFilesystemPathID(directProgram.Options().ConfigFilePath, fsys); got != lspFilesystemPathID(firstConfig, fsys) {
+	if got := lspFilesystemPathID(directProgram.Options().ConfigFilePath.AsString(), fsys); got != lspFilesystemPathID(firstConfig, fsys) {
 		t.Fatalf("expected direct project %q to outrank importing project %q, got %q", firstConfig, importConfig, directProgram.Options().ConfigFilePath)
 	}
-	secondConfigID := tspath.ToPath(fsys.Realpath(secondConfig), "", fsys.UseCaseSensitiveFileNames())
+	secondConfigID := pathutil.ToPath(fsys.Realpath(pathutil.Path(secondConfig)).AsString(), "", fsys.CaseSensitivity().IsCaseSensitive())
 	if opened := s.session.Snapshot().ProjectCollection.ConfiguredProject(secondConfigID); opened != nil {
 		t.Fatal("lint-only custom tsconfig must not be added to the Session's permanent API-open project set")
 	}
@@ -1918,7 +1923,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	if err != nil {
 		t.Fatalf("get language service after speculative fix: %v", err)
 	}
-	if got := languageService.GetProgram().GetSourceFile(tspath.NormalizePath(sourcePath)).Text(); got != "export const value = 1;\n" {
+	if got := languageService.GetProgram().GetSourceFile(pathutil.File(tspath.NormalizePath(sourcePath))).Text(); got != "export const value = 1;\n" {
 		t.Fatalf("speculative fix polluted Session overlay: got %q", got)
 	}
 
@@ -1941,7 +1946,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	if gapHasTypeInfo {
 		t.Fatal("file outside every declared project must not have type information")
 	}
-	if gapProgram.GetSourceFile(tspath.NormalizePath(gapPath)) == nil {
+	if gapProgram.GetSourceFile(pathutil.File(tspath.NormalizePath(gapPath))) == nil {
 		t.Fatal("gap fallback program must contain the open file")
 	}
 }
@@ -1970,7 +1975,7 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 	s := NewServer(&ServerOptions{
 		Cwd:                dir,
 		FS:                 fsys,
-		DefaultLibraryPath: bundled.LibPath(),
+		DefaultLibraryPath: bundled.LibPath().AsString(),
 	})
 	s.backgroundCtx = ctx
 	s.initializeParams = &lsproto.InitializeParams{}
@@ -2025,7 +2030,7 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 	if !hasTypeInfo || sourceFile == nil {
 		t.Fatal("Session-owned configured source lost type information")
 	}
-	if got := lspFilesystemPathID(program.Options().ConfigFilePath, fsys); got != lspFilesystemPathID(configPath, fsys) {
+	if got := lspFilesystemPathID(program.Options().ConfigFilePath.AsString(), fsys); got != lspFilesystemPathID(configPath, fsys) {
 		t.Fatalf("selected Program config = %q, want %q", program.Options().ConfigFilePath, configPath)
 	}
 
@@ -2180,11 +2185,11 @@ type realpathAliasLSPTestFS struct {
 	realRoot  string
 }
 
-func (fs *realpathAliasLSPTestFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
+func (fs *realpathAliasLSPTestFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
 	aliasRoot := tspath.NormalizePath(fs.aliasRoot)
-	if relative, within := config.RelativePathWithinConfigRoot(filePath, aliasRoot, true); within {
-		return tspath.ResolvePath(tspath.NormalizePath(fs.realRoot), relative)
+	if relative, within := config.RelativePathWithinConfigRoot(filePath.AsString(), aliasRoot, true); within {
+		return pathutil.Path(tspath.ResolvePath(tspath.NormalizePath(fs.realRoot), relative))
 	}
 	return fs.FS.Realpath(filePath)
 }
@@ -2196,7 +2201,7 @@ func TestRunConfiguredLintForContent_OverlaysLexicalTargetIntoDefaultExcludedRea
 			name = "Windows drive aliases"
 		}
 		t.Run(name, func(t *testing.T) {
-			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 			if portableWindows {
 				root = "C:/Repo"
 			}
@@ -2241,7 +2246,7 @@ func TestRunConfiguredLintForContent_OverlaysLexicalTargetIntoDefaultExcludedRea
 
 			editorOverlay := s.currentEditorOverlayFSForTarget(uri, lspConfigTarget(aliasFile, aliasRoot, s.fs))
 			for _, filePath := range []string{aliasFile, realFile} {
-				if got, ok := editorOverlay.ReadFile(filePath); !ok || got != openContent {
+				if got, ok := editorOverlay.ReadFile(pathutil.File(filePath)); !ok || got != openContent {
 					t.Fatalf("editor overlay read %q = %q, %v; want open content", filePath, got, ok)
 				}
 			}
@@ -2636,9 +2641,11 @@ type caseInsensitiveLSPTestFS struct {
 	mockFS
 }
 
-func (f *caseInsensitiveLSPTestFS) UseCaseSensitiveFileNames() bool { return false }
-func (f *caseInsensitiveLSPTestFS) Realpath(filePath string) string {
-	return strings.ToLower(tspath.NormalizePath(filePath))
+func (f *caseInsensitiveLSPTestFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
+}
+func (f *caseInsensitiveLSPTestFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	return pathutil.Path(strings.ToLower(tspath.NormalizePath(filePath.AsString())))
 }
 
 func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.T) {
@@ -2686,7 +2693,7 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 	s := newTestServer()
 	s.cwd = cwd
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	caseSensitive := s.fs.UseCaseSensitiveFileNames()
+	caseSensitive := s.fs.CaseSensitivity().IsCaseSensitive()
 	cfg := config.RslintConfig{
 		// Global ignores entry: hides everything under lib/.
 		{Ignores: []string{"lib/**"}},
@@ -2732,7 +2739,7 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 			if projectRequests != 1 || len(diags) != 1 || diags[0].RuleName != "no-debugger" {
 				t.Fatalf("non-ignored file requested projects %d times and produced diagnostics: %+v", projectRequests, diags)
 			}
-			if tspath.ToPath(diags[0].FilePath, "", caseSensitive) != tspath.ToPath(filePath, "", caseSensitive) {
+			if pathutil.ToPath(diags[0].FilePath, "", caseSensitive) != pathutil.ToPath(filePath, "", caseSensitive) {
 				t.Fatalf("diagnostic path = %q, want %q", diags[0].FilePath, filePath)
 			}
 		})
@@ -2947,7 +2954,7 @@ func TestRunConfiguredLintForContent_VirtualProjectDirectoryAliases(t *testing.T
 		for _, ownerAlias := range []bool{false, true} {
 			for _, documentAlias := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/ownerAlias=%v/documentAlias=%v", selector, ownerAlias, documentAlias), func(t *testing.T) {
-					root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+					root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 					physical := tspath.ResolvePath(root, "real")
 					if err := os.MkdirAll(tspath.ResolvePath(physical, ".git"), 0o755); err != nil {
 						t.Fatal(err)
@@ -3018,7 +3025,7 @@ func TestRunConfiguredLintForContent_VirtualProjectDirectoryAliases(t *testing.T
 func TestEditorOverlayKeepsMovedTargetAndIndependentAliases(t *testing.T) {
 	for _, replacementExists := range []bool{false, true} {
 		t.Run(fmt.Sprintf("replacementExists=%v", replacementExists), func(t *testing.T) {
-			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 			first, replacement := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "replacement")
 			for _, directory := range []string{first, tspath.ResolvePath(replacement, "virtual/deep")} {
 				if err := os.MkdirAll(directory, 0o755); err != nil {
@@ -3061,24 +3068,24 @@ func TestEditorOverlayKeepsMovedTargetAndIndependentAliases(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, file := range []string{path, target.CanonicalPath, tspath.ResolvePath(owner, "virtual/deep/new.ts")} {
-				if text, ok := overlay.ReadFile(file); !ok || text != strings.TrimPrefix(content, utils.BOM) {
+				if text, ok := overlay.ReadFile(pathutil.File(file)); !ok || text != strings.TrimPrefix(content, utils.BOM) {
 					t.Fatalf("selected alias read %q = %q, %v", file, text, ok)
 				}
-				if !overlay.FileExists(file) || overlay.Stat(file) == nil || overlay.Stat(file).Size() != int64(len(strings.TrimPrefix(content, utils.BOM))) || !utils.SourceHasBOM(overlay, file) || overlay.Realpath(file) != target.CanonicalPath {
+				if !overlay.FileExists(pathutil.File(file)) || overlay.Stat(pathutil.Path(file)) == nil || overlay.Stat(pathutil.Path(file)).Size() != int64(len(strings.TrimPrefix(content, utils.BOM))) || !utils.SourceHasBOM(overlay, file) || overlay.Realpath(pathutil.Path(file)).AsString() != target.CanonicalPath {
 					t.Fatalf("selected alias metadata changed after retargeting: %q", file)
 				}
-				if !overlay.DirectoryExists(tspath.GetDirectoryPath(file)) || !slices.Contains(overlay.GetAccessibleEntries(tspath.GetDirectoryPath(file)).Files, "new.ts") {
+				if !overlay.DirectoryExists(pathutil.Directory(tspath.GetDirectoryPath(file))) || !slices.Contains(overlay.GetAccessibleEntries(pathutil.Directory(tspath.GetDirectoryPath(file))).Files, "new.ts") {
 					t.Fatalf("selected buffer disappeared from alias directory: %q", file)
 				}
 			}
 			dependencyPath := tspath.ResolvePath(alternate, "virtual/deep/dependency.ts")
-			if text, ok := overlay.ReadFile(dependencyPath); !ok || text != strings.TrimPrefix(dependencyContent, utils.BOM) || !overlay.FileExists(dependencyPath) || overlay.Stat(dependencyPath) == nil || !utils.SourceHasBOM(overlay, dependencyPath) || overlay.Realpath(dependencyPath) != tspath.ResolvePath(replacement, "virtual/deep/dependency.ts") {
+			if text, ok := overlay.ReadFile(pathutil.File(dependencyPath)); !ok || text != strings.TrimPrefix(dependencyContent, utils.BOM) || !overlay.FileExists(pathutil.File(dependencyPath)) || overlay.Stat(pathutil.Path(dependencyPath)) == nil || !utils.SourceHasBOM(overlay, dependencyPath) || overlay.Realpath(pathutil.Path(dependencyPath)).AsString() != tspath.ResolvePath(replacement, "virtual/deep/dependency.ts") {
 				t.Fatalf("independent dependency alias lost its own ancestry: %q, %v", text, ok)
 			}
-			if text, ok := overlay.ReadFile(tspath.ResolvePath(moved, "virtual/deep/other.ts")); !ok || text != "other disk" {
+			if text, ok := overlay.ReadFile(pathutil.File(tspath.ResolvePath(moved, "virtual/deep/other.ts"))); !ok || text != "other disk" {
 				t.Fatalf("other disk file was redirected to the selected target's old root: %q, %v", text, ok)
 			}
-			entries := overlay.GetAccessibleEntries(moved)
+			entries := overlay.GetAccessibleEntries(pathutil.Directory(moved))
 			if slices.Contains(entries.Files, "first-only.ts") || !slices.Contains(entries.Files, "replacement-only.ts") || !slices.Contains(entries.Directories, "virtual") {
 				t.Fatalf("directory projection mixed disk roots or lost the frozen buffer: %+v", entries)
 			}
@@ -3091,7 +3098,9 @@ type sharedEditorEntriesFS struct {
 	entries vfs.Entries
 }
 
-func (fs *sharedEditorEntriesFS) GetAccessibleEntries(string) vfs.Entries { return fs.entries }
+func (fs *sharedEditorEntriesFS) GetAccessibleEntries(tspath.RootedDirectoryPath) vfs.Entries {
+	return fs.entries
+}
 
 func TestEditorOverlayAliasEntriesDoNotMutateSharedBacking(t *testing.T) {
 	files, directories := make([]string, 16), make([]string, 16)

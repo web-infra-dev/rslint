@@ -83,11 +83,11 @@ func isAsyncFunctionReference(ctx rule.RuleContext, node *ast.Node) bool {
 	}
 
 	symbol := ctx.Refs.Resolve(node)
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	if symbol == nil || len(symbol.Declarations()) != 1 {
 		return false
 	}
 
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if declaration == nil ||
 		(declaration.Kind != ast.KindFunctionDeclaration &&
 			declaration.Kind != ast.KindFunctionExpression) {

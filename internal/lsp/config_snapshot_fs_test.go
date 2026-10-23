@@ -2,6 +2,8 @@ package lsp
 
 import (
 	"fmt"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"testing"
 )
 
@@ -10,13 +12,13 @@ type caseInsensitiveConfigSnapshotFS struct {
 	realpathCalls int
 }
 
-func (fsys *caseInsensitiveConfigSnapshotFS) UseCaseSensitiveFileNames() bool {
-	return false
+func (fsys *caseInsensitiveConfigSnapshotFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
 }
 
-func (fsys *caseInsensitiveConfigSnapshotFS) Realpath(filePath string) string {
+func (fsys *caseInsensitiveConfigSnapshotFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
 	fsys.realpathCalls++
-	return fmt.Sprintf("%s#%d", filePath, fsys.realpathCalls)
+	return pathutil.Path(fmt.Sprintf("%s#%d", filePath, fsys.realpathCalls))
 }
 
 func TestConfigSnapshotFSCaseInsensitiveRealpathIdentity(t *testing.T) {

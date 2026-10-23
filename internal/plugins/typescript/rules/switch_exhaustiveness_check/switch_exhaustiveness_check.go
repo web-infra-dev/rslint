@@ -163,7 +163,7 @@ func getSwitchMetadata(
 
 	symbolName := ""
 	if sym := discriminantType.Symbol(); sym != nil {
-		symbolName = sym.Name
+		symbolName = sym.Name()
 	}
 
 	containsNonLiteralType := doesTypeContainNonLiteralType(discriminantType)
@@ -338,7 +338,7 @@ func checkSwitchExhaustive(
 		if utils.IsTypeFlagSet(t, checker.TypeFlagsESSymbolLike) {
 			name := ""
 			if sym := t.Symbol(); sym != nil {
-				name = sym.Name
+				name = sym.Name()
 			}
 			parts[i] = "typeof " + name
 		} else {
@@ -473,7 +473,7 @@ func fixSwitch(
 		missingBranchName := ""
 		hasMissingBranchName := false
 		if sym := missingBranchType.Symbol(); sym != nil {
-			missingBranchName = sym.Name
+			missingBranchName = sym.Name()
 			hasMissingBranchName = true
 		}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type gitignoreReadSpyFS struct {
@@ -22,13 +23,13 @@ type gitignoreReadSpyFS struct {
 	directories []string
 }
 
-func (fsys *gitignoreReadSpyFS) ReadFile(path string) (string, bool) {
-	fsys.reads = append(fsys.reads, tspath.NormalizePath(path))
+func (fsys *gitignoreReadSpyFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	fsys.reads = append(fsys.reads, tspath.NormalizePath(path.AsString()))
 	return fsys.FS.ReadFile(path)
 }
 
-func (fsys *gitignoreReadSpyFS) GetAccessibleEntries(path string) vfs.Entries {
-	fsys.directories = append(fsys.directories, tspath.NormalizePath(path))
+func (fsys *gitignoreReadSpyFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	fsys.directories = append(fsys.directories, tspath.NormalizePath(path.AsString()))
 	return fsys.FS.GetAccessibleEntries(path)
 }
 
@@ -44,7 +45,7 @@ func gitPolicyFixture(t *testing.T, files map[string]string) string {
 			t.Fatal(err)
 		}
 	}
-	return tspath.NormalizePath(osvfs.FS().Realpath(root))
+	return tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(root)).AsString())
 }
 
 func gitPolicyMatcher(t *testing.T, entries RslintConfig, owner string, fsys vfs.FS, policy *GitPolicy) TargetMatcher {
@@ -497,8 +498,10 @@ func TestGitPolicyOnlyWalksSuppliedDirectoryRootsAndExactChains(t *testing.T) {
 
 type gitPolicyNoRealpathFS struct{ vfs.FS }
 
-func (fsys gitPolicyNoRealpathFS) Realpath(string) string { return "" }
-func (fsys gitPolicyNoRealpathFS) GetAccessibleEntries(path string) vfs.Entries {
+func (fsys gitPolicyNoRealpathFS) Realpath(tspath.RootedPath) tspath.RootedPath {
+	return ""
+}
+func (fsys gitPolicyNoRealpathFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
 	entries := fsys.FS.GetAccessibleEntries(path)
 	entries.Symlinks = nil
 	return entries
@@ -520,14 +523,24 @@ type gitPolicyVolumeRootFS struct {
 	root string
 }
 
-func (gitPolicyVolumeRootFS) Stat(string) vfs.FileInfo { return nil }
+func (gitPolicyVolumeRootFS) Stat(tspath.RootedPath) vfs.FileInfo {
+	return nil
+}
 
-func (fsys gitPolicyVolumeRootFS) UseCaseSensitiveFileNames() bool { return false }
-func (fsys gitPolicyVolumeRootFS) DirectoryExists(string) bool     { return false }
-func (fsys gitPolicyVolumeRootFS) FileExists(string) bool          { return false }
-func (fsys gitPolicyVolumeRootFS) Realpath(path string) string     { return path }
-func (fsys gitPolicyVolumeRootFS) ReadFile(path string) (string, bool) {
-	if path == tspath.CombinePaths(fsys.root, ".gitignore") {
+func (fsys gitPolicyVolumeRootFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
+}
+func (fsys gitPolicyVolumeRootFS) DirectoryExists(tspath.RootedDirectoryPath) bool {
+	return false
+}
+func (fsys gitPolicyVolumeRootFS) FileExists(tspath.RootedFilePath) bool {
+	return false
+}
+func (fsys gitPolicyVolumeRootFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	return path
+}
+func (fsys gitPolicyVolumeRootFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if path.AsString() == tspath.CombinePaths(fsys.root, ".gitignore") {
 		return "dist/\n", true
 	}
 	return "", false

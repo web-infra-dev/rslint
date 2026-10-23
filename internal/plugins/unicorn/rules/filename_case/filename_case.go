@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed filename_case.schema.json
@@ -646,7 +647,7 @@ func getPathSegmentsWithTspath(fileName string, cwd string) []string {
 	if (tspath.GetRootLength(cwd) > 0) != (tspath.GetRootLength(resolved) > 0) {
 		return []string{basename}
 	}
-	relative := tspath.GetRelativePathFromDirectory(cwd, resolved, tspath.ComparePathsOptions{
+	relative := pathutil.GetRelativePathFromDirectory(cwd, resolved, pathutil.ComparePathsOptions{
 		CurrentDirectory:          cwd,
 		UseCaseSensitiveFileNames: true,
 	})
@@ -689,7 +690,7 @@ var FilenameCaseRule = rule.Rule{
 		if fileName == "" {
 			return nil
 		}
-		pathSegments := getPathSegments(fileName, ctx.ProcessCurrentDirectory())
+		pathSegments := getPathSegments(fileName.AsString(), ctx.ProcessCurrentDirectory())
 		basename := pathSegments[len(pathSegments)-1]
 		// Skip ESLint's stdin / inline-source virtual filenames.
 		if basename == "<input>" || basename == "<text>" {

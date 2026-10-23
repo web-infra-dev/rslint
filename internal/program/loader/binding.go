@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // LoadResult is the complete Program input for one lint generation. It carries
@@ -30,8 +31,8 @@ type LoadResult struct {
 func authoritativePath(filePath string, fsys vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
 	if fsys != nil {
-		if realPath := fsys.Realpath(filePath); realPath != "" {
-			return tspath.NormalizePath(realPath)
+		if realPath := fsys.Realpath(pathutil.Path(filePath)); realPath != "" {
+			return tspath.NormalizePath(realPath.AsString())
 		}
 	}
 	return filePath
@@ -173,10 +174,10 @@ func regularFileNameFromEntries(entries vfs.Entries, fileName string, useCaseSen
 	if entries.Symlinks == nil {
 		return "", false
 	}
-	canonicalFileName := tspath.GetCanonicalFileName(fileName, useCaseSensitive)
+	canonicalFileName := pathutil.GetCanonicalFileName(fileName, useCaseSensitive)
 	match := ""
 	for _, entryName := range entries.Files {
-		if tspath.GetCanonicalFileName(entryName, useCaseSensitive) != canonicalFileName {
+		if pathutil.GetCanonicalFileName(entryName, useCaseSensitive) != canonicalFileName {
 			continue
 		}
 		if match != "" && match != entryName {
@@ -221,7 +222,7 @@ func (index *programFileIndex) canonicalSourcePathIDs(sourcePaths []string) []st
 	sort.Strings(directoryIDs)
 	pendingIdentities := make([]programDirectoryIdentity, len(directoryIDs))
 	hasPendingIdentity := make([]bool, len(directoryIDs))
-	useCaseSensitive := index.fsys.UseCaseSensitiveFileNames()
+	useCaseSensitive := index.fsys.CaseSensitivity().IsCaseSensitive()
 	work := core.NewWorkGroup(index.singleThreaded)
 	queueSource := func(sourceIndex int, directory programDirectoryIdentity) {
 		work.Queue(func() {
@@ -259,7 +260,7 @@ func (index *programFileIndex) canonicalSourcePathIDs(sourcePaths []string) []st
 				directoryPath := directoryPathByID[directoryID]
 				directory = programDirectoryIdentity{
 					canonicalPath: authoritativePath(directoryPath, index.fsys),
-					entries:       index.fsys.GetAccessibleEntries(directoryPath),
+					entries:       index.fsys.GetAccessibleEntries(pathutil.Directory(directoryPath)),
 				}
 				pendingIdentities[directoryIndex] = directory
 				hasPendingIdentity[directoryIndex] = true
@@ -300,7 +301,7 @@ func (index *programFileIndex) buildPrograms(programIndexes []int) {
 			continue
 		}
 		for _, sourceFile := range program.GetSourceFiles() {
-			sourcePath := tspath.NormalizePath(sourceFile.FileName())
+			sourcePath := tspath.NormalizePath(sourceFile.FileName().AsString())
 			sourcePathID := exactPathID(sourcePath)
 			canonicalID, known := index.canonicalBySourcePath[sourcePathID]
 			sourceIndex := -1
@@ -358,9 +359,9 @@ func groupUnboundTargets(
 	}
 
 	groups := make([][]target.File, 0, 1)
-	keysByGroup := make([]map[tspath.Path]struct{}, 0, 1)
+	keysByGroup := make([]map[tspath.PathKey]struct{}, 0, 1)
 	for _, target := range targets {
-		key := tspath.ToPath(target.Path, currentDirectory, useCaseSensitive)
+		key := pathutil.ToPath(target.Path, currentDirectory, useCaseSensitive)
 		groupIndex := -1
 		for i, keys := range keysByGroup {
 			if _, exists := keys[key]; !exists {
@@ -371,7 +372,7 @@ func groupUnboundTargets(
 		if groupIndex == -1 {
 			groupIndex = len(groups)
 			groups = append(groups, nil)
-			keysByGroup = append(keysByGroup, make(map[tspath.Path]struct{}))
+			keysByGroup = append(keysByGroup, make(map[tspath.PathKey]struct{}))
 		}
 		groups[groupIndex] = append(groups[groupIndex], target)
 		keysByGroup[groupIndex][key] = struct{}{}
@@ -412,7 +413,7 @@ func (s *Session) appendCompatibilityPrograms(
 	fsys := s.FS()
 	useCaseSensitive := true
 	if fsys != nil {
-		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
+		useCaseSensitive = fsys.CaseSensitivity().IsCaseSensitive()
 	}
 	for _, group := range groupUnboundTargets(targets, currentDirectory, useCaseSensitive) {
 		rootFileNames := make([]string, 0, len(group))
@@ -445,8 +446,8 @@ func (s *Session) appendCompatibilityPrograms(
 				return fmt.Errorf("program did not contain lint target %q", target.Path)
 			}
 			sourcePath := sourceFile.FileName()
-			binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath)
-			storeSourceTargetMapping(binding.LintTargetBySourcePath, sourcePath, target.CanonicalPath, target)
+			binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath.AsString())
+			storeSourceTargetMapping(binding.LintTargetBySourcePath, sourcePath.AsString(), target.CanonicalPath, target)
 		}
 	}
 	return nil
@@ -487,7 +488,7 @@ func allRootsSupportedByParser(targets []target.File, useCaseSensitive bool) boo
 		if !tspath.HasExtension(target.Path) {
 			return false
 		}
-		fileName := tspath.GetCanonicalFileName(target.Path, useCaseSensitive)
+		fileName := pathutil.GetCanonicalFileName(target.Path, useCaseSensitive)
 		supported := false
 		for _, extensions := range supportedExtensions {
 			if tspath.FileExtensionIsOneOf(fileName, extensions) {
@@ -529,7 +530,7 @@ func (s *Session) appendRootPrograms(
 		files := rootProgram.SourceFiles()
 		targets := make([]string, len(files))
 		for index, file := range files {
-			targets[index] = file.FileName()
+			targets[index] = file.FileName().AsString()
 		}
 		binding.TargetsByProgram = append(binding.TargetsByProgram, targets)
 	}
@@ -551,7 +552,7 @@ func (s *Session) LoadCLI(
 	binding, unbound := s.bindTargetsToProjects(set, plan, singleThreaded)
 	useCaseSensitive := true
 	if fsys := s.FS(); fsys != nil {
-		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
+		useCaseSensitive = fsys.CaseSensitivity().IsCaseSensitive()
 	}
 	if !allRootsSupportedByParser(unbound, useCaseSensitive) {
 		if err := s.appendCompatibilityPrograms(&binding, unbound, currentDirectory, singleThreaded); err != nil {

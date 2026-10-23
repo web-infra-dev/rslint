@@ -35,7 +35,7 @@ var NamedRule = rule.Rule{
 			message := fmt.Sprintf("%s not found in '%s'", name.Text(), source.Text())
 			if len(path) > 1 {
 				for i, file := range path {
-					if relative, err := filepath.Rel(filepath.Dir(ctx.SourceFile.FileName()), file); err == nil {
+					if relative, err := filepath.Rel(filepath.Dir(ctx.SourceFile.FileName().AsString()), file); err == nil {
 						path[i] = relative
 					}
 				}

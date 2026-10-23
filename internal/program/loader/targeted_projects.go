@@ -9,10 +9,10 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type projectTargetBinding struct {
@@ -164,7 +164,7 @@ func (execution *targetedProjectExecution) rootFileIndex(index int) (*lintprogra
 		return nil, err
 	}
 	slot.rootFilesOnce.Do(func() {
-		slot.rootFiles = lintprogram.NewRootFileIndex(slot.config.FileNames(), execution.session.FS())
+		slot.rootFiles = lintprogram.NewRootFileIndex(pathutil.Strings(slot.config.FileNames()), execution.session.FS())
 	})
 	return slot.rootFiles, nil
 }
@@ -247,14 +247,14 @@ func (execution *targetedProjectExecution) predictedProjectPosition(
 ) int {
 	useCaseSensitive := true
 	if fsys := execution.session.FS(); fsys != nil {
-		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
+		useCaseSensitive = fsys.CaseSensitivity().IsCaseSensitive()
 	}
-	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: useCaseSensitive}
+	options := pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: useCaseSensitive}
 	bestPosition := -1
 	bestDirectoryLength := -1
 	for position, projectIndex := range orderedProjectIndexes {
 		directory := execution.plan.specs[projectIndex].programCwd
-		if !tspath.ContainsPath(directory, target.Path, options) {
+		if !pathutil.ContainsPath(directory, target.Path, options) {
 			continue
 		}
 		if len(directory) > bestDirectoryLength {
@@ -432,7 +432,7 @@ func (s *Session) executeTargetProjectPlan(
 	if request.Scope == ActiveOwners {
 		roots := make([][]string, len(plan.specs))
 		for index := range roots {
-			roots[index] = execution.slots[index].config.FileNames()
+			roots[index] = pathutil.Strings(execution.slots[index].config.FileNames())
 		}
 		// The eager binder's exact identity ranking is also valid before
 		// construction. Copy the groups because ranking filters its input slice.

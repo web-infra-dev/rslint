@@ -403,7 +403,7 @@ const assertion = /* before value */ 'x' as /* before type */ 'x';`
 	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
 		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 			FileName: "/prefer-as-const.ts",
-			Path:     "/prefer-as-const.ts",
+			PathKey:  "/prefer-as-const.ts",
 		}, source, core.ScriptKindTS)
 		comments := rule.NewCommentStore(sourceFile)
 		var diagnostics []rule.RuleDiagnostic

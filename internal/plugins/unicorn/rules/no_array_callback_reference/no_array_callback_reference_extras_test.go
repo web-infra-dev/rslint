@@ -481,7 +481,7 @@ func TestNoArrayCallbackReferenceEditDemand(t *testing.T) {
 			for _, demand := range []rule.EditDemand{rule.EditDemandAll, rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion} {
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program: lintprogram.NewFromCompiler(program), File: file.FileName(),
+					Program: lintprogram.NewFromCompiler(program), File: file.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: no_array_callback_reference.NoArrayCallbackReferenceRule.Name, Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -558,7 +558,7 @@ func TestNoArrayCallbackReferenceWithoutTypeChecker(t *testing.T) {
 			}
 			count := 0
 			linter.LintSingleFile(linter.LintSingleFileOptions{
-				Program: lintprogram.NewFromCompiler(program), File: file.FileName(),
+				Program: lintprogram.NewFromCompiler(program), File: file.FileName().AsString(),
 				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{Name: no_array_callback_reference.NoArrayCallbackReferenceRule.Name, Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {

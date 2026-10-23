@@ -64,7 +64,7 @@ func (m *ExportMeta) Deprecation(ctx rule.RuleContext) *Deprecation {
 }
 
 func exportDocumentationAvailable(ctx rule.RuleContext, file *ast.SourceFile) bool {
-	return exportExtensionAllowed(ctx.Settings, file.FileName()) && ctx.Program().IsValid() &&
+	return exportExtensionAllowed(ctx.Settings, file.FileName().AsString()) && ctx.Program().IsValid() &&
 		len(ctx.Program().SyntacticDiagnostics(context.Background(), file)) == 0
 }
 

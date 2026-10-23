@@ -37,7 +37,11 @@ replace (
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/dlclark/regexp2 v1.12.0
 	github.com/fatih/color v1.19.0
+	github.com/fxamacker/cbor/v2 v2.9.0
+	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68
+	github.com/google/go-cmp v0.7.0
 	github.com/microsoft/TypeScript/tsc/shim/api/encoder v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/ast v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/binder v0.0.0
@@ -69,28 +73,21 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	github.com/zeebo/xxh3 v1.1.0
-	golang.org/x/sync v0.22.0
-	golang.org/x/sys v0.47.0
-	golang.org/x/tools v0.49.0
+	golang.org/x/sync v0.23.0
+	golang.org/x/sys v0.48.0
+	golang.org/x/text v0.42.0
+	golang.org/x/tools v0.50.0
 	gotest.tools/v3 v3.5.2
 )
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/klauspost/compress v1.19.0 // indirect
+	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
-	github.com/mackerelio/go-osstat v0.2.7 // indirect
+	github.com/mackerelio/go-osstat v0.2.8 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/microsoft/TypeScript/tsc v0.0.0-20261019203854-3e9236361fa9 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/mod v0.39.0 // indirect
-)
-
-require (
-	github.com/dlclark/regexp2 v1.12.0
-	github.com/fxamacker/cbor/v2 v2.9.0
-	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68
-	github.com/microsoft/TypeScript/tsc v0.0.0-20260904213532-1f70213d4922 // indirect
-	golang.org/x/text v0.41.0
+	golang.org/x/mod v0.41.0 // indirect
 )

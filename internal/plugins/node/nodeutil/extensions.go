@@ -50,7 +50,7 @@ func importExtensionMapping(ctx rule.RuleContext, options map[string]any) extens
 			return mapping
 		}
 	}
-	if mapping, ok := compilerExtensions(tsconfig.FindNearest(p, ctx.SourceFile.FileName())); ok {
+	if mapping, ok := compilerExtensions(tsconfig.FindNearest(p, ctx.SourceFile.FileName().AsString())); ok {
 		return mapping
 	}
 	return preservedExtensions
@@ -101,7 +101,7 @@ func configuredExtensions(p *program.Program, cwd string, options map[string]any
 // ImportExtension maps a target's source extension to the emitted import
 // extension. Like upstream, JavaScript importers keep the original extension.
 func ImportExtension(ctx rule.RuleContext, extension string) string {
-	if tspath.HasTSFileExtension(ctx.SourceFile.FileName()) {
+	if tspath.HasTSFileExtension(ctx.SourceFile.FileName().AsString()) {
 		if emitted, ok := importExtensionMapping(ctx, nil).forward[extension]; ok {
 			return emitted
 		}

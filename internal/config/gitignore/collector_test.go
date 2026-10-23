@@ -5,6 +5,7 @@ package gitignore
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 	"slices"
 	"sync"
@@ -410,34 +411,36 @@ type readerTestFS struct {
 	beforeMarker  func(string)
 }
 
-func (fsys *readerTestFS) UseCaseSensitiveFileNames() bool { return fsys.caseSensitive }
-func (fsys *readerTestFS) DirectoryExists(path string) bool {
-	if fsys.beforeMarker != nil {
-		fsys.beforeMarker(path)
-	}
-	fsys.mu.Lock()
-	defer fsys.mu.Unlock()
-	fsys.markerCalls[path]++
-	return fsys.directories[path]
+func (fsys *readerTestFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(fsys.caseSensitive)
 }
-func (fsys *readerTestFS) FileExists(path string) bool {
+func (fsys *readerTestFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
 	if fsys.beforeMarker != nil {
-		fsys.beforeMarker(path)
+		fsys.beforeMarker(path.AsString())
 	}
 	fsys.mu.Lock()
 	defer fsys.mu.Unlock()
-	fsys.markerCalls[path]++
-	_, ok := fsys.files[path]
+	fsys.markerCalls[path.AsString()]++
+	return fsys.directories[path.AsString()]
+}
+func (fsys *readerTestFS) FileExists(path tspath.RootedFilePath) bool {
+	if fsys.beforeMarker != nil {
+		fsys.beforeMarker(path.AsString())
+	}
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+	fsys.markerCalls[path.AsString()]++
+	_, ok := fsys.files[path.AsString()]
 	return ok
 }
-func (fsys *readerTestFS) ReadFile(path string) (string, bool) {
+func (fsys *readerTestFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	if fsys.beforeRead != nil {
-		fsys.beforeRead(path)
+		fsys.beforeRead(path.AsString())
 	}
 	fsys.mu.Lock()
 	defer fsys.mu.Unlock()
-	fsys.readCalls[path]++
-	content, ok := fsys.files[path]
+	fsys.readCalls[path.AsString()]++
+	content, ok := fsys.files[path.AsString()]
 	return content, ok
 }
 

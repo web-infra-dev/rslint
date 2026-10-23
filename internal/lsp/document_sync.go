@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // lintDebounceDelay is how long to wait after the last keystroke before
@@ -40,7 +41,7 @@ func (s *Server) handleDidOpen(ctx context.Context, params *lsproto.DidOpenTextD
 
 	s.documents[uri] = content
 	if s.lintPrograms != nil {
-		existedOnDisk := s.fs != nil && s.fs.FileExists(uriToPath(uri))
+		existedOnDisk := s.fs != nil && s.fs.FileExists(pathutil.File(uriToPath(uri)))
 		s.lintPrograms.DidOpen(uri, content, existedOnDisk)
 	}
 

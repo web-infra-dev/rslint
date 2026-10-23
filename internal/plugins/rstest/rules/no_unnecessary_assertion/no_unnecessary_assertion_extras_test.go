@@ -17,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed testdata/types.txtar
@@ -321,7 +322,7 @@ func TestTypeCapabilities(t *testing.T) {
 	}
 	tc, done := program.GetTypeChecker(t.Context())
 	defer done()
-	file := program.GetSourceFile("probe.ts")
+	file := program.GetSourceFile(tspath.ToRootedFilePath("probe.ts", pathutil.Directory(root.Dir)))
 	if file == nil {
 		t.Fatal("missing probe.ts")
 	}
@@ -385,14 +386,14 @@ func TestTypeCapabilities(t *testing.T) {
 					name = name.Expression()
 				}
 				symbol := tc.GetSymbolAtLocation(name)
-				if symbol == nil || len(symbol.Declarations) == 0 {
+				if symbol == nil || len(symbol.Declarations()) == 0 {
 					t.Fatalf("%s: symbol unavailable", text)
 				}
-				source := ast.GetSourceFileOfNode(symbol.Declarations[0])
-				if text == "ambient()" && !strings.HasSuffix(source.FileName(), "/globals.d.ts") {
+				source := ast.GetSourceFileOfNode(symbol.Declarations()[0])
+				if text == "ambient()" && !strings.HasSuffix(source.FileName().AsString(), "/globals.d.ts") {
 					t.Fatal("ambient symbol did not resolve to globals.d.ts")
 				}
-				if text == "NaN" && !strings.Contains(source.FileName(), "/lib.es5.d.ts") {
+				if text == "NaN" && !strings.Contains(source.FileName().AsString(), "/lib.es5.d.ts") {
 					t.Fatal("NaN did not resolve to default lib")
 				}
 			}

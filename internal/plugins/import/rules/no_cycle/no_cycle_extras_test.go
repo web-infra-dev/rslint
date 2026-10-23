@@ -596,8 +596,8 @@ type noCycleDepthOneProbeFS struct {
 	probes atomic.Int64
 }
 
-func (fs *noCycleDepthOneProbeFS) FileExists(path string) bool {
-	if strings.Contains(path, "no-cycle-demand-probe") {
+func (fs *noCycleDepthOneProbeFS) FileExists(path tspath.RootedFilePath) bool {
+	if strings.Contains(path.AsString(), "no-cycle-demand-probe") {
 		fs.probes.Add(1)
 	}
 	return fs.FS.FileExists(path)

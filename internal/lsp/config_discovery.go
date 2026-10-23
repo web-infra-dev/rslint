@@ -22,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 const (
@@ -402,7 +403,7 @@ func normalizeLSPExplicitConfigPath(configPath string) (string, error) {
 }
 
 func lspConfigPathsEqual(left string, right string, fsys vfs.FS) bool {
-	caseSensitive := fsys == nil || fsys.UseCaseSensitiveFileNames()
+	caseSensitive := fsys == nil || fsys.CaseSensitivity().IsCaseSensitive()
 	return lspLexicalPathID(left, caseSensitive) == lspLexicalPathID(right, caseSensitive)
 }
 
@@ -542,7 +543,7 @@ func (s *Server) failureAtCommittedConfigBoundary(
 	if catalog == nil || len(catalog.Failures) == 0 || len(s.jsConfigs) == 0 {
 		return discovery.ConfigFailure{}, false
 	}
-	caseSensitive := fsys == nil || fsys.UseCaseSensitiveFileNames()
+	caseSensitive := fsys == nil || fsys.CaseSensitivity().IsCaseSensitive()
 	committed := make(map[string]struct{}, len(s.jsConfigs))
 	for configKey := range s.jsConfigs {
 		// Synthetic unavailable boundaries are retryable tombstones, not a
@@ -566,7 +567,12 @@ func (s *Server) failureAtCommittedConfigBoundary(
 }
 
 func lspLexicalPathID(filePath string, caseSensitive bool) string {
-	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", caseSensitive))
+	// An omitted configuration keeps its empty identity; it is not a rooted
+	// compiler path and must not be resolved through PathKey validation.
+	if filePath == "" {
+		return ""
+	}
+	return string(pathutil.ToPath(tspath.NormalizePath(filePath), "", caseSensitive))
 }
 
 func (s *Server) abortFailedConfigRefresh(
@@ -624,7 +630,7 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		}
 		entries = normalizedEntries
 		physical, _ := pathSpaces.PhysicalDirectory(configDir)
-		configID := lspLexicalPathID(physical, fsys == nil || fsys.UseCaseSensitiveFileNames())
+		configID := lspLexicalPathID(physical, fsys == nil || fsys.CaseSensitivity().IsCaseSensitive())
 		if previous, exists := seenConfigDirs[configID]; exists {
 			return nil, fmt.Errorf(
 				"discovered config contains duplicate directories %q and %q",
@@ -747,7 +753,7 @@ func unavailableConfigBoundaryDirectories(fsys vfs.FS, catalog *discovery.Config
 	if catalog == nil || len(catalog.Failures) == 0 {
 		return nil
 	}
-	caseSensitive := fsys == nil || fsys.UseCaseSensitiveFileNames()
+	caseSensitive := fsys == nil || fsys.CaseSensitivity().IsCaseSensitive()
 	byIdentity := make(map[string]string, len(catalog.Failures))
 	for _, failure := range catalog.Failures {
 		directory := tspath.NormalizePath(failure.Directory)
@@ -760,7 +766,7 @@ func unavailableConfigBoundaryDirectories(fsys vfs.FS, catalog *discovery.Config
 		if hasUsableLexicalConfigAncestor(directory, catalog.Configs, caseSensitive) {
 			continue
 		}
-		identity := string(tspath.ToPath(directory, "", caseSensitive))
+		identity := string(pathutil.ToPath(directory, "", caseSensitive))
 		if _, exists := byIdentity[identity]; !exists {
 			byIdentity[identity] = directory
 		}
@@ -781,7 +787,7 @@ func unavailableConfigBoundaryDirectories(fsys vfs.FS, catalog *discovery.Config
 		covered := false
 		for _, boundary := range boundaries {
 			if pathStringsEqual(candidate, boundary, caseSensitive) ||
-				tspath.StartsWithDirectory(candidate, boundary, caseSensitive) {
+				pathutil.StartsWithDirectory(candidate, boundary, caseSensitive) {
 				covered = true
 				break
 			}
@@ -801,7 +807,7 @@ func hasUsableLexicalConfigAncestor(
 	for configDir := range configs {
 		configDir = tspath.NormalizePath(configDir)
 		if pathStringsEqual(directory, configDir, caseSensitive) ||
-			tspath.StartsWithDirectory(directory, configDir, caseSensitive) {
+			pathutil.StartsWithDirectory(directory, configDir, caseSensitive) {
 			return true
 		}
 	}

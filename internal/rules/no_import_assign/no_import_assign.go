@@ -92,11 +92,11 @@ type importedBindingReferenceMatcher struct {
 }
 
 func isOnlySynthesizedJSDocSymbol(symbol *ast.Symbol) bool {
-	if symbol == nil || len(symbol.Declarations) == 0 ||
-		symbol.Flags&(ast.SymbolFlagsAlias|ast.SymbolFlagsTypeAlias) == 0 {
+	if symbol == nil || len(symbol.Declarations()) == 0 ||
+		symbol.Flags()&(ast.SymbolFlagsAlias|ast.SymbolFlagsTypeAlias) == 0 {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if !isSynthesizedJSDocDeclaration(declaration) {
 			return false
 		}
@@ -117,7 +117,7 @@ func resolvesToFunctionBodyFromParameter(
 	node *ast.Node,
 	symbol *ast.Symbol,
 ) bool {
-	if symbol == nil || len(symbol.Declarations) == 0 {
+	if symbol == nil || len(symbol.Declarations()) == 0 {
 		return false
 	}
 	for current := node; current != nil; current = current.Parent {
@@ -129,7 +129,7 @@ func resolvesToFunctionBodyFromParameter(
 		if body == nil {
 			return false
 		}
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if declaration.Pos() < body.Pos() || declaration.End() > body.End() {
 				return false
 			}
@@ -301,7 +301,7 @@ func isArgumentOfWellKnownMutationFunction(node *ast.Node, ctx *rule.RuleContext
 	if ctx.TypeChecker != nil {
 		sym := ctx.TypeChecker.GetSymbolAtLocation(object)
 		if sym != nil {
-			for _, decl := range sym.Declarations {
+			for _, decl := range sym.Declarations() {
 				declSF := ast.GetSourceFileOfNode(decl)
 				if declSF != nil && declSF == ctx.SourceFile {
 					return false

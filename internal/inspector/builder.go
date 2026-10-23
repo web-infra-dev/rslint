@@ -66,7 +66,7 @@ func AddListMeta(info *NodeInfo, name string, list *ast.NodeList) {
 // IsInternalSymbol checks if a symbol is an internal/synthetic symbol (like __call__, __new__, etc.)
 func IsInternalSymbol(symbol *ast.Symbol) bool {
 	// Internal symbols start with \xFE (InternalSymbolName prefix in TypeScript)
-	return len(symbol.Name) > 0 && symbol.Name[0] == '\xFE'
+	return len(symbol.Name()) > 0 && symbol.Name()[0] == '\xFE'
 }
 
 // KindToString converts an AST Kind to a string representation with package prefix
@@ -103,7 +103,7 @@ func (b *Builder) BuildSourceFileNodeInfo(sf *ast.SourceFile) *NodeInfo {
 
 	// Set fileName if this is an external file (different from builder's sourceFile)
 	if sf != b.sourceFile {
-		info.FileName = sf.FileName()
+		info.FileName = sf.FileName().AsString()
 	}
 
 	// Build statements directly from SourceFile (avoiding AsSourceFile conversion)

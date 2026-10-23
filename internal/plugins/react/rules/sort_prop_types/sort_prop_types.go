@@ -561,10 +561,10 @@ func checkTypeNode(typeNode *ast.Node, aliases map[string]*ast.Node, check func(
 }
 
 func declarationObject(sourceFile *ast.SourceFile, symbol *ast.Symbol) *ast.Node {
-	if sourceFile == nil || symbol == nil || symbol.ValueDeclaration == nil {
+	if sourceFile == nil || symbol == nil || symbol.ValueDeclaration() == nil {
 		return nil
 	}
-	decl := symbol.ValueDeclaration
+	decl := symbol.ValueDeclaration()
 	switch decl.Kind {
 	case ast.KindBindingElement:
 		decl = utils.EnclosingVariableDeclarationOfBindingElement(decl)

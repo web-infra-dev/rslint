@@ -184,7 +184,7 @@ const kept = Math.pow(base /* keep */, exponent);`,
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: lintprogram.NewFromCompiler(program),
-			File:    sourceFile.FileName(),
+			File:    sourceFile.FileName().AsString(),
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:     PreferExponentiationOperatorRule.Name,

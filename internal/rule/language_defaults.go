@@ -3,6 +3,7 @@ package rule
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // languageGlobal is one global supplied by the resolved language defaults,
@@ -77,7 +78,7 @@ var javascriptSourceExtensions = []string{
 }
 
 func isJavaScriptSourceExtension(fileName string) bool {
-	ext := tspath.GetAnyExtensionFromPath(fileName, nil, false)
+	ext := pathutil.GetAnyExtensionFromPath(fileName, nil, false)
 	return tspath.ExtensionIsOneOf(ext, javascriptSourceExtensions)
 }
 
@@ -97,7 +98,7 @@ func isJavaScriptSourceExtension(fileName string) bool {
 // when module syntax is present.
 func ResolveLanguageDefaults(fileName string, languageOptions LanguageOptions) (GlobalsInit, RefStoreInit, LanguageOptions) {
 	if languageOptions.SourceType == "" {
-		if tspath.GetAnyExtensionFromPath(fileName, nil, false) == tspath.ExtensionCjs {
+		if pathutil.GetAnyExtensionFromPath(fileName, nil, false) == tspath.ExtensionCjs {
 			languageOptions.SourceType = "commonjs"
 		} else {
 			languageOptions.SourceType = "module"

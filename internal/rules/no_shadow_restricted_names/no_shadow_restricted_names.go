@@ -137,10 +137,10 @@ func isSymbolSafelyShadowingUndefined(sym *ast.Symbol, writtenSymbols map[*ast.S
 	if writtenSymbols[sym] {
 		return false
 	}
-	if len(sym.Declarations) == 0 {
+	if len(sym.Declarations()) == 0 {
 		return true
 	}
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		if decl == nil || decl.Kind != ast.KindVariableDeclaration {
 			return false
 		}

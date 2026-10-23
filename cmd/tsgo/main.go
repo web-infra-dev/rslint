@@ -19,6 +19,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type EncodedSourceFile = []byte
@@ -78,7 +79,7 @@ func getDiagnostics(diagnostics []*ast.Diagnostic, fileMap *map[string]int32) []
 		diags = append(diags, Diagnostics{
 			Message:  diag.String(),
 			Category: int32(diag.Category()),
-			File:     (*fileMap)[diag.File().FileName()],
+			File:     (*fileMap)[diag.File().FileName().AsString()],
 			Loc: Location{
 				Start: int32(positionMap.UTF8ToUTF16(diag.Pos())),
 				End:   int32(positionMap.UTF8ToUTF16(diag.End())),
@@ -225,7 +226,7 @@ func runProject(args []string, stdout, stderr io.Writer) int {
 	defer done()
 
 	checkResult := CheckResult{}
-	checkResult.RootFiles = append(checkResult.RootFiles, program.CommandLine().FileNames()...)
+	checkResult.RootFiles = append(checkResult.RootFiles, pathutil.Strings(program.CommandLine().FileNames())...)
 	checkResult.Semantic = NewSemantic()
 	checkResult.SourceFileExtra = []SourceFileExtra{}
 
@@ -238,16 +239,16 @@ func runProject(args []string, stdout, stderr io.Writer) int {
 		sourceFileIds[file] = sourcefileId
 	}
 	for sourcefileId, file := range sourceFiles {
-		fileMap[file.FileName()] = int32(sourcefileId)
-		checkResult.ModuleList = append(checkResult.ModuleList, file.FileName())
+		fileMap[file.FileName().AsString()] = int32(sourcefileId)
+		checkResult.ModuleList = append(checkResult.ModuleList, file.FileName().AsString())
 		sourceFile := file.AsSourceFile()
-		if !sourceFile.IsDeclarationFile && program.IsSourceFromProjectReference(sourceFile.Path()) {
-			checkResult.RootFiles = append(checkResult.RootFiles, sourceFile.FileName())
+		if !sourceFile.IsDeclarationFile && program.IsSourceFromProjectReference(sourceFile.PathKey()) {
+			checkResult.RootFiles = append(checkResult.RootFiles, sourceFile.FileName().AsString())
 		}
 
 		encodedSourceFile, _, err := encoder.EncodeSourceFile(sourceFile)
 		if err != nil {
-			log.Printf("error encoding source file %v: %v", file.Path(), err)
+			log.Printf("error encoding source file %v: %v", file.PathKey(), err)
 			return 1
 		}
 		checkResult.SourceFileExtra = append(checkResult.SourceFileExtra, SourceFileExtra{
@@ -260,7 +261,7 @@ func runProject(args []string, stdout, stderr io.Writer) int {
 		exports := []ast.SymbolId{}
 		if sourceFile.Symbol != nil {
 			for _, symbol := range tc.GetExportsOfModule(sourceFile.Symbol) {
-				if symbol.Flags&ast.SymbolFlagsAlias != 0 {
+				if symbol.Flags()&ast.SymbolFlagsAlias != 0 {
 					if tc.GetTypeOnlyAliasDeclaration(symbol) != nil {
 						continue
 					}
@@ -268,7 +269,7 @@ func runProject(args []string, stdout, stderr io.Writer) int {
 						symbol = target
 					}
 				}
-				if symbol.Flags&ast.SymbolFlagsValue == 0 {
+				if symbol.Flags()&ast.SymbolFlagsValue == 0 {
 					continue
 				}
 				exports = append(exports, ast.GetSymbolId(symbol))

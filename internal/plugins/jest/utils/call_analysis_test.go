@@ -13,7 +13,7 @@ func parseJestAnalysisFixture(source string) *ast.SourceFile {
 	return parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/shared-jest-analysis.test.ts",
-			Path:     "/shared-jest-analysis.test.ts",
+			PathKey:  "/shared-jest-analysis.test.ts",
 		},
 		source,
 		core.ScriptKindTS,

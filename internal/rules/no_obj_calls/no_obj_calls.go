@@ -170,7 +170,7 @@ func isTrackableLocalSymbol(symbol *ast.Symbol) bool {
 		ast.SymbolFlagsEnum |
 		ast.SymbolFlagsModule |
 		ast.SymbolFlagsAlias
-	return symbol.Flags&flags != 0
+	return symbol.Flags()&flags != 0
 }
 
 func (state *ruleState) collectCalls() {

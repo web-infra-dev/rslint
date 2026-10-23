@@ -432,7 +432,7 @@ func (a *OperandAnalyzer) classifyCurrentFileTypeofIdentifier(ident *ast.Node) (
 	}
 
 	foundGlobalAugmentation := false
-	for _, decl := range symbol.Declarations {
+	for _, decl := range symbol.Declarations() {
 		if decl == nil || ast.GetSourceFileOfNode(decl) != a.ctx.SourceFile {
 			continue
 		}

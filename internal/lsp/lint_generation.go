@@ -224,7 +224,7 @@ func newLintGeneration(
 				return *pluginConfig
 			},
 			WirePath: func(path string) string {
-				if path == sourcePath {
+				if path == sourcePath.AsString() {
 					return target.Path
 				}
 				return path
@@ -234,7 +234,7 @@ func newLintGeneration(
 	return linter.Generation{
 		Native: linter.NativeGeneration{
 			Programs:         []*lintprogram.Program{sourceProgram},
-			TargetsByProgram: [][]string{{sourcePath}},
+			TargetsByProgram: [][]string{{sourcePath.AsString()}},
 			SingleThreaded:   true,
 			Cwd:              processCwd,
 			RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
@@ -243,7 +243,7 @@ func newLintGeneration(
 		},
 		Target: linter.TargetProjection{
 			Path: func(path string) string {
-				if path == sourcePath {
+				if path == sourcePath.AsString() {
 					return target.Path
 				}
 				return path

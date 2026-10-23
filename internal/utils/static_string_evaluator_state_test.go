@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -23,7 +24,7 @@ func TestStaticReferenceScanCacheIsolation(t *testing.T) {
 	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program")
-	source := program.GetSourceFile(filePath)
+	source := program.GetSourceFile(pathutil.File(filePath))
 	assert.Assert(t, source != nil)
 	typeChecker, done := program.GetTypeChecker(t.Context())
 	defer done()

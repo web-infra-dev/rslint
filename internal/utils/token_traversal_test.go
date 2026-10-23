@@ -54,7 +54,7 @@ func snapshotTraversalToken(node *ast.Node) tokenTraversalSnapshot {
 func parseTokenTraversalSource(source string) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/traversal.tsx",
-		Path:     "/traversal.tsx",
+		PathKey:  "/traversal.tsx",
 	}, source, core.ScriptKindTSX)
 }
 

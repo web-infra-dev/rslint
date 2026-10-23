@@ -25,7 +25,7 @@ func TestDisplayNameRuleWithoutSemanticContext(t *testing.T) {
   `
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/react.tsx",
-		Path:     "/react.tsx",
+		PathKey:  "/react.tsx",
 	}, code, core.ScriptKindTSX)
 	comments := rule.NewCommentStore(sourceFile)
 	var diagnostics []rule.RuleDiagnostic
@@ -110,7 +110,7 @@ func TestWrapperSiblingIndexMatchesReference(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/react.tsx",
-				Path:     "/react.tsx",
+				PathKey:  "/react.tsx",
 			}, testCase.code, core.ScriptKindTSX)
 			var call, fn *ast.Node
 			var visit ast.Visitor

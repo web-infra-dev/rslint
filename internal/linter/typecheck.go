@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // typeCheckRequest bundles the inputs for runTypeCheckAcrossPrograms.
@@ -130,7 +131,7 @@ type typeCheckDedupeKey struct {
 func typeCheckDedupeKeyForDiagnostic(prog *program.Program, d *ast.Diagnostic) typeCheckDedupeKey {
 	loc := d.Loc()
 	return typeCheckDedupeKey{
-		path:    typeCheckFilesystemPathID(prog, d.File().FileName()),
+		path:    typeCheckFilesystemPathID(prog, d.File().FileName().AsString()),
 		code:    d.Code(),
 		pos:     loc.Pos(),
 		end:     loc.End(),
@@ -143,14 +144,14 @@ func typeCheckFilesystemPathID(prog *program.Program, filePath string) string {
 	if prog == nil {
 		return filePath
 	}
-	filePath = tspath.GetNormalizedAbsolutePath(filePath, prog.CurrentDirectory())
+	filePath = pathutil.GetNormalizedAbsolutePath(filePath, prog.CurrentDirectory())
 	fsys := prog.FS()
 	if fsys != nil {
-		if realPath := fsys.Realpath(filePath); realPath != "" {
-			filePath = tspath.NormalizePath(realPath)
+		if realPath := fsys.Realpath(pathutil.Path(filePath)); realPath != "" {
+			filePath = tspath.NormalizePath(realPath.AsString())
 		}
 	}
-	return string(tspath.ToPath(filePath, "", true))
+	return string(pathutil.ToPath(filePath, "", true))
 }
 
 // flattenDiagnosticMessage builds a human-readable message from a
@@ -158,13 +159,13 @@ func typeCheckFilesystemPathID(prog *program.Program, filePath string) string {
 // RelatedInformation. Format mirrors tsc's output.
 func flattenDiagnosticMessage(d *ast.Diagnostic) string {
 	return flattenDiagnosticMessageWithRelatedPath(d, func(file *ast.SourceFile) string {
-		return file.FileName()
+		return file.FileName().AsString()
 	})
 }
 
 func flattenDiagnosticMessageForIdentity(prog *program.Program, d *ast.Diagnostic) string {
 	return flattenDiagnosticMessageWithRelatedPath(d, func(file *ast.SourceFile) string {
-		return typeCheckFilesystemPathID(prog, file.FileName())
+		return typeCheckFilesystemPathID(prog, file.FileName().AsString())
 	})
 }
 

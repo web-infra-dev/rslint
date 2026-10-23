@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed no_unpublished_bin.schema.json
@@ -22,7 +23,7 @@ var NoUnpublishedBinRule = rule.Rule{
 			return nil
 		}
 		fileName := ctx.SourceFile.FileName()
-		pkg := packagejson.FindNearestValid(program, fileName)
+		pkg := packagejson.FindNearestValid(program, fileName.AsString())
 		if pkg == nil {
 			return nil
 		}
@@ -30,7 +31,7 @@ var NoUnpublishedBinRule = rule.Rule{
 		if len(options) > 0 {
 			opts, _ = options[0].(map[string]any)
 		}
-		relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), fileName, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: program.FS().UseCaseSensitiveFileNames()})
+		relative := pathutil.GetRelativePathFromDirectory(pkg.Directory(), fileName.AsString(), pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: program.FS().CaseSensitivity().IsCaseSensitive()})
 		converted, ok := nodeutil.ConvertPath(relative, opts, ctx.Settings)
 		if !ok {
 			return nil
@@ -39,9 +40,9 @@ var NoUnpublishedBinRule = rule.Rule{
 		// only when conversion changed it; nodeutil owns publication policy.
 		absolute := fileName
 		if converted != relative {
-			absolute = tspath.ResolvePath(pkg.Directory(), converted)
+			absolute = pathutil.File(tspath.ResolvePath(pkg.Directory(), converted))
 		}
-		if !nodeutil.IsBinFile(program, pkg, absolute) || !nodeutil.IsUnpublished(program, pkg, absolute) {
+		if !nodeutil.IsBinFile(program, pkg, absolute.AsString()) || !nodeutil.IsUnpublished(program, pkg, absolute.AsString()) {
 			return nil
 		}
 

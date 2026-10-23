@@ -83,10 +83,10 @@ func isImportSpecifierFromReact(ctx rule.RuleContext, ident *ast.Node) bool {
 			return false
 		}
 		var decl *ast.Node
-		if symbol.ValueDeclaration != nil {
-			decl = symbol.ValueDeclaration
-		} else if len(symbol.Declarations) > 0 {
-			decl = symbol.Declarations[0]
+		if symbol.ValueDeclaration() != nil {
+			decl = symbol.ValueDeclaration()
+		} else if len(symbol.Declarations()) > 0 {
+			decl = symbol.Declarations()[0]
 		}
 		if decl == nil || decl.Kind != ast.KindImportSpecifier {
 			return false

@@ -118,7 +118,7 @@ func GetTypeName(
 		// the type parameter for some reason. So this gets the constraint type
 		// via AST.
 		symbol := checker.Type_symbol(t)
-		decls := symbol.Declarations
+		decls := symbol.Declarations()
 		if len(decls) > 0 {
 			if ast.IsTypeParameterDeclaration(decls[0]) {
 				typeParamDecl := decls[0].AsTypeParameterDeclaration()
@@ -1082,8 +1082,8 @@ func GetDeclaration(
 	if symbol == nil {
 		return nil
 	}
-	if len(symbol.Declarations) > 0 {
-		return symbol.Declarations[0]
+	if len(symbol.Declarations()) > 0 {
+		return symbol.Declarations()[0]
 	}
 	return nil
 }
@@ -1289,7 +1289,7 @@ func getBaseEnumType(typeChecker *checker.Checker, t *checker.Type) *checker.Typ
 	}
 
 	return typeChecker.GetTypeAtLocation(
-		symbol.ValueDeclaration.Parent,
+		symbol.ValueDeclaration().Parent,
 	)
 }
 
@@ -1671,7 +1671,7 @@ func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 	if symbol == nil {
 		return false
 	}
-	for _, decl := range symbol.Declarations {
+	for _, decl := range symbol.Declarations() {
 		if ast.GetSourceFileOfNode(decl) == sf && !isInAmbientAugmentation(decl) {
 			return true
 		}
@@ -1720,7 +1720,7 @@ func valueSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile, skipTypeO
 	if symbol == nil {
 		return false
 	}
-	for _, decl := range symbol.Declarations {
+	for _, decl := range symbol.Declarations() {
 		switch decl.Kind {
 		case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration:
 			continue

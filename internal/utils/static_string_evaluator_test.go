@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -48,14 +49,14 @@ func TestStaticStringEvaluatorPropertyNames(t *testing.T) {
 				kind = ast.KindElementAccessExpression
 			}
 			source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/property.ts", Path: "/property.ts",
+				FileName: "/property.ts", PathKey: "/property.ts",
 			}, `const key = "fn"; class C { #fn; method() { object`+access+`; } }`, core.ScriptKindTS)
 			member := findFirstNodeOfKind(t, source, kind)
 			if got, known := evaluator.EvalAccessExpressionName(member); got != test.want || known != test.known {
 				t.Fatalf("member name = (%q, %v), want (%q, %v)", got, known, test.want, test.known)
 			}
 			source = parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/property.ts", Path: "/property.ts",
+				FileName: "/property.ts", PathKey: "/property.ts",
 			}, `const key = "fn"; class C { `+test.key+` = 0; }`, core.ScriptKindTS)
 			property := findFirstNodeOfKind(t, source, ast.KindPropertyDeclaration)
 			if got, known := evaluator.EvalPropertyName(property.Name()); got != test.want || known != test.known {
@@ -65,7 +66,7 @@ func TestStaticStringEvaluatorPropertyNames(t *testing.T) {
 	}
 	// The existing literal-only helper retains its narrower contract.
 	source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: "/property.ts", Path: "/property.ts",
+		FileName: "/property.ts", PathKey: "/property.ts",
 	}, `({["f" + "n"]: 0})`, core.ScriptKindTS)
 	property := findFirstNodeOfKind(t, source, ast.KindPropertyAssignment)
 	if _, known := GetStaticPropertyName(property.Name()); known {
@@ -288,7 +289,7 @@ func TestStaticStringEvaluator(t *testing.T) {
 	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program")
 
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	assert.Assert(t, sourceFile != nil)
 
 	typeChecker, done := program.GetTypeChecker(t.Context())
@@ -538,7 +539,7 @@ const selfRead = selfMutating[0];`
 			fs := NewOverlayVFS(root.FS, map[string]string{filePath: code})
 			program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
 			assert.NilError(t, err)
-			sourceFile := program.GetSourceFile(filePath)
+			sourceFile := program.GetSourceFile(pathutil.File(filePath))
 			assert.Assert(t, sourceFile != nil)
 			typeChecker, done := program.GetTypeChecker(t.Context())
 			defer done()
@@ -671,7 +672,7 @@ const selfRead = selfMutating[0];`
 				fs := NewOverlayVFS(root.FS, map[string]string{filePath: code})
 				program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
 				assert.NilError(t, err)
-				sourceFile := program.GetSourceFile(filePath)
+				sourceFile := program.GetSourceFile(pathutil.File(filePath))
 				assert.Assert(t, sourceFile != nil)
 				typeChecker, done := program.GetTypeChecker(t.Context())
 				defer done()
@@ -742,7 +743,7 @@ const stringProperty = ({..."stable"})[0];
 			fs := NewOverlayVFS(root.FS, map[string]string{filePath: code})
 			program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
 			assert.NilError(t, err)
-			sourceFile := program.GetSourceFile(filePath)
+			sourceFile := program.GetSourceFile(pathutil.File(filePath))
 			assert.Assert(t, sourceFile != nil)
 			typeChecker, done := program.GetTypeChecker(t.Context())
 			defer done()
@@ -797,7 +798,7 @@ func TestStaticStringEvaluatorConfiguredGlobals(t *testing.T) {
 		`parseInt("10")`, `Math.max(Infinity, 2)`,
 	} {
 		t.Run(expression, func(t *testing.T) {
-			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/globals.js", Path: "/globals.js"}, "const value = "+expression, core.ScriptKindJS)
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/globals.js", PathKey: "/globals.js"}, "const value = "+expression, core.ScriptKindJS)
 			evaluator := NewStaticStringEvaluatorWithSourceFile(nil, source)
 			initializer := findVariableInitializer(t, source, "value")
 			for _, access := range []GlobalAccess{GlobalAccessOff, GlobalAccessReadonly, GlobalAccessWritable} {
@@ -888,7 +889,7 @@ func TestStaticStringEvaluatorReviewValues(t *testing.T) {
 		{`null.x`, "", false, false},
 	} {
 		t.Run(test.expression, func(t *testing.T) {
-			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/review.ts", Path: "/review.ts"}, "const value = "+test.expression, core.ScriptKindTS)
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/review.ts", PathKey: "/review.ts"}, "const value = "+test.expression, core.ScriptKindTS)
 			initializer := findVariableInitializer(t, source, "value")
 			for _, scope := range []bool{false, true} {
 				evaluator := NewStaticStringEvaluatorWithoutScope()
@@ -955,7 +956,7 @@ func TestStaticStringEvaluatorSpreadLimits(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/spread.ts", Path: "/spread.ts",
+				FileName: "/spread.ts", PathKey: "/spread.ts",
 			}, "const value = "+test.expression+";", core.ScriptKindTS)
 			evaluator := NewStaticStringEvaluator(nil)
 			isArray, known := evaluator.EvalArrayValue(findVariableInitializer(t, sourceFile, "value"))
@@ -972,7 +973,7 @@ func TestStaticStringEvaluatorSpreadLimits(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/spread.ts", Path: "/spread.ts",
+				FileName: "/spread.ts", PathKey: "/spread.ts",
 			}, "const value = "+test.expression+";", core.ScriptKindTS)
 			_, known := NewStaticStringEvaluator(nil).EvalValue(findVariableInitializer(t, sourceFile, "value"))
 			assert.Equal(t, known, test.known)
@@ -1027,7 +1028,7 @@ const objectSpreadLone = ({...'\uD800x'})[0];
 	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program")
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	assert.Assert(t, sourceFile != nil)
 	typeChecker, done := program.GetTypeChecker(t.Context())
 	defer done()
@@ -1166,7 +1167,7 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err)
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	assert.Assert(t, sourceFile != nil)
 	typeChecker, done := program.GetTypeChecker(t.Context())
 	defer done()
@@ -1361,7 +1362,7 @@ func TestStaticStringEvaluatorBigInt(t *testing.T) {
 		{"1n << 999999999999n", "", false}, {"'x'.charAt(0n)", "", false},
 	} {
 		t.Run(test.expression, func(t *testing.T) {
-			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/bigint.js", Path: "/bigint.js"}, "const value = "+test.expression+";", core.ScriptKindJS)
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/bigint.js", PathKey: "/bigint.js"}, "const value = "+test.expression+";", core.ScriptKindJS)
 			node := findVariableInitializer(t, source, "value")
 			got, known := NewStaticStringEvaluatorWithoutScope().EvalToString(node)
 			if known != test.known || known && got != test.want {
@@ -1394,7 +1395,7 @@ func TestStaticStringEvaluatorBinaryExpressions(t *testing.T) {
 		{"[1] - 2", "-1"}, {"[] < 1", "true"},
 	} {
 		t.Run(test.expression, func(t *testing.T) {
-			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/binary.js", Path: "/binary.js"}, "const value = "+test.expression+";", core.ScriptKindJS)
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/binary.js", PathKey: "/binary.js"}, "const value = "+test.expression+";", core.ScriptKindJS)
 			node := findVariableInitializer(t, source, "value")
 			got, known := NewStaticStringEvaluatorWithoutScope().EvalToString(node)
 			if !known || got != test.want {
@@ -1417,7 +1418,7 @@ func TestStaticStringEvaluatorGlobalNumbers(t *testing.T) {
 		{"function f(Infinity) { const value = Infinity; }", "", false},
 	} {
 		t.Run(test.code, func(t *testing.T) {
-			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/globals.js", Path: "/globals.js"}, test.code, core.ScriptKindJS)
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/globals.js", PathKey: "/globals.js"}, test.code, core.ScriptKindJS)
 			node := findVariableInitializer(t, source, "value")
 			got, known := NewStaticStringEvaluatorWithSourceFile(nil, source).EvalToString(node)
 			assert.Equal(t, known, test.known)

@@ -63,7 +63,7 @@ func norm(dir, rel string) string {
 // programHasFile checks if a program's GetSourceFiles() includes a file.
 func programHasFile(program *compiler.Program, fileName string) bool {
 	for _, sf := range program.GetSourceFiles() {
-		if sf.FileName() == fileName {
+		if sf.FileName().AsString() == fileName {
 			return true
 		}
 	}
@@ -75,7 +75,7 @@ func programHasFile(program *compiler.Program, fileName string) bool {
 func requireProgramHasFile(t *testing.T, program *compiler.Program, fileName string) {
 	t.Helper()
 	for _, sf := range program.GetSourceFiles() {
-		if sf.FileName() == fileName {
+		if sf.FileName().AsString() == fileName {
 			return
 		}
 	}
@@ -89,7 +89,7 @@ func collectLintedFiles(t *testing.T, programs []*compiler.Program) map[string]i
 	_, err := runLinterPositional(
 		programs, true, nil, nil, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			counts[sf.FileName()]++
+			counts[sf.FileName().AsString()]++
 			return noopRule()
 		},
 		false, func(d rule.RuleDiagnostic) {}, nil, nil,
@@ -427,7 +427,7 @@ func TestLegacySingleProgramScopeCanSelectImportedFile(t *testing.T) {
 	lintedFiles := make(map[string]int)
 	runLinterInCompilerProgram(program, []string{libPath}, nil, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			lintedFiles[sf.FileName()]++
+			lintedFiles[sf.FileName().AsString()]++
 			return noopRule()
 		},
 		false, func(d rule.RuleDiagnostic) {}, nil, nil,

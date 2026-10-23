@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestNoUselessBackreferenceRule(t *testing.T) {
@@ -664,7 +665,7 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sourceFile := program.GetSourceFile("file.ts")
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	if sourceFile == nil {
 		t.Fatal("file.ts was not loaded")
 	}
@@ -672,7 +673,7 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 	var diagnostics []rule.RuleDiagnostic
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program: lintprogram.NewFromCompiler(program),
-		Files:   []string{sourceFile.FileName()},
+		Files:   []string{sourceFile.FileName().AsString()},
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     NoUselessBackreferenceRule.Name,
@@ -718,7 +719,7 @@ first("\\1(a)");
 	if err != nil {
 		t.Fatal(err)
 	}
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	if sourceFile == nil {
 		t.Fatal("file.ts was not loaded")
 	}
@@ -730,7 +731,7 @@ first("\\1(a)");
 	}
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program: sourceProgram,
-		Files:   []string{sourceFile.FileName()},
+		Files:   []string{sourceFile.FileName().AsString()},
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     NoUselessBackreferenceRule.Name,
@@ -845,7 +846,7 @@ enum Pattern {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	if sourceFile == nil {
 		t.Fatalf("%s was not loaded", filePath)
 	}

@@ -95,13 +95,13 @@ var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 					if symbol == nil {
 						return
 					}
-					param := symbol.ValueDeclaration
+					param := symbol.ValueDeclaration()
 
 					if param == nil || !ast.IsParameterDeclaration(param) {
 						return
 					}
 
-					parentNode := symbol.ValueDeclaration.Parent
+					parentNode := symbol.ValueDeclaration().Parent
 					if !ast.IsFunctionExpression(parentNode) && !ast.IsArrowFunction(parentNode) {
 						return
 					}

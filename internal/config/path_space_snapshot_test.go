@@ -12,6 +12,9 @@ func TestExactPathIDWindowsDrive(t *testing.T) {
 		left, right string
 		equal       bool
 	}{
+		{"", "", true},
+		{".", "./", true},
+		{"src/../file.ts", "file.ts", true},
 		{`C:\Repo\src\a.ts`, "c:/Repo/src/a.ts", true},
 		{"./C:/Repo/src/../a.ts", "c:/Repo/a.ts", true},
 		{"C:/Repo/a.ts", "D:/Repo/a.ts", false},

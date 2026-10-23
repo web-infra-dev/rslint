@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestNoImportAssignRule(t *testing.T) {
@@ -762,7 +763,7 @@ func lintNoImportAssignForComparison(
 	if err != nil {
 		t.Fatal(err)
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, pathutil.Directory(rootDir.Dir)))
 	if sourceFile == nil {
 		t.Fatal("comparison source file was not loaded")
 	}
@@ -770,7 +771,7 @@ func lintNoImportAssignForComparison(
 	var diagnostics []noImportAssignDiagnosticFingerprint
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:     lintprogram.NewFromCompiler(program),
-		File:        sourceFile.FileName(),
+		File:        sourceFile.FileName().AsString(),
 		HasTypeInfo: true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{

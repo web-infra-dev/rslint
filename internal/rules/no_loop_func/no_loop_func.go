@@ -206,7 +206,7 @@ func (s *RunState) CollectThroughReferences(funcNode *ast.Node) []ReferenceEntry
 			// set, the same outcome as one that resolved but was declared
 			// outside `funcNode` and never written to.
 			sym := s.Ctx.Refs.Resolve(n)
-			if sym != nil && (sym.Flags&ast.SymbolFlagsValue) != 0 {
+			if sym != nil && (sym.Flags()&ast.SymbolFlagsValue) != 0 {
 				if !isSymbolDeclaredInside(sym, funcNode) {
 					refs = append(refs, ReferenceEntry{
 						name:   n.Text(),
@@ -241,7 +241,7 @@ func isSymbolDeclaredInside(sym *ast.Symbol, funcNode *ast.Node) bool {
 		return false
 	}
 	nameNode := funcNode.Name()
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		if decl == funcNode || (nameNode != nil && decl == nameNode) {
 			continue
 		}
@@ -277,10 +277,10 @@ func IsWriteRef(node *ast.Node) bool {
 // modify the function's closed-over view of it during successive iterations.
 func (s *RunState) isSafeCore(loopNode *ast.Node, ref ReferenceEntry) bool {
 	sym := ref.symbol
-	if sym == nil || len(sym.Declarations) == 0 {
+	if sym == nil || len(sym.Declarations()) == 0 {
 		return true
 	}
-	decl := sym.Declarations[0]
+	decl := sym.Declarations()[0]
 
 	// Look up the enclosing VariableDeclarationList (for var/let/const/using).
 	declList := GetDeclListForSymbolDecl(decl)
@@ -368,7 +368,7 @@ func (s *RunState) references(sym *ast.Symbol) []*ast.Node {
 	}
 	refs := s.Ctx.Refs.References(sym)
 	var declNames []*ast.Node
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		if ast.GetSourceFileOfNode(decl) != s.Ctx.SourceFile {
 			continue
 		}

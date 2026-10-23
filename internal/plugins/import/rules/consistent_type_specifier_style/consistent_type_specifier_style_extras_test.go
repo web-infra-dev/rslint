@@ -29,7 +29,7 @@ func TestConsistentTypeSpecifierStyleEditDemand(t *testing.T) {
 		{"comments", `import {Value, type /*keep*/ Foo, type Bar} from 'module';`, "prefer-top-level", 2, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/edit-demand.ts", Path: "/edit-demand.ts"}, tc.code, core.ScriptKindTS)
+			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/edit-demand.ts", PathKey: "/edit-demand.ts"}, tc.code, core.ScriptKindTS)
 			options := rule_tester.ResolveTestCaseOptions(t, r, []any{tc.option})
 			var all []rule.RuleDiagnostic
 			for _, demand := range []rule.EditDemand{rule.EditDemandAll, rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion} {

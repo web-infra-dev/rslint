@@ -173,7 +173,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// Resolve immutable language initialization once per file. Globals and
 		// RefStore receive their own concrete data and never inspect the current
 		// selection input (the file extension) themselves.
-		globalsInit, refsInit, languageOptions := rule.ResolveLanguageDefaults(file.FileName(), environment.LanguageOptions)
+		globalsInit, refsInit, languageOptions := rule.ResolveLanguageDefaults(file.FileName().AsString(), environment.LanguageOptions)
 
 		fileChecker := chk
 
@@ -187,7 +187,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// The mark is gone from the text by the time the file is parsed, so
 		// answering means going back to whatever produced that text; a file no
 		// rule asks about never does.
-		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
+		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName().AsString())
 		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
 		baseContext := (rule.RuleContext{
 			SourceFile:      file,
@@ -327,7 +327,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		}
 		file.Node.ForEachChild(childVisitor)
 		if opts.Timing != nil {
-			opts.Timing.addFile(file.FileName(), rules, ruleDurations)
+			opts.Timing.addFile(file.FileName().AsString(), rules, ruleDurations)
 		}
 		registeredListeners.reset()
 	}

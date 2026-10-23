@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestIsNameShadowedBetweenEnumDeclaration(t *testing.T) {
@@ -18,7 +19,7 @@ value.outside;
 `
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 
 	shadowed := AccessExpressionObject(findNodeWithText(t, sourceFile, "value.present"))
@@ -85,7 +86,7 @@ try {} catch (caught) {
 	if err != nil {
 		t.Fatalf("CreateProgram() error = %v", err)
 	}
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	if sourceFile == nil {
 		t.Fatal("program did not contain test source file")
 	}
@@ -400,7 +401,7 @@ func TestShadowingScopeModels(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.ts",
-				Path:     "/test.ts",
+				PathKey:  "/test.ts",
 			}, test.code, core.ScriptKindTS)
 
 			callee := findNodeWithText(t, sourceFile, "Target()").Expression()
@@ -424,7 +425,7 @@ func TestScopeManagerShadowPackageHelpersDoNotAllocateCaches(t *testing.T) {
 	code := `class C<Target> { m<Target>(@dec(Target()) x: number, Target: any) { var Target; } }`
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, code, core.ScriptKindTS)
 	callee := findNodeWithText(t, sourceFile, "Target()").Expression()
 

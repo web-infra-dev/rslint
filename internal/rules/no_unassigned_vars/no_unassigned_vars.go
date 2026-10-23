@@ -144,7 +144,7 @@ func binderVariableDeclarationSymbols(node *ast.Node) variableSymbols {
 	for _, sym := range [...]*ast.Symbol{node.Symbol(), node.LocalSymbol()} {
 		if sym != nil {
 			result.add(sym)
-			result.add(sym.ExportSymbol)
+			result.add(sym.ExportSymbol())
 		}
 	}
 	return result
@@ -172,7 +172,7 @@ func (s *runState) symbolHasKnownWrite(sym *ast.Symbol) bool {
 			return hasWrite
 		}
 	}
-	declarations := sym.Declarations
+	declarations := sym.Declarations()
 
 	hasWrite := false
 	for _, declaration := range declarations {

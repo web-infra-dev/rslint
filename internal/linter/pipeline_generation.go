@@ -61,7 +61,7 @@ func projectGenerationTargets(
 			if source == nil {
 				continue
 			}
-			path := projectTargetPath(generation.Target.Path, source.FileName())
+			path := projectTargetPath(generation.Target.Path, source.FileName().AsString())
 			if path == "" {
 				return nil, errors.New("linter pipeline: projected target path must not be empty")
 			}

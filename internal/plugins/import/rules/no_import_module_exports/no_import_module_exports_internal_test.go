@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestCompileExceptionMatchersWindowsSeparators(t *testing.T) {
@@ -113,7 +114,7 @@ func TestResolveNodePackageEntry(t *testing.T) {
 				}
 				files[fileName] = ""
 			}
-			fs := utils.NewOverlayVFS(iovfs.From(fstest.MapFS{}, true), files)
+			fs := utils.NewOverlayVFS(iovfs.From(fstest.MapFS{}, pathutil.CaseSensitivity(true)), files)
 			p, err := program.NewFromRoots(program.RootOptions{
 				Host: utils.CreateCompilerHost(root, fs), CompilerOptions: program.SourceOnlyCompilerOptions(),
 				SingleThreaded: true,

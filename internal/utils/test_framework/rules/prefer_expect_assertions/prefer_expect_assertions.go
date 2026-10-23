@@ -714,10 +714,10 @@ func resolveLocalFunction(ctx rule.RuleContext, reference *ast.Node) *ast.Node {
 		return nil
 	}
 	symbol := ctx.Refs.Resolve(reference)
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	if symbol == nil || len(symbol.Declarations()) != 1 {
 		return nil
 	}
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if declaration == nil || ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
 		return nil
 	}

@@ -34,7 +34,7 @@ func isPendingCall(node *ast.Node, ctx rule.RuleContext) bool {
 		return true
 	}
 
-	for _, decl := range symbol.Declarations {
+	for _, decl := range symbol.Declarations() {
 		if decl == nil {
 			continue
 		}

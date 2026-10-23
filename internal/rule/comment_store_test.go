@@ -14,7 +14,7 @@ func parseCommentStoreSource(t *testing.T, source string) *ast.SourceFile {
 	t.Helper()
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 }
 

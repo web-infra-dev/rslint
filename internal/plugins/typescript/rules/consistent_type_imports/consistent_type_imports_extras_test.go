@@ -18,6 +18,8 @@ import (
 // Dimension 4 shape.
 func TestConsistentTypeImportsExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &ConsistentTypeImportsRule, []rule_tester.ValidTestCase{
+		{Code: `import source Wasm from 'foo'; type T = typeof Wasm;`},
+		{Code: `import source Wasm from 'foo'; type T = typeof Wasm;`, Options: map[string]any{"prefer": "no-type-imports"}},
 		// ---- Dimension 4: a parenthesized value reference stays a value use ----
 		{Code: `import Foo from 'foo'; const value = (((Foo)));`},
 		// ---- Dimension 4: element access in value position stays a value use ----
@@ -137,7 +139,7 @@ func TestConsistentTypeImportsEditDemand(t *testing.T) {
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: lintprogram.NewFromCompiler(program),
-			File:    sourceFile.FileName(),
+			File:    sourceFile.FileName().AsString(),
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:     ConsistentTypeImportsRule.Name,

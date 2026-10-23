@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type sourceMappingFS struct {
@@ -15,9 +16,9 @@ type sourceMappingFS struct {
 	observed  []string
 }
 
-func (fs *sourceMappingFS) Realpath(path string) string {
-	fs.observed = append(fs.observed, path)
-	return fs.realPaths[path]
+func (fs *sourceMappingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	fs.observed = append(fs.observed, path.AsString())
+	return pathutil.Path(fs.realPaths[path.AsString()])
 }
 
 func TestLookupSourceTargetPrefersExactThenCanonicalIdentity(t *testing.T) {

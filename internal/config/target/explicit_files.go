@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // ExplicitFileOutcome records the target-selection facts needed by a caller
@@ -26,7 +27,7 @@ type explicitLintTarget struct {
 }
 
 type explicitLintTargetSet struct {
-	byPath         map[tspath.Path]*explicitLintTarget
+	byPath         map[tspath.PathKey]*explicitLintTarget
 	requestedPaths []string
 }
 
@@ -69,13 +70,13 @@ func newExplicitLintTargetSet(
 		return nil
 	}
 	set := &explicitLintTargetSet{
-		byPath:         make(map[tspath.Path]*explicitLintTarget, len(files)),
+		byPath:         make(map[tspath.PathKey]*explicitLintTarget, len(files)),
 		requestedPaths: make([]string, 0, len(files)),
 	}
 	for _, identity := range files {
 		filePath := tspath.NormalizePath(identity.Path)
 		set.requestedPaths = append(set.requestedPaths, filePath)
-		pathID := tspath.ToPath(filePath, "", true)
+		pathID := pathutil.ToPath(filePath, "", true)
 		if _, exists := set.byPath[pathID]; exists {
 			continue
 		}
@@ -85,7 +86,7 @@ func newExplicitLintTargetSet(
 			if physicalPath == "" {
 				physicalPath = filePath
 			}
-			exists = fsys.FileExists(tspath.NormalizePath(physicalPath))
+			exists = fsys.FileExists(pathutil.File(tspath.NormalizePath(physicalPath)))
 		}
 		set.byPath[pathID] = &explicitLintTarget{
 			target:    File{PathIdentity: identity},
@@ -112,9 +113,9 @@ func (set *explicitLintTargetSet) targetsForPaths(filePaths []string) []*explici
 		return nil
 	}
 	targets := make([]*explicitLintTarget, 0, len(filePaths))
-	seen := make(map[tspath.Path]struct{}, len(filePaths))
+	seen := make(map[tspath.PathKey]struct{}, len(filePaths))
 	for _, filePath := range filePaths {
-		pathID := tspath.ToPath(tspath.NormalizePath(filePath), "", true)
+		pathID := pathutil.ToPath(tspath.NormalizePath(filePath), "", true)
 		if _, exists := seen[pathID]; exists {
 			continue
 		}
@@ -132,7 +133,7 @@ func (set *explicitLintTargetSet) outcomes() []ExplicitFileOutcome {
 	}
 	outcomes := make([]ExplicitFileOutcome, 0, len(set.requestedPaths))
 	for _, filePath := range set.requestedPaths {
-		target := set.byPath[tspath.ToPath(filePath, "", true)]
+		target := set.byPath[pathutil.ToPath(filePath, "", true)]
 		if target == nil {
 			continue
 		}

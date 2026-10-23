@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestNoParamReassignRule(t *testing.T) {
@@ -910,7 +911,7 @@ function shadowed(a: number) {
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)
 	}
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	if sourceFile == nil {
 		t.Fatalf("source file not found for %s", filePath)
 	}

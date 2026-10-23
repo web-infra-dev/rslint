@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_cycle"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func mustPrepareLintPlan(t *testing.T, opts PrepareLintPlanOptions) *LintPlan {
@@ -117,7 +118,7 @@ func TestPreparedLintPlanSharesExecutorRuleViews(t *testing.T) {
 		"a.ts": "export const a = 1;",
 		"b.ts": "export const b = 2;",
 	})
-	files := []*ast.SourceFile{raw.GetSourceFile(paths["a.ts"]), raw.GetSourceFile(paths["b.ts"])}
+	files := []*ast.SourceFile{raw.GetSourceFile(pathutil.File(paths["a.ts"])), raw.GetSourceFile(pathutil.File(paths["b.ts"]))}
 	sourceOnly := mustSourceOnlyTestProgram(t, raw, files)
 	typed := lintprogram.NewFromCompiler(raw)
 	environment := &rule.RuleEnvironment{Settings: map[string]any{"setting": "value"}}
@@ -242,15 +243,15 @@ func TestExactLintProjectionReusesUnchangedProgramUniverse(t *testing.T) {
 		"a.ts": "export const a = 1;",
 		"b.ts": "export const b = 1;",
 	})
-	a := raw.GetSourceFile(paths["a.ts"])
-	b := raw.GetSourceFile(paths["b.ts"])
+	a := raw.GetSourceFile(pathutil.File(paths["a.ts"]))
+	b := raw.GetSourceFile(pathutil.File(paths["b.ts"]))
 	if a == nil || b == nil {
 		t.Fatal("fixture Program did not contain both source files")
 	}
 	sourceProgram := mustSourceOnlyTestProgram(t, raw, []*ast.SourceFile{a, b})
 	universe := sourceProgram.SourceFiles()
 
-	exact, err := resolveExactProgramFiles(sourceProgram, []string{a.FileName(), b.FileName()})
+	exact, err := resolveExactProgramFiles(sourceProgram, []string{a.FileName().AsString(), b.FileName().AsString()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +259,7 @@ func TestExactLintProjectionReusesUnchangedProgramUniverse(t *testing.T) {
 		t.Fatal("unchanged exact projection copied the Program source universe")
 	}
 
-	subset, err := resolveExactProgramFiles(sourceProgram, []string{a.FileName()})
+	subset, err := resolveExactProgramFiles(sourceProgram, []string{a.FileName().AsString()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +274,7 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 		"gap.ts":  "const gap = 1;",
 		"zero.ts": "const zero = 1;",
 	})
-	gapFile := program.GetSourceFile(paths["gap.ts"])
+	gapFile := program.GetSourceFile(pathutil.File(paths["gap.ts"]))
 	if gapFile == nil {
 		t.Fatal("fixture Program did not contain gap.ts")
 	}
@@ -287,8 +288,8 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 
 	newRuleHandler := func(calls map[string]int) RuleHandler {
 		return func(file *ast.SourceFile) []rule.ConfiguredRule {
-			calls[file.FileName()]++
-			switch file.FileName() {
+			calls[file.FileName().AsString()]++
+			switch file.FileName().AsString() {
 			case paths["a.ts"]:
 				rules := noopRule()
 				return append(rules, rule.ConfiguredRule{
@@ -315,7 +316,7 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 		GetRulesForFile:  newRuleHandler(preparedCalls),
 	})
 	pluginTargets := plan.Targets()
-	if len(pluginTargets) != 1 || pluginTargets[0].File.FileName() != paths["a.ts"] {
+	if len(pluginTargets) != 1 || pluginTargets[0].File.FileName().AsString() != paths["a.ts"] {
 		t.Fatalf("prepared plugin projection = %+v, want only a.ts", pluginTargets)
 	}
 	if len(pluginTargets[0].Rules) != 2 {
@@ -352,7 +353,7 @@ func TestLintPlanRunsSourceOnlyProgramWithoutChecker(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{
 		"gap.ts": "const gap = missing;",
 	})
-	file := program.GetSourceFile(paths["gap.ts"])
+	file := program.GetSourceFile(pathutil.File(paths["gap.ts"]))
 	if file == nil {
 		t.Fatal("fixture Program did not contain gap.ts")
 	}
@@ -363,7 +364,7 @@ func TestLintPlanRunsSourceOnlyProgramWithoutChecker(t *testing.T) {
 	programs := testPrograms(sourceOnly)
 	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
 		Programs:         programs,
-		TargetsByProgram: [][]string{{file.FileName()}},
+		TargetsByProgram: [][]string{{file.FileName().AsString()}},
 		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{
@@ -439,8 +440,8 @@ func TestSourceOnlyPlanSeparatesUniverseFromExecutionProjection(t *testing.T) {
 		"a.ts": "export const a = 1;",
 		"b.ts": "export const b = 1;",
 	})
-	a := program.GetSourceFile(paths["a.ts"])
-	b := program.GetSourceFile(paths["b.ts"])
+	a := program.GetSourceFile(pathutil.File(paths["a.ts"]))
+	b := program.GetSourceFile(pathutil.File(paths["b.ts"]))
 	if a == nil || b == nil {
 		t.Fatal("fixture Program did not contain both source files")
 	}
@@ -450,7 +451,7 @@ func TestSourceOnlyPlanSeparatesUniverseFromExecutionProjection(t *testing.T) {
 	programs := testPrograms(sourceOnly)
 	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
 		Programs:         programs,
-		TargetsByProgram: [][]string{{a.FileName()}},
+		TargetsByProgram: [][]string{{a.FileName().AsString()}},
 		SingleThreaded:   true,
 		GetRulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
 			resolved.Add(1)
@@ -499,8 +500,8 @@ func TestSourceOnlyProgramSharesModuleGraphAndDerivedCache(t *testing.T) {
 		"b.ts": `import "./a"; export const b = 1;`,
 	})
 	files := []*ast.SourceFile{
-		program.GetSourceFile(paths["a.ts"]),
-		program.GetSourceFile(paths["b.ts"]),
+		program.GetSourceFile(pathutil.File(paths["a.ts"])),
+		program.GetSourceFile(pathutil.File(paths["b.ts"])),
 	}
 	for i, file := range files {
 		if file == nil {
@@ -513,7 +514,7 @@ func TestSourceOnlyProgramSharesModuleGraphAndDerivedCache(t *testing.T) {
 	programs := testPrograms(sourceOnly)
 	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
 		Programs:         programs,
-		TargetsByProgram: [][]string{{files[0].FileName(), files[1].FileName()}},
+		TargetsByProgram: [][]string{{files[0].FileName().AsString(), files[1].FileName().AsString()}},
 		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
@@ -564,8 +565,8 @@ func TestSourceOnlyProgramRunsProgramIndexedImportRule(t *testing.T) {
 		"b.ts": `import "./a"; export const b = 1;`,
 	})
 	files := []*ast.SourceFile{
-		program.GetSourceFile(paths["a.ts"]),
-		program.GetSourceFile(paths["b.ts"]),
+		program.GetSourceFile(pathutil.File(paths["a.ts"])),
+		program.GetSourceFile(pathutil.File(paths["b.ts"])),
 	}
 	for i, file := range files {
 		if file == nil {
@@ -578,7 +579,7 @@ func TestSourceOnlyProgramRunsProgramIndexedImportRule(t *testing.T) {
 	programs := testPrograms(sourceOnly)
 	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
 		Programs:         programs,
-		TargetsByProgram: [][]string{{files[0].FileName()}},
+		TargetsByProgram: [][]string{{files[0].FileName().AsString()}},
 		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
@@ -630,7 +631,7 @@ func checkerFreeExecutionTestOptions(
 	program, paths := createTestProgramWithFiles(t, sources)
 	files := make([]*ast.SourceFile, 0, fileCount)
 	for _, name := range names {
-		file := program.GetSourceFile(paths[name])
+		file := program.GetSourceFile(pathutil.File(paths[name]))
 		if file == nil {
 			t.Fatalf("fixture Program did not contain %s", name)
 		}
@@ -639,7 +640,7 @@ func checkerFreeExecutionTestOptions(
 	programs := testPrograms(mustSourceOnlyTestProgram(t, program, files))
 	targets := make([]string, len(files))
 	for index, file := range files {
-		targets[index] = file.FileName()
+		targets[index] = file.FileName().AsString()
 	}
 	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
 		Programs:         programs,

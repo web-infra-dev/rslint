@@ -216,7 +216,7 @@ func lintNoNullWithDemand(t testing.TB, source string, demand rule.EditDemand) r
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, source, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	diagnostics := make([]rule.RuleDiagnostic, 0, 1)

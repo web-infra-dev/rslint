@@ -37,6 +37,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/testutil/estree"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type commandReadCountingFS struct {
@@ -51,10 +52,10 @@ type commandRealpathCountingFS struct {
 	calls map[string]int
 }
 
-func (fsys *commandRealpathCountingFS) Realpath(fileName string) string {
-	fileName = tspath.NormalizePath(fileName)
+func (fsys *commandRealpathCountingFS) Realpath(fileName tspath.RootedPath) tspath.RootedPath {
+	fileName = pathutil.Path(tspath.NormalizePath(fileName.AsString()))
 	fsys.mu.Lock()
-	fsys.calls[fileName]++
+	fsys.calls[fileName.AsString()]++
 	fsys.mu.Unlock()
 	return fsys.FS.Realpath(fileName)
 }
@@ -65,10 +66,10 @@ func (fsys *commandRealpathCountingFS) callCount(fileName string) int {
 	return fsys.calls[tspath.NormalizePath(fileName)]
 }
 
-func (fsys *commandReadCountingFS) ReadFile(fileName string) (string, bool) {
-	fileName = tspath.NormalizePath(fileName)
+func (fsys *commandReadCountingFS) ReadFile(fileName tspath.RootedFilePath) (string, bool) {
+	fileName = pathutil.File(tspath.NormalizePath(fileName.AsString()))
 	fsys.mu.Lock()
-	fsys.reads[fileName]++
+	fsys.reads[fileName.AsString()]++
 	fsys.mu.Unlock()
 	return fsys.FS.ReadFile(fileName)
 }
@@ -135,15 +136,15 @@ type directoryAccessSpyFS struct {
 	gitignoreReads []string
 }
 
-func (fs *directoryAccessSpyFS) ReadFile(path string) (string, bool) {
-	if filepath.Base(path) == ".gitignore" {
-		fs.gitignoreReads = append(fs.gitignoreReads, tspath.NormalizePath(path))
+func (fs *directoryAccessSpyFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if filepath.Base(path.AsString()) == ".gitignore" {
+		fs.gitignoreReads = append(fs.gitignoreReads, tspath.NormalizePath(path.AsString()))
 	}
 	return fs.FS.ReadFile(path)
 }
 
-func (fs *directoryAccessSpyFS) GetAccessibleEntries(path string) vfs.Entries {
-	fs.accessedDirs = append(fs.accessedDirs, tspath.NormalizePath(path))
+func (fs *directoryAccessSpyFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	fs.accessedDirs = append(fs.accessedDirs, tspath.NormalizePath(path.AsString()))
 	return fs.FS.GetAccessibleEntries(path)
 }
 
@@ -209,7 +210,7 @@ func TestPrintDiagnosticUTF8(t *testing.T) {
 			// Find source file
 			var sourceFile *ast.SourceFile
 			for _, file := range program.GetSourceFiles() {
-				if strings.HasSuffix(file.FileName(), "index.ts") {
+				if strings.HasSuffix(file.FileName().AsString(), "index.ts") {
 					sourceFile = file
 					break
 				}
@@ -242,7 +243,7 @@ func TestPrintDiagnosticUTF8(t *testing.T) {
 				Severity: rule.SeverityWarning,
 			}
 
-			comparePathOptions := tspath.ComparePathsOptions{
+			comparePathOptions := pathutil.ComparePathsOptions{
 				CurrentDirectory:          tmpDir,
 				UseCaseSensitiveFileNames: true,
 			}
@@ -269,7 +270,7 @@ func TestPrintDiagnosticUTF8(t *testing.T) {
 
 // createTestDiagnostic is a helper that creates a program from source, then builds a
 // RuleDiagnostic spanning from startOffset to endOffset in the source text.
-func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset int) (rule.RuleDiagnostic, tspath.ComparePathsOptions) {
+func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset int) (rule.RuleDiagnostic, pathutil.ComparePathsOptions) {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -289,7 +290,7 @@ func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset in
 
 	var sourceFile *ast.SourceFile
 	for _, file := range program.GetSourceFiles() {
-		if strings.HasSuffix(file.FileName(), "index.ts") {
+		if strings.HasSuffix(file.FileName().AsString(), "index.ts") {
 			sourceFile = file
 			break
 		}
@@ -301,12 +302,12 @@ func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset in
 	diagnostic := rule.RuleDiagnostic{
 		RuleName:   "test-rule",
 		SourceFile: sourceFile,
-		FilePath:   sourceFile.FileName(),
+		FilePath:   sourceFile.FileName().AsString(),
 		Range:      core.NewTextRange(startOffset, endOffset),
 		Message:    rule.RuleMessage{Id: "test", Description: "Test diagnostic"},
 		Severity:   rule.SeverityError,
 	}
-	comparePathOptions := tspath.ComparePathsOptions{
+	comparePathOptions := pathutil.ComparePathsOptions{
 		CurrentDirectory:          tmpDir,
 		UseCaseSensitiveFileNames: true,
 	}
@@ -314,7 +315,7 @@ func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset in
 }
 
 // renderDiagnostic renders a diagnostic and returns the output string.
-func renderDiagnostic(t *testing.T, d rule.RuleDiagnostic, opts tspath.ComparePathsOptions) string {
+func renderDiagnostic(t *testing.T, d rule.RuleDiagnostic, opts pathutil.ComparePathsOptions) string {
 	t.Helper()
 	var buf bytes.Buffer
 	report, err := assembleLintReport(lintReportInput{
@@ -804,7 +805,7 @@ func TestValidateTypeCheckOnlyFlags_FixTakesPriority(t *testing.T) {
 }
 
 func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
-	directory := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	directory := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	write := func(name string, content string) string {
 		t.Helper()
 		filePath := filepath.Join(directory, name)
@@ -851,7 +852,7 @@ func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
 }
 
 func TestHandleLintCommandTypeCheckProjectConstructionOrder(t *testing.T) {
-	directory := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	directory := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	targetPath := tspath.ResolvePath(directory, "target.ts")
 	if err := os.WriteFile(targetPath, []byte("export const value = 1;\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -1146,7 +1147,7 @@ func TestHandleLintCommandConfigCatalogSelection(t *testing.T) {
 }
 
 func TestHandleLintCommandBuildsOnlySelectedProjects(t *testing.T) {
-	parent := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	parent := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	dir := tspath.ResolvePath(parent, "pkg")
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -1272,7 +1273,7 @@ func TestHandleLintCommandDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *testi
 	}
 	unrelatedDir = tspath.NormalizePath(unrelatedDir)
 	for _, accessed := range spy.accessedDirs {
-		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+		if accessed == unrelatedDir || pathutil.StartsWithDirectory(accessed, unrelatedDir, true) {
 			t.Fatalf("directory target entered unrelated directory %q", accessed)
 		}
 	}
@@ -1318,14 +1319,14 @@ func TestHandleLintCommandExplicitConfigDirectoryTargetInheritsAncestorGitignore
 		t.Fatalf("ancestor Git rule failed to suppress selected file: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	for _, source := range []string{filepath.Join(repositoryRoot, ".gitignore"), filepath.Join(cwd, ".gitignore"), filepath.Join(selectedDir, ".gitignore")} {
-		physical := tspath.CombinePaths(osvfs.FS().Realpath(filepath.Dir(source)), ".gitignore")
+		physical := tspath.CombinePaths(osvfs.FS().Realpath(pathutil.Path(filepath.Dir(source))).AsString(), ".gitignore")
 		if !slices.Contains(spy.gitignoreReads, physical) {
 			t.Fatalf("ancestor/target source %s not observed: %v", physical, spy.gitignoreReads)
 		}
 	}
 	unrelatedDir = tspath.NormalizePath(unrelatedDir)
 	for _, accessed := range spy.accessedDirs {
-		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+		if accessed == unrelatedDir || pathutil.StartsWithDirectory(accessed, unrelatedDir, true) {
 			t.Fatalf("explicit config target entered unrelated directory %q", accessed)
 		}
 	}
@@ -1585,7 +1586,7 @@ func TestShouldShortCircuitMachineOutput_LintModeKeepsRunningOtherwise(t *testin
 // (what the message looks like) are pinned independently.
 
 func TestFormatAllowFileWarning_NotFound(t *testing.T) {
-	opts := tspath.ComparePathsOptions{CurrentDirectory: "/work", UseCaseSensitiveFileNames: true}
+	opts := pathutil.ComparePathsOptions{CurrentDirectory: "/work", UseCaseSensitiveFileNames: true}
 	msg := formatAllowFileWarning(allowFileWarning{Path: "/work/missing.ts", Kind: allowFileNotFound}, opts)
 	if !strings.Contains(msg, "missing.ts") {
 		t.Errorf("message should contain file name, got %q", msg)
@@ -1602,7 +1603,7 @@ func TestFormatAllowFileWarning_NotFound(t *testing.T) {
 }
 
 func TestFormatAllowFileWarning_Ignored(t *testing.T) {
-	opts := tspath.ComparePathsOptions{CurrentDirectory: "/work", UseCaseSensitiveFileNames: true}
+	opts := pathutil.ComparePathsOptions{CurrentDirectory: "/work", UseCaseSensitiveFileNames: true}
 	msg := formatAllowFileWarning(allowFileWarning{Path: "/work/src/x.ts", Kind: allowFileIgnored}, opts)
 	if !strings.Contains(msg, "src/x.ts") {
 		t.Errorf("message should contain relative path, got %q", msg)
@@ -1615,7 +1616,7 @@ func TestFormatAllowFileWarning_Ignored(t *testing.T) {
 func TestFormatAllowFileWarning_UnknownKindIsEmpty(t *testing.T) {
 	// Defensive: future Kind enum additions shouldn't crash callers if
 	// formatter isn't updated. Empty string is the agreed sentinel.
-	msg := formatAllowFileWarning(allowFileWarning{Path: "/x.ts", Kind: allowFileWarningKind(99)}, tspath.ComparePathsOptions{})
+	msg := formatAllowFileWarning(allowFileWarning{Path: "/x.ts", Kind: allowFileWarningKind(99)}, pathutil.ComparePathsOptions{})
 	if msg != "" {
 		t.Errorf("unknown kind should produce empty message, got %q", msg)
 	}
@@ -1936,7 +1937,7 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		TargetsByProgram: targetsByProgram,
 		SingleThreaded:   true,
 		GetRulesForFile: func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			return fileConfigResolver.EnabledRulesForSourcePath(sf.FileName())
+			return fileConfigResolver.EnabledRulesForSourcePath(sf.FileName().AsString())
 		},
 	})
 	if err != nil {
@@ -2178,8 +2179,8 @@ func findProgramFileForTest(t *testing.T, program *compiler.Program, suffix stri
 	normalizedSuffix := strings.ReplaceAll(suffix, "\\", "/")
 	for _, sf := range program.GetSourceFiles() {
 		name := sf.FileName()
-		if strings.HasSuffix(name, normalizedSuffix) {
-			return name
+		if strings.HasSuffix(name.AsString(), normalizedSuffix) {
+			return name.AsString()
 		}
 	}
 	t.Fatalf("program file with suffix %q not found", suffix)
@@ -2431,7 +2432,7 @@ func TestCLIFinalChangeCommitterKeepsFrozenAliasTarget(t *testing.T) {
 	for _, leaf := range []bool{false, true} {
 		for _, sameContent := range []bool{false, true} {
 			t.Run(fmt.Sprintf("leaf=%t/same-content=%t", leaf, sameContent), func(t *testing.T) {
-				root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+				root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 				first, second := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "second")
 				for _, directory := range []string{first, second} {
 					if err := os.Mkdir(directory, 0o755); err != nil {
@@ -2497,7 +2498,7 @@ func TestCLIFinalChangeCommitterKeepsFrozenAliasTarget(t *testing.T) {
 }
 
 func TestCLIFinalChangeCommitterRejectsStaleCanonicalTarget(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	first, second, alias := tspath.ResolvePath(root, "first.ts"), tspath.ResolvePath(root, "second.ts"), tspath.ResolvePath(root, "alias.ts")
 	for _, file := range []string{first, second} {
 		if err := os.WriteFile(file, []byte("before"), 0o644); err != nil {
@@ -2529,7 +2530,7 @@ func TestCLIFinalChangeCommitterRejectsStaleCanonicalTarget(t *testing.T) {
 }
 
 func TestCLIFinalChangeCommitterRejectsUnselectedPathBeforeAnyWrite(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	first, second, alias := tspath.ResolvePath(root, "first.ts"), tspath.ResolvePath(root, "second.ts"), tspath.ResolvePath(root, "unselected.ts")
 	for _, file := range []string{first, second} {
 		if err := os.WriteFile(file, []byte("before"), 0o644); err != nil {

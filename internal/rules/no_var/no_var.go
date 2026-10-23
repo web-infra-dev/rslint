@@ -273,7 +273,7 @@ func isGlobalVar(varScope *ast.Node, ctx *rule.RuleContext) bool {
 
 // Condition 4: isRedeclared checks if a symbol has multiple declarations.
 func isRedeclared(sym *ast.Symbol) bool {
-	return sym != nil && len(sym.Declarations) >= 2
+	return sym != nil && len(sym.Declarations()) >= 2
 }
 
 // isRedeclaredByFunction covers the one legal value-space redeclaration that
@@ -300,7 +300,7 @@ func isRedeclaredByFunction(nameNode *ast.Node, ownSymbol *ast.Symbol, scopeNode
 			return true
 		}
 		if owner := current.Symbol(); owner != nil &&
-			symbolDeclaresFunction(owner.Exports[name], ownSymbol) {
+			symbolDeclaresFunction(owner.Exports()[name], ownSymbol) {
 			return true
 		}
 		if current == last {
@@ -314,7 +314,7 @@ func symbolDeclaresFunction(symbol *ast.Symbol, ownSymbol *ast.Symbol) bool {
 	if symbol == nil || symbol == ownSymbol {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration.Kind == ast.KindFunctionDeclaration {
 			return true
 		}

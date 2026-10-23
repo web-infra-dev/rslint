@@ -68,14 +68,14 @@ var NoRelativeParentImportsRule = rule.Rule{
 			if !found || resolvedPath == "" || settings.IsExternalResolvedImport(ctx, source.Text(), resolvedPath) {
 				continue
 			}
-			relativePath, err := filepath.Rel(tspath.GetDirectoryPath(fileName), resolvedPath)
+			relativePath, err := filepath.Rel(tspath.GetDirectoryPath(fileName.AsString()), resolvedPath)
 			if err != nil || settings.IsInternalSpecifier(relativePath) ||
 				!strings.HasPrefix(relativePath, "../") && !strings.HasPrefix(relativePath, `..\`) {
 				continue
 			}
 			ctx.ReportNode(source, rule.RuleMessage{Description: fmt.Sprintf(
 				"Relative imports from parent directories are not allowed. Please either pass what you're importing through at runtime (dependency injection), move `%s` to same directory as `%s` or consider making `%s` a package.",
-				tspath.GetBaseFileName(fileName), source.Text(), source.Text(),
+				tspath.GetBaseFileName(fileName.AsString()), source.Text(), source.Text(),
 			)})
 		}
 		return nil

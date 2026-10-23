@@ -810,7 +810,7 @@ func TestPreferTemplateEditDemand(t *testing.T) {
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, `const text = "item-" + value + "-done";`, core.ScriptKindTS)
 	var stringNode *ast.Node
 	var visit func(*ast.Node) bool

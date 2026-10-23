@@ -1,7 +1,7 @@
 import { lint } from '@rslint/core/internal';
 import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
-import { RemoteSourceFile } from '@rslint/api';
+import { RemoteSourceFile, SyntaxKind } from '@rslint/api';
 
 // rslint's JavaScript API takes a config OBJECT (Go never reads config from disk, and
 // there is no separate ruleOptions surface). A single-rule config keeps each
@@ -117,6 +117,35 @@ describe('encoded source files', async (t) => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
   let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
   const fileContent = `let x: string = "hello";const y = x as string;`;
+  test('TypeScript 7.1 import syntax survives the Go-to-JS encoding', async () => {
+    const source = `import source Wasm from './module.wasm';
+declare module '*' with { type: 'text' } { const text: string; export default text; }
+export const compiled = Wasm;`;
+    const result = await lint({
+      config: cfg(
+        './tsconfig.virtual.json',
+        '@typescript-eslint/no-unnecessary-type-assertion',
+      ),
+      configDirectory: cwd,
+      workingDirectory: cwd,
+      includeEncodedSourceFiles: true,
+      fileContents: { [virtual_entry]: source },
+    });
+    const bytes = Uint8Array.from(
+      atob(result.encodedSourceFiles['src/virtual.ts']),
+      (character) => character.charCodeAt(0),
+    );
+    const file = new RemoteSourceFile(bytes, new TextDecoder());
+    expect(file.text).toBe(source);
+    const [importDeclaration, ambientModule] = file.statements;
+    expect(importDeclaration.kind).toBe(SyntaxKind.ImportDeclaration);
+    expect(importDeclaration.importClause.phaseModifier).toBe(
+      SyntaxKind.SourceKeyword,
+    );
+    expect(ambientModule.kind).toBe(SyntaxKind.ModuleDeclaration);
+    expect(ambientModule.attributes.kind).toBe(SyntaxKind.TypeLiteral);
+    expect(ambientModule.attributes.members[0].name.text).toBe('type');
+  });
   test('encoded source files', async (t) => {
     const diags = await lint({
       config: cfg(

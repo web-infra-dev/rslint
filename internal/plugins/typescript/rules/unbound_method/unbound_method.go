@@ -138,7 +138,7 @@ func isSafeUse(node *ast.Node) bool {
 }
 
 func isNotImported(symbol *ast.Symbol, currentSourceFile *ast.SourceFile) bool {
-	decl := symbol.ValueDeclaration
+	decl := symbol.ValueDeclaration()
 	if decl == nil {
 		// working around https://github.com/microsoft/TypeScript/issues/31294
 		return false
@@ -191,7 +191,7 @@ func checkMethod(valueDeclaration *ast.Node, ignoreStatic bool) ( /* dangerous *
 }
 
 func checkIfMethod(symbol *ast.Symbol, ignoreStatic bool) ( /* dangerous */ bool /* firstParamIsThis */, bool) {
-	valueDeclaration := symbol.ValueDeclaration
+	valueDeclaration := symbol.ValueDeclaration()
 	if valueDeclaration == nil {
 		// working around https://github.com/microsoft/TypeScript/issues/31294
 		return false, false

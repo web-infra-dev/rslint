@@ -9,8 +9,9 @@
     "url": "https://github.com/web-infra-dev/rslint"
   },
   "scripts": {
-    "build": "rs lib",
-    "compile": "tsgo -p tsconfig.build.json"
+    "build": "pnpm run build:compiler && rs lib",
+    "build:compiler": "go build -o ../../typescript-go/built/local/ ../../typescript-go/tsc/cmd/tsc",
+    "compile": "pnpm run build:compiler && node ../../typescript-go/packages/typescript/bin/tsc -p tsconfig.build.json"
   },
   "keywords": [],
   "author": "",

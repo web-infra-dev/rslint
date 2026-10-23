@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func newTestReport(diagnostics []Diagnostic, summary Summary) Report {
@@ -215,7 +215,7 @@ func renderDefaultLineBreakFixture(
 	var rendered bytes.Buffer
 	if err := Render(&rendered, report, Options{
 		Format: FormatDefault,
-		ComparePaths: tspath.ComparePathsOptions{
+		ComparePaths: pathutil.ComparePathsOptions{
 			CurrentDirectory:          "/repo",
 			UseCaseSensitiveFileNames: true,
 		},
@@ -900,7 +900,7 @@ type failingWriter struct{ err error }
 
 func (w failingWriter) Write(_ []byte) (int, error) { return 0, w.err }
 
-func createOutputTestDiagnostic(t *testing.T, severity Severity) (Diagnostic, tspath.ComparePathsOptions) {
+func createOutputTestDiagnostic(t *testing.T, severity Severity) (Diagnostic, pathutil.ComparePathsOptions) {
 	t.Helper()
 	dir := t.TempDir()
 	source := "const value = 1;\n"
@@ -921,5 +921,5 @@ func createOutputTestDiagnostic(t *testing.T, severity Severity) (Diagnostic, ts
 		Source:   projectedSource,
 		Message:  "test message",
 		Severity: severity,
-	}, tspath.ComparePathsOptions{CurrentDirectory: dir, UseCaseSensitiveFileNames: true}
+	}, pathutil.ComparePathsOptions{CurrentDirectory: dir, UseCaseSensitiveFileNames: true}
 }

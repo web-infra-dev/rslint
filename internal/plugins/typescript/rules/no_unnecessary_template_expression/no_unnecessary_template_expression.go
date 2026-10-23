@@ -284,7 +284,7 @@ var NoUnnecessaryTemplateExpressionRule = rule.CreateRule(rule.Rule{
 		isEnumMemberType := func(t *checker.Type) bool {
 			return utils.TypeRecurser(t, func(t *checker.Type) bool {
 				symbol := checker.Type_symbol(t)
-				return symbol != nil && symbol.ValueDeclaration != nil && ast.IsEnumMember(symbol.ValueDeclaration)
+				return symbol != nil && symbol.ValueDeclaration() != nil && ast.IsEnumMember(symbol.ValueDeclaration())
 			})
 		}
 

@@ -11,7 +11,7 @@ import (
 func TestOutermostParenthesizedExpression(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, "consume((((value)))); consume(plain);", core.ScriptKindTS)
 
 	value := findNodeWithText(t, sourceFile, "value")
@@ -56,7 +56,7 @@ func TestESTreeCallCallee(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/case.ts",
-				Path:     "/case.ts",
+				PathKey:  "/case.ts",
 			}, test.code, test.scriptKind)
 			var call *ast.Node
 			VisitDescendants(sourceFile.AsNode(), func(node *ast.Node) bool {

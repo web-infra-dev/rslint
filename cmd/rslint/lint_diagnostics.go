@@ -8,6 +8,7 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type typeScriptDiagnosticDedupeKey struct {
@@ -121,8 +122,8 @@ type allowFileWarning struct {
 // formatAllowFileWarning renders an allowFileWarning for stderr emission,
 // resolving the absolute path against comparePathOptions. Returns "" for
 // unknown kinds so callers can safely ignore the empty case.
-func formatAllowFileWarning(w allowFileWarning, opts tspath.ComparePathsOptions) string {
-	rel := tspath.ConvertToRelativePath(w.Path, opts)
+func formatAllowFileWarning(w allowFileWarning, opts pathutil.ComparePathsOptions) string {
+	rel := pathutil.ConvertToRelativePath(w.Path, opts)
 	switch w.Kind {
 	case allowFileNotFound:
 		return fmt.Sprintf("warning: %s was not found, skipping", rel)

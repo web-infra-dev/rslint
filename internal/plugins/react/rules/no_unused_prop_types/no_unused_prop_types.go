@@ -554,7 +554,7 @@ func declaredProps(node *ast.Node, customValidators []string, wrappers []reactut
 		if node.Kind == ast.KindIdentifier {
 			if symbol := resolve(node); symbol != nil {
 				var initializer *ast.Node
-				for _, declaration := range symbol.Declarations {
+				for _, declaration := range symbol.Declarations() {
 					if declaration.Kind == ast.KindVariableDeclaration {
 						if value := declaration.AsVariableDeclaration().Initializer; value != nil {
 							initializer = value

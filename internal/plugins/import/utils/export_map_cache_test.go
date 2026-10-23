@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // exportMapNames is the set of names a map exposes, in a form tests can
@@ -54,7 +55,7 @@ func contextsForFilesWithCompiler(t *testing.T, files map[string]string, entries
 	sourceProgram := lintprogram.NewFromCompiler(program)
 	contexts := make([]rule.RuleContext, 0, len(entries))
 	for _, entry := range entries {
-		sourceFile := program.GetSourceFile(entry)
+		sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(entry, pathutil.Directory(rootDir.Dir)))
 		if sourceFile == nil {
 			t.Fatalf("entry %q was not parsed", entry)
 		}

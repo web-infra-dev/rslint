@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // IsInStrictMode checks whether a node is in strict mode code.
@@ -18,7 +19,7 @@ import (
 // the class.
 func IsInStrictMode(node *ast.Node, sourceFile *ast.SourceFile) bool {
 	sourceType := "script"
-	if tspath.GetAnyExtensionFromPath(sourceFile.FileName(), nil, false) == tspath.ExtensionCjs {
+	if pathutil.GetAnyExtensionFromPath(sourceFile.FileName().AsString(), nil, false) == tspath.ExtensionCjs {
 		sourceType = "commonjs"
 	} else if ast.IsExternalModule(sourceFile) {
 		sourceType = "module"

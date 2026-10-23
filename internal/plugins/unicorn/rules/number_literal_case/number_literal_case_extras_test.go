@@ -86,7 +86,7 @@ func TestNumberLiteralCaseEditDemand(t *testing.T) {
 	const source = `const values = [0Xab, 0Xabn];`
 	const fixedSource = `const values = [0xAB, 0xABn];`
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: "/edit-demand.ts", Path: "/edit-demand.ts",
+		FileName: "/edit-demand.ts", PathKey: "/edit-demand.ts",
 	}, source, core.ScriptKindTS)
 
 	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {

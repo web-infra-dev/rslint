@@ -26,7 +26,7 @@ func (b *Builder) BuildShallowNodeInfo(node *ast.Node) *NodeInfo {
 	nodeFile := ast.GetSourceFileOfNode(node)
 	if nodeFile != nil && nodeFile != b.sourceFile {
 		// External file - set FileName for fetching from that file
-		info.FileName = nodeFile.FileName()
+		info.FileName = nodeFile.FileName().AsString()
 	}
 	// Get text for identifiers and literals
 	if text := GetNodeText(node); text != "" {

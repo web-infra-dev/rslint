@@ -339,7 +339,7 @@ func (a *analyzer) typeProps(n *ast.Node, visiting map[*ast.Node]bool, memo map[
 		if name.Kind == ast.KindIdentifier {
 			symbol := a.ctx.Refs.Resolve(name)
 			if symbol != nil {
-				for _, declaration := range symbol.Declarations {
+				for _, declaration := range symbol.Declarations() {
 					if ast.GetSourceFileOfNode(declaration) == a.ctx.SourceFile && (declaration.Kind == ast.KindTypeAliasDeclaration || declaration.Kind == ast.KindInterfaceDeclaration) {
 						merge(declaration)
 					}

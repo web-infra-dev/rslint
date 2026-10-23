@@ -29,7 +29,7 @@ func TestRstestConcurrentContextIsSharedPerFile(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/concurrent-context.test.ts",
-			Path:     "/concurrent-context.test.ts",
+			PathKey:  "/concurrent-context.test.ts",
 		},
 		`test.concurrent("x", () => marker());`,
 		core.ScriptKindTS,
@@ -278,13 +278,13 @@ func TestRstestCallbackOwnershipSourceOnlyScopesAndWrites(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(
 				ast.SourceFileParseOptions{
 					FileName: "/ownership.test.ts",
-					Path:     "/ownership.test.ts",
+					PathKey:  "/ownership.test.ts",
 				},
 				testCase.code,
 				core.ScriptKindTS,
 			)
 			binder.BindSourceFile(sourceFile)
-			_, refsInit, _ := rule.ResolveLanguageDefaults(sourceFile.FileName(), rule.LanguageOptions{})
+			_, refsInit, _ := rule.ResolveLanguageDefaults(sourceFile.FileName().AsString(), rule.LanguageOptions{})
 			ctx := rule.RuleContext{
 				SourceFile: sourceFile,
 				Refs:       rule.NewRefStore(sourceFile, &core.CompilerOptions{}, nil, refsInit),

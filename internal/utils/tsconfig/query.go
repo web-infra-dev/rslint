@@ -1,11 +1,11 @@
 package tsconfig
 
 import (
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type nearestConfigKey string
@@ -19,8 +19,7 @@ func Read(p *program.Program, fileName string) *core.CompilerOptions {
 	}
 	fileName = tspath.ResolvePath(p.CurrentDirectory(), fileName)
 	return program.Cached(p, compilerOptionsKey(fileName), func() *core.CompilerOptions {
-		host := compiler.NewCompilerHost(p.CurrentDirectory(), p.FS(), p.DefaultLibraryPath(), nil, nil, nil)
-		parsed, _ := tsoptions.GetParsedCommandLineOfConfigFile(fileName, &core.CompilerOptions{}, nil, host, nil)
+		parsed, _ := tsoptions.GetParsedCommandLineOfConfigFile(pathutil.File(fileName), &core.CompilerOptions{}, nil, p.FS(), nil)
 		if parsed != nil {
 			return parsed.CompilerOptions()
 		}
@@ -38,7 +37,7 @@ func FindNearest(p *program.Program, fileName string) *core.CompilerOptions {
 	return program.Cached(p, nearestConfigKey(directory), func() *core.CompilerOptions {
 		config, found := tspath.ForEachAncestorDirectory(directory, func(directory string) (string, bool) {
 			config := tspath.ResolvePath(directory, "tsconfig.json")
-			return config, p.FS().FileExists(config)
+			return config, p.FS().FileExists(pathutil.File(config))
 		})
 		if found {
 			return Read(p, config)

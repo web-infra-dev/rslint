@@ -56,7 +56,7 @@ func isTypeReadonly(
 	// This preserves aliases around unions, which otherwise lose their identity
 	// while their constituents are inspected.
 	if alias := checker.Type_alias(t); alias != nil && alias.Symbol() != nil {
-		aliasName := alias.Symbol().Name
+		aliasName := alias.Symbol().Name()
 		for _, specifier := range options.Allow {
 			if utils.Some(specifier.Name, func(name string) bool { return name == aliasName }) {
 				return readonlynessReadonly
@@ -154,7 +154,7 @@ func isReadonlyArrayOrTuple(
 	}
 
 	if typeChecker.IsArrayType(t) {
-		if symbol := checker.Type_symbol(t); symbol != nil && symbol.Name == "Array" {
+		if symbol := checker.Type_symbol(t); symbol != nil && symbol.Name() == "Array" {
 			return readonlynessMutable
 		}
 		return checkTypeArguments()
@@ -183,7 +183,7 @@ func isReadonlyObject(
 		if isPrivateProperty(property) {
 			continue
 		}
-		if !isPropertyReadonly(typeChecker, t, property.Name) {
+		if !isPropertyReadonly(typeChecker, t, property.Name()) {
 			return readonlynessMutable
 		}
 	}
@@ -196,10 +196,10 @@ func isReadonlyObject(
 		// which is `any` for these escaped property symbols. tsgo's equivalent API
 		// exposes the authored value type instead, so omit the deep value walk while
 		// retaining the readonly-property check above.
-		if strings.HasPrefix(property.Name, ast.InternalSymbolNamePrefix+"@") {
+		if strings.HasPrefix(property.Name(), ast.InternalSymbolNamePrefix+"@") {
 			continue
 		}
-		propertyType := typeChecker.GetTypeOfPropertyOfType(t, property.Name)
+		propertyType := typeChecker.GetTypeOfPropertyOfType(t, property.Name())
 		if propertyType == nil {
 			return readonlynessMutable
 		}
@@ -235,16 +235,16 @@ func isReadonlyObject(
 }
 
 func isMethodProperty(property *ast.Symbol) bool {
-	if property.Flags&ast.SymbolFlagsMethod != 0 {
+	if property.Flags()&ast.SymbolFlagsMethod != 0 {
 		return true
 	}
-	if declaration := property.ValueDeclaration; declaration != nil {
-		if symbol := declaration.Symbol(); symbol != nil && symbol.Flags&ast.SymbolFlagsMethod != 0 {
+	if declaration := property.ValueDeclaration(); declaration != nil {
+		if symbol := declaration.Symbol(); symbol != nil && symbol.Flags()&ast.SymbolFlagsMethod != 0 {
 			return true
 		}
 	}
-	if len(property.Declarations) > 0 {
-		if symbol := property.Declarations[len(property.Declarations)-1].Symbol(); symbol != nil && symbol.Flags&ast.SymbolFlagsMethod != 0 {
+	if len(property.Declarations()) > 0 {
+		if symbol := property.Declarations()[len(property.Declarations())-1].Symbol(); symbol != nil && symbol.Flags()&ast.SymbolFlagsMethod != 0 {
 			return true
 		}
 	}
@@ -252,7 +252,7 @@ func isMethodProperty(property *ast.Symbol) bool {
 }
 
 func isPrivateProperty(property *ast.Symbol) bool {
-	declaration := property.ValueDeclaration
+	declaration := property.ValueDeclaration()
 	if declaration == nil {
 		return false
 	}
@@ -276,8 +276,8 @@ func isPropertyReadonly(typeChecker *checker.Checker, t *checker.Type, name stri
 	// does, apply explicit modifiers to every key spelling and inherit a source
 	// property's modifier only when the name type filters rather than remaps.
 	if checker.Type_objectFlags(t)&checker.ObjectFlagsMapped != 0 {
-		if symbol := checker.Type_symbol(t); symbol != nil && len(symbol.Declarations) > 0 {
-			declaration := symbol.Declarations[0]
+		if symbol := checker.Type_symbol(t); symbol != nil && len(symbol.Declarations()) > 0 {
+			declaration := symbol.Declarations()[0]
 			if declaration.Kind == ast.KindMappedType {
 				mapped := declaration.AsMappedTypeNode()
 				readonlyToken := mapped.ReadonlyToken
@@ -298,16 +298,16 @@ func isPropertyReadonly(typeChecker *checker.Checker, t *checker.Type, name stri
 	if property == nil {
 		return false
 	}
-	if property.CheckFlags&ast.CheckFlagsReadonly != 0 || property.Flags&ast.SymbolFlagsValueModule != 0 {
+	if property.CheckFlags()&ast.CheckFlagsReadonly != 0 || property.Flags()&ast.SymbolFlagsValueModule != 0 {
 		return true
 	}
-	if property.Flags&ast.SymbolFlagsGetAccessor != 0 && property.Flags&ast.SymbolFlagsSetAccessor == 0 {
+	if property.Flags()&ast.SymbolFlagsGetAccessor != 0 && property.Flags()&ast.SymbolFlagsSetAccessor == 0 {
 		return true
 	}
-	if property.Flags&ast.SymbolFlagsEnumMember != 0 {
+	if property.Flags()&ast.SymbolFlagsEnumMember != 0 {
 		return true
 	}
-	for _, declaration := range property.Declarations {
+	for _, declaration := range property.Declarations() {
 		if declaration.ModifierFlags()&ast.ModifierFlagsReadonly != 0 ||
 			isConstVariableDeclaration(declaration) ||
 			isReadonlyAssignmentDeclaration(typeChecker, declaration) {
@@ -335,7 +335,7 @@ func isReadonlyAssignmentDeclaration(typeChecker *checker.Checker, declaration *
 			return false
 		}
 		var writableType *checker.Type
-		if valueDeclaration := writableProperty.ValueDeclaration; valueDeclaration != nil && valueDeclaration.Kind == ast.KindPropertyAssignment {
+		if valueDeclaration := writableProperty.ValueDeclaration(); valueDeclaration != nil && valueDeclaration.Kind == ast.KindPropertyAssignment {
 			writableType = typeChecker.GetTypeAtLocation(valueDeclaration.Initializer())
 		} else {
 			writableType = checker.Checker_getTypeOfSymbol(typeChecker, writableProperty)

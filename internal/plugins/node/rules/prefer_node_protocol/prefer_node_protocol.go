@@ -137,10 +137,10 @@ func isNodeBinding(ctx rule.RuleContext, identifier *ast.Node, symbol *ast.Symbo
 	if identifier.Text() == "process" && isBuiltinImport(ctx, identifier, "process", "default") {
 		return true
 	}
-	if identifier.Text() != "require" && identifier.Text() != "process" || len(symbol.Declarations) != 1 {
+	if identifier.Text() != "require" && identifier.Text() != "process" || len(symbol.Declarations()) != 1 {
 		return false
 	}
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if declaration.Kind != ast.KindVariableDeclaration {
 		return false
 	}
@@ -187,10 +187,10 @@ func isBuiltinImport(ctx rule.RuleContext, node *ast.Node, moduleName, exportNam
 		return false
 	}
 	symbol := ctx.Refs.ResolveInFile(node)
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	if symbol == nil || len(symbol.Declarations()) != 1 {
 		return false
 	}
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if ast.IsTypeOnlyImportDeclaration(declaration) {
 		return false
 	}

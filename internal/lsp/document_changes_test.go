@@ -308,7 +308,7 @@ func lintOffTheEditorPath(program *compiler.Program, file string, resolver *conf
 		Program: lintprogram.NewFromCompiler(program),
 		File:    file,
 		GetRulesForFile: func(f *ast.SourceFile) []rule.ConfiguredRule {
-			rules, _ := resolver.EnabledRulesForFile(f.FileName())
+			rules, _ := resolver.EnabledRulesForFile(f.FileName().AsString())
 			return rules
 		},
 		Consumer: rule.DiagnosticConsumer{

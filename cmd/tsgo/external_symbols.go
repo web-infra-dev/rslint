@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 const globalNamespace = "global"
@@ -63,14 +64,14 @@ func (c *externalSymbolCollector) collectGlobals(program *compiler.Program) {
 	// Read scope symbols without inspecting the types of global values.
 	// Resolve each name in the global scope to exclude module-local declarations.
 	symbols := c.tc.GetSymbolsInScope(files[0].AsNode(), ast.SymbolFlagsValue)
-	sort.Slice(symbols, func(i, j int) bool { return symbols[i].Name < symbols[j].Name })
+	sort.Slice(symbols, func(i, j int) bool { return symbols[i].Name() < symbols[j].Name() })
 	for _, symbol := range symbols {
-		global := c.tc.GetGlobalSymbol(symbol.Name, ast.SymbolFlagsValue, nil)
+		global := c.tc.GetGlobalSymbol(symbol.Name(), ast.SymbolFlagsValue, nil)
 		global = c.resolveSymbol(global)
 		if global == nil || global.IsExternalModule() {
 			continue
 		}
-		c.record(globalNamespace, symbol.Name, global)
+		c.record(globalNamespace, symbol.Name(), global)
 	}
 }
 
@@ -91,7 +92,7 @@ func (c *externalSymbolCollector) collectGlobals(program *compiler.Program) {
 // the compiler's file classification determines which files are scanned.
 func (c *externalSymbolCollector) collectDependencies(program *compiler.Program) {
 	for _, file := range program.GetSourceFiles() {
-		if program.IsSourceFileDefaultLibrary(file.Path()) {
+		if program.IsSourceFileDefaultLibrary(file.PathKey()) {
 			c.collectLibrary(file)
 			continue
 		}
@@ -109,16 +110,16 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 // externalFileNamespace reads a dependency's package name from compiler metadata,
 // using its file name when the package has no declared name.
 func externalFileNamespace(program *compiler.Program, file *ast.SourceFile) string {
-	directory := program.GetSourceFileMetaData(file.Path()).PackageJsonDirectory
+	directory := program.GetSourceFileMetaData(file.PathKey()).PackageJsonDirectory
 	if directory == "" {
-		directory = program.GetNearestAncestorDirectoryWithPackageJson(tspath.GetDirectoryPath(file.FileName()))
+		directory = program.GetNearestAncestorDirectoryWithPackageJson(pathutil.Directory(tspath.GetDirectoryPath(file.FileName().AsString())))
 	}
-	if info := program.GetPackageJsonInfo(tspath.CombinePaths(directory, "package.json")); info.Exists() {
+	if info := program.GetPackageJsonInfo(pathutil.File(tspath.CombinePaths(directory.AsString(), "package.json"))); info.Exists() {
 		if name, ok := info.Contents.Name.GetValue(); ok && name != "" {
 			return module.GetPackageNameFromTypesPackageName(name)
 		}
 	}
-	return file.FileName()
+	return file.FileName().AsString()
 }
 
 // collectLibrary collects standard library declarations and names constructor
@@ -141,10 +142,10 @@ func (c *externalSymbolCollector) collectLibrary(file *ast.SourceFile) {
 	sort.Strings(names)
 	for _, name := range names {
 		symbol := c.resolveSymbol(file.Locals[name])
-		if symbol == nil || symbol.Flags&ast.SymbolFlagsInterface == 0 {
+		if symbol == nil || symbol.Flags()&ast.SymbolFlagsInterface == 0 {
 			continue
 		}
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if declaration.Kind != ast.KindVariableDeclaration {
 				continue
 			}
@@ -156,15 +157,15 @@ func (c *externalSymbolCollector) collectLibrary(file *ast.SourceFile) {
 			if constructor == nil {
 				continue
 			}
-			prototype := constructor.Members["prototype"]
-			if prototype == nil || prototype.ValueDeclaration == nil {
+			prototype := constructor.Members()["prototype"]
+			if prototype == nil || prototype.ValueDeclaration() == nil {
 				continue
 			}
-			prototypeType := prototype.ValueDeclaration.Type()
+			prototypeType := prototype.ValueDeclaration().Type()
 			if prototypeType != nil && prototypeType.Kind == ast.KindTypeReference &&
 				c.resolveSymbol(c.tc.GetSymbolAtLocation(prototypeType.AsTypeReferenceNode().TypeName)) == symbol {
-				c.collectTable(globalNamespace, joinExternalName(name, "prototype"), symbol.Members)
-				c.collectTable(globalNamespace, name, constructor.Members)
+				c.collectTable(globalNamespace, joinExternalName(name, "prototype"), symbol.Members())
+				c.collectTable(globalNamespace, name, constructor.Members())
 			}
 		}
 	}
@@ -184,10 +185,10 @@ func (c *externalSymbolCollector) resolveSymbol(symbol *ast.Symbol) *ast.Symbol 
 		return nil
 	}
 	symbol = c.tc.GetMergedSymbol(symbol)
-	if symbol.ExportSymbol != nil {
-		symbol = symbol.ExportSymbol
+	if symbol.ExportSymbol() != nil {
+		symbol = symbol.ExportSymbol()
 	}
-	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
+	if symbol.Flags()&ast.SymbolFlagsAlias != 0 {
 		if target, ok := c.tc.ResolveAlias(symbol); ok {
 			return c.tc.GetMergedSymbol(target)
 		}
@@ -237,11 +238,11 @@ func (c *externalSymbolCollector) collectTable(namespace, prefix string, table a
 // The exported path is "renamed", while its symbol ID belongs to "value".
 func (c *externalSymbolCollector) collectExports(namespace, prefix string, symbol *ast.Symbol) {
 	exports := c.tc.GetExportsOfModule(symbol)
-	sort.Slice(exports, func(i, j int) bool { return exports[i].Name < exports[j].Name })
+	sort.Slice(exports, func(i, j int) bool { return exports[i].Name() < exports[j].Name() })
 	for _, exported := range exports {
 		name := prefix
-		if exported.Name != ast.InternalSymbolNameExportEquals {
-			name = joinExternalName(prefix, exported.Name)
+		if exported.Name() != ast.InternalSymbolNameExportEquals {
+			name = joinExternalName(prefix, exported.Name())
 		}
 		c.collect(namespace, name, exported)
 	}
@@ -275,7 +276,7 @@ func (c *externalSymbolCollector) collect(namespace, name string, symbol *ast.Sy
 		return
 	}
 	symbol = c.resolveSymbol(symbol)
-	if symbol == nil || symbol.Flags&ast.SymbolFlagsTypeParameter != 0 {
+	if symbol == nil || symbol.Flags()&ast.SymbolFlagsTypeParameter != 0 {
 		return
 	}
 	c.record(namespace, name, symbol)
@@ -285,24 +286,24 @@ func (c *externalSymbolCollector) collect(namespace, name string, symbol *ast.Sy
 	}
 	c.active[key] = true
 	defer delete(c.active, key)
-	if symbol.Flags&ast.SymbolFlagsModule != 0 {
+	if symbol.Flags()&ast.SymbolFlagsModule != 0 {
 		c.collectExports(namespace, name, symbol)
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if declaration.Kind == ast.KindModuleDeclaration {
 				c.collectTable(namespace, name, declaration.Locals())
 			}
 		}
 	} else {
-		c.collectTable(namespace, name, symbol.Exports)
+		c.collectTable(namespace, name, symbol.Exports())
 	}
 	membersName := name
-	if symbol.Flags&ast.SymbolFlagsClass != 0 {
+	if symbol.Flags()&ast.SymbolFlagsClass != 0 {
 		membersName = joinExternalName(name, "prototype")
 	}
-	c.collectTable(namespace, membersName, symbol.Members)
+	c.collectTable(namespace, membersName, symbol.Members())
 	// Traverse only members written in a declaration, never the type of a value.
 	// Type references, return types and function bodies do not introduce paths.
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		switch declaration.Kind {
 		case ast.KindVariableDeclaration, ast.KindPropertyDeclaration, ast.KindPropertySignature,
 			ast.KindPropertyAssignment, ast.KindTypeAliasDeclaration:
@@ -316,7 +317,7 @@ func (c *externalSymbolCollector) collect(namespace, name string, symbol *ast.Sy
 		for _, node := range nodes {
 			if node != nil && (node.Kind == ast.KindTypeLiteral || node.Kind == ast.KindObjectLiteralExpression) {
 				if declared := node.Symbol(); declared != nil {
-					c.collectTable(namespace, name, declared.Members)
+					c.collectTable(namespace, name, declared.Members())
 				}
 			}
 		}

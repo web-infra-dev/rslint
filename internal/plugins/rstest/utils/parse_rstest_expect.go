@@ -812,7 +812,7 @@ func classifyRstestExpectRoot(
 	callbacks := analysis.callbacksRef()
 	ctx := analysis.ctx
 	initializations := 0
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		switch declaration.Kind {
 		case ast.KindVariableDeclaration, ast.KindBindingElement:
 			if internalUtils.IsVariableWriteReference(declaration.Name()) {
@@ -882,7 +882,7 @@ func isImportMetaRstestObjectAlias(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
 			continue
 		}

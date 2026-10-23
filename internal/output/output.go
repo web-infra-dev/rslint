@@ -5,14 +5,14 @@ import (
 	"errors"
 	"io"
 
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 const outputBufferSize = 4096 * 100
 
 type Options struct {
 	Format       Format
-	ComparePaths tspath.ComparePathsOptions
+	ComparePaths pathutil.ComparePathsOptions
 	Quiet        bool
 	ColorEnabled bool
 }

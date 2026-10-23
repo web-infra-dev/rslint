@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // PathIdentity keeps the caller-visible path together with the physical file
@@ -47,8 +48,8 @@ func ResolveDirectoryIdentities(directories []string, fsys vfs.FS) []DirectoryId
 		lexicalPath := tspath.NormalizePath(directory)
 		canonicalPath := lexicalPath
 		if fsys != nil {
-			if realPath := fsys.Realpath(lexicalPath); realPath != "" {
-				canonicalPath = tspath.NormalizePath(realPath)
+			if realPath := fsys.Realpath(pathutil.Path(lexicalPath)); realPath != "" {
+				canonicalPath = tspath.NormalizePath(realPath.AsString())
 			}
 		}
 		resolved = append(resolved, DirectoryIdentity{
@@ -81,7 +82,7 @@ func canonicalDirectoryPathOrSelf(directory string, fsys vfs.FS) string {
 	}
 	canonical := canonicalPathOrSelf(directory, fsys)
 	// Overlay directories can satisfy DirectoryExists without a disk entry.
-	if canonical != directory || fsys.Stat(directory) != nil {
+	if canonical != directory || fsys.Stat(pathutil.Path(directory)) != nil {
 		return canonical
 	}
 	rootLength := tspath.GetRootLength(directory)
@@ -95,7 +96,7 @@ func canonicalDirectoryPathOrSelf(directory string, fsys vfs.FS) string {
 	}
 	for ancestor := tspath.GetDirectoryPath(directory); ancestor != "" && ancestor != directory && len(ancestor) >= rootLength; ancestor = tspath.GetDirectoryPath(ancestor) {
 		canonical = canonicalPathOrSelf(ancestor, fsys)
-		if canonical != ancestor || fsys.Stat(ancestor) != nil {
+		if canonical != ancestor || fsys.Stat(pathutil.Path(ancestor)) != nil {
 			return tspath.CombinePaths(canonical, strings.TrimPrefix(directory[len(ancestor):], "/"))
 		}
 		if len(ancestor) <= rootLength {
@@ -107,8 +108,8 @@ func canonicalDirectoryPathOrSelf(directory string, fsys vfs.FS) string {
 
 func canonicalPathOrSelf(path string, fsys vfs.FS) string {
 	if fsys != nil {
-		if canonical := fsys.Realpath(path); canonical != "" {
-			return tspath.NormalizePath(canonical)
+		if canonical := fsys.Realpath(pathutil.Path(path)); canonical != "" {
+			return tspath.NormalizePath(canonical.AsString())
 		}
 	}
 	return tspath.NormalizePath(path)

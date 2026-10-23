@@ -113,7 +113,7 @@ func (safety *staticControlFlowSafety) safeReferencesAndMembers(node *ast.Node) 
 			return true
 		}
 		initializer, symbol, ok := safety.evaluator.resolveIdentifierInitializer(node)
-		if !ok || !ast.IsVarConst(symbol.Declarations[0].Parent) {
+		if !ok || !ast.IsVarConst(symbol.Declarations()[0].Parent) {
 			return true
 		}
 		if safety.visiting[symbol] {
@@ -190,7 +190,7 @@ func (safety *staticControlFlowSafety) safeMember(node *ast.Node) bool {
 		return ok && index < len(elements) && elements[index].Kind != ast.KindOmittedExpression
 	case ast.KindIdentifier:
 		initializer, symbol, ok := safety.evaluator.resolveIdentifierInitializer(object)
-		if !ok || !ast.IsVarConst(symbol.Declarations[0].Parent) {
+		if !ok || !ast.IsVarConst(symbol.Declarations()[0].Parent) {
 			return false
 		}
 		object = initializer
@@ -308,10 +308,10 @@ func (safety *staticControlFlowSafety) hasMutableBinding(node *ast.Node) bool {
 			return false
 		}
 		symbol := safety.evaluator.referenceSymbol(node)
-		if symbol == nil || len(symbol.Declarations) != 1 {
+		if symbol == nil || len(symbol.Declarations()) != 1 {
 			return false
 		}
-		declaration := symbol.Declarations[0]
+		declaration := symbol.Declarations()[0]
 		if declaration.Kind != ast.KindVariableDeclaration || declaration.Parent == nil ||
 			declaration.Parent.Kind != ast.KindVariableDeclarationList {
 			return false

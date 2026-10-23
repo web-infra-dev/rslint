@@ -297,7 +297,7 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 			// typescript-eslint we don't need an escapeLeadingUnderscores step.
 			symbol := checker.Type_symbol(t)
 			if symbol != nil {
-				if member, ok := symbol.Members[memberName]; ok {
+				if member, ok := symbol.Members()[memberName]; ok {
 					return member
 				}
 			}
@@ -445,7 +445,7 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 				}
 				for _, signature := range signatures {
 					for index, parameter := range checker.Signature_parameters(signature) {
-						decl := parameter.ValueDeclaration
+						decl := parameter.ValueDeclaration()
 						t := ctx.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node.Expression())
 
 						// If this is a array 'rest' parameter, check all of the argument indices

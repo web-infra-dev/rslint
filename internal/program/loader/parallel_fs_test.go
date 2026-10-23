@@ -8,7 +8,9 @@ import (
 	"testing"
 	"testing/synctest"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type parallelProgramTestFS struct {
@@ -20,24 +22,24 @@ type parallelProgramTestFS struct {
 	writeFile       func(string, string) error
 }
 
-func (f *parallelProgramTestFS) DirectoryExists(path string) bool {
-	return f.directoryExists(path)
+func (f *parallelProgramTestFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	return f.directoryExists(path.AsString())
 }
 
-func (f *parallelProgramTestFS) FileExists(path string) bool {
-	return f.fileExists(path)
+func (f *parallelProgramTestFS) FileExists(path tspath.RootedFilePath) bool {
+	return f.fileExists(path.AsString())
 }
 
-func (f *parallelProgramTestFS) ReadFile(path string) (string, bool) {
-	return f.readFile(path)
+func (f *parallelProgramTestFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	return f.readFile(path.AsString())
 }
 
-func (f *parallelProgramTestFS) Realpath(path string) string {
-	return f.realpath(path)
+func (f *parallelProgramTestFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	return pathutil.Path(f.realpath(path.AsString()))
 }
 
-func (f *parallelProgramTestFS) WriteFile(path string, content string) error {
-	return f.writeFile(path, content)
+func (f *parallelProgramTestFS) WriteFile(path tspath.RootedFilePath, content string) error {
+	return f.writeFile(path.AsString(), content)
 }
 
 type blockingRealpathQuery struct {
@@ -79,7 +81,7 @@ func TestParallelProgramFSCoalescesConcurrentRealpathMisses(t *testing.T) {
 			go func() {
 				ready.Done()
 				<-start
-				results <- cached.Realpath("/same/exact/path")
+				results <- cached.Realpath("/same/exact/path").AsString()
 			}()
 		}
 		ready.Wait()
@@ -116,8 +118,8 @@ func TestParallelProgramFSDoesNotSerializeDifferentPaths(t *testing.T) {
 		defer gate.releaseAll()
 		cached := newParallelProgramFS(&parallelProgramTestFS{realpath: gate.run})
 		results := make(chan string, 2)
-		go func() { results <- cached.Realpath("/first") }()
-		go func() { results <- cached.Realpath("/second") }()
+		go func() { results <- cached.Realpath("/first").AsString() }()
+		go func() { results <- cached.Realpath("/second").AsString() }()
 
 		// Both goroutines must independently reach the underlying filesystem
 		// before either query is released. synctest makes that observation
@@ -214,7 +216,7 @@ func testParallelProgramFSPanicReleasesWaiterAndRetries(t *testing.T) {
 	}
 
 	waiterResult := make(chan string, 1)
-	go func() { waiterResult <- cached.Realpath(path) }()
+	go func() { waiterResult <- cached.Realpath(path).AsString() }()
 	// Once the bubble is idle, an empty result, one underlying call, and the
 	// original cache entry prove that the waiter is blocked on ownerFlight.
 	synctest.Wait()
@@ -297,18 +299,23 @@ func TestParallelProgramFSUsesExactCrossPlatformPathKeys(t *testing.T) {
 		"//server/share/a.ts",
 		`\\server\share\a.ts`,
 	}
+	normalizedPaths := make(map[tspath.RootedPath]struct{})
 	for _, path := range paths {
-		if got := cached.Realpath(path); got != path {
+		// Rooted paths normalize separators and dot segments before reaching
+		// the VFS; exact casing and lexical link names remain distinct.
+		normalized := pathutil.Path(path)
+		normalizedPaths[normalized] = struct{}{}
+		if got := cached.Realpath(normalized); got != normalized {
 			t.Fatalf("cold Realpath(%q) = %q", path, got)
 		}
-		if got := cached.Realpath(path); got != path {
+		if got := cached.Realpath(normalized); got != normalized {
 			t.Fatalf("warm Realpath(%q) = %q", path, got)
 		}
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	for _, path := range paths {
-		if got := calls[path]; got != 1 {
+	for path := range normalizedPaths {
+		if got := calls[path.AsString()]; got != 1 {
 			t.Errorf("underlying calls for exact key %q = %d, want 1", path, got)
 		}
 	}

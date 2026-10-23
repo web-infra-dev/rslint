@@ -87,7 +87,7 @@ func TestNumberLiteralCaseUpstreamLegacyOctal(t *testing.T) {
 	// neither legacy spelling needs a casing diagnostic or an edit.
 	for _, code := range []string{"var foo = 0777", "var foo = 0888"} {
 		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-			FileName: "/legacy.js", Path: "/legacy.js",
+			FileName: "/legacy.js", PathKey: "/legacy.js",
 		}, code, core.ScriptKindJS)
 		if diagnostics := lintLiteralSource(t, sourceFile, rule.EditDemandAll); len(diagnostics) != 0 {
 			t.Errorf("legacy literal %q: unexpected diagnostics: %#v", code, diagnostics)

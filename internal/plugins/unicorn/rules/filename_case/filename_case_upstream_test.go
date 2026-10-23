@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestLatestUpstreamAcronymCases(t *testing.T) {
@@ -269,8 +270,8 @@ func TestLatestUpstreamPathBehavior(t *testing.T) {
 func runFilenameCaseForPath(t *testing.T, cwd string, fileName string, options []any) []rule.RuleDiagnostic {
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName,
-		Path:     tspath.Path(fileName),
+		FileName: pathutil.File(fileName),
+		PathKey:  tspath.PathKey(fileName),
 	}, "export {};", core.ScriptKindTS)
 	var diagnostics []rule.RuleDiagnostic
 	ctx := (rule.RuleContext{

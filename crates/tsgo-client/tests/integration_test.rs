@@ -81,6 +81,14 @@ fn test_tsgo_integration_simple_project() {
         "Expected symbols in symbol table"
     );
     assert!(
+        project
+            .semantic
+            .symtab
+            .iter()
+            .any(|(id, _)| *id > u32::MAX as u64),
+        "Fixture must exercise 64-bit compiler symbol IDs"
+    );
+    assert!(
         !project.semantic.typetab.is_empty(),
         "Expected types in type table"
     );

@@ -98,14 +98,14 @@ func (s *RefStore) References(sym *ast.Symbol) []*ast.Node {
 		s.walked = true
 		s.collectCandidates()
 	}
-	s.resolvePending(sym.Name)
+	s.resolvePending(sym.Name())
 	// A symbol's name is not always the name its references are written with:
 	// `export default function foo() {}` binds the declaration to an export
 	// symbol named "default", while every reference still spells `foo`. Drain
 	// the bucket of each declared name too, or those references stay pending
 	// forever.
-	for _, decl := range sym.Declarations {
-		if name := decl.Name(); name != nil && name.Kind == ast.KindIdentifier && name.Text() != sym.Name {
+	for _, decl := range sym.Declarations() {
+		if name := decl.Name(); name != nil && name.Kind == ast.KindIdentifier && name.Text() != sym.Name() {
 			s.resolvePending(name.Text())
 		}
 	}
@@ -156,7 +156,7 @@ func (s *RefStore) resolvePending(name string) {
 // merged this way, so every symbol of a module file and every nested scope
 // skips the checker round trip; the rest pay it once per symbol.
 func (s *RefStore) mergedSymbol(sym *ast.Symbol, at *ast.Node) *ast.Symbol {
-	if s.tc == nil || s.resolver.Globals == nil || s.resolver.Globals[sym.Name] != sym {
+	if s.tc == nil || s.resolver.Globals == nil || s.resolver.Globals[sym.Name()] != sym {
 		return sym
 	}
 	if merged, ok := s.merged[sym]; ok {
@@ -176,8 +176,8 @@ func (s *RefStore) mergedSymbol(sym *ast.Symbol, at *ast.Node) *ast.Symbol {
 // sharesDeclaration reports whether a and b have a declaration node in
 // common, the mark of one being the merged form of the other.
 func sharesDeclaration(a, b *ast.Symbol) bool {
-	for _, decl := range b.Declarations {
-		for _, other := range a.Declarations {
+	for _, decl := range b.Declarations() {
+		for _, other := range a.Declarations() {
 			if other == decl {
 				return true
 			}
@@ -227,7 +227,7 @@ func (s *RefStore) ResolveTypeOrNamespace(node *ast.Node) *ast.Symbol {
 	if symbol == nil {
 		return nil
 	}
-	flags := symbol.Flags
+	flags := symbol.Flags()
 	if flags&ast.SymbolFlagsAlias != 0 {
 		if s.tc == nil {
 			return nil
@@ -347,7 +347,7 @@ func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.Symb
 			continue
 		}
 		if isExportAliasOnly(result) {
-			location = outerExportScopeLocation(result.Declarations[0])
+			location = outerExportScopeLocation(result.Declarations()[0])
 			continue
 		}
 		if isQualifiedNamespaceNameOnly(result) {
@@ -382,10 +382,10 @@ func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.Symb
 // variable for them, so the scope walk has to step over the binding and resume
 // outside the namespace.
 func isExportAliasOnly(symbol *ast.Symbol) bool {
-	if len(symbol.Declarations) == 0 {
+	if len(symbol.Declarations()) == 0 {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration.Kind != ast.KindExportSpecifier && declaration.Kind != ast.KindNamespaceExport {
 			return false
 		}
@@ -399,10 +399,10 @@ func isExportAliasOnly(symbol *ast.Symbol) bool {
 // manager only creates a variable for a namespace named by a plain identifier
 // — so the scope walk has to step over the binding and resume outside.
 func isQualifiedNamespaceNameOnly(symbol *ast.Symbol) bool {
-	if len(symbol.Declarations) == 0 {
+	if len(symbol.Declarations()) == 0 {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if !utils.IsQualifiedNamespaceSegment(declaration) {
 			return false
 		}
@@ -415,14 +415,14 @@ func isQualifiedNamespaceNameOnly(symbol *ast.Symbol) bool {
 // when no enclosing table claims it, leaving the caller to keep the symbol
 // rather than guess where the walk should resume.
 func bindingScope(symbol *ast.Symbol, name string) *ast.Node {
-	if len(symbol.Declarations) == 0 {
+	if len(symbol.Declarations()) == 0 {
 		return nil
 	}
-	for node := symbol.Declarations[0].Parent; node != nil; node = node.Parent {
+	for node := symbol.Declarations()[0].Parent; node != nil; node = node.Parent {
 		if locals := node.Locals(); locals != nil && locals[name] == symbol {
 			return node
 		}
-		if owner := node.Symbol(); owner != nil && owner.Exports != nil && owner.Exports[name] == symbol {
+		if owner := node.Symbol(); owner != nil && owner.Exports() != nil && owner.Exports()[name] == symbol {
 			return node
 		}
 	}
@@ -436,10 +436,10 @@ func bindingScope(symbol *ast.Symbol, name string) *ast.Node {
 // but TypeScript's resolver keeps that self-reference visible throughout the
 // class node — decorators included.
 func classExpressionNameInOwnDecorator(location *ast.Node, result *ast.Symbol) *ast.Node {
-	if len(result.Declarations) != 1 || result.Declarations[0].Kind != ast.KindClassExpression {
+	if len(result.Declarations()) != 1 || result.Declarations()[0].Kind != ast.KindClassExpression {
 		return nil
 	}
-	class := result.Declarations[0]
+	class := result.Declarations()[0]
 	for node := location; node != nil; node = node.Parent {
 		if node.Kind == ast.KindDecorator && node.Parent == class {
 			return class
@@ -455,10 +455,10 @@ func classExpressionNameInOwnDecorator(location *ast.Node, result *ast.Symbol) *
 // when no enclosing scope table claims it — leaving that symbol in place rather
 // than guessing where the walk should resume.
 func jsdocOnlyScope(symbol *ast.Symbol, name string) *ast.Node {
-	if len(symbol.Declarations) == 0 || hasAuthoredDeclaration(symbol) {
+	if len(symbol.Declarations()) == 0 || hasAuthoredDeclaration(symbol) {
 		return nil
 	}
-	for node := symbol.Declarations[0].Parent; node != nil; node = node.Parent {
+	for node := symbol.Declarations()[0].Parent; node != nil; node = node.Parent {
 		if locals := node.Locals(); locals != nil && locals[name] == symbol {
 			return node
 		}
@@ -467,7 +467,7 @@ func jsdocOnlyScope(symbol *ast.Symbol, name string) *ast.Node {
 	// parameter environment rather than a Locals table. A reparsed clone is
 	// attached directly to the class, so leave the class before looking for an
 	// authored outer declaration.
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if declaration.Kind == ast.KindTypeParameter && declaration.Parent != nil && ast.IsClassLike(declaration.Parent) {
 		return declaration.Parent
 	}
@@ -517,7 +517,7 @@ func collectAuthoredImportBindings(sourceFile *ast.SourceFile) map[string]struct
 // which is the shape where the scope walk crossed a boundary the language does
 // not. It returns nil when no such function encloses location.
 func bodyOnlyParameterBarrier(location *ast.Node, result *ast.Symbol) *ast.Node {
-	if len(result.Declarations) == 0 {
+	if len(result.Declarations()) == 0 {
 		return nil
 	}
 	for node := location; node != nil; node = node.Parent {
@@ -537,7 +537,7 @@ func bodyOnlyParameterBarrier(location *ast.Node, result *ast.Symbol) *ast.Node 
 // same name, a type parameter, a merged outer declaration — stays visible from
 // the parameter list.
 func declaredOnlyWithin(symbol *ast.Symbol, body *ast.Node) bool {
-	for _, decl := range symbol.Declarations {
+	for _, decl := range symbol.Declarations() {
 		if decl.Pos() < body.Pos() || decl.End() > body.End() {
 			return false
 		}
@@ -650,7 +650,7 @@ func hasAuthoredDeclaration(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
-	for _, decl := range symbol.Declarations {
+	for _, decl := range symbol.Declarations() {
 		if decl.Kind != ast.KindSourceFile && !isJSDocSynthesized(decl) {
 			return true
 		}
@@ -736,7 +736,7 @@ func isOwnExportAlias(node *ast.Node, symbol *ast.Symbol) bool {
 	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindExportSpecifier || symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == node.Parent {
 			return true
 		}

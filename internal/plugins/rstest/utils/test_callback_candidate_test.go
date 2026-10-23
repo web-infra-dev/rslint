@@ -14,7 +14,7 @@ func TestRstestCallAnalysisCandidateNames(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/candidate.test.ts",
-			Path:     "/candidate.test.ts",
+			PathKey:  "/candidate.test.ts",
 		},
 		`import { test as importedTest, expect as importedExpect } from "@rstest/core";
 const testAlias = importedTest;
@@ -43,7 +43,7 @@ func TestRstestCallAnalysisParseFnCallComputesCacheMiss(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/callbacks.test.ts",
-			Path:     "/callbacks.test.ts",
+			PathKey:  "/callbacks.test.ts",
 		},
 		`test("late", () => {});
 describe("late suite", () => {});
@@ -87,7 +87,7 @@ func TestRstestCallAnalysisCallbacksWidenExpectCandidates(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/context.test.ts",
-			Path:     "/context.test.ts",
+			PathKey:  "/context.test.ts",
 		},
 		`test("context", ({ expect: check }) => {
   check(1).toBe(1);
@@ -125,7 +125,7 @@ func TestRstestCallAnalysisCallbacksSkipFilesWithoutTests(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/expect-only.test.ts",
-			Path:     "/expect-only.test.ts",
+			PathKey:  "/expect-only.test.ts",
 		},
 		`expect(value).toBe(1); helper();`,
 		core.ScriptKindTS,
@@ -149,7 +149,7 @@ func TestRstestCallAnalysisCallbacksRemainTestOnly(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/describe-only.test.ts",
-			Path:     "/describe-only.test.ts",
+			PathKey:  "/describe-only.test.ts",
 		},
 		`describe.concurrent("suite", () => {});`,
 		core.ScriptKindTS,
@@ -180,7 +180,7 @@ func TestRstestCallAnalysisCallbacksUnwrapTypeScriptAssertions(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/wrapped-callbacks.test.ts",
-			Path:     "/wrapped-callbacks.test.ts",
+			PathKey:  "/wrapped-callbacks.test.ts",
 		},
 		`test("as", (() => {}) as () => void);
 test("satisfies", (() => {}) satisfies () => void);
@@ -200,7 +200,7 @@ func TestRstestConcurrentContextBuildsOwnershipLazily(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/concurrent-context.test.ts",
-			Path:     "/concurrent-context.test.ts",
+			PathKey:  "/concurrent-context.test.ts",
 		},
 		`test.concurrent("x", () => marker());`,
 		core.ScriptKindTS,
@@ -241,7 +241,7 @@ func TestRstestCallAnalysisParseExpectCallFillsIdentityCache(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/expect-cache.test.ts",
-			Path:     "/expect-cache.test.ts",
+			PathKey:  "/expect-cache.test.ts",
 		},
 		`expect(value).toBe(1);`,
 		core.ScriptKindTS,

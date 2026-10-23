@@ -20,7 +20,7 @@ type traversalCommentExpectation struct {
 func parseCommentTraversalSource(source string, kind core.ScriptKind) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/comments.tsx",
-		Path:     "/comments.tsx",
+		PathKey:  "/comments.tsx",
 	}, source, kind)
 }
 

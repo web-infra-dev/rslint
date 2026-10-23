@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // newBoundRefStore parses source as fileName, binds it (populating symbols
@@ -25,8 +26,8 @@ func newBoundRefStore(t *testing.T, fileName string, scriptKind core.ScriptKind,
 func newBoundRefStoreWithLanguageOptions(t *testing.T, fileName string, scriptKind core.ScriptKind, source string, languageOptions LanguageOptions) (*ast.SourceFile, *RefStore) {
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName,
-		Path:     tspath.Path(fileName),
+		FileName: pathutil.File(fileName),
+		PathKey:  tspath.PathKey(fileName),
 	}, source, scriptKind)
 	binder.BindSourceFile(sourceFile)
 	_, refsInit, _ := ResolveLanguageDefaults(fileName, languageOptions)
@@ -50,12 +51,12 @@ func newCheckedRefStore(t *testing.T, source string) (*ast.SourceFile, *RefStore
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)
 	}
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	if sourceFile == nil {
 		t.Fatalf("GetSourceFile(%q) = nil", filePath)
 	}
 	tc, done := program.GetTypeChecker(t.Context())
-	_, refsInit, _ := ResolveLanguageDefaults(sourceFile.FileName(), LanguageOptions{})
+	_, refsInit, _ := ResolveLanguageDefaults(sourceFile.FileName().AsString(), LanguageOptions{})
 	return sourceFile, NewRefStore(sourceFile, program.Options(), tc, refsInit), done
 }
 
@@ -563,8 +564,8 @@ func TestRefStoreExportDefaultNamedFunction(t *testing.T) {
 	if sym == nil {
 		t.Fatal("declaration identifier has no bound symbol")
 	}
-	if sym.Name != ast.InternalSymbolNameDefault {
-		t.Fatalf("declaration symbol name = %q, want %q", sym.Name, ast.InternalSymbolNameDefault)
+	if sym.Name() != ast.InternalSymbolNameDefault {
+		t.Fatalf("declaration symbol name = %q, want %q", sym.Name(), ast.InternalSymbolNameDefault)
 	}
 
 	got := refs.References(sym)
@@ -834,8 +835,8 @@ func TestRefStoreTypeOnlyExportCheckerFallbackRespectsMeaningAndShadowing(t *tes
 	if target == localValue {
 		t.Fatal("type-only export resolved to the shadowing local value symbol")
 	}
-	if target.Flags&(ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) == 0 {
-		t.Fatalf("resolved checker symbol flags = %v, want a type-capable symbol", target.Flags)
+	if target.Flags()&(ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) == 0 {
+		t.Fatalf("resolved checker symbol flags = %v, want a type-capable symbol", target.Flags())
 	}
 	if got := refs.References(localValue); len(got) != 0 {
 		t.Fatalf("References(local value) = %v, want none", got)
@@ -1022,8 +1023,8 @@ namespace N {
 				if target == nil || target == localValue || isOwnExportAlias(specifier, target) {
 					t.Fatalf("Resolve(type-only export) = %v, want the outer type", target)
 				}
-				if target.Flags&(ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) == 0 {
-					t.Fatalf("resolved checker symbol flags = %v, want a type-capable symbol", target.Flags)
+				if target.Flags()&(ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) == 0 {
+					t.Fatalf("resolved checker symbol flags = %v, want a type-capable symbol", target.Flags())
 				}
 				if got := refs.References(target); len(got) != 1 || got[0] != specifier {
 					t.Fatalf("References(outer type) = %v, want [%v]", got, specifier)
@@ -1054,8 +1055,8 @@ func TestRefStoreLocalExportCheckerFallbackResolvesGlobalValue(t *testing.T) {
 		t.Fatal("Resolve(local export window) = nil, want the global value symbol")
 		return
 	}
-	if target.Flags&ast.SymbolFlagsValue == 0 {
-		t.Fatalf("resolved checker symbol flags = %v, want a value-capable symbol", target.Flags)
+	if target.Flags()&ast.SymbolFlagsValue == 0 {
+		t.Fatalf("resolved checker symbol flags = %v, want a value-capable symbol", target.Flags())
 	}
 	got := refs.References(target)
 	if len(got) != 1 || got[0] != specifierIdent {
@@ -1290,8 +1291,8 @@ func TestRefStoreGlobalReferenceProgramScopeSemantics(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: test.fileName,
-				Path:     tspath.Path(test.fileName),
+				FileName: pathutil.File(test.fileName),
+				PathKey:  tspath.PathKey(test.fileName),
 			}, test.source, test.scriptKind)
 			binder.BindSourceFile(sourceFile)
 			_, refsInit, _ := ResolveLanguageDefaults(test.fileName, LanguageOptions{SourceType: test.sourceType})
@@ -1500,8 +1501,8 @@ function f() {
 	if target == nil || target == localValue {
 		t.Fatalf("Resolve(heritage qualifier) = %v, want the global Intl namespace", target)
 	}
-	if target.Flags&(ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) == 0 {
-		t.Fatalf("resolved checker symbol flags = %v, want a namespace-capable symbol", target.Flags)
+	if target.Flags()&(ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) == 0 {
+		t.Fatalf("resolved checker symbol flags = %v, want a namespace-capable symbol", target.Flags())
 	}
 	if got := refs.References(target); len(got) != 1 || got[0] != use {
 		t.Fatalf("References(global namespace) = %v, want [%v]", got, use)

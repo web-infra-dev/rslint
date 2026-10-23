@@ -13,7 +13,7 @@ func parseAnalysisCacheFixture() *ast.SourceFile {
 	return parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/shared-analysis.test.ts",
-			Path:     "/shared-analysis.test.ts",
+			PathKey:  "/shared-analysis.test.ts",
 		},
 		`test("case", () => {});`,
 		core.ScriptKindTS,

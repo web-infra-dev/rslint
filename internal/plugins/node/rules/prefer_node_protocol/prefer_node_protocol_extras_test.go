@@ -24,7 +24,7 @@ func TestPreferNodeProtocolEditDemand(t *testing.T) {
 	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program: lintprogram.NewFromCompiler(program), File: file.FileName(),
+			Program: lintprogram.NewFromCompiler(program), File: file.FileName().AsString(),
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{Name: r.Name, Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners { return r.Run(ctx, nil) },

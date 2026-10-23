@@ -130,7 +130,7 @@ func TestHandleGetAstInfoUsesRequestedSourceFileName(t *testing.T) {
 				wantFileName = "index.ts"
 			}
 			wantFileName = tspath.ResolvePath("/", wantFileName)
-			if astInfoProgramCache.sourceFile == nil || astInfoProgramCache.sourceFile.FileName() != wantFileName {
+			if astInfoProgramCache.sourceFile == nil || astInfoProgramCache.sourceFile.FileName().AsString() != wantFileName {
 				t.Fatalf("source file = %v, want %s", astInfoProgramCache.sourceFile, wantFileName)
 			}
 		})

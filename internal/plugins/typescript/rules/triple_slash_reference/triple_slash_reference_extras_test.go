@@ -366,7 +366,7 @@ func TestTripleSlashReferenceDisableDirectives(t *testing.T) {
 func runTripleSlashReferenceDirect(source string, options []any) []rule.RuleDiagnostic {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	diagnostics := make([]rule.RuleDiagnostic, 0, 1)

@@ -11,13 +11,14 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func build(t *testing.T, source string) *Manager {
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 	return Build(sourceFile, Options{})
 }
@@ -310,7 +311,7 @@ func buildWithReferences(t *testing.T, source string) *Manager {
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.tsx",
-		Path:     "/test.tsx",
+		PathKey:  "/test.tsx",
 	}, source, core.ScriptKindTSX)
 	return Build(sourceFile, Options{CollectReferences: true})
 }
@@ -357,7 +358,7 @@ func TestBuildCollectsReferencesOnlyWhenAsked(t *testing.T) {
 func TestBuildFiltersCollectedReferencesWithoutChangingResolution(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, `const kept = 1, skipped = 2; kept; skipped; missing;`, core.ScriptKindTS)
 	m := Build(sourceFile, Options{
 		CollectReferences: true,
@@ -416,7 +417,7 @@ func TestBuildReferenceIdentifierPositions(t *testing.T) {
 func TestBuildJsxReferencesExcludeEspreeClosingTags(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.jsx",
-		Path:     "/test.jsx",
+		PathKey:  "/test.jsx",
 	}, `<App></App>; <ns.Widget></ns.Widget>; <foo:bar></foo:bar>;`, core.ScriptKindJSX)
 	m := Build(sourceFile, Options{CollectReferences: true})
 	got := referencedNames(m)
@@ -803,7 +804,7 @@ func TestIsReferenceIdentifierRejectsReExportAndImportTypeNames(t *testing.T) {
 	} {
 		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 			FileName: "/test.ts",
-			Path:     "/test.ts",
+			PathKey:  "/test.ts",
 		}, source, core.ScriptKindTS)
 		for _, identifier := range identifiersWithText(sourceFile.AsNode(), "Subject") {
 			if IsReferenceIdentifier(identifier) {
@@ -832,7 +833,7 @@ func TestIsReferenceIdentifierMatchesTypeScriptParserEdges(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.ts",
-				Path:     "/test.ts",
+				PathKey:  "/test.ts",
 			}, test.source, core.ScriptKindTS)
 			identifiers := identifiersWithText(sourceFile.AsNode(), test.identifier)
 			if len(identifiers) != 1 {
@@ -862,8 +863,8 @@ func TestIsTypeScriptJsxThisReference(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: test.fileName,
-				Path:     tspath.Path(test.fileName),
+				FileName: pathutil.File(test.fileName),
+				PathKey:  tspath.PathKey(test.fileName),
 			}, test.source, test.scriptKind)
 			var got []bool
 			var visit func(*ast.Node) bool

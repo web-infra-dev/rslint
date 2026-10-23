@@ -10,6 +10,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestNoEmptyObjectTypeCrossFileDeclarationMergeSuggestions(t *testing.T) {
@@ -37,7 +38,7 @@ func TestNoEmptyObjectTypeCrossFileDeclarationMergeSuggestions(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create program: %v", err)
 			}
-			sourceFile := program.GetSourceFile(interfacePath)
+			sourceFile := program.GetSourceFile(pathutil.File(interfacePath))
 			if sourceFile == nil {
 				t.Fatalf("source file %q not found", interfacePath)
 			}
@@ -45,7 +46,7 @@ func TestNoEmptyObjectTypeCrossFileDeclarationMergeSuggestions(t *testing.T) {
 			var diagnostics []rule.RuleDiagnostic
 			linter.LintSingleFile(linter.LintSingleFileOptions{
 				Program:     lintprogram.NewFromCompiler(program),
-				File:        sourceFile.FileName(),
+				File:        sourceFile.FileName().AsString(),
 				HasTypeInfo: true,
 				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{

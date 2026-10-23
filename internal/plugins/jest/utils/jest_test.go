@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestJestVersionPackageLookup(t *testing.T) {
@@ -20,7 +21,7 @@ func TestJestVersionPackageLookup(t *testing.T) {
 		{`{}`, ""}, {`null`, ""}, {`["jest"]`, ""}, {`{`, ""},
 	} {
 		t.Run(test.metadata, func(t *testing.T) {
-			fs := internalUtils.NewOverlayVFS(iovfs.From(fstest.MapFS{}, true), map[string]string{
+			fs := internalUtils.NewOverlayVFS(iovfs.From(fstest.MapFS{}, pathutil.CaseSensitivity(true)), map[string]string{
 				"/jest-metadata/nested/file.js":      "jest.resetModuleRegistry();",
 				"/jest-metadata/package.json":        `{"dependencies":{"jest":"^20"}}`,
 				"/jest-metadata/nested/package.json": test.metadata,

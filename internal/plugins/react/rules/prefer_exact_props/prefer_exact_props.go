@@ -173,7 +173,7 @@ func resolveDirectConstInitializer(
 }
 
 func classifyDirectConstInitializer(ctx rule.RuleContext, identifier *ast.Node, symbol *ast.Symbol) *ast.Node {
-	declarationNode := symbol.ValueDeclaration
+	declarationNode := symbol.ValueDeclaration()
 	if declarationNode == nil || declarationNode.Kind != ast.KindVariableDeclaration ||
 		ast.GetSourceFileOfNode(declarationNode) != ctx.SourceFile {
 		return nil

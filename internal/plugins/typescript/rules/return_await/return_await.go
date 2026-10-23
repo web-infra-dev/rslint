@@ -182,7 +182,7 @@ var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 			for declarationScope := ast.GetEnclosingBlockScopeContainer(node); declarationScope != nil; declarationScope = ast.GetEnclosingBlockScopeContainer(declarationScope) {
 				locals := declarationScope.Locals()
 				for _, local := range locals {
-					decl := local.ValueDeclaration
+					decl := local.ValueDeclaration()
 					// if it's a using/await using declaration, and it comes _before_ the
 					// node we're checking, it affects control flow for that node.
 

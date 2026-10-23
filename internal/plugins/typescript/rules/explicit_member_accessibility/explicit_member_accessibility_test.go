@@ -3758,7 +3758,7 @@ func runExplicitMemberAccessibilityWithDemand(
 	options := rule_tester.ResolveTestCaseOptions(t, &ExplicitMemberAccessibilityRule, rawOptions)
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/source.ts",
-		Path:     "/source.ts",
+		PathKey:  "/source.ts",
 	}, code, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	diagnostics := make([]rule.RuleDiagnostic, 0, 4)

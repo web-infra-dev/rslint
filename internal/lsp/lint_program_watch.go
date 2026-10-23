@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/trackingvfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // lintTrackingFS keeps the CompilerHost stable while swapping the upstream
@@ -45,23 +46,23 @@ func (fs *lintTrackingFS) drain() lintProgramLookups {
 	failedLookups := fs.failedLookups
 	fs.reset()
 	return lintProgramLookups{
-		seenFiles:     tracker.SeenFiles.ToSlice(),
+		seenFiles:     pathutil.Strings(tracker.SeenFiles.ToSlice()),
 		failedLookups: failedLookups.ToSlice(),
 	}
 }
 
-func (fs *lintTrackingFS) ReadFile(path string) (string, bool) {
+func (fs *lintTrackingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	content, ok := fs.FS.ReadFile(path)
 	if !ok {
-		fs.failedLookups.Add(path)
+		fs.failedLookups.Add(path.AsString())
 	}
 	return content, ok
 }
 
-func (fs *lintTrackingFS) FileExists(path string) bool {
+func (fs *lintTrackingFS) FileExists(path tspath.RootedFilePath) bool {
 	exists := fs.FS.FileExists(path)
 	if !exists {
-		fs.failedLookups.Add(path)
+		fs.failedLookups.Add(path.AsString())
 	}
 	return exists
 }
@@ -70,60 +71,43 @@ func lintProgramDirectoryWatchInput(path string) string {
 	return tspath.CombinePaths(path, "__rslint_watch__")
 }
 
-func (fs *lintTrackingFS) DirectoryExists(path string) bool {
+func (fs *lintTrackingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
 	exists := fs.Inner.DirectoryExists(path)
 	if !exists {
-		fs.failedLookups.Add(path)
-		fs.SeenFiles.Add(lintProgramDirectoryWatchInput(path))
+		fs.failedLookups.Add(path.AsString())
+		fs.SeenFiles.Add(pathutil.Path(lintProgramDirectoryWatchInput(path.AsString())))
 	}
 	return exists
 }
 
-func (fs *lintTrackingFS) GetAccessibleEntries(path string) vfs.Entries {
-	fs.SeenFiles.Add(lintProgramDirectoryWatchInput(path))
+func (fs *lintTrackingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	fs.SeenFiles.Add(pathutil.Path(lintProgramDirectoryWatchInput(path.AsString())))
 	return fs.Inner.GetAccessibleEntries(path)
 }
 
-func (fs *lintTrackingFS) Stat(path string) vfs.FileInfo {
+func (fs *lintTrackingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
 	info := fs.Inner.Stat(path)
 	if info != nil && info.IsDir() {
-		if !tspath.IsDiskPathRoot(path) {
-			fs.SeenFiles.Add(lintProgramDirectoryWatchInput(path))
+		if !pathutil.IsDiskPathRoot(path.AsString()) {
+			fs.SeenFiles.Add(pathutil.Path(lintProgramDirectoryWatchInput(path.AsString())))
 		}
 	} else {
 		fs.SeenFiles.Add(path)
 		if info == nil {
-			fs.failedLookups.Add(path)
+			fs.failedLookups.Add(path.AsString())
 		}
 	}
 	return info
 }
 
-func (fs *lintTrackingFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error {
-	fs.SeenFiles.Add(lintProgramDirectoryWatchInput(root))
-	fs.DirectoryExists(root)
-	return fs.Inner.WalkDir(root, func(
-		path string,
-		entry vfs.DirEntry,
-		err error,
-	) error {
-		if err == nil && entry != nil && entry.IsDir() {
-			fs.SeenFiles.Add(lintProgramDirectoryWatchInput(path))
-		} else {
-			fs.SeenFiles.Add(path)
-		}
-		return walkFn(path, entry, err)
-	})
-}
-
-func (fs *lintTrackingFS) Realpath(path string) string {
+func (fs *lintTrackingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
 	realPath := fs.Inner.Realpath(path)
-	if fs.Inner.DirectoryExists(path) {
-		if !tspath.IsDiskPathRoot(path) {
-			fs.SeenFiles.Add(lintProgramDirectoryWatchInput(path))
+	if fs.Inner.DirectoryExists(tspath.RootedDirectoryPathFromPath(path)) {
+		if !pathutil.IsDiskPathRoot(path.AsString()) {
+			fs.SeenFiles.Add(pathutil.Path(lintProgramDirectoryWatchInput(path.AsString())))
 		}
-		if realPath != "" && !tspath.IsDiskPathRoot(realPath) {
-			fs.SeenFiles.Add(lintProgramDirectoryWatchInput(realPath))
+		if realPath != "" && !pathutil.IsDiskPathRoot(realPath.AsString()) {
+			fs.SeenFiles.Add(pathutil.Path(lintProgramDirectoryWatchInput(realPath.AsString())))
 		}
 	} else {
 		fs.SeenFiles.Add(path)
@@ -174,9 +158,9 @@ func (c *lintProgramCoverage) ensure(
 		return false, true, nil
 	}
 
-	inputs := &collections.SyncSet[tspath.Path]{}
-	caseSensitive := c.server.fs.UseCaseSensitiveFileNames()
-	currentDirectoryPath := tspath.ToPath(
+	inputs := &collections.SyncMap[tspath.PathKey, tspath.RootedFilePath]{}
+	caseSensitive := c.server.fs.CaseSensitivity().IsCaseSensitive()
+	currentDirectoryPath := pathutil.ToPath(
 		currentDirectory,
 		currentDirectory,
 		caseSensitive,
@@ -186,17 +170,17 @@ func (c *lintProgramCoverage) ensure(
 		lsproto.WatchKindDelete
 	exactWatchers := make([]*lsproto.FileSystemWatcher, 0)
 	for _, fileName := range seenFiles {
-		path := tspath.ToPath(fileName, currentDirectory, caseSensitive)
-		if tspath.IsDiskPathRoot(string(path)) {
+		path := pathutil.ToPath(fileName, currentDirectory, caseSensitive)
+		if pathutil.IsDiskPathRoot(string(path)) {
 			continue
 		}
 		// Module detection probes package.json through every ancestor. Keep
 		// those probes exact so an ancestor at the volume root does not force a
 		// recursive root watcher.
 		if tspath.GetBaseFileName(string(path)) == "package.json" &&
-			path.GetDirectoryPath().ContainsPath(currentDirectoryPath) {
+			tspath.ContainsPath(path.Parent().AsString(), currentDirectoryPath.AsString(), tspath.CaseSensitive) {
 			watcher := fileSystemWatcher(
-				string(path.GetDirectoryPath()),
+				string(path.Parent()),
 				"package.json",
 				c.relativePatternSupport,
 			)
@@ -204,14 +188,14 @@ func (c *lintProgramCoverage) ensure(
 			exactWatchers = append(exactWatchers, watcher)
 			continue
 		}
-		inputs.Add(path)
+		inputs.Store(path, tspath.ToRootedFilePath(fileName, pathutil.Directory(currentDirectory)))
 	}
 
 	mapPatterns := project.CreateResolutionLookupGlobMapper(
-		c.server.cwd,
-		c.server.defaultLibraryPath,
-		currentDirectory,
-		caseSensitive,
+		pathutil.Directory(c.server.cwd),
+		pathutil.Directory(c.server.defaultLibraryPath),
+		pathutil.Directory(currentDirectory),
+		pathutil.CaseSensitivity(caseSensitive),
 	)
 	watchers := project.NewWatchedFiles(
 		"rslint standalone programs",

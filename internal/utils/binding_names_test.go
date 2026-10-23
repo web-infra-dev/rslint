@@ -14,7 +14,7 @@ func TestBindingNameSymbolForConstructorParameters(t *testing.T) {
 	for _, modifier := range []string{"", "public", "private", "protected", "readonly", "private readonly"} {
 		t.Run(modifier, func(t *testing.T) {
 			source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/test.ts", Path: "/test.ts",
+				FileName: "/test.ts", PathKey: "/test.ts",
 			}, "class C { constructor("+modifier+" value = input) { use(value); } }", core.ScriptKindTS)
 			binder.BindSourceFile(source)
 			constructor := source.Statements.Nodes[0].AsClassDeclaration().Members.Nodes[0]
@@ -33,7 +33,7 @@ func TestBindingNameSymbolForConstructorParameters(t *testing.T) {
 func TestForEachVariableDeclarationBinding(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, "const simple = 0, {a, b: renamed, nested: {c}, ...rest} = object, [first, , ...tail] = array;", core.ScriptKindTS)
 
 	statement := sourceFile.Statements.Nodes[0].AsVariableStatement()

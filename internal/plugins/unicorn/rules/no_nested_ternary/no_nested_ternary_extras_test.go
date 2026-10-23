@@ -184,7 +184,7 @@ func TestNoNestedTernaryEditDemand(t *testing.T) {
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, "const value = outer ? inner ? yes : no : fallback;", core.ScriptKindTS)
 
 	run := func(demand rule.EditDemand) rule.RuleDiagnostic {

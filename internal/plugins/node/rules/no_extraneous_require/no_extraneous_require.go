@@ -27,7 +27,7 @@ var NoExtraneousRequireRule = rule.Rule{
 		if p == nil || fileName == "<input>" {
 			return nil
 		}
-		pkg := packagejson.FindNearestValid(p, fileName)
+		pkg := packagejson.FindNearestValid(p, fileName.AsString())
 		if pkg == nil {
 			return nil
 		}
@@ -46,7 +46,7 @@ var NoExtraneousRequireRule = rule.Rule{
 					if !found {
 						var resource string
 						name, resource = nodeutil.ImportModuleName(specifier)
-						if name != "" && (nodeutil.AllowsDependency(p, pkg, name) || slices.Contains(allowed, name) || nodeutil.HasTypeScriptAlias(p, fileName, resource)) {
+						if name != "" && (nodeutil.AllowsDependency(p, pkg, name) || slices.Contains(allowed, name) || nodeutil.HasTypeScriptAlias(p, fileName.AsString(), resource)) {
 							name = ""
 						}
 						if name != "" {
@@ -54,7 +54,7 @@ var NoExtraneousRequireRule = rule.Rule{
 								value := nodeutil.RequireResolutionOptions(ctx, opts)
 								resolution = &value
 							}
-							if moduleresolver.ResolveModule(p, resource, fileName, *resolution) == "" {
+							if moduleresolver.ResolveModule(p, resource, fileName.AsString(), *resolution) == "" {
 								name = ""
 							}
 						}

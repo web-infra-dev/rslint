@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // cliFinalChangeCommitter performs the CLI's one terminal disk projection.
@@ -84,7 +85,7 @@ func (committer cliFinalChangeCommitter) CommitFinalChanges(
 
 func readPhysicalFileText(path string) (string, bool) {
 	fsys := bundled.WrapFS(osvfs.FS())
-	text, ok := fsys.ReadFile(path)
+	text, ok := fsys.ReadFile(pathutil.File(path))
 	if !ok {
 		return "", false
 	}

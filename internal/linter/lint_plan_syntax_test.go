@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func syntaxDiagnosticTestProgram(t *testing.T) (*compiler.Program, string) {
@@ -68,7 +69,7 @@ func TestLintPlanSyntacticDiagnosticsRespectsProgramCoverage(t *testing.T) {
 		t.Errorf("compiler-backed diagnostics were duplicated by the lint projection: %v", diagnostics)
 	}
 
-	sourceFile := compilerProgram.GetSourceFile(targetPath)
+	sourceFile := compilerProgram.GetSourceFile(pathutil.File(targetPath))
 	if sourceFile == nil {
 		t.Fatalf("compiler Program does not contain %q", targetPath)
 	}
@@ -200,7 +201,7 @@ func TestLintPlanParallelSyntacticDiagnosticsPreserveTargetOrder(t *testing.T) {
 			Programs:         programs,
 			TargetsByProgram: [][]string{{earlyValid, earlyBroken}, {lateBroken, lateValid}},
 			GetRulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
-				switch file.FileName() {
+				switch file.FileName().AsString() {
 				case earlyValid:
 					close(earlyBlocked)
 					<-releaseEarly
@@ -244,7 +245,7 @@ func TestLintPlanParallelSyntacticDiagnosticsPreserveTargetOrder(t *testing.T) {
 
 func TestCollectFileSyntacticDiagnosticsProjectsTypeScriptFields(t *testing.T) {
 	compilerProgram, targetPath := syntaxDiagnosticTestProgram(t)
-	sourceFile := compilerProgram.GetSourceFile(targetPath)
+	sourceFile := compilerProgram.GetSourceFile(pathutil.File(targetPath))
 	if sourceFile == nil {
 		t.Fatalf("compiler Program does not contain %q", targetPath)
 	}

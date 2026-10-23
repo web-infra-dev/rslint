@@ -170,7 +170,7 @@ func lintDeferredEdits(t *testing.T, test deferredEditCase, program *lintprogram
 	var diagnostics []rule.RuleDiagnostic
 	options := rule_tester.ResolveTestCaseOptions(t, &test.rule, test.options)
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program: program, File: sourceFile.FileName(), HasTypeInfo: typed,
+		Program: program, File: sourceFile.FileName().AsString(), HasTypeInfo: typed,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{Name: test.rule.Name, Severity: rule.SeverityWarning,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners { return test.rule.Run(ctx, options) },
@@ -262,7 +262,7 @@ func TestRstestDeferredEditDemand(t *testing.T) {
 
 func assertDeferredOutputParses(t *testing.T, code string) {
 	t.Helper()
-	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/fixed.ts", Path: "/fixed.ts"}, code, core.ScriptKindTS)
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/fixed.ts", PathKey: "/fixed.ts"}, code, core.ScriptKindTS)
 	if len(sourceFile.Diagnostics()) != 0 {
 		t.Fatalf("fix produced parse diagnostics: %s", code)
 	}
@@ -275,7 +275,7 @@ func BenchmarkRstestDeferredNodeImports(b *testing.B) {
 			fmt.Fprintf(&source, "import { test as test%d } from 'node:test';\n", i)
 		}
 		source.WriteString("import { expect } from 'rstack/test';\n")
-		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/bench.ts", Path: "/bench.ts"}, source.String(), core.ScriptKindTS)
+		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/bench.ts", PathKey: "/bench.ts"}, source.String(), core.ScriptKindTS)
 		for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix} {
 			b.Run(fmt.Sprintf("imports=%d/demand=%d", count, demand), func(b *testing.B) {
 				b.ReportAllocs()

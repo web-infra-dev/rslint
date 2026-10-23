@@ -22,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_cycle"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func rootProgramTestPlan(dir string, names ...string) target.Plan {
@@ -119,7 +120,7 @@ func TestRootProgramsMatchCompatibilityProgram(t *testing.T) {
 		if (programFile.ExternalModuleIndicator == nil) != (directFile.ExternalModuleIndicator == nil) {
 			t.Fatalf("external-module detection differs for %q", target.Path)
 		}
-		if legacyMetadata := compatibility.GetSourceFileMetaData(programFile.Path()); legacyMetadata != sourceProgram.SourceFileMetadata(directFile) {
+		if legacyMetadata := compatibility.GetSourceFileMetaData(programFile.PathKey()); legacyMetadata != sourceProgram.SourceFileMetadata(directFile) {
 			t.Fatalf("source metadata differs for %q: legacy=%+v direct=%+v", target.Path, legacyMetadata, sourceProgram.SourceFileMetadata(directFile))
 		}
 
@@ -142,8 +143,8 @@ func TestRootProgramsMatchCompatibilityProgram(t *testing.T) {
 				t.Fatalf("module resolution differs for %q in %q: legacy=%+v direct=%+v", specifier.Text(), target.Path, legacyResolution, directResolution)
 			}
 			if legacyResolution.IsResolved() {
-				legacySource := compatibility.GetSourceFileForResolvedModule(legacyResolution.ResolvedFileName)
-				directSource := sourceProgram.GetSourceFileForResolvedModule(directResolution.ResolvedFileName)
+				legacySource := compatibility.GetSourceFileForResolvedModule(legacyResolution)
+				directSource := sourceProgram.GetSourceFileForResolvedModule(directResolution)
 				if (legacySource == nil) != (directSource == nil) ||
 					legacySource != nil && legacySource.FileName() != directSource.FileName() {
 					t.Fatalf("resolved source lookup differs for %q", specifier.Text())
@@ -152,7 +153,7 @@ func TestRootProgramsMatchCompatibilityProgram(t *testing.T) {
 		}
 	}
 	unselected := tspath.ResolvePath(dir, "unselected.js")
-	if compatibility.GetSourceFile(unselected) != nil || sourceProgram.GetSourceFile(unselected) != nil {
+	if compatibility.GetSourceFile(pathutil.File(unselected)) != nil || sourceProgram.GetSourceFile(unselected) != nil {
 		t.Fatal("NoResolve Programs materialized an unselected dependency")
 	}
 }
@@ -351,8 +352,8 @@ type rootProgramExactCaseFS struct {
 	directories map[string]struct{}
 }
 
-func (fsys *rootProgramExactCaseFS) DirectoryExists(path string) bool {
-	if _, ok := fsys.directories[tspath.NormalizePath(path)]; ok {
+func (fsys *rootProgramExactCaseFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	if _, ok := fsys.directories[tspath.NormalizePath(path.AsString())]; ok {
 		return true
 	}
 	return fsys.exactCaseProgramFS.DirectoryExists(path)
@@ -413,13 +414,13 @@ func TestRootProgramsIsolateCaseFoldedPackageScopes(t *testing.T) {
 	directExternal := make(map[string]bool, 2)
 	for _, sourceProgram := range direct.Programs {
 		for _, file := range sourceProgram.SourceFiles() {
-			directExternal[file.FileName()] = file.ExternalModuleIndicator != nil
+			directExternal[file.FileName().AsString()] = file.ExternalModuleIndicator != nil
 		}
 	}
 	legacyExternal := make(map[string]bool, 2)
 	for _, program := range legacy.Programs {
 		for _, file := range program.SourceFiles() {
-			legacyExternal[file.FileName()] = file.ExternalModuleIndicator != nil
+			legacyExternal[file.FileName().AsString()] = file.ExternalModuleIndicator != nil
 		}
 	}
 	if !legacyExternal[upper] || legacyExternal[lower] ||
@@ -602,7 +603,7 @@ func collectTargetSyntacticDiagnostics(
 					continue
 				}
 				loc := diagnostic.Loc()
-				key := diagnosticKey{file.FileName(), diagnostic.Code(), loc.Pos(), loc.End()}
+				key := diagnosticKey{file.FileName().AsString(), diagnostic.Code(), loc.Pos(), loc.End()}
 				if _, exists := seen[key]; exists {
 					continue
 				}
@@ -610,7 +611,7 @@ func collectTargetSyntacticDiagnostics(
 				diagnostics = append(diagnostics, rule.RuleDiagnostic{
 					RuleName:     fmt.Sprintf("TypeScript(TS%d)", diagnostic.Code()),
 					SourceFile:   file,
-					FilePath:     file.FileName(),
+					FilePath:     file.FileName().AsString(),
 					Range:        loc,
 					Message:      rule.RuleMessage{Description: diagnostic.String()},
 					Severity:     rule.SeverityError,

@@ -23,7 +23,7 @@ func TestDisableManagerSameLineBoundaries(t *testing.T) {
 		} {
 			t.Run(prefix+"/"+testCase.name, func(t *testing.T) {
 				code := "/* 😀 */ before(); /* " + prefix + "-disable" + testCase.disable + " */ inside(); /* " + prefix + "-enable" + testCase.enable + " */ after();"
-				sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/directives.js", Path: "/directives.js"}, code, core.ScriptKindJS)
+				sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/directives.js", PathKey: "/directives.js"}, code, core.ScriptKindJS)
 				dm := NewDisableManager(sf, NewCommentStore(sf))
 				for _, query := range []struct {
 					marker string

@@ -168,7 +168,7 @@ export type T = typeof M;
 			if d.File() == nil {
 				continue
 			}
-			out[key{d.File().FileName(), d.Code(), d.Loc().Pos(), d.Loc().End()}] = struct{}{}
+			out[key{d.File().FileName().AsString(), d.Code(), d.Loc().Pos(), d.Loc().End()}] = struct{}{}
 		}
 		return out
 	}

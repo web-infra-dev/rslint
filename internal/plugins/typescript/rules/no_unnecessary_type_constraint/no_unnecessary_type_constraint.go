@@ -106,7 +106,7 @@ var NoUnnecessaryTypeConstraintRule = rule.CreateRule(rule.Rule{
 							len(parent.TypeParameters()) == 1 {
 							if !needsDisambiguationResolved {
 								needsDisambiguation = tspath.FileExtensionIsOneOf(
-									ctx.SourceFile.FileName(),
+									ctx.SourceFile.FileName().AsString(),
 									disambiguationExtensions,
 								)
 								needsDisambiguationResolved = true

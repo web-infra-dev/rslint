@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/iovfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // Root identifies where a TypeScript program's files should be read from.
@@ -27,6 +28,6 @@ type Root struct {
 func EmbedRoot(fsys embed.FS) Root {
 	return Root{
 		Dir: "/",
-		FS:  bundled.WrapFS(iovfs.From(fsys, true)),
+		FS:  bundled.WrapFS(iovfs.From(fsys, pathutil.CaseSensitivity(true))),
 	}
 }

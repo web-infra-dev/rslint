@@ -10,10 +10,13 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/diagnostics"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/compilerhost"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // SyntacticError carries structured diagnostics for syntax errors.
@@ -27,9 +30,9 @@ func (e *SyntacticError) Error() string {
 	return e.msg
 }
 
-func CreateCompilerHost(cwd string, fs vfs.FS) compiler.CompilerHost {
+func CreateCompilerHost(cwd string, fs vfs.FS) compilerhost.Host {
 	defaultLibraryPath := bundled.LibPath()
-	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath, nil, nil, nil)
+	return compilerhost.WithDirectory(compiler.NewCompilerHost(fs, defaultLibraryPath, nil, nil, nil), pathutil.Directory(cwd))
 }
 
 func configNotFoundError(resolvedConfigPath string) error {
@@ -49,11 +52,11 @@ func CreateProgramUsingProjectReferenceSources(singleThreaded bool, fs vfs.FS, c
 
 func createProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost, useSourceOfProjectReference bool) (*compiler.Program, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
-	if !fs.FileExists(resolvedConfigPath) {
+	if !fs.FileExists(pathutil.File(resolvedConfigPath)) {
 		return nil, configNotFoundError(resolvedConfigPath)
 	}
 
-	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)
+	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(pathutil.File(resolvedConfigPath), &core.CompilerOptions{}, nil, fs, nil)
 
 	return createProgramFromConfig(singleThreaded, configParseResult, host, useSourceOfProjectReference)
 }
@@ -63,22 +66,19 @@ func createProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 // final target set decides which syntax diagnostics are user-visible.
 func CreateProgramLenient(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost) (*compiler.Program, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
-	if !fs.FileExists(resolvedConfigPath) {
+	if !fs.FileExists(pathutil.File(resolvedConfigPath)) {
 		return nil, configNotFoundError(resolvedConfigPath)
 	}
 
-	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)
+	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(pathutil.File(resolvedConfigPath), &core.CompilerOptions{}, nil, fs, nil)
 
 	return CreateProgramFromParsedConfigLenient(singleThreaded, configParseResult, host)
 }
 
 // CreateProgramFromOptions creates a program from in-memory compiler options and root file names,
 // without requiring a tsconfig file on disk.
-func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host compiler.CompilerHost) (*compiler.Program, error) {
-	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, rootFileNames, nil, tspath.ComparePathsOptions{
-		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
-		CurrentDirectory:          host.GetCurrentDirectory(),
-	})
+func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host compilerhost.Host) (*compiler.Program, error) {
+	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, pathutil.ResolveFiles(rootFileNames, host.GetCurrentDirectory()), nil, host.GetCurrentDirectory(), host.FS().CaseSensitivity())
 
 	return createProgramFromConfig(singleThreaded, configParseResult, host, false)
 }
@@ -86,11 +86,8 @@ func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.Compile
 // CreateProgramFromOptionsLenient creates a Program like
 // CreateProgramFromOptions but leaves syntax-diagnostic admission to its
 // caller.
-func CreateProgramFromOptionsLenient(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host compiler.CompilerHost) (*compiler.Program, error) {
-	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, rootFileNames, nil, tspath.ComparePathsOptions{
-		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
-		CurrentDirectory:          host.GetCurrentDirectory(),
-	})
+func CreateProgramFromOptionsLenient(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host compilerhost.Host) (*compiler.Program, error) {
+	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, pathutil.ResolveFiles(rootFileNames, host.GetCurrentDirectory()), nil, host.GetCurrentDirectory(), host.FS().CaseSensitivity())
 
 	return CreateProgramFromParsedConfigLenient(singleThreaded, configParseResult, host)
 }
@@ -119,7 +116,7 @@ func CreateProgramFromParsedConfigLenientWithProjectReferences(singleThreaded bo
 	return createProgramFromParsedConfigLenient(singleThreaded, config, &rootProjectReferenceHost{
 		CompilerHost: host,
 		root:         config,
-		rootPath:     tspath.ToPath(config.ConfigName(), host.GetCurrentDirectory(), host.FS().UseCaseSensitiveFileNames()),
+		rootPath:     host.FS().CaseSensitivity().PathKey(config.ConfigName().AsPath()),
 	}, true)
 }
 
@@ -127,17 +124,18 @@ func CreateProgramFromParsedConfigLenientWithProjectReferences(singleThreaded bo
 // ConfigFile identity. Re-parsing that root would make its own sources look
 // like redirected reference sources and suppress their semantic diagnostics.
 // Other project reads continue through the caller's metadata/cache host.
+
 type rootProjectReferenceHost struct {
 	compiler.CompilerHost
 	root     *tsoptions.ParsedCommandLine
-	rootPath tspath.Path
+	rootPath tspath.PathKey
 }
 
-func (host *rootProjectReferenceHost) GetResolvedProjectReference(fileName string, path tspath.Path) *tsoptions.ParsedCommandLine {
+func (host *rootProjectReferenceHost) GetResolvedProjectReference(fileName tspath.RootedFilePath, path tspath.PathKey) *tsoptions.ParsedCommandLine {
 	if path == host.rootPath {
 		return host.root
 	}
-	return host.CompilerHost.GetResolvedProjectReference(fileName, path)
+	return host.CompilerHost.GetResolvedProjectReference(pathutil.File(fileName.AsString()), path)
 }
 
 func createProgramFromParsedConfigLenient(singleThreaded bool, config *tsoptions.ParsedCommandLine, host compiler.CompilerHost, useSourceOfProjectReference bool) (*compiler.Program, error) {
@@ -153,6 +151,9 @@ func createProgramFromParsedConfigLenient(singleThreaded bool, config *tsoptions
 	program := compiler.NewProgram(opts)
 	if program == nil {
 		return nil, errors.New("couldn't create program")
+	}
+	if err := programPathError(program); err != nil {
+		return nil, err
 	}
 
 	program.BindSourceFiles()
@@ -172,6 +173,9 @@ func createProgramFromConfig(singleThreaded bool, config *tsoptions.ParsedComman
 	program := compiler.NewProgram(opts)
 	if program == nil {
 		return nil, errors.New("couldn't create program")
+	}
+	if err := programPathError(program); err != nil {
+		return nil, err
 	}
 
 	syntacticDiags := program.GetSyntacticDiagnostics(context.Background(), nil)
@@ -197,4 +201,15 @@ func createProgramFromConfig(singleThreaded bool, config *tsoptions.ParsedComman
 	// program.CreateCheckers()
 
 	return program, nil
+}
+
+// TypeScript 7.1 rejects network roots before parsing them. Surface that error
+// even for lenient Programs: silently dropping a root would skip its rules.
+func programPathError(program *compiler.Program) error {
+	for _, diagnostic := range program.GetProgramDiagnostics() {
+		if diagnostic.Code() == diagnostics.Network_path_0_is_not_supported.Code() {
+			return fmt.Errorf("TypeScript TS%d: %s", diagnostic.Code(), diagnostic.String())
+		}
+	}
+	return nil
 }

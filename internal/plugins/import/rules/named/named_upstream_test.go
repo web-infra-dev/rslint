@@ -167,7 +167,7 @@ func TestNamedUpstream(t *testing.T) {
 // Upstream group: named (path case-insensitivity)
 func TestNamedUpstreamCaseInsensitive(t *testing.T) {
 	root := namedRoot(t, "testdata/upstream.txtar")
-	if root.FS.UseCaseSensitiveFileNames() {
+	if root.FS.CaseSensitivity().IsCaseSensitive() {
 		t.Skip("upstream case-insensitive filesystem group")
 	}
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &named.NamedRule,

@@ -240,7 +240,7 @@ func buildPathTestGraph(t *testing.T, code string) (*Graph[string], map[string][
 	t.Helper()
 	source := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, code, core.ScriptKindTS)
 	var root *ast.Node
 	source.AsNode().ForEachChild(func(node *ast.Node) bool {

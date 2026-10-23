@@ -190,7 +190,9 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			return
 		}
 		clause := declaration.ImportClause.AsImportClause()
-		if clause == nil {
+		if clause == nil || clause.PhaseModifier == ast.KindSourceKeyword {
+			// A type-only rewrite would discard the source phase and change
+			// which object this import binds.
 			return
 		}
 		source := importSource(declaration.ModuleSpecifier)

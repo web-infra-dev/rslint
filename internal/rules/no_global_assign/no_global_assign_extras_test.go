@@ -106,10 +106,10 @@ Object = 4; // eslint-disable-line no-global-assign`,
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/no-global-assign.ts", Path: "/no-global-assign.ts",
+				FileName: "/no-global-assign.ts", PathKey: "/no-global-assign.ts",
 			}, test.code, core.ScriptKindTS)
 			binder.BindSourceFile(sourceFile)
-			globalsInit, refsInit, language := rule.ResolveLanguageDefaults(sourceFile.FileName(), rule.LanguageOptions{})
+			globalsInit, refsInit, language := rule.ResolveLanguageDefaults(sourceFile.FileName().AsString(), rule.LanguageOptions{})
 			for _, withRefs := range []bool{false, true} {
 				for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
 					t.Run(fmt.Sprintf("refs=%t/demand=%d", withRefs, demand), func(t *testing.T) {

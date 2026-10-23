@@ -432,8 +432,8 @@ func classifyRegExpAliasSymbol(
 	cache.resolving[key] = true
 	defer delete(cache.resolving, key)
 
-	dependencies := make([]regExpAliasDependency, 0, len(symbol.Declarations)+1)
-	for _, declaration := range symbol.Declarations {
+	dependencies := make([]regExpAliasDependency, 0, len(symbol.Declarations())+1)
+	for _, declaration := range symbol.Declarations() {
 		dependencies = appendAliasDeclarationDependencies(dependencies, ctx, declaration, kind, cache)
 	}
 	if ctx.Refs != nil {

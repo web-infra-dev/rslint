@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // FinalCompilerOptions contains resolved values for consumers checking compiler
@@ -83,7 +84,7 @@ func runConfig(args []string, stdout, stderr io.Writer) int {
 	cwd = tspath.NormalizePath(cwd)
 	configPath = tspath.ResolvePath(cwd, configPath)
 	host := utils.CreateCompilerHost(cwd, cachedvfs.From(osvfs.FS()))
-	config, diagnostics := tsoptions.GetParsedCommandLineOfConfigFile(configPath, &core.CompilerOptions{}, nil, host, nil)
+	config, diagnostics := tsoptions.GetParsedCommandLineOfConfigFile(pathutil.File(configPath), &core.CompilerOptions{}, nil, host.FS(), nil)
 	if config != nil {
 		diagnostics = append(diagnostics, config.GetConfigFileParsingDiagnostics()...)
 	}
@@ -91,7 +92,7 @@ func runConfig(args []string, stdout, stderr io.Writer) int {
 		for _, diagnostic := range diagnostics {
 			path := configPath
 			if diagnostic.File() != nil {
-				path = diagnostic.File().FileName()
+				path = diagnostic.File().FileName().AsString()
 			}
 			fmt.Fprintf(stderr, "%s: TS%d: %s\n", path, diagnostic.Code(), diagnostic.String())
 		}

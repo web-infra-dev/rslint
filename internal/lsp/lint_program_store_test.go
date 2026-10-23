@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type lintProgramStoreFixture struct {
@@ -55,7 +56,7 @@ func newLintProgramStoreFixture(t *testing.T, source string) *lintProgramStoreFi
 	server := newTestServer()
 	server.cwd = root
 	server.fs = bundled.WrapFS(osvfs.FS())
-	server.defaultLibraryPath = bundled.LibPath()
+	server.defaultLibraryPath = bundled.LibPath().AsString()
 	server.initializeParams = &lsproto.InitializeParams{}
 	sourceURI := documentURIFromPath(sourcePath)
 	server.documents[sourceURI] = source
@@ -129,7 +130,7 @@ func TestLintProgramStoreReusesAndUpdatesSource(t *testing.T) {
 	if updated.Host() != first.Host() {
 		t.Fatal("source-only update replaced the stable compiler host")
 	}
-	sourceFile := updated.GetSourceFile(fixture.sourcePath)
+	sourceFile := updated.GetSourceFile(pathutil.File(fixture.sourcePath))
 	if sourceFile == nil {
 		t.Fatal("updated Program does not contain the lint target")
 	}
@@ -185,7 +186,7 @@ func TestLintProgramStoreVirtualDependencyDirectoryAliasChangesTypes(t *testing.
 						t.Fatal("virtual dependency was selected as a lint root")
 					}
 				}
-				if diagnostics := first.GetSemanticDiagnostics(context.Background(), first.GetSourceFile(fixture.sourcePath)); len(diagnostics) != 0 {
+				if diagnostics := first.GetSemanticDiagnostics(context.Background(), first.GetSourceFile(pathutil.File(fixture.sourcePath))); len(diagnostics) != 0 {
 					t.Fatalf("initial consumer diagnostics = %v", diagnostics)
 				}
 				const changed = "export const value = 123;\n"
@@ -193,7 +194,7 @@ func TestLintProgramStoreVirtualDependencyDirectoryAliasChangesTypes(t *testing.
 				fixture.store.DidChange(virtualURI, changed)
 				updated := load()
 				foundMismatch := false
-				for _, diagnostic := range updated.GetSemanticDiagnostics(context.Background(), updated.GetSourceFile(fixture.sourcePath)) {
+				for _, diagnostic := range updated.GetSemanticDiagnostics(context.Background(), updated.GetSourceFile(pathutil.File(fixture.sourcePath))) {
 					foundMismatch = foundMismatch || diagnostic.Code() == 2322
 				}
 				if !foundMismatch {
@@ -202,14 +203,14 @@ func TestLintProgramStoreVirtualDependencyDirectoryAliasChangesTypes(t *testing.
 				fixture.server.documents[virtualURI] = original
 				fixture.store.DidChange(virtualURI, original)
 				restored := load()
-				if diagnostics := restored.GetSemanticDiagnostics(context.Background(), restored.GetSourceFile(fixture.sourcePath)); len(diagnostics) != 0 {
+				if diagnostics := restored.GetSemanticDiagnostics(context.Background(), restored.GetSourceFile(pathutil.File(fixture.sourcePath))); len(diagnostics) != 0 {
 					t.Fatalf("consumer retained diagnostics after restoring dependency: %v", diagnostics)
 				}
 				delete(fixture.server.documents, virtualURI)
 				fixture.store.DidClose(virtualURI)
 				closed := load()
 				foundMissing := false
-				for _, diagnostic := range closed.GetSemanticDiagnostics(context.Background(), closed.GetSourceFile(fixture.sourcePath)) {
+				for _, diagnostic := range closed.GetSemanticDiagnostics(context.Background(), closed.GetSourceFile(pathutil.File(fixture.sourcePath))) {
 					foundMissing = foundMissing || diagnostic.Code() == 2307
 				}
 				if !foundMissing {
@@ -245,7 +246,7 @@ func TestLintProgramStoreVirtualTargetDirectoryAliasReusesHost(t *testing.T) {
 	if updated == first || updated.Host() != first.Host() {
 		t.Fatal("virtual target edit did not update through the resident compiler host")
 	}
-	sourceFile := updated.GetSourceFile(fixture.sourcePath)
+	sourceFile := updated.GetSourceFile(pathutil.File(fixture.sourcePath))
 	if sourceFile == nil || sourceFile.Text() != changed {
 		t.Fatalf("virtual target source did not update: %v", sourceFile)
 	}
@@ -288,10 +289,10 @@ func TestLintProgramStoreProjectServiceReusesModeAndUpdatesSource(t *testing.T) 
 	fixture.server.documents[fixture.sourceURI] = changed
 	fixture.store.DidChange(fixture.sourceURI, changed)
 	updated := loadService()
-	if updated == first || updated.GetSourceFile(fixture.sourcePath).Text() != changed {
+	if updated == first || updated.GetSourceFile(pathutil.File(fixture.sourcePath)).Text() != changed {
 		t.Fatal("service cache did not advance to the editor generation")
 	}
-	if first.GetSourceFile(fixture.sourcePath).Text() != original {
+	if first.GetSourceFile(pathutil.File(fixture.sourcePath)).Text() != original {
 		t.Fatal("updating the service cache mutated a previous Program")
 	}
 	if !fixture.store.Invalidate() || len(fixture.store.programs) != 0 {
@@ -365,10 +366,10 @@ func TestLintProgramStoreProjectServiceIgnoresPreviouslyLoadedReferences(t *test
 	if speculative.Options().ConfigFilePath != "" || !speculative.Options().NoResolve.IsTrue() {
 		t.Fatal("speculative generation bypassed disabled reference traversal")
 	}
-	if speculative.GetSourceFile(fileName).Text() != fixedContent || speculative.GetSourceFile(fileName) == first.GetSourceFile(fileName) {
+	if speculative.GetSourceFile(fileName).Text() != fixedContent || speculative.GetSourceFile(fileName) == first.GetSourceFile(pathutil.File(fileName)) {
 		t.Fatal("speculative generation reused resident text")
 	}
-	if first.GetSourceFile(fileName).Text() != server.documents[uri] {
+	if first.GetSourceFile(pathutil.File(fileName)).Text() != server.documents[uri] {
 		t.Fatal("speculative generation changed resident source text")
 	}
 }
@@ -444,7 +445,7 @@ func TestLintProgramStoreProjectServiceFinalizesSelectedProject(t *testing.T) {
 		t.Fatalf("built a Program beyond the metadata-selected project: selected=%s Programs=%v", selected.configPath, store.programs)
 	}
 	// Emulate a checker's lazy dependency read outside the existing coverage.
-	selected.program.Host().FS().FileExists(tspath.NormalizePath(filepath.Join(t.TempDir(), "lazy.d.ts")))
+	selected.program.Host().FS().FileExists(pathutil.File(tspath.NormalizePath(filepath.Join(t.TempDir(), "lazy.d.ts"))))
 	request.finalize()
 	if store.programs[selectedKey] != nil {
 		t.Fatal("selected fallback retained lazy reads predating watcher coverage")
@@ -478,28 +479,28 @@ func TestLintProgramStoreProjectServiceUpdatesReferencedSources(t *testing.T) {
 		return selected.program
 	}
 	first := load()
-	if first.GetSourceFile(referencePath).Text() != original {
+	if first.GetSourceFile(pathutil.File(referencePath)).Text() != original {
 		t.Fatal("initial service Program did not use referenced editor source")
 	}
-	if diagnostics := first.GetSemanticDiagnostics(context.Background(), first.GetSourceFile(fileName)); len(diagnostics) != 0 {
+	if diagnostics := first.GetSemanticDiagnostics(context.Background(), first.GetSourceFile(pathutil.File(fileName))); len(diagnostics) != 0 {
 		t.Fatalf("initial semantic diagnostics=%v", diagnostics)
 	}
 	const changed = "export const value = false;\n"
 	server.documents[referenceURI] = changed
 	store.DidChange(referenceURI, changed)
 	updated := load()
-	if updated == first || updated.GetSourceFile(referencePath).Text() != changed {
+	if updated == first || updated.GetSourceFile(pathutil.File(referencePath)).Text() != changed {
 		t.Fatal("referenced editor change did not advance the consuming Program")
 	}
-	if first.GetSourceFile(referencePath).Text() != original {
+	if first.GetSourceFile(pathutil.File(referencePath)).Text() != original {
 		t.Fatal("reference update mutated the prior Program")
 	}
-	if !updated.IsSourceFromProjectReference(updated.GetSourceFile(referencePath).Path()) ||
-		updated.GetSourceFile(tspath.ResolvePath(directory, "lib/dist/value.d.ts")) != nil {
+	if !updated.IsSourceFromProjectReference(updated.GetSourceFile(pathutil.File(referencePath)).PathKey()) ||
+		updated.GetSourceFile(pathutil.File(tspath.ResolvePath(directory, "lib/dist/value.d.ts"))) != nil {
 		t.Fatal("incremental update lost project source-reference semantics")
 	}
 	foundMismatch := false
-	for _, diagnostic := range updated.GetSemanticDiagnostics(context.Background(), updated.GetSourceFile(fileName)) {
+	for _, diagnostic := range updated.GetSemanticDiagnostics(context.Background(), updated.GetSourceFile(pathutil.File(fileName))) {
 		foundMismatch = foundMismatch || diagnostic.Code() == 2322
 	}
 	if !foundMismatch {
@@ -854,8 +855,8 @@ func TestLintProgramStoreProjectServiceTracksMissingReferences(t *testing.T) {
 		t.Fatal("new reference reused the Program from its missing-config generation")
 	}
 	found := false
-	second.RangeResolvedProjectReference(func(_ tspath.Path, parsed, _ *tsoptions.ParsedCommandLine, _ int) bool {
-		if parsed != nil && lintProgramLexicalPathID(parsed.ConfigName(), server.fs) == lintProgramLexicalPathID(refPath, server.fs) {
+	second.RangeResolvedProjectReference(func(_ tspath.PathKey, parsed, _ *tsoptions.ParsedCommandLine, _ int) bool {
+		if parsed != nil && lintProgramLexicalPathID(parsed.ConfigName().AsString(), server.fs) == lintProgramLexicalPathID(refPath, server.fs) {
 			found = true
 		}
 		return true
@@ -887,7 +888,7 @@ func TestLintProgramStoreRebuildsForGraphChange(t *testing.T) {
 		t.Fatal("graph-changing edit retained the old Program")
 	}
 	if source := updated.GetSourceFile(
-		tspath.NormalizePath(dependencyPath),
+		pathutil.File(tspath.NormalizePath(dependencyPath)),
 	); source == nil {
 		t.Fatal("graph-changing edit did not load the new dependency")
 	}
@@ -901,7 +902,7 @@ func TestLintProgramStoreRebuildsForGraphChange(t *testing.T) {
 		Type: lsproto.FileChangeTypeChanged,
 	}})
 	reloaded := fixture.load(t)
-	dependency := reloaded.GetSourceFile(tspath.NormalizePath(dependencyPath))
+	dependency := reloaded.GetSourceFile(pathutil.File(tspath.NormalizePath(dependencyPath)))
 	if dependency == nil || dependency.Text() != changedDependency {
 		t.Fatal("watched dependency change was not visible after rebuild")
 	}
@@ -1227,7 +1228,7 @@ func TestLintProgramStoreOpeningNewIncludedFileRebuilds(t *testing.T) {
 	if rebuilt == first {
 		t.Fatal("newly included source did not rebuild the Program")
 	}
-	if sourceFile == nil || lintProgramLexicalPathID(sourceFile.FileName(), fixture.server.fs) != lintProgramLexicalPathID(newPath, fixture.server.fs) {
+	if sourceFile == nil || lintProgramLexicalPathID(sourceFile.FileName().AsString(), fixture.server.fs) != lintProgramLexicalPathID(newPath, fixture.server.fs) {
 		t.Fatalf("newly included source missing from rebuilt Program: %v", sourceFile)
 	}
 }
@@ -1276,7 +1277,7 @@ func TestLintProgramStoreOpeningNewImportedFileRebuildsBeforeWatchEvent(t *testi
 		t.Fatal("newly resolved import did not rebuild the Program")
 	}
 	if sourceFile == nil ||
-		lintProgramLexicalPathID(sourceFile.FileName(), fixture.server.fs) != lintProgramLexicalPathID(importedPath, fixture.server.fs) {
+		lintProgramLexicalPathID(sourceFile.FileName().AsString(), fixture.server.fs) != lintProgramLexicalPathID(importedPath, fixture.server.fs) {
 		t.Fatalf("newly resolved import missing from rebuilt Program: %v", sourceFile)
 	}
 }
@@ -1317,7 +1318,7 @@ type realpathCountingFS struct {
 	calls int
 }
 
-func (fs *realpathCountingFS) Realpath(path string) string {
+func (fs *realpathCountingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
 	fs.calls++
 	return fs.FS.Realpath(path)
 }
@@ -1330,22 +1331,22 @@ type retargetingLintProgramFS struct {
 	targetCall int
 }
 
-func (fs *retargetingLintProgramFS) Realpath(filePath string) string {
-	if tspath.NormalizePath(filePath) != fs.targetPath {
+func (fs *retargetingLintProgramFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	if tspath.NormalizePath(filePath.AsString()) != fs.targetPath {
 		return fs.FS.Realpath(filePath)
 	}
 	fs.targetCall++
 	if fs.targetCall == 1 {
-		return fs.firstPath
+		return pathutil.Path(fs.firstPath)
 	}
-	return fs.laterPath
+	return pathutil.Path(fs.laterPath)
 }
 
 func TestLintProgramStoreReusesFrozenTargetForResidentAndRebuild(t *testing.T) {
 	const content = "export const value = 1;\n"
 	fixture := newLintProgramStoreFixture(t, content)
 	fixture.load(t)
-	canonicalPath := tspath.NormalizePath(fixture.server.fs.Realpath(fixture.sourcePath))
+	canonicalPath := tspath.NormalizePath(fixture.server.fs.Realpath(pathutil.Path(fixture.sourcePath)).AsString())
 	laterPath := tspath.NormalizePath(filepath.Join(filepath.Dir(fixture.sourcePath), "moved.ts"))
 	if err := os.WriteFile(laterPath, []byte("export const moved = 2;\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -1444,7 +1445,7 @@ func TestLintProgramStoreWatchesExternalEmptyIncludeDirectory(t *testing.T) {
 	server := newTestServer()
 	server.cwd = workspace
 	server.fs = bundled.WrapFS(osvfs.FS())
-	server.defaultLibraryPath = bundled.LibPath()
+	server.defaultLibraryPath = bundled.LibPath().AsString()
 	server.initializeParams = &lsproto.InitializeParams{}
 	sourceURI := documentURIFromPath(sourcePath)
 	server.documents[sourceURI] = content
@@ -1477,8 +1478,8 @@ func TestLintProgramStoreWatchesExternalEmptyIncludeDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	finalize()
-	if realPath := server.fs.Realpath(shared); realPath != "" {
-		shared = realPath
+	if realPath := server.fs.Realpath(pathutil.Path(shared)); realPath != "" {
+		shared = realPath.AsString()
 	}
 	shared = strings.ToLower(filepath.ToSlash(shared))
 	for _, glob := range watcherGlobs {

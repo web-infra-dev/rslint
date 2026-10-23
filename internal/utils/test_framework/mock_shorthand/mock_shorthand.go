@@ -239,7 +239,7 @@ func isMutableBinding(symbol *ast.Symbol, sourceFile *ast.SourceFile) bool {
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if ast.GetSourceFileOfNode(declaration) != sourceFile {
 			continue
 		}
@@ -472,7 +472,7 @@ func resolvesTo(ctx rule.RuleContext, identifier *ast.Node, declaration *ast.Nod
 		return true
 	}
 	symbol := ctx.Refs.Resolve(identifier)
-	return symbol != nil && slices.Contains(symbol.Declarations, declaration)
+	return symbol != nil && slices.Contains(symbol.Declarations(), declaration)
 }
 
 // DropsComment reports whether replacing replaced with the text of kept would

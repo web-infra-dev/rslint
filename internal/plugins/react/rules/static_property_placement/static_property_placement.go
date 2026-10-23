@@ -207,8 +207,8 @@ func (r *componentResolver) variable(node *ast.Node, name string) []*scope.Varia
 	if parent := ast.WalkUpParenthesizedExpressions(node.Parent); parent != nil {
 		statement := ast.WalkUpParenthesizedExpressions(parent.Parent)
 		if statement != nil && statement.Kind == ast.KindExpressionStatement && statement.Parent == r.ctx.SourceFile.AsNode() {
-			if symbol := r.ctx.SourceFile.Locals[name]; symbol != nil && len(symbol.Declarations) == 1 {
-				declaration := symbol.Declarations[0]
+			if symbol := r.ctx.SourceFile.Locals[name]; symbol != nil && len(symbol.Declarations()) == 1 {
+				declaration := symbol.Declarations()[0]
 				kind, topLevel := scope.DefVariable, false
 				switch declaration.Kind {
 				case ast.KindVariableDeclaration:

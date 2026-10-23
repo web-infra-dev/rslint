@@ -25,7 +25,7 @@ func runLSP(args []string) int {
 		Err:                os.Stderr,
 		Cwd:                utils.Must(os.Getwd()),
 		FS:                 fs,
-		DefaultLibraryPath: defaultLibraryPath,
+		DefaultLibraryPath: defaultLibraryPath.AsString(),
 		TypingsLocation:    typingsLocation,
 	})
 

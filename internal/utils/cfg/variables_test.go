@@ -25,7 +25,7 @@ func TestVariableLivenessPaths(t *testing.T) {
 		t.Run(strconv.Itoa(variables), func(t *testing.T) {
 			for trial := range 100 {
 				source := strings.Repeat("if (c) {}\n", trial%9)
-				sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/graph.ts", Path: "/graph.ts"}, source, core.ScriptKindTS)
+				sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/graph.ts", PathKey: "/graph.ts"}, source, core.ScriptKindTS)
 				// Use the builder to create blocks with their proper graph indices,
 				// then replace the edges and events for this dataflow-only test.
 				graph := Build(sf.AsNode(), Hooks[variableEvent]{})
@@ -258,7 +258,7 @@ func writePositions(nodes map[*ast.Node]bool) []int {
 // predicates used by consumers. Read/write selection is outside DeadWrites.
 func variableQueryFixture(t *testing.T, source string) (*ast.Node, map[*ast.Node]int, []VariableWrite) {
 	t.Helper()
-	sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/variable.ts", Path: "/variable.ts"}, source, core.ScriptKindTS)
+	sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/variable.ts", PathKey: "/variable.ts"}, source, core.ScriptKindTS)
 	binder.BindSourceFile(sf)
 	var nodes []*ast.Node
 	var walk func(*ast.Node)

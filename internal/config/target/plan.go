@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // Plan is the stable projection of one lint-target discovery pass. Files
@@ -92,7 +93,7 @@ func Resolve(request Request) (Plan, error) {
 			request.GitPolicy,
 		)
 	}
-	useCaseSensitive := request.FS == nil || request.FS.UseCaseSensitiveFileNames()
+	useCaseSensitive := request.FS == nil || request.FS.CaseSensitivity().IsCaseSensitive()
 	if explicitFiles != nil {
 		for _, explicitFile := range explicitFiles.byPath {
 			if !explicitFile.evaluated {
@@ -144,8 +145,8 @@ func normalizeLintTarget(target File, defaultConfigDirectory string, fsys vfs.FS
 	if target.CanonicalPath == "" {
 		target.CanonicalPath = target.Path
 		if fsys != nil {
-			if realPath := fsys.Realpath(target.CanonicalPath); realPath != "" {
-				target.CanonicalPath = realPath
+			if realPath := fsys.Realpath(pathutil.Path(target.CanonicalPath)); realPath != "" {
+				target.CanonicalPath = realPath.AsString()
 			}
 		}
 	}
@@ -153,8 +154,8 @@ func normalizeLintTarget(target File, defaultConfigDirectory string, fsys vfs.FS
 	if target.CanonicalParentPath == "" {
 		target.CanonicalParentPath = tspath.GetDirectoryPath(target.Path)
 		if fsys != nil {
-			if realPath := fsys.Realpath(target.CanonicalParentPath); realPath != "" {
-				target.CanonicalParentPath = realPath
+			if realPath := fsys.Realpath(pathutil.Path(target.CanonicalParentPath)); realPath != "" {
+				target.CanonicalParentPath = realPath.AsString()
 			}
 		}
 	}

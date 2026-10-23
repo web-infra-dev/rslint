@@ -241,10 +241,10 @@ func BuildEslintPluginFileInputs(
 			filePath := filePlan.file.FileName()
 			var fileConfig EslintPluginFileConfig
 			if resolveConfig != nil {
-				fileConfig = resolveConfig(filePath)
+				fileConfig = resolveConfig(filePath.AsString())
 			}
 			inputs = append(inputs, buildEslintPluginFileInput(
-				filePath,
+				filePath.AsString(),
 				fileConfig.ConfigKey,
 				filePlan.rules,
 				fileConfig.LanguageOptions,

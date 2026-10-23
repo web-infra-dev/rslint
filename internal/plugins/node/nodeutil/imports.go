@@ -186,7 +186,7 @@ func resolveWithTypeScriptAliases(p *program.Program, name, fileName string, opt
 			for name, targets := range config.Paths.Entries() {
 				alias := moduleresolver.Alias{Name: strings.TrimRight(name, `/\*`)}
 				for _, target := range targets {
-					alias.Targets = append(alias.Targets, tspath.ResolvePath(tspath.GetDirectoryPath(config.ConfigFilePath), strings.TrimRight(target, `/\*`)))
+					alias.Targets = append(alias.Targets, tspath.ResolvePath(tspath.GetDirectoryPath(config.ConfigFilePath.AsString()), strings.TrimRight(target, `/\*`)))
 				}
 				options.Aliases = append(options.Aliases, alias)
 			}
@@ -224,8 +224,8 @@ func importResolutionOptions(ctx rule.RuleContext, conditions []string, options 
 	for i, base := range result.Paths {
 		result.Paths[i] = tspath.ResolvePath(cwd, base)
 	}
-	if tspath.HasTSFileExtension(fileName) {
-		config := tsconfig.FindNearest(p, fileName)
+	if tspath.HasTSFileExtension(fileName.AsString()) {
+		config := tsconfig.FindNearest(p, fileName.AsString())
 		if config != nil && config.AllowImportingTsExtensions == core.TSTrue {
 			if result.Extensions == nil {
 				result.Extensions = []string{".js", ".ts", ".mjs", ".mts", ".cjs", ".cts", ".json", ".node"}

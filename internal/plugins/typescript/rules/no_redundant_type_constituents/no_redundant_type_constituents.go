@@ -58,7 +58,7 @@ func errorTypeAliasName(typePart typeFlagsWithNodeOrType) (string, bool) {
 	if sym == nil {
 		return "", false
 	}
-	return sym.Name, true
+	return sym.Name(), true
 }
 
 type typeFlagsWithNodeOrType struct {

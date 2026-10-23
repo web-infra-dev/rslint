@@ -25,6 +25,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestOrderBranchCoverage(t *testing.T) {
@@ -545,7 +546,7 @@ func alphabetizeOptionsForDemand() []any {
 func lintOrderWithDemand(program *compiler.Program, sourceFile *ast.SourceFile, demand rule.EditDemand, options []any) []rule.RuleDiagnostic {
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(), HasTypeInfo: true,
+		Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName().AsString(), HasTypeInfo: true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name: order.OrderRule.Name, Severity: rule.SeverityError,
@@ -572,7 +573,7 @@ func createOrderProgram(t testing.TB, fileName, code string) (*compiler.Program,
 	if err != nil {
 		t.Fatalf("create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, pathutil.Directory(root.Dir)))
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", fileName)
 	}
@@ -738,7 +739,7 @@ func TestOrderWorkspacePackages(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			source := program.GetSourceFile(tspath.ResolvePath(directory, "input.ts"))
+			source := program.GetSourceFile(pathutil.File(tspath.ResolvePath(directory, "input.ts")))
 			if source == nil {
 				t.Fatal("missing input.ts")
 			}

@@ -13,7 +13,7 @@ func firstCall(t *testing.T, code string) *ast.Node {
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, code, core.ScriptKindTS)
 
 	var found *ast.Node
@@ -36,7 +36,7 @@ func firstPromiseTestNode(t *testing.T, code string, kind ast.Kind) *ast.Node {
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, code, core.ScriptKindTS)
 
 	var found *ast.Node

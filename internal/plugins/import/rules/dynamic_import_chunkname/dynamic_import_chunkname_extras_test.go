@@ -1589,7 +1589,7 @@ func TestDynamicImportChunknameEditDemand(t *testing.T) {
 		},
 	} {
 		t.Run(tc.code, func(t *testing.T) {
-			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.ts", Path: "/test.ts"}, tc.code, core.ScriptKindTS)
+			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.ts", PathKey: "/test.ts"}, tc.code, core.ScriptKindTS)
 			call := file.Statements.Nodes[0].AsExpressionStatement().Expression
 			var all rule.RuleDiagnostic
 			for _, demand := range []rule.EditDemand{rule.EditDemandAll, rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion} {

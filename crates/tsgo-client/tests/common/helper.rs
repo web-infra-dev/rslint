@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use tsgo_client::Api;
 use tsgo_client::client::{Client, Options};
-use tsgo_client::proto::{NodeReference, ProjectResponse, Semantic, SymbolData, TypeData};
+use tsgo_client::proto::{
+    NodeReference, ProjectResponse, Semantic, SymbolData, SymbolId, TypeData,
+};
 
 /// Build the matching server once, including when integration tests run concurrently.
 pub(crate) fn get_tsgo_path() -> Option<PathBuf> {
@@ -84,7 +86,7 @@ pub(crate) fn source_file_id(project: &ProjectResponse<'_>, suffix: &str) -> u32
         .unwrap_or_else(|| panic!("Missing source file {suffix}")) as u32
 }
 
-pub(crate) fn symbol_data(semantic: &Semantic, id: u32) -> &SymbolData {
+pub(crate) fn symbol_data(semantic: &Semantic, id: SymbolId) -> &SymbolData {
     &semantic
         .symtab
         .iter()
@@ -97,7 +99,7 @@ pub(crate) fn named_symbol<'a>(
     semantic: &'a Semantic,
     file: u32,
     name: &[u8],
-) -> (u32, &'a SymbolData) {
+) -> (SymbolId, &'a SymbolData) {
     let matches = semantic
         .symtab
         .iter()
@@ -137,7 +139,7 @@ pub(crate) fn node_type(semantic: &Semantic, file: u32, start: u32, end: u32) ->
     type_data(semantic, id)
 }
 
-pub(crate) fn external_symbol(semantic: &Semantic, namespace: &str, name: &str) -> u32 {
+pub(crate) fn external_symbol(semantic: &Semantic, namespace: &str, name: &str) -> SymbolId {
     let matches = semantic
         .external_symbols
         .iter()
@@ -155,7 +157,7 @@ pub(crate) fn same_location(left: &NodeReference, right: &NodeReference) -> bool
     left.sourcefile_id == right.sourcefile_id && left.start == right.start && left.end == right.end
 }
 
-pub(crate) fn node_symbol(semantic: &Semantic, node: &NodeReference) -> u32 {
+pub(crate) fn node_symbol(semantic: &Semantic, node: &NodeReference) -> SymbolId {
     semantic
         .node2sym
         .iter()

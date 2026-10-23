@@ -305,7 +305,7 @@ func TestFileExtensionInImportEditDemand(t *testing.T) {
 			run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program: p, File: file.FileName(),
+					Program: p, File: file.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: FileExtensionInImportRule.Name, Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {

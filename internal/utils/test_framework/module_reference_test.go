@@ -19,7 +19,7 @@ func TestResolveModuleImportSpecifierTypeOnlyPolicy(t *testing.T) {
 		t.Run(code, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.ts",
-				Path:     "/test.ts",
+				PathKey:  "/test.ts",
 			}, code, core.ScriptKindTS)
 			specifier := findFirstNodeOfKind(sourceFile, ast.KindImportSpecifier)
 			if specifier == nil {
