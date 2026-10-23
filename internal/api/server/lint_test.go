@@ -893,20 +893,32 @@ func TestHandleLint_LowLevelResponsePathsRemainRelativeToConfigDirectory(t *test
 		"src/source.js": "debugger;\n",
 	})
 
-	response, err := (&Handler{}).HandleLint(api.LintRequest{
-		Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
-		ConfigDirectory:  configDirectory,
-		WorkingDirectory: workingDirectory,
-		Files:            []string{target},
-	})
-	if err != nil {
-		t.Fatalf("HandleLint: %v", err)
-	}
-	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "src/source.js" {
-		t.Fatalf("diagnostic paths = %+v, want config-relative source", response.Diagnostics)
-	}
-	if !reflect.DeepEqual(response.LintedFiles, []string{"src/source.js"}) {
-		t.Fatalf("linted files = %v, want config-relative source", response.LintedFiles)
+	for _, testCase := range []struct {
+		name             string
+		workingDirectory string
+		configDirectory  string
+	}{
+		{name: "absolute", workingDirectory: workingDirectory, configDirectory: configDirectory},
+		{name: "relative", workingDirectory: workingDirectory, configDirectory: "./config"},
+		{name: "current directory", workingDirectory: configDirectory, configDirectory: "."},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			response, err := (&Handler{}).HandleLint(api.LintRequest{
+				Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
+				ConfigDirectory:  testCase.configDirectory,
+				WorkingDirectory: testCase.workingDirectory,
+				Files:            []string{target},
+			})
+			if err != nil {
+				t.Fatalf("HandleLint: %v", err)
+			}
+			if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "src/source.js" {
+				t.Fatalf("diagnostic paths = %+v, want config-relative source", response.Diagnostics)
+			}
+			if !reflect.DeepEqual(response.LintedFiles, []string{"src/source.js"}) {
+				t.Fatalf("linted files = %v, want config-relative source", response.LintedFiles)
+			}
+		})
 	}
 }
 

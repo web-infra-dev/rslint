@@ -124,7 +124,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	if configDirectory == "" {
 		configDirectory = currentDirectory
 	}
-	configDirectory = tspath.NormalizePath(configDirectory)
+	configDirectory = resolveRequestPath(configDirectory)
 	// Inline API config has no module directory. Its matching/path base can
 	// differ from the invocation cwd and must not become the discovery root.
 	if len(rslintConfig) > 0 {

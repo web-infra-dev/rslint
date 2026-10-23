@@ -72,7 +72,7 @@ func (h *Handler) HandleGetAstInfo(req api.GetAstInfoRequest) (*api.GetAstInfoRe
 	// Otherwise, query the user's source file
 	var targetSourceFile *ast.SourceFile
 	if req.FileName != "" && req.FileName != userFileName {
-		targetSourceFile = program.GetSourceFile(pathutil.File(req.FileName))
+		targetSourceFile = program.GetSourceFile(tspath.ToRootedFilePath(req.FileName, program.GetCurrentDirectory()))
 		if targetSourceFile == nil {
 			return &api.GetAstInfoResponse{}, nil
 		}

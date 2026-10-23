@@ -8,8 +8,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/module"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 const globalNamespace = "global"
@@ -112,11 +110,13 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 func externalFileNamespace(program *compiler.Program, file *ast.SourceFile) string {
 	directory := program.GetSourceFileMetaData(file.PathKey()).PackageJsonDirectory
 	if directory == "" {
-		directory = program.GetNearestAncestorDirectoryWithPackageJson(pathutil.Directory(tspath.GetDirectoryPath(file.FileName().AsString())))
+		directory = program.GetNearestAncestorDirectoryWithPackageJson(file.FileName().Directory())
 	}
-	if info := program.GetPackageJsonInfo(pathutil.File(tspath.CombinePaths(directory.AsString(), "package.json"))); info.Exists() {
-		if name, ok := info.Contents.Name.GetValue(); ok && name != "" {
-			return module.GetPackageNameFromTypesPackageName(name)
+	if directory != "" {
+		if info := program.GetPackageJsonInfo(directory.ResolveFile("package.json")); info.Exists() {
+			if name, ok := info.Contents.Name.GetValue(); ok && name != "" {
+				return module.GetPackageNameFromTypesPackageName(name)
+			}
 		}
 	}
 	return file.FileName().AsString()
