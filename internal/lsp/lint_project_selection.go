@@ -575,7 +575,7 @@ func selectLintProgram(
 				continue
 			}
 			candidateProgram := candidate.GetProgram()
-			configPath := string(candidate.Id())
+			configPath := candidate.Id()
 			if configPath == "" {
 				continue
 			}

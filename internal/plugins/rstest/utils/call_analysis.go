@@ -597,7 +597,7 @@ func (analysis *RstestCallAnalysis) indexSourceFile() {
 			return false
 		})
 	}
-	visit(analysis.ctx.SourceFile.Node.AsNode())
+	visit(analysis.ctx.SourceFile.AsNode())
 
 	for changed := true; changed; {
 		changed = false
