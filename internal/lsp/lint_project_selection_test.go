@@ -356,9 +356,52 @@ func TestLintProjectSnapshotNormalizesWindowsDrive(t *testing.T) {
 	if !lintSessionProgramMatchesConfig(program, upper, nil, fsys) {
 		t.Fatal("equivalent Windows configuration could not reuse its Program")
 	}
-	if upper.commandLine.CompilerOptions().ConfigFilePath != "c:/Repo/tsconfig.json" {
+	if upper.commandLine.CompilerOptions().ConfigFilePath != "C:/Repo/tsconfig.json" {
 		t.Fatal("snapshot comparison mutated the parsed option paths")
 	}
+	t.Run("references", func(t *testing.T) {
+		files := make(map[string]string)
+		names, err := archive.FileNames("snapshot-references")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range names {
+			content, err := archive.ReadFile("snapshot-references/" + name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, drive := range []string{"C:", "c:"} {
+				files[tspath.ResolvePath(drive+"/Repo", name)] = string(content)
+			}
+		}
+		server := newTestServer()
+		server.cwd = "C:/Repo/app"
+		server.fs = &exactCaseLSPProgramFS{FS: utils.NewOverlayVFS(&mockFS{}, files), files: files}
+		server.backgroundCtx = context.Background()
+		server.initializeParams = &lsproto.InitializeParams{}
+		if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+			t.Fatal(err)
+		}
+		defer server.session.Close()
+		const uri = lsproto.DocumentUri("file:///C:/Repo/app/target.ts")
+		server.session.DidOpenFile(context.Background(), uri, 1, files["C:/Repo/app/target.ts"], lsproto.LanguageKindTypeScript)
+		service, err := server.session.GetLanguageService(context.Background(), uri)
+		if err != nil {
+			t.Fatal(err)
+		}
+		load := func(path string) (*lintProjectMetadata, bool, error) {
+			metadata, err := parseStandaloneLintProject(path, server.fs, server.fs)
+			return metadata, metadata != nil, err
+		}
+		metadata, _, err := load("C:/Repo/app/tsconfig.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		program := service.GetProgram()
+		if !lintSessionProgramMatchesConfig(program, metadata, load, server.fs) {
+			t.Fatal("equivalent Windows referenced configuration could not reuse its Session Program")
+		}
+	})
 }
 
 func TestRunConfiguredLintForContentDirectRootSkipsEarlierImportProgram(t *testing.T) {

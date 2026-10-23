@@ -82,11 +82,9 @@ func parseStandaloneLintProject(
 	if parseFS == nil {
 		return nil, fmt.Errorf("cannot parse TypeScript config %q without a filesystem", tsConfigPath)
 	}
-	// Keep the parser base aligned with rslint's URI decoding and resident
-	// watch roots. Metadata still retains the declared drive spelling.
-	parsePath := utils.NormalizeAbsoluteDrive(tsConfigPath)
+	// Preserve the declared path spelling; config diagnostics also embed it.
 	parsed, _ := tsoptions.GetParsedCommandLineOfConfigFile(
-		pathutil.File(parsePath),
+		pathutil.File(tsConfigPath),
 		&core.CompilerOptions{},
 		nil,
 		parseFS,
