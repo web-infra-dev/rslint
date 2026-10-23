@@ -80,6 +80,13 @@ const LOCAL_PLUGIN = `export default {
             const operator = sc.getFirstTokenBetween(node.left, node.right);
             context.report({ node: operator, message: 'replace operator', fix: fixer => fixer.replaceText(operator, '>') });
           },
+          Literal(node) {
+            if (node.value === 'surrogate') {
+              context.report({ node, message: 'replace literal', fix: fixer => fixer.replaceText(node, '"' + String.fromCharCode(0xd800) + '"') });
+            } else if (node.value === 'a😀b') {
+              context.report({ node, message: 'replace scalar half', fix: fixer => fixer.replaceTextRange([node.range[0] + 2, node.range[0] + 3], 'X') });
+            }
+          },
           MethodDefinition(node) {
             if (node.kind !== 'constructor' || node.key.type !== 'Identifier') return;
             context.report({ node: node.key, message: 'quote key', fix: fixer => fixer.replaceText(node.key, '"constructor"') });
@@ -335,6 +342,12 @@ export default [{ files: ['**/*.ts'],
       'export declare const value: T; export declare function f<T>(x: T): T;\n',
       'export declare const value: T; export declare function f<T>(x: T): T;\n',
     ],
+    [
+      'surrogate.ts',
+      'const value = "surrogate";\n',
+      'const value = "\ud800";\n',
+    ],
+    ['scalar.ts', 'const value = "a😀b";\n', 'const value = "aX\ude00b";\n'],
   ])(
     'ESTree ranges survive the complete --fix pipeline: %s',
     async (filePath, text, expected) => {
@@ -379,8 +392,8 @@ export default [{ files: ['**/*.ts'],
         expect(upstream.output).toBe(expected);
         const result = await runRslint(['--fix'], dir);
         expect(result.exitCode).toBe(0);
-        expect(await fs.readFile(path.join(dir, filePath), 'utf8')).toBe(
-          upstream.output,
+        expect(await fs.readFile(path.join(dir, filePath))).toEqual(
+          Buffer.from(upstream.output),
         );
       } finally {
         await cleanupTempDir(dir);

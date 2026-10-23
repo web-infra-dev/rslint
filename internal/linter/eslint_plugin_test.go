@@ -963,10 +963,10 @@ func TestDispatchEslintPlugin_FixAndSuggestionsRebuilt(t *testing.T) {
 		})
 	}
 	t.Run("surrogate replacement", func(t *testing.T) {
-		checkLosslessFix(t, "a", `{"range":[0,1],"text":"\ud800","textUTF16":[55296]}`, "\xed\xa0\x80")
+		checkLosslessFix(t, "a", `{"range":[0,1],"text":"\ud800"}`, "\ufffd")
 	})
 	t.Run("surrogate replacement part", func(t *testing.T) {
-		checkLosslessFix(t, "ab", `{"range":[0,2],"text":"\udc00b","parts":[{"text":"\udc00","textUTF16":[56320]},{"sourceRange":[1,2]}]}`, "\xed\xb0\x80b")
+		checkLosslessFix(t, "a\x80", `{"range":[0,2],"text":"\udc00\ufffd","parts":[{"text":"\udc00"},{"sourceRange":[1,2]}]}`, "\ufffd\x80")
 	})
 }
 

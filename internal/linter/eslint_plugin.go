@@ -15,7 +15,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -79,16 +78,14 @@ const (
 )
 
 type EslintPluginFix struct {
-	Range     [2]int                `json:"range"`
-	Text      string                `json:"text"`
-	TextUTF16 []uint16              `json:"textUTF16,omitempty"`
-	Parts     []EslintPluginFixPart `json:"parts,omitempty"`
+	Range [2]int                `json:"range"`
+	Text  string                `json:"text"`
+	Parts []EslintPluginFixPart `json:"parts,omitempty"`
 }
 
 type EslintPluginFixPart struct {
-	SourceRange *[2]int  `json:"sourceRange,omitempty"`
-	Text        string   `json:"text,omitempty"`
-	TextUTF16   []uint16 `json:"textUTF16,omitempty"`
+	SourceRange *[2]int `json:"sourceRange,omitempty"`
+	Text        string  `json:"text,omitempty"`
 }
 
 type EslintPluginSuggestion struct {
@@ -970,21 +967,14 @@ func rebuildEslintPluginFix(fix EslintPluginFix, source string, clamp func(int) 
 			if part.SourceRange != nil {
 				builder.WriteString(source[part.SourceRange[0]:part.SourceRange[1]])
 			} else {
-				builder.WriteString(eslintPluginFixText(part.Text, part.TextUTF16))
+				builder.WriteString(part.Text)
 			}
 		}
 		text = builder.String()
 	} else {
-		text = eslintPluginFixText(fix.Text, fix.TextUTF16)
+		text = fix.Text
 	}
 	return rule.RuleFix{Text: text, Range: core.NewTextRange(start, end)}
-}
-
-func eslintPluginFixText(text string, units []uint16) string {
-	if units != nil {
-		return ecmascript.StringFromCodeUnits(units)
-	}
-	return text
 }
 
 func rebuildEslintPluginSuggestions(suggestions []EslintPluginSuggestion, source string, clamp func(int) int) *[]rule.RuleSuggestion {

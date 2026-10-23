@@ -66,12 +66,10 @@ export interface SuggestionDescriptor {
 export interface FixTextPart {
   sourceRange?: [number, number];
   text?: string;
-  textUTF16?: number[];
 }
 
 export interface DiagnosticFix extends Fix {
   parts?: FixTextPart[];
-  textUTF16?: number[];
 }
 
 type SourceFixPart = string | [number, number];
