@@ -527,8 +527,15 @@ func (s *lintProgramStore) markContent(
 	}
 	if invalidatePossibleNewSource {
 		for configFileName, metadata := range s.projectMetadata {
-			if metadata != nil && metadata.commandLine != nil &&
-				metadata.commandLine.PossiblyMatchesFileName(pathutil.File(fileName)) {
+			if metadata == nil || metadata.commandLine == nil {
+				continue
+			}
+			// Wildcard globs keep the parsed base spelling. Match through that
+			// base so URI drive normalization does not hide a newly included file.
+			directory := metadata.commandLine.BaseDirectory()
+			relative := tspath.ResolveRelativePathFromDirectory(directory.AsString(), fileName, directory, metadata.commandLine.CaseSensitivity())
+			if metadata.commandLine.PossiblyMatchesFileName(pathutil.File(fileName)) ||
+				metadata.commandLine.PossiblyMatchesFileName(directory.ResolveFile(relative)) {
 				delete(s.projectMetadata, configFileName)
 				discarded = true
 			}
@@ -568,11 +575,16 @@ func (s *lintProgramStore) markContent(
 			s.markStateSourceContent(state, sourceFile, content)
 			continue
 		}
-		if invalidatePossibleNewSource &&
-			(state.program.CommandLine().PossiblyMatchesFileName(pathutil.File(fileName)) ||
-				state.failedLookupMatches(fileName, s.server.fs)) {
-			delete(s.programs, configFileName)
-			discarded = true
+		if invalidatePossibleNewSource {
+			commandLine := state.program.CommandLine()
+			directory := commandLine.BaseDirectory()
+			relative := tspath.ResolveRelativePathFromDirectory(directory.AsString(), fileName, directory, commandLine.CaseSensitivity())
+			if commandLine.PossiblyMatchesFileName(pathutil.File(fileName)) ||
+				commandLine.PossiblyMatchesFileName(directory.ResolveFile(relative)) ||
+				state.failedLookupMatches(fileName, s.server.fs) {
+				delete(s.programs, configFileName)
+				discarded = true
+			}
 		}
 	}
 	return discarded
