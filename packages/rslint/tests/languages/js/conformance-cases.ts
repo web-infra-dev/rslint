@@ -205,6 +205,7 @@ add('classes', [
   '@dec export class C {}',
   'export @dec class C {}',
   'declare class C { constructor(x: T); method(x: T): T; }',
+  'class C { field = { this: 1 }; self!: typeof this; member!: typeof this.field.this; polymorphic!: this; method(this: C) { type Self = typeof this; type Method = typeof this.method; type Other = typeof C.prototype.field.this; return this.field.this; } }',
 ]);
 
 const types = [

@@ -551,7 +551,7 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 	case ast.KindTypeQuery:
 		n := node.AsTypeQueryNode()
 		return p.addNode("TSTypeQuery", node,
-			nodeValue(p.convert(n.ExprName, false)), p.typeParameters(n.TypeArguments, false))
+			nodeValue(p.convertTypeQueryName(n.ExprName)), p.typeParameters(n.TypeArguments, false))
 	case ast.KindTypeOperator:
 		n := node.AsTypeOperatorNode()
 		return p.addNode("TSTypeOperator", node,
@@ -1636,6 +1636,24 @@ func heritageParts(node *ast.Node) (*ast.Node, *ast.NodeList) {
 	}
 	panic(fmt.Errorf("unsupported heritage syntax %s", node.Kind))
 }
+
+func (p *estreeProjector) convertTypeQueryName(node *ast.Node) uint32 {
+	if node.Kind == ast.KindIdentifier && node.Text() == "this" {
+		p.check()
+		// Type queries encode this as an identifier in tsgo, including its
+		// token classification, but ESTree uses an expression in this role.
+		p.recordTokenCover(node, false)
+		return p.addNode("ThisExpression", node)
+	}
+	if node.Kind == ast.KindQualifiedName {
+		p.check()
+		data := node.AsQualifiedName()
+		return p.addNode("TSQualifiedName", node,
+			nodeValue(p.convertTypeQueryName(data.Left)), nodeValue(p.convert(data.Right, false)))
+	}
+	return p.convert(node, false)
+}
+
 func (p *estreeProjector) convertHeritageName(node *ast.Node) uint32 {
 	if node.Kind == ast.KindQualifiedName {
 		data := node.AsQualifiedName()
