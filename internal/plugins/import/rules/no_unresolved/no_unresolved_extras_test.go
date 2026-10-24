@@ -162,6 +162,31 @@ func TestNoUnresolvedExtras(t *testing.T) {
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &no_unresolved.NoUnresolvedRule, valid, invalid)
 }
 
+// eslint-import-resolver-typescript v4.4.4 also resolves files TypeScript does
+// not load, through tsconfig paths and enhanced-resolve lookup.
+func TestNoUnresolvedTypeScriptFallback(t *testing.T) {
+	root := unresolvedRoot(t, false)
+	const fileName = "typescript-fallback/src/input.ts"
+	const tsconfig = "typescript-fallback/tsconfig.json"
+	typescript := map[string]any{"import/resolver": "typescript"}
+	missing := `import '@/missing.css'; import './missing.css'; import 'pkg/missing.css'; import 'exported/private/hidden.css';`
+	rule_tester.RunRuleTester(root, tsconfig, t, &no_unresolved.NoUnresolvedRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `import '@/style.css'; import './style.css'; import './style.css?inline'; import '@/util';`, FileName: fileName, Settings: typescript},
+			// A later paths target is tried when an earlier one is missing.
+			{Code: `import '~/logo.svg';`, FileName: fileName, Settings: typescript},
+			{Code: `import './legacy.js'; import 'pkg/dist/reset.css'; import 'exported/style.css';`, FileName: fileName, Settings: typescript},
+			// The query is dropped before paths are matched and substituted.
+			{Code: `import '@icons/logo?raw'; import 'theme?inline';`, FileName: fileName, Settings: typescript},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Package exports still restrict which files can be imported.
+			{Code: missing, FileName: fileName, Settings: typescript, Errors: unresolvedErrors(missing, "@/missing.css", "./missing.css", "pkg/missing.css", "exported/private/hidden.css")},
+			// Substituting `ghost?raw` would yield `ghost?raw.svg` and resolve ghost.ts.
+			{Code: `import '@icons/ghost?raw';`, FileName: fileName, Settings: typescript, Errors: unresolvedErrors(`import '@icons/ghost?raw';`, "@icons/ghost?raw")},
+		})
+}
+
 func TestNoUnresolvedIgnoreValidation(t *testing.T) {
 	if err := no_unresolved.NoUnresolvedRule.Schema.Validate([]any{map[string]any{"ignore": []any{"["}}}); err == nil {
 		t.Fatal("an invalid ignore expression must fail configuration validation")
