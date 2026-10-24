@@ -59,7 +59,7 @@ func TestPipelineDetachesSourcesAfterFreezingNativeAndPluginFixes(t *testing.T) 
 				pipelineTestProvider(generation, nil),
 				ObservationPolicy{Plugin: mode, Demand: ArtifactDemand{Native: rule.EditDemandAutofix, Plugin: rule.EditDemandAutofix}},
 				autofixPolicyForTest(1, AutofixPolicy{}),
-				func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 					return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
 						FilePath: request.Files[0].Path,
 						Diagnostics: []EslintPluginDiagnostic{{
@@ -67,7 +67,7 @@ func TestPipelineDetachesSourcesAfterFreezingNativeAndPluginFixes(t *testing.T) 
 							Fixes: []EslintPluginFix{{Range: [2]int{1, 2}, Text: "B"}},
 						}},
 					}}}, nil
-				},
+				}),
 			))
 			if err != nil {
 				t.Fatal(err)

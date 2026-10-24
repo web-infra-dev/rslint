@@ -80,7 +80,7 @@ export function platformTuple(): string {
       return `linux-${arch}-${isMusl() ? 'musl' : 'gnu'}`;
     default:
       throw new Error(
-        `@rslint/core: unsupported platform ${platform}-${arch} (no native parser binary)`,
+        `@rslint/core: unsupported platform ${platform}-${arch} (no native transport binary)`,
       );
   }
 }

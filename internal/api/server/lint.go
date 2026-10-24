@@ -464,9 +464,9 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			pluginConfigKeyByOwner = map[string]string{configDirectory: wireConfigDirectory}
 		}
 		if dispatch == nil {
-			dispatch = func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			dispatch = linter.EslintPluginDispatchFunc(func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 				return nil, errors.New("bidirectional pluginLint transport is unavailable")
-			}
+			})
 		}
 	}
 	generationForBinding := func(binding loader.LoadResult, generationFS vfs.FS) linter.Generation {

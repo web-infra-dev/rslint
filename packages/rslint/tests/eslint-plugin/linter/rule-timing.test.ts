@@ -6,7 +6,7 @@
  */
 import { describe, test, expect } from 'rstack/test';
 
-import { lintFile } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
+import { lintFile } from '../project-frame.js';
 import type { LoadedPlugins } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
 import type { RuleContext } from '../../../src/eslint-plugin/linter/context.js';
 

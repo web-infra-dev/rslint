@@ -34,6 +34,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/testutil/estree"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -1477,21 +1478,21 @@ func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
 				t,
 				dir,
 				args,
-				func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+				linter.EslintPluginDispatchFunc(func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 					request = got
 					results := make([]linter.EslintPluginFileResult, len(got.Files))
 					for index, file := range got.Files {
 						results[index].FilePath = file.Path
 					}
 					return &linter.EslintPluginLintResult{Results: results}, nil
-				},
+				}),
 			)
 			if code != 0 || len(request.Files) != 1 {
 				t.Fatalf("CLI plugin request failed: code=%d request=%+v stdout=%q stderr=%q", code, request, stdout, stderr)
 			}
-			text := request.Files[0].Text
-			if text == nil || *text != content {
-				t.Fatalf("frozen generation text = %v, want %q", text, content)
+			frame := request.Files[0].Frame
+			if estree.SourceText(t, frame) != strings.TrimPrefix(content, "\ufeff") {
+				t.Fatal("CLI frame did not freeze its filesystem generation")
 			}
 		})
 	}

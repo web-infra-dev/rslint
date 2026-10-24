@@ -7,12 +7,14 @@ import (
 )
 
 // Attachment is a complete value whose transport is chosen by Channel. Its
-// contents must remain immutable until SendRequest returns. Strings retain
+// ordinary contents must remain immutable until SendRequest returns. Prepared
+// RequestOutput views instead transfer producer access at publication. Strings retain
 // their existing storage; byte buffers are borrowed rather than copied here.
 type Attachment struct {
 	text   string
 	bytes  []byte
 	binary bool
+	output *RequestOutput
 }
 
 // Text supplies Unicode text. As with Go JSON string encoding, each invalid
@@ -104,4 +106,22 @@ func attach(msg *Message, memory *memoryPool, values []Attachment) []MemoryBatch
 	}
 	msg.Transport = &TransportMetadata{Batches: batches}
 	return batches
+}
+
+// Prepared outputs already contain their bytes in reserved storage. Ordinary
+// attachments keep their existing copy/inline path and may share the request.
+func attachOutput(msg *Message, memory *memoryPool, values []Attachment) ([]MemoryBatch, error) {
+	var output *RequestOutput
+	for _, value := range values {
+		if value.output != nil {
+			if output != nil && output != value.output {
+				return nil, errors.New("ipc: attachments have different output owners")
+			}
+			output = value.output
+		}
+	}
+	if output == nil {
+		return attach(msg, memory, values), nil
+	}
+	return output.publish(msg, memory, values)
 }

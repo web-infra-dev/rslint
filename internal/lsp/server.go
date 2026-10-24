@@ -241,7 +241,7 @@ type Server struct {
 	// the `rslint/pluginLint` reverse request and decodes its result.
 	// nil until the first committed config transaction installs it. Safe to call from a
 	// goroutine (it only touches sendRequest, which is goroutine-safe).
-	eslintPluginDispatch linter.EslintPluginDispatcher
+	eslintPluginDispatch linter.EslintPluginDispatchFunc
 	// eslintPluginConfigGeneration identifies the JS config and Node worker
 	// generation that must serve reverse plugin-lint requests. It changes only
 	// on a serialized config transaction and is captured before dispatching work

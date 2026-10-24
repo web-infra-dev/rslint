@@ -107,14 +107,10 @@ if (!parentPort) {
 // the config file's own location (Node's ESM resolver walks
 // node_modules from the config file's directory), so monorepos with
 // independent plugin installs per sub-package route correctly.
-let loadedPluginsByDir: Map<string, LoadedPlugins> | null = null;
+let loadedPluginsByDir: Map<string, LoadedPlugins>;
 
 const init = async () => {
   const data = workerData as WorkerInitData;
-  if (!data || !Array.isArray(data.configs) || data.configs.length === 0) {
-    sendInitError('worker received malformed init data (configs[] required)');
-    return;
-  }
   try {
     loadedPluginsByDir = await loadPluginsFromConfigs(data.configs);
   } catch (err) {
@@ -145,28 +141,6 @@ function sendInitError(message: string): void {
 
 // ── 2. Task dispatch ──
 parentPort.on('message', (msg: InboundMessage) => {
-  if (loadedPluginsByDir == null) {
-    // Could happen if main thread sends a task before observing 'ready'
-    // — defensive only; main pool waits for ready by contract.
-    if ((msg as TaskMessage).kind === 'task') {
-      const t = msg as TaskMessage;
-      const r: ResultMessage = {
-        kind: 'result',
-        taskId: t.taskId,
-        result: {
-          filePath: t.request.filePath,
-          diagnostics: [],
-          fixes: [],
-          suggestionsCount: 0,
-          cancelled: false,
-          parseError: 'worker not initialized',
-        },
-      };
-      parentPort!.postMessage(r);
-    }
-    return;
-  }
-
   if (msg.kind === 'shutdown') {
     // Use `parentPort.close()` instead of `process.exit(0)`. Per Node
     // docs, `MessagePort.close()` delivers any already-queued

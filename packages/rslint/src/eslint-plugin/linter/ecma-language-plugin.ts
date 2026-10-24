@@ -4,11 +4,11 @@
  * files. Wires together (in dependency order):
  *
  *   plugin-loader     — loaded once at Worker init
- *   normalize-ast     — per-file
+ *   frame             — per-file
  *   scope-factory     — per-file lazy
  *   options-defaults  — per-rule per-file (inside context)
  *   context           — per-rule per-file
- *   tokenizer         — lazy inside context
+ *   SourceCode        — token/scope APIs with lazy resources
  *   listener-merge    — per-file
  *   fixer             — per-rule per-file (inside context)
  *   suggestions       — gated by suggestionsMode (inside context)
@@ -20,45 +20,44 @@
  * `ruleErrors` fields rather than thrown — a single broken file must
  * not abort the batch.
  *
- * Caveat on `parseError`: the native parser (oxc via napi) is a
- * RECOVERING parser — for most syntax errors it returns a best-effort AST rather than
- * throwing, so such files are linted against the recovery AST instead of being reported
- * as a parse error the way espree (which aborts on any syntax error) would. `parseError`
- * is therefore set only when the native parse actually throws (its source-size guard, or
- * a Rust panic caught by catch_unwind). This is a deliberate oxc-vs-espree difference.
+ * Syntax diagnostics are owned by the Go Program. `parseError` is retained
+ * as the result field for invalid frame input or abnormal worker failure.
  */
 
-import { readFileSync } from 'node:fs';
+import { getNativeBinding } from '../../native/binding.js';
+import type { SharedBytes } from '../../native/types.js';
 import {
-  parse as nativeParse,
-  parseSharedBytes,
-  type SharedBytes,
-} from '../native/load-binding.js';
-
-import {
-  buildLineStartOffsets,
-  buildUtf16ToByteMap,
-  normalizeAst,
-} from '../ast/normalize-ast.js';
+  decodeFrame,
+  FrameCancelled,
+  checkFrameCancellation,
+} from '../../languages/js/frame.js';
+import { buildUtf16ToByteMap } from '../../languages/js/positions.js';
 import {
   makeScopeManagerFactory,
   seedEcmaGlobals,
   seedGlobals,
-} from '../ast/scope-factory.js';
+} from '../../languages/js/scope-factory.js';
 import { mergeListeners, visit } from './listener-merge.js';
 import {
   createRuleContext,
-  createSourceCode,
-  type Diagnostic,
-  type ESTreeNode,
   type ListenerFn,
   type RuleContext,
-  type SuggestionsMode,
 } from './context.js';
+import { createSourceCode } from '../source-code/source-code.js';
+import {
+  takeFixParts,
+  type Diagnostic,
+  type DiagnosticFix,
+  type FixTextPart,
+  type SuggestionsMode,
+} from './diagnostic-builder.js';
+import type { ESTreeNode, GlobalsConfig } from '../../languages/js/types.js';
 import type { LoadedPlugins } from '../plugin/plugin-loader.js';
 import type { Fix } from './fixer.js';
-import type { GlobalsConfig } from '../types.js';
 import { applyDisableDirectives } from './apply-disable-directives.js';
+
+// Unicode matching treats a valid surrogate pair as one non-surrogate scalar.
+const UNPAIRED_SURROGATE = /[\uD800-\uDFFF]/gu;
 
 /**
  * Per-file rule resolution. The worker has already picked the right
@@ -95,19 +94,11 @@ export interface RuleConfig {
   };
 }
 
-/** Per-file lint request input (called by Worker dispatcher per task).
- *
- * A task carries a complete snapshot as inline text or a native sharedSource
- * capability. Rust reads shared bytes and supplies both parser output and the
- * SourceCode string. Hosts that explicitly allow a filesystem read can omit
- * both inputs; an invalid shared source never falls back to disk.
- */
+/** Per-file task carrying final syntax from the Go Program. */
 export interface LintFileRequest {
   filePath: string;
-  /** Complete source override for overlay or in-memory generations. */
-  text?: string;
-  /** Complete immutable snapshot; only the native parser consumes it. */
-  sharedSource?: SharedBytes;
+  /** Workers materialize ordinary objects from owned bytes after the last native read. */
+  frame: Uint8Array | SharedBytes;
   /**
    * Forwarded subset of user `languageOptions`. Only the fields the
    * runner actually consumes are typed here; the rest of the user's
@@ -181,7 +172,7 @@ export interface LintFileResult {
   suggestionsCount: number;
   /** True iff the visit was cancelled mid-flight (cancelFlag observed). */
   cancelled: boolean;
-  /** Set when the native parser failed; diagnostics is empty in this case. */
+  /** Set when frame input or worker execution failed; diagnostics is empty in this case. */
   parseError?: string;
   /** Per-rule errors caught during create() / listener execution. */
   ruleErrors?: Array<{ rule: string; message: string }>;
@@ -190,6 +181,19 @@ export interface LintFileResult {
    * invocations). Present only when the request set `collectTiming`.
    */
   ruleTimes?: Record<string, number>;
+}
+
+// End the private native-copy stack frame before rule execution starts. A
+// block-local Buffer in lintFile can remain a stack root throughout the visit.
+// Caller-owned inline frames retain their existing ownership.
+function readFrame(req: LintFileRequest): ReturnType<typeof decodeFrame> {
+  checkFrameCancellation(req.cancelFlag);
+  return decodeFrame(
+    req.frame instanceof Uint8Array
+      ? req.frame
+      : getNativeBinding().readBytes(req.frame),
+    req.cancelFlag,
+  );
 }
 
 /**
@@ -208,133 +212,70 @@ export function lintFile(
     cancelled: false,
   };
 
-  // Shared snapshots stay in Rust until parsing. Inline and explicit disk
-  // inputs retain their existing BOM and decoding behavior.
-  let sourceText = '';
-  if (req.sharedSource !== undefined && req.text !== undefined) {
-    result.parseError = 'conflicting plugin source inputs';
-    return result;
-  }
-  if (req.sharedSource === undefined) {
-    if (req.text !== undefined) {
-      sourceText = req.text;
-    } else {
-      try {
-        sourceText = readFileSync(req.filePath, 'utf8');
-      } catch (err) {
-        result.parseError = `worker fs.readFile failed for ${req.filePath}: ${(err as Error)?.message ?? String(err)}`;
-        return result;
-      }
-    }
-  }
-
-  // Strip a leading UTF-8 BOM before parsing. ESLint's `SourceCode`
-  // constructor does the same — without this, the native parser keeps the
-  // BOM byte in its source view and every node range comes back
-  // shifted +1 UTF-16 / +3 UTF-8 from what ESLint would emit, so all
-  // wire diagnostics on BOM-prefixed files would point one column
-  // late. `SourceCode.hasBOM` still reflects the original file via
-  // the `hasBOM` flag we thread through to createSourceCode below.
-  let hadBOM = sourceText.charCodeAt(0) === 0xfeff;
-  if (hadBOM) sourceText = sourceText.slice(1);
-
-  // ── 1. parse ─────────────────────────────────────────────────────
-  //
-  // lang derivation (extension + the `ecmaFeatures.jsx` promotion of .js->jsx / .ts->tsx)
-  // and preserveParens now live Rust-side in the native parser's `derive_source_type`
-  // (single source of truth). The JS side only computes the `jsx` flag + sourceType and
-  // forwards them.
-  const jsxEnabled =
-    req.languageOptions?.parserOptions?.ecmaFeatures?.jsx === true;
-  // ESLint v10: `sourceType` is top-level in `languageOptions`; default 'module'.
-  const sourceTypeRaw = req.languageOptions?.sourceType ?? 'module';
-  // KNOWN LIMITATION — `languageOptions.ecmaVersion` is NOT enforced at parse time. oxc
-  // always parses the latest grammar (under-reporting-only gap; the runner never
-  // MIS-parses valid code). `ecmaVersion` still flows to the scope analyzer and
-  // `context.languageOptions`.
-  // Tracks the napi `ParseResult` (program JSON + comments + columnar token arrays).
-  let parsed: ReturnType<typeof nativeParse>;
+  let parsed: ReturnType<typeof decodeFrame>;
   try {
-    if (req.sharedSource !== undefined) {
-      const source = parseSharedBytes(
-        req.filePath,
-        req.sharedSource,
-        sourceTypeRaw,
-        jsxEnabled,
-      );
-      parsed = source.parsed;
-      sourceText = source.sourceText;
-      hadBOM = source.hadBom;
-    } else {
-      parsed = nativeParse(req.filePath, sourceText, sourceTypeRaw, jsxEnabled);
-    }
+    parsed = readFrame(req);
   } catch (err) {
-    // Source validation and parser failures use the existing parseError path.
-    result.parseError = `parse: ${(err as Error)?.message ?? String(err)}`;
+    if (err instanceof FrameCancelled) result.cancelled = true;
+    else result.parseError = `frame: ${(err as Error)?.message ?? String(err)}`;
     return result;
   }
-  const lso = buildLineStartOffsets(sourceText);
-  // The native parser returns the ESTree as a JSON string (UTF-16 offsets, no `range`).
-  const ast = JSON.parse(parsed.program) as ESTreeNode;
-
-  // ── 2. normalize ─────────────────────────────────────────────────
-  try {
-    normalizeAst(ast, lso, sourceText);
-  } catch (err) {
-    result.parseError = `normalize: ${(err as Error)?.message ?? String(err)}`;
-    return result;
-  }
+  const sourceText = parsed.text,
+    hadBOM = parsed.hasBOM;
+  const ast = parsed.ast,
+    lso = parsed.lineStarts;
 
   // ── 3. scope-manager factory (lazy) ──────────────────────────────
   // ESLint v10: sourceType / ecmaVersion / globals are top-level fields
   // of `languageOptions`. No legacy positions are accepted.
-  const globals = req.languageOptions?.globals;
-  const ecmaFeatures = req.languageOptions?.parserOptions?.ecmaFeatures;
-  const scopeManagerFactory = (() => {
-    const inner = makeScopeManagerFactory(ast, {
-      filePath: req.filePath,
-      sourceType: req.languageOptions?.sourceType ?? 'module',
-      ecmaVersion: req.languageOptions?.ecmaVersion,
-      globals,
-      // Forward each ecmaFeatures-derived knob the scope analyzers
-      // honour. Pre-fix, the runner hard-coded `impliedStrict: true`
-      // and ignored `globalReturn` entirely, silently breaking
-      // sourceType:'script' bundles and Node CJS scripts. Defaults
-      // are filled in by `scope-factory` to match ESLint v10.
-      impliedStrict: ecmaFeatures?.impliedStrict,
-      globalReturn: ecmaFeatures?.globalReturn,
-    });
-    return () => {
-      const sm = inner();
-      // Seed lazily — only when the scope-manager is materialized.
-      // Order matters:
-      //   1. seedEcmaGlobals injects the ES built-in set (parseInt /
-      //      Array / NaN / ...) into globalScope.variables and
-      //      resolves matching `through` refs against them.
-      //   2. seedGlobals layers the user's `languageOptions.globals`
-      //      on top, possibly overriding readonly/writable mode and
-      //      re-running the resolve pass for any new refs.
-      // This mirrors ESLint flat-config's behavior — without step 1,
-      // rules built on `ReferenceTracker.iterateGlobalReferences` see
-      // an empty global scope and silently never fire.
-      seedEcmaGlobals(sm, req.languageOptions?.ecmaVersion);
-      seedGlobals(sm, globals);
-      return sm;
-    };
-  })();
+  // Lazy SourceCode resources may outlive lintFile. Keep their language
+  // metadata, rather than capturing the request and its transport frame.
+  const languageOptions = req.languageOptions;
+  const globals = languageOptions?.globals;
+  const ecmaFeatures = languageOptions?.parserOptions?.ecmaFeatures;
+  const createScopeManager = makeScopeManagerFactory(ast, {
+    filePath: req.filePath,
+    sourceType: languageOptions?.sourceType ?? 'module',
+    ecmaVersion: languageOptions?.ecmaVersion,
+    globals,
+    // Forward each ecmaFeatures-derived knob the scope analyzers
+    // honour. Pre-fix, the runner hard-coded `impliedStrict: true`
+    // and ignored `globalReturn` entirely, silently breaking
+    // sourceType:'script' bundles and Node CJS scripts. Defaults
+    // are filled in by `scope-factory` to match ESLint v10.
+    impliedStrict: ecmaFeatures?.impliedStrict,
+    globalReturn: ecmaFeatures?.globalReturn,
+  });
+  const scopeManagerFactory = () => {
+    const sm = createScopeManager();
+    // Seed lazily — only when the scope-manager is materialized.
+    // Order matters:
+    //   1. seedEcmaGlobals injects the ES built-in set (parseInt /
+    //      Array / NaN / ...) into globalScope.variables and
+    //      resolves matching `through` refs against them.
+    //   2. seedGlobals layers the user's `languageOptions.globals`
+    //      on top, possibly overriding readonly/writable mode and
+    //      re-running the resolve pass for any new refs.
+    // This mirrors ESLint flat-config's behavior — without step 1,
+    // rules built on `ReferenceTracker.iterateGlobalReferences` see
+    // an empty global scope and silently never fire.
+    seedEcmaGlobals(sm, languageOptions?.ecmaVersion);
+    seedGlobals(sm, globals);
+    return sm;
+  };
 
   // ── 4. shared SourceCode + per-rule contexts ─────────────────────
   // Build ONE SourceCode for the file. Every rule context wires the
   // same instance via `opts.sourceCode`, so the lazy caches (tokens,
   // comments, scopeManager) prime once and are reused across rules.
-  // `parsedComments` is the oxc-emitted compact comment list — when
+  // `parsedComments` is the Go-projected compact comment list — when
   // present, `getAllComments` builds an ESLint-shape Comment[] directly
   // (cheap loc adapter) instead of invoking the full text tokenizer.
   const sharedSourceCode = createSourceCode({
     text: sourceText,
     ast,
     scopeManagerFactory,
-    // BOM was already stripped above; thread the original-file flag so
+    // Go already removed exactly one BOM; thread the original-file flag so
     // `SourceCode.hasBOM` reflects whether the source on disk started
     // with a BOM (matches ESLint's API).
     hasBOM: hadBOM,
@@ -346,7 +287,7 @@ export function lintFile(
           end: number;
         }>
       | undefined,
-    // Native parser-driven token stream (columnar, UTF-16). The SourceCode lazily rebuilds
+    // Go-projected token stream (columnar, UTF-16). The SourceCode lazily rebuilds
     // Token[] from these on first token-API use.
     parsedTokens: {
       types: parsed.tokenTypes,
@@ -356,7 +297,7 @@ export function lintFile(
   });
 
   // ESLint v10's espree attaches `Program.tokens` (and `Program.comments`)
-  // to the AST root directly. the native parser doesn't, so plugin rules that
+  // to the AST root directly. the frame decoder doesn't, so plugin rules that
   // read `program.tokens` (e.g. `eslint-plugin-import/no-empty-named-blocks`)
   // see `undefined` and throw. Attach a lazy getter that delegates to
   // the shared SourceCode's tokenizer — only pays the tokenize cost if
@@ -445,7 +386,7 @@ export function lintFile(
       // `ctx.languageOptions.parserOptions.ecmaFeatures.jsx` see the
       // exact same paths they would in ESLint itself (FileContext in
       // ESLint just stores the reference unchanged).
-      languageOptions: req.languageOptions,
+      languageOptions,
       text: sourceText,
       lsoCache: lso,
       sourceCode: sharedSourceCode,
@@ -566,7 +507,7 @@ export function lintFile(
   // to UTF-8 byte offsets. Two units of measurement collide at the
   // wire boundary:
   //
-  //   - the native parser emits offsets in UTF-16 code units (matching JS
+  //   - the frame carries offsets in UTF-16 code units (matching JS
   //     string indexing). Token API, sourceCode.getText, fixer ranges
   //     — every piece of runner-internal code naturally operates in
   //     this unit.
@@ -622,7 +563,7 @@ export function lintFile(
   // ~60% of files on a clean codebase), every byte of that map is
   // unused. Gate the build on having something to convert.
   if (filteredDiagnostics.length > 0) {
-    const u16ToByte = buildUtf16ToByteMap(sourceText);
+    const u16ToByte = parsed.utf16ToByte ?? buildUtf16ToByteMap(sourceText);
     // `u16ToByte` indexes from 0 to `sourceText.length` inclusive (the
     // sentinel at `[length]` is the total byte count for one-past-end
     // `endPos`). Clamp every offset before lookup so a plugin that
@@ -643,20 +584,79 @@ export function lintFile(
       return Math.trunc(pos);
     };
     const toByte = (pos: number): number => u16ToByte[clamp(pos)];
+    const convertFix = (fix: DiagnosticFix): DiagnosticFix => {
+      const sourceParts = takeFixParts(fix);
+      let start = clamp(fix.range[0]),
+        end = clamp(fix.range[1]);
+      // Byte ranges cannot split a scalar. Carry its retained UTF-16 half
+      // in the replacement text and expand the range to the scalar edges.
+      const splitScalar = (offset: number): boolean =>
+        offset > 0 && u16ToByte[offset] === u16ToByte[offset - 1];
+      const prefix = splitScalar(start) ? sourceText[--start] : '';
+      const suffix = splitScalar(end) ? sourceText[end++] : '';
+      let parts: FixTextPart[] | undefined;
+      if (parsed.utf16ToByte && sourceParts) {
+        // Source spans are copied by Go from the exact frozen bytes. Only
+        // partial scalar edges become text; adjacent text stays one string
+        // so independently emitted surrogate halves combine before encoding.
+        const sourceFragments: FixTextPart[] = [];
+        let pending = prefix;
+        const flush = (): void => {
+          if (pending)
+            sourceFragments.push({
+              text: pending.replace(UNPAIRED_SURROGATE, '\ufffd'),
+            });
+          pending = '';
+        };
+        for (const part of sourceParts) {
+          if (typeof part === 'string') {
+            pending += part;
+            continue;
+          }
+          let from = clamp(part[0]),
+            to = clamp(part[1]);
+          if (from === to) continue;
+          if (splitScalar(from)) pending += sourceText[from++];
+          const trailing = to > from && splitScalar(to) ? sourceText[--to] : '';
+          if (from < to) {
+            flush();
+            sourceFragments.push({
+              sourceRange: [u16ToByte[from], u16ToByte[to]],
+            });
+          }
+          pending += trailing;
+        }
+        pending += suffix;
+        flush();
+        parts = sourceFragments;
+      }
+      // Go consumes UTF-8 replacement text. Normalize after concatenation,
+      // matching Node's string encoding without passing lone surrogates
+      // through JSON transports with different Unicode admission rules.
+      const text = (prefix + fix.text + suffix).replace(
+        UNPAIRED_SURROGATE,
+        '\ufffd',
+      );
+      const range: [number, number] = [u16ToByte[start], u16ToByte[end]];
+      // Plugin fixes may be frozen, shared or carry arbitrary metadata.
+      // Only framework-owned source fragments belong in the wire result.
+      return parts ? { range, text, parts } : { range, text };
+    };
     for (const d of filteredDiagnostics) {
       d.startPos = toByte(d.startPos);
       d.endPos = toByte(d.endPos);
       if (d.fixes && d.fixes.length > 0) {
-        for (const f of d.fixes) {
-          f.range = [toByte(f.range[0]), toByte(f.range[1])];
-          result.fixes.push(f);
+        for (let i = 0; i < d.fixes.length; i++) {
+          const fix = convertFix(d.fixes[i]);
+          d.fixes[i] = fix;
+          result.fixes.push(fix);
         }
       }
       if (d.suggestions && d.suggestions.length > 0) {
         for (const s of d.suggestions) {
           if (s.fixes) {
-            for (const f of s.fixes) {
-              f.range = [toByte(f.range[0]), toByte(f.range[1])];
+            for (let i = 0; i < s.fixes.length; i++) {
+              s.fixes[i] = convertFix(s.fixes[i]);
             }
           }
         }

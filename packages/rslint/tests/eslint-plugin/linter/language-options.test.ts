@@ -23,7 +23,8 @@
 
 import { describe, test, expect } from 'rstack/test';
 
-import { lintFile } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
+import { lintFile } from '../project-frame.js';
+import { projectFrame } from '../../languages/js/project-frame.js';
 import type { LoadedPlugins } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
 import type { RuleContext } from '../../../src/eslint-plugin/linter/context.js';
 import type { GlobalAccess } from '../../../src/eslint-plugin/types.js';
@@ -158,7 +159,7 @@ describe('A12: languageOptions exposed on RuleContext', () => {
 
 // ── A13 — JSX parsing flag on .js / .ts files ─────────────────────
 
-describe('A13: parserOptions.ecmaFeatures.jsx promotes parser lang', () => {
+describe('A13: Program owns JSX grammar, parserOptions reach rule contexts', () => {
   test('.js + ecmaFeatures.jsx=true parses JSX content without parseError', () => {
     const recorded: RecordedContext = {};
     const loaded = makeLoadedPlugins(recorded);
@@ -187,13 +188,13 @@ describe('A13: parserOptions.ecmaFeatures.jsx promotes parser lang', () => {
     expect(result.parseError).toBeUndefined();
   });
 
-  test('.ts + ecmaFeatures.jsx=true parses TSX content without parseError', () => {
+  test('.tsx frames retain JSX and TypeScript syntax', () => {
     const recorded: RecordedContext = {};
     const loaded = makeLoadedPlugins(recorded);
 
     const result = lintFile(
       {
-        filePath: 'component.ts',
+        filePath: 'component.tsx',
         text:
           'type Props = { name: string };\n' +
           'const App: React.FC<Props> = ({ name }) => <h1>{name}</h1>;\n',
@@ -212,6 +213,15 @@ describe('A13: parserOptions.ecmaFeatures.jsx promotes parser lang', () => {
 
     expect(result.parseError).toBeUndefined();
   });
+
+  test.each(['ts', 'mts', 'cts'])(
+    '.%s grammar cannot be promoted by a worker parser option',
+    (extension) => {
+      expect(() =>
+        projectFrame(`component.${extension}`, 'const App = () => <Foo />;'),
+      ).toThrow('syntax errors');
+    },
+  );
 
   test('.jsx files parse JSX regardless of flag', () => {
     // Sanity check that file-extension inference still works when

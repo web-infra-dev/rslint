@@ -159,34 +159,6 @@ describe('IPC byte attachments', () => {
     }
   });
 
-  test.each([
-    'A',
-    'AA',
-    'AAA',
-    '====',
-    'AA=A',
-    'A===',
-    'AAAA=',
-    'AA\n=',
-    '-_==',
-    'AB==',
-    'AAB=',
-  ])('rejects malformed or non-canonical base64 bytes: %j', async (bytes) => {
-    const pair = receiver();
-    let dispatched = false;
-    pair.b.setInboundHandler(() => {
-      dispatched = true;
-    });
-    try {
-      const result = await pair.request({ attachments: [{ bytes }] });
-      expect(result.kind).toBe('error');
-      expect(result.data).toEqual({ message: 'invalid IPC attachment bytes' });
-      expect(dispatched).toBe(false);
-    } finally {
-      pair.cleanup();
-    }
-  });
-
   test('adds the mapping to the first request envelope only', async () => {
     const memory = createMemoryTransport();
     const pair = pairClients({ memoryTransport: memory });
@@ -458,7 +430,7 @@ describe('IPC byte attachments', () => {
     },
   );
 
-  test.each(['fd', 'configure', 'version', 'descriptor'] as const)(
+  test.each(['fd', 'configure', 'descriptor'] as const)(
     'closes native storage when initialization fails: %s',
     (failure) => {
       const binding = getNativeBinding();
@@ -475,7 +447,7 @@ describe('IPC byte attachments', () => {
         descriptor() {
           if (failure === 'descriptor')
             throw new Error('descriptor unavailable');
-          return { version: MEMORY_CONFIG.version + 1 };
+          return { version: MEMORY_CONFIG.version };
         }
         register(): number {
           throw new Error('must not register');
@@ -489,9 +461,7 @@ describe('IPC byte attachments', () => {
       };
       try {
         expect(() => createMemoryTransport().configure(MEMORY_CONFIG)).toThrow(
-          failure === 'version'
-            ? 'inconsistent shared memory version'
-            : `${failure} unavailable`,
+          `${failure} unavailable`,
         );
         expect(closed).toBe(true);
       } finally {
@@ -1346,7 +1316,7 @@ describe('real Go/Node arbitrary byte attachments', () => {
 });
 
 describe('encode/decode round-trip', () => {
-  test('rejects an oversized outbound frame before writing and keeps the client usable', async () => {
+  test('rejects a frame that cannot fit its encoding before writing', async () => {
     const pair = pairClients();
     const byteLength = Buffer.byteLength;
     let writes = 0;
@@ -1358,18 +1328,18 @@ describe('encode/decode round-trip', () => {
     pair.b.start();
     let rejected: Promise<unknown>;
     try {
-      // Stub only the size measurement, avoiding a >256 MiB test allocation.
+      // Exercise the uint32 boundary without allocating a large frame.
       // The real serializer, pending map, frame writer and recovery all run.
       Buffer.byteLength = (value, encoding) =>
         typeof value === 'string' && value.includes('oversizeProbe')
-          ? 256 * 1024 * 1024 + 1
+          ? 0x1_0000_0000
           : byteLength(value, encoding);
       rejected = pair.a.sendRequest('oversizeProbe', {});
     } finally {
       Buffer.byteLength = byteLength;
     }
     try {
-      await expect(rejected!).rejects.toThrow('exceeds cap');
+      await expect(rejected!).rejects.toThrow('exceeds representable maximum');
       expect(writes).toBe(0);
       expect(
         (pair.a as unknown as { pending: Map<number, unknown> }).pending.size,
@@ -1889,79 +1859,40 @@ describe('Schema parity with Go (smoke)', () => {
     }
   });
 
-  // Regression: a write failure on the output stream must NOT leave
-  // pending sendRequest promises parked forever. Mirrors the Go-side
-  // writerLoop EPIPE-cascade fix. Without the JS-side fix:
-  //   - output.write throws (or emits error async) when stream is
-  //     destroyed.
-  //   - Pending sendRequest sits on its respCh promise indefinitely.
-  //   - Node sometimes surfaces the unhandled 'error' event as an
-  //     uncaught exception.
-  // A3 regression — peer-written frame whose declared length exceeds
-  // the 256 MiB cap must trigger the OOM-cap guard SYNCHRONOUSLY on the
-  // 'data' event and tear the connection down. Without the guard the
-  // client sits in the `if (this.buf.length < HEADER_BYTES + len) break;`
-  // arm, waiting forever for a body that never comes while any further
-  // chunks pile into `this.buf` (unbounded growth → worker OOM).
-  //
-  // This test pins the guard FIRING, not just "the pending eventually
-  // rejected": it asserts (1) the cap-specific diagnostic ("exceeds cap"
-  // + "stream desync") reaches stderr — that wording is emitted ONLY by
-  // the guard, so a deleted guard leaves stderr empty — and (2) the
-  // pending request rejects via the real teardown path, won by the
-  // actual rejection rather than a watchdog. The rejection is observed
-  // through a fixed microtask barrier after the synchronous guard transition,
-  // so a missing rejection fails without parking under the stderr patch.
-  test('cap guard fires synchronously on an oversized frame-length header and seals the client', async () => {
-    const aToB = new PassThrough();
-    const bToA = new PassThrough();
-    const a = new IpcClient(bToA, aToB);
-    a.start();
+  test('accepts a header above the shared pool capacity', () => {
+    const header = Buffer.alloc(4);
+    header.writeUInt32LE(257 * 1024 * 1024, 0);
+    expect(decodeFrame(header)).toBeNull();
+  });
 
-    // Capture the cap-specific diagnostic the guard writes to stderr.
-    const originalStderrWrite = process.stderr.write;
-    let stderr = '';
-    (process.stderr as { write: unknown }).write = (
-      chunk: string | Uint8Array,
-    ): boolean => {
-      stderr += typeof chunk === 'string' ? chunk : chunk.toString();
-      return true;
-    };
-
-    const pending = a.sendRequest('lint', { test: 1 });
+  test('a runtime decoding failure rejects pending requests', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const client = new IpcClient(input, output);
+    client.start();
+    const pending = client.sendRequest('lint', {});
+    const frame = encodeFrame({ kind: 'response', id: 1, data: {} });
+    const body = frame.subarray(4);
+    const toString = Buffer.prototype.toString;
     try {
-      // Header declaring a body 1 MiB above the 256 MiB cap, then no body.
-      const header = Buffer.alloc(4);
-      header.writeUInt32LE(257 * 1024 * 1024, 0);
-      bToA.write(header);
-
-      // The guard runs in the input data handler. Assert its synchronous state
-      // transition before awaiting the pending rejection so a deleted guard
-      // fails immediately instead of parking until the outer test watchdog.
-      expect(
-        (a as unknown as { closed: boolean }).closed,
-        'oversized frame must seal the client',
-      ).toBe(true);
+      Buffer.prototype.toString = function (...args) {
+        if (this.equals(body)) throw new RangeError('frame string is too long');
+        return Reflect.apply(toString, this, args);
+      };
+      input.write(frame);
     } finally {
-      (process.stderr as { write: unknown }).write = originalStderrWrite;
+      Buffer.prototype.toString = toString;
     }
-
-    // Await the actual teardown outcome. The suite's finite outer bound is the
-    // deadlock sentinel if a mutation seals the client but forgets to reject
-    // pending requests; no promise-layer count is part of this contract.
-    await expect(pending).rejects.toThrow(/input read failed.*exceeds cap/);
-
-    // The cap-specific diagnostic — emitted ONLY by the guard — must be
-    // present. A deleted/disabled guard leaves stderr empty here.
-    expect(stderr).toMatch(/exceeds cap/);
-    expect(stderr).toMatch(/stream desync/);
-
-    // The client is sealed: a subsequent sendRequest fails fast.
-    await expect(a.sendRequest('lint', {})).rejects.toThrow(
-      /cannot sendRequest on closed client/,
-    );
-
-    void aToB;
+    try {
+      expect(client.isClosed).toBe(true);
+      await expect(pending).rejects.toThrow(
+        'input read failed: frame string is too long',
+      );
+    } finally {
+      client.close();
+      input.destroy();
+      output.destroy();
+    }
   });
 
   test('output stream error rejects pending requests and seals client', async () => {

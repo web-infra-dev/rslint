@@ -65,13 +65,13 @@ func configuredDocumentPipelineResultForTest(
 			Plugin:        linter.PluginAfterNativeJoined,
 			PluginFailure: linter.PluginDiscardOnFailure,
 		},
-		func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		linter.EslintPluginDispatchFunc(func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 			results := make([]linter.EslintPluginFileResult, len(request.Files))
 			for index, file := range request.Files {
 				results[index].FilePath = file.Path
 			}
 			return &linter.EslintPluginLintResult{Results: results}, nil
-		},
+		}),
 	))
 }
 

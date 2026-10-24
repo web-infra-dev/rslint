@@ -2,7 +2,7 @@
   "name": "@rslint/native",
   "version": "0.0.0",
   "private": true,
-  "description": "Build-only napi config and Rust sources for the rslint native parser. Not published — the compiled .node ships in the @rslint/native-<tuple> platform packages.",
+  "description": "Build-only napi config and Rust sources for the rslint native byte transport. Not published — the compiled .node ships in the @rslint/native-<tuple> platform packages.",
   "napi": {
     "binaryName": "rslint",
     "targets": [

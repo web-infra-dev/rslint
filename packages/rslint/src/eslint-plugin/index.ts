@@ -26,11 +26,11 @@ export type { PluginLintHost } from './host.js';
 // read responses without importing internal modules.
 export type {
   Diagnostic,
-  ESTreeNode,
   SuggestionDescriptor,
   SuggestionsMode,
-  RuleContext,
-} from './linter/context.js';
+} from './linter/diagnostic-builder.js';
+export type { ESTreeNode } from '../languages/js/types.js';
+export type { RuleContext } from './linter/context.js';
 export type {
   LintFileRequest,
   LintFileResult,
@@ -61,5 +61,4 @@ export type {
   EslintPluginLintRequest,
   ResolvedEslintPluginLintRequest,
   EslintPluginLintResult,
-  BuildPluginLintTasksOptions,
 } from './plugin/plugin-lint-protocol.js';

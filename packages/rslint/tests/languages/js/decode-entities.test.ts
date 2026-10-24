@@ -1,18 +1,12 @@
 /**
- * Unit edges for JSX entity decoding (`decodeJsxText` / `decodeJsxAttributeValue`), ported from
- * the deleted `lexer/jsx-entity-decoding` suite when the hand-written tokenizer was removed (M4).
- * These acorn-jsx bug-for-bug ports are now consumed by the token rebuild (JSXText value) and
- * by normalize-ast (JSX node values), so their edge cases — especially `decodeJsxAttributeValue`,
- * which only the AST path uses — stay pinned directly here.
+ * Unit edges for JSXText token decoding. Go-projected AST text and attribute
+ * values are covered by the shared conformance corpus.
  */
 import { describe, test, expect } from 'rstack/test';
 
-import {
-  decodeJsxText,
-  decodeJsxAttributeValue,
-} from '../../../src/eslint-plugin/source-code/decode-entities.js';
+import { decodeJsxText } from '../../../src/languages/js/decode-entities.js';
 
-describe('decodeJsxText / decodeJsxAttributeValue unit edges', () => {
+describe('decodeJsxText unit edges', () => {
   test('named, decimal, hex references', () => {
     expect(decodeJsxText('&amp;&lt;&gt;&quot;&apos;')).toBe('&<>"\'');
     expect(decodeJsxText('&#65;&#x42;')).toBe('AB');
@@ -48,13 +42,7 @@ describe('decodeJsxText / decodeJsxAttributeValue unit edges', () => {
     expect(decodeJsxText('&#13;\n')).toBe('\r\n'); // a CR from a ref is not re-folded against a source LF
   });
 
-  test('decodeJsxAttributeValue decodes but preserves CRLF', () => {
-    expect(decodeJsxAttributeValue('&amp;')).toBe('&');
-    expect(decodeJsxAttributeValue('x\r\ny')).toBe('x\r\ny');
-  });
-
   test('fast path returns the same content for entity-free input', () => {
     expect(decodeJsxText('plain text')).toBe('plain text');
-    expect(decodeJsxAttributeValue('plain text')).toBe('plain text');
   });
 });

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -34,11 +35,11 @@ func newDeferredPluginRun(task pluginTask) (DeferredPluginRun, error) {
 		return nil, errors.New("linter pipeline: deferred plugin run retained fix source candidates")
 	}
 	for _, input := range task.inputs {
-		if input.SourceFile != nil {
+		if input.SourceFile != nil || input.DiagnosticSource != nil {
 			return nil, errors.New("linter pipeline: deferred plugin run retained a source frame")
 		}
-		if input.Text == nil {
-			return nil, errors.New("linter pipeline: deferred plugin run requires inline text")
+		if input.Frame == nil && input.FrameError == "" {
+			return nil, errors.New("linter pipeline: deferred plugin run requires frozen ESTree")
 		}
 	}
 	var state struct {
@@ -67,6 +68,7 @@ func newDeferredPluginRun(task pluginTask) (DeferredPluginRun, error) {
 }
 
 func (t pluginTask) run(ctx context.Context, dispatcher EslintPluginDispatcher) EslintPluginDispatchOutcome {
+	failurePath := eslintPluginDispatchFailurePath(t.inputs)
 	var diagnostics []rule.RuleDiagnostic
 	notices, err := dispatchEslintPluginRules(
 		ctx,
@@ -86,7 +88,7 @@ func (t pluginTask) run(ctx context.Context, dispatcher EslintPluginDispatcher) 
 		case PluginKeepPartialWithSynthetic:
 			if !errors.Is(err, context.Canceled) {
 				diagnostics = append(diagnostics, NewEslintPluginErrorDiagnostic(
-					eslintPluginDispatchFailurePath(t.inputs),
+					failurePath,
 					"rslint/plugin-lint-error",
 					"ESLint plugin lint dispatch failed: "+err.Error(),
 				))
@@ -106,6 +108,7 @@ func (t pluginTask) run(ctx context.Context, dispatcher EslintPluginDispatcher) 
 }
 
 func materializePluginTask(
+	ctx context.Context,
 	plan *LintPlan,
 	generation Generation,
 	snapshot SourceSnapshot,
@@ -117,7 +120,6 @@ func materializePluginTask(
 		return pluginTask{failure: policy.PluginFailure}, nil
 	}
 	inputs := BuildEslintPluginFileInputs(plan, generation.Plugin.ConfigForFile)
-	inlineSources := detached || !generation.Plugin.HostReadsInitialText || !snapshot.Empty()
 	targetPathByWire := make(map[string]string, len(inputs))
 	var fixCandidates []fixSourceCandidate
 	collectFixes := policy.Demand.Plugin&rule.EditDemandAutofix != 0
@@ -153,18 +155,23 @@ func materializePluginTask(
 		}
 		input.Path = wirePath
 	}
+	var builder estree.Builder
 	for index := range inputs {
 		input := &inputs[index]
-		if inlineSources {
-			text, err := readTargetText(generation.Target.ReadText, snapshot, targetPaths[index], input.SourceFile)
-			if err != nil {
-				return pluginTask{}, fmt.Errorf("linter pipeline: freeze plugin source %q: %w", input.Path, err)
-			}
-			input.Text = &text
+		text, err := readTargetText(generation.Target.ReadText, snapshot, targetPaths[index], input.SourceFile)
+		if err != nil {
+			return pluginTask{}, fmt.Errorf("linter pipeline: freeze plugin source %q: %w", input.Path, err)
 		}
+		input.Text = &text
 		if detached {
-			if input.Text == nil {
-				return pluginTask{}, fmt.Errorf("linter pipeline: detached plugin source %q must be inline", input.Path)
+			frame, projectErr := projectPluginFrame(ctx, &builder, *input, nil)
+			if projectErr != nil {
+				if ctx.Err() != nil {
+					return pluginTask{}, ctx.Err()
+				}
+				input.FrameError = projectErr.Error()
+			} else {
+				input.Frame = frame
 			}
 			frozen, err := detachPluginInput(*input)
 			if err != nil {
@@ -208,8 +215,8 @@ func materializePluginTask(
 }
 
 func detachPluginInput(input EslintPluginFileInput) (EslintPluginFileInput, error) {
-	if input.Text == nil {
-		return EslintPluginFileInput{}, errors.New("inline text is required")
+	if input.Text == nil || (input.Frame == nil && input.FrameError == "") {
+		return EslintPluginFileInput{}, errors.New("frozen ESTree and diagnostic text are required")
 	}
 	text := *input.Text
 	languageOptions, err := clonePluginJSON(input.LanguageOptions)
@@ -240,6 +247,8 @@ func detachPluginInput(input EslintPluginFileInput) (EslintPluginFileInput, erro
 		Path:            input.Path,
 		Text:            &text,
 		SourceFile:      nil,
+		Frame:           input.Frame,
+		FrameError:      input.FrameError,
 		ConfigKey:       input.ConfigKey,
 		LanguageOptions: languageOptions,
 		Settings:        settings,

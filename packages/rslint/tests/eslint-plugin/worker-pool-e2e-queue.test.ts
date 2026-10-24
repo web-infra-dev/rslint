@@ -1,3 +1,4 @@
+import { projectFrame } from '../languages/js/project-frame.js';
 import { describe, test, expect, rs, afterEach } from 'rstack/test';
 import { EventEmitter } from 'node:events';
 import os from 'node:os';
@@ -118,6 +119,39 @@ async function controlledPool(options: Partial<WorkerPoolOptions> = {}) {
 
 describe('WorkerPool demand-driven capacity', () => {
   afterEach(() => rs.restoreAllMocks());
+
+  test.each(['owned', 'shared'] as const)(
+    'keeps large %s frames parallel within the worker-count limit',
+    async (kind) => {
+      const h = await controlledPool({ workerCount: 2 });
+      const input = (name: string): LintTask => ({
+        ...task(name, ''),
+        frame:
+          kind === 'owned'
+            ? new Uint8Array(3 << 20)
+            : { lease: 1, offset: 0, length: 3 << 20 },
+      });
+      try {
+        const batch = h.pool.lintBatch([
+          input('large-a.ts'),
+          input('large-b.ts'),
+          input('large-c.ts'),
+        ]);
+        expect(h.starts.map((s) => s.worker.posted.length)).toEqual([1, 1]);
+        h.finish(0);
+        expect(h.starts.map((s) => s.worker.posted.length)).toEqual([2, 1]);
+        h.finish(1);
+        h.finish(0);
+        expect((await batch).map((result) => result.filePath)).toEqual([
+          'large-a.ts',
+          'large-b.ts',
+          'large-c.ts',
+        ]);
+      } finally {
+        await h.close();
+      }
+    },
+  );
 
   test.each([
     [1, 1],
@@ -548,7 +582,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       const batchP = pool.lintBatch(
         [1, 2, 3, 4, 5].map((i) => ({
           filePath: `q${i}.ts`,
-          text: 'const x = null;\n',
+          frame: projectFrame('fixture.ts', 'const x = null;\n'),
           rules: { 'local/no-null': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'off',
@@ -581,7 +615,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
 
     // Driving every slot past its respawn cap (crashCount=cap + terminate)
     // drains the in-flight batch as parseError:pool_degraded. The terminate of
-    // an oxc-napi worker can native-abort on Windows — run it isolated (see
+    // an native-loaded worker can native-abort on Windows — run it isolated (see
     // ./pool-isolation). The in-child asserts pin the pool_degraded drain.
     test(
       'all workers degraded → pendingQueue drains as parseError:pool_degraded (no hang)',
@@ -625,7 +659,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       for (let i = 0; i < 20; i++) {
         tasks.push({
           filePath: `f${i}.ts`,
-          text: 'const x = null;\n',
+          frame: projectFrame('fixture.ts', 'const x = null;\n'),
           rules: { 'local/no-null': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'off',
@@ -739,7 +773,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         const r = await pool.lintBatch([
           {
             filePath: 'a.ts',
-            text: 'const x = null;\n',
+            frame: projectFrame('fixture.ts', 'const x = null;\n'),
             rules: { 'local/no-null': { options: [] } },
             collectFixes: false,
             suggestionsMode: 'off',
@@ -773,7 +807,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         for (let i = 0; i < 30; i++) {
           tasks.push({
             filePath: `bp${i}.ts`,
-            text: 'const x = null;\n',
+            frame: projectFrame('fixture.ts', 'const x = null;\n'),
             rules: { 'local/no-null': { options: [] } },
             collectFixes: false,
             suggestionsMode: 'off',
@@ -797,7 +831,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
 
     // A SECOND batch issued AFTER the pool settled into the terminal degraded
     // state must also resolve pool_degraded (not hang) — Fix A. Reaching that
-    // state needs a forced terminate of an oxc-napi worker, which can
+    // state needs a forced terminate of an native-loaded worker, which can
     // native-abort on Windows, so run it isolated (see ./pool-isolation). The
     // in-child asserts pin the terminal-state sanity checks and both drains.
     test(

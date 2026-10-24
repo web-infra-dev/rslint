@@ -1,6 +1,7 @@
 package linter
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -58,7 +59,7 @@ func TestPipelineConcurrentPluginStartsBeforeNativeAndPlansProjectedFix(t *testi
 			Plugin: PluginConcurrentJoined,
 		},
 		autofixPolicyForTest(1, AutofixPolicy{}),
-		func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			if request.Files[0].Path != fileName {
 				t.Fatalf("plugin wire path = %q, want Program source path %q", request.Files[0].Path, fileName)
 			}
@@ -74,7 +75,7 @@ func TestPipelineConcurrentPluginStartsBeforeNativeAndPlansProjectedFix(t *testi
 					Fixes:    []EslintPluginFix{{Range: [2]int{0, 1}, Text: "b"}},
 				}},
 			}}}, nil
-		},
+		}),
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -122,11 +123,11 @@ func TestPipelineJoinedModesPropagateCallerCancellation(t *testing.T) {
 					Plugin:        mode,
 					PluginFailure: PluginDiscardOnFailure,
 				},
-				func(dispatchCtx context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				EslintPluginDispatchFunc(func(dispatchCtx context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 					<-nativeFinished
 					cancel()
 					return nil, dispatchCtx.Err()
-				},
+				}),
 			))
 			if !errors.Is(err, context.Canceled) {
 				t.Fatalf("pipeline error = %v, want context.Canceled", err)
@@ -159,9 +160,9 @@ func TestPipelineDoesNotPromoteIndependentPluginBudgetFailure(t *testing.T) {
 			Plugin:        PluginAfterNativeJoined,
 			PluginFailure: PluginDiscardOnFailure,
 		},
-		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			return nil, context.DeadlineExceeded
-		},
+		}),
 	))
 	if err != nil {
 		t.Fatalf("pipeline promoted an independent plugin budget failure: %v", err)
@@ -190,6 +191,57 @@ func TestPipelineRejectsMissingJoinedPluginDispatcher(t *testing.T) {
 	))
 	if err == nil || !strings.Contains(err.Error(), "requires a dispatcher") {
 		t.Fatalf("missing dispatcher error = %v", err)
+	}
+}
+
+func TestPipelineNativeOnlySkipsPluginSourceMaterialization(t *testing.T) {
+	for _, mode := range []PluginExecution{PluginConcurrentJoined, PluginAfterNativeJoined} {
+		for _, registered := range []bool{false, true} {
+			t.Run(fmt.Sprintf("mode-%d/plugin-registered-%t", mode, registered), func(t *testing.T) {
+				root := tspath.NormalizePath(t.TempDir())
+				fileName := tspath.ResolvePath(root, "source.ts")
+				var originalStatement *ast.Node
+				nativeVisits := 0
+				generation := pipelineTestGeneration(t, root, fileName, "debugger;", []rule.ConfiguredRule{{
+					Name:     "native/check",
+					Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return rule.RuleListeners{ast.KindDebuggerStatement: func(node *ast.Node) {
+							nativeVisits++
+							if node != originalStatement {
+								t.Fatal("native traversal replaced the Program AST node")
+							}
+							ctx.ReportNode(node, rule.RuleMessage{Description: "native debugger"})
+						}}
+					},
+				}}, nil)
+				originalStatement = generation.Native.Programs[0].GetSourceFile(fileName).Statements.Nodes[0]
+				if registered {
+					generation.Plugin = &PluginGeneration{ConfigForFile: func(string) EslintPluginFileConfig {
+						t.Fatal("native-only target resolved plugin config")
+						return EslintPluginFileConfig{}
+					}}
+				}
+				generation.Target.ReadText = func(string, ast.SourceFileLike) (string, error) {
+					return "", errors.New("native-only lint must not materialize plugin source")
+				}
+				result, err := RunPipeline(context.Background(), NewLintRequest(
+					pipelineTestProvider(generation, nil),
+					ObservationPolicy{Plugin: mode},
+					nil,
+				))
+				if err != nil {
+					t.Fatal(err)
+				}
+				diagnostics, complete := result.Observation.CompleteDiagnostics()
+				if nativeVisits != 1 || !complete || len(diagnostics) != 1 || diagnostics[0].RuleName != "native/check" {
+					t.Fatalf("native visits/complete/diagnostics = %d/%t/%+v", nativeVisits, complete, diagnostics)
+				}
+				if len(result.PluginOutcomes()) != 0 {
+					t.Fatal("native-only lint dispatched plugin work")
+				}
+			})
+		}
 	}
 }
 
@@ -239,7 +291,7 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 			Target: TargetProjection{ReadText: func(_ string, source ast.SourceFileLike) (string, error) {
 				return source.Text(), nil
 			}},
-			Plugin: &PluginGeneration{HostReadsInitialText: true},
+			Plugin: &PluginGeneration{},
 		}, nil, nil
 	})
 
@@ -253,19 +305,19 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 			Plugin: PluginConcurrentJoined,
 		},
 		autofixPolicyForTest(1, AutofixPolicy{VerifyAfterLastRound: true}),
-		func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			dispatches++
 			if len(request.Files) != 2 {
 				dispatchValidationErr = fmt.Errorf("plugin files = %+v", request.Files)
 			}
+			expected := initial
+			if dispatches == 2 {
+				expected = expectedSecond
+			}
 			for _, file := range request.Files {
-				if dispatches == 1 && file.Text != nil {
-					dispatchValidationErr = fmt.Errorf("initial disk-backed input %q was inlined", file.Path)
-				}
-				if dispatches == 2 {
-					if file.Text == nil || *file.Text != expectedSecond[file.Path] {
-						dispatchValidationErr = fmt.Errorf("memory-generation input = %+v", file)
-					}
+				text, exists := expected[file.Path]
+				if !exists || !bytes.HasSuffix(file.Frame, []byte(text)) {
+					dispatchValidationErr = errors.New("generation frame mismatch")
 				}
 			}
 			results := make([]EslintPluginFileResult, len(request.Files))
@@ -273,7 +325,7 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 				results[index].FilePath = file.Path
 			}
 			return &EslintPluginLintResult{Results: results}, nil
-		},
+		}),
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -308,9 +360,9 @@ func TestPipelineRejectsDuplicatePluginWirePath(t *testing.T) {
 	_, err := RunPipeline(context.Background(), NewLintRequest(
 		pipelineTestProvider(generation, nil),
 		ObservationPolicy{Plugin: PluginConcurrentJoined},
-		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			return &EslintPluginLintResult{}, nil
-		},
+		}),
 	))
 	if err == nil || !strings.Contains(err.Error(), "duplicate plugin wire path") {
 		t.Fatalf("duplicate wire path error = %v", err)

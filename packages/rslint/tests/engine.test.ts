@@ -14,10 +14,8 @@ import { createMemoryTransport } from '../src/ipc/memory-transport.js';
 import { IpcClient, decodeFrame, encodeFrame } from '../src/ipc/client.js';
 import { createPluginLintHost } from '../src/eslint-plugin/host.js';
 import { resolvePluginAttachments } from '../src/eslint-plugin/plugin/attachments.js';
-import {
-  parse,
-  parseSharedBytes,
-} from '../src/eslint-plugin/native/load-binding.js';
+import { getNativeBinding } from '../src/native/binding.js';
+import { decodeFrame as decodeEstreeFrame } from '../src/languages/js/frame.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FAKE_BIN = path.resolve(__dirname, './fixtures/fake-ipc-binary.cjs');
@@ -88,27 +86,16 @@ describe('CLI shared source integration', () => {
               lint: async (request: any, signal, attachments) => {
                 const resolved = resolvePluginAttachments(request, attachments);
                 for (const input of resolved.files) {
-                  if (shared) {
-                    expect(input.text).toBeUndefined();
-                    expect(input.sharedSource).toBeDefined();
-                    if (!input.sharedSource)
-                      throw new Error('missing shared snapshot');
-                    const native = parseSharedBytes(
-                      input.path,
-                      input.sharedSource,
-                      'module',
-                      false,
-                    );
-                    expect(native.parsed).toEqual(
-                      parse(input.path, native.sourceText, 'module', false),
-                    );
-                    snapshots.push(native.sourceText);
-                  } else {
-                    expect(input.sharedSource).toBeUndefined();
-                    if (typeof input.text !== 'string')
-                      throw new Error('missing inline snapshot');
-                    snapshots.push(input.text);
-                  }
+                  if (shared)
+                    expect(input.frame).not.toBeInstanceOf(Uint8Array);
+                  else expect(input.frame).toBeInstanceOf(Uint8Array);
+                  const bytes =
+                    input.frame instanceof Uint8Array
+                      ? input.frame
+                      : getNativeBinding().readBytes(input.frame);
+                  const frame = decodeEstreeFrame(bytes);
+                  expect(frame.hasBOM).toBe(true);
+                  snapshots.push(frame.text);
                 }
                 // A concurrent disk edit after Go took its snapshot must never
                 // change what either the native parser or the real worker lints.
@@ -121,7 +108,7 @@ describe('CLI shared source integration', () => {
         });
         expect(exit).toBe(mode === 'fix' ? 0 : 1);
         expect(configurationCalls).toBe(mode === 'inline' ? 0 : 1);
-        expect(snapshots[0]).toBe(shared ? original.slice(1) : original);
+        expect(snapshots[0]).toBe(original.slice(1));
         if (mode === 'fix') {
           expect(snapshots).toEqual([
             original.slice(1),

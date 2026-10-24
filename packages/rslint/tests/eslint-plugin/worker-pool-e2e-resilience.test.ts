@@ -1,3 +1,4 @@
+import { projectFrame } from '../languages/js/project-frame.js';
 import { describe, test, expect } from 'rstack/test';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
@@ -44,7 +45,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       // postMessage throw without depending on worker internals.
       const badTask: LintTask = {
         filePath: 'bad.ts',
-        text: `const x = null;`,
+        frame: projectFrame('fixture.ts', `const x = null;`),
         rules: {
           'local/no-null': {
             options: [],
@@ -91,7 +92,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
 
       const poison = (i: number): LintTask => ({
         filePath: `poison${i}.ts`,
-        text: 'const x = null;',
+        frame: projectFrame('fixture.ts', 'const x = null;'),
         rules: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           'local/no-null': { options: [], meta: { f: () => i } as any },
@@ -120,7 +121,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     });
 
     // Directly terminating one worker of a 2-worker pool then shutting down
-    // exercises the respawn-during-shutdown race. The terminate of an oxc-napi
+    // exercises the respawn-during-shutdown race. The terminate of an native-loaded
     // worker can native-abort on Windows — run it isolated (see
     // ./pool-isolation). The isolated child must exit cleanly after proving the
     // pool drained without leaking the respawn.
@@ -135,7 +136,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
 
     // A hung listener trips the per-task timeout, which terminates the worker
     // and respawns it; the next batch must succeed on the replacement. The
-    // timeout-driven terminate of an oxc-napi worker can native-abort on
+    // timeout-driven terminate of an native-loaded worker can native-abort on
     // Windows — run it isolated (see ./pool-isolation).
     test(
       'hung listener → task_timeout → respawn → next batch succeeds',

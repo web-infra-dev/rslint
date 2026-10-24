@@ -19,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/testutil/estree"
 )
 
 func runLSPGenerationForTest(
@@ -36,13 +37,13 @@ func runLSPGenerationForTest(
 			Plugin:        linter.PluginAfterNativeJoined,
 			PluginFailure: linter.PluginDiscardOnFailure,
 		},
-		func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		linter.EslintPluginDispatchFunc(func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 			results := make([]linter.EslintPluginFileResult, len(request.Files))
 			for index, file := range request.Files {
 				results[index].FilePath = file.Path
 			}
 			return &linter.EslintPluginLintResult{Results: results}, nil
-		},
+		}),
 	))
 }
 
@@ -149,14 +150,14 @@ func TestLSPGenerationReleaseLifecycle(t *testing.T) {
 			t.Fatalf("release/plugin run = %d/%v, want 1/non-nil", releases, presentation.run != nil)
 		}
 		var request linter.EslintPluginLintRequest
-		outcome, err := presentation.run(context.Background(), func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		outcome, err := presentation.run(context.Background(), linter.EslintPluginDispatchFunc(func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 			request = got
 			return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{FilePath: got.Files[0].Path}}}, nil
-		})
+		}))
 		if err != nil || outcome.DispatchError != nil {
 			t.Fatalf("plugin work errors = %v/%v", err, outcome.DispatchError)
 		}
-		if len(request.Files) != 1 || request.Files[0].Text == nil || *request.Files[0].Text != content {
+		if len(request.Files) != 1 || estree.SourceText(t, request.Files[0].Frame) != content {
 			t.Fatalf("detached plugin request = %+v", request.Files)
 		}
 	})

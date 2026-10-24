@@ -1,3 +1,4 @@
+import { projectFrame } from '../languages/js/project-frame.js';
 import path from 'node:path';
 
 import type { LintTask } from '../../src/eslint-plugin/worker-pool.js';
@@ -35,7 +36,7 @@ export function task(
 ): LintTask {
   return {
     filePath,
-    text,
+    frame: projectFrame(filePath, text),
     rules: { [rule]: { options: [] } },
     collectFixes: false,
     suggestionsMode: 'off',

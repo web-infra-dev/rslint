@@ -1,6 +1,9 @@
 import { describe, test, expect } from 'rstack/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { Linter } from 'eslint';
+import * as typescriptParser from '@typescript-eslint/parser';
 import { runRslint, createTempDir, cleanupTempDir } from './helpers.js';
 
 // A self-contained mock ESLint plugin (mirrors tests/eslint-plugin/
@@ -57,6 +60,51 @@ const LOCAL_PLUGIN = `export default {
         };
       },
     },
+    'projection-probe': {
+      meta: { fixable: 'code', schema: [] },
+      create(context) {
+        const sc = context.sourceCode;
+        return {
+          AssignmentPattern(node) {
+            context.report({ node, message: 'remove default', fix: fixer => fixer.replaceText(node, sc.getText(node.left)) });
+          },
+          SequenceExpression(node) {
+            if (node.expressions[0]?.type !== 'SequenceExpression') return;
+            context.report({ node: node.expressions[0], message: 'replace inner sequence', fix: fixer => fixer.replaceText(node.expressions[0], 'selected') });
+          },
+          'ObjectPattern[optional=true], ArrayPattern[optional=true]'(node) {
+            context.report({ node, message: 'replace optional binding', fix: fixer => fixer.replaceText(node, 'parameter?: T') });
+          },
+          BinaryExpression(node) {
+            if (node.operator !== '>=') return;
+            const operator = sc.getFirstTokenBetween(node.left, node.right);
+            context.report({ node: operator, message: 'replace operator', fix: fixer => fixer.replaceText(operator, '>') });
+          },
+          Literal(node) {
+            if (node.value === 'surrogate') {
+              context.report({ node, message: 'replace literal', fix: fixer => fixer.replaceText(node, '"' + String.fromCharCode(0xd800) + '"') });
+            } else if (node.value === 'a😀b') {
+              context.report({ node, message: 'replace scalar half', fix: fixer => fixer.replaceTextRange([node.range[0] + 2, node.range[0] + 3], 'X') });
+            }
+          },
+          MethodDefinition(node) {
+            if (node.kind !== 'constructor' || node.key.type !== 'Identifier') return;
+            context.report({ node: node.key, message: 'quote key', fix: fixer => fixer.replaceText(node.key, '"constructor"') });
+          },
+          JSXAttribute(node) {
+            if (node.name.name !== 'value' || node.value.value === 'fixed') return;
+            context.report({ node: node.value, message: 'replace attribute', fix: fixer => fixer.replaceText(node.value, '"fixed"') });
+          },
+          TemplateElement(node) {
+            if (!node.value.raw.includes('\\n') || node.parent.type !== 'TemplateLiteral' || node.parent.expressions.length) return;
+            context.report({ node: node.parent, message: 'replace template', fix: fixer => fixer.replaceText(node.parent, '\`fixed\`') });
+          },
+          ExportNamedDeclaration(node) {
+            if (node.declaration?.declare && node.exportKind !== 'type') throw new Error('wrong ambient export kind');
+          },
+        };
+      },
+    },
   },
 };
 `;
@@ -101,6 +149,57 @@ async function lint(
 }
 
 describe('CLI community plugins (object-form) end-to-end', () => {
+  test('--fix runs plugins on a long comma expression', async () => {
+    const text = 'a,'.repeat(5999) + '[1].filter(Boolean);\n';
+    const { dir, exitCode, diags } = await lint(
+      {
+        'local-plugin.mjs': LOCAL_PLUGIN,
+        'rslint.config.mjs': PLUGIN_CONFIG,
+        'tsconfig.json': TSCONFIG,
+        'sequence.ts': text,
+      },
+      ['--fix'],
+    );
+    try {
+      expect(exitCode).toBe(0);
+      expect(diags).toEqual([]);
+      expect(await fs.readFile(path.join(dir, 'sequence.ts'), 'utf8')).toBe(
+        text.replace('.filter(', '.some('),
+      );
+    } finally {
+      await cleanupTempDir(dir);
+    }
+  });
+
+  test.each([
+    ['no plugin', ''],
+    [
+      'disabled plugin rules',
+      `{ files: ['**/*.ts'], plugins: { local }, rules: { 'local/no-null': 'off' } },`,
+    ],
+    [
+      'unmatched plugin files',
+      `{ files: ['**/other.ts'], plugins: { local }, rules: { 'local/no-null': 'error' } },`,
+    ],
+  ])('%s preserves native diagnostics', async (_label, pluginConfig) => {
+    const { dir, exitCode, diags } = await lint({
+      'local-plugin.mjs': LOCAL_PLUGIN,
+      'rslint.config.mjs': `import local from './local-plugin.mjs';
+export default [
+  { files: ['**/*.ts'], rules: { 'no-debugger': 'error' } },
+  ${pluginConfig}
+];`,
+      'a.ts': 'debugger;\nconst value = null;\n',
+    });
+    try {
+      expect(exitCode).toBe(1);
+      expect(diags.map((diag) => diag.ruleName)).toEqual(['no-debugger']);
+      expect(diags[0].range.start.line).toBe(1);
+    } finally {
+      await cleanupTempDir(dir);
+    }
+  });
+
   test.each([
     ['n', 'prefer-global/url'],
     ['custom', 'a/b/c'],
@@ -194,6 +293,113 @@ export default [{ files: ['**/*.ts'],
       await cleanupTempDir(dir);
     }
   });
+
+  test.each([
+    [
+      'binding.ts',
+      '\ufeff// 😀\r\nconst {source: local = 1, nested: {value = 2} = fallback} = input;\r\n',
+      '\ufeff// 😀\r\nconst {source: local, nested: {value}} = input;\r\n',
+    ],
+    [
+      'operator.ts',
+      '// 😀\nconst value = left >= right; left >>= 1;\n',
+      '// 😀\nconst value = left > right; left >>= 1;\n',
+    ],
+    ['sequence.js', '// 😀\n(a, b), c;\n', '// 😀\n(selected), c;\n'],
+    ['sequence.ts', '// 😀\n(a, b), c;\n', '// 😀\n(selected), c;\n'],
+    [
+      'optional.ts',
+      'type F = ({value}?: T) => void;\n',
+      'type F = (parameter?: T) => void;\n',
+    ],
+    [
+      'optional.tsx',
+      'type F = ([value]?: T) => void;\n',
+      'type F = (parameter?: T) => void;\n',
+    ],
+    [
+      'constructor.ts',
+      '// 😀\nclass C { private /* constructor */ constructor() {} static constructor() {} }\n',
+      '// 😀\nclass C { private /* constructor */ "constructor"() {} static constructor() {} }\n',
+    ],
+    [
+      'attribute.tsx',
+      'const element = <A value="\\" />; /* after */ next();\n',
+      'const element = <A value="fixed" />; /* after */ next();\n',
+    ],
+    [
+      'attribute.jsx',
+      'const element = <A value="first\r\nsecond" />; next();\n',
+      'const element = <A value="fixed" />; next();\n',
+    ],
+    [
+      'template.js',
+      '// 😀\nconst value = `first\r\nlast`;\n',
+      '// 😀\nconst value = `fixed`;\n',
+    ],
+    [
+      'ambient.ts',
+      'export declare const value: T; export declare function f<T>(x: T): T;\n',
+      'export declare const value: T; export declare function f<T>(x: T): T;\n',
+    ],
+    [
+      'surrogate.ts',
+      'const value = "surrogate";\n',
+      'const value = "\ud800";\n',
+    ],
+    ['scalar.ts', 'const value = "a😀b";\n', 'const value = "aX\ude00b";\n'],
+  ])(
+    'ESTree ranges survive the complete --fix pipeline: %s',
+    async (filePath, text, expected) => {
+      const dir = await createTempDir({
+        'local-plugin.mjs': LOCAL_PLUGIN,
+        'rslint.config.mjs': `import local from './local-plugin.mjs'; export default [{files: ['**/*.{js,jsx,ts,tsx}'], plugins: {local}, rules: {'local/projection-probe': 'error'}}];`,
+        'tsconfig.json': JSON.stringify({
+          compilerOptions: {
+            target: 'ESNext',
+            module: 'ESNext',
+            allowJs: true,
+            jsx: 'preserve',
+          },
+          include: ['**/*'],
+        }),
+        [filePath]: text,
+      });
+      try {
+        const { default: plugin } = await import(
+          /* webpackIgnore: true */ pathToFileURL(
+            path.join(dir, 'local-plugin.mjs'),
+          ).href
+        );
+        const upstream = new Linter().verifyAndFix(
+          text,
+          [
+            {
+              files: ['**/*.{js,jsx,ts,tsx}'],
+              languageOptions: {
+                parser: typescriptParser,
+                sourceType: 'module',
+                ecmaVersion: 'latest',
+                parserOptions: { ecmaFeatures: { jsx: true } },
+              },
+              plugins: { local: plugin },
+              rules: { 'local/projection-probe': 'error' },
+            },
+          ],
+          { filename: filePath },
+        );
+        expect(upstream.messages).toEqual([]);
+        expect(upstream.output).toBe(expected);
+        const result = await runRslint(['--fix'], dir);
+        expect(result.exitCode).toBe(0);
+        expect(await fs.readFile(path.join(dir, filePath))).toEqual(
+          Buffer.from(upstream.output),
+        );
+      } finally {
+        await cleanupTempDir(dir);
+      }
+    },
+  );
 
   test('--fix performs a final verification after the tenth write pass', async () => {
     const config = `import local from './local-plugin.mjs';

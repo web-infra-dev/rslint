@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"unicode/utf8"
 )
 
 // MessageKind identifies a frame's purpose. The transport only owns the
@@ -176,9 +175,7 @@ func ReadFrame(r *bufio.Reader) (*Message, error) {
 		return nil, err
 	}
 	if length > MaxFrameSize {
-		return nil, fmt.Errorf(
-			"ipc: frame length %d exceeds cap %d (likely stream desync)",
-			length, MaxFrameSize)
+		return nil, fmt.Errorf("ipc: frame length %d does not fit int", length)
 	}
 	body := make([]byte, length)
 	if _, err := io.ReadFull(r, body); err != nil {
@@ -203,103 +200,14 @@ func WriteFrame(w io.Writer, msg *Message) error {
 }
 
 func encodeFrame(msg *Message) ([]byte, error) {
-	if err := preflightAttachments(msg); err != nil {
-		return nil, err
-	}
 	body, err := marshalJSON(msg)
 	if err != nil {
 		return nil, fmt.Errorf("ipc: encode frame (kind=%s): %w", msg.Kind, err)
 	}
 	if len(body) > MaxFrameSize {
-		return nil, fmt.Errorf("ipc: frame body %d exceeds cap %d", len(body), MaxFrameSize)
+		return nil, fmt.Errorf("ipc: frame body %d does not fit uint32 length", len(body))
 	}
 	return body, nil
-}
-
-// preflightAttachments rejects oversized inline values before JSON escaping or
-// base64 encoding allocates a complete frame. The application payload is opaque
-// and can contain JSON whitespace, so this is a lower bound excluding Data;
-// encodeFrame checks the exact final size as well.
-func preflightAttachments(msg *Message) error {
-	if len(msg.Attachments) == 0 {
-		return nil
-	}
-	skeleton := *msg
-	skeleton.Data = nil
-	skeleton.Attachments = append([]AttachmentData(nil), msg.Attachments...)
-	emptyText, emptyBytes := "", []byte{}
-	for i := range skeleton.Attachments {
-		attachment := &skeleton.Attachments[i]
-		if attachment.Text != nil {
-			attachment.Text = &emptyText
-		}
-		if attachment.Bytes != nil {
-			attachment.Bytes = &emptyBytes
-		}
-	}
-	metadata, err := marshalJSON(&skeleton)
-	if err != nil {
-		return fmt.Errorf("ipc: encode attachment metadata: %w", err)
-	}
-	remaining := MaxFrameSize - len(metadata)
-	for _, attachment := range msg.Attachments {
-		if attachment.Text != nil {
-			remaining = consumeJSONText(*attachment.Text, remaining)
-		}
-		if attachment.Bytes != nil {
-			length := len(*attachment.Bytes)
-			// Compare before multiplication so even a huge buffer cannot
-			// overflow size arithmetic on a 32-bit platform.
-			groups := length / 3
-			if length%3 != 0 {
-				groups++
-			}
-			if remaining < 0 || groups > remaining/4 {
-				remaining = -1
-			} else {
-				remaining -= groups * 4
-			}
-		}
-		if remaining < 0 {
-			return fmt.Errorf("ipc: inline attachments exceed frame cap %d", MaxFrameSize)
-		}
-	}
-	if remaining < 0 {
-		return fmt.Errorf("ipc: attachment metadata exceeds frame cap %d", MaxFrameSize)
-	}
-	return nil
-}
-
-// consumeJSONText accounts for string contents as encoding/json emits them
-// with HTML escaping disabled. The surrounding quotes are in the skeleton.
-func consumeJSONText(value string, remaining int) int {
-	for i := 0; i < len(value) && remaining >= 0; {
-		c := value[i]
-		if c < utf8.RuneSelf {
-			switch c {
-			case '\\', '"', '\n', '\r', '\t', '\b', '\f':
-				remaining -= 2
-			default:
-				if c < 0x20 {
-					remaining -= 6
-				} else {
-					remaining--
-				}
-			}
-			i++
-			continue
-		}
-		r, size := utf8.DecodeRuneInString(value[i:])
-		if r == '\u2028' || r == '\u2029' {
-			remaining -= 6
-		} else if r == utf8.RuneError && size == 1 {
-			remaining -= len("�")
-		} else {
-			remaining -= size
-		}
-		i += size
-	}
-	return remaining
 }
 
 func writeEncodedFrame(w io.Writer, body []byte) error {

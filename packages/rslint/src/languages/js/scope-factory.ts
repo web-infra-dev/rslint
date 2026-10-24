@@ -35,7 +35,7 @@ import {
   ECMASCRIPT_GLOBALS,
   LATEST_ECMASCRIPT_VERSION,
 } from './builtin-globals.js';
-import type { GlobalAccess } from '../types.js';
+import type { GlobalAccess } from './types.js';
 
 type NormalizedGlobalAccess = 'readonly' | 'writable' | 'off';
 

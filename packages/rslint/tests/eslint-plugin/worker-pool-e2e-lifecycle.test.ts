@@ -1,3 +1,4 @@
+import { projectFrame } from '../languages/js/project-frame.js';
 import { describe, test, expect } from 'rstack/test';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -35,7 +36,7 @@ import {
  *
  * Exercises the full happy path inside the runner package (WorkerPool
  * → worker_threads loading the user's rslint config → queued
- * lintBatch → oxc-parser → normalize → scope → context → listeners →
+ * lintBatch → frame decoder → scope → context → listeners →
  * plugin-lint-result-shaped data). The plugin here is the local fixture
  * plugin (`fixtures/local-plugin.mjs`), not an external dependency.
  */
@@ -359,7 +360,7 @@ console.log(JSON.stringify({ hostBefore, hostAfter: nodeModule.getCompileCacheDi
       const results = await pool.lintBatch([
         {
           filePath: 'fix.ts',
-          text: SRC,
+          frame: projectFrame('fixture.ts', SRC),
           rules: { 'local/prefer-array-some': { options: [] } },
           collectFixes: true,
           suggestionsMode: 'off',
@@ -392,7 +393,7 @@ console.log(JSON.stringify({ hostBefore, hostAfter: nodeModule.getCompileCacheDi
       const results = await pool.lintBatch([
         {
           filePath: 'sug.ts',
-          text: `const x = null;`,
+          frame: projectFrame('fixture.ts', `const x = null;`),
           rules: { 'local/no-null': { options: [] } },
           collectFixes: false,
           suggestionsMode: 'eager',
@@ -419,7 +420,7 @@ console.log(JSON.stringify({ hostBefore, hostAfter: nodeModule.getCompileCacheDi
 
     // A plugin listener wedged in a sync infinite loop can't process the
     // inbound shutdown message, so shutdown must escalate to a forced
-    // terminate() after the 5s grace. Terminating an oxc-napi worker can
+    // terminate() after the 5s grace. Terminating an native-loaded worker can
     // native-abort below the JS layer on Windows — run it isolated (see
     // ./pool-isolation/runner.mjs). Only a clean child exit is success; a
     // native abort remains visible in the audit but fails this test.
@@ -506,7 +507,7 @@ console.log(JSON.stringify({ hostBefore, hostAfter: nodeModule.getCompileCacheDi
     // U11: a plugin with a refed top-level `setInterval` keeps the worker event
     // loop alive, so `pool.shutdown()` can't drain it cooperatively and must
     // escalate to a forced `terminate()`. Terminating a worker that holds the
-    // oxc-napi addon can native-abort below the JS layer on Windows — which
+    // native-loaded addon can native-abort below the JS layer on Windows — which
     // would crash THIS test process if the pool ran in-process. So the scenario
     // runs in an isolated subprocess (see ./pool-isolation/runner.mjs): a native
     // abort is confined there, and the pool's outcome comes back via milestones.

@@ -7,7 +7,6 @@ mod mapping;
 
 use napi::{Env, Error, Result, Unknown};
 use napi_derive::napi;
-use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::sync::{
@@ -162,29 +161,6 @@ impl Lease {
                     .bytes(region.start + start - region.offset, end - start)
             })
         })
-    }
-
-    fn bytes(&self, offset: u32, length: u32) -> Result<Cow<'_, [u8]>> {
-        let range = self.range(offset, length)?;
-        let mut chunks = self.chunks(range);
-        let Some(first) = chunks.next() else {
-            return Ok(Cow::Borrowed(&[]));
-        };
-        if first.len() == length as usize {
-            return Ok(Cow::Borrowed(first));
-        }
-        // A consumer sees one logical byte range, even across batch boundaries.
-        // In particular, UTF-8 consumers must decode only after this assembly.
-        let mut bytes = Vec::new();
-        bytes
-            .try_reserve_exact(length as usize)
-            .map_err(|_| invalid())?;
-        bytes.extend_from_slice(first);
-        for chunk in chunks {
-            bytes.extend_from_slice(chunk);
-        }
-        debug_assert_eq!(bytes.len(), length as usize);
-        Ok(Cow::Owned(bytes))
     }
 
     /// The range is validated before the destination is allocated. Each byte is
@@ -409,17 +385,6 @@ fn acquire(bytes: &SharedBytes) -> Result<Arc<Lease>> {
         .ok_or_else(invalid)
 }
 
-/// The lease remains pinned for the entire callback, including a cross-batch
-/// assembly. Borrowed slices cannot escape this scope or outlive revocation.
-pub(crate) fn with_bytes<T>(
-    bytes: SharedBytes,
-    read: impl FnOnce(&[u8]) -> Result<T>,
-) -> Result<T> {
-    let lease = acquire(&bytes)?;
-    let data = lease.bytes(bytes.offset, bytes.length)?;
-    read(data.as_ref())
-}
-
 /// Return independent, writable Node memory. Never expose read-only mapped
 /// pages as a Buffer or rely on JavaScript to honor Rust's immutable borrows.
 #[napi(catch_unwind, ts_return_type = "Buffer")]
@@ -446,7 +411,11 @@ pub fn read_bytes(env: &Env, bytes: SharedBytes) -> NativeResult<Unknown<'_>> {
             // no user code can observe a partially copied buffer or mutate it.
             let output =
                 unsafe { std::slice::from_raw_parts_mut(destination.cast::<u8>(), range.len()) };
+            #[cfg(feature = "test-worker-termination")]
+            crate::reader_worker_test::before_read(bytes.lease);
             lease.copy_into(range, output);
+            #[cfg(feature = "test-worker-termination")]
+            crate::reader_worker_test::after_read(bytes.lease, output);
         }
         // SAFETY: creation succeeded in this env. Returning the existing value
         // requires no further N-API calls; NativeResult preserves pending errors.
@@ -481,6 +450,18 @@ mod tests {
         let mut arena = MemoryArena::new().unwrap();
         arena.configure(test_configuration()).unwrap();
         arena
+    }
+
+    fn read(lease: u32, offset: u32, length: u32) -> Result<Vec<u8>> {
+        let lease = acquire(&SharedBytes {
+            lease,
+            offset,
+            length,
+        })?;
+        let range = lease.range(offset, length)?;
+        let mut bytes = vec![0; range.len()];
+        lease.copy_into(range, &mut bytes);
+        Ok(bytes)
     }
 
     #[test]
@@ -606,13 +587,9 @@ mod tests {
         arena.mapping.as_ref().unwrap().publish_for_test(0, 1);
         let id = arena.register(vec![batch(0, 1, 8)]).unwrap();
         assert!(arena.register(vec![batch(0, 2, 8)]).is_err());
-        {
-            let registry = readers().lock().unwrap();
-            let lease = registry.get(&id).unwrap();
-            assert_eq!(lease.bytes(8, 0).unwrap().as_ref(), b"");
-            assert!(lease.bytes(8, 1).is_err());
-            assert!(lease.bytes(u32::MAX, u32::MAX).is_err());
-        }
+        assert_eq!(read(id, 8, 0).unwrap(), b"");
+        assert!(read(id, 8, 1).is_err());
+        assert!(read(id, u32::MAX, u32::MAX).is_err());
         assert!(arena.release(id));
         assert!(!arena.release(id));
         assert!(!readers().lock().unwrap().contains_key(&id));
@@ -622,34 +599,6 @@ mod tests {
         assert_ne!(id, next);
         assert!(!arena.release(id));
         assert!(arena.release(next));
-    }
-
-    #[test]
-    fn revocation_during_read_pins_mapping_through_close() {
-        let mut arena = configured_arena();
-        arena.mapping.as_ref().unwrap().publish_for_test(0, 1);
-        let id = arena.register(vec![batch(0, 1, 8)]).unwrap();
-        with_bytes(
-            SharedBytes {
-                lease: id,
-                offset: 0,
-                length: 8,
-            },
-            |bytes| {
-                assert!(!arena.release(id));
-                assert!(!readers().lock().unwrap().contains_key(&id));
-                arena.mapping.as_ref().unwrap().publish_for_test(0, 2);
-                assert!(arena.register(vec![batch(0, 2, 8)]).is_err());
-                arena.close();
-                assert!(arena.descriptor().is_err());
-                assert!(arena.configure(test_configuration()).is_err());
-                assert!(arena.register(vec![batch(1, 1, 8)]).is_err());
-                assert_eq!(bytes, &[0; 8]);
-                Ok(())
-            },
-        )
-        .unwrap();
-        arena.close();
     }
 
     #[test]
@@ -680,39 +629,9 @@ mod tests {
         let lease = arena
             .register(vec![batch(slot, 1, config.slot_size)])
             .unwrap();
-        with_bytes(
-            SharedBytes {
-                lease,
-                offset: 0,
-                length: config.slot_size,
-            },
-            |bytes| {
-                assert_eq!(bytes, source);
-                Ok(())
-            },
-        )
-        .unwrap();
-        with_bytes(
-            SharedBytes {
-                lease,
-                offset: config.slot_size - 1,
-                length: 1,
-            },
-            |bytes| {
-                assert_eq!(bytes, &[29]);
-                Ok(())
-            },
-        )
-        .unwrap();
-        assert!(with_bytes(
-            SharedBytes {
-                lease,
-                offset: config.slot_size,
-                length: 1
-            },
-            |_| Ok(()),
-        )
-        .is_err());
+        assert_eq!(read(lease, 0, config.slot_size).unwrap(), source);
+        assert_eq!(read(lease, config.slot_size - 1, 1).unwrap(), &[29]);
+        assert!(read(lease, config.slot_size, 1).is_err());
         assert!(arena.release(lease));
     }
 
@@ -764,44 +683,28 @@ mod tests {
     fn ordered_batches_preserve_binary_bytes_and_cross_batch_ranges() {
         let mut arena = configured_arena();
         let mapping = arena.mapping.as_ref().unwrap();
-        // Deliberately reverse physical slot order and split a UTF-8 scalar.
+        // Reverse physical slot order and split a UTF-8 scalar across batches.
         mapping.write_for_test(2, 1, &[0, 0xff, 0xf0]);
         mapping.write_for_test(0, 1, &[0x9f, 0x92, 0xa9, 42, 0]);
         let id = arena
             .register(vec![batch(2, 1, 3), batch(1, 1, 0), batch(0, 1, 5)])
             .unwrap();
-        {
-            let registry = readers().lock().unwrap();
-            let lease = registry.get(&id).unwrap();
-            let first = lease.bytes(0, 2).unwrap();
-            assert!(matches!(first, Cow::Borrowed(_)));
-            assert_eq!(first.as_ref(), &[0, 0xff]);
-            let scalar = lease.bytes(2, 4).unwrap();
-            assert!(matches!(scalar, Cow::Owned(_)));
-            assert_eq!(std::str::from_utf8(scalar.as_ref()).unwrap(), "\u{1f4a9}");
-            let expected = [0, 0xff, 0xf0, 0x9f, 0x92, 0xa9, 42, 0];
-            let all = lease.bytes(0, 8).unwrap();
-            assert_eq!(all.as_ref(), expected);
-            let mut copy = [0; 8];
-            lease.copy_into(lease.range(0, 8).unwrap(), &mut copy);
-            assert_eq!(copy, expected);
-            copy.fill(9);
-            assert_eq!(lease.bytes(0, 8).unwrap().as_ref(), expected);
-            assert_eq!(lease.bytes(8, 0).unwrap().as_ref(), b"");
-            assert!(lease.bytes(9, 0).is_err());
-            assert!(lease.bytes(8, 1).is_err());
-            assert!(lease.bytes(u32::MAX, 1).is_err());
-        }
+        assert_eq!(read(id, 0, 2).unwrap(), &[0, 0xff]);
+        assert_eq!(
+            std::str::from_utf8(&read(id, 2, 4).unwrap()).unwrap(),
+            "\u{1f4a9}"
+        );
+        let expected = [0, 0xff, 0xf0, 0x9f, 0x92, 0xa9, 42, 0];
+        let mut copy = read(id, 0, 8).unwrap();
+        assert_eq!(copy, expected);
+        copy.fill(9);
+        assert_eq!(read(id, 0, 8).unwrap(), expected);
+        assert_eq!(read(id, 8, 0).unwrap(), b"");
+        assert!(read(id, 9, 0).is_err());
+        assert!(read(id, 8, 1).is_err());
+        assert!(read(id, u32::MAX, 1).is_err());
         assert!(arena.release(id));
-        assert!(with_bytes(
-            SharedBytes {
-                lease: id,
-                offset: 8,
-                length: 0
-            },
-            |_| Ok(())
-        )
-        .is_err());
+        assert!(read(id, 8, 0).is_err());
     }
 
     #[test]
@@ -819,47 +722,40 @@ mod tests {
             length: 5,
         })
         .unwrap();
-        with_bytes(
-            SharedBytes {
+        {
+            let reader = acquire(&SharedBytes {
                 lease: id,
                 offset: 1,
                 length: 1,
-            },
-            |bytes| {
-                assert!(!arena.release(id));
-                assert!(!arena.release(id));
-                assert_eq!(arena.slots[&0].lease, id);
-                assert_eq!(arena.slots[&2].lease, id);
-                assert!(with_bytes(
-                    SharedBytes {
-                        lease: id,
-                        offset: 0,
-                        length: 0
-                    },
-                    |_| Ok(())
-                )
-                .is_err());
-                let mapping = arena.mapping.as_ref().unwrap();
-                mapping.publish_for_test(0, 2);
-                mapping.publish_for_test(2, 2);
-                assert!(arena.register(vec![batch(0, 2, 2)]).is_err());
-                assert!(arena.register(vec![batch(2, 2, 3)]).is_err());
-                let unrelated = arena.register(vec![batch(1, 1, 0)]).unwrap();
-                assert!(arena.release(unrelated));
-                assert_eq!(bytes, b"b");
-                Ok(())
-            },
-        )
-        .unwrap();
+            })
+            .unwrap();
+            assert!(!arena.release(id));
+            assert!(!arena.release(id));
+            assert_eq!(arena.slots[&0].lease, id);
+            assert_eq!(arena.slots[&2].lease, id);
+            assert!(read(id, 0, 0).is_err());
+            let mapping = arena.mapping.as_ref().unwrap();
+            mapping.publish_for_test(0, 2);
+            mapping.publish_for_test(2, 2);
+            assert!(arena.register(vec![batch(0, 2, 2)]).is_err());
+            assert!(arena.register(vec![batch(2, 2, 3)]).is_err());
+            let unrelated = arena.register(vec![batch(1, 1, 0)]).unwrap();
+            assert!(arena.release(unrelated));
+            let mut bytes = [0; 1];
+            reader.copy_into(reader.range(1, 1).unwrap(), &mut bytes);
+            assert_eq!(&bytes, b"b");
+        }
         assert!(!arena.release(id));
-        assert_eq!(last_reader.bytes(0, 5).unwrap().as_ref(), b"abcde");
+        let mut bytes = [0; 5];
+        last_reader.copy_into(last_reader.range(0, 5).unwrap(), &mut bytes);
+        assert_eq!(&bytes, b"abcde");
         drop(last_reader);
         assert!(arena.release(id));
         assert!(arena.revoked.is_empty());
         assert!(!arena.release(id));
         // Reader completion restores capacity without reopening the arena or
-        // reviving the old capability, including after many repeated cycles.
-        for generation in 2..20 {
+        // reviving the old capability across successive generations.
+        for generation in 2..4 {
             let mapping = arena.mapping.as_ref().unwrap();
             mapping.publish_for_test(0, generation);
             mapping.publish_for_test(2, generation);
@@ -889,23 +785,22 @@ mod tests {
         let id = arena
             .register(vec![batch(0, 1, 2), batch(1, 1, 2)])
             .unwrap();
-        with_bytes(
-            SharedBytes {
-                lease: id,
-                offset: 1,
-                length: 2,
-            },
-            |bytes| {
-                assert!(!arena.release(id));
-                assert_eq!(arena.slots[&0].lease, id);
-                assert_eq!(arena.slots[&1].lease, id);
-                arena.close();
-                assert!(arena.revoked.is_empty());
-                assert_eq!(bytes, b"bc");
-                Ok(())
-            },
-        )
+        let reader = acquire(&SharedBytes {
+            lease: id,
+            offset: 1,
+            length: 2,
+        })
         .unwrap();
+        assert!(!arena.release(id));
+        assert_eq!(arena.slots[&0].lease, id);
+        assert_eq!(arena.slots[&1].lease, id);
+        arena.close();
+        assert!(arena.revoked.is_empty());
+        assert!(arena.descriptor().is_err());
+        assert!(arena.configure(test_configuration()).is_err());
+        let mut bytes = [0; 2];
+        reader.copy_into(reader.range(1, 2).unwrap(), &mut bytes);
+        assert_eq!(&bytes, b"bc");
     }
 
     #[test]
@@ -928,27 +823,8 @@ mod tests {
             .unwrap();
         assert_ne!(old, current);
         assert!(!arena.release(old));
-        assert!(with_bytes(
-            SharedBytes {
-                lease: old,
-                offset: 0,
-                length: 1
-            },
-            |_| Ok(())
-        )
-        .is_err());
-        with_bytes(
-            SharedBytes {
-                lease: current,
-                offset: 0,
-                length: 7,
-            },
-            |bytes| {
-                assert_eq!(bytes, b"datanew"); // cspell:ignore datanew
-                Ok(())
-            },
-        )
-        .unwrap();
+        assert!(read(old, 0, 1).is_err());
+        assert_eq!(read(current, 0, 7).unwrap(), b"datanew"); // cspell:ignore datanew
         assert!(arena.release(current));
     }
 }

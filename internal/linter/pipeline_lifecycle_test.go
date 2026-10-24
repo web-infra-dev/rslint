@@ -100,14 +100,14 @@ func TestPipelineReclaimsCompletedProgramWhileOtherConsumersRun(t *testing.T) {
 						result, err := RunPipeline(context.Background(), NewLintRequest(provider, ObservationPolicy{
 							Plugin: mode,
 							Demand: ArtifactDemand{Native: demand, Plugin: demand},
-						}, func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+						}, EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 							close(pluginStarted)
 							<-resume
 							return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
 								FilePath:    request.Files[0].Path,
 								Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/check", Message: "plugin", StartPos: 6, EndPos: 11}},
 							}}}, nil
-						}))
+						})))
 						done <- outcome{result, err}
 					}()
 					startedConsumers := []<-chan struct{}{otherStarted}
@@ -258,7 +258,7 @@ func TestConcurrentPipelineJoinsPluginBatchesBeforeReleaseOnPanic(t *testing.T) 
 				releases.Add(1)
 			}),
 			ObservationPolicy{PluginFailure: PluginKeepPartialWithSynthetic},
-			func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 				if _, waiting := request.Rules["plugin/wait"]; waiting {
 					close(waitStarted)
 					<-resume
@@ -271,7 +271,7 @@ func TestConcurrentPipelineJoinsPluginBatchesBeforeReleaseOnPanic(t *testing.T) 
 				<-waitStarted
 				close(panicTriggered)
 				panic(marker)
-			},
+			}),
 		))
 		done <- outcome{result, err}
 	}()
@@ -447,7 +447,7 @@ func TestPipelinePublishesTextDiagnosticSources(t *testing.T) {
 			original := generation.Native.Programs[0].SourceFiles()[0]
 			var releases int
 			provider := pipelineTestProvider(generation, func() { releases++ })
-			dispatch := func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			dispatch := EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 				if mode != PluginConcurrentJoined && releases != 1 {
 					t.Fatalf("detached dispatch preceded generation release: %d", releases)
 				}
@@ -455,7 +455,7 @@ func TestPipelinePublishesTextDiagnosticSources(t *testing.T) {
 					FilePath:    request.Files[0].Path,
 					Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/check", Message: "plugin", StartPos: 6, EndPos: 11}},
 				}}}, nil
-			}
+			})
 			var result PipelineResult
 			var err error
 			var pluginDiagnostics []rule.RuleDiagnostic
@@ -737,12 +737,12 @@ func TestPipelineAfterNativeReleasesBeforePluginDispatch(t *testing.T) {
 			Plugin:        PluginAfterNativeJoined,
 			PluginFailure: PluginDiscardOnFailure,
 		},
-		func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			if releases.Load() != 1 {
 				t.Fatalf("release count at plugin dispatch = %d, want 1", releases.Load())
 			}
 			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: request.Files[0].Path}}}, nil
-		},
+		}),
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -785,10 +785,10 @@ func TestProgressivePluginRunIsFrozenAndSingleUse(t *testing.T) {
 	settings["value"] = "mutated"
 	options[0].(map[string]any)["choice"] = "mutated"
 	var request EslintPluginLintRequest
-	outcome, err := presentation.run(context.Background(), func(_ context.Context, got EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+	outcome, err := presentation.run(context.Background(), EslintPluginDispatchFunc(func(_ context.Context, got EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		request = got
 		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: got.Files[0].Path}}}, nil
-	})
+	}))
 	if err != nil || outcome.DispatchError != nil {
 		t.Fatalf("work errors = %v/%v", err, outcome.DispatchError)
 	}
@@ -797,9 +797,9 @@ func TestProgressivePluginRunIsFrozenAndSingleUse(t *testing.T) {
 		len(frozenOptions) != 1 || frozenOptions[0].(map[string]any)["choice"] != "frozen" {
 		t.Fatalf("deferred request retained mutable config: %+v", request)
 	}
-	if _, err := presentation.run(context.Background(), func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+	if _, err := presentation.run(context.Background(), EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return &EslintPluginLintResult{}, nil
-	}); !errors.Is(err, ErrDeferredPluginRunAlreadyInvoked) {
+	})); !errors.Is(err, ErrDeferredPluginRunAlreadyInvoked) {
 		t.Fatalf("second run error = %v, want ErrDeferredPluginRunAlreadyInvoked", err)
 	}
 }
@@ -840,12 +840,12 @@ func TestConcurrentPipelineCancelsAndJoinsPluginBeforeReleaseOnNativePanic(t *te
 				releases.Add(1)
 			}),
 			ObservationPolicy{Plugin: PluginConcurrentJoined},
-			func(pluginCtx context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			EslintPluginDispatchFunc(func(pluginCtx context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 				close(pluginStarted)
 				<-pluginCtx.Done()
 				close(pluginStopped)
 				return nil, pluginCtx.Err()
-			},
+			}),
 		))
 	}()
 	if recovered == nil || releases.Load() != 1 {

@@ -588,7 +588,6 @@ export class Rslint {
 
     return {
       handlers: {
-        pluginLintAttachments: true,
         loadConfigs: async (request) => {
           const response = await configHost.loadConfigs(request);
           transactions.add(request.transactionId);
