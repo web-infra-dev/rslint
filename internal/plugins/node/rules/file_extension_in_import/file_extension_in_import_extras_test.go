@@ -2,23 +2,29 @@
 package file_extension_in_import
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/iovfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // Additional syntax and filesystem cases checked against eslint-plugin-n v18.3.0.
@@ -281,6 +287,116 @@ func TestFileExtensionInImportSymlinks(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestFileExtensionInImportFrozenDirectory(t *testing.T) {
+	for _, redirect := range []bool{false, true} {
+		for _, ambiguous := range []bool{false, true} {
+			t.Run("redirect="+strconv.FormatBool(redirect)+"/ambiguous="+strconv.FormatBool(ambiguous), func(t *testing.T) {
+				root := tspath.NormalizePath(t.TempDir())
+				directory := tspath.CombinePaths(root, "original")
+				replacement := tspath.CombinePaths(root, "replacement")
+				alias := tspath.CombinePaths(root, "alias")
+				for _, path := range []string{directory, replacement} {
+					if err := os.Mkdir(path, 0o700); err != nil {
+						t.Fatal(err)
+					}
+				}
+				code := `import './a.js';`
+				if ambiguous {
+					code = `import './a.json';`
+					if err := os.Symlink("missing", tspath.CombinePaths(directory, "a.json")); err != nil {
+						if filepath.Separator == '\\' {
+							t.Skipf("symlinks unavailable: %v", err)
+						}
+						t.Fatal(err)
+					}
+				}
+				for name, content := range map[string]string{"entry.js": code, "a.js": "export {};"} {
+					if err := os.WriteFile(tspath.CombinePaths(directory, name), []byte(content), 0o600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := os.Symlink(directory, alias); err != nil {
+					if filepath.Separator == '\\' {
+						t.Skipf("symlinks unavailable: %v", err)
+					}
+					t.Fatal(err)
+				}
+				base := bundled.WrapFS(osvfs.FS())
+				spaces := rslintconfig.NewPathSpaceSnapshot(map[string]rslintconfig.RslintConfig{alias: {}}, base)
+				frozen, err := loader.WithFrozenIO(base, spaces, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if redirect {
+					if err := os.Remove(alias); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Symlink(replacement, alias); err != nil {
+						t.Fatal(err)
+					}
+				}
+				filename := tspath.CombinePaths(alias, "entry.js")
+				p, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+					Host: utils.CreateCompilerHost(alias, frozen), CompilerOptions: &core.CompilerOptions{},
+					RootFileNames: []string{filename}, SingleThreaded: true,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				var diagnostics []rule.RuleDiagnostic
+				linter.LintSingleFile(linter.LintSingleFileOptions{
+					Program: p, File: filename,
+					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						return []rule.ConfiguredRule{{Name: FileExtensionInImportRule.Name, Severity: rule.SeverityError,
+							Run: func(ctx rule.RuleContext) rule.RuleListeners {
+								return FileExtensionInImportRule.Run(ctx, []any{"never"})
+							},
+						}}
+					},
+					Consumer: rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},
+				})
+				if len(diagnostics) != 1 || diagnostics[0].Message.Id != "forbidExt" {
+					t.Fatalf("unexpected diagnostics: %#v", diagnostics)
+				}
+				fixes := diagnostics[0].FixesPtr
+				if ambiguous {
+					if fixes != nil {
+						t.Fatalf("must not remove an extension with a broken sibling: %+v", *fixes)
+					}
+				} else {
+					if fixes == nil || len(*fixes) != 1 {
+						t.Fatalf("expected one safe extension removal, got %v", fixes)
+					}
+					fix := (*fixes)[0]
+					if output := code[:fix.Range.Pos()] + fix.Text + code[fix.Range.End():]; output != `import './a';` {
+						t.Fatalf("unexpected fixed source: %s", output)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestFileExtensionInImportIncompleteVirtualDirectory(t *testing.T) {
+	directory := tspath.NormalizePath(t.TempDir())
+	prefix := strings.TrimPrefix(directory, "/") + "/"
+	files := fstest.MapFS{
+		prefix + "tsconfig.json": {Data: []byte(`{"compilerOptions":{"allowJs":true},"include":["*.js"]}`)},
+		prefix + "a.js":          {Data: []byte("export {};")},
+		prefix + "a.json":        {Mode: fs.ModeNamedPipe},
+	}
+	root := rule_tester.Root{Dir: directory, FS: bundled.WrapFS(iovfs.From(files, pathutil.CaseSensitivity(true)))}
+	// Accessible entries omit the pipe, so the apparent single candidate cannot
+	// authorize a removal. Adding a known extension does not need that guarantee.
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &FileExtensionInImportRule, nil, []rule_tester.InvalidTestCase{{
+		Code: `import './a.js'`, FileName: "input.js", Options: []any{"never"},
+		Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 16}},
+	}, {
+		Code: `import './a'`, FileName: "input.js", Output: []string{`import './a.js'`},
+		Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireExt", Message: "require file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 13}},
+	}})
 }
 
 func TestFileExtensionInImportEditDemand(t *testing.T) {

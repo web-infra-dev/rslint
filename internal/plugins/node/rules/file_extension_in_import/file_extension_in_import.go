@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -34,43 +35,60 @@ func extension(name string) string {
 
 type directoryEntriesKey string
 
-func existingExtensions(p *program.Program, filePath, basename string) []string {
+type directoryEntries struct {
+	names    []string
+	complete bool
+}
+
+func hostDirectoryNames(fs vfs.FS, directory string) ([]string, bool) {
+	// Stat through the Program first to preserve its path mapping and network
+	// rejection. Accessible entries alone may omit broken links or special files.
+	info := fs.Stat(pathutil.Path(directory))
+	if info == nil || info.Sys() == nil {
+		return nil, false
+	}
+	handle, err := os.Open(fs.Realpath(pathutil.Path(directory)).AsString())
+	if err != nil {
+		return nil, false
+	}
+	defer handle.Close()
+	hostInfo, err := handle.Stat()
+	if err != nil || !os.SameFile(info, hostInfo) {
+		return nil, false
+	}
+	// Validate and enumerate the same opened directory, even if its alias moves.
+	names, err := handle.Readdirnames(-1)
+	return names, err == nil
+}
+
+func existingExtensions(p *program.Program, filePath, basename string) ([]string, bool) {
 	directory := filepath.Dir(filePath)
 	if filepath.Separator == '/' && strings.Contains(directory, `\`) {
-		return nil
+		return nil, false
 	}
+
 	directory = tspath.NormalizePath(directory)
-	names := program.Cached(p, directoryEntriesKey(directory), func() []string {
+	entries := program.Cached(p, directoryEntriesKey(directory), func() directoryEntries {
 		fs := p.FS()
 		entries := fs.GetAccessibleEntries(pathutil.Directory(directory))
 		names := append(slices.Clone(entries.Files), entries.Directories...)
-		// The compiler's directory entries and WalkDir now omit broken links
-		// and special files. For an actual host directory, retain those names
-		// when deciding whether removing an extension would be ambiguous.
-		// Require matching filesystem identity so virtual directories cannot
-		// accidentally pick up unrelated host entries. The VFS stat happens
-		// first and preserves the OS VFS's network-path rejection.
-		if info := fs.Stat(pathutil.Path(directory)); info != nil && info.Sys() != nil {
-			if hostInfo, err := os.Stat(directory); err == nil && os.SameFile(info, hostInfo) {
-				entries, _ := os.ReadDir(directory)
-				for _, entry := range entries {
-					names = append(names, entry.Name())
-				}
-			}
+		hostNames, complete := hostDirectoryNames(fs, directory)
+		if complete {
+			names = append(names, hostNames...)
 		}
 		slices.Sort(names)
-		return slices.Compact(names)
+		return directoryEntries{names: slices.Compact(names), complete: complete}
 	})
 	prefix := basename + "."
-	start, _ := slices.BinarySearch(names, prefix)
+	start, _ := slices.BinarySearch(entries.names, prefix)
 	var extensions []string
-	for _, name := range names[start:] {
+	for _, name := range entries.names[start:] {
 		if !strings.HasPrefix(name, prefix) {
 			break
 		}
 		extensions = append(extensions, extension(name))
 	}
-	return extensions
+	return extensions, entries.complete
 }
 
 func preferredExtension(existing, preferred []string) string {
@@ -133,13 +151,15 @@ var FileExtensionInImportRule = rule.Rule{
 			if actualExt != "" && (!canProbe || !fs.FileExists(pathutil.File(normalizedPath))) {
 				// A fallback such as utils.client may actually name utils.client.ts.
 				basename := filepath.Base(name)
-				if found := preferredExtension(existingExtensions(p, filePath, basename), resolution.Extensions); found != "" {
+				existing, _ := existingExtensions(p, filePath, basename)
+				if found := preferredExtension(existing, resolution.Extensions); found != "" {
 					actualExt = found
 				}
 			}
 			isDirectory := false
 			if canProbe && fs.DirectoryExists(pathutil.Directory(normalizedPath)) {
-				if found := preferredExtension(existingExtensions(p, filepath.Join(filePath, "index"), "index"), resolution.Extensions); found != "" {
+				existing, _ := existingExtensions(p, filepath.Join(filePath, "index"), "index")
+				if found := preferredExtension(existing, resolution.Extensions); found != "" {
 					isDirectory = true
 					actualExt = found
 				}
@@ -196,7 +216,8 @@ var FileExtensionInImportRule = rule.Rule{
 						return nil
 					}
 					basename := strings.TrimSuffix(filepath.Base(filePath), extension(filePath))
-					if len(existingExtensions(p, filePath, basename)) != 1 {
+					existing, complete := existingExtensions(p, filePath, basename)
+					if !complete || len(existing) != 1 {
 						return nil
 					}
 					span := utils.TrimNodeTextRange(ctx.SourceFile, source)
