@@ -14,6 +14,25 @@ import (
 //go:embed no_misused_promises.schema.json
 var schemaJSON []byte
 
+// Unknown expressions, spreads and assertions keep the callee-first path.
+// These literal forms usually make checking the arguments cheaper instead.
+func preferArgumentTypeCheck(arguments []*ast.Node) bool {
+	for _, argument := range arguments {
+		argument = ast.SkipParentheses(argument)
+		switch argument.Kind {
+		case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
+			ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
+			ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression,
+			ast.KindObjectLiteralExpression, ast.KindVoidExpression,
+			ast.KindTypeOfExpression, ast.KindDeleteExpression:
+			continue
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 func buildConditionalMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "conditional",
@@ -524,6 +543,20 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 		checkArguments := func(
 			node *ast.Expression,
 		) {
+			if preferArgumentTypeCheck(node.Arguments()) {
+				// Literal forms are usually non-callable, but global primitive
+				// augmentation can add signatures. The checker remains authoritative.
+				possible := false
+				for _, argument := range node.Arguments() {
+					if returnsThenable(argument) {
+						possible = true
+						break
+					}
+				}
+				if !possible {
+					return
+				}
+			}
 			if isPromiseFinallyMethod(node) {
 				return
 			}

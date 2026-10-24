@@ -438,6 +438,27 @@ func TestDirectoryBlockMatcherCachesLexicalDirectory(t *testing.T) {
 	}
 }
 
+func TestIsDirAbsolutelyBlockedAboveFloor(t *testing.T) {
+	for _, test := range []struct {
+		patterns []string
+		floor    int
+		want     bool
+	}{
+		{[]string{"unrelated", "a"}, 0, true},
+		{[]string{"unrelated", "a"}, 1, false},
+		{[]string{"unrelated", "a/b"}, 1, true},
+		{[]string{"unrelated", "a/b"}, 2, false},
+		{[]string{"unrelated", "a/b/c"}, 2, true},
+		{[]string{"unrelated", "a/b/c"}, 3, false},
+		{[]string{"!a/**", "a/**/*"}, 0, false},
+		{[]string{"unrelated", "a/b", "!a/b/c"}, 1, true},
+	} {
+		if got := isDirAbsolutelyBlockedAboveFloor("a/b/c", ParseIgnorePatterns(test.patterns), test.floor); got != test.want {
+			t.Errorf("patterns=%v floor=%d: got %v, want %v", test.patterns, test.floor, got, test.want)
+		}
+	}
+}
+
 // --- Unit: segPrefixEither / negReach.overlaps segment boundary ---
 // overlaps drives the negation-aware half of canPruneDir. Its correctness hinges
 // on segPrefixEither being SEGMENT-anchored (bidirectional): a negation target

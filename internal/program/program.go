@@ -388,7 +388,7 @@ func packageNamesFromResolutions(
 func (b *compilerBackend) sourceFiles() []*ast.SourceFile { return b.raw.SourceFiles() }
 func (b *compilerBackend) rootFileNames() []string        { return b.raw.CommandLine().FileNames() }
 func (b *compilerBackend) ownsSourceFile(file *ast.SourceFile) bool {
-	return b.raw.GetSourceFile(file.FileName()) == file
+	return b.raw.GetSourceFileByPath(file.Path()) == file
 }
 func (b *compilerBackend) compilerOptions() *core.CompilerOptions { return b.raw.Options() }
 func (b *compilerBackend) fileSystem() vfs.FS                     { return b.raw.Host().FS() }

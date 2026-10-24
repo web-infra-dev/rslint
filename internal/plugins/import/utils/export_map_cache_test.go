@@ -1,13 +1,16 @@
 package utils_test
 
 import (
+	"fmt"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
@@ -16,6 +19,102 @@ import (
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
+
+func TestExportQueriesAreConservativeAcrossCycles(t *testing.T) {
+	files := make(map[string]string)
+	entries := make([]string, 24)
+	for i := range entries {
+		entries[i] = fmt.Sprintf("query-consumer-%d.ts", i)
+		files[entries[i]] = fmt.Sprintf("import * as value from './query-graph-%d';", i)
+		files[fmt.Sprintf("query-graph-%d.ts", i)] = fmt.Sprintf(`
+export const name%d = 1;
+export * from './query-graph-%d';
+export { nested as renamed } from './query-graph-%d';
+import * as local from './query-graph-%d';
+export { local as nested };
+export default local;
+export { missing as broken } from './query-missing';
+`, i%7, (i+1)%24, (i*7+3)%24, (i+5)%24)
+	}
+	contexts := contextsForFiles(t, files, entries...)
+	names := []string{"name0", "name1", "name2", "name3", "name4", "name5", "name6", "nested", "renamed", "default", "broken", "absent"}
+	for _, ctx := range contexts {
+		request := modules.SourceFromSpecifier(firstImportSpecifier(t, ctx.SourceFile))
+		exports, ok := import_utils.GetExportMap(ctx, request)
+		if !ok {
+			t.Fatalf("missing export map for %s", ctx.SourceFile.FileName())
+		}
+		for _, name := range names {
+			meta := exports.Get(name)
+			if meta != nil && !import_utils.MayHaveExport(ctx, request, name) {
+				t.Errorf("%s: filtered declared export %q", ctx.SourceFile.FileName(), name)
+			}
+			if meta != nil && meta.Namespace != nil && !import_utils.MayHaveNamespaceExport(ctx, request, name) {
+				t.Errorf("%s: filtered namespace metadata for %q", ctx.SourceFile.FileName(), name)
+			}
+		}
+		if import_utils.MayHaveExport(ctx, request, "absent") || import_utils.MayHaveNamespaceExport(ctx, request, "absent") {
+			t.Errorf("%s: failed to exclude an absent export", ctx.SourceFile.FileName())
+		}
+	}
+	unknown := contextsForFiles(t, map[string]string{
+		"query-unknown-entry.ts": `import * as value from './query-unknown';`,
+		"query-unknown.ts":       `export * from './query-missing';`,
+	}, "query-unknown-entry.ts")[0]
+	source := modules.SourceFromSpecifier(firstImportSpecifier(t, unknown.SourceFile))
+	if !import_utils.MayHaveExport(unknown, source, "anything") || !import_utils.MayHaveNamespaceExport(unknown, source, "anything") {
+		t.Fatal("unresolved star must retain the complete export-map query")
+	}
+}
+
+func TestExportSyntaxRebindsSharedSourceFiles(t *testing.T) {
+	root := fixtures.GetRootDir()
+	entry := tspath.ResolvePath(root.Dir, "syntax-entry.ts")
+	barrel := tspath.ResolvePath(root.Dir, "syntax-barrel.ts")
+	cache := rslint_utils.NewParseCache()
+	build := func(name, barrelText string) (*compiler.Program, rule.RuleContext) {
+		fs := rslint_utils.NewOverlayVFS(root.FS, map[string]string{
+			entry:  `import * as all from "./syntax-barrel";`,
+			barrel: barrelText,
+			tspath.ResolvePath(root.Dir, "syntax-target.ts"): "export const " + name + " = 1;",
+		})
+		host := rslint_utils.WithParseCache(rslint_utils.CreateCompilerHost(root.Dir, fs), cache)
+		raw, err := rslint_utils.CreateProgramFromOptions(true, &core.CompilerOptions{NoLib: core.TSTrue}, []string{entry}, host)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return raw, (rule.RuleContext{SourceFile: raw.GetSourceFile(entry)}).WithProgram(lintprogram.NewFromCompiler(raw))
+	}
+	first, firstCtx := build("first", `export * from "./syntax-target";`)
+	second, secondCtx := build("second", `export * from "./syntax-target";`)
+	if first.GetSourceFile(barrel) != second.GetSourceFile(barrel) {
+		t.Fatal("fixture did not reuse the exact barrel SourceFile")
+	}
+	var group sync.WaitGroup
+	for range 4 {
+		for _, test := range []struct {
+			ctx             rule.RuleContext
+			present, absent string
+		}{{firstCtx, "first", "second"}, {secondCtx, "second", "first"}} {
+			group.Go(func() {
+				source := modules.SourceFromSpecifier(firstImportSpecifier(t, test.ctx.SourceFile))
+				exports, ok := import_utils.GetExportMap(test.ctx, source)
+				if !ok || !exports.Has(test.present) || exports.Has(test.absent) {
+					t.Errorf("shared syntax leaked Program resolution for %s", test.present)
+				}
+			})
+		}
+	}
+	group.Wait()
+	replaced, replacedCtx := build("second", `export { second as renamed } from "./syntax-target";`)
+	if replaced.GetSourceFile(barrel) == first.GetSourceFile(barrel) {
+		t.Fatal("changed syntax retained the previous SourceFile")
+	}
+	exports, ok := import_utils.GetExportMap(replacedCtx, modules.SourceFromSpecifier(firstImportSpecifier(t, replacedCtx.SourceFile)))
+	if !ok || !exports.Has("renamed") || exports.Has("first") || exports.Has("second") {
+		t.Fatal("replaced SourceFile reused stale export syntax")
+	}
+}
 
 // exportMapNames is the set of names a map exposes, in a form tests can
 // compare. Only names matter here; the metadata is covered elsewhere.
@@ -231,6 +330,7 @@ func TestIndexReleasesItsProgram(t *testing.T) {
 		if _, ok := import_utils.GetExportMap(contexts[0], modules.SourceFromSpecifier(firstImportSpecifier(t, contexts[0].SourceFile))); !ok {
 			t.Fatal("GetExportMap returned no map for the fixture")
 		}
+		import_utils.MayHaveExport(contexts[0], modules.SourceFromSpecifier(firstImportSpecifier(t, contexts[0].SourceFile)), "absent")
 	}()
 
 	// Cleanups run on a collection and then on their own goroutine, so the

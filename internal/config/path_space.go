@@ -1,6 +1,8 @@
 package config
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -352,6 +354,20 @@ func hasDistinctFileIdentityWithCanonicalParent(
 // RelativePathWithinConfigRoot returns filePath relative to configDir when it
 // is inside the config's lexical path space.
 func RelativePathWithinConfigRoot(filePath string, configDir string, useCaseSensitive bool) (string, bool) {
+	// Exact, normalized POSIX prefixes preserve relative spelling even for a
+	// case-insensitive comparison. Other spellings retain ts-go's path semantics.
+	if strings.HasPrefix(filePath, "/") && strings.HasPrefix(configDir, "/") &&
+		!strings.ContainsAny(filePath, "\\") && !strings.ContainsAny(configDir, "\\") &&
+		!strings.Contains(filePath, "/.") && !strings.Contains(configDir, "/.") &&
+		!strings.Contains(filePath, "//") && !strings.Contains(configDir, "//") &&
+		!strings.HasSuffix(filePath, "/") && !strings.HasSuffix(configDir, "/") {
+		if filePath == configDir {
+			return "", true
+		}
+		if len(filePath) > len(configDir) && strings.HasPrefix(filePath, configDir) && filePath[len(configDir)] == '/' {
+			return filePath[len(configDir)+1:], true
+		}
+	}
 	filePath = utils.NormalizeAbsoluteDrive(filePath)
 	configDir = utils.NormalizeAbsoluteDrive(configDir)
 	options := tspath.ComparePathsOptions{

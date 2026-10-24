@@ -68,6 +68,7 @@ type nameReplacements struct {
 	classVariablesByID     map[*ast.Node][]*scope.Variable
 	unresolvedScopesByName map[string][]*scope.Scope
 	localeComparer         *ecmascript.LocaleComparer
+	mayHaveJSDocParameter  bool
 }
 
 type preparedOptionsCacheKey struct{ encoded string }
@@ -92,6 +93,7 @@ var NameReplacementsRule = rule.Rule{
 			opts:                   opts,
 			generatedNamesByScope:  make(map[*scope.Scope]map[string]struct{}),
 			reportedPropertyRanges: make(map[core.TextRange]struct{}),
+			mayHaveJSDocParameter:  strings.Contains(ctx.SourceFile.Text(), "@param"),
 		}
 
 		state.checkFilename()
@@ -635,7 +637,7 @@ func (r *nameReplacements) checkVariable(variable *scope.Variable, declarations 
 	message := replacementMessage(variable.ID.Text(), replacements, "variable")
 	reportRange := utils.GetESTreeBindingIdentifierRange(r.ctx.SourceFile, variable.ID)
 	canRename := r.canRename(variable, variables, references)
-	canFixParameter := r.canFixParameter(variable)
+	canFixParameter := canRename && r.canFixParameter(variable)
 	if replacements.total == 1 && canRename && canFixParameter {
 		replacement := replacements.samples[0]
 		for _, currentScope := range scopes {
@@ -897,6 +899,9 @@ func (r *nameReplacements) canFixParameter(variable *scope.Variable) bool {
 }
 
 func (r *nameReplacements) hasAttachedJSDocParameterComment(function *ast.Node) bool {
+	if !r.mayHaveJSDocParameter {
+		return false
+	}
 	candidate := function
 	var comment *ast.CommentRange
 	for candidate != nil {
@@ -933,8 +938,11 @@ func (r *nameReplacements) previousSourceItem(node *ast.Node) (*ast.CommentRange
 	if commentIndex > 0 {
 		comment = comments[commentIndex-1]
 	}
+	if comment == nil {
+		return nil, false
+	}
 	token, hasToken := utils.TokenBeforePosition(r.ctx.SourceFile, start)
-	if comment != nil && (!hasToken || comment.End() > token.End) {
+	if !hasToken || comment.End() > token.End {
 		return comment, true
 	}
 	return nil, false

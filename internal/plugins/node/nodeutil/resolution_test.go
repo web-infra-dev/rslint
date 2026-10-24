@@ -30,6 +30,24 @@ func programForResolution(t *testing.T, files map[string]string, fileName string
 	return programForResolutionFS(t, files, fileName, osvfs.FS())
 }
 
+func TestResolverCachePreservesRecursiveErrorIdentity(t *testing.T) {
+	files := map[string]string{
+		"/cycle/package.json":  `{"browser":{"x":"y","y":"x"}}`,
+		"/cycle/ordinary.js":   "export {};",
+		"/cycle/__import__.js": "export {};",
+	}
+	p := programForResolution(t, files, "/cycle/ordinary.js")
+	options := moduleresolver.Options{AliasFields: [][]string{{"browser"}}}
+	for _, test := range []struct{ file, message string }{
+		{"/cycle/ordinary.js", "Recursive alias while resolving 'y'"},
+		{"/cycle/__import__.js", "Recursive alias while resolving 'x'"},
+	} {
+		if got := moduleresolver.Resolve(p, "x", test.file, options); got.Path != "" || got.Error != test.message {
+			t.Errorf("resolve from %s = %+v, want %s", test.file, got, test.message)
+		}
+	}
+}
+
 func programForResolutionFS(t *testing.T, files map[string]string, fileName string, base vfs.FS) *program.Program {
 	t.Helper()
 	fs := utils.NewOverlayVFS(bundled.WrapFS(base), maps.Clone(files))

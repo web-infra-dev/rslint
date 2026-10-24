@@ -31,6 +31,9 @@ var NoNamedAsDefaultMemberRule = rule.Rule{
 			if declaration.ImportClause == nil || declaration.ImportClause.Name() == nil {
 				continue
 			}
+			if !import_utils.MemberReceiverNames(ctx)[declaration.ImportClause.Name().Text()] {
+				continue
+			}
 			source := modules.SourceFromSpecifier(declaration.ModuleSpecifier)
 			if import_utils.HasCommonJSNamespaceDefault(ctx, source) {
 				continue
