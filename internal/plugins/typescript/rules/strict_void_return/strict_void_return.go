@@ -373,7 +373,7 @@ var StrictVoidReturnRule = rule.CreateRule(rule.Rule{
 			if heritageClauses == nil {
 				return
 			}
-			memberName := memberSymbol.Name
+			memberName := memberSymbol.Name()
 			for _, clause := range heritageClauses.Nodes {
 				for _, baseTypeNode := range clause.AsHeritageClause().Types.Nodes {
 					baseType := ctx.TypeChecker.GetTypeAtLocation(baseTypeNode)

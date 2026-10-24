@@ -17,6 +17,7 @@ import (
 	api "github.com/web-infra-dev/rslint/internal/api"
 	"github.com/web-infra-dev/rslint/internal/inspector"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // programCache holds a cached Program instance for AST info requests
@@ -71,7 +72,7 @@ func (h *Handler) HandleGetAstInfo(req api.GetAstInfoRequest) (*api.GetAstInfoRe
 	// Otherwise, query the user's source file
 	var targetSourceFile *ast.SourceFile
 	if req.FileName != "" && req.FileName != userFileName {
-		targetSourceFile = program.GetSourceFile(req.FileName)
+		targetSourceFile = program.GetSourceFile(tspath.ToRootedFilePath(req.FileName, program.GetCurrentDirectory()))
 		if targetSourceFile == nil {
 			return &api.GetAstInfoResponse{}, nil
 		}
@@ -180,7 +181,7 @@ func createAndCacheProgram(fileName, fileContent, compilerOptionsJSON string, co
 	}
 
 	// Get the source file
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(pathutil.File(fileName))
 	if sourceFile == nil {
 		return nil, nil, errors.New("failed to get source file")
 	}

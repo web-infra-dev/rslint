@@ -59,7 +59,7 @@ func (reference ModuleReference) Text() string {
 // nowhere.
 func (reference ModuleReference) Path() string {
 	if reference.Target != nil {
-		return reference.Target.FileName()
+		return reference.Target.FileName().AsString()
 	}
 	return reference.ResolvedPath
 }

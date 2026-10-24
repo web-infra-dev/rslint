@@ -559,7 +559,7 @@ func TestNoAbsolutePathIgnoreSchema(t *testing.T) {
 }
 
 func TestNoAbsolutePathEditDemand(t *testing.T) {
-	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/foo/bar/index.js", Path: "/foo/bar/index.js"}, `import value from "/foo/bar/.\ud800";`, core.ScriptKindJS)
+	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/foo/bar/index.js", PathKey: "/foo/bar/index.js"}, `import value from "/foo/bar/.\ud800";`, core.ScriptKindJS)
 	r := &NoAbsolutePathRule
 	var all rule.RuleDiagnostic
 	for _, demand := range []rule.EditDemand{rule.EditDemandAll, rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion} {
@@ -596,7 +596,7 @@ func TestNoAbsolutePathEditDemand(t *testing.T) {
 }
 
 func TestNoAbsolutePathHostPaths(t *testing.T) {
-	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/host.js", Path: "/host.js"}, `import "C:/foo"; import "\\\\server\\share"; import "\\foo"; import "C:foo";`, core.ScriptKindJS)
+	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/host.js", PathKey: "/host.js"}, `import "C:/foo"; import "\\\\server\\share"; import "\\foo"; import "C:foo";`, core.ScriptKindJS)
 	count := 0
 	r := &NoAbsolutePathRule
 	ctx := (rule.RuleContext{SourceFile: file}).WithDiagnosticConsumer(r.Name, rule.SeverityError, rule.DiagnosticConsumer{
@@ -655,7 +655,7 @@ func TestQuoteModulePath(t *testing.T) {
 		if !ok || !utf8.ValidString(text) {
 			t.Fatalf("code units %x produced an invalid source string %q", units, text)
 		}
-		file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/quoted.js", Path: "/quoted.js"}, text, core.ScriptKindJS)
+		file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/quoted.js", PathKey: "/quoted.js"}, text, core.ScriptKindJS)
 		value := file.Statements.Nodes[0].AsExpressionStatement().Expression.Text()
 		if got := ecmascript.StringCodeUnits(value); !reflect.DeepEqual(got, units) {
 			t.Errorf("quoted %x as %s, parsed back as %x", units, text, got)

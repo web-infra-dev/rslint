@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type importResolver struct {
@@ -98,10 +99,10 @@ func (r *ImportResolver) ResolveName(name string, source modules.Source) (string
 			if !resolver.options.PreserveSymlinks {
 				// Node resolves from the real importer directory as well as
 				// returning the real target when symlink preservation is off.
-				directory := r.ctx.Program().FS().Realpath(tspath.GetDirectoryPath(fileName))
-				fileName = tspath.ResolvePath(directory, tspath.GetBaseFileName(fileName))
+				directory := r.ctx.Program().FS().Realpath(pathutil.Path(tspath.GetDirectoryPath(fileName.AsString())))
+				fileName = pathutil.File(tspath.ResolvePath(directory.AsString(), tspath.GetBaseFileName(fileName.AsString())))
 			}
-			result := moduleresolver.Resolve(r.ctx.Program(), name, fileName, resolver.options)
+			result := moduleresolver.Resolve(r.ctx.Program(), name, fileName.AsString(), resolver.options)
 			if result.Error == "" {
 				return result.Path, true, ""
 			}

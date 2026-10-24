@@ -10,11 +10,11 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 const specifierCacheImporter = "/specifier-cache-fixture/importer.ts"
@@ -75,7 +75,7 @@ func TestSourceFileModuleSpecifierCacheSeparatesSourceFiles(t *testing.T) {
 	if original == edited {
 		t.Fatal("the fixture programs share one file object; the test proves nothing")
 	}
-	if original.Path() != edited.Path() {
+	if original.PathKey() != edited.PathKey() {
 		t.Fatal("the fixture files disagree on their path; the test proves nothing")
 	}
 	syntax := lintprogram.ESModuleReferences | lintprogram.CommonJSReferences
@@ -166,13 +166,13 @@ func TestSourceFileModuleSpecifierCacheReleasesReplacedAndRemovedFiles(t *testin
 		specifierCacheReferences(program, target, specifierCacheESM)
 
 		files[specifierCacheImporter] = "export const used = 1;\n"
-		changed := tspath.ToPath(
+		changed := pathutil.ToPath(
 			specifierCacheImporter,
-			program.GetCurrentDirectory(),
-			fs.UseCaseSensitiveFileNames(),
+			program.GetCurrentDirectory().AsString(),
+			fs.CaseSensitivity().IsCaseSensitive(),
 		)
 		var reused bool
-		updated, _, reused = program.UpdateProgram(changed, program.Host(), nil)
+		updated, _, reused = program.UpdateProgram(changed, program.Host(), nil, nil)
 		if updated == nil || reused {
 			t.Fatalf("the import graph change did not rebuild the program (reused=%v)", reused)
 		}
@@ -214,12 +214,12 @@ func TestCachedModuleGraphResolvesPerProgram(t *testing.T) {
 	file := specifierCacheFile(t, program)
 
 	files[specifierCacheTarget] = "export const value = 2;\n"
-	changed := tspath.ToPath(
+	changed := pathutil.ToPath(
 		specifierCacheTarget,
-		program.GetCurrentDirectory(),
-		fs.UseCaseSensitiveFileNames(),
+		program.GetCurrentDirectory().AsString(),
+		fs.CaseSensitivity().IsCaseSensitive(),
 	)
-	updated, _, reused := program.UpdateProgram(changed, program.Host(), nil)
+	updated, _, reused := program.UpdateProgram(changed, program.Host(), nil, nil)
 	if updated == nil || !reused {
 		t.Fatalf("the fixture edit did not update the program in place (reused=%v)", reused)
 	}

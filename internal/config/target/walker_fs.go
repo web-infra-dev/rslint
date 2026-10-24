@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type lintDirectoryEntry struct {
@@ -23,7 +24,7 @@ func readLintDirectory(fsys vfs.FS, directory string) []lintDirectoryEntry {
 	if fsys == nil {
 		return nil
 	}
-	accessible := fsys.GetAccessibleEntries(directory)
+	accessible := fsys.GetAccessibleEntries(pathutil.Directory(directory))
 	entries := make([]lintDirectoryEntry, 0, len(accessible.Directories)+len(accessible.Files))
 
 	parentRealPath := ""
@@ -34,11 +35,11 @@ func readLintDirectory(fsys vfs.FS, directory string) []lintDirectoryEntry {
 			_, isSymlink = accessible.Symlinks[name]
 		} else {
 			if parentRealPath == "" {
-				parentRealPath = fsys.Realpath(directory)
+				parentRealPath = fsys.Realpath(pathutil.Path(directory)).AsString()
 			}
-			realPath := fsys.Realpath(directoryPath)
+			realPath := fsys.Realpath(pathutil.Path(directoryPath))
 			expectedRealPath := tspath.CombinePaths(parentRealPath, name)
-			isSymlink = parentRealPath != "" && realPath != "" && !rslintconfig.PathsEqual(realPath, expectedRealPath, fsys.UseCaseSensitiveFileNames())
+			isSymlink = parentRealPath != "" && realPath != "" && !rslintconfig.PathsEqual(realPath.AsString(), expectedRealPath, fsys.CaseSensitivity().IsCaseSensitive())
 		}
 		if !isSymlink {
 			entries = append(entries, lintDirectoryEntry{name: name, directory: true})

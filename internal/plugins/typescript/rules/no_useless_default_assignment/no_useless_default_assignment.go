@@ -190,8 +190,8 @@ func checkParameterContextualType(ctx rule.RuleContext, paramNode *ast.Node, ini
 	// Rest parameter on the contextual side — the user's parameter resolves
 	// to the element type of an iterable, so a default value remains
 	// meaningful per element. Skip.
-	if paramSymbol.ValueDeclaration != nil && ast.IsParameterDeclaration(paramSymbol.ValueDeclaration) {
-		decl := paramSymbol.ValueDeclaration.AsParameterDeclaration()
+	if paramSymbol.ValueDeclaration() != nil && ast.IsParameterDeclaration(paramSymbol.ValueDeclaration()) {
+		decl := paramSymbol.ValueDeclaration().AsParameterDeclaration()
 		if decl.DotDotDotToken != nil {
 			return
 		}

@@ -227,7 +227,7 @@ func TestJsxOneExpressionPerLineTriviaAndSpacing(t *testing.T) {
 func TestJsxOneExpressionPerLineEditDemand(t *testing.T) {
 	for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
 		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-			FileName: "/demand.tsx", Path: "/demand.tsx",
+			FileName: "/demand.tsx", PathKey: "/demand.tsx",
 		}, "<A>{x}text  {y}</A>", core.ScriptKindTSX)
 		comments := rule.NewCommentStore(sourceFile)
 		var diagnostics []rule.RuleDiagnostic

@@ -1736,7 +1736,7 @@ func TestNoRestrictedSyntaxDispatchMatchesFullMatcher(t *testing.T) {
 
 	sourceFile := tsparser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/dispatch-attack.ts",
-		Path:     "/dispatch-attack.ts",
+		PathKey:  "/dispatch-attack.ts",
 	}, `foo; bar; function foo() {} object.foo;`, core.ScriptKindTS)
 	mc := &matchContext{sf: sourceFile}
 

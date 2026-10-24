@@ -106,7 +106,7 @@ func isStrictCallbagBasicsNamespace(ctx rule.RuleContext, node *ast.Node) bool {
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || declaration.Kind != ast.KindNamespaceImport ||
 			declaration.Parent == nil || declaration.Parent.Parent == nil ||
 			declaration.Parent.Parent.Kind != ast.KindImportDeclaration {

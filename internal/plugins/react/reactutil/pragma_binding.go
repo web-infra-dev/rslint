@@ -106,13 +106,13 @@ func isDestructuredFromPragmaSymbol(symbol *ast.Symbol, pragma, pragmaLower stri
 	// This checker-only fallback has no reference scope with which to model
 	// ESLint's definitions. Preserve the declaration order supplied by the
 	// checker instead of comparing Pos values from potentially different files.
-	for i := len(symbol.Declarations) - 1; i >= 0; i-- {
-		if declaration := symbol.Declarations[i]; declaration != nil {
+	for i := len(symbol.Declarations()) - 1; i >= 0; i-- {
+		if declaration := symbol.Declarations()[i]; declaration != nil {
 			return isDestructuredFromPragmaDeclaration(declaration, pragma, pragmaLower)
 		}
 	}
-	if symbol.ValueDeclaration != nil {
-		return isDestructuredFromPragmaDeclaration(symbol.ValueDeclaration, pragma, pragmaLower)
+	if symbol.ValueDeclaration() != nil {
+		return isDestructuredFromPragmaDeclaration(symbol.ValueDeclaration(), pragma, pragmaLower)
 	}
 	return false
 }

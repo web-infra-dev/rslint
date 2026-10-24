@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // PublicationCheck shares publication policy between import and require rules.
@@ -27,7 +28,7 @@ func NewPublicationCheck(ctx rule.RuleContext, options map[string]any) *Publicat
 	if p == nil || fileName == "<input>" {
 		return nil
 	}
-	pkg := packagejson.FindNearestValid(p, fileName)
+	pkg := packagejson.FindNearestValid(p, fileName.AsString())
 	if pkg == nil || options["ignorePrivate"] != false && pkg.Field("private") == true {
 		return nil
 	}
@@ -36,7 +37,7 @@ func NewPublicationCheck(ctx rule.RuleContext, options map[string]any) *Publicat
 		cwd = p.CurrentDirectory()
 	}
 	check := &PublicationCheck{program: p, pkg: pkg, converter: compilePathConverter(options, ctx.Settings), cwd: cwd}
-	converted, ok := check.relativePath(fileName)
+	converted, ok := check.relativePath(fileName.AsString())
 	if !ok || IsUnpublished(p, pkg, tspath.ResolvePath(pkg.Directory(), converted)) {
 		return nil
 	}
@@ -50,7 +51,7 @@ func (check *PublicationCheck) relativePath(target string) (string, bool) {
 	if !IsAbsolutePath(target) {
 		target = filepath.Join(filepath.FromSlash(check.cwd), target)
 	}
-	relative := tspath.GetRelativePathFromDirectory(check.pkg.Directory(), tspath.NormalizePath(target), tspath.ComparePathsOptions{UseCaseSensitiveFileNames: check.program.FS().UseCaseSensitiveFileNames()})
+	relative := pathutil.GetRelativePathFromDirectory(check.pkg.Directory(), tspath.NormalizePath(target), pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: check.program.FS().CaseSensitivity().IsCaseSensitive()})
 	return check.converter.convert(relative)
 }
 

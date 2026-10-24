@@ -17,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 const gitignoreWatcherID project.WatcherID = "rslint-gitignore-policy"
@@ -296,7 +297,7 @@ func isStrictAncestorAutoJSConfigPath(filePath string, cwd string, fsys vfs.FS) 
 	if filePath == "" || cwd == "" || fsys == nil {
 		return false
 	}
-	caseSensitive := fsys.UseCaseSensitiveFileNames()
+	caseSensitive := fsys.CaseSensitivity().IsCaseSensitive()
 	baseName := tspath.GetBaseFileName(tspath.NormalizePath(filePath))
 	isAutoConfig := false
 	for _, configName := range discovery.AutoJSConfigFileNames {
@@ -311,7 +312,7 @@ func isStrictAncestorAutoJSConfigPath(filePath string, cwd string, fsys vfs.FS) 
 	directory := tspath.GetDirectoryPath(tspath.NormalizePath(filePath))
 	workspace := tspath.NormalizePath(cwd)
 	return !pathStringsEqual(directory, workspace, caseSensitive) &&
-		tspath.StartsWithDirectory(workspace, directory, caseSensitive)
+		pathutil.StartsWithDirectory(workspace, directory, caseSensitive)
 }
 
 func pathStringsEqual(left string, right string, caseSensitive bool) bool {

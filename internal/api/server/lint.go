@@ -25,6 +25,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch linter.EslintPluginDispatcher, requester api.Requester) (*api.LintResponse, error) {
@@ -123,7 +124,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	if configDirectory == "" {
 		configDirectory = currentDirectory
 	}
-	configDirectory = tspath.NormalizePath(configDirectory)
+	configDirectory = resolveRequestPath(configDirectory)
 	// Inline API config has no module directory. Its matching/path base can
 	// differ from the invocation cwd and must not become the discovery root.
 	if len(rslintConfig) > 0 {
@@ -364,7 +365,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		// The low-level Config API keeps its ConfigDirectory-relative contract.
 		responsePathBase = currentDirectory
 	}
-	comparePathOptions := tspath.ComparePathsOptions{
+	comparePathOptions := pathutil.ComparePathsOptions{
 		CurrentDirectory:          responsePathBase,
 		UseCaseSensitiveFileNames: true,
 	}
@@ -493,7 +494,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				SingleThreaded:   false, // Don't use single-threaded mode for IPC
 				Cwd:              currentDirectory,
 				RulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-					return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
+					return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName().AsString())
 				},
 			},
 			Target: linter.TargetProjection{
@@ -572,7 +573,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// The shared result uses absolute stable target identities. Copy it into the
 	// API's caller-visible relative path space only after all producers joined.
 	for index := range diagnostics {
-		diagnostics[index].FilePath = tspath.ConvertToRelativePath(diagnostics[index].FilePath, comparePathOptions)
+		diagnostics[index].FilePath = pathutil.ConvertToRelativePath(diagnostics[index].FilePath, comparePathOptions)
 	}
 
 	// Track every selected target, including syntax-error and zero-rule files,
@@ -582,7 +583,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		if lintedFile.SourceFile == nil {
 			continue
 		}
-		responsePath := tspath.ConvertToRelativePath(lintedFile.Path, comparePathOptions)
+		responsePath := pathutil.ConvertToRelativePath(lintedFile.Path, comparePathOptions)
 		sourceFiles[responsePath] = lintedFile.SourceFile
 	}
 
@@ -602,7 +603,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		if len(applied.FinalSources) > 0 {
 			output = make(map[string]string, len(applied.FinalSources))
 			for _, source := range applied.FinalSources {
-				output[tspath.ConvertToRelativePath(source.Path, comparePathOptions)] = source.Text
+				output[pathutil.ConvertToRelativePath(source.Path, comparePathOptions)] = source.Text
 			}
 		}
 		if len(output) == 0 {

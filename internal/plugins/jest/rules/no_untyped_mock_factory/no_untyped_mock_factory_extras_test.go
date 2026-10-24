@@ -121,7 +121,7 @@ jest.mock(modulePath, () => ({}));`, "edit-demand.ts", "tsconfig.json")
 		for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
 			var diagnostics []rule.RuleDiagnostic
 			linter.LintSingleFile(linter.LintSingleFileOptions{
-				Program: program, File: file.FileName(), HasTypeInfo: typed,
+				Program: program, File: file.FileName().AsString(), HasTypeInfo: typed,
 				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{Name: NoUntypedMockFactoryRule.Name, Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {

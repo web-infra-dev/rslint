@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -46,7 +47,7 @@ void inheritedClassConstructor;
 	fs := utils.NewOverlayVFS(root.FS, map[string]string{filePath: code})
 	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", utils.CreateCompilerHost(root.Dir, fs))
 	assert.NilError(t, err)
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	assert.Assert(t, sourceFile != nil)
 	typeChecker, done := program.GetTypeChecker(t.Context())
 	defer done()

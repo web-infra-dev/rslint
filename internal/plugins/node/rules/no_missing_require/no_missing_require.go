@@ -49,7 +49,7 @@ var NoMissingRequireRule = rule.Rule{
 							value := nodeutil.RequireResolutionOptions(ctx, opts)
 							resolution = &value
 						}
-						resolveError = nodeutil.RequireResolveError(p, target.Name, fileName, *resolution)
+						resolveError = nodeutil.RequireResolveError(p, target.Name, fileName.AsString(), *resolution)
 						resolveErrors[target.Name] = resolveError
 					}
 					if resolveError != "" {

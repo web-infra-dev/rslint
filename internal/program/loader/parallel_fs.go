@@ -3,8 +3,10 @@ package loader
 import (
 	"sync"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // parallelProgramFS coalesces Realpath queries that concurrent TypeScript
@@ -12,10 +14,9 @@ import (
 // Realpath results for its request lifetime; every other operation remains the
 // responsibility of the request's existing VFS/cache stack.
 //
-// Keys are deliberately left in the caller's path space. In particular, this
-// layer never cleans, case-folds, or resolves a path before caching it, so
-// lexical, casing, separator, UNC, symlink, and overlay identities remain the
-// responsibility of the wrapped VFS.
+// Keys retain the caller's normalized rooted spelling. This layer never
+// case-folds or resolves a path before caching it, so casing, UNC, symlink,
+// and overlay identities remain the responsibility of the wrapped VFS.
 type parallelProgramFS struct {
 	vfs.FS
 	realpathCache sync.Map // exact path string -> string or *realpathFlight
@@ -40,16 +41,16 @@ func (f *parallelProgramFS) SourceHasBOM(path string) bool {
 	return utils.SourceHasBOM(f.FS, path)
 }
 
-func (f *parallelProgramFS) Realpath(path string) string {
+func (f *parallelProgramFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
 	for {
-		if cached, ok := f.realpathCache.Load(path); ok {
+		if cached, ok := f.realpathCache.Load(path.AsString()); ok {
 			if value, completed := completedRealpath(cached); completed {
-				return value
+				return pathutil.Path(value)
 			}
 			flight := mustRealpathFlight(cached)
 			flight.ready.Wait()
 			if flight.completed {
-				return flight.value
+				return pathutil.Path(flight.value)
 			}
 			// A panicking owner removes its entry and releases waiters without
 			// publishing a value. Retry so one waiter can become the next owner.
@@ -58,17 +59,17 @@ func (f *parallelProgramFS) Realpath(path string) string {
 
 		candidate := &realpathFlight{}
 		candidate.ready.Add(1)
-		actual, loaded := f.realpathCache.LoadOrStore(path, candidate)
+		actual, loaded := f.realpathCache.LoadOrStore(path.AsString(), candidate)
 		if !loaded {
-			return f.queryAndPublishRealpath(path, candidate)
+			return pathutil.Path(f.queryAndPublishRealpath(path.AsString(), candidate))
 		}
 		if value, completed := completedRealpath(actual); completed {
-			return value
+			return pathutil.Path(value)
 		}
 		flight := mustRealpathFlight(actual)
 		flight.ready.Wait()
 		if flight.completed {
-			return flight.value
+			return pathutil.Path(flight.value)
 		}
 	}
 }
@@ -97,7 +98,7 @@ func (f *parallelProgramFS) queryAndPublishRealpath(path string, flight *realpat
 		}
 	}()
 
-	value = f.FS.Realpath(path)
+	value = f.FS.Realpath(pathutil.Path(path)).AsString()
 	flight.value = value
 	flight.completed = true
 	// Replace the transient flight with the plain value so warm reads have

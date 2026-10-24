@@ -226,10 +226,10 @@ func (tracker *Tracker) trackIdentifier(identifier *ast.Node, value *Trace) {
 }
 
 func (tracker *Tracker) isStableBinding(identifier *ast.Node, symbol *ast.Symbol) bool {
-	if len(symbol.Declarations) != 1 {
+	if len(symbol.Declarations()) != 1 {
 		return false
 	}
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if declaration.Name() != identifier {
 		return false
 	}

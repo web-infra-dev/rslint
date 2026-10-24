@@ -255,7 +255,7 @@ func isContextualKeyword(kind ast.Kind) bool {
 		ast.KindUndefinedKeyword, ast.KindUniqueKeyword, ast.KindUnknownKeyword,
 		ast.KindUsingKeyword, ast.KindFromKeyword, ast.KindGlobalKeyword,
 		ast.KindBigIntKeyword, ast.KindOverrideKeyword, ast.KindOfKeyword,
-		ast.KindDeferKeyword,
+		ast.KindDeferKeyword, ast.KindSourceKeyword,
 	}
 	for _, value := range values {
 		if kind == value {

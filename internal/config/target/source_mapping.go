@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // LookupSourceTarget maps a Program source path back to the selected lint
@@ -28,8 +29,8 @@ func LookupSourceTarget(
 
 func canonicalPathOrSelf(path string, fsys vfs.FS) string {
 	if fsys != nil {
-		if physical := fsys.Realpath(path); physical != "" {
-			return tspath.NormalizePath(physical)
+		if physical := fsys.Realpath(pathutil.Path(path)); physical != "" {
+			return tspath.NormalizePath(physical.AsString())
 		}
 	}
 	return tspath.NormalizePath(path)

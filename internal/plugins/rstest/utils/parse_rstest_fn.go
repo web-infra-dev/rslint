@@ -421,7 +421,7 @@ func resolveRstestRoot(
 	}
 
 	tracking := false
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if !isConstRstestVariableDeclaration(declaration) {
 			continue
 		}
@@ -484,7 +484,7 @@ func resolveImportMetaRstestBinding(symbol *ast.Symbol) (string, *ast.Node, bool
 	if symbol == nil {
 		return "", nil, false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || declaration.Kind != ast.KindBindingElement {
 			continue
 		}

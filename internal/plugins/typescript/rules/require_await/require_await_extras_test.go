@@ -19,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func requireAwaitSuggestion(source string, occurrence int) []rule_tester.InvalidTestCaseSuggestion {
@@ -659,7 +660,7 @@ func TestRequireAwaitEditDemand(t *testing.T) {
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program:     lintprogram.NewFromCompiler(compilerProgram),
-			File:        sourceFile.FileName(),
+			File:        sourceFile.FileName().AsString(),
 			HasTypeInfo: true,
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
@@ -832,8 +833,8 @@ func TestRequireAwaitRecoveryAST(t *testing.T) {
 		t.Run(strconv.Itoa(index), func(t *testing.T) {
 			fileName := "/require-await-recovery-" + strconv.Itoa(index) + ".ts"
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: fileName,
-				Path:     tspath.Path(fileName),
+				FileName: pathutil.File(fileName),
+				PathKey:  tspath.PathKey(fileName),
 			}, source, core.ScriptKindTS)
 			ctx := rule.RuleContext{
 				SourceFile:     sourceFile,

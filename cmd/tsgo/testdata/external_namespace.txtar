@@ -1,0 +1,7 @@
+-- tsconfig.json --
+{"compilerOptions":{"module":"preserve","moduleResolution":"bundler","types":[]},"files":["index.ts"]}
+-- index.ts --
+import { value } from "pkg";
+export const result = value;
+-- node_modules/pkg/index.d.ts --
+export declare const value: number;

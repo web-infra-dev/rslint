@@ -55,7 +55,7 @@ var NoUnassignedImportRule = rule.Rule{
 			// Only relative and slash-prefixed specifiers are file paths.
 			// Resolve them lexically; this rule does not resolve modules on disk.
 			if strings.HasPrefix(source, ".") || strings.HasPrefix(source, "/") {
-				directory := filepath.Dir(ctx.SourceFile.FileName())
+				directory := filepath.Dir(ctx.SourceFile.FileName().AsString())
 				if strings.HasPrefix(source, "/") {
 					directory = filepath.VolumeName(directory)
 				}

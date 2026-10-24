@@ -345,7 +345,7 @@ func collectEffectEventBindings(sf *ast.SourceFile) *eeRegistry {
 				break
 			}
 			for _, symbol := range data.Locals {
-				for _, declaration := range symbol.Declarations {
+				for _, declaration := range symbol.Declarations() {
 					recordEffectEventBinding(reg, declaration)
 				}
 			}
@@ -451,7 +451,7 @@ func resolveBinding(ctx rule.RuleContext, idNode *ast.Node) (*ast.Node, bool) {
 	if sym == nil {
 		return nil, false
 	}
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		if isUseEffectEventBindingDeclaration(decl) {
 			return findEnclosingFunction(decl), true
 		}

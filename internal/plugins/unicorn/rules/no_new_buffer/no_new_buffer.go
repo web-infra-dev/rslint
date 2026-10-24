@@ -303,7 +303,7 @@ func hasTypeAnnotation(ctx rule.RuleContext, node *ast.Node, predicate func(*ast
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration != nil && predicate(declaration.Type()) {
 			return true
 		}

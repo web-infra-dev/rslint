@@ -53,7 +53,7 @@ var NoAbsolutePathRule = rule.Rule{
 							cwd = cwd[slash:]
 						}
 					}
-					fromParts = posixPathComponents(tspath.GetDirectoryPath(ctx.SourceFile.FileName()), cwd)
+					fromParts = posixPathComponents(tspath.GetDirectoryPath(ctx.SourceFile.FileName().AsString()), cwd)
 				}
 				relative := relativeImportPath(fromParts, source.Specifier().Text(), cwd)
 				text, ok := quoteModulePath(relative)

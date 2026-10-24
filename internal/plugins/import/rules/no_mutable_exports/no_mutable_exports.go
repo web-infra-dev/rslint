@@ -43,12 +43,12 @@ var NoMutableExportsRule = rule.Rule{
 				return nil
 			}
 			resolved := ctx.TypeChecker.SkipAlias(sym)
-			if resolved == nil || len(resolved.Declarations) == 0 {
+			if resolved == nil || len(resolved.Declarations()) == 0 {
 				return nil
 			}
 			// Iterate all declarations to handle declaration merging
 			// (e.g., var Foo + namespace Foo — Declarations[0] may not be the var).
-			for _, decl := range resolved.Declarations {
+			for _, decl := range resolved.Declarations() {
 				if ast.IsVariableDeclaration(decl) {
 					declList := decl.Parent
 					if declList != nil && ast.IsVariableDeclarationList(declList) {

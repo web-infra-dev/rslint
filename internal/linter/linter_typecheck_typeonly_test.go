@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // These tests exercise the "type-check only" code path: LintPlan=nil combined
@@ -273,7 +274,7 @@ func TestTypeCheckOnly_SkipsSourceOnlyProgram(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x: number = 'hello';",
 	})
-	file := program.GetSourceFile(paths["a.ts"])
+	file := program.GetSourceFile(pathutil.File(paths["a.ts"]))
 	if file == nil {
 		t.Fatal("fixture Program did not contain a.ts")
 	}

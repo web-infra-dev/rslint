@@ -93,7 +93,7 @@ func TestGetFunctionHeadLocTypeAccessorComputedKey(t *testing.T) {
 			t.Parallel()
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/file.ts",
-				Path:     "/file.ts",
+				PathKey:  "/file.ts",
 			}, tt.code, core.ScriptKindTS)
 
 			var accessor *ast.Node

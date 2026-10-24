@@ -173,11 +173,11 @@ func mergedNamespaceInitializer(ctx rule.RuleContext, reference *scope.Reference
 		if owner == nil {
 			continue
 		}
-		symbol := owner.Exports[reference.Identifier.Text()]
-		if symbol == nil || symbol.Flags&(ast.SymbolFlagsValue|ast.SymbolFlagsAlias) == 0 {
+		symbol := owner.Exports()[reference.Identifier.Text()]
+		if symbol == nil || symbol.Flags()&(ast.SymbolFlagsValue|ast.SymbolFlagsAlias) == 0 {
 			continue
 		}
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if declaration.Kind == ast.KindVariableDeclaration &&
 				declaration.Name() != nil && declaration.Name().Kind == ast.KindIdentifier &&
 				ast.GetSourceFileOfNode(declaration) == ctx.SourceFile {

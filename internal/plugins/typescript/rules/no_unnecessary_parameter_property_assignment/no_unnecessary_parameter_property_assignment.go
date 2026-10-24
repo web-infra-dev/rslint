@@ -392,10 +392,10 @@ func isReferenceFromParameter(ctx rule.RuleContext, id *ast.Node) bool {
 		return false
 	}
 	sym := ctx.TypeChecker.GetSymbolAtLocation(id)
-	if sym == nil || len(sym.Declarations) == 0 {
+	if sym == nil || len(sym.Declarations()) == 0 {
 		return false
 	}
-	return sym.Declarations[0].Kind == ast.KindParameter
+	return sym.Declarations()[0].Kind == ast.KindParameter
 }
 
 // constructorHasParameterPropertyNamed reports whether the constructor's

@@ -305,7 +305,7 @@ func TestPrepareLintPlanHonorsSingleThreadedOrder(t *testing.T) {
 		SingleThreaded:   true,
 		TargetsByProgram: [][]string{wantOrder},
 		GetRulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
-			gotOrder = append(gotOrder, file.FileName())
+			gotOrder = append(gotOrder, file.FileName().AsString())
 			return noopRule()
 		},
 	})
@@ -360,7 +360,7 @@ func TestPrepareLintPlanDeduplicatesTargetsInFirstOccurrenceOrder(t *testing.T) 
 		GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 	})
 	targets := plan.Targets()
-	if len(targets) != 2 || targets[0].File.FileName() != paths["b.ts"] || targets[1].File.FileName() != paths["a.ts"] {
+	if len(targets) != 2 || targets[0].File.FileName().AsString() != paths["b.ts"] || targets[1].File.FileName().AsString() != paths["a.ts"] {
 		t.Fatalf("deduplicated target order = %v, want [%q %q]", targetFileNames(targets), paths["b.ts"], paths["a.ts"])
 	}
 }
@@ -368,7 +368,7 @@ func TestPrepareLintPlanDeduplicatesTargetsInFirstOccurrenceOrder(t *testing.T) 
 func targetFileNames(targets []LintTarget) []string {
 	fileNames := make([]string, len(targets))
 	for index, target := range targets {
-		fileNames[index] = target.File.FileName()
+		fileNames[index] = target.File.FileName().AsString()
 	}
 	return fileNames
 }
@@ -443,7 +443,7 @@ func TestRunLinterProgramAdmissionSingleWorker(t *testing.T) {
 				current := active.Add(1)
 				updateProgramAdmissionPeak(&peak, current)
 				orderMu.Lock()
-				gotOrder = append(gotOrder, ctx.SourceFile.FileName())
+				gotOrder = append(gotOrder, ctx.SourceFile.FileName().AsString())
 				orderMu.Unlock()
 				runtime.Gosched()
 				active.Add(-1)
@@ -656,7 +656,7 @@ func TestDynamicProgramAdmissionReplenishesBeforeProgramCompletes(t *testing.T) 
 	releaseSlow := func() { slowOnce.Do(func() { close(slowRelease) }) }
 	var fastFile, slowFile, nextFile string
 	run := func(ctx rule.RuleContext) rule.RuleListeners {
-		switch ctx.SourceFile.FileName() {
+		switch ctx.SourceFile.FileName().AsString() {
 		case fastFile:
 			started <- struct{}{}
 			<-fastRelease
@@ -670,14 +670,14 @@ func TestDynamicProgramAdmissionReplenishesBeforeProgramCompletes(t *testing.T) 
 	}
 	firstOptions := checkerFreeExecutionTestOptions(t, false, run)
 	first := firstOptions.LintPlan.programs[0]
-	fastFile = first.files[0].file.FileName()
-	slowFile = first.files[minCheckerFreeFilesPerLintWorker].file.FileName()
+	fastFile = first.files[0].file.FileName().AsString()
+	slowFile = first.files[minCheckerFreeFilesPerLintWorker].file.FileName().AsString()
 	followingOptions, followingPaths := programAdmissionTestOptions(t, 2, false, run)
 	following := followingOptions.LintPlan.programs
 	nextFile = followingPaths[0]
 	firstTargets := make([]string, len(first.files))
 	for index, file := range first.files {
-		firstTargets[index] = file.file.FileName()
+		firstTargets[index] = file.file.FileName().AsString()
 	}
 	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
 		Programs:         []*program.Program{first.program, following[0].program, following[1].program},
@@ -765,7 +765,7 @@ func TestDynamicProgramAdmissionReusesMixedPlan(t *testing.T) {
 	plain := checkerFreeExecutionTestOptions(t, false, run).LintPlan.programs[0]
 	plainTargets := make([]string, len(plain.files))
 	for index, file := range plain.files {
-		plainTargets[index] = file.file.FileName()
+		plainTargets[index] = file.file.FileName().AsString()
 	}
 	// Keep a shared compiler, a checker-free Program large enough to split,
 	// a plugin-only task and an empty task in the same reusable plan.
@@ -774,7 +774,7 @@ func TestDynamicProgramAdmissionReusesMixedPlan(t *testing.T) {
 	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
 		Programs: programs, TargetsByProgram: targets,
 		GetRulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
-			switch file.FileName() {
+			switch file.FileName().AsString() {
 			case paths["empty.ts"]:
 				return nil
 			case paths["plugin.ts"]:

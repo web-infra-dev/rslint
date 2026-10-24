@@ -289,10 +289,10 @@ func (scan *fileScan) classifyThroughDeclaration(factory *ast.Node) verdict {
 }
 
 func (scan *fileScan) computeDeclarationVerdict(symbol *ast.Symbol) verdict {
-	if len(symbol.Declarations) != 1 {
+	if len(symbol.Declarations()) != 1 {
 		return verdictUnknown
 	}
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if declaration == nil || ast.GetSourceFileOfNode(declaration) != scan.ctx.SourceFile {
 		return verdictUnknown
 	}
@@ -435,7 +435,7 @@ func isPromiseInstanceType(sourceProgram *lintprogram.Program, typeChecker *chec
 		checker.Type_objectFlags(resolved)&checker.ObjectFlagsReference != 0 {
 		resolved = resolved.Target()
 	}
-	if symbol := checker.Type_symbol(resolved); symbol != nil && symbol.Name == "Promise" &&
+	if symbol := checker.Type_symbol(resolved); symbol != nil && symbol.Name() == "Promise" &&
 		utils.IsSymbolFromDefaultLibrary(sourceProgram, symbol) {
 		return true
 	}

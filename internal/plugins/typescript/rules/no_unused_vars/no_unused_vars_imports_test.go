@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestNoUnusedVarsImports(t *testing.T) {
@@ -326,7 +327,7 @@ console.log(usedValue);
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program:         lintprogram.NewFromCompiler(program),
-					File:            sourceFile.FileName(),
+					File:            sourceFile.FileName().AsString(),
 					HasTypeInfo:     true,
 					GetRulesForFile: noUnusedVarsConfiguredRules(test.options),
 					Consumer: rule.DiagnosticConsumer{
@@ -435,7 +436,7 @@ func createNoUnusedVarsProgram(t testing.TB, fileName string, code string) (*com
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, pathutil.Directory(rootDir.Dir)))
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", fileName)
 	}

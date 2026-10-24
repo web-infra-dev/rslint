@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/project"
 	"github.com/microsoft/TypeScript/tsc/shim/project/logging"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func (s *Server) handleInitialize(ctx context.Context, params *lsproto.InitializeParams) (lsproto.InitializeResponse, error) {
@@ -87,9 +88,9 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 	s.session = project.NewSession(&project.SessionInit{
 		BackgroundCtx: s.backgroundCtx,
 		Options: &project.SessionOptions{
-			CurrentDirectory:   s.cwd,
-			DefaultLibraryPath: s.defaultLibraryPath,
-			TypingsLocation:    s.typingsLocation,
+			CurrentDirectory:   pathutil.Directory(s.cwd),
+			DefaultLibraryPath: pathutil.Directory(s.defaultLibraryPath),
+			TypingsLocation:    pathutil.Directory(s.typingsLocation),
 			PositionEncoding:   s.positionEncoding,
 			WatchEnabled:       s.watchEnabled,
 		},

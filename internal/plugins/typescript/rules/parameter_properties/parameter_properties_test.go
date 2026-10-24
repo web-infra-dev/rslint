@@ -1018,7 +1018,7 @@ func runParameterPropertiesWithDemand(
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/parameter-properties-demand.ts",
-		Path:     "/parameter-properties-demand.ts",
+		PathKey:  "/parameter-properties-demand.ts",
 	}, code, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	diagnostics := make([]rule.RuleDiagnostic, 0, 1)

@@ -384,7 +384,7 @@ func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
 		}
 	}
 	symbol := r.ctx.Refs.ResolveTypeOrNamespace(node)
-	if symbol == nil || len(symbol.Declarations) == 0 {
+	if symbol == nil || len(symbol.Declarations()) == 0 {
 		// A name nothing declares is still the author's to fix.
 		return false
 	}

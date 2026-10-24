@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -97,12 +98,12 @@ func setupDiscoveryTxtarFixture(t *testing.T, name string) (string, map[string]s
 	if err != nil {
 		t.Fatal(err)
 	}
-	configDir := osvfs.FS().Realpath(tspath.NormalizePath(archive.Materialize(t, name)))
+	configDir := osvfs.FS().Realpath(pathutil.Path(tspath.NormalizePath(archive.Materialize(t, name))))
 	paths := make(map[string]string, len(names))
 	for _, relativeName := range names {
-		paths[relativeName] = tspath.ResolvePath(configDir, relativeName)
+		paths[relativeName] = tspath.ResolvePath(configDir.AsString(), relativeName)
 	}
-	return configDir, paths
+	return configDir.AsString(), paths
 }
 
 // Core fix: a gitignore file-level dir (target/ → **/target/**/*) is pruned

@@ -145,7 +145,7 @@ func isHookContextExpect(ctx rule.RuleContext, analysis *rstest.RstestCallAnalys
 
 func resolveUnwrittenDeclaration(ctx rule.RuleContext, identifier *ast.Node) *ast.Node {
 	symbol := ctx.Refs.Resolve(identifier)
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	if symbol == nil || len(symbol.Declarations()) != 1 {
 		return nil
 	}
 	for _, reference := range ctx.Refs.References(symbol) {
@@ -153,7 +153,7 @@ func resolveUnwrittenDeclaration(ctx rule.RuleContext, identifier *ast.Node) *as
 			return nil
 		}
 	}
-	return symbol.Declarations[0]
+	return symbol.Declarations()[0]
 }
 
 func enclosingFunction(node *ast.Node) *ast.Node {

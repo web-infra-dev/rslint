@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type gitPolicySource struct {
@@ -19,19 +20,19 @@ type gitPolicySource struct {
 // config owner: all paths are physical and all observations precede matching.
 type GitPolicy struct {
 	useCaseSensitive bool
-	roots            map[tspath.Path]string
-	sources          map[tspath.Path]gitPolicySource
-	covered          map[tspath.Path]struct{}
-	blockedEntries   map[tspath.Path]struct{}
+	roots            map[tspath.PathKey]string
+	sources          map[tspath.PathKey]gitPolicySource
+	covered          map[tspath.PathKey]struct{}
+	blockedEntries   map[tspath.PathKey]struct{}
 }
 
 func NewGitPolicy(snapshot gitignore.Snapshot) *GitPolicy {
 	policy := &GitPolicy{
 		useCaseSensitive: snapshot.UseCaseSensitive,
-		roots:            make(map[tspath.Path]string),
-		sources:          make(map[tspath.Path]gitPolicySource),
-		covered:          make(map[tspath.Path]struct{}),
-		blockedEntries:   make(map[tspath.Path]struct{}),
+		roots:            make(map[tspath.PathKey]string),
+		sources:          make(map[tspath.PathKey]gitPolicySource),
+		covered:          make(map[tspath.PathKey]struct{}),
+		blockedEntries:   make(map[tspath.PathKey]struct{}),
 	}
 	for _, directory := range snapshot.Roots {
 		policy.roots[policy.pathID(directory)] = tspath.NormalizePath(directory)
@@ -83,7 +84,7 @@ func (policy *GitPolicy) blockedDirectoryOnRoute(physicalDir, scanRoot string) s
 	return ""
 }
 
-func (policy *GitPolicy) pathID(path string) tspath.Path {
+func (policy *GitPolicy) pathID(path string) tspath.PathKey {
 	return gitignore.DirectoryPathID(path, policy.useCaseSensitive)
 }
 
@@ -208,16 +209,16 @@ func CollectGitPolicy(
 	matcher := NewGlobalIgnoreMatcher(authored, configDirectory, fsys)
 	var visit func(string, string, gitignore.Cursor)
 	visit = func(lexical, physical string, cursor gitignore.Cursor) {
-		if IsDefaultExcludedPath(lexical, "", fsys == nil || fsys.UseCaseSensitiveFileNames()) || matcher.CanPruneDirectory(lexical, physical) {
+		if IsDefaultExcludedPath(lexical, "", fsys == nil || fsys.CaseSensitivity().IsCaseSensitive()) || matcher.CanPruneDirectory(lexical, physical) {
 			return
 		}
 		cursor = reader.Observe(cursor, physical)
 		if fsys == nil {
 			return
 		}
-		entries := fsys.GetAccessibleEntries(physical)
+		entries := fsys.GetAccessibleEntries(pathutil.Directory(physical))
 		for _, name := range entries.Directories {
-			if excludedGitDirectory(name, fsys.UseCaseSensitiveFileNames()) {
+			if excludedGitDirectory(name, fsys.CaseSensitivity().IsCaseSensitive()) {
 				continue
 			}
 			childLexical := tspath.CombinePaths(lexical, name)
@@ -226,8 +227,8 @@ func CollectGitPolicy(
 					continue
 				}
 			} else {
-				if resolved := fsys.Realpath(tspath.CombinePaths(physical, name)); resolved != "" &&
-					!PathsEqual(resolved, tspath.CombinePaths(physical, name), fsys.UseCaseSensitiveFileNames()) {
+				if resolved := fsys.Realpath(pathutil.Path(tspath.CombinePaths(physical, name))); resolved != "" &&
+					!PathsEqual(resolved.AsString(), tspath.CombinePaths(physical, name), fsys.CaseSensitivity().IsCaseSensitive()) {
 					continue
 				}
 			}

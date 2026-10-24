@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type configCandidate struct {
@@ -40,7 +41,7 @@ type configLoadState struct {
 }
 
 type configOwnerIdentity struct {
-	lexicalDirectory  tspath.Path
+	lexicalDirectory  tspath.PathKey
 	physicalDirectory string
 }
 
@@ -57,7 +58,7 @@ type moduleLoadCoordinator struct {
 	pathSpaces     *rslintconfig.PathSpaceSnapshot
 
 	statesByPath     map[string]*configLoadState
-	stateByIdentity  map[tspath.Path]*configLoadState
+	stateByIdentity  map[tspath.PathKey]*configLoadState
 	ownerByIdentity  map[configOwnerIdentity]string
 	failureByPath    map[string]ConfigFailure
 	nextCandidateID  int
@@ -81,7 +82,7 @@ func newModuleLoadCoordinator(
 		fresh:           fresh,
 		singleThreaded:  singleThreaded,
 		statesByPath:    make(map[string]*configLoadState),
-		stateByIdentity: make(map[tspath.Path]*configLoadState),
+		stateByIdentity: make(map[tspath.PathKey]*configLoadState),
 		ownerByIdentity: make(map[configOwnerIdentity]string),
 		failureByPath:   make(map[string]ConfigFailure),
 	}
@@ -96,17 +97,17 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 		candidate configCandidate
 		aliases   map[string]configCandidate
 	}
-	groups := make(map[tspath.Path]*candidateGroup, len(rawCandidates))
+	groups := make(map[tspath.PathKey]*candidateGroup, len(rawCandidates))
 	for _, candidate := range rawCandidates {
 		candidate.path = tspath.NormalizePath(candidate.path)
 		candidate.directory = tspath.NormalizePath(candidate.directory)
 		if candidate.physicalDirectory == "" {
 			candidate.physicalDirectory = candidate.directory
-			if physical := coordinator.fs.Realpath(candidate.directory); physical != "" {
-				candidate.physicalDirectory = tspath.NormalizePath(physical)
+			if physical := coordinator.fs.Realpath(pathutil.Path(candidate.directory)); physical != "" {
+				candidate.physicalDirectory = tspath.NormalizePath(physical.AsString())
 			}
 		}
-		identity := tspath.ToPath(candidate.path, "", coordinator.fs.UseCaseSensitiveFileNames())
+		identity := pathutil.ToPath(candidate.path, "", coordinator.fs.CaseSensitivity().IsCaseSensitive())
 		if state := coordinator.stateByIdentity[identity]; state != nil {
 			if err := coordinator.validateNativeCaseAlias(state.candidate, candidate); err != nil {
 				return err
@@ -162,7 +163,7 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 		// owner spelling. Distinct lexical aliases may fail independently;
 		// the catalog validates only the final effective owners for ambiguity.
 		ownerID := configOwnerIdentity{
-			lexicalDirectory:  tspath.ToPath(candidate.directory, "", coordinator.fs.UseCaseSensitiveFileNames()),
+			lexicalDirectory:  pathutil.ToPath(candidate.directory, "", coordinator.fs.CaseSensitivity().IsCaseSensitive()),
 			physicalDirectory: rslintconfig.ExactPathID(candidate.physicalDirectory),
 		}
 		if owner, exists := coordinator.ownerByIdentity[ownerID]; exists {
@@ -224,7 +225,7 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 			loadedStates = append(loadedStates, state)
 			coordinator.configsLoaded++
 		}
-		identity := tspath.ToPath(candidate.path, "", coordinator.fs.UseCaseSensitiveFileNames())
+		identity := pathutil.ToPath(candidate.path, "", coordinator.fs.CaseSensitivity().IsCaseSensitive())
 		coordinator.stateByIdentity[identity] = state
 		for aliasPath := range group.aliases {
 			coordinator.statesByPath[aliasPath] = state
@@ -258,23 +259,23 @@ func (coordinator *moduleLoadCoordinator) validateNativeCaseAlias(left configCan
 		}
 		return nil
 	}
-	if coordinator.fs.UseCaseSensitiveFileNames() || !strings.EqualFold(left.path, right.path) {
+	if coordinator.fs.CaseSensitivity().IsCaseSensitive() || !strings.EqualFold(left.path, right.path) {
 		return fmt.Errorf("config candidate identity collision between %q and %q", left.path, right.path)
 	}
 	physicalPath := func(path string) string {
-		if realPath := coordinator.fs.Realpath(path); realPath != "" {
-			return tspath.NormalizePath(realPath)
+		if realPath := coordinator.fs.Realpath(pathutil.Path(path)); realPath != "" {
+			return tspath.NormalizePath(realPath.AsString())
 		}
 		return tspath.NormalizePath(path)
 	}
 	samePhysicalPath := func(leftPath string, rightPath string) bool {
-		if tspath.ToPath(leftPath, "", true) == tspath.ToPath(rightPath, "", true) {
+		if pathutil.ToPath(leftPath, "", true) == pathutil.ToPath(rightPath, "", true) {
 			return true
 		}
 		// Realpath may preserve native case aliases (notably EvalSymlinks on
 		// macOS). Verify both directory and file identities without assuming
 		// that distinct spellings mean distinct filesystem objects.
-		leftInfo, rightInfo := coordinator.fs.Stat(leftPath), coordinator.fs.Stat(rightPath)
+		leftInfo, rightInfo := coordinator.fs.Stat(pathutil.Path(leftPath)), coordinator.fs.Stat(pathutil.Path(rightPath))
 		return leftInfo != nil && rightInfo != nil && os.SameFile(leftInfo, rightInfo)
 	}
 	leftPhysicalDirectory := left.physicalDirectory

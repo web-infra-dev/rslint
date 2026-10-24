@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // ProgramSourceLookup resolves a filesystem target to the exact source file in
@@ -25,8 +26,8 @@ func NewProgramSourceLookup(program *compiler.Program, fs vfs.FS) *ProgramSource
 func (lookup *ProgramSourceLookup) canonicalPathID(filePath string) string {
 	filePath = tspath.NormalizePath(filePath)
 	if lookup.fs != nil {
-		if realPath := lookup.fs.Realpath(filePath); realPath != "" {
-			filePath = tspath.NormalizePath(realPath)
+		if realPath := lookup.fs.Realpath(pathutil.Path(filePath)); realPath != "" {
+			filePath = tspath.NormalizePath(realPath.AsString())
 		}
 	}
 	return ExactPathID(filePath)
@@ -40,17 +41,17 @@ func (lookup *ProgramSourceLookup) SourceFileForCandidate(candidate string, cano
 		return nil
 	}
 	candidate = tspath.NormalizePath(candidate)
-	sourceFile := lookup.program.GetSourceFile(candidate)
+	sourceFile := lookup.program.GetSourceFile(pathutil.File(candidate))
 	if sourceFile == nil {
 		return nil
 	}
-	if ExactPathID(sourceFile.FileName()) == ExactPathID(candidate) {
+	if ExactPathID(sourceFile.FileName().AsString()) == ExactPathID(candidate) {
 		return sourceFile
 	}
 	if canonicalTarget == "" {
 		return nil
 	}
-	if lookup.canonicalPathID(sourceFile.FileName()) == lookup.canonicalPathID(canonicalTarget) {
+	if lookup.canonicalPathID(sourceFile.FileName().AsString()) == lookup.canonicalPathID(canonicalTarget) {
 		return sourceFile
 	}
 	return nil
@@ -73,7 +74,7 @@ func (lookup *ProgramSourceLookup) canonicalSourceFileByID(canonicalID string) *
 		lookup.canonicalIndexBuilt = true
 		lookup.canonicalSources = make(map[string]*ast.SourceFile)
 		for _, sourceFile := range lookup.program.GetSourceFiles() {
-			canonicalID := lookup.canonicalPathID(sourceFile.FileName())
+			canonicalID := lookup.canonicalPathID(sourceFile.FileName().AsString())
 			existing := lookup.canonicalSources[canonicalID]
 			if existing == nil || sourceFile.FileName() < existing.FileName() {
 				lookup.canonicalSources[canonicalID] = sourceFile
@@ -100,13 +101,13 @@ func (lookup *ProgramSourceLookup) SourceFileForTarget(filePath string, canonica
 	}
 	canonicalPath = tspath.NormalizePath(canonicalPath)
 	canonicalID := ExactPathID(canonicalPath)
-	if sourceFile := lookup.program.GetSourceFile(filePath); sourceFile != nil &&
-		lookup.canonicalPathID(sourceFile.FileName()) == canonicalID {
+	if sourceFile := lookup.program.GetSourceFile(pathutil.File(filePath)); sourceFile != nil &&
+		lookup.canonicalPathID(sourceFile.FileName().AsString()) == canonicalID {
 		return sourceFile
 	}
 	if ExactPathID(canonicalPath) != ExactPathID(filePath) {
-		if sourceFile := lookup.program.GetSourceFile(canonicalPath); sourceFile != nil &&
-			lookup.canonicalPathID(sourceFile.FileName()) == canonicalID {
+		if sourceFile := lookup.program.GetSourceFile(pathutil.File(canonicalPath)); sourceFile != nil &&
+			lookup.canonicalPathID(sourceFile.FileName().AsString()) == canonicalID {
 			return sourceFile
 		}
 	}
@@ -126,8 +127,8 @@ func (lookup *ProgramSourceLookup) SourceFileForPath(filePath string) *ast.Sourc
 
 	canonicalPath := filePath
 	if lookup.fs != nil {
-		if realPath := lookup.fs.Realpath(filePath); realPath != "" {
-			canonicalPath = tspath.NormalizePath(realPath)
+		if realPath := lookup.fs.Realpath(pathutil.Path(filePath)); realPath != "" {
+			canonicalPath = tspath.NormalizePath(realPath.AsString())
 		}
 	}
 	if sourceFile := lookup.SourceFileForCandidate(filePath, canonicalPath); sourceFile != nil {

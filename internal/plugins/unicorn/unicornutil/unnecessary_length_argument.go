@@ -215,7 +215,7 @@ func accessHasGetter(ctx rule.RuleContext, node *ast.Node) bool {
 		return false
 	}
 
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration.Kind == ast.KindGetAccessor ||
 			ast.HasSyntacticModifier(declaration, ast.ModifierFlagsAccessor) {
 			return true

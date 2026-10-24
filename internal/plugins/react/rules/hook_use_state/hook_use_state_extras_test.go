@@ -17,7 +17,7 @@ import (
 func TestHookUseStateEditDemand(t *testing.T) {
 	const code = `import {useState} from 'react'; const [value]: [number] = useState(initial);`
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: "/test.tsx", Path: "/test.tsx",
+		FileName: "/test.tsx", PathKey: "/test.tsx",
 	}, code, core.ScriptKindTSX)
 	for _, testCase := range []struct {
 		name   string

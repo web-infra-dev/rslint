@@ -272,7 +272,7 @@ func TestPreferDestructuringEditDemand(t *testing.T) {
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program:     lintprogram.NewFromCompiler(program),
-			File:        sourceFile.FileName(),
+			File:        sourceFile.FileName().AsString(),
 			HasTypeInfo: true,
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
@@ -353,7 +353,7 @@ const scoped = object.scoped;
 const kept = object.kept;`
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/disable-directives.ts",
-		Path:     "/disable-directives.ts",
+		PathKey:  "/disable-directives.ts",
 	}, code, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	diagnostics := make([]rule.RuleDiagnostic, 0, 1)

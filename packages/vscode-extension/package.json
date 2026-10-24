@@ -83,7 +83,7 @@
     "build": "node scripts/build.js",
     "watch": "node scripts/build.js --watch",
     "package": "vsce package",
-    "test": "rimraf .vscode-test-out && tsgo -p tsconfig.spec.emit.json && node .vscode-test-out/__tests__/runTest.js"
+    "test": "rimraf .vscode-test-out && tsc -p tsconfig.spec.emit.json && node .vscode-test-out/__tests__/runTest.js"
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
@@ -97,8 +97,7 @@
     "mocha": "catalog:",
     "ovsx": "catalog:",
     "rimraf": "catalog:",
-    "typescript": "catalog:",
-    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:typescript7",
     "vscode-languageclient": "catalog:",
     "vscode-languageserver": "catalog:"
   },

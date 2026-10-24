@@ -9,6 +9,7 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func resolveDeclaredProjectPaths(fsys vfs.FS, rslintConfig RslintConfig, configDirectory string, rootOverride string) ([]string, error) {
@@ -69,7 +70,7 @@ func resolveProjectPatterns(fsys vfs.FS, patterns ProjectPaths, base string) ([]
 
 		tsconfigPath := tspath.ResolvePath(base, config)
 
-		if !fsys.FileExists(tsconfigPath) {
+		if !fsys.FileExists(pathutil.File(tsconfigPath)) {
 			return nil, fmt.Errorf("tsconfig file %q doesn't exist", tsconfigPath)
 		}
 
@@ -108,7 +109,7 @@ func ResolveTsConfigPathsWithPolicy(rslintConfig RslintConfig, cwd string, fs vf
 			return nil, nil
 		}
 		defaultTsConfig := tspath.ResolvePath(cwd, "tsconfig.json")
-		if fs.FileExists(defaultTsConfig) {
+		if fs.FileExists(pathutil.File(defaultTsConfig)) {
 			return []string{defaultTsConfig}, nil
 		}
 		return nil, nil
@@ -143,7 +144,7 @@ func expandProjectGlob(fsys vfs.FS, configDirectory string, pattern string) ([]s
 	searchRoot := normalizeGlobPath(tspath.ResolvePath(configDirectory, authoredSearchRoot))
 	resolvedPattern := normalizeGlobPath(tspath.ResolvePath(configDirectory, normalizedPattern))
 
-	if !fsys.DirectoryExists(searchRoot) {
+	if !fsys.DirectoryExists(pathutil.Directory(searchRoot)) {
 		return nil, nil
 	}
 

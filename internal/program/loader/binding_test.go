@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"strings"
 	"sync"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type bindingIndexTestFS struct {
@@ -26,34 +28,34 @@ type bindingIndexTestFS struct {
 	caseSensitive bool
 }
 
-func (fsys *bindingIndexTestFS) UseCaseSensitiveFileNames() bool {
-	return fsys.caseSensitive
+func (fsys *bindingIndexTestFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(fsys.caseSensitive)
 }
 
-func (fsys *bindingIndexTestFS) FileExists(filePath string) bool {
-	_, ok := fsys.files[tspath.NormalizePath(filePath)]
+func (fsys *bindingIndexTestFS) FileExists(filePath tspath.RootedFilePath) bool {
+	_, ok := fsys.files[tspath.NormalizePath(filePath.AsString())]
 	return ok
 }
 
-func (fsys *bindingIndexTestFS) ReadFile(filePath string) (string, bool) {
-	content, ok := fsys.files[tspath.NormalizePath(filePath)]
+func (fsys *bindingIndexTestFS) ReadFile(filePath tspath.RootedFilePath) (string, bool) {
+	content, ok := fsys.files[tspath.NormalizePath(filePath.AsString())]
 	return content, ok
 }
 
-func (fsys *bindingIndexTestFS) GetAccessibleEntries(directoryPath string) vfs.Entries {
-	if entries, ok := fsys.entries[tspath.NormalizePath(directoryPath)]; ok {
+func (fsys *bindingIndexTestFS) GetAccessibleEntries(directoryPath tspath.RootedDirectoryPath) vfs.Entries {
+	if entries, ok := fsys.entries[tspath.NormalizePath(directoryPath.AsString())]; ok {
 		return entries
 	}
 	return fsys.FS.GetAccessibleEntries(directoryPath)
 }
 
-func (fsys *bindingIndexTestFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
+func (fsys *bindingIndexTestFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
 	fsys.mu.Lock()
-	fsys.calls[filePath]++
+	fsys.calls[filePath.AsString()]++
 	fsys.mu.Unlock()
-	if realPath := fsys.realPaths[filePath]; realPath != "" {
-		return realPath
+	if realPath := fsys.realPaths[filePath.AsString()]; realPath != "" {
+		return pathutil.Path(realPath)
 	}
 	return filePath
 }
@@ -127,7 +129,7 @@ func TestExactProgramSourceFileKeepsLexicalBoundary(t *testing.T) {
 			})
 			fsys.caseSensitive = false
 			program := createBindingIndexTestProgram(t, fsys, test.source)
-			if test.caseFolded && program.GetSourceFile(test.candidate) == nil {
+			if test.caseFolded && program.GetSourceFile(pathutil.File(test.candidate)) == nil {
 				t.Fatal("fixture did not exercise a case-folded compiler hit")
 			}
 			fsys.resetCalls()
@@ -328,7 +330,7 @@ func TestProgramFileIndex_CanonicalizesRegularFilesByDirectory(t *testing.T) {
 		secondTarget: secondSource,
 	} {
 		sourceFile := index.sourceFile([]int{0}, 0, targetPath)
-		if sourceFile == nil || sourceFile.FileName() != sourcePath {
+		if sourceFile == nil || sourceFile.FileName().AsString() != sourcePath {
 			t.Fatalf("directory-derived canonical lookup for %q returned %v", targetPath, sourceFile)
 		}
 	}
@@ -537,7 +539,7 @@ func TestProgramFileIndex_PreservesLexicalAliasTieBreak(t *testing.T) {
 		false,
 	)
 	sourceFile := index.sourceFile([]int{0}, 0, targetPath)
-	if sourceFile == nil || sourceFile.FileName() != aliases[1] {
+	if sourceFile == nil || sourceFile.FileName().AsString() != aliases[1] {
 		t.Fatalf("canonical alias tie-break returned %v, want %q", sourceFile, aliases[1])
 	}
 }
@@ -578,6 +580,15 @@ func TestProgramFileIndex_UsesTspathIdentityAcrossFilesystemRoots(t *testing.T) 
 				Files:    []string{"Alias.ts", "Other.ts"},
 				Symlinks: map[string]struct{}{},
 			}
+			if strings.HasPrefix(test.sourcePath, "//") {
+				_, err := utils.CreateProgramFromOptionsLenient(true,
+					&core.CompilerOptions{NoLib: core.TSTrue, NoResolve: core.TSTrue},
+					[]string{test.sourcePath, otherSource}, utils.CreateCompilerHost(sourceDirectory, fsys))
+				if err == nil || !strings.Contains(err.Error(), "TS5116") {
+					t.Fatalf("network roots must report the compiler's TS5116 restriction: %v", err)
+				}
+				return
+			}
 			program := createBindingIndexTestProgram(t, fsys, test.sourcePath, otherSource)
 			fsys.resetCalls()
 
@@ -588,7 +599,7 @@ func TestProgramFileIndex_UsesTspathIdentityAcrossFilesystemRoots(t *testing.T) 
 				true,
 			)
 			sourceFile := index.sourceFile([]int{0}, 0, test.targetPath)
-			if sourceFile == nil || sourceFile.FileName() != test.sourcePath {
+			if sourceFile == nil || sourceFile.FileName().AsString() != test.sourcePath {
 				t.Fatalf("lookup returned %v, want %q", sourceFile, test.sourcePath)
 			}
 			if calls := fsys.callCount(sourceDirectory); calls != 1 {

@@ -53,7 +53,7 @@ var NoMixedEnumsRule = rule.CreateRule(rule.Rule{
 		getDesiredTypeForDefinition := func(node *ast.Node) allowedType {
 			symbol := ctx.TypeChecker.GetSymbolAtLocation(node.Name())
 
-			declaration := symbol.Declarations[0]
+			declaration := symbol.Declarations()[0]
 
 			return getMemberType(declaration.Members()[0])
 		}

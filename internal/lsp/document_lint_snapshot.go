@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // documentLintSnapshot freezes every config-sensitive fact for one editor
@@ -91,7 +92,7 @@ func uriToPath(uri lsproto.DocumentUri) string {
 	// Convert file:// URI to file path using net/url for proper percent-decoding.
 	// Handles spaces (%20), CJK characters, and other encoded chars in paths.
 	// file:///home/user       → /home/user  (Unix)
-	// file:///C:/Users        → c:/Users    (Windows — same drive spelling as tsgo)
+	// file:///C:/Users        → c:/Users    (rslint's Windows drive identity)
 	// file:///path%20name/f   → /path name/f
 	uriStr := string(uri)
 	if uriStr == "" {
@@ -116,9 +117,9 @@ func lspFilesystemPathID(filePath string, fs vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
 	caseSensitive := true
 	if fs != nil {
-		caseSensitive = fs.UseCaseSensitiveFileNames()
-		if realPath := fs.Realpath(filePath); realPath != "" {
-			filePath = tspath.NormalizePath(realPath)
+		caseSensitive = fs.CaseSensitivity().IsCaseSensitive()
+		if realPath := fs.Realpath(pathutil.Path(filePath)); realPath != "" {
+			filePath = tspath.NormalizePath(realPath.AsString())
 		}
 	}
 	return lspLexicalPathID(filePath, caseSensitive)
@@ -139,7 +140,7 @@ func lspConfigTarget(filePath string, configDirectory string, fs vfs.FS) target.
 func isDefaultExcludedLintPath(filePath string, cwd string, fs vfs.FS) bool {
 	useCaseSensitive := true
 	if fs != nil {
-		useCaseSensitive = fs.UseCaseSensitiveFileNames()
+		useCaseSensitive = fs.CaseSensitivity().IsCaseSensitive()
 	}
 	return config.IsDefaultExcludedPath(filePath, cwd, useCaseSensitive)
 }
@@ -360,7 +361,7 @@ func (s *Server) documentWorkspaceDirectory(file target.File, pathSpaces *config
 		if !contains {
 			continue
 		}
-		if candidateDepth := len(tspath.GetPathComponents(boundary, "")); candidateDepth > depth {
+		if candidateDepth := len(tspath.GetPathComponents(boundary)); candidateDepth > depth {
 			selected, depth = boundary, candidateDepth
 		}
 	}

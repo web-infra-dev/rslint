@@ -47,7 +47,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	sf := ctx.SourceFile
 
 	tryGetAliasedSymbol := func(symbol *ast.Symbol) *ast.Symbol {
-		if symbol == nil || symbol.Flags&ast.SymbolFlagsAlias == 0 {
+		if symbol == nil || symbol.Flags()&ast.SymbolFlagsAlias == 0 {
 			return nil
 		}
 		return ctx.TypeChecker.GetAliasedSymbol(symbol)
@@ -58,7 +58,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if symbol == nil {
 			return false
 		}
-		for _, decl := range symbol.Declarations {
+		for _, decl := range symbol.Declarations() {
 			for _, ns := range namespacesInScope {
 				if decl == ns {
 					return true
@@ -74,7 +74,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 
 	getSymbolInScope := func(location *ast.Node, flags ast.SymbolFlags, name string) *ast.Symbol {
 		for _, sym := range ctx.TypeChecker.GetSymbolsInScope(location, flags) {
-			if sym.Name == name {
+			if sym.Name() == name {
 				return sym
 			}
 		}
@@ -106,7 +106,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if accessedSymbol == nil {
 			return false
 		}
-		fromScope := getSymbolInScope(qualifier, accessedSymbol.Flags, name.Text())
+		fromScope := getSymbolInScope(qualifier, accessedSymbol.Flags(), name.Text())
 		if fromScope == nil {
 			return false
 		}

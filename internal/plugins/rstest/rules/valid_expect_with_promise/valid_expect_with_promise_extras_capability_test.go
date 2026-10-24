@@ -85,7 +85,7 @@ func TestValidExpectWithPromiseTypeCapability(t *testing.T) {
 						}
 						if name == "derived" {
 							symbol := checker.Type_symbol(typ)
-							if symbol == nil || len(symbol.Declarations) == 0 || !strings.HasSuffix(ast.GetSourceFileOfNode(symbol.Declarations[0]).FileName(), "/values.ts") {
+							if symbol == nil || len(symbol.Declarations()) == 0 || !strings.HasSuffix(ast.GetSourceFileOfNode(symbol.Declarations()[0]).FileName().AsString(), "/values.ts") {
 								t.Error("lost cross-file class symbol")
 							}
 						}
@@ -100,7 +100,7 @@ func TestValidExpectWithPromiseTypeCapability(t *testing.T) {
 						}
 						if name == "ambient" || name == "thenable" {
 							symbol := ctx.Refs.Resolve(subject)
-							if symbol == nil || len(symbol.Declarations) == 0 || !strings.HasSuffix(ast.GetSourceFileOfNode(symbol.Declarations[0]).FileName(), "/ambient.d.ts") {
+							if symbol == nil || len(symbol.Declarations()) == 0 || !strings.HasSuffix(ast.GetSourceFileOfNode(symbol.Declarations()[0]).FileName().AsString(), "/ambient.d.ts") {
 								t.Errorf("%s lost ambient symbol", name)
 							}
 						}
@@ -178,7 +178,7 @@ func TestValidExpectWithPromiseNoLib(t *testing.T) {
 func runCapabilityRules(t *testing.T, program *lintprogram.Program, file *ast.SourceFile, rules []rule.ConfiguredRule) (*linter.LintResult, []rule.RuleDiagnostic) {
 	t.Helper()
 	plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
-		Programs: []*lintprogram.Program{program}, TargetsByProgram: [][]string{{file.FileName()}}, SingleThreaded: true,
+		Programs: []*lintprogram.Program{program}, TargetsByProgram: [][]string{{file.FileName().AsString()}}, SingleThreaded: true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule { return rules },
 	})
 	if err != nil {

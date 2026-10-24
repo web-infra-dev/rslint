@@ -467,11 +467,11 @@ func (staticEvaluator *StaticStringEvaluator) resolveIdentifierInitializer(node 
 	}
 
 	symbol := staticEvaluator.referenceSymbol(expr)
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	if symbol == nil || len(symbol.Declarations()) != 1 {
 		return nil, nil, false
 	}
 
-	declarationNode := symbol.Declarations[0]
+	declarationNode := symbol.Declarations()[0]
 	if declarationNode == nil || declarationNode.Kind != ast.KindVariableDeclaration {
 		return nil, nil, false
 	}
@@ -2027,10 +2027,10 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			staticEvaluator.referenceFlags = make(map[*ast.Symbol]staticReferenceFlags, 8)
 		}
 		staticEvaluator.referenceFlags[symbol] |= flag
-		if flag&staticReferencePropertyMutation == 0 || len(symbol.Declarations) != 1 {
+		if flag&staticReferencePropertyMutation == 0 || len(symbol.Declarations()) != 1 {
 			return
 		}
-		declaration := symbol.Declarations[0]
+		declaration := symbol.Declarations()[0]
 		if declaration.Kind == ast.KindBindingElement {
 			root := EnclosingVariableDeclarationOfBindingElement(declaration)
 			if root == nil {

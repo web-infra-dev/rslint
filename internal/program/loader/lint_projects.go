@@ -43,7 +43,7 @@ func (s *Session) discoverServiceProjects(
 		if parsed == nil {
 			continue
 		}
-		path := tspath.NormalizePath(parsed.ConfigName())
+		path := tspath.NormalizePath(parsed.ConfigName().AsString())
 		indexes, exists := projects[path]
 		if !exists {
 			indexes = []int{len(plan.specs)}

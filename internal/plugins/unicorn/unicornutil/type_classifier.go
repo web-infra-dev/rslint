@@ -145,7 +145,7 @@ func classifyIntersection(ctx rule.RuleContext, parts []*checker.Type, options T
 
 func classifyHeritage(ctx rule.RuleContext, t *checker.Type, options TypeClassifierOptions) TypeClass {
 	symbol := checker.Type_symbol(t)
-	if symbol == nil || symbol.Flags&options.HeritageSymbolFlags == 0 {
+	if symbol == nil || symbol.Flags()&options.HeritageSymbolFlags == 0 {
 		return TypeUnknown
 	}
 	// Constructors have the class symbol too, but do not inherit its instance
@@ -168,12 +168,12 @@ func classifyHeritage(ctx rule.RuleContext, t *checker.Type, options TypeClassif
 // TypeSymbolName returns a type's direct symbol name, falling back to its
 // alias symbol, just like Unicorn's getTypeSymbol helper.
 func TypeSymbolName(t *checker.Type) (string, bool) {
-	if sym := checker.Type_symbol(t); sym != nil && sym.Name != "" {
-		return sym.Name, true
+	if sym := checker.Type_symbol(t); sym != nil && sym.Name() != "" {
+		return sym.Name(), true
 	}
 	if alias := checker.Type_alias(t); alias != nil {
-		if sym := alias.Symbol(); sym != nil && sym.Name != "" {
-			return sym.Name, true
+		if sym := alias.Symbol(); sym != nil && sym.Name() != "" {
+			return sym.Name(), true
 		}
 	}
 	return "", false

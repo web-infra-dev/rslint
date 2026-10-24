@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type discoveryWalkNode struct {
@@ -200,7 +201,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 		return result
 	}
 
-	entries := coordinator.fs.GetAccessibleEntries(node.canonicalDirectory)
+	entries := coordinator.fs.GetAccessibleEntries(pathutil.Directory(node.canonicalDirectory))
 	directories := append([]string(nil), entries.Directories...)
 	sort.Strings(directories)
 	parentRealPath := ""
@@ -211,12 +212,12 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 	for _, name := range directories {
 		var childTargets *discoveryTargetTrie
 		if walkTargets != nil {
-			childTargets = walkTargets.child(name, coordinator.fs.UseCaseSensitiveFileNames())
+			childTargets = walkTargets.child(name, coordinator.fs.CaseSensitivity().IsCaseSensitive())
 			if childTargets == nil {
 				continue
 			}
 		}
-		if rslintconfig.IsDefaultExcludedPath(name, "", coordinator.fs.UseCaseSensitiveFileNames()) {
+		if rslintconfig.IsDefaultExcludedPath(name, "", coordinator.fs.CaseSensitivity().IsCaseSensitive()) {
 			continue
 		}
 		if isSymlinkDirectoryChild(coordinator.fs, node.canonicalDirectory, parentRealPath, name, entries) {

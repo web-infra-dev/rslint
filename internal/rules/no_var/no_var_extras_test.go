@@ -136,9 +136,9 @@ func TestNoVarDeferredInitializerEditDemand(t *testing.T) {
 	const body = "var value = { method() { return read(); } }; function read() { return value; }"
 	for _, prefix := range []string{"/* comment */\n", "// eslint-disable-next-line no-var\n", "/* rslint-disable no-var */\n"} {
 		for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
-			sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/demand.js", Path: tspath.Path("/demand.js")}, prefix+body, core.ScriptKindJS)
+			sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/demand.js", PathKey: tspath.PathKey("/demand.js")}, prefix+body, core.ScriptKindJS)
 			binder.BindSourceFile(sf)
-			_, init, language := rule.ResolveLanguageDefaults(sf.FileName(), rule.LanguageOptions{})
+			_, init, language := rule.ResolveLanguageDefaults(sf.FileName().AsString(), rule.LanguageOptions{})
 			var diagnostics []rule.RuleDiagnostic
 			ctx := rule.RuleContext{
 				SourceFile: sf, LanguageOptions: language,

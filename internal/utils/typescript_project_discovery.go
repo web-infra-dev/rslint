@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // TypeScriptProjectDiscovery searches parsed config roots in one filesystem
@@ -15,7 +16,7 @@ import (
 type TypeScriptProjectDiscovery struct {
 	fs          vfs.FS
 	parseConfig func(string) (*tsoptions.ParsedCommandLine, error)
-	configs     map[tspath.Path]*tsoptions.ParsedCommandLine
+	configs     map[tspath.PathKey]*tsoptions.ParsedCommandLine
 }
 
 func NewTypeScriptProjectDiscovery(
@@ -24,12 +25,12 @@ func NewTypeScriptProjectDiscovery(
 ) *TypeScriptProjectDiscovery {
 	return &TypeScriptProjectDiscovery{
 		fs: fs, parseConfig: parseConfig,
-		configs: make(map[tspath.Path]*tsoptions.ParsedCommandLine),
+		configs: make(map[tspath.PathKey]*tsoptions.ParsedCommandLine),
 	}
 }
 
-func (d *TypeScriptProjectDiscovery) path(name string) tspath.Path {
-	return tspath.ToPath(name, "", d.fs.UseCaseSensitiveFileNames())
+func (d *TypeScriptProjectDiscovery) path(name string) tspath.PathKey {
+	return pathutil.ToPath(name, "", d.fs.CaseSensitivity().IsCaseSensitive())
 }
 
 func (d *TypeScriptProjectDiscovery) config(name string) (*tsoptions.ParsedCommandLine, error) {
@@ -37,7 +38,7 @@ func (d *TypeScriptProjectDiscovery) config(name string) (*tsoptions.ParsedComma
 	if parsed, known := d.configs[key]; known {
 		return parsed, nil
 	}
-	if !d.fs.FileExists(name) {
+	if !d.fs.FileExists(pathutil.File(name)) {
 		d.configs[key] = nil
 		return nil, nil //nolint:nilnil // No config at this location is a normal search miss.
 	}
@@ -54,28 +55,28 @@ func (d *TypeScriptProjectDiscovery) config(name string) (*tsoptions.ParsedComma
 
 type typeScriptProjectSearch struct {
 	discovery *TypeScriptProjectDiscovery
-	file      tspath.Path
+	file      tspath.PathKey
 	fallback  *tsoptions.ParsedCommandLine
-	seen      map[tspath.Path]bool
+	seen      map[tspath.PathKey]bool
 }
 
 // referencedRoot identifies source redirects from config metadata. A cycle
 // back to the containing config is not a redirect away from that config.
-func (q *typeScriptProjectSearch) referencedRoot(parsed *tsoptions.ParsedCommandLine, seen map[tspath.Path]bool) (bool, error) {
+func (q *typeScriptProjectSearch) referencedRoot(parsed *tsoptions.ParsedCommandLine, seen map[tspath.PathKey]bool) (bool, error) {
 	for _, name := range parsed.ResolvedProjectReferencePaths() {
-		key := q.discovery.path(name)
+		key := q.discovery.path(name.AsString())
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
-		child, err := q.discovery.config(name)
+		child, err := q.discovery.config(name.AsString())
 		if err != nil {
 			return false, err
 		}
 		if child == nil {
 			continue
 		}
-		if _, direct := child.FileNamesByPath()[q.file]; direct {
+		if child.FilePaths().Has(q.file) {
 			return true, nil
 		}
 		if found, err := q.referencedRoot(child, seen); err != nil || found {
@@ -86,14 +87,14 @@ func (q *typeScriptProjectSearch) referencedRoot(parsed *tsoptions.ParsedCommand
 }
 
 func (q *typeScriptProjectSearch) direct(parsed *tsoptions.ParsedCommandLine) (*tsoptions.ParsedCommandLine, error) {
-	if _, included := parsed.FileNamesByPath()[q.file]; !included {
+	if !parsed.FilePaths().Has(q.file) {
 		return nil, nil //nolint:nilnil // Imports do not make a lint target a configured root.
 	}
 	options := parsed.CompilerOptions()
 	if options.DisableSourceOfProjectReferenceRedirect.IsTrue() {
 		return parsed, nil
 	}
-	redirected, err := q.referencedRoot(parsed, map[tspath.Path]bool{q.discovery.path(parsed.ConfigName()): true})
+	redirected, err := q.referencedRoot(parsed, map[tspath.PathKey]bool{q.discovery.path(parsed.ConfigName().AsString()): true})
 	if err != nil {
 		return nil, err
 	}
@@ -115,12 +116,12 @@ func (q *typeScriptProjectSearch) references(parsed *tsoptions.ParsedCommandLine
 	}
 	var children []*tsoptions.ParsedCommandLine
 	for _, name := range parsed.ResolvedProjectReferencePaths() {
-		key := q.discovery.path(name)
+		key := q.discovery.path(name.AsString())
 		if q.seen[key] {
 			continue
 		}
 		q.seen[key] = true
-		child, err := q.discovery.config(name)
+		child, err := q.discovery.config(name.AsString())
 		if err != nil {
 			return nil, err
 		}
@@ -149,17 +150,17 @@ func (q *typeScriptProjectSearch) references(parsed *tsoptions.ParsedCommandLine
 func (d *TypeScriptProjectDiscovery) Find(fileName, rootDirectory string) (*tsoptions.ParsedCommandLine, error) {
 	fileName = tspath.NormalizePath(fileName)
 	query := typeScriptProjectSearch{
-		discovery: d, file: d.path(fileName), seen: make(map[tspath.Path]bool),
+		discovery: d, file: d.path(fileName), seen: make(map[tspath.PathKey]bool),
 	}
 	directory := tspath.GetDirectoryPath(fileName)
 	boundary, contains := DirectorySearchBoundary(
 		DirectoryIdentity{LexicalPath: directory},
-		DirectoryIdentity{LexicalPath: tspath.GetNormalizedAbsolutePath(rootDirectory, "")},
+		DirectoryIdentity{LexicalPath: pathutil.GetNormalizedAbsolutePath(rootDirectory, "")},
 		d.fs,
 	)
 	if !contains {
 		// External targets retain TypeScript's own-ancestor search behavior.
-		boundary = tspath.GetPathComponents(directory, "")[0]
+		boundary = tspath.GetPathComponents(directory)[0]
 	}
 	for ; ; directory = tspath.GetDirectoryPath(directory) {
 		for _, name := range []string{"tsconfig.json", "jsconfig.json"} {
@@ -170,7 +171,7 @@ func (d *TypeScriptProjectDiscovery) Find(fileName, rootDirectory string) (*tsop
 			if parsed == nil {
 				continue
 			}
-			query.seen[d.path(parsed.ConfigName())] = true
+			query.seen[d.path(parsed.ConfigName().AsString())] = true
 			if selected, err := query.direct(parsed); err != nil || selected != nil {
 				return selected, err
 			}

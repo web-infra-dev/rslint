@@ -194,10 +194,10 @@ func isUndefinedLiteral(ctx rule.RuleContext, node *ast.Node) bool {
 		return true
 	}
 	sym := ctx.TypeChecker.GetSymbolAtLocation(node)
-	if sym == nil || sym.Declarations == nil || len(sym.Declarations) == 0 {
+	if sym == nil || sym.Declarations() == nil || len(sym.Declarations()) == 0 {
 		return true
 	}
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		if decl == nil {
 			return false
 		}
@@ -357,10 +357,10 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 				}
 				seen[name] = true
 				sym := ctx.TypeChecker.GetSymbolAtLocation(node)
-				if sym == nil || sym.Declarations == nil {
+				if sym == nil || sym.Declarations() == nil {
 					return "", false
 				}
-				for _, decl := range sym.Declarations {
+				for _, decl := range sym.Declarations() {
 					if decl == nil || !isConstVariableDeclaration(decl) {
 						continue
 					}
@@ -398,18 +398,18 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 			}
 			name := nameNode
 			sym := ctx.TypeChecker.GetSymbolAtLocation(name)
-			if sym == nil || sym.Declarations == nil || len(sym.Declarations) == 0 {
+			if sym == nil || sym.Declarations() == nil || len(sym.Declarations()) == 0 {
 				return
 			}
-			for _, decl := range sym.Declarations {
+			for _, decl := range sym.Declarations() {
 				typeDecl := decl.Parent
 				t := ctx.TypeChecker.GetTypeAtLocation(typeDecl)
 				includesSym := checker.Checker_getPropertyOfType(ctx.TypeChecker, t, "includes")
-				if includesSym == nil || includesSym.Declarations == nil {
+				if includesSym == nil || includesSym.Declarations() == nil {
 					return
 				}
 				ok := false
-				for _, incDecl := range includesSym.Declarations {
+				for _, incDecl := range includesSym.Declarations() {
 					if hasSameParameters(incDecl, decl) {
 						ok = true
 						break

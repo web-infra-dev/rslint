@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed no_extraneous_dependencies.schema.json
@@ -45,7 +46,7 @@ var NoExtraneousDependenciesRule = rule.Rule{
 		var allowed [5]bool
 		allowed[0] = true
 		for i := 1; i < 5; i++ {
-			allowed[i] = allowDependency(opts[dependencyFields[i]], ctx.SourceFile.FileName(), cwd)
+			allowed[i] = allowDependency(opts[dependencyFields[i]], ctx.SourceFile.FileName().AsString(), cwd)
 		}
 		settings := import_utils.SettingsFor(ctx)
 		resolver := import_utils.NewImportResolver(ctx)
@@ -169,14 +170,14 @@ func readDependencies(ctx rule.RuleContext, configured any, cwd string) dependen
 	}
 	explicit := len(dirs) > 0
 	if !explicit {
-		dirs = []string{ctx.Program().NearestPackageJSONDirectory(tspath.GetDirectoryPath(ctx.SourceFile.FileName()))}
+		dirs = []string{ctx.Program().NearestPackageJSONDirectory(tspath.GetDirectoryPath(ctx.SourceFile.FileName().AsString()))}
 	}
 	for _, dir := range dirs {
 		if dir == "" {
 			continue
 		}
 		file := tspath.ResolvePath(tspath.ResolvePath(cwd, dir), "package.json")
-		text, ok := ctx.Program().FS().ReadFile(file)
+		text, ok := ctx.Program().FS().ReadFile(pathutil.File(file))
 		if !ok {
 			if explicit && len(dirs) == 1 {
 				ctx.ReportRange(core.NewTextRange(0, 0), rule.RuleMessage{Description: "The package.json file could not be found."})
@@ -221,7 +222,7 @@ func realPackageName(ctx rule.RuleContext, resolved string) string {
 		if root == "" {
 			return ""
 		}
-		if text, ok := ctx.Program().FS().ReadFile(tspath.ResolvePath(root, "package.json")); ok {
+		if text, ok := ctx.Program().FS().ReadFile(pathutil.File(tspath.ResolvePath(root, "package.json"))); ok {
 			var pkg struct {
 				Name string `json:"name"`
 			}

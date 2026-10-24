@@ -143,7 +143,7 @@ func checkIdentifier(ctx rule.RuleContext, opts options, node *ast.Node) {
 	// getReferenceGroups bails. ctx.Refs.References excludes declaration names,
 	// so reproduce that bail explicitly: a variable with more than one
 	// declaration is not a single `const` array binding.
-	if len(symbol.Declarations) != 1 {
+	if len(symbol.Declarations()) != 1 {
 		return
 	}
 

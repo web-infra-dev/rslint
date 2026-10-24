@@ -11,6 +11,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // TestNoUnusedVarsAmbientFastPathMatchesLegacy attacks the NodeFlagsAmbient
@@ -69,8 +70,8 @@ declare namespace PrivateTypes {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: testCase.fileName,
-				Path:     tspath.Path(testCase.fileName),
+				FileName: pathutil.File(testCase.fileName),
+				PathKey:  tspath.PathKey(testCase.fileName),
 			}, testCase.code, core.ScriptKindTS)
 			optimizedContext := &analysisContext{
 				declarationFile: sourceFile.IsDeclarationFile,

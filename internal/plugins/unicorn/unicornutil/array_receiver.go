@@ -514,7 +514,7 @@ func classifyArrayIdentifier(
 		return arrayClassUnknown
 	}
 	symbol := ctx.Refs.ResolveInFile(idNode)
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	if symbol == nil || len(symbol.Declarations()) != 1 {
 		return arrayClassUnknown
 	}
 	if state.visiting[symbol] {
@@ -530,7 +530,7 @@ func classifyArrayIdentifier(
 		delete(state.visiting, symbol)
 	}()
 
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if declaration == nil {
 		return arrayClassUnknown
 	}
@@ -667,7 +667,7 @@ func classifyArrayTypeReference(
 	visitedSymbols[symbol] = true
 	defer delete(visitedSymbols, symbol)
 
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil {
 			continue
 		}
@@ -760,12 +760,12 @@ func classifyArrayClassReference(ctx rule.RuleContext, node *ast.Node, targetNam
 		if symbol == nil {
 			return classifyKnownArrayTypeName(node.Text(), targetNames, nonTargetNames)
 		}
-		if visited[symbol] || len(symbol.Declarations) == 0 {
+		if visited[symbol] || len(symbol.Declarations()) == 0 {
 			return arrayClassUnknown
 		}
 		visited[symbol] = true
 		defer delete(visited, symbol)
-		declaration := symbol.Declarations[0]
+		declaration := symbol.Declarations()[0]
 		if ast.IsVariableDeclaration(declaration) && ast.IsIdentifier(declaration.Name()) && ast.IsVarConst(declaration) {
 			return classifyArrayClassReference(ctx, declaration.AsVariableDeclaration().Initializer, targetNames, nonTargetNames, visited, options)
 		}

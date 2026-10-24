@@ -26,7 +26,7 @@ func collectNoEmitDiagnostics(ctx context.Context, raw *compiler.Program) []*ast
 	configFilePath := raw.Options().ConfigFilePath
 
 	keep := func(diagnostics []*ast.Diagnostic) []*ast.Diagnostic {
-		return filterShortCircuitDiagnostics(diagnostics, configFilePath)
+		return filterShortCircuitDiagnostics(diagnostics, configFilePath.AsString())
 	}
 
 	configDiagnostics := keep(raw.GetConfigFileParsingDiagnostics())
@@ -59,7 +59,7 @@ func filterShortCircuitDiagnostics(diagnostics []*ast.Diagnostic, configFilePath
 	filtered := make([]*ast.Diagnostic, 0, len(diagnostics))
 	for _, diagnostic := range diagnostics {
 		file := diagnostic.File()
-		if file == nil || configFilePath != "" && file.FileName() == configFilePath {
+		if file == nil || configFilePath != "" && file.FileName().AsString() == configFilePath {
 			continue
 		}
 		filtered = append(filtered, diagnostic)

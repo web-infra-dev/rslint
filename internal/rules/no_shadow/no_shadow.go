@@ -175,7 +175,7 @@ func runWithVariant(variant ruleVariant) func(rule.RuleContext, []any) rule.Rule
 
 		filename := ""
 		if ctx.SourceFile.AsNode() != nil {
-			filename = ctx.SourceFile.FileName()
+			filename = ctx.SourceFile.FileName().AsString()
 		}
 		isDeclFile := strings.HasSuffix(filename, ".d.ts") ||
 			strings.HasSuffix(filename, ".d.cts") ||

@@ -13,7 +13,7 @@ func newTypeScriptDiagnostic(sourceFile *ast.SourceFile, diagnostic *ast.Diagnos
 	return rule.RuleDiagnostic{
 		RuleName:     fmt.Sprintf("TypeScript(TS%d)", diagnostic.Code()),
 		SourceFile:   sourceFile,
-		FilePath:     sourceFile.FileName(),
+		FilePath:     sourceFile.FileName().AsString(),
 		Range:        diagnostic.Loc(),
 		Message:      rule.RuleMessage{Description: description},
 		Severity:     rule.SeverityError,

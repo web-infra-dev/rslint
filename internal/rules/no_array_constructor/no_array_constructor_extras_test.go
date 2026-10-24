@@ -36,6 +36,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func jsdocDirectFixCase(code, marker, output, fileName string) rule_tester.InvalidTestCase {
@@ -478,7 +479,7 @@ func TestNoArrayConstructorEmptyParserLibDivergence(t *testing.T) {
 	configuredRules, merged := rslintconfig.ResolveEnabledRules(
 		rule.NewCatalog(NoArrayConstructorRule),
 		config,
-		sourceFile.FileName(),
+		sourceFile.FileName().AsString(),
 		root.Dir,
 	)
 	if merged == nil || len(configuredRules) != 1 {
@@ -488,7 +489,7 @@ func TestNoArrayConstructorEmptyParserLibDivergence(t *testing.T) {
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:         lintprogram.NewFromCompiler(program),
-		File:            sourceFile.FileName(),
+		File:            sourceFile.FileName().AsString(),
 		HasTypeInfo:     true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule { return configuredRules },
 		Consumer: rule.DiagnosticConsumer{
@@ -776,8 +777,8 @@ func parseNoArrayConstructorSource(source string) *ast.SourceFile {
 func parseNoArrayConstructorSourceWithKind(fileName string, source string, scriptKind core.ScriptKind) *ast.SourceFile {
 	path := "/no-array-constructor-" + fileName
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: path,
-		Path:     tspath.Path(path),
+		FileName: pathutil.File(path),
+		PathKey:  tspath.PathKey(path),
 	}, source, scriptKind)
 }
 
@@ -815,7 +816,7 @@ func lintNoArrayConstructorWithDemand(
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:         lintprogram.NewFromCompiler(program),
-		File:            sourceFile.FileName(),
+		File:            sourceFile.FileName().AsString(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noArrayConstructorConfiguredRules(options),
 		Consumer: rule.DiagnosticConsumer{
@@ -850,7 +851,7 @@ func createNoArrayConstructorProgram(t testing.TB, fileName string, code string)
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, pathutil.Directory(root.Dir)))
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", fileName)
 	}

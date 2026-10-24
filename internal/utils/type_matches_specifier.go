@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type TypeOrValueSpecifierFrom uint8
@@ -156,7 +157,7 @@ func specifierNameMatchesWithCalleeNames(
 		symbol = alias.Symbol()
 	}
 
-	if symbol != nil && slices.Contains(names, symbol.Name) {
+	if symbol != nil && slices.Contains(names, symbol.Name()) {
 		return true
 	}
 
@@ -206,18 +207,18 @@ func typeDeclaredInFile(
 	program *program.Program,
 ) bool {
 	cwd := program.CurrentDirectory()
-	useCaseSensitiveFileNames := program.FS().UseCaseSensitiveFileNames()
+	useCaseSensitiveFileNames := program.FS().CaseSensitivity().IsCaseSensitive()
 	canonical := func(fileName string) string {
-		return tspath.GetCanonicalFileName(fileName, useCaseSensitiveFileNames)
+		return pathutil.GetCanonicalFileName(fileName, useCaseSensitiveFileNames)
 	}
 	if !pathProvided {
 		return Some(declarationFiles, func(f *ast.SourceFile) bool {
-			return strings.HasPrefix(canonical(f.FileName()), canonical(cwd))
+			return strings.HasPrefix(canonical(f.FileName().AsString()), canonical(cwd))
 		})
 	}
-	absPath := canonical(tspath.GetNormalizedAbsolutePath(relativePath, cwd))
+	absPath := canonical(pathutil.GetNormalizedAbsolutePath(relativePath, cwd))
 	return Some(declarationFiles, func(f *ast.SourceFile) bool {
-		return canonical(f.FileName()) == absPath
+		return canonical(f.FileName().AsString()) == absPath
 	})
 }
 
@@ -345,7 +346,7 @@ func typeMatchesSpecifier(
 		}
 		var declarations []*ast.Node
 		if symbol != nil {
-			declarations = symbol.Declarations
+			declarations = symbol.Declarations()
 		}
 		declarationFiles := Map(declarations, func(d *ast.Node) *ast.SourceFile {
 			return ast.GetSourceFileOfNode(d)
@@ -386,7 +387,7 @@ func typeMatchesSpecifier(
 func TypeMatchesDeclarationSpecifier(t *checker.Type, specifier TypeOrValueSpecifier, program *program.Program) bool {
 	var declarations []*ast.Node
 	if symbol := checker.Type_symbol(t); symbol != nil {
-		declarations = symbol.Declarations
+		declarations = symbol.Declarations()
 	}
 	files := Map(declarations, ast.GetSourceFileOfNode)
 	isLib := typeDeclaredInLib(files, program)
@@ -413,16 +414,19 @@ func TypeMatchesDeclarationSpecifier(t *checker.Type, specifier TypeOrValueSpeci
 		return false
 	}
 	canonical := func(name string) string {
-		return tspath.GetCanonicalFileName(tspath.NormalizePath(name), program.FS().UseCaseSensitiveFileNames())
+		return pathutil.GetCanonicalFileName(tspath.NormalizePath(name), program.FS().CaseSensitivity().IsCaseSensitive())
 	}
 	cwd := canonical(program.CurrentDirectory())
-	typeRoots, _ := program.Options().GetEffectiveTypeRoots(program.CurrentDirectory())
-	pathOptions := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: program.FS().UseCaseSensitiveFileNames()}
+	typeRoots, _ := program.Options().GetEffectiveTypeRoots(pathutil.Directory(program.CurrentDirectory()))
+	pathOptions := pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: program.FS().CaseSensitivity().IsCaseSensitive()}
 	// Picomatch treats whitespace in a configured pattern literally.
+
 	globOptions := minimatch3.Options{PreserveWhitespace: true}
 	for _, file := range files {
-		name := canonical(file.FileName())
-		if Some(typeRoots, func(root string) bool { return tspath.ContainsPath(canonical(root), name, pathOptions) }) {
+		name := canonical(file.FileName().AsString())
+		if Some(typeRoots, func(root tspath.RootedDirectoryPath) bool {
+			return pathutil.ContainsPath(canonical(root.AsString()), name, pathOptions)
+		}) {
 			continue
 		}
 		if !specifier.pathProvided && specifier.Path == "" {
@@ -431,10 +435,10 @@ func TypeMatchesDeclarationSpecifier(t *checker.Type, specifier TypeOrValueSpeci
 			}
 			continue
 		}
-		if !tspath.ContainsPath(cwd, name, pathOptions) {
+		if !pathutil.ContainsPath(cwd, name, pathOptions) {
 			continue
 		}
-		relative := tspath.GetRelativePathFromDirectory(cwd, name, pathOptions)
+		relative := pathutil.GetRelativePathFromDirectory(cwd, name, pathOptions)
 		if minimatch3.Match(specifier.Path, name, globOptions) || minimatch3.Match(specifier.Path, "./"+relative, globOptions) {
 			return true
 		}
@@ -504,7 +508,7 @@ func valueMatchesSpecifier(
 	}
 	var declarations []*ast.Node
 	if symbol != nil {
-		declarations = symbol.Declarations
+		declarations = symbol.Declarations()
 	}
 	declarationFiles := Map(declarations, func(d *ast.Node) *ast.SourceFile {
 		return ast.GetSourceFileOfNode(d)

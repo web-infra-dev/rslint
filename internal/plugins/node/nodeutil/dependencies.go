@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type dependenciesKey string
@@ -37,7 +38,7 @@ func AllowsDependency(p *program.Program, pkg *packagejson.Package, name string)
 			if ancestor == nil {
 				break
 			}
-			relative := tspath.GetRelativePathFromDirectory(ancestor.Directory(), pkg.Directory(), tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+			relative := pathutil.GetRelativePathFromDirectory(ancestor.Directory(), pkg.Directory(), pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: true})
 			if matchesWorkspace(relative, ancestor.Field("workspaces")) {
 				add(ancestor)
 				break

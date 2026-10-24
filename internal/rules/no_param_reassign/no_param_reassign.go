@@ -208,7 +208,7 @@ func isSameBinding(ident *ast.Node, binding *paramBinding, fn *ast.Node, ctx rul
 			return true
 		}
 		// Parameter properties: two symbols share a Parameter decl.
-		return binding.decl != nil && refSym.ValueDeclaration == binding.decl
+		return binding.decl != nil && refSym.ValueDeclaration() == binding.decl
 	}
 	return !utils.IsNameShadowedBetween(ident, fn, binding.name)
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestOwnedCompilerProgramsShareCacheOnlyWithinBatch(t *testing.T) {
@@ -166,8 +167,8 @@ func TestSourceOnlyProgramOwnsBoundUniverseWithoutCheckerCapability(t *testing.T
 		t.Fatalf("CreateProgramFromOptions: %v", err)
 	}
 
-	a := raw.GetSourceFile(tspath.ResolvePath(root, "a.ts"))
-	b := raw.GetSourceFile(tspath.ResolvePath(root, "b.ts"))
+	a := raw.GetSourceFile(pathutil.File(tspath.ResolvePath(root, "a.ts")))
+	b := raw.GetSourceFile(pathutil.File(tspath.ResolvePath(root, "b.ts")))
 	if a == nil || b == nil {
 		t.Fatal("fixture Program did not contain both roots")
 	}
@@ -179,7 +180,7 @@ func TestSourceOnlyProgramOwnsBoundUniverseWithoutCheckerCapability(t *testing.T
 		t.Fatal("source-only Program exposed a checker capability")
 	}
 	for _, file := range sourceProgram.SourceFiles() {
-		if !file.IsBound() || !sourceProgram.OwnsSourceFile(file) || sourceProgram.GetSourceFile(file.FileName()) != file {
+		if !file.IsBound() || !sourceProgram.OwnsSourceFile(file) || sourceProgram.GetSourceFile(file.FileName().AsString()) != file {
 			t.Fatalf("source Program lost exact source identity for %q", file.FileName())
 		}
 	}
@@ -188,7 +189,7 @@ func TestSourceOnlyProgramOwnsBoundUniverseWithoutCheckerCapability(t *testing.T
 	}
 	foreign := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: a.FileName(),
-		Path:     a.Path(),
+		PathKey:  a.PathKey(),
 	}, a.Text(), core.ScriptKindTS)
 	importSpecifier := a.Imports()[0]
 	mode := sourceProgram.GetModeForUsageLocation(a, importSpecifier)
@@ -214,13 +215,13 @@ func TestSourceOnlyProgramRejectsInvalidSourceGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProgramFromOptions: %v", err)
 	}
-	owned := raw.GetSourceFile(fileName)
+	owned := raw.GetSourceFile(pathutil.File(fileName))
 	if owned == nil {
 		t.Fatal("fixture Program did not contain a.ts")
 	}
 	reparsed := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: owned.FileName(),
-		Path:     owned.Path(),
+		PathKey:  owned.PathKey(),
 	}, owned.Text(), core.ScriptKindTS)
 	if _, err := lintprogram.NewFromBoundSources(raw, []*ast.SourceFile{reparsed}); err == nil ||
 		err.Error() != "program: source \"/program-source-only-invalid-test/a.ts\" is not bound" {
@@ -232,7 +233,7 @@ func TestSourceOnlyProgramRejectsInvalidSourceGeneration(t *testing.T) {
 		t.Fatalf("foreign source generation error = %v", err)
 	}
 	if _, err := lintprogram.NewFromBoundSources(raw, []*ast.SourceFile{reparsed, owned}); err == nil ||
-		err.Error() != fmt.Sprintf("program: source universe contains different ASTs for path %q", owned.Path()) {
+		err.Error() != fmt.Sprintf("program: source universe contains different ASTs for path %q", owned.PathKey()) {
 		t.Fatalf("same-path source conflict error = %v", err)
 	}
 }
@@ -298,21 +299,23 @@ func TestRootProgramCachesSyntacticDiagnosticsDuringConstruction(t *testing.T) {
 }
 
 type typedNilCompilerHost struct {
-	compiler.CompilerHost
+	utils.CompilerHost
 }
 
 type caseInsensitiveFS struct {
 	vfs.FS
 }
 
-func (caseInsensitiveFS) UseCaseSensitiveFileNames() bool { return false }
+func (caseInsensitiveFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
+}
 
 type typedNilFS struct {
 	vfs.FS
 }
 
 type typedNilFSCompilerHost struct {
-	compiler.CompilerHost
+	utils.CompilerHost
 }
 
 func (*typedNilFSCompilerHost) FS() vfs.FS {

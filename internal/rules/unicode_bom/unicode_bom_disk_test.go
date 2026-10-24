@@ -18,6 +18,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -118,7 +119,7 @@ func TestUnicodeBomFastPathRejectsStaleStat(t *testing.T) {
 	const source = "var a = 123;\n"
 	filePath := writeFixture(t, utils.BOM+source)
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	assert.Assert(t, fs.Stat(filePath) != nil, "failed to prime the VFS stat cache")
+	assert.Assert(t, fs.Stat(pathutil.Path(filePath)) != nil, "failed to prime the VFS stat cache")
 	assert.NilError(t, os.WriteFile(filePath, []byte(source), 0o644))
 
 	assert.Equal(t, 0, len(lintFile(t, filePath, fs)),
@@ -186,7 +187,7 @@ func lintFile(t *testing.T, filePath string, fs vfs.FS) []rule.RuleDiagnostic {
 		Program:                lintprogram.NewFromCompiler(program),
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-			if sourceFile.FileName() != filePath {
+			if sourceFile.FileName().AsString() != filePath {
 				return nil
 			}
 			return []rule.ConfiguredRule{{

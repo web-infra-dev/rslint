@@ -31,7 +31,7 @@ func BenchmarkNameReplacementsIndependentBindings(b *testing.B) {
 				diagnostics := 0
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: sourceProgram,
-					File:    sourceFile.FileName(),
+					File:    sourceFile.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{
 							Name:     name_replacements.NameReplacementsRule.Name,

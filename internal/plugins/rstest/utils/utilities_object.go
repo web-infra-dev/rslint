@@ -85,7 +85,7 @@ func ReceiverIsLocallyDeclared(ctx rule.RuleContext, receiver *ast.Node) bool {
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
 			continue
 		}

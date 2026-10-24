@@ -45,7 +45,7 @@ function f(createElement) {
 		Program:                sourceProgram,
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
 		GetRulesForFile: func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			if sf.FileName() != filePath {
+			if sf.FileName().AsString() != filePath {
 				return nil
 			}
 			return []rule.ConfiguredRule{{

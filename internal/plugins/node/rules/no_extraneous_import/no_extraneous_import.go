@@ -25,7 +25,7 @@ var NoExtraneousImportRule = rule.Rule{
 		if p == nil || fileName == "<input>" {
 			return nil
 		}
-		pkg := packagejson.FindNearestValid(p, fileName)
+		pkg := packagejson.FindNearestValid(p, fileName.AsString())
 		if pkg == nil {
 			return nil
 		}
@@ -39,7 +39,7 @@ var NoExtraneousImportRule = rule.Rule{
 			name, resource := nodeutil.ImportModuleName(specifier)
 			if name == "" || nodeutil.AllowsDependency(p, pkg, name) || slices.Contains(allowed, name) ||
 				typeOnly && nodeutil.AllowsDependency(p, pkg, module.GetTypesPackageName(name)) ||
-				nodeutil.HasTypeScriptAlias(p, fileName, resource) {
+				nodeutil.HasTypeScriptAlias(p, fileName.AsString(), resource) {
 				return ""
 			}
 			index := 0
@@ -50,7 +50,7 @@ var NoExtraneousImportRule = rule.Rule{
 				resolution := nodeutil.ImportResolutionOptions(ctx, typeOnly, opts)
 				resolutionOptions[index] = &resolution
 			}
-			if moduleresolver.ResolveModule(p, resource, fileName, *resolutionOptions[index]) != "" {
+			if moduleresolver.ResolveModule(p, resource, fileName.AsString(), *resolutionOptions[index]) != "" {
 				return name
 			}
 			return ""

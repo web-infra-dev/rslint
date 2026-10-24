@@ -214,8 +214,8 @@ func (c *syntaxChecker) inferExpressionType(node *ast.Node) string {
 		if init, ok := c.static().ResolveIdentifierInitializer(node); ok {
 			return c.expressionType(init)
 		}
-		if symbol := c.ctx.Refs.ResolveInFile(node); symbol != nil && len(symbol.Declarations) == 1 {
-			kind := symbol.Declarations[0].Kind
+		if symbol := c.ctx.Refs.ResolveInFile(node); symbol != nil && len(symbol.Declarations()) == 1 {
+			kind := symbol.Declarations()[0].Kind
 			if kind == ast.KindFunctionDeclaration || kind == ast.KindFunctionExpression {
 				return "Function"
 			}

@@ -35,7 +35,7 @@ var NoRestrictedImportRule = rule.Rule{
 					resolution := nodeutil.ImportResolutionOptions(ctx, typeOnly, nil)
 					resolutionOptions[index] = &resolution
 				}
-				return nodeutil.ImportFilePath(ctx.Program(), name, ctx.SourceFile.FileName(), typeOnly, *resolutionOptions[index])
+				return nodeutil.ImportFilePath(ctx.Program(), name, ctx.SourceFile.FileName().AsString(), typeOnly, *resolutionOptions[index])
 			})
 			if message != nil {
 				ctx.ReportNode(source, *message)

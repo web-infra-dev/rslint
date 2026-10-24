@@ -11,7 +11,7 @@ import (
 func parseModuleSpecifierCacheFile(source string) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/module-cache.ts",
-		Path:     "/module-cache.ts",
+		PathKey:  "/module-cache.ts",
 	}, source, core.ScriptKindTS)
 }
 

@@ -965,7 +965,7 @@ func TestPreferNamedCaptureGroupEditDemand(t *testing.T) {
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, `/(a)/;`, core.ScriptKindTS)
 	statement := sourceFile.Statements.Nodes[0].AsExpressionStatement()
 	literalNode := statement.Expression

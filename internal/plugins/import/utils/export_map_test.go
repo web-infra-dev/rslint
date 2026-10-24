@@ -19,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestGetLocalExportNames(t *testing.T) {
@@ -196,7 +197,7 @@ func TestExportMapsGlobalNamespace(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			source := raw.GetSourceFile(tspath.ResolvePath(root, "consumer.ts"))
+			source := raw.GetSourceFile(pathutil.File(tspath.ResolvePath(root, "consumer.ts")))
 			ctx := (rule.RuleContext{SourceFile: source}).WithProgram(lintprogram.NewFromCompiler(raw))
 			specifier := source.Statements.Nodes[0].AsImportDeclaration().ModuleSpecifier
 			exports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(specifier))
@@ -999,34 +1000,34 @@ func newCaseInsensitiveOverlayFS(virtualFiles map[string]string) vfs.FS {
 	}
 }
 
-func (fsys *caseInsensitiveOverlayFS) UseCaseSensitiveFileNames() bool {
-	return false
+func (fsys *caseInsensitiveOverlayFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
 }
 
-func (fsys *caseInsensitiveOverlayFS) FileExists(path string) bool {
-	if _, ok := fsys.findVirtualPath(path); ok {
+func (fsys *caseInsensitiveOverlayFS) FileExists(path tspath.RootedFilePath) bool {
+	if _, ok := fsys.findVirtualPath(path.AsString()); ok {
 		return true
 	}
 	return fsys.FS.FileExists(path)
 }
 
-func (fsys *caseInsensitiveOverlayFS) ReadFile(path string) (contents string, ok bool) {
-	if actualPath, ok := fsys.findVirtualPath(path); ok {
+func (fsys *caseInsensitiveOverlayFS) ReadFile(path tspath.RootedFilePath) (contents string, ok bool) {
+	if actualPath, ok := fsys.findVirtualPath(path.AsString()); ok {
 		return fsys.virtualFiles[actualPath], true
 	}
 	return fsys.FS.ReadFile(path)
 }
 
-func (fsys *caseInsensitiveOverlayFS) Stat(path string) vfs.FileInfo {
-	if actualPath, ok := fsys.findVirtualPath(path); ok {
-		return fsys.FS.Stat(actualPath)
+func (fsys *caseInsensitiveOverlayFS) Stat(path tspath.RootedPath) vfs.FileInfo {
+	if actualPath, ok := fsys.findVirtualPath(path.AsString()); ok {
+		return fsys.FS.Stat(pathutil.Path(actualPath))
 	}
 	return fsys.FS.Stat(path)
 }
 
-func (fsys *caseInsensitiveOverlayFS) Realpath(path string) string {
-	if actualPath, ok := fsys.findVirtualPath(path); ok {
-		return actualPath
+func (fsys *caseInsensitiveOverlayFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	if actualPath, ok := fsys.findVirtualPath(path.AsString()); ok {
+		return pathutil.Path(actualPath)
 	}
 	return fsys.FS.Realpath(path)
 }
@@ -1058,7 +1059,7 @@ func contextForImportWithCompiler(t *testing.T, source string) (rule.RuleContext
 		t.Fatalf("CreateProgram: %v", err)
 	}
 
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, pathutil.Directory(rootDir.Dir)))
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) == 0 {
 		t.Fatal("test source file was not parsed")
 	}
@@ -1084,7 +1085,7 @@ func contextForImportWithFS(t *testing.T, fs vfs.FS, filePath string) (rule.Rule
 		t.Fatalf("CreateProgramFromOptions: %v", err)
 	}
 
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) == 0 {
 		t.Fatal("test source file was not parsed")
 	}
@@ -1112,7 +1113,7 @@ func contextForImportWithCompilerOptions(t *testing.T, source string, options *c
 		t.Fatalf("CreateProgramFromOptions: %v", err)
 	}
 
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) == 0 {
 		t.Fatal("test source file was not parsed")
 	}

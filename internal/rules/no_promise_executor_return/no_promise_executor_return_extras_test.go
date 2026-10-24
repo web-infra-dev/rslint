@@ -941,7 +941,7 @@ func lintNoPromiseExecutorReturnWithDemand(
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:         lintprogram.NewFromCompiler(program),
-		File:            sourceFile.FileName(),
+		File:            sourceFile.FileName().AsString(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noPromiseExecutorReturnConfiguredRules(options),
 		Consumer: rule.DiagnosticConsumer{
@@ -976,7 +976,7 @@ func createNoPromiseExecutorReturnProgram(t testing.TB, fileName string, code st
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, program.GetCurrentDirectory()))
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", fileName)
 	}

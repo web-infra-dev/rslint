@@ -108,7 +108,7 @@ func TestNoEmptyEditDemand(t *testing.T) {
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: sourceProgram,
-			File:    sourceFile.FileName(),
+			File:    sourceFile.FileName().AsString(),
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:     NoEmptyRule.Name,

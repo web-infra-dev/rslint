@@ -47,12 +47,12 @@ func LintProgram(t testing.TB, opts LintProgramOptions) {
 	}
 	linted := 0
 	for _, file := range files {
-		if pathContainsAny(string(file.Path()), opts.ExcludedPathSubstrings) {
+		if pathContainsAny(string(file.PathKey()), opts.ExcludedPathSubstrings) {
 			continue
 		}
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program:         opts.Program,
-			File:            file.FileName(),
+			File:            file.FileName().AsString(),
 			HasTypeInfo:     opts.Program.CanProvideTypeChecker(file),
 			GetRulesForFile: opts.GetRulesForFile,
 			Consumer:        consumer,
@@ -84,10 +84,10 @@ func selectProgramFiles(t testing.TB, sourceProgram *program.Program, fileNames 
 		if file == nil {
 			t.Fatalf("LintProgram file %q is not in Program", fileName)
 		}
-		if _, ok := seen[file.FileName()]; ok {
+		if _, ok := seen[file.FileName().AsString()]; ok {
 			continue
 		}
-		seen[file.FileName()] = struct{}{}
+		seen[file.FileName().AsString()] = struct{}{}
 		files = append(files, file)
 	}
 	return files

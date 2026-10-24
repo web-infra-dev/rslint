@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed no_unresolved.schema.json
@@ -49,7 +50,7 @@ var NoUnresolvedRule = rule.Rule{
 		var resolver *import_utils.ImportResolver
 		reportedResolverError := false
 		strict := opts["caseSensitiveStrict"] == true
-		checkCase := !ctx.Program().FS().UseCaseSensitiveFileNames() && (strict || opts["caseSensitive"] != false)
+		checkCase := !ctx.Program().FS().CaseSensitivity().IsCaseSensitive() && (strict || opts["caseSensitive"] != false)
 		for _, ref := range modules.Collect(ctx.SourceFile, kinds) {
 			source := unresolvedSource(ref)
 			if source == nil || slices.ContainsFunc(ignored, func(re *esregexp.RegExp) bool { return re.TestOrTimeout(source.Text()) }) {
@@ -115,7 +116,7 @@ func pathHasExactCase(ctx rule.RuleContext, path string, strict bool) bool {
 			if directory == path || directory == "" {
 				return true
 			}
-			entries := ctx.Program().FS().GetAccessibleEntries(directory)
+			entries := ctx.Program().FS().GetAccessibleEntries(pathutil.Directory(directory))
 			name := tspath.GetBaseFileName(path)
 			if !slices.Contains(entries.Files, name) && !slices.Contains(entries.Directories, name) {
 				return false

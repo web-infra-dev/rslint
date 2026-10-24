@@ -29,7 +29,7 @@ func TestEnforceNodeProtocolUsageEditDemand(t *testing.T) {
 		{"never", `import "node:fs";`, `import "fs";`},
 	} {
 		t.Run(tc.mode, func(t *testing.T) {
-			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/edit-demand.ts", Path: "/edit-demand.ts"}, tc.code, core.ScriptKindTS)
+			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/edit-demand.ts", PathKey: "/edit-demand.ts"}, tc.code, core.ScriptKindTS)
 			options := rule_tester.ResolveTestCaseOptions(t, r, []any{tc.mode})
 			var all rule.RuleDiagnostic
 			for _, demand := range []rule.EditDemand{rule.EditDemandAll, rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion} {

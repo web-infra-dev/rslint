@@ -69,7 +69,7 @@ func RespellFixes(ctx rule.RuleContext, respell Respell) []rule.RuleFix {
 	if respell.Symbol == nil {
 		return nil
 	}
-	for _, declaration := range respell.Symbol.Declarations {
+	for _, declaration := range respell.Symbol.Declarations() {
 		if declaration.Kind != ast.KindImportSpecifier || ast.IsTypeOnlyImportDeclaration(declaration) {
 			continue
 		}
@@ -139,7 +139,7 @@ func isMutableRequireBinding(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || declaration.Kind != ast.KindBindingElement {
 			continue
 		}

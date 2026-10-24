@@ -19,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestPreferSetHasExtras(t *testing.T) {
@@ -476,7 +477,7 @@ func lintPreferSetHasWithDemand(
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:     lintprogram.NewFromCompiler(program),
-		File:        sourceFile.FileName(),
+		File:        sourceFile.FileName().AsString(),
 		HasTypeInfo: true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
@@ -519,7 +520,7 @@ func createPreferSetHasProgram(t testing.TB, fileName, code string) (*compiler.P
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, pathutil.Directory(rootDir.Dir)))
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", fileName)
 	}

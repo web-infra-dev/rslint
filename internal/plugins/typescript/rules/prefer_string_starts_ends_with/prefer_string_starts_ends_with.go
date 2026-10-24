@@ -348,7 +348,7 @@ func (h *ruleHelper) resolveRegExpFromNode(node *ast.Node) *regexpInfo {
 	if node.Kind == ast.KindIdentifier {
 		sym := h.ctx.TypeChecker.GetSymbolAtLocation(node)
 		if sym != nil {
-			decls := sym.Declarations
+			decls := sym.Declarations()
 			for _, decl := range decls {
 				if decl.Kind == ast.KindVariableDeclaration {
 					varDecl := decl.AsVariableDeclaration()

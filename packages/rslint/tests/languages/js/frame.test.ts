@@ -9,6 +9,7 @@ import {
 } from '../../../src/languages/js/frame.js';
 import { FRAME_SCHEMAS } from '../../../src/languages/js/frame-schema.js';
 import { VISITOR_KEYS } from '../../../src/languages/js/visitor-keys.js';
+import { buildTokens } from '../../../src/languages/js/token-builder.js';
 import { lintFile as lintFrame } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
 import { projectFrame, projectSyntax } from './project-frame.js';
 
@@ -260,6 +261,80 @@ function canonical(value: unknown): unknown {
 }
 
 describe('Go projection matches canonical ESTree', () => {
+  test.each(['js', 'ts'])(
+    'import phases preserve AST and tokens in .%s',
+    (extension) => {
+      const declarationText = "import source compiled from 'mod';";
+      const sourceText =
+        "import.source('mod', { with: { type: 'webassembly' } });";
+      const deferText = "import.defer('mod');";
+      const ordinaryText = "import('mod');";
+      const text = [
+        '// 😀',
+        declarationText,
+        sourceText,
+        deferText,
+        ordinaryText,
+      ].join('\n');
+      const decoded = projectSyntax(`phase.${extension}`, text);
+      const body = decoded.ast.body as ESTreeNode[];
+      expect(body[0]).toMatchObject({
+        type: 'ImportDeclaration',
+        phase: 'source',
+        range: [
+          text.indexOf(declarationText),
+          text.indexOf(declarationText) + declarationText.length,
+        ],
+        specifiers: [
+          { type: 'ImportDefaultSpecifier', local: { name: 'compiled' } },
+        ],
+      });
+      const source = body[1].expression as ESTreeNode;
+      const deferred = body[2].expression as ESTreeNode;
+      const ordinary = body[3].expression as ESTreeNode;
+      expect(source).toMatchObject({
+        type: 'ImportExpression',
+        phase: 'source',
+        range: [
+          text.indexOf(sourceText),
+          text.indexOf(sourceText) + sourceText.length - 1,
+        ],
+        source: { type: 'Literal', value: 'mod' },
+        options: { type: 'ObjectExpression' },
+      });
+      expect(deferred).toMatchObject({
+        type: 'ImportExpression',
+        phase: 'defer',
+        range: [
+          text.indexOf(deferText),
+          text.indexOf(deferText) + deferText.length - 1,
+        ],
+      });
+      expect(ordinary.type).toBe('ImportExpression');
+      expect(ordinary).not.toHaveProperty('phase');
+      const tokens = buildTokens(
+        decoded.tokenTypes,
+        decoded.tokenStarts,
+        decoded.tokenEnds,
+        decoded.text,
+        decoded.lineStarts,
+      );
+      expect(tokens.filter((token) => token.value === 'source')).toMatchObject([
+        {
+          type: 'Identifier',
+          range: [
+            text.indexOf(declarationText) + 7,
+            text.indexOf(declarationText) + 13,
+          ],
+        },
+        {
+          type: 'Identifier',
+          range: [text.indexOf(sourceText) + 7, text.indexOf(sourceText) + 13],
+        },
+      ]);
+    },
+  );
+
   const cases = [
     'const {source: local = 1, [key]: other = 2, nested: {value} = fallback} = input; function f({source: local = 1}) {} const [item = 1] = list;',
     '// 😀\nclass C { private /* constructor in trivia */ constructor /* ( */ () {} } class D { protected\nconstructor() {} }',

@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -823,7 +824,7 @@ func normalizePath(filePath, cwd string) string {
 }
 
 func normalizePathWithCaseSensitivity(filePath, cwd string, useCaseSensitive bool) string {
-	return tspath.NormalizePath(tspath.ConvertToRelativePath(filePath, tspath.ComparePathsOptions{
+	return tspath.NormalizePath(pathutil.ConvertToRelativePath(filePath, pathutil.ComparePathsOptions{
 		UseCaseSensitiveFileNames: useCaseSensitive,
 		CurrentDirectory:          cwd,
 	}))

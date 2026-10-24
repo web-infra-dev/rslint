@@ -522,10 +522,10 @@ func resolveConstInitializer(ctx rule.RuleContext, idNode *ast.Node, seen map[*a
 		return nil
 	}
 	seen[sym] = true
-	if sym.Declarations == nil {
+	if sym.Declarations() == nil {
 		return nil
 	}
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		if decl == nil || !ast.IsVariableDeclaration(decl) {
 			continue
 		}

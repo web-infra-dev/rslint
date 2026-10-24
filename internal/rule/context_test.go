@@ -84,7 +84,7 @@ func TestEditDemandValidation(t *testing.T) {
 func TestRuleContextRejectsInvalidDiagnosticConsumer(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, "const value = 1;", core.ScriptKindTS)
 
 	tests := []struct {
@@ -120,7 +120,7 @@ func TestRuleContextRejectsInvalidDiagnosticConsumer(t *testing.T) {
 func TestDeferredReportsRejectNilBuilder(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, "const value = 1;", core.ScriptKindTS)
 	ctx := RuleContext{SourceFile: sourceFile}.WithDiagnosticConsumer(
 		"test",
@@ -167,7 +167,7 @@ func TestDeferredReportsRejectNilBuilder(t *testing.T) {
 func TestDeferredFixesAndSuggestionsDemand(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, "const value = 1;", core.ScriptKindTS)
 	textRange := core.NewTextRange(0, 5)
 	message := RuleMessage{Id: "combined", Description: "combined report"}
@@ -255,7 +255,7 @@ func TestDeferredFixesAndSuggestionsDemand(t *testing.T) {
 func TestDeferredFixesAndSuggestionsAttachOnlyNonEmptyCategories(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, "const value = 1;", core.ScriptKindTS)
 	textRange := core.NewTextRange(0, 5)
 	message := RuleMessage{Id: "combined", Description: "combined report"}
@@ -329,7 +329,7 @@ func TestDeferredFixesAndSuggestionsAttachOnlyNonEmptyCategories(t *testing.T) {
 func TestNodeDeferredFixesAndSuggestionsSkipsSuppressedBuilders(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, "const visible = 1;\n// rslint-disable-next-line test\nconst blocked = 2;\n", core.ScriptKindTS)
 	if sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 2 {
 		t.Fatal("suppression fixture did not parse into two statements")
@@ -388,7 +388,7 @@ func TestNodeDeferredFixesAndSuggestionsSkipsSuppressedBuilders(t *testing.T) {
 func TestWithReporterPreservesAllEditArtifacts(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, "const value = 1;", core.ScriptKindTS)
 	textRange := core.NewTextRange(0, 5)
 	fix := RuleFixReplaceRange(textRange, "let")

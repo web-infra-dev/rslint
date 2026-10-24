@@ -494,7 +494,7 @@ func countDiagnosticsForRule(t *testing.T, fileName, source string, impl rule.Ru
 		Program:                sourceProgram,
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
 		GetRulesForFile: func(sf *tsast.SourceFile) []rule.ConfiguredRule {
-			if sf.FileName() != filePath {
+			if sf.FileName().AsString() != filePath {
 				return nil
 			}
 			return []rule.ConfiguredRule{configured}

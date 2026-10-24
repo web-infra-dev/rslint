@@ -560,7 +560,7 @@ consume(outer);
 		Program:                sourceProgram,
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-			if sourceFile.FileName() != filePath {
+			if sourceFile.FileName().AsString() != filePath {
 				return nil
 			}
 			return []rule.ConfiguredRule{{
@@ -844,7 +844,7 @@ consume(data);`,
 					Program:                sourceProgram,
 					ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
 					GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-						if sourceFile.FileName() != filePath {
+						if sourceFile.FileName().AsString() != filePath {
 							return nil
 						}
 						return []rule.ConfiguredRule{{

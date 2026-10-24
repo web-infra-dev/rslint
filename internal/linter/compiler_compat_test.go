@@ -7,9 +7,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 var legacyDefaultExcludedPathSubstrings = []string{"/node_modules/", "bundled:"}
@@ -101,12 +101,12 @@ func testProgramsByCheckerCapability(
 			if file == nil {
 				continue
 			}
-			if _, ok := checkerFiles[file.FileName()]; ok {
-				typedTargets = append(typedTargets, file.FileName())
+			if _, ok := checkerFiles[file.FileName().AsString()]; ok {
+				typedTargets = append(typedTargets, file.FileName().AsString())
 				continue
 			}
 			sourceOnlyFiles = append(sourceOnlyFiles, file)
-			sourceOnlyTargets = append(sourceOnlyTargets, file.FileName())
+			sourceOnlyTargets = append(sourceOnlyTargets, file.FileName().AsString())
 		}
 		targets = append(targets, typedTargets)
 		if len(sourceOnlyFiles) == 0 {
@@ -239,13 +239,13 @@ func prepareExactTestProgramLintPlan(
 	seen := make(map[string]struct{}, len(targets))
 	for _, target := range targets {
 		file := sourceProgram.GetSourceFile(target)
-		if file == nil || pathContainsAny(string(file.Path()), excludePaths) {
+		if file == nil || pathContainsAny(string(file.PathKey()), excludePaths) {
 			continue
 		}
-		if _, ok := seen[file.FileName()]; ok {
+		if _, ok := seen[file.FileName().AsString()]; ok {
 			continue
 		}
-		seen[file.FileName()] = struct{}{}
+		seen[file.FileName().AsString()] = struct{}{}
 		files = append(files, file)
 	}
 	return prepareProgramLintPlanForFiles(programRulePlanOptions{
@@ -287,17 +287,17 @@ func collectLegacyFilesToLint(opts legacyProgramPlanOptions) []*ast.SourceFile {
 }
 
 func filePassesLegacyProjection(opts legacyProgramPlanOptions, file *ast.SourceFile, allowFileInfos []os.FileInfo) bool {
-	if pathContainsAny(string(file.Path()), opts.excludePaths) {
+	if pathContainsAny(string(file.PathKey()), opts.excludePaths) {
 		return false
 	}
 	if opts.scope.files != nil || opts.scope.dirs != nil {
-		fileAllowed := opts.scope.files != nil && isFileAllowed(file.FileName(), opts.scope.files, allowFileInfos)
-		dirAllowed := opts.scope.dirs != nil && isDirAllowed(file.FileName(), opts.scope.dirs)
+		fileAllowed := opts.scope.files != nil && isFileAllowed(file.FileName().AsString(), opts.scope.files, allowFileInfos)
+		dirAllowed := opts.scope.dirs != nil && isDirAllowed(file.FileName().AsString(), opts.scope.dirs)
 		if !fileAllowed && !dirAllowed {
 			return false
 		}
 	}
-	return opts.fileFilter == nil || opts.fileFilter(file.FileName())
+	return opts.fileFilter == nil || opts.fileFilter(file.FileName().AsString())
 }
 
 func pathContainsAny(path string, substrings []string) bool {
@@ -339,7 +339,7 @@ func precomputeAllowFileInfos(allowFiles []string) []os.FileInfo {
 
 func isDirAllowed(fileName string, allowDirs []string) bool {
 	for _, dirPath := range allowDirs {
-		if tspath.StartsWithDirectory(fileName, dirPath, true) {
+		if pathutil.StartsWithDirectory(fileName, dirPath, true) {
 			return true
 		}
 	}

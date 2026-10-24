@@ -158,11 +158,11 @@ func GetConstVariableInitializer(node *ast.Node, typeChecker *checker.Checker) *
 			}
 		}
 	}
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	if symbol == nil || len(symbol.Declarations()) != 1 {
 		return nil
 	}
 
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if ast.IsBindingElement(declaration) {
 		declaration = EnclosingVariableDeclarationOfBindingElement(declaration)
 	}

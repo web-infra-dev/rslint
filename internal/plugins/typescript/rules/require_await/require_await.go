@@ -401,9 +401,9 @@ func hasCallSignature(typeChecker *checker.Checker, t *checker.Type) bool {
 
 func isCallbackParameter(typeChecker *checker.Checker, param *ast.Symbol, node *ast.Node) bool {
 	t := checker.Checker_getApparentType(typeChecker, typeChecker.GetTypeOfSymbolAtLocation(param, node))
-	if param.ValueDeclaration != nil &&
-		ast.IsParameterDeclaration(param.ValueDeclaration) &&
-		param.ValueDeclaration.AsParameterDeclaration().DotDotDotToken != nil {
+	if param.ValueDeclaration() != nil &&
+		ast.IsParameterDeclaration(param.ValueDeclaration()) &&
+		param.ValueDeclaration().AsParameterDeclaration().DotDotDotToken != nil {
 		t = checker.Checker_getIndexTypeOfType(typeChecker, t, checker.Checker_numberType(typeChecker))
 		if t == nil {
 			return false

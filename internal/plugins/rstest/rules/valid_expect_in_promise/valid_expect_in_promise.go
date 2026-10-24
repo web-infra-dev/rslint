@@ -209,7 +209,7 @@ func importMetaRstestBindingName(symbol *ast.Symbol) (string, bool) {
 	if symbol == nil {
 		return "", false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || declaration.Kind != ast.KindBindingElement {
 			continue
 		}
@@ -237,7 +237,7 @@ func isImportMetaRstestAlias(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
 			continue
 		}

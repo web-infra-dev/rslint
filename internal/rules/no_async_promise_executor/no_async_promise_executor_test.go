@@ -33,7 +33,7 @@ func TestSourceMayUsePromise(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/source.ts",
-				Path:     "/source.ts",
+				PathKey:  "/source.ts",
 			}, testCase.code, core.ScriptKindTS)
 			if got := sourceMayUsePromise(sourceFile); got != testCase.want {
 				t.Fatalf("sourceMayUsePromise(%q) = %v, want %v", testCase.code, got, testCase.want)

@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type discoverySeed struct {
@@ -81,7 +82,7 @@ func (coordinator *discoveryCoordinator) resolveDirectorySeedOwners(seeds []*dis
 				reachable, authoredBlocked := coordinator.advanceDirectorySeedGit(
 					resolution,
 					candidateDirectory,
-					discoveryPathsEqual(candidateDirectory, rootDirectory, coordinator.fs.UseCaseSensitiveFileNames()),
+					discoveryPathsEqual(candidateDirectory, rootDirectory, coordinator.fs.CaseSensitivity().IsCaseSensitive()),
 				)
 				if authoredBlocked {
 					resolution.next = len(resolution.candidates)
@@ -146,7 +147,7 @@ func (coordinator *discoveryCoordinator) advanceDirectorySeedGit(
 	destination string,
 	reopenDestination bool,
 ) (reachable bool, authoredBlocked bool) {
-	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
+	useCaseSensitive := coordinator.fs.CaseSensitivity().IsCaseSensitive()
 	destination = tspath.NormalizePath(destination)
 	var reverse []string
 	for directory := destination; directory != ""; directory = configDiscoveryParent(directory) {
@@ -306,8 +307,8 @@ func (coordinator *discoveryCoordinator) findCandidateForOwner(
 	for _, name := range AutoJSConfigFileNames {
 		candidatePath := tspath.CombinePaths(directory, name)
 		canonicalCandidate := tspath.CombinePaths(canonicalDirectory, name)
-		if isDefaultDiscoveryExcluded(candidatePath, coordinator.request.CWD, coordinator.fs.UseCaseSensitiveFileNames()) ||
-			!coordinator.fs.FileExists(canonicalCandidate) {
+		if isDefaultDiscoveryExcluded(candidatePath, coordinator.request.CWD, coordinator.fs.CaseSensitivity().IsCaseSensitive()) ||
+			!coordinator.fs.FileExists(pathutil.File(canonicalCandidate)) {
 			continue
 		}
 		if coordinator.isGloballyIgnoredCandidate(ownerPath, rslintconfig.PathIdentity{

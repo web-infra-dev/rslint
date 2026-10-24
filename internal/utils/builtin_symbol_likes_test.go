@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -21,7 +22,7 @@ func TestIsSymbolFromDefaultLibrary(t *testing.T) {
 
 		program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 		assert.NilError(t, err, "couldn't create program")
-		sourceFile := program.GetSourceFile(filePath)
+		sourceFile := program.GetSourceFile(pathutil.File(filePath))
 		c, done := program.GetTypeChecker(t.Context())
 		defer done()
 		t := c.GetTypeAtLocation(sourceFile.Statements.Nodes[0].AsTypeAliasDeclaration().Name())

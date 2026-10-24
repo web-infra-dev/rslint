@@ -353,10 +353,10 @@ value = 1;`,
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/no-unassigned-vars.ts", Path: "/no-unassigned-vars.ts",
+				FileName: "/no-unassigned-vars.ts", PathKey: "/no-unassigned-vars.ts",
 			}, test.code, core.ScriptKindTS)
 			binder.BindSourceFile(sourceFile)
-			_, refsInit, _ := rule.ResolveLanguageDefaults(sourceFile.FileName(), rule.LanguageOptions{})
+			_, refsInit, _ := rule.ResolveLanguageDefaults(sourceFile.FileName().AsString(), rule.LanguageOptions{})
 			for _, shared := range []bool{false, true} {
 				for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
 					t.Run(fmt.Sprintf("shared=%t/demand=%d", shared, demand), func(t *testing.T) {

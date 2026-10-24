@@ -24,7 +24,7 @@ func (b *Builder) BuildShallowSignatureInfo(sig *checker.Signature) *SignatureIn
 	minArgCount := 0
 	for i, param := range params {
 		isRest := flags&checker.SignatureFlagsHasRestParameter != 0 && i == len(params)-1
-		isOptional := param.Flags&ast.SymbolFlagsOptional != 0
+		isOptional := param.Flags()&ast.SymbolFlagsOptional != 0
 		if !isRest && !isOptional {
 			minArgCount++
 		}
@@ -41,7 +41,7 @@ func (b *Builder) BuildShallowSignatureInfo(sig *checker.Signature) *SignatureIn
 		// Check if declaration is from external file
 		declFile := ast.GetSourceFileOfNode(decl)
 		if declFile != nil && declFile != b.sourceFile {
-			info.FileName = declFile.FileName()
+			info.FileName = declFile.FileName().AsString()
 		}
 	}
 
@@ -65,7 +65,7 @@ func (b *Builder) BuildSignatureInfo(sig *checker.Signature) *SignatureInfo {
 	minArgCount := 0
 	for i, param := range params {
 		isRest := flags&checker.SignatureFlagsHasRestParameter != 0 && i == len(params)-1
-		isOptional := param.Flags&ast.SymbolFlagsOptional != 0
+		isOptional := param.Flags()&ast.SymbolFlagsOptional != 0
 		if !isRest && !isOptional {
 			minArgCount++
 		}
@@ -87,7 +87,7 @@ func (b *Builder) BuildSignatureInfo(sig *checker.Signature) *SignatureInfo {
 		// Check if declaration is from external file
 		declFile := ast.GetSourceFileOfNode(decl)
 		if declFile != nil && declFile != b.sourceFile {
-			info.FileName = declFile.FileName()
+			info.FileName = declFile.FileName().AsString()
 		}
 	}
 

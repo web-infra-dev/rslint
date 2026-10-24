@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed valid_mock_module_path.schema.json
@@ -176,7 +177,7 @@ func localModuleExists(sourceProgram *program.Program, fileName, specifier strin
 	}
 	for _, extension := range append([]string{""}, extensions...) {
 		candidate := tspath.NormalizePath(base + extension)
-		if fs.FileExists(candidate) || fs.DirectoryExists(candidate) {
+		if fs.FileExists(pathutil.File(candidate)) || fs.DirectoryExists(pathutil.Directory(candidate)) {
 			return true
 		}
 	}
@@ -237,10 +238,10 @@ var ValidMockModulePathRule = rule.Rule{
 
 				specifier := moduleName.AsStringLiteral().Text
 				if strings.HasPrefix(specifier, ".") {
-					if localModuleExists(sourceProgram, fileName, specifier, moduleFileExtensions) {
+					if localModuleExists(sourceProgram, fileName.AsString(), specifier, moduleFileExtensions) {
 						return
 					}
-				} else if packageModuleExists(sourceProgram, fileName, specifier) {
+				} else if packageModuleExists(sourceProgram, fileName.AsString(), specifier) {
 					return
 				}
 

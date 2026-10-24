@@ -21,7 +21,7 @@ func BenchmarkForEachComment(b *testing.B) {
 		b.Run(fixture.name, func(b *testing.B) {
 			parse := func() *ast.SourceFile {
 				return parser.ParseSourceFile(ast.SourceFileParseOptions{
-					FileName: "/comments.ts", Path: "/comments.ts",
+					FileName: "/comments.ts", PathKey: "/comments.ts",
 				}, fixture.source, core.ScriptKindTS)
 			}
 			for _, warm := range []bool{false, true} {

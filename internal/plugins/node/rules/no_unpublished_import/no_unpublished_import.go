@@ -51,7 +51,7 @@ var NoUnpublishedImportRule = rule.Rule{
 						resolutionOptions[index] = &resolution
 						unpublished[index] = map[string]bool{}
 					}
-					target := nodeutil.ImportFilePath(p, resource, fileName, typeOnly, *resolutionOptions[index])
+					target := nodeutil.ImportFilePath(p, resource, fileName.AsString(), typeOnly, *resolutionOptions[index])
 					ignored = publication.IsUnpublishedFile(target)
 					// Options and package metadata stay fixed within this file.
 					// Type imports can resolve differently; each occurrence still reports.

@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // PathAliasResolver probes compiler paths independently of package lookup.
@@ -17,7 +18,7 @@ import (
 type PathAliasResolver struct {
 	program  *program.Program
 	patterns *module.ParsedPatterns
-	resolver *module.Resolver
+	resolver *module.DefaultResolver
 }
 
 func NewPathAliasResolver(p *program.Program) *PathAliasResolver {
@@ -50,19 +51,19 @@ func (r *PathAliasResolver) HasAliasAt(sourceFile *ast.SourceFile, name string, 
 		aliasOptions.Paths = nil
 		aliasOptions.RootDirs = nil
 		host := utils.CreateCompilerHost(p.CurrentDirectory(), p.FS())
-		r.resolver = module.NewResolver(host, aliasOptions, "", "", nil)
+		r.resolver = module.NewResolver(module.ResolverOptions{Host: host, CompilerOptions: aliasOptions})
 	}
 	fileName := sourceFile.FileName()
 	if options.PreserveSymlinks != core.TSTrue {
-		if realPath := p.FS().Realpath(fileName); realPath != "" {
-			fileName = realPath
+		if realPath := p.FS().Realpath(fileName.AsPath()); realPath != "" {
+			fileName = tspath.RootedFilePathFromPath(realPath)
 		}
 	}
 	mode := p.GetModeForUsageLocation(sourceFile, source.Specifier())
-	base := options.GetPathsBasePath(p.CurrentDirectory())
+	base := options.GetPathsBasePath(pathutil.Directory(p.CurrentDirectory()))
 	for _, target := range options.Paths.GetOrZero(pattern.Text) {
-		candidate := tspath.ResolvePath(base, strings.Replace(target, "*", pattern.MatchedText(name), 1))
-		if resolved, _ := r.resolver.ResolveModuleName(candidate, fileName, mode, nil); resolved.IsResolved() {
+		candidate := tspath.ResolvePath(base.AsString(), strings.Replace(target, "*", pattern.MatchedText(name), 1))
+		if resolved, _, _ := r.resolver.ResolveModuleName(candidate, fileName, mode, nil); resolved.IsResolved() {
 			return true
 		}
 	}

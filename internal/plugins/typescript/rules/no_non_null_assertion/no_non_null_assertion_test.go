@@ -444,7 +444,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 func parseNoNonNullAssertionSource(code string) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/source.ts",
-		Path:     "/source.ts",
+		PathKey:  "/source.ts",
 	}, code, core.ScriptKindTS)
 }
 

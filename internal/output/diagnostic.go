@@ -5,7 +5,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type location struct {
@@ -22,7 +22,7 @@ type diagnosticView struct {
 
 func newDiagnosticView(
 	diagnostic Diagnostic,
-	paths tspath.ComparePathsOptions,
+	paths pathutil.ComparePathsOptions,
 	requireSource bool,
 ) (diagnosticView, error) {
 	if diagnostic.Start.Line < 0 || diagnostic.End.Line < diagnostic.Start.Line ||
@@ -77,7 +77,7 @@ func newDiagnosticView(
 
 	return diagnosticView{
 		raw:          diagnostic,
-		relativePath: tspath.ConvertToRelativePath(diagnostic.FilePath, paths),
+		relativePath: pathutil.ConvertToRelativePath(diagnostic.FilePath, paths),
 		start:        location{line: diagnostic.Start.Line, column: diagnostic.Start.Column},
 		end:          location{line: diagnostic.End.Line, column: diagnostic.End.Column},
 	}, nil

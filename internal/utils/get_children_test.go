@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // parseJSFile parses JavaScript code with allowJs enabled to trigger JSDoc reparse.
@@ -17,16 +18,16 @@ func parseJSFile(t *testing.T, code string) *ast.SourceFile {
 	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	host := CreateCompilerHost(rootDir.Dir, fs)
 	program, err := CreateProgramFromOptions(true, &core.CompilerOptions{
-		AllowJs:  core.TSTrue,
-		CheckJs:  core.TSTrue,
-		Strict:   core.TSTrue,
-		Target:   core.ScriptTargetESNext,
-		NoEmit:   core.TSTrue,
+		AllowJs: core.TSTrue,
+		CheckJs: core.TSTrue,
+		Strict:  core.TSTrue,
+		Target:  core.ScriptTargetESNext,
+		NoEmit:  core.TSTrue,
 	}, []string{filePath}, host)
 	if err != nil {
 		t.Fatalf("couldn't create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	if sourceFile == nil {
 		t.Fatal("source file not found")
 	}

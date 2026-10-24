@@ -153,10 +153,10 @@ func (a *analyzer) symbolOf(node *ast.Node) *ast.Symbol {
 // scope and are not visible to ESLint's scope analyzer, so the rule must
 // treat references to them like unresolved identifiers.
 func symbolIsDeclareGlobal(sym *ast.Symbol) bool {
-	if sym == nil || len(sym.Declarations) == 0 {
+	if sym == nil || len(sym.Declarations()) == 0 {
 		return false
 	}
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		if !isInsideDeclareGlobal(decl) {
 			return false
 		}
@@ -665,9 +665,9 @@ func (a *analyzer) report(assignmentNode, left *ast.Node, sym *ast.Symbol, isMem
 			return
 		}
 		leftText := normalizedNodeText(a.ctx.SourceFile, left)
-		a.ctx.ReportNode(assignmentNode, messageNonAtomicObjectUpdate(leftText, sym.Name))
+		a.ctx.ReportNode(assignmentNode, messageNonAtomicObjectUpdate(leftText, sym.Name()))
 	} else {
-		a.ctx.ReportNode(assignmentNode, messageNonAtomicUpdate(sym.Name))
+		a.ctx.ReportNode(assignmentNode, messageNonAtomicUpdate(sym.Name()))
 	}
 }
 
@@ -745,7 +745,7 @@ func (a *analyzer) collectDestructuringTargets(node *ast.Node, state *analysisSt
 		}
 	case ast.KindIdentifier:
 		if sym := a.symbolOf(n); sym != nil {
-			*targets = append(*targets, destructuringTarget{symbol: sym, name: sym.Name})
+			*targets = append(*targets, destructuringTarget{symbol: sym, name: sym.Name()})
 		}
 	default:
 		// Member target or other — walk as a normal expression so any side
@@ -766,7 +766,7 @@ func (a *analyzer) collectDestructuringProperty(prop *ast.Node, state *analysisS
 		name := sp.Name()
 		if name != nil && name.Kind == ast.KindIdentifier {
 			if sym := a.symbolOf(name); sym != nil {
-				*targets = append(*targets, destructuringTarget{symbol: sym, name: sym.Name})
+				*targets = append(*targets, destructuringTarget{symbol: sym, name: sym.Name()})
 			}
 		}
 	case ast.KindPropertyAssignment:

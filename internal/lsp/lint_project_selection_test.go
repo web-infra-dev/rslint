@@ -27,6 +27,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func lintProjectMetadataForTest(
@@ -40,10 +41,7 @@ func lintProjectMetadataForTest(
 	}
 	return newLintProjectMetadata(
 		configPath,
-		tsoptions.NewParsedCommandLine(options, rootFiles, nil, tspath.ComparePathsOptions{
-			CurrentDirectory:          tspath.GetDirectoryPath(configPath),
-			UseCaseSensitiveFileNames: true,
-		}),
+		tsoptions.NewParsedCommandLine(options, pathutil.Files(rootFiles), nil, pathutil.Directory(tspath.GetDirectoryPath(configPath)), tspath.CaseSensitive),
 		fs,
 	)
 }
@@ -211,8 +209,8 @@ type configReadCountingFS struct {
 	unreadable bool
 }
 
-func (fs *configReadCountingFS) ReadFile(path string) (string, bool) {
-	if lintProgramLexicalPathID(path, fs.FS) == lintProgramLexicalPathID(fs.target, fs.FS) {
+func (fs *configReadCountingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if lintProgramLexicalPathID(path.AsString(), fs.FS) == lintProgramLexicalPathID(fs.target, fs.FS) {
 		fs.reads++
 		if fs.unreadable {
 			return "", false
@@ -261,10 +259,10 @@ func TestStandaloneLintProjectRequestReusesParsedConfigSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sourceFile == nil || lintProgramLexicalPathID(sourceFile.FileName(), fs) != lintProgramLexicalPathID(firstSource, fs) {
+	if sourceFile == nil || lintProgramLexicalPathID(sourceFile.FileName().AsString(), fs) != lintProgramLexicalPathID(firstSource, fs) {
 		t.Fatalf("Program did not use the selected parsed snapshot: %v", sourceFile)
 	}
-	if program.GetSourceFile(tspath.NormalizePath(secondSource)) != nil {
+	if program.GetSourceFile(pathutil.File(tspath.NormalizePath(secondSource))) != nil {
 		t.Fatal("Program reparsed the changed config during the same selection request")
 	}
 	if fs.reads != 1 {
@@ -308,8 +306,8 @@ func TestStandaloneLintProjectRequestKeepsReferenceSnapshot(t *testing.T) {
 		t.Fatalf("Program source=%v error=%v", source, err)
 	}
 	found := false
-	program.RangeResolvedProjectReference(func(_ tspath.Path, parsed, _ *tsoptions.ParsedCommandLine, _ int) bool {
-		if parsed != nil && lintProgramLexicalPathID(parsed.ConfigName(), fsys) == lintProgramLexicalPathID(refPath, fsys) {
+	program.RangeResolvedProjectReference(func(_ tspath.PathKey, parsed, _ *tsoptions.ParsedCommandLine, _ int) bool {
+		if parsed != nil && lintProgramLexicalPathID(parsed.ConfigName().AsString(), fsys) == lintProgramLexicalPathID(refPath, fsys) {
 			found = true
 			if parsed != reference.commandLine {
 				t.Error("construction reparsed a selected reference snapshot")
@@ -358,6 +356,52 @@ func TestLintProjectSnapshotNormalizesWindowsDrive(t *testing.T) {
 	if !lintSessionProgramMatchesConfig(program, upper, nil, fsys) {
 		t.Fatal("equivalent Windows configuration could not reuse its Program")
 	}
+	if upper.commandLine.CompilerOptions().ConfigFilePath != "C:/Repo/tsconfig.json" {
+		t.Fatal("snapshot comparison mutated the parsed option paths")
+	}
+	t.Run("references", func(t *testing.T) {
+		files := make(map[string]string)
+		names, err := archive.FileNames("snapshot-references")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range names {
+			content, err := archive.ReadFile("snapshot-references/" + name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, drive := range []string{"C:", "c:"} {
+				files[tspath.ResolvePath(drive+"/Repo", name)] = string(content)
+			}
+		}
+		server := newTestServer()
+		server.cwd = "C:/Repo/app"
+		server.fs = &exactCaseLSPProgramFS{FS: utils.NewOverlayVFS(&mockFS{}, files), files: files}
+		server.backgroundCtx = context.Background()
+		server.initializeParams = &lsproto.InitializeParams{}
+		if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+			t.Fatal(err)
+		}
+		defer server.session.Close()
+		const uri = lsproto.DocumentUri("file:///C:/Repo/app/target.ts")
+		server.session.DidOpenFile(context.Background(), uri, 1, files["C:/Repo/app/target.ts"], lsproto.LanguageKindTypeScript)
+		service, err := server.session.GetLanguageService(context.Background(), uri)
+		if err != nil {
+			t.Fatal(err)
+		}
+		load := func(path string) (*lintProjectMetadata, bool, error) {
+			metadata, err := parseStandaloneLintProject(path, server.fs, server.fs)
+			return metadata, metadata != nil, err
+		}
+		metadata, _, err := load("C:/Repo/app/tsconfig.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		program := service.GetProgram()
+		if !lintSessionProgramMatchesConfig(program, metadata, load, server.fs) {
+			t.Fatal("equivalent Windows referenced configuration could not reuse its Session Program")
+		}
+	})
 }
 
 func TestRunConfiguredLintForContentDirectRootSkipsEarlierImportProgram(t *testing.T) {
@@ -596,7 +640,7 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 			server.documents[uri] = editorText
 			if test.withSession {
 				server.backgroundCtx = context.Background()
-				server.defaultLibraryPath = bundled.LibPath()
+				server.defaultLibraryPath = bundled.LibPath().AsString()
 				server.initializeParams = &lsproto.InitializeParams{}
 				if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 					t.Fatal(err)
@@ -656,7 +700,7 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 				if wantConfig != "" {
 					wantConfig = tspath.ResolvePath(directory, wantConfig)
 				}
-				if got := program.Options().ConfigFilePath; lintProgramLexicalPathID(got, fsys) != lintProgramLexicalPathID(wantConfig, fsys) {
+				if got := program.Options().ConfigFilePath; lintProgramLexicalPathID(got.AsString(), fsys) != lintProgramLexicalPathID(wantConfig, fsys) {
 					t.Fatalf("speculative=%v: config=%q, want %q", speculative, got, test.wantConfig)
 				}
 				if len(program.RootFileNames()) != test.wantRoots {
@@ -720,8 +764,11 @@ func TestLSPWindowsAbsoluteRootsKeepGenerationContext(t *testing.T) {
 				content = "/// <reference path=\"./globals.js\" />\nexport function value() { var local = globalValue; return local; }\n"
 			}
 			configText, err := json.Marshal(map[string]any{
-				"compilerOptions": map[string]any{"noLib": true, "allowJs": false},
-				"files":           roots,
+				"compilerOptions": map[string]any{
+					"noLib": true, "allowJs": false, "rootDir": ".",
+					"rootDirs": []string{"."}, "typeRoots": []string{"./types"}, "outDir": "./dist",
+				},
+				"files": roots,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -769,12 +816,16 @@ func TestLSPWindowsAbsoluteRootsKeepGenerationContext(t *testing.T) {
 				t.Fatal(err)
 			}
 			sessionProgram := languageService.GetProgram()
-			sessionSource := sessionProgram.GetSourceFile(snapshot.target.Path)
-			if sessionSource == nil || config.ExactPathID(sessionSource.FileName()) != config.ExactPathID(sourcePath) || snapshot.target.Path != "c:/Repo/new.ts" {
+			sessionSource := sessionProgram.GetSourceFile(pathutil.File(snapshot.target.Path))
+			if sessionSource == nil || config.ExactPathID(sessionSource.FileName().AsString()) != config.ExactPathID(sourcePath) || snapshot.target.Path != "c:/Repo/new.ts" {
 				t.Fatalf("fixture lost the source across drive spellings: source=%v target=%q", sessionSource, snapshot.target.Path)
 			}
 			if compatible := lintSessionProgramSupportsService(sessionProgram); compatible == test.jsReference {
 				t.Fatalf("Session service compatibility=%v, want %v", compatible, !test.jsReference)
+			}
+			optionsBefore, err := json.Marshal(sessionProgram.Options())
+			if err != nil {
+				t.Fatal(err)
 			}
 			for _, speculative := range []bool{false, true} {
 				var generation linter.Generation
@@ -793,7 +844,7 @@ func TestLSPWindowsAbsoluteRootsKeepGenerationContext(t *testing.T) {
 					t.Fatalf("speculative=%v: Programs=%d error=%v", speculative, len(generation.Native.Programs), err)
 				}
 				program := generation.Native.Programs[0]
-				if got := program.Options().ConfigFilePath; config.ExactPathID(got) != config.ExactPathID(configPath) {
+				if got := program.Options().ConfigFilePath; config.ExactPathID(got.AsString()) != config.ExactPathID(configPath) {
 					t.Fatalf("speculative=%v: selected config=%q, want %q", speculative, got, configPath)
 				}
 				source := program.GetSourceFile(snapshot.target.Path)
@@ -823,6 +874,13 @@ func TestLSPWindowsAbsoluteRootsKeepGenerationContext(t *testing.T) {
 				if diagnostics[0].SourceFile.Text() != content || server.documents[uri] != content {
 					t.Fatalf("speculative=%v: diagnostic or resident document used the wrong content", speculative)
 				}
+			}
+			optionsAfter, err := json.Marshal(sessionProgram.Options())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(optionsAfter) != string(optionsBefore) {
+				t.Fatal("lint generation mutated Session compiler options")
 			}
 		})
 	}
@@ -879,7 +937,7 @@ func TestProjectServiceLSPDoesNotUseIndirectSessionMembership(t *testing.T) {
 	server.cwd = directory
 	server.fs = bundled.WrapFS(osvfs.FS())
 	server.backgroundCtx = context.Background()
-	server.defaultLibraryPath = bundled.LibPath()
+	server.defaultLibraryPath = bundled.LibPath().AsString()
 	server.initializeParams = &lsproto.InitializeParams{}
 	if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 		t.Fatal(err)
@@ -935,11 +993,11 @@ func TestProjectServiceLSPDoesNotUseIndirectSessionMembership(t *testing.T) {
 	}
 	importingProgram := ls.GetProgram()
 	configPath := tspath.ResolvePath(directory, "tsconfig.json")
-	caseSensitive := server.fs.UseCaseSensitiveFileNames()
-	if got := importingProgram.Options().ConfigFilePath; tspath.ToPath(got, "", caseSensitive) != tspath.ToPath(configPath, "", caseSensitive) {
+	caseSensitive := server.fs.CaseSensitivity().IsCaseSensitive()
+	if got := importingProgram.Options().ConfigFilePath; pathutil.ToPath(got.AsString(), "", caseSensitive) != pathutil.ToPath(configPath, "", caseSensitive) {
 		t.Fatalf("Session selected config %q, want %q", got, configPath)
 	}
-	if importingProgram.GetSourceFile(fileName) == nil {
+	if importingProgram.GetSourceFile(pathutil.File(fileName)) == nil {
 		t.Fatalf("Session Program does not contain imported source %q", fileName)
 	}
 	assertGap()
@@ -1041,7 +1099,7 @@ func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
 						if wantTyped {
 							wantConfig = tspath.ResolvePath(directory, "tsconfig.json")
 						}
-						if lintProgramLexicalPathID(program.Options().ConfigFilePath, server.fs) != lintProgramLexicalPathID(wantConfig, server.fs) {
+						if lintProgramLexicalPathID(program.Options().ConfigFilePath.AsString(), server.fs) != lintProgramLexicalPathID(wantConfig, server.fs) {
 							t.Fatalf("speculative=%v: config=%q, want %q", speculative, program.Options().ConfigFilePath, wantConfig)
 						}
 						source := program.GetSourceFile(fileName)
@@ -1091,7 +1149,7 @@ func TestStandaloneFallbackProgramKeepsSourceBoundary(t *testing.T) {
 				if source == nil || !source.IsBound() || source.Text() != content {
 					t.Fatalf("generation %d lost its bound overlay source", generation)
 				}
-				if len(program.SourceFiles()) != 1 || program.GetSourceFile(dependency) != nil {
+				if len(program.SourceFiles()) != 1 || program.GetSourceFile(pathutil.File(dependency)) != nil {
 					t.Fatalf("generation %d materialized an import, reference or library outside the gap target", generation)
 				}
 				if diagnostics := program.GetSyntacticDiagnostics(context.Background(), source); len(diagnostics) != 0 {
@@ -1100,7 +1158,7 @@ func TestStandaloneFallbackProgramKeepsSourceBoundary(t *testing.T) {
 				specifier := source.Imports()[0]
 				mode := program.GetModeForUsageLocation(source, specifier)
 				resolved := program.GetResolvedModule(source, specifier.Text(), mode)
-				if resolved == nil || !resolved.IsResolved() || resolved.ResolvedFileName != dependency {
+				if resolved == nil || !resolved.IsResolved() || resolved.ResolvedFileName.AsString() != dependency {
 					t.Fatalf("generation %d lost direct import resolution: %+v", generation, resolved)
 				}
 				// One generation's compiler options must not become shared state.
@@ -1235,13 +1293,13 @@ func TestLSPDisabledProjectKeepsDiagnosticAndFixContext(t *testing.T) {
 			server.cwd = directory
 			server.fs = bundled.WrapFS(osvfs.FS())
 			server.backgroundCtx = context.Background()
-			server.defaultLibraryPath = bundled.LibPath()
+			server.defaultLibraryPath = bundled.LibPath().AsString()
 			server.initializeParams = &lsproto.InitializeParams{}
 			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 				t.Fatal(err)
 			}
 			defer server.session.Close()
-			content, ok := server.fs.ReadFile(fileName)
+			content, ok := server.fs.ReadFile(pathutil.File(fileName))
 			if !ok {
 				t.Fatal("missing target fixture")
 			}
@@ -1334,7 +1392,7 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 			server.cwd = directory
 			server.fs = bundled.WrapFS(osvfs.FS())
 			server.backgroundCtx = context.Background()
-			server.defaultLibraryPath = bundled.LibPath()
+			server.defaultLibraryPath = bundled.LibPath().AsString()
 			// No dynamic watched-file registration: Session does not hear the
 			// disk config edit, but lint discovery observes the new snapshot.
 			server.initializeParams = &lsproto.InitializeParams{}
@@ -1342,7 +1400,7 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer server.session.Close()
-			content, ok := server.fs.ReadFile(fileName)
+			content, ok := server.fs.ReadFile(pathutil.File(fileName))
 			if !ok {
 				t.Fatal("missing target fixture")
 			}
@@ -1507,7 +1565,7 @@ func TestLSPRootMembershipTypedGapTyped(t *testing.T) {
 						if phase.typed {
 							wantConfig = configPath
 						}
-						if lintProgramLexicalPathID(program.Options().ConfigFilePath, server.fs) != lintProgramLexicalPathID(wantConfig, server.fs) {
+						if lintProgramLexicalPathID(program.Options().ConfigFilePath.AsString(), server.fs) != lintProgramLexicalPathID(wantConfig, server.fs) {
 							t.Fatalf("speculative=%v: config=%s, want %s", speculative, program.Options().ConfigFilePath, wantConfig)
 						}
 						source := program.GetSourceFile(fileName)
@@ -1572,7 +1630,7 @@ func TestProjectServiceLSPUsesReferencedEditorSources(t *testing.T) {
 			server.fs = bundled.WrapFS(osvfs.FS())
 			server.lintSessionRoots = newLintSessionProjectRootCache()
 			server.backgroundCtx = context.Background()
-			server.defaultLibraryPath = bundled.LibPath()
+			server.defaultLibraryPath = bundled.LibPath().AsString()
 			server.initializeParams = &lsproto.InitializeParams{}
 			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 				t.Fatal(err)
@@ -1590,7 +1648,7 @@ func TestProjectServiceLSPUsesReferencedEditorSources(t *testing.T) {
 			server.session.DidOpenFile(context.Background(), uri, 1, test.targetContent, "typescript")
 			if test.wantMismatch {
 				ls, err := server.session.GetLanguageService(context.Background(), uri)
-				if err != nil || ls.GetProgram().GetSourceFile(targetPath) == nil || ls.GetProgram().GetSourceFile(referencePath) != nil {
+				if err != nil || ls.GetProgram().GetSourceFile(pathutil.File(targetPath)) == nil || ls.GetProgram().GetSourceFile(pathutil.File(referencePath)) != nil {
 					t.Fatalf("fixture did not expose a JS reference rejected by a target-containing Session Program: %v", err)
 				}
 			}
@@ -1669,7 +1727,7 @@ func TestDocumentServiceBoundaryUsesWorkspaceForDiagnosticsAndFixes(t *testing.T
 		for _, pkg := range []string{"pkg", "other"} {
 			path := root + "/" + pkg + "/target.ts"
 			uri := documentURIFromPath(path)
-			content, ok := server.fs.ReadFile(path)
+			content, ok := server.fs.ReadFile(pathutil.File(path))
 			if !ok {
 				t.Fatal("missing fixture source")
 			}
@@ -1760,7 +1818,7 @@ func TestDocumentServiceBoundaryDistinguishesFileAndDirectoryLinks(t *testing.T)
 			}
 			installJSConfigsForTest(server, map[string]config.RslintConfig{owner: entries})
 			uri := documentURIFromPath(path)
-			content, ok := server.fs.ReadFile(path)
+			content, ok := server.fs.ReadFile(pathutil.File(path))
 			if !ok {
 				t.Fatal("missing fixture source")
 			}
@@ -1913,7 +1971,7 @@ func TestDocumentServiceBoundaryUsesNativeDirectoryCaseIdentity(t *testing.T) {
 
 func assertDocumentServiceBoundaryForTest(t *testing.T, server *Server, file, wantRoot string, wantTyped bool) {
 	t.Helper()
-	content, ok := server.fs.ReadFile(file)
+	content, ok := server.fs.ReadFile(pathutil.File(file))
 	if !ok {
 		t.Fatal("missing fixture source")
 	}
@@ -1927,6 +1985,24 @@ func assertDocumentServiceBoundaryForTest(t *testing.T, server *Server, file, wa
 	}
 	provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
 	generation, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+	if strings.HasPrefix(file, "//") {
+		// Directory policy still applies, but TypeScript rejects UNC programs.
+		if release != nil {
+			release()
+		}
+		if err == nil || !strings.Contains(err.Error(), "TS5116") {
+			t.Fatalf("UNC generation error = %v, want TS5116", err)
+		}
+		_, speculativeRelease, speculativeErr := acquireSpeculativeGeneration(context.Background(), content, snapshot,
+			server.freezeSpeculativeLintEnvironment(uri, snapshot.target))
+		if speculativeRelease != nil {
+			speculativeRelease()
+		}
+		if speculativeErr == nil || !strings.Contains(speculativeErr.Error(), "TS5116") {
+			t.Fatalf("speculative UNC generation error = %v, want TS5116", speculativeErr)
+		}
+		return
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2048,7 +2124,7 @@ func TestDocumentProjectPolicyUsesFlatConfigAndAuthoredBases(t *testing.T) {
 			server.cwd = directory
 			server.fs = bundled.WrapFS(osvfs.FS())
 			server.backgroundCtx = context.Background()
-			server.defaultLibraryPath = bundled.LibPath()
+			server.defaultLibraryPath = bundled.LibPath().AsString()
 			server.initializeParams = &lsproto.InitializeParams{}
 			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 				t.Fatal(err)
@@ -2112,7 +2188,7 @@ func TestDocumentProjectPolicyUsesFlatConfigAndAuthoredBases(t *testing.T) {
 					t.Fatalf("speculative=%v: Programs=%d error=%v", speculative, len(generation.Native.Programs), err)
 				}
 				program := generation.Native.Programs[0]
-				if !test.gap && lintProgramLexicalPathID(program.Options().ConfigFilePath, server.fs) != lintProgramLexicalPathID(tspath.ResolvePath(directory, test.wantConfig), server.fs) {
+				if !test.gap && lintProgramLexicalPathID(program.Options().ConfigFilePath.AsString(), server.fs) != lintProgramLexicalPathID(tspath.ResolvePath(directory, test.wantConfig), server.fs) {
 					t.Fatalf("speculative=%v: selected %q, want %s", speculative, program.Options().ConfigFilePath, test.wantConfig)
 				}
 				result, err := runLSPGenerationForTest(context.Background(), generation, release, linter.ArtifactDemand{})
@@ -2170,7 +2246,7 @@ func TestProjectServiceLSPLexicalAliases(t *testing.T) {
 		}
 		program := generation.Native.Programs[0]
 		wantConfig := tspath.ResolvePath(tspath.GetDirectoryPath(fileName), "tsconfig.json")
-		if lintProgramLexicalPathID(program.Options().ConfigFilePath, server.fs) != lintProgramLexicalPathID(wantConfig, server.fs) {
+		if lintProgramLexicalPathID(program.Options().ConfigFilePath.AsString(), server.fs) != lintProgramLexicalPathID(wantConfig, server.fs) {
 			t.Fatalf("%s: config=%q, want %q", fileName, program.Options().ConfigFilePath, wantConfig)
 		}
 		if program.Options().Strict.IsTrue() != (fileName == realFile) {

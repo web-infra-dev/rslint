@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // vfsAdapter adapts a vfs.FS to the standard fs.FS used by
@@ -61,22 +62,22 @@ func (a *vfsAdapter) cachedRealpath(path string) string {
 	if a.resolvedPaths == nil {
 		a.resolvedPaths = make(map[string]string)
 	}
-	realpath := a.vfs.Realpath(path)
-	a.resolvedPaths[path] = realpath
-	return realpath
+	realpath := a.vfs.Realpath(pathutil.Path(path))
+	a.resolvedPaths[path] = realpath.AsString()
+	return realpath.AsString()
 }
 
 func (a *vfsAdapter) pointsToAncestor(path string, targetRealpath string) bool {
-	compareOptions := tspath.ComparePathsOptions{
-		UseCaseSensitiveFileNames: a.vfs.UseCaseSensitiveFileNames(),
+	compareOptions := pathutil.ComparePathsOptions{
+		UseCaseSensitiveFileNames: a.vfs.CaseSensitivity().IsCaseSensitive(),
 	}
 	root := tspath.NormalizePath(a.root)
 	current := tspath.NormalizePath(path)
 	for {
-		if tspath.ComparePaths(a.cachedRealpath(current), targetRealpath, compareOptions) == 0 {
+		if pathutil.ComparePaths(a.cachedRealpath(current), targetRealpath, compareOptions) == 0 {
 			return true
 		}
-		if tspath.ComparePaths(current, root, compareOptions) == 0 {
+		if pathutil.ComparePaths(current, root, compareOptions) == 0 {
 			return false
 		}
 		parent := tspath.GetDirectoryPath(current)
@@ -110,7 +111,7 @@ func (f *vfsDirFile) Close() error { return nil }
 
 func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 	if f.entries == nil {
-		accessible := f.adapter.vfs.GetAccessibleEntries(f.path)
+		accessible := f.adapter.vfs.GetAccessibleEntries(pathutil.Directory(f.path))
 
 		f.entries = make([]fs.DirEntry, 0, len(accessible.Directories)+len(accessible.Files))
 
@@ -130,8 +131,8 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 				}
 				dirRealPath = f.adapter.cachedRealpath(dirPath)
 				expectedRealPath := tspath.CombinePaths(parentRealPath, dir)
-				isSymlink = tspath.ComparePaths(dirRealPath, expectedRealPath, tspath.ComparePathsOptions{
-					UseCaseSensitiveFileNames: f.adapter.vfs.UseCaseSensitiveFileNames(),
+				isSymlink = pathutil.ComparePaths(dirRealPath, expectedRealPath, pathutil.ComparePathsOptions{
+					UseCaseSensitiveFileNames: f.adapter.vfs.CaseSensitivity().IsCaseSensitive(),
 				}) != 0
 			}
 

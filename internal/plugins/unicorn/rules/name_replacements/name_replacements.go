@@ -475,7 +475,7 @@ func (r *nameReplacements) checkFilename() {
 	if !r.opts.checkFilenames || r.ctx.SourceFile == nil {
 		return
 	}
-	filename := path.Base(r.ctx.SourceFile.FileName())
+	filename := path.Base(r.ctx.SourceFile.FileName().AsString())
 	if filename == "" || filename == "." || filename == "<input>" || filename == "<text>" {
 		return
 	}

@@ -27,6 +27,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/term"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func isBroadProjectLoadScope(
@@ -38,12 +39,12 @@ func isBroadProjectLoadScope(
 	if len(allowDirs) == 0 {
 		return len(allowFiles) == 0
 	}
-	options := tspath.ComparePathsOptions{
+	options := pathutil.ComparePathsOptions{
 		CurrentDirectory:          currentDirectory,
 		UseCaseSensitiveFileNames: useCaseSensitive,
 	}
 	for _, directory := range allowDirs {
-		if tspath.ContainsPath(directory, currentDirectory, options) {
+		if pathutil.ContainsPath(directory, currentDirectory, options) {
 			return true
 		}
 	}
@@ -310,14 +311,14 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// so it already holds the normalized CWD.
 	cwd := workingDirectory
 
-	comparePathOptions := tspath.ComparePathsOptions{
+	comparePathOptions := pathutil.ComparePathsOptions{
 		CurrentDirectory:          cwd,
 		UseCaseSensitiveFileNames: true,
 	}
 	projectScope := loader.Targeted
 	if typeCheck || typeCheckOnly {
 		projectScope = loader.AllDeclared
-	} else if isBroadProjectLoadScope(allowFiles, allowDirs, cwd, fs.UseCaseSensitiveFileNames()) {
+	} else if isBroadProjectLoadScope(allowFiles, allowDirs, cwd, fs.CaseSensitivity().IsCaseSensitive()) {
 		projectScope = loader.ActiveOwners
 	}
 	// No args → implicit CWD scoping (same as `rslint .`), matching ESLint.
@@ -465,7 +466,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		if !typeCheckOnly {
 			fileConfigResolver = configResolver.WithSourceMappings(binding.LintTargetBySourcePath, generationFS, true)
 			rulesForFile = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-				return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
+				return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName().AsString())
 			}
 		}
 		targetPath := func(sourcePath string) string {
@@ -518,8 +519,8 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			for _, file := range files {
 				path := tspath.NormalizePath(file.Path)
 				overrides[path] = file.Text
-				if realPath := sourceFS.Realpath(path); realPath != "" {
-					overrides[tspath.NormalizePath(realPath)] = file.Text
+				if realPath := sourceFS.Realpath(pathutil.Path(path)); realPath != "" {
+					overrides[tspath.NormalizePath(realPath.AsString())] = file.Text
 				}
 			}
 			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides))

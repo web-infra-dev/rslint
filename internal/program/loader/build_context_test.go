@@ -17,6 +17,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type programMetadataTestFS struct {
@@ -34,18 +35,18 @@ func newProgramMetadataTestFS(contents map[string]string) *programMetadataTestFS
 	}
 }
 
-func (f *programMetadataTestFS) ReadFile(path string) (string, bool) {
+func (f *programMetadataTestFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.reads[path]++
-	content, ok := f.contents[path]
+	f.reads[path.AsString()]++
+	content, ok := f.contents[path.AsString()]
 	return content, ok
 }
 
-func (f *programMetadataTestFS) WriteFile(path string, content string) error {
+func (f *programMetadataTestFS) WriteFile(path tspath.RootedFilePath, content string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.contents[path] = content
+	f.contents[path.AsString()] = content
 	return nil
 }
 
@@ -64,9 +65,9 @@ func (f *programMetadataTestFS) readCount(path string) int {
 func TestProgramMetadataFSSelectiveExactPathCaching(t *testing.T) {
 	const (
 		pkg          = "/repo/package.json"
-		pkgAlias     = "/repo/./package.json"
+		pkgAlias     = "/repo/linked/package.json"
 		upperPkg     = "/repo/PACKAGE.JSON"
-		windowsPkg   = `C:\repo\package.json`
+		windowsPkg   = "C:/repo/package.json"
 		source       = "/repo/source.ts"
 		customConfig = "/repo/config.shared.json"
 	)
@@ -167,7 +168,7 @@ type blockingProgramMetadataFS struct {
 	release chan struct{}
 }
 
-func (f *blockingProgramMetadataFS) ReadFile(string) (string, bool) {
+func (f *blockingProgramMetadataFS) ReadFile(tspath.RootedFilePath) (string, bool) {
 	f.mu.Lock()
 	f.reads++
 	readNumber := f.reads
@@ -251,12 +252,12 @@ type panickingProgramMetadataFS struct {
 	vfs.FS
 }
 
-func (f *panickingProgramMetadataFS) ReadFile(string) (string, bool) {
+func (f *panickingProgramMetadataFS) ReadFile(tspath.RootedFilePath) (string, bool) {
 	panic("metadata read panic")
 }
 
 func TestProgramMetadataFSPanicReleasesEntry(t *testing.T) {
-	const path = "/repo/package.json"
+	const path tspath.RootedFilePath = "/repo/package.json"
 	fsys := newProgramMetadataFS(&panickingProgramMetadataFS{FS: bundled.WrapFS(osvfs.FS())})
 	generation := fsys.currentGeneration()
 	read := &programMetadataRead{ready: make(chan struct{})}
@@ -287,9 +288,9 @@ type programReadCountingFS struct {
 	reads map[string]int
 }
 
-func (f *programReadCountingFS) ReadFile(path string) (string, bool) {
+func (f *programReadCountingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	f.mu.Lock()
-	f.reads[path]++
+	f.reads[path.AsString()]++
 	f.mu.Unlock()
 	return f.FS.ReadFile(path)
 }
@@ -358,7 +359,7 @@ func TestBuildContextMetadataDiscoveryPreservesParallelSourceReuse(t *testing.T)
 	if first.err != nil || second.err != nil {
 		t.Fatalf("build programs: first=%v second=%v", first.err, second.err)
 	}
-	firstSource, secondSource := first.program.GetSourceFile(fileName), second.program.GetSourceFile(fileName)
+	firstSource, secondSource := first.program.GetSourceFile(pathutil.File(fileName)), second.program.GetSourceFile(pathutil.File(fileName))
 	if firstSource == nil || secondSource == nil {
 		t.Fatal("shared source must be present in both Programs")
 	}
@@ -428,10 +429,10 @@ func TestBuildContextExtendedConfigCrossCycleDoesNotDeadlock(t *testing.T) {
 		host := context.newCompilerHostWithCache(root)
 		context.registerTSConfig(filepath.Join(root, name))
 		_, _ = tsoptions.GetParsedCommandLineOfConfigFile(
-			filepath.Join(root, name),
+			pathutil.File(filepath.Join(root, name)),
 			nil,
 			nil,
-			host,
+			host.FS(),
 			context.extendedConfigCache,
 		)
 		done <- struct{}{}
@@ -502,7 +503,7 @@ func TestBuildContextWriteInvalidatesExtendedConfigGeneration(t *testing.T) {
 	}
 
 	basePath := tspath.NormalizePath(filepath.Join(root, "base.json"))
-	if err := context.FS().WriteFile(basePath, `{"compilerOptions":{"strict":false}}`); err != nil {
+	if err := context.FS().WriteFile(pathutil.File(basePath), `{"compilerOptions":{"strict":false}}`); err != nil {
 		t.Fatalf("write extended config: %v", err)
 	}
 	after, err := context.parseConfig(root, filepath.Join(root, "b.json"))

@@ -876,7 +876,7 @@ func regexpBindingSymbol(identifier *ast.Node) *ast.Symbol {
 		ast.SymbolFlagsEnum |
 		ast.SymbolFlagsModule |
 		ast.SymbolFlagsAlias
-	if symbol.Flags&flags == 0 {
+	if symbol.Flags()&flags == 0 {
 		return nil
 	}
 	return symbol

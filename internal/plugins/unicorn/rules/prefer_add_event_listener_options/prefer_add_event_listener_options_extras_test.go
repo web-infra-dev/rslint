@@ -190,7 +190,7 @@ func TestPreferAddEventListenerOptionsEditDemand(t *testing.T) {
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, `window.addEventListener("click", listener, true);`, core.ScriptKindTS)
 
 	run := func(demand rule.EditDemand) rule.RuleDiagnostic {

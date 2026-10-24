@@ -14,6 +14,7 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestFreezeProgramRootIdentitiesUsesTargetHintsAndCanonicalUnion(t *testing.T) {
@@ -109,7 +110,7 @@ type projectRootDirectoryAccessFS struct {
 	calls int
 }
 
-func (fsys *projectRootDirectoryAccessFS) GetAccessibleEntries(directoryPath string) vfs.Entries {
+func (fsys *projectRootDirectoryAccessFS) GetAccessibleEntries(directoryPath tspath.RootedDirectoryPath) vfs.Entries {
 	fsys.mu.Lock()
 	fsys.calls++
 	fsys.mu.Unlock()
@@ -221,8 +222,8 @@ type concurrentProjectRootIdentityFS struct {
 	release       chan struct{}
 }
 
-func (fsys *concurrentProjectRootIdentityFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
+func (fsys *concurrentProjectRootIdentityFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
 	fsys.concurrencyMu.Lock()
 	fsys.active++
 	fsys.maxActive = max(fsys.maxActive, fsys.active)
@@ -236,7 +237,7 @@ func (fsys *concurrentProjectRootIdentityFS) Realpath(filePath string) string {
 	fsys.concurrencyMu.Lock()
 	fsys.active--
 	fsys.concurrencyMu.Unlock()
-	return "/physical/" + tspath.GetBaseFileName(filePath)
+	return pathutil.Path("/physical/" + tspath.GetBaseFileName(filePath.AsString()))
 }
 
 func TestProjectRootIdentityResolverUsesBoundedWorkerPool(t *testing.T) {

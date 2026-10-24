@@ -13,7 +13,7 @@ func firstCallNamed(t *testing.T, code, name string) *ast.Node {
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, code, core.ScriptKindTS)
 	var found *ast.Node
 	var visit func(*ast.Node) bool

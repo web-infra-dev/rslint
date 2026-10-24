@@ -55,7 +55,7 @@ func runRules(
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/padding.ts",
-		Path:     "/padding.ts",
+		PathKey:  "/padding.ts",
 	}, code, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	var diagnostics []rule.RuleDiagnostic
@@ -110,7 +110,7 @@ func runNamedRules(
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/padding.ts",
-		Path:     "/padding.ts",
+		PathKey:  "/padding.ts",
 	}, code, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	disableManager := rule.NewDisableManager(sourceFile, comments)
@@ -376,7 +376,7 @@ func TestPaddingAtomicRuleWinsOverAggregateRegardlessOfRegistrationOrder(t *test
 	const code = "setup();\nbeforeAll(connect);"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/padding.ts",
-		Path:     "/padding.ts",
+		PathKey:  "/padding.ts",
 	}, code, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	cache := rule.NewFileCache()
@@ -425,7 +425,7 @@ func TestPaddingFamiliesReportIndependently(t *testing.T) {
 	const code = "setup();\nbeforeAll(connect);"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/padding.ts",
-		Path:     "/padding.ts",
+		PathKey:  "/padding.ts",
 	}, code, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	cache := rule.NewFileCache()
@@ -538,7 +538,7 @@ func TestPaddingUsesDefinitionMessage(t *testing.T) {
 	customMessage := rule.RuleMessage{Id: "custom", Description: "Custom padding message."}
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/padding.ts",
-		Path:     "/padding.ts",
+		PathKey:  "/padding.ts",
 	}, code, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	var diagnostics []rule.RuleDiagnostic
@@ -587,7 +587,7 @@ func TestPaddingCopiesInputs(t *testing.T) {
 	code := "setup();\nbeforeAll(connect);"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/padding.ts",
-		Path:     "/padding.ts",
+		PathKey:  "/padding.ts",
 	}, code, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	var diagnostics []rule.RuleDiagnostic
@@ -629,7 +629,7 @@ func runConfiguredRules(t *testing.T, code string, rules []configuredRule) []rul
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/padding.ts",
-		Path:     "/padding.ts",
+		PathKey:  "/padding.ts",
 	}, code, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	disableManager := rule.NewDisableManager(sourceFile, comments)

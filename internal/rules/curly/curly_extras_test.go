@@ -684,7 +684,7 @@ func TestCurlyEditDemandPreservesDiagnostics(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/curly-edit-demand.ts",
-				Path:     tspath.Path("/curly-edit-demand.ts"),
+				PathKey:  tspath.PathKey("/curly-edit-demand.ts"),
 			}, testCase.code, core.ScriptKindTS)
 
 			run := func(demand rule.EditDemand) rule.RuleDiagnostic {

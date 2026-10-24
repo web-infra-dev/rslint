@@ -1731,7 +1731,7 @@ func TestDestructuringAssignmentEditDemand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, program.GetCurrentDirectory()))
 	if sourceFile == nil {
 		t.Fatalf("source file %q was not created", fileName)
 	}
@@ -1757,7 +1757,7 @@ func TestDestructuringAssignmentEditDemand(t *testing.T) {
 			programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
 			lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 				Programs:         programs,
-				TargetsByProgram: [][]string{{sourceFile.FileName()}},
+				TargetsByProgram: [][]string{{sourceFile.FileName().AsString()}},
 				SingleThreaded:   true,
 				GetRulesForFile: func(_ *ast.SourceFile) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{

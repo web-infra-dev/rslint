@@ -25,6 +25,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type upstreamGroup struct {
@@ -208,7 +209,7 @@ func lintUpstreamCase(t *testing.T, testCase upstreamCase, globals map[string]an
 		compilerProgram, err = utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", host)
 		if compilerProgram != nil {
 			sourceProgram = lintprogram.NewFromCompiler(compilerProgram)
-			sourceFile = compilerProgram.GetSourceFile(fileName)
+			sourceFile = compilerProgram.GetSourceFile(pathutil.File(resolvedFileName))
 		}
 	}
 	if err != nil {
@@ -222,7 +223,7 @@ func lintUpstreamCase(t *testing.T, testCase upstreamCase, globals map[string]an
 	var diagnostics []rule.RuleDiagnostic
 	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 		Programs:         []*lintprogram.Program{sourceProgram},
-		TargetsByProgram: [][]string{{sourceFile.FileName()}},
+		TargetsByProgram: [][]string{{sourceFile.FileName().AsString()}},
 		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{

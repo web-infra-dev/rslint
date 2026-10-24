@@ -190,7 +190,7 @@ func TestPreferArrowCallbackEditDemand(t *testing.T) {
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, `items.map(function(value) { return value + 1; });`, core.ScriptKindTS)
 	var functionNode *ast.Node
 	var visit func(*ast.Node) bool

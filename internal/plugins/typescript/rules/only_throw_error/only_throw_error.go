@@ -70,7 +70,7 @@ func isRethrownError(ctx rule.RuleContext, expr *ast.Node) bool {
 		return false
 	}
 
-	decl := symbol.ValueDeclaration
+	decl := symbol.ValueDeclaration()
 	if decl == nil {
 		return false
 	}

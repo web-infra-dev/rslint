@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // PathSpaceSnapshot freezes every authored config base used by one evaluation
@@ -113,7 +114,7 @@ func (snapshot *PathSpaceSnapshot) base(directory string) (configTargetBase, boo
 func normalizeAuthoredBase(directory string) string {
 	directory = tspath.NormalizePath(directory)
 	if len(directory) > tspath.GetRootLength(directory) {
-		directory = tspath.RemoveTrailingDirectorySeparators(directory)
+		directory = pathutil.RemoveTrailingDirectorySeparators(directory)
 	}
 	return directory
 }
@@ -209,10 +210,10 @@ func ExactPathID(filePath string) string {
 
 // PathsEqual compares two paths using TypeScript's cross-platform path rules.
 func PathsEqual(left string, right string, useCaseSensitive bool) bool {
-	return tspath.ComparePaths(
+	return pathutil.ComparePaths(
 		left,
 		right,
-		tspath.ComparePathsOptions{UseCaseSensitiveFileNames: useCaseSensitive},
+		pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: useCaseSensitive},
 	) == 0
 }
 

@@ -31,7 +31,7 @@ func diagnosticTextSource(source ast.SourceFileLike) ast.SourceFileLike {
 	if !ok || file == nil {
 		return source
 	}
-	return ast.GetOrComputeSourceFileData(file, diagnosticTextKey, func(file *ast.SourceFile) *textSourceFile {
+	return file.GetOrComputeData(diagnosticTextKey, func(file *ast.SourceFile) *textSourceFile {
 		return newTextSourceFile(file.Text())
 	})
 }

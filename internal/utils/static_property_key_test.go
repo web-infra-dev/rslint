@@ -55,7 +55,7 @@ func TestStaticAccessExpressionKeys(t *testing.T) {
 		{`function f(Symbol) { object[Symbol.iterator]; }`, false},
 	} {
 		t.Run(test.code, func(t *testing.T) {
-			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/key.ts", Path: "/key.ts"}, test.code, core.ScriptKindTS)
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/key.ts", PathKey: "/key.ts"}, test.code, core.ScriptKindTS)
 			member := findFirstNodeOfKind(t, source, ast.KindElementAccessExpression)
 			evaluator := NewStaticStringEvaluatorWithSourceFile(nil, source)
 			if got := evaluator.HasStaticAccessExpressionKey(member); got != test.known {
@@ -66,7 +66,7 @@ func TestStaticAccessExpressionKeys(t *testing.T) {
 }
 
 func TestStaticSymbolKeysRequireScope(t *testing.T) {
-	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/key.ts", Path: "/key.ts"}, `object[Symbol.iterator]`, core.ScriptKindTS)
+	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/key.ts", PathKey: "/key.ts"}, `object[Symbol.iterator]`, core.ScriptKindTS)
 	member := findFirstNodeOfKind(t, source, ast.KindElementAccessExpression)
 	identifier := findFirstNodeOfKind(t, source, ast.KindIdentifier)
 	for _, evaluator := range []*StaticStringEvaluator{nil, NewStaticStringEvaluatorWithoutScope()} {

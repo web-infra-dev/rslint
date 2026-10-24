@@ -2,8 +2,8 @@
   "extends": "../../tsconfig.spec.json",
   "compilerOptions": {
     "outDir": ".vscode-test-out",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "rootDir": ".",
     "skipLibCheck": true,
     "allowArbitraryExtensions": true,

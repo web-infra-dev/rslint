@@ -46,7 +46,7 @@ func TestSourceMayContainMergePair(t *testing.T) {
 		sourceFile := parser.ParseSourceFile(
 			ast.SourceFileParseOptions{
 				FileName: "/source.test.ts",
-				Path:     "/source.test.ts",
+				PathKey:  "/source.test.ts",
 			},
 			testCase.source,
 			core.ScriptKindTS,
@@ -70,7 +70,7 @@ func TestSourceMayContainMergePairKeepsUnknownSourceFile(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/source.test.ts",
-			Path:     "/source.test.ts",
+			PathKey:  "/source.test.ts",
 		},
 		`expect(spy).toHaveBeenCalledOnce(); expect(spy).toHaveBeenCalledWith(value);`,
 		core.ScriptKindTS,
@@ -104,7 +104,7 @@ func TestOnlyInertStatementIntervals(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			source := "before();\nexpect(spy).toHaveBeenCalledOnce();\n" + tt.middle + "\nexpect(spy).toHaveBeenCalledWith(expected);\nafter();"
-			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/case.ts", Path: "/case.ts"}, source, core.ScriptKindTS)
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/case.ts", PathKey: "/case.ts"}, source, core.ScriptKindTS)
 			ctx := rule.RuleContext{SourceFile: sourceFile}
 			analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 			statements := sourceFile.Statements.Nodes
@@ -144,7 +144,7 @@ after();`
 			if nested {
 				code = "{\n" + source + "\n}"
 			}
-			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/case.ts", Path: "/case.ts"}, code, core.ScriptKindTS)
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/case.ts", PathKey: "/case.ts"}, code, core.ScriptKindTS)
 			var diagnostics []rule.RuleDiagnostic
 			ctx := (rule.RuleContext{SourceFile: sourceFile}).WithReporter(PreferCalledExactlyOnceWithRule.Name, rule.SeverityError, func(diagnostic rule.RuleDiagnostic) {
 				diagnostics = append(diagnostics, diagnostic)
@@ -181,7 +181,7 @@ func BenchmarkAdjacentPairs(b *testing.B) {
 			for i := range pairs {
 				fmt.Fprintf(&source, "expect(spy%d).toHaveBeenCalledOnce();\nexpect(spy%d).toHaveBeenCalledWith(1);\n", i, i)
 			}
-			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/case.ts", Path: "/case.ts"}, source.String(), core.ScriptKindTS)
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/case.ts", PathKey: "/case.ts"}, source.String(), core.ScriptKindTS)
 			b.ReportAllocs()
 			b.SetBytes(int64(source.Len()))
 			for b.Loop() {

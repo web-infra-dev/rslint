@@ -15,7 +15,7 @@ import (
 func TestPreferTernarySourceOnlyComputedKey(t *testing.T) {
 	source := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.js",
-		Path:     "/test.js",
+		PathKey:  "/test.js",
 	}, `if (t) { (x)['b' + 'ar'] = a; } else { x.bar = b; }`, core.ScriptKindJS)
 
 	comments := rule.NewCommentStore(source)

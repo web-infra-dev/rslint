@@ -116,7 +116,7 @@ func suggestionName(ctx rule.RuleContext, node *ast.Node) string {
 	if filename == "<input>" || filename == "<text>" {
 		return ""
 	}
-	base, _, _ := strings.Cut(tspath.GetBaseFileName(filename), ".")
+	base, _, _ := strings.Cut(tspath.GetBaseFileName(filename.AsString()), ".")
 	name := unicornutil.CamelCase(base)
 	if !scanner.IsIdentifierText(name, core.LanguageVariantStandard) {
 		return ""

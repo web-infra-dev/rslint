@@ -307,7 +307,7 @@ func invalidWithOutputs(code string, outputs ...string) rule_tester.InvalidTestC
 func expectedErrors(code string) []rule_tester.InvalidTestCaseError {
 	opts := ast.SourceFileParseOptions{
 		FileName: "/tmp/prefer_exponentiation_operator.ts",
-		Path:     tspath.Path("/tmp/prefer_exponentiation_operator.ts"),
+		PathKey:  tspath.PathKey("/tmp/prefer_exponentiation_operator.ts"),
 	}
 	sf := parser.ParseSourceFile(opts, code, core.ScriptKindTS)
 	var errors []rule_tester.InvalidTestCaseError
@@ -341,7 +341,7 @@ func expectedErrors(code string) []rule_tester.InvalidTestCaseError {
 func expectedFirstCallError(code string) []rule_tester.InvalidTestCaseError {
 	opts := ast.SourceFileParseOptions{
 		FileName: "/tmp/prefer_exponentiation_operator.ts",
-		Path:     tspath.Path("/tmp/prefer_exponentiation_operator.ts"),
+		PathKey:  tspath.PathKey("/tmp/prefer_exponentiation_operator.ts"),
 	}
 	sf := parser.ParseSourceFile(opts, code, core.ScriptKindTS)
 

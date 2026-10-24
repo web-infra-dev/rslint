@@ -75,7 +75,7 @@ func TokenAtOrAfter(sourceFile *ast.SourceFile, pos int) (SourceToken, bool) {
 // not after pos. Reading the parsed tree preserves lexical context across
 // templates and recognizes regular-expression literals as single tokens.
 func TokenBeforePosition(sourceFile *ast.SourceFile, pos int) (SourceToken, bool) {
-	tokens := ast.GetOrComputeSourceFileData(sourceFile, sourceTokenIndexKey, func(sourceFile *ast.SourceFile) []SourceToken {
+	tokens := sourceFile.GetOrComputeData(sourceTokenIndexKey, func(sourceFile *ast.SourceFile) []SourceToken {
 		return TokensOfNode(sourceFile, sourceFile.AsNode())
 	})
 	index := sort.Search(len(tokens), func(index int) bool {
@@ -183,7 +183,7 @@ func endsWithRegularExpressionLiteral(text string) bool {
 func tokensOfText(text string) []SourceToken {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/token-adjacency.ts",
-		Path:     "/token-adjacency.ts",
+		PathKey:  "/token-adjacency.ts",
 	}, text, core.ScriptKindTS)
 	return TokensOfNode(sourceFile, sourceFile.AsNode())
 }

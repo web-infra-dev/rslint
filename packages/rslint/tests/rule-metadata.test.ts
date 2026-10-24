@@ -11,6 +11,10 @@ import {
   getCurrentRuleIds,
   getRuleIdsAtRef,
 } from '../../../scripts/sync-version-info/release.js';
+import {
+  compareVersions,
+  getTypeScriptBinding,
+} from '../../../scripts/sync-version-info/version.js';
 
 function withFixture<T>(
   run: (root: string, write: (file: string, content: string) => void) => T,
@@ -29,6 +33,26 @@ function withFixture<T>(
 }
 
 describe('rule metadata', () => {
+  test('TypeScript bindings recognize two-part prerelease tags and peeled commits', () => {
+    const commit = 'c'.repeat(40);
+    const tag = 'a'.repeat(40);
+    const getGitOutput = (args: string[]) => {
+      if (args[0] === 'ls-files') return `160000 ${commit} 0\ttypescript-go`;
+      if (args[0] === 'diff') return '';
+      return [
+        `${tag}\trefs/tags/v7.1-beta`,
+        `${commit}\trefs/tags/v7.1-beta^{}`,
+        `${commit}\trefs/tags/v7.1.0-alpha`,
+      ].join('\n');
+    };
+    expect(getTypeScriptBinding(getGitOutput)).toEqual({
+      commit,
+      releaseVersion: '7.1-beta',
+    });
+    expect(compareVersions('7.1', '7.1.0')).toBe(0);
+    expect(compareVersions('7.1', '7.0.2')).toBeGreaterThan(0);
+  });
+
   test('filesystem and Git discovery preserve nested rule IDs and test ownership', () => {
     withFixture((root, write) => {
       write('internal/rules/core_rule/core_rule.go', 'package core_rule');

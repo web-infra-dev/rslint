@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func packageRoot(t testing.TB) rule_tester.Root {
@@ -255,10 +256,12 @@ type publicationFS struct {
 	caseSensitive bool
 }
 
-func (fs *publicationFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
+func (fs *publicationFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(fs.caseSensitive)
+}
 
-func (fs *publicationFS) ReadFile(name string) (string, bool) {
-	text, ok := fs.files[tspath.GetCanonicalFileName(name, fs.caseSensitive)]
+func (fs *publicationFS) ReadFile(name tspath.RootedFilePath) (string, bool) {
+	text, ok := fs.files[pathutil.GetCanonicalFileName(name.AsString(), fs.caseSensitive)]
 	return text, ok
 }
 
@@ -278,7 +281,7 @@ func TestPublicationCrossPlatformPaths(t *testing.T) {
 					"lib/blocked/.npmignore":     "!restored.js\r\n",
 					"lib/中文 space[1]/.npmignore": "ignored.js\r\n",
 				} {
-					fs.files[tspath.GetCanonicalFileName(tspath.ResolvePath(directory, relative), caseSensitive)] = text
+					fs.files[pathutil.GetCanonicalFileName(tspath.ResolvePath(directory, relative), caseSensitive)] = text
 				}
 				p, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
 					Host: utils.CreateCompilerHost(directory, fs), CompilerOptions: &core.CompilerOptions{},

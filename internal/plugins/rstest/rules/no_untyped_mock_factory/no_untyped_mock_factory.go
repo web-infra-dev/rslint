@@ -93,7 +93,7 @@ func declaredFactoryAtCall(
 	reference *ast.Node,
 ) (bool, bool) {
 	var declarations []*ast.Node
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration != nil && ast.GetSourceFileOfNode(declaration) == ctx.SourceFile {
 			declarations = append(declarations, declaration)
 		}

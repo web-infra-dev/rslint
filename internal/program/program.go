@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // Program is rslint's immutable facade over one complete source generation.
@@ -45,13 +46,13 @@ type sourceBackend interface {
 	modeForUsageLocation(sourceFile ast.HasFileName, location *ast.StringLiteralLike) core.ResolutionMode
 	resolvedModule(sourceFile ast.HasFileName, moduleName string, mode core.ResolutionMode) *module.ResolvedModule
 	resolveModuleName(moduleName string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule
-	sourceFileForResolvedModule(fileName string) *ast.SourceFile
+	sourceFileForResolvedModule(resolved *module.ResolvedModule) *ast.SourceFile
 	sourceFile(fileName string) *ast.SourceFile
 	sourceFileMetadata(file *ast.SourceFile) ast.SourceFileMetaData
 	syntacticDiagnostics(ctx context.Context, file *ast.SourceFile) []*ast.Diagnostic
 	isSourceFileDefaultLibrary(file *ast.SourceFile) bool
 	isSourceFileFromExternalLibrary(file *ast.SourceFile) bool
-	packageNamesBySourceFile() map[tspath.Path][]string
+	packageNamesBySourceFile() map[tspath.PathKey][]string
 }
 
 // typeBackend is an optional private capability adapter. Its absence is not a
@@ -153,8 +154,8 @@ func (p *Program) ownsSourceReference(source ast.HasFileName) bool {
 	if file, ok := source.(*ast.SourceFile); ok {
 		return p.OwnsSourceFile(file)
 	}
-	file := p.GetSourceFile(source.FileName())
-	return file != nil && file.Path() == source.Path()
+	file := p.GetSourceFile(source.FileName().AsString())
+	return file != nil && file.PathKey() == source.PathKey()
 }
 
 func (p *Program) Options() *core.CompilerOptions {
@@ -192,8 +193,8 @@ func (p *Program) NearestPackageJSONDirectory(directory string) string {
 	return p.source.nearestPackageJSONDirectory(directory)
 }
 
-func (p *Program) FileExists(path string) bool {
-	return p.IsValid() && p.source.fileExists(path)
+func (p *Program) FileExists(path tspath.RootedFilePath) bool {
+	return p.IsValid() && p.source.fileExists(path.AsString())
 }
 
 func (p *Program) GetModeForUsageLocation(sourceFile ast.HasFileName, location *ast.StringLiteralLike) core.ResolutionMode {
@@ -225,11 +226,11 @@ func (p *Program) ResolveModuleName(moduleName string, containingFile string, mo
 	return p.source.resolveModuleName(moduleName, containingFile, mode)
 }
 
-func (p *Program) GetSourceFileForResolvedModule(fileName string) *ast.SourceFile {
-	if !p.IsValid() {
+func (p *Program) GetSourceFileForResolvedModule(resolved *module.ResolvedModule) *ast.SourceFile {
+	if resolved == nil || !p.IsValid() {
 		return nil
 	}
-	return p.source.sourceFileForResolvedModule(fileName)
+	return p.source.sourceFileForResolvedModule(resolved)
 }
 
 func (p *Program) GetSourceFile(fileName string) *ast.SourceFile {
@@ -323,9 +324,9 @@ func (p *Program) IsSourceFileDefaultLibrary(file *ast.SourceFile) bool {
 		return false
 	}
 	for _, library := range libraries {
-		if tspath.ComparePaths(file.FileName(), library, tspath.ComparePathsOptions{
+		if pathutil.ComparePaths(file.FileName().AsString(), library, pathutil.ComparePathsOptions{
 			CurrentDirectory:          p.CurrentDirectory(),
-			UseCaseSensitiveFileNames: fs.UseCaseSensitiveFileNames(),
+			UseCaseSensitiveFileNames: fs.CaseSensitivity().IsCaseSensitive(),
 		}) == 0 {
 			return true
 		}
@@ -346,39 +347,39 @@ func (p *Program) PackageNamesForSourceFile(file *ast.SourceFile) []string {
 		return nil
 	}
 	names := Cached(p, packageNamesCacheKey{}, p.source.packageNamesBySourceFile)
-	return names[file.Path()]
+	return names[file.PathKey()]
 }
 
 func packageNamesFromResolutions(
-	getSourceFile func(string) *ast.SourceFile,
-	moduleResolutions map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule],
-	typeResolutions map[tspath.Path]module.ModeAwareCache[*module.ResolvedTypeReferenceDirective],
-) map[tspath.Path][]string {
-	names := make(map[tspath.Path][]string)
-	add := func(fileName string, packageID module.PackageId) {
+	getSourceFile func(tspath.RootedFilePath, tspath.PathKey) *ast.SourceFile,
+	moduleResolutions map[tspath.PathKey]module.ModeAwareCache[*module.ResolvedModule],
+	typeResolutions map[tspath.PathKey]module.ModeAwareCache[*module.ResolvedTypeReferenceDirective],
+) map[tspath.PathKey][]string {
+	names := make(map[tspath.PathKey][]string)
+	add := func(fileName tspath.RootedFilePath, path tspath.PathKey, packageID module.PackageId) {
 		if packageID.Name == "" {
 			return
 		}
-		file := getSourceFile(fileName)
+		file := getSourceFile(fileName, path)
 		if file == nil {
 			return
 		}
 		name := packageID.PackageName()
-		if !slices.Contains(names[file.Path()], name) {
-			names[file.Path()] = append(names[file.Path()], name)
+		if !slices.Contains(names[file.PathKey()], name) {
+			names[file.PathKey()] = append(names[file.PathKey()], name)
 		}
 	}
 	for _, resolutions := range moduleResolutions {
 		for _, resolution := range resolutions {
 			if resolution != nil {
-				add(resolution.ResolvedFileName, resolution.PackageId)
+				add(resolution.ResolvedFileName, resolution.ResolvedPath, resolution.PackageId)
 			}
 		}
 	}
 	for _, resolutions := range typeResolutions {
 		for _, resolution := range resolutions {
 			if resolution != nil {
-				add(resolution.ResolvedFileName, resolution.PackageId)
+				add(resolution.ResolvedFileName, resolution.ResolvedPath, resolution.PackageId)
 			}
 		}
 	}
@@ -386,18 +387,22 @@ func packageNamesFromResolutions(
 }
 
 func (b *compilerBackend) sourceFiles() []*ast.SourceFile { return b.raw.SourceFiles() }
-func (b *compilerBackend) rootFileNames() []string        { return b.raw.CommandLine().FileNames() }
+func (b *compilerBackend) rootFileNames() []string {
+	return pathutil.Strings(b.raw.CommandLine().FileNames())
+}
 func (b *compilerBackend) ownsSourceFile(file *ast.SourceFile) bool {
 	return b.raw.GetSourceFile(file.FileName()) == file
 }
 func (b *compilerBackend) compilerOptions() *core.CompilerOptions { return b.raw.Options() }
 func (b *compilerBackend) fileSystem() vfs.FS                     { return b.raw.Host().FS() }
-func (b *compilerBackend) workingDirectory() string               { return b.raw.Host().GetCurrentDirectory() }
-func (b *compilerBackend) defaultLibraryPath() string             { return b.raw.Host().DefaultLibraryPath() }
-func (b *compilerBackend) nearestPackageJSONDirectory(directory string) string {
-	return b.raw.GetNearestAncestorDirectoryWithPackageJson(directory)
+func (b *compilerBackend) workingDirectory() string               { return b.raw.GetCurrentDirectory().AsString() }
+func (b *compilerBackend) defaultLibraryPath() string {
+	return b.raw.Host().DefaultLibraryPath().AsString()
 }
-func (b *compilerBackend) fileExists(path string) bool { return b.raw.FileExists(path) }
+func (b *compilerBackend) nearestPackageJSONDirectory(directory string) string {
+	return b.raw.GetNearestAncestorDirectoryWithPackageJson(pathutil.Directory(directory)).AsString()
+}
+func (b *compilerBackend) fileExists(path string) bool { return b.raw.FileExists(pathutil.File(path)) }
 func (b *compilerBackend) modeForUsageLocation(file ast.HasFileName, location *ast.StringLiteralLike) core.ResolutionMode {
 	return b.raw.GetModeForUsageLocation(file, location)
 }
@@ -405,29 +410,32 @@ func (b *compilerBackend) resolvedModule(file ast.HasFileName, name string, mode
 	return b.raw.GetResolvedModule(file, name, mode)
 }
 func (b *compilerBackend) resolveModuleName(name string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule {
-	return b.raw.ResolveModuleName(name, containingFile, mode)
+	resolved, _, _ := compiler.Program_newResolver(b.raw).ResolveModuleName(name, pathutil.File(containingFile), mode, nil)
+	return resolved
 }
-func (b *compilerBackend) sourceFileForResolvedModule(fileName string) *ast.SourceFile {
-	return b.raw.GetSourceFileForResolvedModule(fileName)
+func (b *compilerBackend) sourceFileForResolvedModule(resolved *module.ResolvedModule) *ast.SourceFile {
+	return b.raw.GetSourceFileForResolvedModule(resolved)
 }
 func (b *compilerBackend) sourceFile(fileName string) *ast.SourceFile {
-	return b.raw.GetSourceFile(fileName)
+	return b.raw.GetSourceFile(tspath.ToRootedFilePath(fileName, b.raw.GetCurrentDirectory()))
 }
 func (b *compilerBackend) sourceFileMetadata(file *ast.SourceFile) ast.SourceFileMetaData {
-	return b.raw.GetSourceFileMetaData(file.Path())
+	return b.raw.GetSourceFileMetaData(file.PathKey())
 }
 func (b *compilerBackend) syntacticDiagnostics(ctx context.Context, file *ast.SourceFile) []*ast.Diagnostic {
 	return b.raw.GetSyntacticDiagnostics(ctx, file)
 }
 func (b *compilerBackend) isSourceFileDefaultLibrary(file *ast.SourceFile) bool {
-	return b.raw.IsSourceFileDefaultLibrary(file.Path())
+	return b.raw.IsSourceFileDefaultLibrary(file.PathKey())
 }
 func (b *compilerBackend) isSourceFileFromExternalLibrary(file *ast.SourceFile) bool {
 	return b.raw.IsSourceFileFromExternalLibrary(file)
 }
-func (b *compilerBackend) packageNamesBySourceFile() map[tspath.Path][]string {
+func (b *compilerBackend) packageNamesBySourceFile() map[tspath.PathKey][]string {
 	return packageNamesFromResolutions(
-		b.raw.GetSourceFileForResolvedModule,
+		func(fileName tspath.RootedFilePath, path tspath.PathKey) *ast.SourceFile {
+			return b.raw.GetSourceFileForResolvedModule(&module.ResolvedModule{ResolvedFileName: fileName, ResolvedPath: path})
+		},
 		b.raw.GetResolvedModules(),
 		b.raw.GetResolvedTypeReferenceDirectives(),
 	)
@@ -446,52 +454,56 @@ func (s *parsedBackend) sourceFiles() []*ast.SourceFile { return s.files }
 func (s *parsedBackend) rootFileNames() []string {
 	roots := make([]string, len(s.files))
 	for index, file := range s.files {
-		roots[index] = file.FileName()
+		roots[index] = file.FileName().AsString()
 	}
 	return roots
 }
 func (s *parsedBackend) ownsSourceFile(file *ast.SourceFile) bool {
-	return s.sourcesByPath[file.Path()] == file
+	return s.sourcesByPath[file.PathKey()] == file
 }
 func (s *parsedBackend) compilerOptions() *core.CompilerOptions { return s.options }
 func (s *parsedBackend) fileSystem() vfs.FS                     { return s.fs }
 func (s *parsedBackend) workingDirectory() string               { return s.currentDirectory }
-func (s *parsedBackend) defaultLibraryPath() string             { return s.host.DefaultLibraryPath() }
+func (s *parsedBackend) defaultLibraryPath() string             { return s.host.DefaultLibraryPath().AsString() }
 func (s *parsedBackend) nearestPackageJSONDirectory(directory string) string {
-	scope := s.resolver.GetPackageScopeForPath(directory)
+	scope := s.resolver.GetPackageScopeForPath(pathutil.Directory(directory))
 	if scope.Exists() {
-		return scope.PackageDirectory
+		return scope.PackageDirectory.AsDirectoryPath().AsString()
 	}
 	return ""
 }
-func (s *parsedBackend) fileExists(path string) bool { return s.fs != nil && s.fs.FileExists(path) }
+func (s *parsedBackend) fileExists(path string) bool {
+	return s.fs != nil && s.fs.FileExists(pathutil.File(path))
+}
 func (s *parsedBackend) modeForUsageLocation(file ast.HasFileName, location *ast.StringLiteralLike) core.ResolutionMode {
 	if file == nil {
 		return core.ResolutionModeNone
 	}
-	return compiler.GetModeForUsageLocation(file.FileName(), s.metadataByPath[file.Path()], location, s.options)
+	return compiler.GetModeForUsageLocation(file.FileName(), s.metadataByPath[file.PathKey()], location, s.options)
 }
 func (s *parsedBackend) resolvedModule(file ast.HasFileName, name string, mode core.ResolutionMode) *module.ResolvedModule {
 	if file == nil {
 		return nil
 	}
-	return s.resolvedModules[file.Path()][module.ModeAwareCacheKey{Name: name, Mode: mode}]
+	return s.resolvedModules[file.PathKey()][module.ModeAwareCacheKey{Name: name, Mode: mode}]
 }
 func (s *parsedBackend) resolveModuleName(name string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule {
-	resolved, _ := s.resolver.ResolveModuleName(name, containingFile, mode, nil)
+	resolved, _, _ := s.resolver.ResolveModuleName(name, pathutil.File(containingFile), mode, nil)
 	return resolved
 }
-func (s *parsedBackend) sourceFileForResolvedModule(fileName string) *ast.SourceFile {
-	return s.sourceFile(fileName)
+func (s *parsedBackend) sourceFileForResolvedModule(resolved *module.ResolvedModule) *ast.SourceFile {
+	return s.sourceFile(resolved.ResolvedFileName.AsString())
 }
 func (s *parsedBackend) sourceFileMetadata(file *ast.SourceFile) ast.SourceFileMetaData {
-	return s.metadataByPath[file.Path()]
+	return s.metadataByPath[file.PathKey()]
 }
 func (s *parsedBackend) syntacticDiagnostics(_ context.Context, file *ast.SourceFile) []*ast.Diagnostic {
-	return s.syntacticDiagnosticsByPath[file.Path()]
+	return s.syntacticDiagnosticsByPath[file.PathKey()]
 }
 func (s *parsedBackend) isSourceFileDefaultLibrary(*ast.SourceFile) bool      { return false }
 func (s *parsedBackend) isSourceFileFromExternalLibrary(*ast.SourceFile) bool { return false }
-func (s *parsedBackend) packageNamesBySourceFile() map[tspath.Path][]string {
-	return packageNamesFromResolutions(s.sourceFile, s.resolvedModules, nil)
+func (s *parsedBackend) packageNamesBySourceFile() map[tspath.PathKey][]string {
+	return packageNamesFromResolutions(func(fileName tspath.RootedFilePath, _ tspath.PathKey) *ast.SourceFile {
+		return s.sourceFile(fileName.AsString())
+	}, s.resolvedModules, nil)
 }

@@ -43,7 +43,7 @@ func TestNoUnnecessaryAwaitEditDemand(t *testing.T) {
 				var got []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
 					Program: lintprogram.NewFromCompiler(program),
-					File:    source.FileName(),
+					File:    source.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{
 							Name: no_unnecessary_await.NoUnnecessaryAwaitRule.Name, Severity: rule.SeverityError,

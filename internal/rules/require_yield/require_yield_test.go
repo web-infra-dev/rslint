@@ -625,7 +625,7 @@ class A {
 		t.Run(tt.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/file.ts",
-				Path:     "/file.ts",
+				PathKey:  "/file.ts",
 			}, tt.code, core.ScriptKindTS)
 
 			var generator *ast.Node

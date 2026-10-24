@@ -745,7 +745,7 @@ func (c *circularReferenceChecker) checkIdentifier(identifier *ast.Node) bool {
 		return true
 	}
 
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration.Kind != ast.KindTypeAliasDeclaration && declaration.Kind != ast.KindInterfaceDeclaration {
 			continue
 		}
@@ -792,7 +792,7 @@ func symbolDeclaresNode(symbol *ast.Symbol, declaration *ast.Node) bool {
 	if symbol == nil || declaration == nil {
 		return false
 	}
-	for _, candidate := range symbol.Declarations {
+	for _, candidate := range symbol.Declarations() {
 		if candidate == declaration {
 			return true
 		}

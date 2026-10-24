@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -21,7 +22,7 @@ func parseBinaryOperands(t *testing.T, code string) (*ast.SourceFile, *ast.Node,
 	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program for code: "+code)
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	return findBinaryOperands(t, sourceFile, code)
 }
 
@@ -29,7 +30,7 @@ func parseBinaryOperandsForKind(t *testing.T, code string, scriptKind core.Scrip
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/file",
-		Path:     "/file",
+		PathKey:  "/file",
 	}, code, scriptKind)
 	return findBinaryOperands(t, sourceFile, code)
 }

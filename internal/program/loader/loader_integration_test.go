@@ -31,6 +31,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func (s *Session) buildProjectsWithOptionsForTest(
@@ -262,7 +263,7 @@ func TestBuildProjectsSeparatesProjectPolicies(t *testing.T) {
 		} else if len(program.CommandLine().FileNames()) != 3 {
 			t.Fatal("single-target lint truncated the owning project's roots")
 		}
-		if program.Options().ConfigFilePath != wantConfig || !program.Options().Strict.IsTrue() {
+		if program.Options().ConfigFilePath.AsString() != wantConfig || !program.Options().Strict.IsTrue() {
 			t.Fatalf("wrong project/options: %+v", program.Options())
 		}
 	}
@@ -295,7 +296,7 @@ func TestBuildProjectsKeepsServiceGapsSourceOnly(t *testing.T) {
 				// Those files must retain their own service policy's miss.
 				var overlap bool
 				for _, program := range projects.compilerPrograms {
-					overlap = overlap || program.GetSourceFile(files[2]) != nil
+					overlap = overlap || program.GetSourceFile(pathutil.File(files[2])) != nil
 				}
 				if !overlap {
 					t.Fatal("fixture did not create overlapping project membership")
@@ -340,16 +341,16 @@ type serviceBoundaryFS struct {
 	dirs  map[string]int
 }
 
-func (fsys *serviceBoundaryFS) ReadFile(path string) (string, bool) {
+func (fsys *serviceBoundaryFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	fsys.mu.Lock()
-	fsys.reads[path]++
+	fsys.reads[path.AsString()]++
 	fsys.mu.Unlock()
 	return fsys.FS.ReadFile(path)
 }
 
-func (fsys *serviceBoundaryFS) GetAccessibleEntries(path string) vfs.Entries {
+func (fsys *serviceBoundaryFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
 	fsys.mu.Lock()
-	fsys.dirs[path]++
+	fsys.dirs[path.AsString()]++
 	fsys.mu.Unlock()
 	return fsys.FS.GetAccessibleEntries(path)
 }
@@ -481,7 +482,7 @@ func TestBuildProjectsKeepsProgramModesSeparate(t *testing.T) {
 					programForFile := make(map[string]*compiler.Program)
 					for index, sources := range binding.TargetsByProgram {
 						program := projects.compilerPrograms[index]
-						if program.Options().ConfigFilePath != tspath.ResolvePath(dir, "tsconfig.json") || len(program.CommandLine().FileNames()) != 3 {
+						if program.Options().ConfigFilePath.AsString() != tspath.ResolvePath(dir, "tsconfig.json") || len(program.CommandLine().FileNames()) != 3 {
 							t.Fatal("selected project lost its config identity or complete roots")
 						}
 						for _, file := range sources {
@@ -490,7 +491,7 @@ func TestBuildProjectsKeepsProgramModesSeparate(t *testing.T) {
 							}
 							programForFile[file] = program
 						}
-						if program.GetSourceFile(tspath.ResolvePath(dir, "c.ts")) == nil {
+						if program.GetSourceFile(pathutil.File(tspath.ResolvePath(dir, "c.ts"))) == nil {
 							t.Fatal("sibling outside lint targets must remain in the type context")
 						}
 					}
@@ -502,13 +503,13 @@ func TestBuildProjectsKeepsProgramModesSeparate(t *testing.T) {
 						if program == nil {
 							t.Fatalf("target %s has no Program", file)
 						}
-						usesSource := program.GetSourceFile(tspath.ResolvePath(dir, "lib/value.ts")) != nil
-						usesDeclaration := program.GetSourceFile(tspath.ResolvePath(dir, "dist/value.d.ts")) != nil
+						usesSource := program.GetSourceFile(pathutil.File(tspath.ResolvePath(dir, "lib/value.ts"))) != nil
+						usesDeclaration := program.GetSourceFile(pathutil.File(tspath.ResolvePath(dir, "dist/value.d.ts"))) != nil
 						if usesSource != serviceForFile[index] || usesDeclaration != (!serviceForFile[index] && output == "stale") {
 							t.Fatalf("target %s borrowed the wrong reference context: source=%v, declaration=%v", file, usesSource, usesDeclaration)
 						}
 						var codes []int
-						for _, diagnostic := range program.GetSemanticDiagnostics(context.Background(), program.GetSourceFile(file)) {
+						for _, diagnostic := range program.GetSemanticDiagnostics(context.Background(), program.GetSourceFile(pathutil.File(file))) {
 							codes = append(codes, int(diagnostic.Code()))
 						}
 						var wantCodes []int
@@ -659,7 +660,7 @@ func TestBuildProjectsSkipsOwnersWithoutTargets(t *testing.T) {
 				}
 				foundProject := false
 				for _, program := range projects.compilerPrograms {
-					foundProject = foundProject || program.Options().ConfigFilePath == tspath.ResolvePath(projectOwner, "missing.json")
+					foundProject = foundProject || program.Options().ConfigFilePath.AsString() == tspath.ResolvePath(projectOwner, "missing.json")
 				}
 				if foundProject {
 					t.Fatal("an owner without targets loaded its project declaration")
@@ -798,7 +799,7 @@ type projectGlobCountingFS struct {
 	calls int
 }
 
-func (fsys *projectGlobCountingFS) DirectoryExists(path string) bool {
+func (fsys *projectGlobCountingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
 	fsys.calls++
 	return fsys.FS.DirectoryExists(path)
 }
@@ -973,10 +974,10 @@ func TestBuildProjectsPreservesProjectDeclarationOrder(t *testing.T) {
 							t.Fatal("target lost its configured Program")
 						}
 						program := projects.compilerPrograms[selected]
-						if program.Options().ConfigFilePath != tspath.ResolvePath(dir, wantConfig) {
+						if program.Options().ConfigFilePath.AsString() != tspath.ResolvePath(dir, wantConfig) {
 							t.Fatalf("target selected %q, want %s", program.Options().ConfigFilePath, wantConfig)
 						}
-						codes := program.GetSemanticDiagnostics(context.Background(), program.GetSourceFile(file))
+						codes := program.GetSemanticDiagnostics(context.Background(), program.GetSourceFile(pathutil.File(file)))
 						if wantConfig == "tsconfig.safe.json" && (len(codes) != 1 || codes[0].Code() != 2322) || wantConfig == "tsconfig.unsafe.json" && len(codes) != 0 {
 							t.Fatalf("wrong typed context after policy merge: %v", codes)
 						}
@@ -999,7 +1000,7 @@ func TestBuildProjectsPreservesRawProjectBases(t *testing.T) {
 				t.Fatal(err)
 			}
 			projects, err := NewSession(fsys).buildProjectsWithOptionsForTest(t, map[string]rslintconfig.RslintConfig{dir: config}, plan, Targeted, true)
-			if err != nil || projects.Len() != 1 || projects.compilerPrograms[0].Options().ConfigFilePath != tspath.ResolvePath(dir, "tsconfig.unsafe.json") {
+			if err != nil || projects.Len() != 1 || projects.compilerPrograms[0].Options().ConfigFilePath.AsString() != tspath.ResolvePath(dir, "tsconfig.unsafe.json") {
 				t.Fatalf("literal directory was treated as a project glob: count=%d error=%v", projects.Len(), err)
 			}
 		})
@@ -1028,7 +1029,7 @@ func TestBuildProjectsPreservesRawProjectBases(t *testing.T) {
 		for index, files := range binding.TargetsByProgram {
 			for _, file := range files {
 				want := tspath.ResolvePath(tspath.GetDirectoryPath(tspath.GetDirectoryPath(file)), "tsconfig.json")
-				if index >= projects.Len() || projects.compilerPrograms[index].Options().ConfigFilePath != want {
+				if index >= projects.Len() || projects.compilerPrograms[index].Options().ConfigFilePath.AsString() != want {
 					t.Fatalf("%s borrowed another entry's raw project base", file)
 				}
 			}
@@ -1075,12 +1076,12 @@ func TestBuildProjectsRootContextsShareExecution(t *testing.T) {
 							if file == files[1] {
 								root = roots[1]
 							}
-							if index >= projects.Len() || projects.compilerPrograms[index].Options().ConfigFilePath != tspath.ResolvePath(root, "config.json") {
+							if index >= projects.Len() || projects.compilerPrograms[index].Options().ConfigFilePath.AsString() != tspath.ResolvePath(root, "config.json") {
 								t.Fatalf("%s borrowed the other root's Program: %v", file, binding.TargetsByProgram)
 							}
 							if file == files[1] {
 								program := projects.compilerPrograms[index]
-								diagnostics := program.GetSemanticDiagnostics(context.Background(), program.GetSourceFile(file))
+								diagnostics := program.GetSemanticDiagnostics(context.Background(), program.GetSourceFile(pathutil.File(file)))
 								if len(diagnostics) != 1 || diagnostics[0].Code() != 2322 {
 									t.Fatalf("later root lost its distinct typed context: %v", diagnostics)
 								}
@@ -1125,7 +1126,7 @@ func TestBuildProjectsWithoutEffectiveProjectsKeepTargetsUnbound(t *testing.T) {
 				if err != nil || projects.Len() != wantProjects {
 					t.Fatalf("implicit project scope: count=%d, want %d, error=%v", projects.Len(), wantProjects, err)
 				}
-				if wantProjects > 0 && projects.compilerPrograms[0].GetSourceFile(files[1]) == nil {
+				if wantProjects > 0 && projects.compilerPrograms[0].GetSourceFile(pathutil.File(files[1])) == nil {
 					t.Fatal("fixture must contain the disabled target in the ordinary Program")
 				}
 				for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadCLI, session.LoadAPI} {
@@ -1171,7 +1172,7 @@ func TestBuildProjectsAllDeclaredKeepsRootForServiceAndClear(t *testing.T) {
 			if mode == "service" {
 				want = 2
 			}
-			if projects.Len() != want || projects.compilerPrograms[0].Options().ConfigFilePath != tspath.ResolvePath(root, "config.json") {
+			if projects.Len() != want || projects.compilerPrograms[0].Options().ConfigFilePath.AsString() != tspath.ResolvePath(root, "config.json") {
 				t.Fatalf("%s changed the raw declaration's root: count=%d", mode, projects.Len())
 			}
 			binding, err := session.LoadAPI(projects, plan, owner, true)
@@ -1210,7 +1211,7 @@ func TestBuildProjectsAllDeclaredWithoutTargets(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || projects.Len() != 1 || projects.compilerPrograms[0].Options().ConfigFilePath != tspath.ResolvePath(dir, "tsconfig.json") {
+			if err != nil || projects.Len() != 1 || projects.compilerPrograms[0].Options().ConfigFilePath.AsString() != tspath.ResolvePath(dir, "tsconfig.json") {
 				t.Fatalf("zero targets changed program-wide default loading: %d, %v", projects.Len(), err)
 			}
 		})
@@ -1307,11 +1308,11 @@ type retargetingFrozenTargetFS struct {
 	targetCalls       int
 }
 
-func (fsys *retargetingFrozenTargetFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
-	if filePath == fsys.targetPath {
+func (fsys *retargetingFrozenTargetFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
+	if filePath.AsString() == fsys.targetPath {
 		fsys.targetCalls++
-		return fsys.liveCanonicalPath
+		return pathutil.Path(fsys.liveCanonicalPath)
 	}
 	return fsys.FS.Realpath(filePath)
 }
@@ -1344,19 +1345,19 @@ type unreadableProjectConfigFS struct {
 	configPath string
 }
 
-func (fsys *unreadableProjectConfigFS) ReadFile(filePath string) (string, bool) {
-	if tspath.NormalizePath(filePath) == fsys.configPath {
+func (fsys *unreadableProjectConfigFS) ReadFile(filePath tspath.RootedFilePath) (string, bool) {
+	if tspath.NormalizePath(filePath.AsString()) == fsys.configPath {
 		return "", false
 	}
 	return fsys.FS.ReadFile(filePath)
 }
 
-func (fsys *streamingTargetProjectFS) ReadFile(filePath string) (string, bool) {
-	filePath = tspath.NormalizePath(filePath)
-	if filePath == fsys.firstSource {
+func (fsys *streamingTargetProjectFS) ReadFile(filePath tspath.RootedFilePath) (string, bool) {
+	filePath = pathutil.File(tspath.NormalizePath(filePath.AsString()))
+	if filePath.AsString() == fsys.firstSource {
 		fsys.sourceOnce.Do(func() { close(fsys.sourceRead) })
 	}
-	if filePath == fsys.laterConfig {
+	if filePath.AsString() == fsys.laterConfig {
 		fsys.waitOnce.Do(func() { close(fsys.laterWaiting) })
 		select {
 		case <-fsys.sourceRead:
@@ -1366,8 +1367,8 @@ func (fsys *streamingTargetProjectFS) ReadFile(filePath string) (string, bool) {
 	return fsys.FS.ReadFile(filePath)
 }
 
-func (f *blockingProgramConfigFS) ReadFile(filePath string) (string, bool) {
-	if _, blocks := f.paths[tspath.NormalizePath(filePath)]; !blocks {
+func (f *blockingProgramConfigFS) ReadFile(filePath tspath.RootedFilePath) (string, bool) {
+	if _, blocks := f.paths[tspath.NormalizePath(filePath.AsString())]; !blocks {
 		return f.FS.ReadFile(filePath)
 	}
 
@@ -1395,10 +1396,10 @@ func (f *blockingProgramConfigFS) peakConcurrency() int {
 	return f.peak
 }
 
-func (f *targetPlanRealpathCountingFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
+func (f *targetPlanRealpathCountingFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
 	f.mu.Lock()
-	f.calls[filePath]++
+	f.calls[filePath.AsString()]++
 	f.mu.Unlock()
 	return f.FS.Realpath(filePath)
 }
@@ -1782,8 +1783,8 @@ func TestLoadProgramsBindsRealpathTargetToProgramSourceName(t *testing.T) {
 
 	var sourceName string
 	for _, sf := range programs[0].GetSourceFiles() {
-		if strings.HasSuffix(sf.FileName(), "/src/a.ts") {
-			sourceName = sf.FileName()
+		if strings.HasSuffix(sf.FileName().AsString(), "/src/a.ts") {
+			sourceName = sf.FileName().AsString()
 			break
 		}
 	}
@@ -1968,8 +1969,8 @@ func TestLoadProgramsBindsFileSymlinkOutsideProgramRoot(t *testing.T) {
 	}
 	var sourceName string
 	for _, sourceFile := range set.compilerPrograms[0].GetSourceFiles() {
-		if strings.HasSuffix(sourceFile.FileName(), "/linked.ts") || sourceFile.FileName() == realTarget {
-			sourceName = sourceFile.FileName()
+		if strings.HasSuffix(sourceFile.FileName().AsString(), "/linked.ts") || sourceFile.FileName().AsString() == realTarget {
+			sourceName = sourceFile.FileName().AsString()
 			break
 		}
 	}
@@ -1999,8 +2000,8 @@ func TestLoadProgramsBindsFileSymlinkOutsideProgramRoot(t *testing.T) {
 func testLintTarget(fsys vfs.FS, ownerDir string, filePath string) target.File {
 	filePath = tspath.NormalizePath(filePath)
 	canonicalPath := filePath
-	if realPath := fsys.Realpath(filePath); realPath != "" {
-		canonicalPath = tspath.NormalizePath(realPath)
+	if realPath := fsys.Realpath(pathutil.Path(filePath)); realPath != "" {
+		canonicalPath = tspath.NormalizePath(realPath.AsString())
 	}
 	return target.File{PathIdentity: rslintconfig.PathIdentity{Path: filePath,
 		CanonicalPath: canonicalPath}, ConfigDirectory: tspath.NormalizePath(ownerDir),
@@ -2208,7 +2209,7 @@ func TestBuildProjectsBoundsParallelBuildsAndPreservesOrder(t *testing.T) {
 	}
 	for index, program := range got.set.compilerPrograms {
 		want := tspath.ResolvePath(rootDir, projects[index])
-		if got := tspath.NormalizePath(program.Options().ConfigFilePath); got != want {
+		if got := tspath.NormalizePath(program.Options().ConfigFilePath.AsString()); got != want {
 			t.Fatalf("Program %d config path = %q, want %q", index, got, want)
 		}
 	}
@@ -2346,7 +2347,7 @@ func TestBuildProjectsPreservesSymlinkedTsconfigBase(t *testing.T) {
 	}
 	programByConfigPath := make(map[string]*compiler.Program, len(set.compilerPrograms))
 	for _, program := range set.compilerPrograms {
-		programByConfigPath[exactPathID(program.Options().ConfigFilePath)] = program
+		programByConfigPath[exactPathID(program.Options().ConfigFilePath.AsString())] = program
 	}
 	aliasConfigPath := tspath.ResolvePath(aliasDir, "tsconfig.json")
 	realConfigPath := tspath.ResolvePath(realDir, "tsconfig.json")
@@ -2358,10 +2359,10 @@ func TestBuildProjectsPreservesSymlinkedTsconfigBase(t *testing.T) {
 	}
 	aliasSource := tspath.ResolvePath(aliasDir, "src/alias.ts")
 	realSource := tspath.ResolvePath(realDir, "src/real.ts")
-	if aliasProgram.GetSourceFile(aliasSource) == nil || aliasProgram.GetSourceFile(realSource) != nil {
+	if aliasProgram.GetSourceFile(pathutil.File(aliasSource)) == nil || aliasProgram.GetSourceFile(pathutil.File(realSource)) != nil {
 		t.Fatalf("symlinked tsconfig must resolve includes from %q", aliasDir)
 	}
-	if realProgram.GetSourceFile(realSource) == nil || realProgram.GetSourceFile(aliasSource) != nil {
+	if realProgram.GetSourceFile(pathutil.File(realSource)) == nil || realProgram.GetSourceFile(pathutil.File(aliasSource)) != nil {
 		t.Fatalf("real tsconfig must resolve includes from %q", realDir)
 	}
 }
@@ -2401,7 +2402,7 @@ func TestLoadProgramsUsesGoverningConfigProjectOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildTargetProject: %v", err)
 	}
-	if targeted.Len() != 1 || tspath.NormalizePath(targeted.compilerPrograms[0].Options().ConfigFilePath) != tspath.ResolvePath(dir, "tsconfig-a.json") {
+	if targeted.Len() != 1 || tspath.NormalizePath(targeted.compilerPrograms[0].Options().ConfigFilePath.AsString()) != tspath.ResolvePath(dir, "tsconfig-a.json") {
 		t.Fatalf("targeted overlap did not retain only the first direct project")
 	}
 }
@@ -2441,7 +2442,7 @@ func TestLoadProgramsPrefersLaterDirectRootOverEarlierImport(t *testing.T) {
 		t.Fatalf("targeted build produced %d Programs, want one direct project", set.Len())
 	}
 	wantConfig := tspath.ResolvePath(dir, "tsconfig-direct.json")
-	if got := tspath.NormalizePath(set.compilerPrograms[0].Options().ConfigFilePath); got != wantConfig {
+	if got := tspath.NormalizePath(set.compilerPrograms[0].Options().ConfigFilePath.AsString()); got != wantConfig {
 		t.Fatalf("selected project = %q, want direct project %q", got, wantConfig)
 	}
 	implicitRoot := tspath.ResolvePath(dir, "implicit-main.ts")
@@ -2497,7 +2498,7 @@ func TestBuildTargetProjectPredictionCannotOverrideEarlierDirectRoot(t *testing.
 		t.Fatalf("selected Programs = %d, want one", set.Len())
 	}
 	wantConfig := tspath.ResolvePath(dir, "tsconfig-first.json")
-	if got := tspath.NormalizePath(set.compilerPrograms[0].Options().ConfigFilePath); got != wantConfig {
+	if got := tspath.NormalizePath(set.compilerPrograms[0].Options().ConfigFilePath.AsString()); got != wantConfig {
 		t.Fatalf("predicted nested project overrode declaration order: got %q, want %q", got, wantConfig)
 	}
 }
@@ -2638,7 +2639,7 @@ func TestBuildProjectsPreservesBroadRootFallback(t *testing.T) {
 							if test.wantProject != "" {
 								wantProject = tspath.ResolvePath(dir, test.wantProject)
 							}
-							if sourceName != file.Path || program.Options().ConfigFilePath != wantProject ||
+							if sourceName != file.Path || program.Options().ConfigFilePath.AsString() != wantProject ||
 								program.CanProvideTypeChecker(program.GetSourceFile(sourceName)) != (test.wantProject != "") {
 								t.Fatalf("scope=%d: wrong binding: source=%q project=%q, want %q", scope, sourceName, program.Options().ConfigFilePath, wantProject)
 							}
@@ -3002,9 +3003,9 @@ func TestBuildTargetProjectUsesFrozenTargetIdentityForMembership(t *testing.T) {
 			writeProgramTestFiles(t, projectDir, test.files)
 			baseFS := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 			frozenCanonicalPath := tspath.NormalizePath(
-				baseFS.Realpath(tspath.ResolvePath(projectDir, "target.ts")),
+				baseFS.Realpath(pathutil.Path(tspath.ResolvePath(projectDir, "target.ts"))).AsString(),
 			)
-			frozenCanonicalParent := tspath.NormalizePath(baseFS.Realpath(projectDir))
+			frozenCanonicalParent := tspath.NormalizePath(baseFS.Realpath(pathutil.Path(projectDir)).AsString())
 
 			requestDir := tspath.NormalizePath(t.TempDir())
 			requestedPath := tspath.ResolvePath(requestDir, "target.ts")
@@ -3016,7 +3017,7 @@ func TestBuildTargetProjectUsesFrozenTargetIdentityForMembership(t *testing.T) {
 				FS:         baseFS,
 				targetPath: requestedPath,
 				liveCanonicalPath: tspath.NormalizePath(
-					baseFS.Realpath(tspath.ResolvePath(liveDir, "target.ts")),
+					baseFS.Realpath(pathutil.Path(tspath.ResolvePath(liveDir, "target.ts"))).AsString(),
 				),
 			}
 			plan := target.Plan{Files: []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: requestedPath,
@@ -3296,34 +3297,40 @@ type exactCaseProgramFS struct {
 	files map[string]string
 }
 
-func (fs *exactCaseProgramFS) UseCaseSensitiveFileNames() bool { return false }
-func (fs *exactCaseProgramFS) FileExists(filePath string) bool {
-	if _, ok := fs.files[tspath.NormalizePath(filePath)]; ok {
+func (fs *exactCaseProgramFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
+}
+func (fs *exactCaseProgramFS) FileExists(filePath tspath.RootedFilePath) bool {
+	if _, ok := fs.files[tspath.NormalizePath(filePath.AsString())]; ok {
 		return true
 	}
 	return fs.FS.FileExists(filePath)
 }
-func (fs *exactCaseProgramFS) ReadFile(filePath string) (string, bool) {
-	if content, ok := fs.files[tspath.NormalizePath(filePath)]; ok {
+func (fs *exactCaseProgramFS) ReadFile(filePath tspath.RootedFilePath) (string, bool) {
+	if content, ok := fs.files[tspath.NormalizePath(filePath.AsString())]; ok {
 		return content, true
 	}
 	return fs.FS.ReadFile(filePath)
 }
-func (fs *exactCaseProgramFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
-	if _, ok := fs.files[filePath]; ok {
+func (fs *exactCaseProgramFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
+	if _, ok := fs.files[filePath.AsString()]; ok {
 		return filePath
 	}
 	return fs.FS.Realpath(filePath)
 }
 
-func (fs *canonicalIdentityTestFS) UseCaseSensitiveFileNames() bool { return false }
-func (fs *canonicalIdentityTestFS) FileExists(string) bool          { return true }
-func (fs *canonicalIdentityTestFS) Realpath(filePath string) string {
-	if realPath := fs.realPaths[tspath.NormalizePath(filePath)]; realPath != "" {
-		return realPath
+func (fs *canonicalIdentityTestFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
+}
+func (fs *canonicalIdentityTestFS) FileExists(tspath.RootedFilePath) bool {
+	return true
+}
+func (fs *canonicalIdentityTestFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	if realPath := fs.realPaths[tspath.NormalizePath(filePath.AsString())]; realPath != "" {
+		return pathutil.Path(realPath)
 	}
-	return tspath.NormalizePath(filePath)
+	return pathutil.Path(tspath.NormalizePath(filePath.AsString()))
 }
 
 func TestTargetResolve_UsesCanonicalIdentityInsteadOfGlobalCaseFlag(t *testing.T) {
@@ -3380,7 +3387,7 @@ func TestLoadProgramsRejectsCaseFoldedSourceWithDifferentCanonicalIdentity(t *te
 	if err != nil {
 		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
 	}
-	if source := program.GetSourceFile(lower); source == nil || source.FileName() != upper {
+	if source := program.GetSourceFile(pathutil.File(lower)); source == nil || source.FileName().AsString() != upper {
 		t.Fatalf("fixture must exercise case-folded Program lookup, got %v", source)
 	}
 
@@ -3404,7 +3411,7 @@ func TestLoadProgramsRejectsCaseFoldedSourceWithDifferentCanonicalIdentity(t *te
 }
 
 func TestBuildProjectsRejectsCaseFoldedServiceSourceWithDifferentCanonicalIdentity(t *testing.T) {
-	configDir := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	configDir := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	upper := tspath.ResolvePath(configDir, "Source.ts")
 	lower := tspath.ResolvePath(configDir, "source.ts")
 	fsys := &exactCaseProgramFS{
@@ -3467,7 +3474,7 @@ func TestLoadProgramsSplitsCompatibilityProgramsForCaseFoldedPathCollisions(t *t
 func TestProgramInputsKeepFrozenDirectoryAcrossGenerations(t *testing.T) {
 	for _, mode := range []string{"explicit", "service", "root override", "source only API", "source only CLI", "type-check-only"} {
 		t.Run(mode, func(t *testing.T) {
-			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 			first, replacement := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "replacement")
 			const firstSource = "export const fromFirst: string = 1; debugger;\n"
 			const replacementSource = "export const fromReplacement = 2;\n"
@@ -3527,7 +3534,7 @@ func TestProgramInputsKeepFrozenDirectoryAcrossGenerations(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, directory := range []string{alias, alias + "/"} {
-				if got := frozen.Realpath(directory); got != first {
+				if got := frozen.Realpath(pathutil.Path(directory)); got.AsString() != first {
 					t.Fatalf("directory spelling escaped frozen input: Realpath(%q) = %q, want %q", directory, got, first)
 				}
 			}
@@ -3554,11 +3561,11 @@ func TestProgramInputsKeepFrozenDirectoryAcrossGenerations(t *testing.T) {
 				found := false
 				for _, program := range programs {
 					for _, source := range program.SourceFiles() {
-						if tspath.GetBaseFileName(source.FileName()) != "source.ts" {
+						if tspath.GetBaseFileName(source.FileName().AsString()) != "source.ts" {
 							continue
 						}
 						found = true
-						if source.Text() != want || source.FileName() != input.Path {
+						if source.Text() != want || source.FileName().AsString() != input.Path {
 							t.Errorf("generation crossed frozen input: source=%q text=%q; want source=%q text=%q", source.FileName(), source.Text(), input.Path, want)
 						}
 					}
@@ -3577,7 +3584,7 @@ func TestProgramInputsKeepFrozenDirectoryAcrossGenerations(t *testing.T) {
 					}
 				}
 			}
-			if got, _ := fsys.ReadFile(tspath.ResolvePath(replacement, "source.ts")); got != replacementSource {
+			if got, _ := fsys.ReadFile(pathutil.File(tspath.ResolvePath(replacement, "source.ts"))); got != replacementSource {
 				t.Fatalf("memory generations changed replacement disk source: %q", got)
 			}
 		})
@@ -3587,7 +3594,7 @@ func TestProgramInputsKeepFrozenDirectoryAcrossGenerations(t *testing.T) {
 func TestProgramInputsKeepFrozenLeafAndAuthoredLanguage(t *testing.T) {
 	for _, mode := range []string{"source only API", "source only CLI", "physical project root"} {
 		t.Run(mode, func(t *testing.T) {
-			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 			owner, original, replacement := tspath.ResolvePath(root, "owner"), tspath.ResolvePath(root, "original"), tspath.ResolvePath(root, "replacement")
 			const text = "export const value: number = 1;\n"
 			writeProgramTestFiles(t, owner, map[string]string{"tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["source.ts"]}`})
@@ -3627,11 +3634,11 @@ func TestProgramInputsKeepFrozenLeafAndAuthoredLanguage(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, path := range []string{input.Path, leaf, input.CanonicalPath} {
-				if got, ok := frozen.ReadFile(path); !ok || got != text || frozen.Realpath(path) != input.CanonicalPath {
-					t.Errorf("frozen leaf IO for %q = %q, %v, %q", path, got, ok, frozen.Realpath(path))
+				if got, ok := frozen.ReadFile(pathutil.File(path)); !ok || got != text || frozen.Realpath(pathutil.Path(path)).AsString() != input.CanonicalPath {
+					t.Errorf("frozen leaf IO for %q = %q, %v, %q", path, got, ok, frozen.Realpath(pathutil.Path(path)))
 				}
 			}
-			if got, _ := frozen.ReadFile(tspath.ResolvePath(replacement, "sibling.ts")); got != "replacement sibling" {
+			if got, _ := frozen.ReadFile(pathutil.File(tspath.ResolvePath(replacement, "sibling.ts"))); got != "replacement sibling" {
 				t.Fatalf("canonical file identity leaked into unrelated directory mapping: %q", got)
 			}
 			assertGeneration := func(generationFS vfs.FS, want string) {
@@ -3655,14 +3662,14 @@ func TestProgramInputsKeepFrozenLeafAndAuthoredLanguage(t *testing.T) {
 					wantName = leaf
 				}
 				source := binding.Programs[0].GetSourceFile(wantName)
-				if source == nil || source.Text() != strings.TrimPrefix(want, utils.BOM) || source.FileName() != wantName {
+				if source == nil || source.Text() != strings.TrimPrefix(want, utils.BOM) || source.FileName().AsString() != wantName {
 					t.Fatalf("authored .ts root lost its source/name: %v", source)
 				}
 				if diagnostics := binding.Programs[0].SyntacticDiagnostics(context.Background(), source); len(diagnostics) != 0 {
 					t.Fatalf("authored .ts root was parsed using canonical .txt language: %v", diagnostics)
 				}
 				for _, path := range []string{input.Path, leaf, input.CanonicalPath} {
-					if got, ok := session.FS().ReadFile(path); !ok || got != source.Text() || utils.SourceHasBOM(session.FS(), path) != strings.HasPrefix(want, utils.BOM) {
+					if got, ok := session.FS().ReadFile(pathutil.File(path)); !ok || got != source.Text() || utils.SourceHasBOM(session.FS(), path) != strings.HasPrefix(want, utils.BOM) {
 						t.Errorf("generation lost frozen leaf text/BOM at %q: text=%q readable=%v", path, got, ok)
 					}
 				}
@@ -3678,7 +3685,7 @@ func TestProgramInputsKeepFrozenLeafAndAuthoredLanguage(t *testing.T) {
 }
 
 func TestProgramInputsPreserveLexicalTsconfigExtendsSibling(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	physical := tspath.ResolvePath(root, "physical/project")
 	lexical := tspath.ResolvePath(root, "lexical/project")
 	writeProgramTestFiles(t, physical, map[string]string{
@@ -3701,17 +3708,17 @@ func TestProgramInputsPreserveLexicalTsconfigExtendsSibling(t *testing.T) {
 		t.Fatalf("build aliased config: programs=%d error=%v", projects.Len(), err)
 	}
 	program := projects.Programs()[0]
-	if program.Options().Strict != core.TSTrue || program.Options().ConfigFilePath != tspath.ResolvePath(lexical, "tsconfig.json") {
+	if program.Options().Strict != core.TSTrue || program.Options().ConfigFilePath.AsString() != tspath.ResolvePath(lexical, "tsconfig.json") {
 		t.Fatalf("extends used physical sibling or flattened config name: strict=%v config=%q", program.Options().Strict, program.Options().ConfigFilePath)
 	}
 }
 
 func TestProgramInputsKeepFrozenNativeCaseAliases(t *testing.T) {
 	fsys := bundled.WrapFS(osvfs.FS())
-	if fsys.UseCaseSensitiveFileNames() {
+	if fsys.CaseSensitivity().IsCaseSensitive() {
 		t.Skip("filesystem is case-sensitive")
 	}
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	first, second := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "second")
 	writeProgramTestFiles(t, first, map[string]string{"tsconfig.json": "FIRST", "only-first.ts": ""})
 	writeProgramTestFiles(t, second, map[string]string{"tsconfig.json": "SECOND", "source.ts": "SECOND SOURCE", "only-second.ts": ""})
@@ -3727,10 +3734,10 @@ func TestProgramInputsKeepFrozenNativeCaseAliases(t *testing.T) {
 	if err := os.Symlink(first, alias); err != nil {
 		t.Skipf("directory symlink unavailable: %v", err)
 	}
-	if got, ok := fsys.ReadFile(tspath.ResolvePath(alias, "tsconfig.json")); !ok || got != "FIRST" {
+	if got, ok := fsys.ReadFile(pathutil.File(tspath.ResolvePath(alias, "tsconfig.json"))); !ok || got != "FIRST" {
 		t.Fatalf("initial alias does not read the first directory: %q, %v", got, ok)
 	}
-	if got, ok := fsys.ReadFile(tspath.ResolvePath(alternate, "tsconfig.json")); !ok || got != "FIRST" {
+	if got, ok := fsys.ReadFile(pathutil.File(tspath.ResolvePath(alternate, "tsconfig.json"))); !ok || got != "FIRST" {
 		t.Skip("filesystem does not resolve the two alias spellings equivalently")
 	}
 	spaces := rslintconfig.NewPathSpaceSnapshot(map[string]rslintconfig.RslintConfig{alias: {{}}}, fsys)
@@ -3756,25 +3763,25 @@ func TestProgramInputsKeepFrozenNativeCaseAliases(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, path := range []string{alias, alternate, alias + "/", alternate + "/"} {
-		if got := tspath.NormalizePath(fsys.Realpath(path)); got != second {
+		if got := tspath.NormalizePath(fsys.Realpath(pathutil.Path(path)).AsString()); got != second {
 			t.Fatalf("alias did not move to the second directory: %q", got)
 		}
-		if got, ok := fsys.ReadFile(tspath.ResolvePath(path, "tsconfig.json")); !ok || got != "SECOND" {
+		if got, ok := fsys.ReadFile(pathutil.File(tspath.ResolvePath(path, "tsconfig.json"))); !ok || got != "SECOND" {
 			t.Fatalf("unfrozen control did not read the replacement: %q, %v", got, ok)
 		}
 		for _, frozen := range []vfs.FS{withoutTargets, withTargets} {
-			if got, ok := frozen.ReadFile(tspath.ResolvePath(path, "tsconfig.json")); !ok || got != "FIRST" {
+			if got, ok := frozen.ReadFile(pathutil.File(tspath.ResolvePath(path, "tsconfig.json"))); !ok || got != "FIRST" {
 				t.Errorf("case spelling escaped frozen directory: %q = %q, %v", path, got, ok)
 			}
-			entries := frozen.GetAccessibleEntries(path)
-			if !slices.Contains(entries.Files, "only-first.ts") || slices.Contains(entries.Files, "only-second.ts") || frozen.Realpath(path) != first {
-				t.Errorf("case spelling escaped frozen directory metadata: %q entries=%v realpath=%q", path, entries.Files, frozen.Realpath(path))
+			entries := frozen.GetAccessibleEntries(pathutil.Directory(path))
+			if !slices.Contains(entries.Files, "only-first.ts") || slices.Contains(entries.Files, "only-second.ts") || frozen.Realpath(pathutil.Path(path)).AsString() != first {
+				t.Errorf("case spelling escaped frozen directory metadata: %q entries=%v realpath=%q", path, entries.Files, frozen.Realpath(pathutil.Path(path)))
 			}
 		}
 	}
 	mixedSource := tspath.ResolvePath(alternate, "SOURCE.ts")
-	if got, ok := withTargets.ReadFile(mixedSource); !ok || got != "FIRST SOURCE" || withTargets.Realpath(mixedSource) != input.CanonicalPath {
-		t.Fatalf("case spelling escaped frozen leaf identity: text=%q readable=%v realpath=%q", got, ok, withTargets.Realpath(mixedSource))
+	if got, ok := withTargets.ReadFile(pathutil.File(mixedSource)); !ok || got != "FIRST SOURCE" || withTargets.Realpath(pathutil.Path(mixedSource)).AsString() != input.CanonicalPath {
+		t.Fatalf("case spelling escaped frozen leaf identity: text=%q readable=%v realpath=%q", got, ok, withTargets.Realpath(pathutil.Path(mixedSource)))
 	}
 }
 
@@ -3783,7 +3790,9 @@ type frozenCaseFlagFS struct {
 	caseSensitive bool
 }
 
-func (fs *frozenCaseFlagFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
+func (fs *frozenCaseFlagFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(fs.caseSensitive)
+}
 
 func TestProgramInputsOnlyFoldUnambiguousNativeCaseIdentities(t *testing.T) {
 	for _, caseSensitive := range []bool{true, false} {

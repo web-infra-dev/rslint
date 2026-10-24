@@ -14,7 +14,7 @@ func IsSymbolFromDefaultLibrary(
 		return false
 	}
 
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		sourceFile := ast.GetSourceFileOfNode(declaration)
 		if program.IsSourceFileDefaultLibrary(sourceFile) {
 			return true
@@ -48,8 +48,8 @@ func addDefaultLibraryGlobalNames(dst map[string]bool, program *program.Program,
 			continue
 		}
 		for _, symbol := range typeChecker.GetSymbolsInScope(sourceFile.AsNode(), flags) {
-			if symbol != nil && symbol.Name != "" && IsSymbolFromDefaultLibrary(program, symbol) {
-				dst[symbol.Name] = true
+			if symbol != nil && symbol.Name() != "" && IsSymbolFromDefaultLibrary(program, symbol) {
+				dst[symbol.Name()] = true
 			}
 		}
 		// Default libraries share one global scope, so one library location
@@ -96,7 +96,7 @@ func IsPromiseConstructorLike(
 func isClassConstructorType(t *checker.Type) bool {
 	symbol := checker.Type_symbol(t)
 	return IsObjectType(t) && checker.Type_objectFlags(t)&checker.ObjectFlagsAnonymous != 0 &&
-		symbol != nil && symbol.Flags&ast.SymbolFlagsClass != 0
+		symbol != nil && symbol.Flags()&ast.SymbolFlagsClass != 0
 }
 
 /**
@@ -148,7 +148,7 @@ func IsReadonlyTypeLike(
 	predicate func(subType *checker.Type) bool,
 ) bool {
 	return IsBuiltinTypeAliasLike(program, typeChecker, t, func(subtype *checker.Type) bool {
-		return checker.Type_alias(subtype).Symbol().Name == "Readonly" && predicate(subtype)
+		return checker.Type_alias(subtype).Symbol().Name() == "Readonly" && predicate(subtype)
 	})
 }
 
@@ -192,7 +192,7 @@ func IsBuiltinSymbolLike(
 			return builtinPredicateMatches_False
 		}
 
-		actualSymbolName := symbol.Name
+		actualSymbolName := symbol.Name()
 
 		if Some(symbolNames, func(name string) bool { return actualSymbolName == name }) && IsSymbolFromDefaultLibrary(program, symbol) {
 			return builtinPredicateMatches_True
@@ -256,7 +256,7 @@ func IsBuiltinSymbolLikeRecurser(
 	}
 
 	symbol := checker.Type_symbol(t)
-	if symbol != nil && symbol.Flags&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface) != 0 {
+	if symbol != nil && symbol.Flags()&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface) != 0 {
 		declaredType := checker.Checker_getDeclaredTypeOfSymbol(typeChecker, symbol)
 		for _, baseType := range checker.Checker_getBaseTypes(typeChecker, declaredType) {
 			if IsBuiltinSymbolLikeRecurser(program, typeChecker, baseType, predicate) {

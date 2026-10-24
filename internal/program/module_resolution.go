@@ -3,6 +3,7 @@ package program
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
@@ -48,19 +49,18 @@ func (p *Program) resolveModuleNameAt(sourceFile *ast.SourceFile, specifier stri
 
 	mode := resolutionMode(p, sourceFile, moduleSpecifier)
 
-	resolvedPath := ""
-	if cached := p.GetResolvedModule(sourceFile, specifier, mode); cached != nil {
-		resolvedPath = cached.ResolvedFileName
-	} else {
+	resolved := p.GetResolvedModule(sourceFile, specifier, mode)
+	if resolved == nil {
 		// A missing cache entry means TypeScript never collected this specifier,
 		// rather than that it tried and failed, so resolving it costs a walk
 		// TypeScript has not already done. Specifiers TypeScript did try and fail on
 		// stay failed.
-		resolvedPath = resolveWithModuleResolver(p, sourceFile, specifier, mode)
+		resolved = resolveWithModuleResolver(p, sourceFile, specifier, mode)
 	}
 
-	if resolvedPath != "" {
-		if target := p.GetSourceFileForResolvedModule(resolvedPath); target != nil {
+	if resolved != nil && resolved.IsResolved() {
+		resolvedPath := resolved.ResolvedFileName.AsString()
+		if target := p.GetSourceFileForResolvedModule(resolved); target != nil {
 			return resolvedPath, target, true
 		}
 		// TypeScript named a file the Program never loaded, such as one outside the
@@ -69,7 +69,7 @@ func (p *Program) resolveModuleNameAt(sourceFile *ast.SourceFile, specifier stri
 	}
 
 	if target := resolveRelativeFromLoadedFiles(p, sourceFile, specifier); target != nil {
-		return target.FileName(), target, true
+		return target.FileName().AsString(), target, true
 	}
 
 	return "", nil, false
@@ -86,7 +86,7 @@ func (p *Program) GetResolvedModulePath(sourceFile ast.HasFileName, source modul
 	if resolved == nil {
 		return ""
 	}
-	return resolved.ResolvedFileName
+	return resolved.ResolvedFileName.AsString()
 }
 
 // resolutionMode answers with the mode a specifier resolves under. TypeScript
@@ -135,12 +135,12 @@ func isRequireCall(node *ast.Node, kinds ast.OuterExpressionKinds) bool {
 // compiler options — `moduleSuffixes`, `paths`, `rootDirs` — every specifier
 // TypeScript did collect was resolved under. It goes through the Program's own
 // resolver, so a specifier several rules ask about is walked once.
-func resolveWithModuleResolver(sourceProgram *Program, sourceFile *ast.SourceFile, specifier string, mode core.ResolutionMode) string {
-	resolved := sourceProgram.ResolveModuleName(specifier, sourceFile.FileName(), mode)
+func resolveWithModuleResolver(sourceProgram *Program, sourceFile *ast.SourceFile, specifier string, mode core.ResolutionMode) *module.ResolvedModule {
+	resolved := sourceProgram.ResolveModuleName(specifier, sourceFile.FileName().AsString(), mode)
 	if resolved == nil || !resolved.IsResolved() {
-		return ""
+		return nil
 	}
-	return resolved.ResolvedFileName
+	return resolved
 }
 
 // resolveRelativeFromLoadedFiles finds the file a relative specifier names by
@@ -155,7 +155,7 @@ func resolveRelativeFromLoadedFiles(sourceProgram *Program, sourceFile *ast.Sour
 	if tspath.PathIsAbsolute(basePath) {
 		basePath = tspath.NormalizePath(basePath)
 	} else {
-		basePath = tspath.ResolvePath(tspath.GetDirectoryPath(sourceFile.FileName()), specifier)
+		basePath = tspath.ResolvePath(tspath.GetDirectoryPath(sourceFile.FileName().AsString()), specifier)
 	}
 
 	for _, candidate := range moduleResolutionFallbackCandidates(basePath) {

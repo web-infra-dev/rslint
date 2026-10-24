@@ -1130,8 +1130,8 @@ func isExported(ctx rule.RuleContext, varInfo *VariableInfo, localExportTargets 
 		// Declaration merging: if ANY declaration of the symbol is exported,
 		// the variable is considered exported (e.g., `interface Foo {} export const Foo = ...`)
 		sym := binderDeclarationSymbol(varInfo.Variable, varInfo.Definition)
-		if sym != nil && len(sym.Declarations) > 1 {
-			for _, decl := range sym.Declarations {
+		if sym != nil && len(sym.Declarations()) > 1 {
+			for _, decl := range sym.Declarations() {
 				if ast.GetSourceFileOfNode(decl) != ctx.SourceFile {
 					// Keep module augmentation declarations local to this file, as
 					// ESLint's scope manager does.
@@ -1685,7 +1685,7 @@ func symbolOwnsDefinition(symbol *ast.Symbol, definition *ast.Node) bool {
 		return false
 	}
 	root := ast.GetRootDeclaration(definition)
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == definition || declaration == root ||
 			ast.GetRootDeclaration(declaration) == root {
 			return true
@@ -1703,7 +1703,7 @@ func symbolIsVisibleInFunctionSignature(symbol *ast.Symbol, function *ast.Node) 
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil {
 			continue
 		}
@@ -1813,7 +1813,7 @@ func binderReferenceSymbolWithMeaning(node *ast.Node, meaning ast.SymbolFlags) *
 	}
 	name := node.Text()
 	matchesMeaning := func(symbol *ast.Symbol) bool {
-		return symbol != nil && symbol.Flags&meaning != 0
+		return symbol != nil && symbol.Flags()&meaning != 0
 	}
 	for current := node.Parent; current != nil; current = current.Parent {
 		if symbol := enumMemberSymbol(current, name); matchesMeaning(symbol) {
@@ -1920,7 +1920,7 @@ func collectSymbolUsages(refs *rule.RefStore, sourceFile *ast.Node, usages map[*
 					// synthetic symbol must not make an inline `/* global module */` look
 					// shadowed.
 					if sym == nil ||
-						sym.Flags&ast.SymbolFlagsModuleExports != 0 ||
+						sym.Flags()&ast.SymbolFlagsModuleExports != 0 ||
 						!utils.IsSymbolDeclaredInFile(sym, sf) {
 						globalRefsByName[name] = append(globalRefsByName[name], node)
 					}
@@ -2022,7 +2022,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 
 	sym := binderDeclarationSymbol(nameNode, definition)
 	// For declaration merging (interface + const, etc.), only process once.
-	if sym != nil && len(sym.Declarations) > 1 {
+	if sym != nil && len(sym.Declarations()) > 1 {
 		if ac.seenMergedSymbols[sym] {
 			return
 		}
@@ -2068,8 +2068,8 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		// collect all declarations so self-references in ANY declaration body
 		// are correctly filtered out.
 		allDecls := []*ast.Node{definition}
-		if len(sym.Declarations) > 1 {
-			allDecls = sym.Declarations
+		if len(sym.Declarations()) > 1 {
+			allDecls = sym.Declarations()
 		}
 		if exists {
 			varInfo.References = usageNodes

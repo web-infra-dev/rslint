@@ -372,7 +372,7 @@ func readJestVersionFromPackageJson(ctx rule.RuleContext) string {
 	if !ctx.Program().IsValid() {
 		return ""
 	}
-	pkg := packagejson.FindNearest(ctx.Program(), ctx.SourceFile.FileName())
+	pkg := packagejson.FindNearest(ctx.Program(), ctx.SourceFile.FileName().AsString())
 	if pkg == nil {
 		return ""
 	}

@@ -566,7 +566,7 @@ func lintNoEmptyInterfaceForTest(
 	diagnostics := make([]rule.RuleDiagnostic, 0, 4)
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:     program,
-		File:        sourceFile.FileName(),
+		File:        sourceFile.FileName().AsString(),
 		HasTypeInfo: hasTypeInfo,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{

@@ -21,7 +21,7 @@ func TestTokenBeforePositionRecoversRegularExpressionLiteral(t *testing.T) {
 	code := "/before/giu\nnext()"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, code, core.ScriptKindTS)
 
 	token, ok := TokenBeforePosition(sourceFile, strings.Index(code, "next"))
@@ -40,7 +40,7 @@ func TestTokenBeforePositionDoesNotTreatDivisionAsRegularExpression(t *testing.T
 	code := "left / right\nnext()"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, code, core.ScriptKindTS)
 
 	token, ok := TokenBeforePosition(sourceFile, strings.Index(code, "next"))
@@ -56,7 +56,7 @@ func TestTokenBeforePositionAfterInterpolatedTemplate(t *testing.T) {
 	code := "`${seed}`; function *f(){yield(1)<a}"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, code, core.ScriptKindTS)
 
 	token, ok := TokenBeforePosition(sourceFile, strings.Index(code, "(1)"))

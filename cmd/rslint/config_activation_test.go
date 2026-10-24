@@ -18,6 +18,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestCLIConfigActivationBeforeExecution(t *testing.T) {
@@ -44,7 +45,7 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 		{name: "default format Program failure", defaultFormat: true, badProject: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			dir := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			dir := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 			targetPath := tspath.NormalizePath(filepath.Join(dir, "index.ts"))
 			const content = "const value = true; if (!!value) { debugger; }\n"
 			if err := os.WriteFile(targetPath, []byte(content), 0o644); err != nil {

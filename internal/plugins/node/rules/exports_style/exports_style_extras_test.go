@@ -267,7 +267,7 @@ func TestExportsStyleEditDemand(t *testing.T) {
 			run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program: lintprogram.NewFromCompiler(program), File: file.FileName(),
+					Program: lintprogram.NewFromCompiler(program), File: file.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: ExportsStyleRule.Name, Severity: rule.SeverityError,
 							Environment: &rule.RuleEnvironment{LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"}},

@@ -36,7 +36,7 @@ var NoRestrictedRequireRule = rule.Rule{
 							options := nodeutil.RequireResolutionOptions(ctx, nil)
 							resolution = &options
 						}
-						return nodeutil.RequireFilePath(ctx.Program(), target.Name, ctx.SourceFile.FileName(), *resolution)
+						return nodeutil.RequireFilePath(ctx.Program(), target.Name, ctx.SourceFile.FileName().AsString(), *resolution)
 					})
 					if message != nil {
 						ctx.ReportNode(target.Node, *message)

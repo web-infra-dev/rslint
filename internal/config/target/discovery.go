@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func discoverLintTargetsWithPreparedFiles(
@@ -44,7 +45,7 @@ func discoverLintTargetsWithPreparedFiles(
 		return targets
 	}
 
-	useCaseSensitive := fsys == nil || fsys.UseCaseSensitiveFileNames()
+	useCaseSensitive := fsys == nil || fsys.CaseSensitivity().IsCaseSensitive()
 	targetMatcher := mustTargetMatcher(config, configDir, fsys, pathSpaces, gitPolicy)
 	for _, root := range allowDirs {
 		if rslintconfig.IsDefaultExcludedPath(root.LexicalPath, scanRoot, useCaseSensitive) ||
@@ -95,10 +96,10 @@ func discoverLintTargetsWithinRoot(
 ) []File {
 	useCaseSensitive := true
 	if fsys != nil {
-		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
+		useCaseSensitive = fsys.CaseSensitivity().IsCaseSensitive()
 	}
 	comparisonKey := func(filePath string) string {
-		return string(tspath.ToPath(tspath.NormalizePath(filePath), "", true))
+		return string(pathutil.ToPath(tspath.NormalizePath(filePath), "", true))
 	}
 	configDir = tspath.NormalizePath(configDir)
 	scanRoot = tspath.NormalizePath(scanRoot)
@@ -258,8 +259,8 @@ func discoverLintTargetsWithinRoot(
 		}
 		canonicalPath := physicalPath
 		if needsRealpath && fsys != nil {
-			if resolved := fsys.Realpath(physicalPath); resolved != "" {
-				canonicalPath = resolved
+			if resolved := fsys.Realpath(pathutil.Path(physicalPath)); resolved != "" {
+				canonicalPath = resolved.AsString()
 			}
 		}
 		// A leaf symlink changes the file identity, never its containing directory.

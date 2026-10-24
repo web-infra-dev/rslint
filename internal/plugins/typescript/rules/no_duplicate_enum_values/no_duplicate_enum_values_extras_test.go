@@ -161,7 +161,7 @@ func TestNoDuplicateEnumValuesAdversarial(t *testing.T) {
 func TestGetEnumValueSkipsInvalidTemplateEscape(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/invalid-template.ts",
-		Path:     "/invalid-template.ts",
+		PathKey:  "/invalid-template.ts",
 	}, "enum E { A = `\\unicode` }", core.ScriptKindTS)
 	member := sourceFile.Statements.Nodes[0].AsEnumDeclaration().Members.Nodes[0].AsEnumMember()
 	if _, ok := getEnumValue(member.Initializer); ok {

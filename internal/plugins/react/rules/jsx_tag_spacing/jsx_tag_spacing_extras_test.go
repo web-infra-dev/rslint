@@ -178,7 +178,7 @@ func TestJsxTagSpacingExtras(t *testing.T) {
 
 func collectDiagnostics(t *testing.T, code string, options any, demand rule.EditDemand) []rule.RuleDiagnostic {
 	t.Helper()
-	sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.tsx", Path: "/test.tsx"}, code, core.ScriptKindTSX)
+	sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.tsx", PathKey: "/test.tsx"}, code, core.ScriptKindTSX)
 	comments := rule.NewCommentStore(sf)
 	var diagnostics []rule.RuleDiagnostic
 	ctx := rule.RuleContext{SourceFile: sf, Comments: comments, DisableManager: rule.NewDisableManager(sf, comments)}.WithDiagnosticConsumer(JsxTagSpacingRule.Name, rule.SeverityError, rule.DiagnosticConsumer{

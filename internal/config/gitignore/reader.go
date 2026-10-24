@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // Source is one observed .gitignore in physical repository coordinates.
@@ -34,25 +35,25 @@ type Reader struct {
 	fs               vfs.FS
 	useCaseSensitive bool
 	mu               sync.Mutex
-	markers          map[tspath.Path]func() bool
-	sources          map[tspath.Path]func() Source
-	roots            map[tspath.Path]string
-	covered          map[tspath.Path]string
-	blockedEntries   map[tspath.Path]string
-	ancestors        map[tspath.Path]Cursor
+	markers          map[tspath.PathKey]func() bool
+	sources          map[tspath.PathKey]func() Source
+	roots            map[tspath.PathKey]string
+	covered          map[tspath.PathKey]string
+	blockedEntries   map[tspath.PathKey]string
+	ancestors        map[tspath.PathKey]Cursor
 }
 
 func NewReader(fsys vfs.FS) *Reader {
 	return &Reader{
-		fs: fsys, useCaseSensitive: fsys == nil || fsys.UseCaseSensitiveFileNames(),
-		markers: make(map[tspath.Path]func() bool), sources: make(map[tspath.Path]func() Source),
-		roots: make(map[tspath.Path]string), covered: make(map[tspath.Path]string),
-		blockedEntries: make(map[tspath.Path]string),
-		ancestors:      make(map[tspath.Path]Cursor),
+		fs: fsys, useCaseSensitive: fsys == nil || fsys.CaseSensitivity().IsCaseSensitive(),
+		markers: make(map[tspath.PathKey]func() bool), sources: make(map[tspath.PathKey]func() Source),
+		roots: make(map[tspath.PathKey]string), covered: make(map[tspath.PathKey]string),
+		blockedEntries: make(map[tspath.PathKey]string),
+		ancestors:      make(map[tspath.PathKey]Cursor),
 	}
 }
 
-func (reader *Reader) pathID(path string) tspath.Path {
+func (reader *Reader) pathID(path string) tspath.PathKey {
 	return DirectoryPathID(path, reader.useCaseSensitive)
 }
 
@@ -63,7 +64,7 @@ func (reader *Reader) hasMarker(directory string) bool {
 	if !ok {
 		marker := tspath.CombinePaths(directory, ".git")
 		load = sync.OnceValue(func() bool {
-			return reader.fs != nil && (reader.fs.DirectoryExists(marker) || reader.fs.FileExists(marker))
+			return reader.fs != nil && (reader.fs.DirectoryExists(pathutil.Directory(marker)) || reader.fs.FileExists(pathutil.File(marker)))
 		})
 		reader.markers[id] = load
 	}
@@ -172,7 +173,7 @@ func (reader *Reader) Observe(cursor Cursor, physicalDir string) Cursor {
 		load = sync.OnceValue(func() Source {
 			source := Source{Directory: physicalDir}
 			if reader.fs != nil {
-				if content, exists := reader.fs.ReadFile(tspath.CombinePaths(physicalDir, ".gitignore")); exists {
+				if content, exists := reader.fs.ReadFile(pathutil.File(tspath.CombinePaths(physicalDir, ".gitignore"))); exists {
 					source.Patterns = convertGitignoreToPatterns(content, relative)
 				}
 			}
@@ -221,10 +222,10 @@ func ParentDirectory(directory string) string { return parentDir(directory) }
 
 // DirectoryPathID makes root spellings with or without a trailing slash share
 // one identity while preserving filesystem and drive roots.
-func DirectoryPathID(directory string, useCaseSensitive bool) tspath.Path {
+func DirectoryPathID(directory string, useCaseSensitive bool) tspath.PathKey {
 	directory = normalizeGlobPath(directory)
 	if directory != "/" && (len(directory) != 3 || directory[1] != ':') {
 		directory = strings.TrimSuffix(directory, "/")
 	}
-	return tspath.ToPath(utils.NormalizeAbsoluteDrive(directory), "", useCaseSensitive)
+	return pathutil.ToPath(utils.NormalizeAbsoluteDrive(directory), "", useCaseSensitive)
 }

@@ -110,10 +110,10 @@ func getConstVariableInitializer(ctx rule.RuleContext, node *ast.Node) *ast.Node
 	}
 
 	symbol := ctx.Refs.ResolveInFile(node)
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	if symbol == nil || len(symbol.Declarations()) != 1 {
 		return nil
 	}
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if declaration == nil || !ast.IsVariableDeclaration(declaration) {
 		return nil
 	}

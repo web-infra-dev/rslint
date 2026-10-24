@@ -2430,7 +2430,7 @@ class Disabled extends React.Component {}
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)
 	}
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(filePath, program.GetCurrentDirectory()))
 	if sourceFile == nil {
 		t.Fatalf("source file not found for %s", filePath)
 	}
@@ -2565,7 +2565,7 @@ const ArrowComp = (p) => <div />;
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)
 	}
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(filePath, program.GetCurrentDirectory()))
 	if sourceFile == nil {
 		t.Fatalf("source file not found for %s", filePath)
 		return

@@ -15,7 +15,7 @@ func parseInlineGlobalsForTest(t *testing.T, source string) (map[string]utils.Gl
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 
 	return ParseInlineGlobals(sourceFile, NewCommentStore(sourceFile))
@@ -129,7 +129,7 @@ func TestParseInlineGlobalsKeepsOrdinaryCommentsLazy(t *testing.T) {
 	source := "// ordinary comment\nconst value = 1;\n"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 	store := NewCommentStore(sourceFile)
 

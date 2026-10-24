@@ -357,7 +357,7 @@ func (analysis *RstestCallAnalysis) expectConfigMember(node *ast.Node) string {
 	if analysis.expectConfigAliasIsReassigned(symbol) {
 		return ""
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		member := ""
 		if declaration != nil && declaration.Kind == ast.KindBindingElement {
 			member = analysis.destructuredExpectConfigMember(declaration)
@@ -597,7 +597,7 @@ func (analysis *RstestCallAnalysis) indexSourceFile() {
 			return false
 		})
 	}
-	visit(analysis.ctx.SourceFile.Node.AsNode())
+	visit(analysis.ctx.SourceFile.AsNode())
 
 	for changed := true; changed; {
 		changed = false

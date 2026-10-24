@@ -140,7 +140,7 @@ func buildDualRootPrograms(t *testing.T, tmpDir string, cache *utils.ParseCache)
 func findByName(t *testing.T, p *compiler.Program, match func(string) bool) *ast.SourceFile {
 	t.Helper()
 	for _, sf := range p.GetSourceFiles() {
-		if match(sf.FileName()) {
+		if match(sf.FileName().AsString()) {
 			return sf
 		}
 	}

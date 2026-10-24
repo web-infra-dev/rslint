@@ -87,7 +87,7 @@ func TestNoUnnecessarySliceEndArtifactsFollowDemand(t *testing.T) {
 			for index, demand := range demands {
 				var found []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
+					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: no_unnecessary_slice_end.NoUnnecessarySliceEndRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return no_unnecessary_slice_end.NoUnnecessarySliceEndRule.Run(ctx, nil)

@@ -100,7 +100,7 @@ var NoVarRequiresRule = rule.CreateRule(rule.Rule{
 
 				// Check if require is a local variable (not the global require)
 				symbol := identifier.Symbol()
-				if symbol != nil && len(symbol.Declarations) > 0 {
+				if symbol != nil && len(symbol.Declarations()) > 0 {
 					// This is a local require variable, not the global one
 					return
 				}

@@ -235,7 +235,7 @@ func TestNoLonelyIfUnterminatedElseBlock(t *testing.T) {
 	} {
 		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 			FileName: "/no-lonely-if-unterminated.ts",
-			Path:     tspath.Path("/no-lonely-if-unterminated.ts"),
+			PathKey:  tspath.PathKey("/no-lonely-if-unterminated.ts"),
 		}, code, core.ScriptKindTS)
 
 		comments := rule.NewCommentStore(sourceFile)
@@ -278,7 +278,7 @@ func TestNoLonelyIfEditDemand(t *testing.T) {
 	code := "if (a) {} else { if (b) baz(); }"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/no-lonely-if-edit-demand.ts",
-		Path:     tspath.Path("/no-lonely-if-edit-demand.ts"),
+		PathKey:  tspath.PathKey("/no-lonely-if-edit-demand.ts"),
 	}, code, core.ScriptKindTS)
 
 	outerIf := sourceFile.Statements.Nodes[0]

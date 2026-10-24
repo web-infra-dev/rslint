@@ -335,7 +335,7 @@ func TestAsyncServerActionEditDemand(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/action.ts", Path: "/action.ts",
+				FileName: "/action.ts", PathKey: "/action.ts",
 			}, test.code, core.ScriptKindTS)
 			run := func(demand rule.EditDemand) rule.RuleDiagnostic {
 				t.Helper()

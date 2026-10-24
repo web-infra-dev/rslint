@@ -180,11 +180,11 @@ func isSetBinding(ctx rule.RuleContext, node *ast.Node, state *setWalkState) boo
 		return false
 	}
 	symbol := ctx.Refs.ResolveInFile(node)
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	if symbol == nil || len(symbol.Declarations()) != 1 {
 		return false
 	}
 	return resolveSetSymbol(state, symbol, func() bool {
-		declaration := symbol.Declarations[0]
+		declaration := symbol.Declarations()[0]
 		if isSetTypeAnnotation(ctx, setBindingTypeAnnotation(declaration), nil) {
 			return true
 		}
@@ -284,7 +284,7 @@ func isSetTypeReference(ctx rule.RuleContext, typeName *ast.Node, state *setWalk
 		typeName, ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
 	)
 	return resolveSetSymbol(state, symbol, func() bool {
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if declaration == nil {
 				continue
 			}

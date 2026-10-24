@@ -2,6 +2,7 @@ package file_extension_in_import
 
 import (
 	_ "embed"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed file_extension_in_import.schema.json
@@ -33,41 +35,60 @@ func extension(name string) string {
 
 type directoryEntriesKey string
 
-func existingExtensions(p *program.Program, filePath, basename string) []string {
+type directoryEntries struct {
+	names    []string
+	complete bool
+}
+
+func hostDirectoryNames(fs vfs.FS, directory string) ([]string, bool) {
+	// Stat through the Program first to preserve its path mapping and network
+	// rejection. Accessible entries alone may omit broken links or special files.
+	info := fs.Stat(pathutil.Path(directory))
+	if info == nil || info.Sys() == nil {
+		return nil, false
+	}
+	handle, err := os.Open(fs.Realpath(pathutil.Path(directory)).AsString())
+	if err != nil {
+		return nil, false
+	}
+	defer handle.Close()
+	hostInfo, err := handle.Stat()
+	if err != nil || !os.SameFile(info, hostInfo) {
+		return nil, false
+	}
+	// Validate and enumerate the same opened directory, even if its alias moves.
+	names, err := handle.Readdirnames(-1)
+	return names, err == nil
+}
+
+func existingExtensions(p *program.Program, filePath, basename string) ([]string, bool) {
 	directory := filepath.Dir(filePath)
 	if filepath.Separator == '/' && strings.Contains(directory, `\`) {
-		return nil
+		return nil, false
 	}
+
 	directory = tspath.NormalizePath(directory)
-	names := program.Cached(p, directoryEntriesKey(directory), func() []string {
+	entries := program.Cached(p, directoryEntriesKey(directory), func() directoryEntries {
 		fs := p.FS()
-		entries := fs.GetAccessibleEntries(directory)
+		entries := fs.GetAccessibleEntries(pathutil.Directory(directory))
 		names := append(slices.Clone(entries.Files), entries.Directories...)
-		// Include broken symlinks and special entries, as readdir does.
-		// Accessible entries also supply files present only in editor overlays.
-		_ = fs.WalkDir(directory, func(path string, entry vfs.DirEntry, err error) error {
-			if err != nil || entry == nil || path == directory {
-				return err
-			}
-			names = append(names, entry.Name())
-			if entry.IsDir() {
-				return vfs.SkipDir
-			}
-			return nil
-		})
+		hostNames, complete := hostDirectoryNames(fs, directory)
+		if complete {
+			names = append(names, hostNames...)
+		}
 		slices.Sort(names)
-		return slices.Compact(names)
+		return directoryEntries{names: slices.Compact(names), complete: complete}
 	})
 	prefix := basename + "."
-	start, _ := slices.BinarySearch(names, prefix)
+	start, _ := slices.BinarySearch(entries.names, prefix)
 	var extensions []string
-	for _, name := range names[start:] {
+	for _, name := range entries.names[start:] {
 		if !strings.HasPrefix(name, prefix) {
 			break
 		}
 		extensions = append(extensions, extension(name))
 	}
-	return extensions
+	return extensions, entries.complete
 }
 
 func preferredExtension(existing, preferred []string) string {
@@ -88,7 +109,7 @@ var FileExtensionInImportRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		p := ctx.Program()
-		if p == nil || ctx.SourceFile == nil || strings.HasPrefix(ctx.SourceFile.FileName(), "<") {
+		if p == nil || ctx.SourceFile == nil || strings.HasPrefix(ctx.SourceFile.FileName().AsString(), "<") {
 			return nil
 		}
 		defaultStyle := "always"
@@ -118,7 +139,7 @@ var FileExtensionInImportRule = rule.Rule{
 				resolutions[index] = &resolution
 			}
 			resolution := resolutions[index]
-			filePath := nodeutil.ImportFilePath(p, name, ctx.SourceFile.FileName(), typeOnly, *resolution)
+			filePath := nodeutil.ImportFilePath(p, name, ctx.SourceFile.FileName().AsString(), typeOnly, *resolution)
 			if filePath == "" {
 				return
 			}
@@ -127,16 +148,18 @@ var FileExtensionInImportRule = rule.Rule{
 			normalizedPath := tspath.NormalizePath(filePath)
 			// A literal POSIX backslash must not alias a slash-separated VFS path.
 			canProbe := filepath.Separator == '\\' || !strings.Contains(filePath, `\`)
-			if actualExt != "" && (!canProbe || !fs.FileExists(normalizedPath)) {
+			if actualExt != "" && (!canProbe || !fs.FileExists(pathutil.File(normalizedPath))) {
 				// A fallback such as utils.client may actually name utils.client.ts.
 				basename := filepath.Base(name)
-				if found := preferredExtension(existingExtensions(p, filePath, basename), resolution.Extensions); found != "" {
+				existing, _ := existingExtensions(p, filePath, basename)
+				if found := preferredExtension(existing, resolution.Extensions); found != "" {
 					actualExt = found
 				}
 			}
 			isDirectory := false
-			if canProbe && fs.DirectoryExists(normalizedPath) {
-				if found := preferredExtension(existingExtensions(p, filepath.Join(filePath, "index"), "index"), resolution.Extensions); found != "" {
+			if canProbe && fs.DirectoryExists(pathutil.Directory(normalizedPath)) {
+				existing, _ := existingExtensions(p, filepath.Join(filePath, "index"), "index")
+				if found := preferredExtension(existing, resolution.Extensions); found != "" {
 					isDirectory = true
 					actualExt = found
 				}
@@ -193,7 +216,8 @@ var FileExtensionInImportRule = rule.Rule{
 						return nil
 					}
 					basename := strings.TrimSuffix(filepath.Base(filePath), extension(filePath))
-					if len(existingExtensions(p, filePath, basename)) != 1 {
+					existing, complete := existingExtensions(p, filePath, basename)
+					if !complete || len(existing) != 1 {
 						return nil
 					}
 					span := utils.TrimNodeTextRange(ctx.SourceFile, source)

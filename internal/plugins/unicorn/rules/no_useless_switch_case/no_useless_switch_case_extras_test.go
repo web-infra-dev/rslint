@@ -459,7 +459,7 @@ func TestNoUselessSwitchCaseEditDemand(t *testing.T) {
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, "switch (value) { case value /* comment */: default: useDefault(); }", core.ScriptKindTS)
 
 	run := func(demand rule.EditDemand) rule.RuleDiagnostic {

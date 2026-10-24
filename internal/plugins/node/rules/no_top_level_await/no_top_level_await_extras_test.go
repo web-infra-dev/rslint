@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // Expected diagnostics were checked against eslint-plugin-n v18.3.0 with
@@ -110,13 +111,15 @@ func TestNoTopLevelAwaitExtras(t *testing.T) {
 
 type caseInsensitiveFS struct{ vfs.FS }
 
-func (caseInsensitiveFS) UseCaseSensitiveFileNames() bool { return false }
+func (caseInsensitiveFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
+}
 
 func TestNoTopLevelAwaitPathCasing(t *testing.T) {
 	root := awaitRoot(t, "testdata/extras.txtar")
 	first := tspath.ResolvePath(root.Dir, "files/src/first.mjs")
 	second := tspath.ResolvePath(root.Dir, "FILES/src/second.mjs")
-	metadata, ok := root.FS.ReadFile(tspath.ResolvePath(root.Dir, "files/package.json"))
+	metadata, ok := root.FS.ReadFile(pathutil.File(tspath.ResolvePath(root.Dir, "files/package.json")))
 	if !ok {
 		t.Fatal("missing package fixture")
 	}

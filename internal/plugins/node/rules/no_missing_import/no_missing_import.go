@@ -50,7 +50,7 @@ var NoMissingImportRule = rule.Rule{
 					resolutionOptions[index] = &resolution
 					resolveErrors[index] = map[string]string{}
 				}
-				resolveError = nodeutil.ImportResolveError(p, resource, fileName, typeOnly, *resolutionOptions[index])
+				resolveError = nodeutil.ImportResolveError(p, resource, fileName.AsString(), typeOnly, *resolutionOptions[index])
 				resolveErrors[index][specifier] = resolveError
 			}
 			if resolveError != "" {

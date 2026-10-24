@@ -3,9 +3,11 @@ package no_unpublished_bin
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func ignoredBin(name string, endLine, endColumn int) []rule_tester.InvalidTestCaseError {
@@ -181,7 +183,9 @@ type unpublishedBinTestFS struct {
 	caseSensitive bool
 }
 
-func (fs unpublishedBinTestFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
+func (fs unpublishedBinTestFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(fs.caseSensitive)
+}
 
 func TestNoUnpublishedBinFilesystemCase(t *testing.T) {
 	for _, sensitive := range []bool{true, false} {

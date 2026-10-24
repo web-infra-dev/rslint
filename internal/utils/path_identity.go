@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // DirectoryIdentity keeps one directory's caller-visible and physical paths.
@@ -24,7 +25,7 @@ func DirectorySearchBoundary(directory, root DirectoryIdentity, fsys vfs.FS) (st
 	normalizeDirectory := func(path string) string {
 		path = ExactPathID(path)
 		if len(path) > tspath.GetRootLength(path) {
-			path = tspath.RemoveTrailingDirectorySeparators(path)
+			path = pathutil.RemoveTrailingDirectorySeparators(path)
 		}
 		return path
 	}
@@ -34,7 +35,7 @@ func DirectorySearchBoundary(directory, root DirectoryIdentity, fsys vfs.FS) (st
 		return "", false
 	}
 	containsExact := func(parent, child string) bool {
-		return tspath.ContainsPath(parent, child, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+		return pathutil.ContainsPath(parent, child, pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: true})
 	}
 	if containsExact(root.LexicalPath, directory.LexicalPath) {
 		return root.LexicalPath, true
@@ -43,8 +44,8 @@ func DirectorySearchBoundary(directory, root DirectoryIdentity, fsys vfs.FS) (st
 	if physicalDirectory == "" {
 		physicalDirectory = directory.LexicalPath
 		if fsys != nil {
-			if physical := fsys.Realpath(physicalDirectory); physical != "" {
-				physicalDirectory = physical
+			if physical := fsys.Realpath(pathutil.Path(physicalDirectory)); physical != "" {
+				physicalDirectory = physical.AsString()
 			}
 		}
 	}
@@ -52,15 +53,15 @@ func DirectorySearchBoundary(directory, root DirectoryIdentity, fsys vfs.FS) (st
 	if physicalRoot == "" {
 		physicalRoot = root.LexicalPath
 		if fsys != nil {
-			if physical := fsys.Realpath(physicalRoot); physical != "" {
-				physicalRoot = physical
+			if physical := fsys.Realpath(pathutil.Path(physicalRoot)); physical != "" {
+				physicalRoot = physical.AsString()
 			}
 		}
 	}
 	physicalDirectory, physicalRoot = normalizeDirectory(physicalDirectory), normalizeDirectory(physicalRoot)
 	var rootInfo vfs.FileInfo
 	if fsys != nil {
-		rootInfo = fsys.Stat(physicalRoot)
+		rootInfo = fsys.Stat(pathutil.Path(physicalRoot))
 	}
 	sameRoot := func(path string) bool {
 		if normalizeDirectory(path) == physicalRoot {
@@ -69,7 +70,7 @@ func DirectorySearchBoundary(directory, root DirectoryIdentity, fsys vfs.FS) (st
 		if rootInfo == nil || !rootInfo.IsDir() {
 			return false
 		}
-		info := fsys.Stat(path)
+		info := fsys.Stat(pathutil.Path(path))
 		return info != nil && info.IsDir() && os.SameFile(rootInfo, info)
 	}
 	containsPhysical := func(path string) bool {
@@ -96,7 +97,7 @@ func DirectorySearchBoundary(directory, root DirectoryIdentity, fsys vfs.FS) (st
 			if fsys == nil {
 				break
 			}
-			physical = fsys.Realpath(ancestor)
+			physical = fsys.Realpath(pathutil.Path(ancestor)).AsString()
 		}
 		if physical != "" && containsPhysical(physical) {
 			boundary = ancestor
@@ -111,7 +112,19 @@ func DirectorySearchBoundary(directory, root DirectoryIdentity, fsys vfs.FS) (st
 // ExactPathID normalizes a path without consulting the filesystem or folding
 // directory and file names. Only absolute Windows drive spelling is folded.
 func ExactPathID(filePath string) string {
-	return NormalizeAbsoluteDrive(string(tspath.ToPath(filePath, "", true)))
+	// Identity keys also include relative paths and the empty sentinel. Those
+	// are not compiler paths and must not be coerced into a rooted PathKey.
+	// A bare drive is drive-relative, even though the compiler normalizer now
+	// supplies its root separator. Preserve its case-sensitive identity.
+	if len(filePath) == 2 && filePath[1] == ':' {
+		return filePath
+	}
+	if tspath.IsRootedDiskPath(filePath) {
+		filePath = tspath.NormalizePath(filePath)
+	} else {
+		filePath = tspath.GetNormalizedAbsolutePath(filePath, "")
+	}
+	return NormalizeAbsoluteDrive(filePath)
 }
 
 // NormalizeAbsoluteDrive gives absolute Windows paths a consistent drive
