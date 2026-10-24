@@ -16,10 +16,10 @@ test-worker-termination = []
 napi = "3.12.1"
 napi-derive = "3.5.6"
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+libc = "0.2.191"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Memory"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Memory"] }
 
 [build-dependencies]
 napi-build = "2.3.2"
