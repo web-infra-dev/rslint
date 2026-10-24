@@ -2685,7 +2685,8 @@ func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 		}
 		// Assert the same bytes as a direct projection of this generation.
 		var builder estree.Builder
-		syntax := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: target, Path: tspath.Path(target)}, strings.TrimPrefix(wantText, "\ufeff"), core.GetScriptKindFromFileName(target))
+		fileName := tspath.RootedFilePathFromAbsolute(target)
+		syntax := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: fileName, PathKey: tspath.CaseSensitive.PathKey(fileName.AsPath())}, strings.TrimPrefix(wantText, "\ufeff"), core.GetScriptKindFromFileName(fileName))
 		expectedFrame, frameErr := builder.Build(context.Background(), syntax, estree.Options{SourceType: "module", HasBOM: strings.HasPrefix(wantText, "\ufeff")})
 		if frameErr != nil || !reflect.DeepEqual(attachments, []ipc.Attachment{ipc.Bytes(expectedFrame)}) {
 			t.Fatal("plugin frame did not freeze the generation")

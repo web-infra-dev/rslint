@@ -1300,7 +1300,8 @@ func TestDispatchEslintPluginReleasesProjectedFrameAfterTransfer(t *testing.T) {
 }
 
 func pluginSyntax(path, text string) *ast.SourceFile {
-	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: path, Path: tspath.Path(tspath.NormalizePath(path))}, strings.TrimPrefix(text, "\ufeff"), core.GetScriptKindFromFileName(path))
+	fileName := tspath.RootedFilePathFromAbsolute(path)
+	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: fileName, PathKey: tspath.CaseSensitive.PathKey(fileName.AsPath())}, strings.TrimPrefix(text, "\ufeff"), core.GetScriptKindFromFileName(fileName))
 }
 
 // Policy tests treat frozen frames as opaque bytes. Projection and output

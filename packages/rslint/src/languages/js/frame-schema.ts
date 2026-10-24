@@ -118,7 +118,7 @@ export const FRAME_SCHEMAS: ReadonlyArray<
   ['MemberExpression', ['object', 'property', 'computed', 'optional']],
   ['CallExpression', ['callee', 'arguments', 'optional', 'typeArguments']],
   ['NewExpression', ['callee', 'arguments', 'typeArguments']],
-  ['ImportExpression', ['source', 'options']],
+  ['ImportExpression', ['source', 'options', 'phase']],
   ['ArrayExpression', ['elements']],
   ['ObjectExpression', ['properties']],
   [

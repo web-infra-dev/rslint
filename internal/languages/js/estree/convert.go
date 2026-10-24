@@ -967,7 +967,7 @@ func (p *estreeProjector) convertCall(node *ast.Node) uint32 {
 	if n.Arguments != nil {
 		arguments = n.Arguments.Nodes
 	}
-	if n.Expression != nil && n.Expression.Kind == ast.KindImportKeyword {
+	if ast.IsImportCall(node) {
 		var source, options uint32
 		if len(arguments) > 0 {
 			source = p.convert(arguments[0], false)
@@ -975,7 +975,11 @@ func (p *estreeProjector) convertCall(node *ast.Node) uint32 {
 		if len(arguments) > 1 {
 			options = p.convert(arguments[1], false)
 		}
-		return p.addNode("ImportExpression", node, nodeValue(source), nodeValue(options))
+		phase := undefinedValue()
+		if ast.IsImportPhaseMetaProperty(n.Expression) {
+			phase = p.stringValue(n.Expression.Name().Text())
+		}
+		return p.addNode("ImportExpression", node, nodeValue(source), nodeValue(options), phase)
 	}
 	callee, chain := p.convertChainOperand(n.Expression)
 	id := p.addNode("CallExpression", node,
