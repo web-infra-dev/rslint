@@ -1,6 +1,10 @@
 {
   "extends": ["../../tsconfig.spec.json"],
-  "include": ["tests/**/*.ts", "../rslint/src/**/*.ts"],
+  "include": [
+    "tests/**/*.ts",
+    "../rslint/src/**/*.ts",
+    "../../internal/plugins/unicorn/rules/name_replacements/testdata/name_replacements_v77.json"
+  ],
   "compilerOptions": {
     "rootDir": "../..",
     "moduleResolution": "bundler",
