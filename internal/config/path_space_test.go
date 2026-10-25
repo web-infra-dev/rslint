@@ -358,6 +358,28 @@ func TestRelativePathWithinConfigRootWindowsDrive(t *testing.T) {
 	}
 }
 
+func TestRelativePathWithinConfigRootSpellings(t *testing.T) {
+	for _, test := range []struct {
+		file, root, relative  string
+		caseSensitive, within bool
+	}{
+		{"/repo/src/a.ts", "/repo", "src/a.ts", true, true},
+		{"/repo", "/repo", "", true, true},
+		{"/repo-other/a.ts", "/repo", "", true, false},
+		{"/repo/src/../a.ts", "/repo", "a.ts", true, true},
+		{"/repo/.cache/a.ts", "/repo", ".cache/a.ts", true, true},
+		{"/repo/src/a.ts", "/", "repo/src/a.ts", true, true},
+		{"/repo//src/a.ts", "/repo/", "src/a.ts", true, true},
+		{"/repo/src/a.ts", "/Repo", "src/a.ts", false, true},
+		{"/repo/src/a.ts", "/Repo", "", true, false},
+	} {
+		relative, within := RelativePathWithinConfigRoot(test.file, test.root, test.caseSensitive)
+		if relative != test.relative || within != test.within {
+			t.Errorf("%q in %q (caseSensitive=%v) = (%q, %v), want (%q, %v)", test.file, test.root, test.caseSensitive, relative, within, test.relative, test.within)
+		}
+	}
+}
+
 func TestResolveConfigDirectoryPathSpace(t *testing.T) {
 	fs := &pathSpaceTestFS{
 		caseSensitive: true,

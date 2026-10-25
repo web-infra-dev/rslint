@@ -4046,6 +4046,40 @@ func TestProgramInputsMapUnchangedPathsWithBoundedAllocations(t *testing.T) {
 	}
 }
 
+func TestProgramInputsBoundProjectionCacheWithoutFreezingLiveIO(t *testing.T) {
+	fsys := &canonicalIdentityTestFS{FS: osvfs.FS(), realPaths: map[string]string{"/captured/live.ts": "/first.ts"}}
+	spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, rslintconfig.DirectoryIdentity{LexicalPath: "/alias", CanonicalPath: "/captured"})
+	frozen, err := WithFrozenIO(fsys, spaces, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := frozen.Realpath("/alias/live.ts"); got != "/first.ts" {
+		t.Fatalf("initial live realpath = %q", got)
+	}
+	fsys.realPaths["/captured/live.ts"] = "/second.ts"
+	if got := frozen.Realpath("/alias/live.ts"); got != "/second.ts" {
+		t.Fatalf("path projection cached a live realpath: %q", got)
+	}
+	view := frozen.(*frozenFileSystem)
+	var group sync.WaitGroup
+	for worker := range 8 {
+		group.Go(func() {
+			for i := range 600 {
+				suffix := fmt.Sprintf("/file-%d-%d.ts", worker, i)
+				for range 2 {
+					if got := view.ioPath("/alias" + suffix); got != "/captured"+suffix {
+						t.Errorf("projection changed at cache capacity: %q", got)
+					}
+				}
+			}
+		})
+	}
+	group.Wait()
+	if len(view.paths) != frozenPathCacheLimit {
+		t.Fatalf("cached %d paths, want bound %d", len(view.paths), frozenPathCacheLimit)
+	}
+}
+
 func BenchmarkFrozenIOPaths(b *testing.B) {
 	const root = "/Users/Developer/repo"
 	spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, rslintconfig.DirectoryIdentity{LexicalPath: root, CanonicalPath: root})

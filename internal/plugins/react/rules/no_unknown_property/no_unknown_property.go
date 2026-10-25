@@ -8,6 +8,7 @@ import (
 	_ "embed"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
@@ -350,14 +351,14 @@ var reactOnProps = []string{
 
 // buildDOMPropertyLookup builds a lowercased-name → canonical-name map for
 // the version-dependent set of recognized DOM property names, used as the
-// case-insensitive fallback in getStandardName. Built once per rule run;
+// case-insensitive fallback in getStandardName. Each version band is immutable;
 // upstream's `names.find(e => e.toLowerCase() === name.toLowerCase())` returns
 // the first match, so entries inserted earlier take precedence (later
 // duplicates are skipped).
 //
 // Older React versions (< 16.1) recognize `allowTransparency`;
 // React >= 16.4 adds pointer-event handlers; React >= 19 adds `precedence`.
-func buildDOMPropertyLookup(settings map[string]interface{}) map[string]string {
+func buildDOMPropertyLookup(version int) map[string]string {
 	// Upper bound: two full lists + optional extras.
 	m := make(map[string]string, len(domPropertyNamesTwoWords)+len(domPropertyNamesOneWord)+len(reactOnProps)+2)
 	add := func(name string) {
@@ -373,21 +374,42 @@ func buildDOMPropertyLookup(settings map[string]interface{}) map[string]string {
 		add(n)
 	}
 	// React < 16.1 still accepts `allowTransparency` (see facebook/react#10823).
-	if reactutil.ReactVersionLessThan(settings, 16, 1, 0) {
+	if version == 0 {
 		add("allowTransparency")
 		return m
 	}
 	// Pointer events arrived in React 16.4.
-	if !reactutil.ReactVersionLessThan(settings, 16, 4, 0) {
+	if version >= 2 {
 		for _, n := range reactOnProps {
 			add(n)
 		}
 		// `precedence` arrived in React 19 (stylesheet support).
-		if !reactutil.ReactVersionLessThan(settings, 19, 0, 0) {
+		if version >= 3 {
 			add("precedence")
 		}
 	}
 	return m
+}
+
+var domPropertyLookups [4]struct {
+	once  sync.Once
+	names map[string]string
+}
+
+func preparedDOMPropertyLookup(settings map[string]interface{}) map[string]string {
+	version := 0
+	switch {
+	case reactutil.ReactVersionLessThan(settings, 16, 1, 0):
+	case reactutil.ReactVersionLessThan(settings, 16, 4, 0):
+		version = 1
+	case reactutil.ReactVersionLessThan(settings, 19, 0, 0):
+		version = 2
+	default:
+		version = 3
+	}
+	lookup := &domPropertyLookups[version]
+	lookup.once.Do(func() { lookup.names = buildDOMPropertyLookup(version) })
+	return lookup.names
 }
 
 // normalizeAttributeCase returns the canonical casing for `name` when its
@@ -565,9 +587,7 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		}
 		requireDataLowercase, _ = optsMap["requireDataLowercase"].(bool)
 	}
-	// Precompute the version-dependent DOM property lookup map once per run;
-	// settings are static for the duration of a rule invocation.
-	domPropertyLookup := buildDOMPropertyLookup(ctx.Settings)
+	domPropertyLookup := preparedDOMPropertyLookup(ctx.Settings)
 
 	return rule.RuleListeners{
 		ast.KindJsxAttribute: func(node *ast.Node) {

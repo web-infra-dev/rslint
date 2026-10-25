@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -206,11 +207,14 @@ func ReactVersionLessThan(settings map[string]interface{}, major, minor, patch i
 // configured ones. GetReactPragma remains correct for the settings-only
 // lookups upstream performs the same way, such as `getFragmentFromContext`.
 func GetReactPragmaFromContext(ctx rule.RuleContext) string {
-	if annotated, found := jsxAnnotationPragma(ctx); found {
-		if isJavaScriptIdentifier(annotated) {
-			return annotated
+	if ctx.SourceFile != nil {
+		annotation := ast.GetOrComputeSourceFileData(ctx.SourceFile, jsxPragmaAnnotationKey, jsxAnnotationPragma)
+		if annotation.found {
+			if isJavaScriptIdentifier(annotation.name) {
+				return annotation.name
+			}
+			return DefaultReactPragma
 		}
-		return DefaultReactPragma
 	}
 	pragma := GetReactPragma(ctx.Settings)
 	if !isJavaScriptIdentifier(pragma) {
@@ -219,19 +223,24 @@ func GetReactPragmaFromContext(ctx rule.RuleContext) string {
 	return pragma
 }
 
+type jsxPragmaAnnotation struct {
+	name  string
+	found bool
+}
+
+// Only the source annotation belongs to the AST; settings remain context-local.
+var jsxPragmaAnnotationKey = ast.NewSourceFileDataKey[jsxPragmaAnnotation]()
+
 // jsxAnnotationPragma returns the head of the first `@jsx <name>` annotation
 // found in a comment, and whether any annotation was present at all. The
 // caller needs both: upstream stops looking at `settings.react.pragma` as soon
 // as an annotation exists, even one it later rejects as a non-identifier.
-func jsxAnnotationPragma(ctx rule.RuleContext) (string, bool) {
-	if ctx.SourceFile == nil {
-		return "", false
-	}
-	text := ctx.SourceFile.Text()
+func jsxAnnotationPragma(sourceFile *ast.SourceFile) jsxPragmaAnnotation {
+	text := sourceFile.Text()
 	// Most files carry no classic-runtime pragma; keep the comment scan off
 	// the hot path for them.
 	if !strings.Contains(text, "@jsx") {
-		return "", false
+		return jsxPragmaAnnotation{}
 	}
 
 	// ESLint's SourceCode#getAllComments exposes the hashbang as its first
@@ -239,16 +248,16 @@ func jsxAnnotationPragma(ctx rule.RuleContext) (string, bool) {
 	// it first to preserve both inclusion and source-order precedence.
 	if shebang := scanner.GetShebang(text); shebang != "" {
 		if name, found := jsxPragmaFromCommentValue(shebang[2:]); found {
-			return name, true
+			return jsxPragmaAnnotation{name: name, found: true}
 		}
 	}
 
-	for _, comment := range ctx.Comments.All() {
+	for _, comment := range rule.NewCommentStore(sourceFile).All() {
 		if name, found := jsxPragmaFromCommentValue(utils.CommentValue(text, comment)); found {
-			return name, true
+			return jsxPragmaAnnotation{name: name, found: true}
 		}
 	}
-	return "", false
+	return jsxPragmaAnnotation{}
 }
 
 func jsxPragmaFromCommentValue(value string) (string, bool) {

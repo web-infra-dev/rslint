@@ -23,10 +23,14 @@ var NoNamedAsDefaultRule = rule.Rule{
 			if name == nil || name.Text() == "default" {
 				return
 			}
+			source := modules.SourceFromSpecifier(declaration.ModuleSpecifier)
+			if !import_utils.MayHaveExport(ctx, source, name.Text()) {
+				return
+			}
 
 			// The shared map supplies module resolution and export metadata.
 			// Parser errors in dependencies are not reproduced as rule reports.
-			exports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(declaration.ModuleSpecifier))
+			exports, ok := import_utils.GetExportMap(ctx, source)
 			if !ok || !exports.HasDefault() || exports.Get(name.Text()) == nil {
 				return
 			}

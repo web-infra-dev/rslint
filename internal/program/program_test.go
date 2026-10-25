@@ -46,6 +46,9 @@ func TestOwnedCompilerProgramsShareCacheOnlyWithinBatch(t *testing.T) {
 	if programs[1] == programs[2] {
 		t.Fatal("duplicate inputs must retain distinct facade identities")
 	}
+	if !programs[1].OwnsSourceFile(specifierCacheFile(t, raw)) || programs[1].OwnsSourceFile(specifierCacheFile(t, other)) {
+		t.Fatal("source ownership must compare exact SourceFile objects, even at the same path")
+	}
 
 	type key struct{}
 	var builds atomic.Int32

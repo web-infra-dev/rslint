@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -69,8 +70,8 @@ func WithFrozenIO(baseFS vfs.FS, pathSpaces *config.PathSpaceSnapshot, files []t
 	return view, nil
 }
 
-// frozenFileSystem owns no discovery, matching, metadata, or source caches. Its only
-// inputs are immutable planning values, and no filesystem query adds mappings.
+// frozenFileSystem projects immutable planning identities. Only path projection
+// is memoized; existence, contents and non-frozen Realpath results use the live FS.
 type frozenFileSystem struct {
 	vfs.FS
 	files           map[string]string
@@ -79,6 +80,15 @@ type frozenFileSystem struct {
 	foldedParents   map[string]string
 	keyPrefix       string
 	foldedKeyPrefix string
+	pathMu          sync.RWMutex
+	paths           map[string]frozenPath
+}
+
+const frozenPathCacheLimit = 4096
+
+type frozenPath struct {
+	path string
+	file bool
 }
 
 // Fold only the varying suffix of paths in this view. In particular, an
@@ -148,6 +158,29 @@ func (f *frozenFileSystem) ioPath(path string) string {
 // resolvePath also reports frozen file identities: Realpath must return those
 // directly instead of observing a file alias again in the underlying FS.
 func (f *frozenFileSystem) resolvePath(path string) (string, bool) {
+	f.pathMu.RLock()
+	cached, ok := f.paths[path]
+	full := len(f.paths) >= frozenPathCacheLimit
+	f.pathMu.RUnlock()
+	if ok {
+		return cached.path, cached.file
+	}
+	physical, file := f.computePath(path)
+	if !full {
+		f.pathMu.Lock()
+		if len(f.paths) < frozenPathCacheLimit {
+			if f.paths == nil {
+				f.paths = make(map[string]frozenPath)
+			}
+			// Path strings may borrow source buffers; retain only their own bytes.
+			f.paths[strings.Clone(path)] = frozenPath{path: strings.Clone(physical), file: file}
+		}
+		f.pathMu.Unlock()
+	}
+	return physical, file
+}
+
+func (f *frozenFileSystem) computePath(path string) (string, bool) {
 	path = tspath.NormalizePath(path)
 	diskPath := tspath.IsRootedDiskPath(path)
 	id := utils.NormalizeAbsoluteDrive(path)

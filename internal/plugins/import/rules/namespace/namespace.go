@@ -79,6 +79,9 @@ func processImportDeclaration(ctx rule.RuleContext, namespaces map[string]*impor
 	if importDecl == nil || importDecl.ImportClause == nil {
 		return
 	}
+	if !importNeedsNamespaceMap(ctx, importDecl) {
+		return
+	}
 
 	imports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(importDecl.ModuleSpecifier))
 	if !ok {
@@ -129,6 +132,34 @@ func processImportDeclaration(ctx rule.RuleContext, namespaces map[string]*impor
 			}
 		}
 	}
+}
+
+func importNeedsNamespaceMap(ctx rule.RuleContext, declaration *ast.ImportDeclaration) bool {
+	clause := declaration.ImportClause.AsImportClause()
+	// Even an unused namespace import can report noExports.
+	if clause.NamedBindings != nil && clause.NamedBindings.Kind == ast.KindNamespaceImport {
+		return true
+	}
+	names := import_utils.MemberReceiverNames(ctx)
+	source := modules.SourceFromSpecifier(declaration.ModuleSpecifier)
+	if clause.Name() != nil && names[clause.Name().Text()] && import_utils.MayHaveNamespaceExport(ctx, source, defaultExportName) {
+		return true
+	}
+	if clause.NamedBindings != nil && clause.NamedBindings.Kind == ast.KindNamedImports {
+		named := clause.NamedBindings.AsNamedImports()
+		if named.Elements == nil {
+			return false
+		}
+		for _, node := range named.Elements.Nodes {
+			if node == nil || node.Kind != ast.KindImportSpecifier || node.Name() == nil || !names[node.Name().Text()] {
+				continue
+			}
+			if name, ok := importSpecifierImportedName(node.AsImportSpecifier()); ok && import_utils.MayHaveNamespaceExport(ctx, source, name) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func importSpecifierImportedName(specifier *ast.ImportSpecifier) (string, bool) {

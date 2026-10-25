@@ -1568,9 +1568,7 @@ type O = {
 const Component = (obj: O) => null;
 <Component func={async () => 0} />;
       `,
-			Tsx: true,
-			// TODO(port) getContextualTypeForJsxExpression is not yet implemented
-			Skip:    true,
+			Tsx:     true,
 			Options: map[string]interface{}{"checksVoidReturn": map[string]interface{}{"attributes": true}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{

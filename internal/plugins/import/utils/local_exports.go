@@ -188,21 +188,36 @@ func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceF
 		return local
 	}
 
-	for _, stmt := range sourceFile.Statements.Nodes {
-		if stmt == nil {
+	for _, syntax := range exportSyntaxFor(sourceFile) {
+		stmt := syntax.statement
+		switch stmt.Kind {
+		case ast.KindImportDeclaration:
+			local.Imports = append(local.Imports, importBinding(sourceProgram, sourceFile, settings, stmt.AsImportDeclaration()))
+			continue
+		case ast.KindExportAssignment:
+			assignment := stmt.AsExportAssignment()
+			if assignment.IsExportEquals {
+				first := len(local.Steps)
+				local.ImplicitDefault = local.ImplicitDefault || exportAssignmentHasDefault(sourceProgram, sourceFile, assignment)
+				local.appendNamespaceAssignment(sourceFile, assignment.Expression)
+				local.captureTypeScriptExportDocs(sourceFile, stmt, first)
+				continue
+			}
+		case ast.KindNamespaceExportDeclaration:
+			// A UMD global alias exposes namespace members only with interop.
+			if compilerOptionsESModuleInterop(sourceProgram) {
+				first := len(local.Steps)
+				local.appendNamespaceAssignment(sourceFile, stmt.Name())
+				local.captureTypeScriptExportDocs(sourceFile, stmt, first)
+			}
 			continue
 		}
-		if stmt.Kind == ast.KindImportDeclaration {
-			local.Imports = append(local.Imports, importBinding(sourceProgram, sourceFile, settings, stmt.AsImportDeclaration()))
-		}
-		first := len(local.Steps)
-		local.appendStatement(sourceProgram, sourceFile, settings, stmt)
-		if stmt.Kind == ast.KindExportAssignment && stmt.AsExportAssignment().IsExportEquals ||
-			stmt.Kind == ast.KindNamespaceExportDeclaration && compilerOptionsESModuleInterop(sourceProgram) {
-			local.captureTypeScriptExportDocs(sourceFile, stmt, first)
-		}
-		for i := first; i < len(local.Steps); i++ {
-			captureExportDocSources(sourceFile, &local.Steps[i], stmt)
+		for _, template := range syntax.steps {
+			step := template
+			if step.Kind == exportStepStar || step.Kind == exportStepNamed && step.FromModule {
+				step.Link = resolveExportLink(sourceProgram, sourceFile, settings, modules.SourceFromSpecifier(stmt.AsExportDeclaration().ModuleSpecifier))
+			}
+			local.Steps = append(local.Steps, step)
 		}
 	}
 
@@ -231,34 +246,6 @@ func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceF
 func isCommonJSDeclaration(sourceProgram *program.Program, sourceFile *ast.SourceFile) bool {
 	return sourceFile.IsDeclarationFile &&
 		ast.GetImpliedNodeFormatForEmitWorker(sourceFile.FileName(), sourceProgram.Options().GetEmitModuleKind(), sourceProgram.SourceFileMetadata(sourceFile)) != core.ResolutionModeESM
-}
-
-func (local *localExports) appendStatement(sourceProgram *program.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, stmt *ast.Node) {
-	if isExportedDeclaration(stmt) {
-		if names := exportedDeclarationNames(stmt); len(names) > 0 {
-			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: names})
-		}
-		return
-	}
-
-	switch stmt.Kind {
-	case ast.KindExportAssignment:
-		exportAssignment := stmt.AsExportAssignment()
-		if exportAssignment.IsExportEquals {
-			local.ImplicitDefault = local.ImplicitDefault || exportAssignmentHasDefault(sourceProgram, sourceFile, exportAssignment)
-			local.appendNamespaceAssignment(sourceFile, exportAssignment.Expression)
-			return
-		}
-		local.Steps = append(local.Steps, exportStep{Kind: exportStepLocalDefault, Local: referencedIdentifierText(exportAssignment.Expression)})
-	case ast.KindNamespaceExportDeclaration:
-		// A UMD global alias is not itself a module export. With interop,
-		// upstream exposes the referenced namespace's members instead.
-		if compilerOptionsESModuleInterop(sourceProgram) {
-			local.appendNamespaceAssignment(sourceFile, stmt.Name())
-		}
-	case ast.KindExportDeclaration:
-		local.appendExportDeclaration(sourceProgram, sourceFile, settings, stmt.AsExportDeclaration())
-	}
 }
 
 // `export = namespace` exposes the namespace's declared members, including
@@ -296,7 +283,7 @@ func (local *localExports) appendNamespaceAssignment(sourceFile *ast.SourceFile,
 	}
 }
 
-func (local *localExports) appendExportDeclaration(sourceProgram *program.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, exportDecl *ast.ExportDeclaration) {
+func (local *localExports) appendExportDeclaration(exportDecl *ast.ExportDeclaration) {
 	if exportDecl == nil {
 		return
 	}
@@ -307,7 +294,6 @@ func (local *localExports) appendExportDeclaration(sourceProgram *program.Progra
 		}
 		local.Steps = append(local.Steps, exportStep{
 			Kind: exportStepStar,
-			Link: resolveExportLink(sourceProgram, sourceFile, settings, modules.SourceFromSpecifier(exportDecl.ModuleSpecifier)),
 		})
 		return
 	}
@@ -319,9 +305,6 @@ func (local *localExports) appendExportDeclaration(sourceProgram *program.Progra
 			return
 		}
 		step := exportStep{Kind: exportStepNamed, FromModule: exportDecl.ModuleSpecifier != nil}
-		if step.FromModule {
-			step.Link = resolveExportLink(sourceProgram, sourceFile, settings, modules.SourceFromSpecifier(exportDecl.ModuleSpecifier))
-		}
 		for _, spec := range namedExports.Elements.Nodes {
 			if spec == nil || spec.Kind != ast.KindExportSpecifier {
 				continue

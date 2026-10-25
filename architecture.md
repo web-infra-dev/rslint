@@ -2119,6 +2119,14 @@ lint and fix execution still await full config activation.
   per unique bitset. The prepared lint plan references these published immutable rule
   slices without moving per-file runtime state into the config cache. LSP keeps
   its existing per-document resolver lifetime.
+- **Conservative Rule Queries**: import rules share a syntax-only receiver-name
+  superset through the per-file cache. The Program/settings-owned module index
+  can rule out absent export names or namespace metadata without building a
+  merged map; possible names and unknown edges still use the complete export
+  implementation. Query traversal tracks file/name pairs through re-export
+  cycles. React DOM property lookups share four immutable version bands;
+  Promise argument checks retain checker authority even for primitive literals,
+  and rename-state decisions remain part of diagnostic evaluation.
 
 ### Caching Strategy
 
@@ -2126,6 +2134,33 @@ lint and fix execution still await full config activation.
 - **LSP Configured-Project Selection Cache**: normal diagnostics and speculative fixes share one root-first selector while keeping separate Program owners. Session projects cache exact/canonical root membership by authored `ParsedCommandLine` generation. Session-external projects retain lightweight parsed metadata only after all config and directory reads have watcher coverage, then reuse that same parse when a Program is needed. Only a selected Program containing the requested root becomes resident; unmatched documents do not construct import probes. Config, project-shape, and covered filesystem changes discard affected metadata and Programs. Registration failure and conflicting editor aliases use fresh request-local construction. Speculative fix Programs always remain isolated. This path is independent from the CLI/API request loader; no second LSP Session or rslint ParseCache is introduced.
 - **Parse Cache in LSP**: the LSP server passes a shared ts-go `project.ParseCache` into the session to avoid re-parsing from scratch on every change.
 - **SourceFile-Owned Module Syntax Reuse**: any `Program.ModuleGraph()` query may attach the syntax-only module-specifier projection to an immutable ts-go `SourceFile`, independently of project ownership or watcher availability. Programs reusing that exact file object share collection, while resolution and target ASTs remain local to each Program generation. Attached values may contain only scalars and nodes owned by that SourceFile—never a Program, resolved target, checker state, or another SourceFile. Replaced files carry the attached data out with their own AST lifetime; no LSP server map, project-membership sweep, or explicit reset owns this cache. Source-only Programs retain it only for their generation's SourceFile lifetime.
+- **SourceFile-Owned Export Syntax**: the import module index similarly shares
+  immutable export-step templates and authored documentation nodes attached to
+  the exact SourceFile. Only import/export statements occupy template slots.
+  Each Program/settings index binds fresh resolution links into its own steps;
+  TypeScript namespace assignments and interop policy stay Program-local.
+  Shared template slices and maps are never mutated by consumers.
+- **Module-Local Export Demand**: the import module index collects each file's
+  declared names and possible namespace bindings once. Name queries consult
+  that local summary without traversing re-export dependencies. Star exports
+  and graph-dependent namespace metadata go through the existing full
+  ExportMap, preserving its ordering, cycles, interop and documentation rules.
+  An already cached full map bypasses the filter. Wide barrels and queries
+  from different graph roots therefore do not repeat per-name graph walks.
+- **SourceFile-Owned React Pragmas**: the first `@jsx` annotation, including
+  its absence, is cached on the exact SourceFile. Hashbang and comment order
+  retain their existing precedence. Only the annotation name and presence
+  are shared; settings fallback and the final pragma remain context-local.
+- **Bounded Frozen Path Projection**: a frozen IO view memoizes at most 4,096
+  exact request spellings to projected paths and frozen-file membership. After
+  capacity is reached, new spellings use the original computation. This cache
+  owns copies of retained strings so path substrings cannot pin source buffers.
+  It lives only with that view and contains no Programs or filesystem answers:
+  existence, contents, metadata and non-frozen Realpath results still query the
+  underlying filesystem. Runtime module resolution separately shares results
+  by directory only when aliases, fallbacks, alias fields and main fields are
+  absent; recursive options retain the original containing-file key so cycle
+  diagnostics keep their observable identity.
 - **Incremental LSP Document Sync**: editor changes reach the server immediately and are applied in order to both rslint's document mirror and the ts-go Session overlay. rslint selects the mandatory LSP UTF-16 encoding so incoming changes, native diagnostics, plugin diagnostics, and edits share VS Code's coordinate model. Whole-document changes remain a supported protocol fallback.
 - **Server-Owned Debounced Re-linting**: `refreshCh` and `debounceCh` collapse bursts of file changes and session refreshes onto the main dispatch loop. The server remains the single owner of the 200 ms typing debounce; open and save diagnostics stay immediate, while save, fix-all, and close discard redundant pending work for their target document.
 - **CLI/API Are Mostly Fresh Runs**: CLI and one-shot API requests generally rebuild `Program` state per run; there is no repository-local rule-result cache or persistent incremental lint cache in the main CLI path today. JavaScript API path canonicalization is also scoped to one `lintFiles()` call.

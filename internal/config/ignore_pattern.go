@@ -622,7 +622,7 @@ func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
 			continue
 		}
 		if candidates == nil {
-			candidates = directoryBlockCandidates(dirPath)
+			candidates = directoryBlockCandidates(dirPath, 0)
 		}
 		for _, candidate := range candidates {
 			if ignorePatternMatches(p, candidate) {
@@ -659,45 +659,41 @@ func isDirAbsolutelyBlockedAboveFloor(
 	patterns []IgnorePattern,
 	minimumDepth int,
 ) bool {
+	var candidates []string
 	for i := range patterns {
 		pattern := patterns[i]
 		if pattern.Negated || pattern.Kind != dirAbsoluteBlock {
 			continue
 		}
-		if depth := 1 + strings.Count(dirPath, "/"); depth > minimumDepth &&
-			(ignorePatternMatches(pattern, dirPath) || ignorePatternMatches(pattern, dirPath+"/x")) {
-			return true
+		if candidates == nil {
+			candidates = directoryBlockCandidates(dirPath, minimumDepth)
 		}
-		depth := 1
-		for slash := strings.IndexByte(dirPath, '/'); slash >= 0; {
-			if depth > minimumDepth {
-				partial := dirPath[:slash]
-				if ignorePatternMatches(pattern, partial) || ignorePatternMatches(pattern, partial+"/x") {
-					return true
-				}
+		for _, candidate := range candidates {
+			if ignorePatternMatches(pattern, candidate) {
+				return true
 			}
-			next := strings.IndexByte(dirPath[slash+1:], '/')
-			if next < 0 {
-				break
-			}
-			slash += next + 1
-			depth++
 		}
 	}
 	return false
 }
 
-func directoryBlockCandidates(dirPath string) []string {
+func directoryBlockCandidates(dirPath string, minimumDepth int) []string {
 	candidates := make([]string, 0, 2+2*strings.Count(dirPath, "/"))
-	candidates = append(candidates, dirPath, dirPath+"/x")
+	if 1+strings.Count(dirPath, "/") > minimumDepth {
+		candidates = append(candidates, dirPath, dirPath+"/x")
+	}
+	depth := 1
 	for slash := strings.IndexByte(dirPath, '/'); slash >= 0; {
-		partial := dirPath[:slash]
-		candidates = append(candidates, partial, partial+"/x")
+		if depth > minimumDepth {
+			partial := dirPath[:slash]
+			candidates = append(candidates, partial, partial+"/x")
+		}
 		next := strings.IndexByte(dirPath[slash+1:], '/')
 		if next < 0 {
 			break
 		}
 		slash += next + 1
+		depth++
 	}
 	return candidates
 }

@@ -92,7 +92,14 @@ func Resolve(p *program.Program, name, containingFile string, options Options) R
 	if err != nil {
 		return Result{}
 	}
-	result := program.Cached(p, resolutionKey{name, containingFile, string(encoded)}, func() Result {
+	cacheFile := containingFile
+	// Recursive aliases and package entry fields can expose the original file
+	// in cycle diagnostics. Only the non-recursive path is directory-invariant.
+	if len(options.Aliases) == 0 && len(options.Fallbacks) == 0 &&
+		len(options.AliasFields) == 0 && len(options.MainFields) == 0 {
+		cacheFile = tspath.GetDirectoryPath(containingFile)
+	}
+	result := program.Cached(p, resolutionKey{name, cacheFile, string(encoded)}, func() Result {
 		if options.Extensions == nil {
 			options.Extensions = DefaultExtensions()
 		}
