@@ -53,9 +53,6 @@ export { missing as broken } from './query-missing';
 				t.Errorf("%s: filtered namespace metadata for %q", ctx.SourceFile.FileName(), name)
 			}
 		}
-		if import_utils.MayHaveExport(ctx, request, "absent") || import_utils.MayHaveNamespaceExport(ctx, request, "absent") {
-			t.Errorf("%s: failed to exclude an absent export", ctx.SourceFile.FileName())
-		}
 	}
 	unknown := contextsForFiles(t, map[string]string{
 		"query-unknown-entry.ts": `import * as value from './query-unknown';`,
@@ -64,6 +61,70 @@ export { missing as broken } from './query-missing';
 	source := modules.SourceFromSpecifier(firstImportSpecifier(t, unknown.SourceFile))
 	if !import_utils.MayHaveExport(unknown, source, "anything") || !import_utils.MayHaveNamespaceExport(unknown, source, "anything") {
 		t.Fatal("unresolved star must retain the complete export-map query")
+	}
+}
+
+func TestExportQueriesUseLocalFacts(t *testing.T) {
+	ctx := contextsForFiles(t, map[string]string{
+		"local-query-entry.ts": `import * as all from './local-query';`,
+		"local-query.ts": `
+import * as ns from './local-query-leaf';
+export const object = {};
+export { object as alias, ns as nested, ns as overwritten };
+export { object as overwritten };
+export default ns;
+`,
+		"local-query-leaf.ts": `export const member = 1;`,
+	}, "local-query-entry.ts")[0]
+	source := modules.SourceFromSpecifier(firstImportSpecifier(t, ctx.SourceFile))
+	for _, name := range []string{"object", "alias", "nested", "overwritten", "default"} {
+		if !import_utils.MayHaveExport(ctx, source, name) {
+			t.Fatalf("filtered local export %q", name)
+		}
+	}
+	for _, name := range []string{"nested", "overwritten", "default"} {
+		if !import_utils.MayHaveNamespaceExport(ctx, source, name) {
+			t.Fatalf("filtered possible namespace %q", name)
+		}
+	}
+	for _, name := range []string{"object", "alias", "absent"} {
+		if import_utils.MayHaveNamespaceExport(ctx, source, name) {
+			t.Fatalf("local facts did not exclude namespace %q", name)
+		}
+	}
+	if import_utils.MayHaveExport(ctx, source, "absent") {
+		t.Fatal("local facts did not exclude an absent export")
+	}
+}
+
+func TestExportQueriesLeaveBarrelsToExportMap(t *testing.T) {
+	files := map[string]string{"wide-query-entry.ts": `import * as all from './wide-query';`}
+	for i := range 16 {
+		files[fmt.Sprintf("wide-query-%d.ts", i)] = fmt.Sprintf("export const object%d = {};", i)
+		files["wide-query.ts"] += fmt.Sprintf("export * from './wide-query-%d';\n", i)
+	}
+	ctx := contextsForFiles(t, files, "wide-query-entry.ts")[0]
+	source := modules.SourceFromSpecifier(firstImportSpecifier(t, ctx.SourceFile))
+	// A per-name recursive negative probe would scan every leaf for every
+	// ordinary object. The local filter must hand these queries to ExportMap.
+	for i := range 16 {
+		name := fmt.Sprintf("object%d", i)
+		if !import_utils.MayHaveNamespaceExport(ctx, source, name) {
+			t.Fatalf("barrel query followed dependencies to exclude %q", name)
+		}
+	}
+	if import_utils.MayHaveExport(ctx, source, "default") {
+		t.Fatal("star re-exports must not introduce a default export")
+	}
+	exports, ok := import_utils.GetExportMap(ctx, source)
+	if !ok || exports.Size() != 16 {
+		t.Fatal("barrel export map lost declared names")
+	}
+	for i := range 16 {
+		name := fmt.Sprintf("object%d", i)
+		if meta := exports.Get(name); meta == nil || meta.Namespace != nil {
+			t.Fatalf("ordinary object %q has unexpected namespace metadata", name)
+		}
 	}
 }
 

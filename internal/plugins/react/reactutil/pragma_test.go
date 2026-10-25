@@ -116,7 +116,7 @@ func TestIsJavaScriptIdentifier(t *testing.T) {
 }
 
 // TestGetReactPragmaFromContextCommentAnnotations covers annotation ordering
-// across tsgo's separately stored hashbang and ordinary comment ranges.
+// and settings isolation when contexts reuse a SourceFile.
 func TestGetReactPragmaFromContextCommentAnnotations(t *testing.T) {
 	t.Parallel()
 
@@ -126,11 +126,26 @@ func TestGetReactPragmaFromContextCommentAnnotations(t *testing.T) {
 		}
 	}
 	for _, testCase := range []struct {
-		name     string
-		source   string
-		settings map[string]interface{}
-		want     string
+		name              string
+		source            string
+		settings          map[string]interface{}
+		want              string
+		wantOtherSettings string
 	}{
+		{
+			name:              "no annotation",
+			source:            "value;",
+			settings:          settingsPragma("Baz"),
+			want:              "Baz",
+			wantOtherSettings: "Other",
+		},
+		{
+			name:              "marker without matching comment",
+			source:            "const value = '@jsx Foo'; /* @jsxFrag Bar */",
+			settings:          settingsPragma("Baz"),
+			want:              "Baz",
+			wantOtherSettings: "Other",
+		},
 		{
 			name:   "hashbang annotation",
 			source: "#!/usr/bin/env node @jsx Foo\nvalue;",
@@ -150,6 +165,12 @@ func TestGetReactPragmaFromContextCommentAnnotations(t *testing.T) {
 		{
 			name:     "invalid hashbang annotation still wins",
 			source:   "#!/usr/bin/env node @jsx Foo-Bar\n/* @jsx Bar */\nvalue;",
+			settings: settingsPragma("Baz"),
+			want:     DefaultReactPragma,
+		},
+		{
+			name:     "invalid first comment annotation still wins",
+			source:   "/* @jsx Foo-Bar */\n/* @jsx Bar */\nvalue;",
 			settings: settingsPragma("Baz"),
 			want:     DefaultReactPragma,
 		},
@@ -178,6 +199,18 @@ func TestGetReactPragmaFromContextCommentAnnotations(t *testing.T) {
 			}
 			if got := GetReactPragmaFromContext(ctx); got != testCase.want {
 				t.Fatalf("GetReactPragmaFromContext() = %q, want %q", got, testCase.want)
+			}
+			otherContext := rule.RuleContext{
+				SourceFile: sourceFile,
+				Comments:   rule.NewCommentStore(sourceFile),
+				Settings:   settingsPragma("Other"),
+			}
+			want := testCase.wantOtherSettings
+			if want == "" {
+				want = testCase.want
+			}
+			if got := GetReactPragmaFromContext(otherContext); got != want {
+				t.Fatalf("GetReactPragmaFromContext() with other settings = %q, want %q", got, want)
 			}
 		})
 	}

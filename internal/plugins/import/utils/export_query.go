@@ -1,18 +1,15 @@
 package utils
 
 import (
-	"slices"
-
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
-type exportQuery struct {
-	file          *ast.SourceFile
-	name          string
-	namespaceOnly bool
+// Only module-local facts belong here. Following re-exports for each requested
+// name repeats graph work on wide barrels and on queries from different roots.
+type exportPossibilities struct {
+	names map[string]bool // Presence declares a name; true permits namespace metadata.
+	star  bool
 }
 
 // MayHaveExport only rules out a definitely absent name. Possible exports and
@@ -38,71 +35,50 @@ func mayHaveExport(ctx rule.RuleContext, source modules.Source, name string, nam
 	if link.Target == nil {
 		return true
 	}
-	key := exportQuery{file: link.Target, name: name, namespaceOnly: namespaceOnly}
-	return index.possibilities.Get(key, func() bool {
-		return index.mayHaveExport(ctx.Program(), link.Target, name, namespaceOnly, make(map[exportKey]bool))
-	})
-}
-
-func (index *ModuleIndex) mayHaveExport(sourceProgram *program.Program, file *ast.SourceFile, name string, namespaceOnly bool, seen map[exportKey]bool) bool {
-	if file == nil {
+	if index.cachedExportMap(link.Target) != nil {
 		return true
 	}
-	key := exportKey{file: file, name: name}
-	if seen[key] {
-		return false
-	}
-	seen[key] = true
-	local := index.localExportsOf(sourceProgram, file)
-	namespaceBinding := func(localName string) bool {
-		if localName != "" {
-			for _, binding := range local.Imports {
-				if binding.NamespaceName == localName && binding.Link.Resolved {
-					return true
-				}
-			}
+	possible := index.possibilities.Get(link.Target, func() exportPossibilities {
+		return localExportPossibilities(index.localExportsOf(ctx.Program(), link.Target))
+	})
+	namespace, exists := possible.names[name]
+	return possible.star && name != defaultExportName || exists && (!namespaceOnly || namespace)
+}
+
+func localExportPossibilities(local *localExports) exportPossibilities {
+	possible := exportPossibilities{names: make(map[string]bool)}
+	namespaces := make(map[string]bool)
+	for _, binding := range local.Imports {
+		if binding.NamespaceName != "" && binding.Link.Resolved {
+			namespaces[binding.NamespaceName] = true
 		}
-		return false
+	}
+	add := func(name string, namespace bool) {
+		// Later exports may overwrite earlier metadata in the full map. Keep
+		// their union here: this filter only proves absence, never precedence.
+		possible.names[name] = possible.names[name] || namespace
 	}
 	for _, step := range local.Steps {
 		switch step.Kind {
 		case exportStepNames:
-			if !namespaceOnly && slices.Contains(step.Names, name) {
-				return true
+			for _, name := range step.Names {
+				add(name, false)
 			}
 		case exportStepLocalDefault:
-			if name == defaultExportName && (!namespaceOnly || namespaceBinding(step.Local)) {
-				return true
-			}
+			add(defaultExportName, namespaces[step.Local])
 		case exportStepNamed:
 			for _, spec := range step.Specs {
-				if spec.Exported != name {
-					continue
+				namespace := namespaces[spec.LocalIdent]
+				if step.FromModule {
+					// The target decides whether this alias carries namespace
+					// metadata. Leave that graph-dependent answer to ExportMap.
+					namespace = !step.Link.Resolved || !spec.LocalOK || step.Link.View != moduleViewDefaultOnly
 				}
-				if !namespaceOnly {
-					return true
-				}
-				if !step.FromModule {
-					if namespaceBinding(spec.LocalIdent) {
-						return true
-					}
-				} else if !step.Link.Resolved || !spec.LocalOK {
-					return true
-				} else if step.Link.View != moduleViewDefaultOnly && index.mayHaveExport(sourceProgram, step.Link.Target, spec.Local, namespaceOnly, seen) {
-					return true
-				}
+				add(spec.Exported, namespace)
 			}
 		case exportStepStar:
-			if name == defaultExportName {
-				continue
-			}
-			if !step.Link.Resolved {
-				return true
-			}
-			if step.Link.View != moduleViewDefaultOnly && index.mayHaveExport(sourceProgram, step.Link.Target, name, namespaceOnly, seen) {
-				return true
-			}
+			possible.star = possible.star || !step.Link.Resolved || step.Link.View != moduleViewDefaultOnly
 		}
 	}
-	return false
+	return possible
 }

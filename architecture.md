@@ -2140,6 +2140,17 @@ lint and fix execution still await full config activation.
   Each Program/settings index binds fresh resolution links into its own steps;
   TypeScript namespace assignments and interop policy stay Program-local.
   Shared template slices and maps are never mutated by consumers.
+- **Module-Local Export Demand**: the import module index collects each file's
+  declared names and possible namespace bindings once. Name queries consult
+  that local summary without traversing re-export dependencies. Star exports
+  and graph-dependent namespace metadata go through the existing full
+  ExportMap, preserving its ordering, cycles, interop and documentation rules.
+  An already cached full map bypasses the filter. Wide barrels and queries
+  from different graph roots therefore do not repeat per-name graph walks.
+- **SourceFile-Owned React Pragmas**: the first `@jsx` annotation, including
+  its absence, is cached on the exact SourceFile. Hashbang and comment order
+  retain their existing precedence. Only the annotation name and presence
+  are shared; settings fallback and the final pragma remain context-local.
 - **Bounded Frozen Path Projection**: a frozen IO view memoizes at most 4,096
   exact request spellings to projected paths and frozen-file membership. After
   capacity is reached, new spellings use the original computation. This cache
