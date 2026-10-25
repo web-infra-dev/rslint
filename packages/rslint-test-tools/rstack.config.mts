@@ -1,7 +1,7 @@
 import { define } from 'rstack';
 
-define.test({
-  testEnvironment: 'node',
+const ecosystemTests = {
+  testEnvironment: 'node' as const,
   globals: true,
   // CI pods expose the shared host's CPU count, so cap worker-process churn.
   pool: { maxWorkers: 16 },
@@ -12,6 +12,8 @@ define.test({
   // Keep their deadlock sentinel consistent with the tests, rather than 10s.
   hookTimeout: 35 * 60_000,
   include: [
+    './tests/eslint-plugin/public-api.test.mjs',
+    './tests/eslint-plugin/pool-isolation/harness.test.ts',
     // cli
     './tests/cli/basic.test.ts',
     './tests/cli/spawn-cli.test.ts',
@@ -926,5 +928,30 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/throw-new-error.test.ts',
 
     './tests/eslint/rules/no-shadow-restricted-names.test.ts',
+  ],
+};
+
+// Cross-language tests own their Go producer; other tests need no Go setup.
+define.test({
+  projects: [
+    {
+      ...ecosystemTests,
+      name: 'ecosystem',
+    },
+    {
+      name: 'go-frame',
+      testEnvironment: 'node',
+      globals: true,
+      pool: { maxWorkers: process.platform === 'win32' ? 1 : 16 },
+      testTimeout: ecosystemTests.testTimeout,
+      hookTimeout: ecosystemTests.hookTimeout,
+      include: [
+        './tests/languages/js/**/*.test.ts',
+        './tests/eslint-plugin/**/*.test.ts',
+      ],
+      exclude: ['./tests/eslint-plugin/pool-isolation/harness.test.ts'],
+      setupFiles: ['./tests/eslint-plugin/setup-worker-entry.ts'],
+      globalSetup: ['./tests/languages/js/setup-projector.ts'],
+    },
   ],
 });

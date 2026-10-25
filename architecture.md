@@ -2259,7 +2259,12 @@ The current architecture already leaves room for:
 - **Rule Engine Tests**: `internal/linter` and `internal/config` have focused behavior tests
 - **Go Rule Testing Helpers**: `internal/rule_tester`
 - **Shared Go Test Infrastructure**: `internal/testutil`; package-specific helpers remain beside the owning tests
-- **JS/TS Integration Tests**: `packages/rslint/tests` and `packages/rslint-test-tools/tests`
+- **Core JS/TS and API Tests**: `packages/rslint/tests`
+- **Cross-Language and Ecosystem Tests**: `packages/rslint-test-tools/tests` owns
+  the Go ESTree producer, upstream AST/token/SourceCode comparisons, and real
+  plugin worker/package integration. Its `go-frame` project builds the producer
+  only for source-to-frame tests. Reference parsers and ESLint are test-tools
+  dependencies; core keeps the libraries bundled into its runtime.
 - **VS Code Extension Tests**: `packages/vscode-extension/__tests__`
 - **Rust / tsgo Tests**: `crates/tsgo-client/tests` verifies exported semantic data through the matching `cmd/tsgo` binary
 

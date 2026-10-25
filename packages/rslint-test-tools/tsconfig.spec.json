@@ -1,7 +1,8 @@
 {
   "extends": ["../../tsconfig.spec.json"],
-  "include": ["tests/**/*.ts"],
+  "include": ["tests/**/*.ts", "../rslint/src/**/*.ts"],
   "compilerOptions": {
+    "rootDir": "../..",
     "moduleResolution": "bundler",
     "module": "preserve"
   },
