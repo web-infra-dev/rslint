@@ -221,6 +221,12 @@ func TestProjectionCancellationAndFailure(t *testing.T) {
 	if data, err := builder.Build(context.Background(), file, Options{SourceType: "module"}); data != nil || err == nil {
 		t.Fatal("unsupported syntax became a successful tree")
 	}
+	for _, text := range []string{"type Value = ?number;", "type Value = !number;"} {
+		data, err := builder.Build(context.Background(), source("/file.ts", text), Options{SourceType: "module"})
+		if data != nil || err == nil || !strings.Contains(err.Error(), "unsupported syntax KindJSDoc") {
+			t.Fatalf("projection of unsupported source type %q = %v/%v", text, data, err)
+		}
+	}
 	if data, err := builder.Build(context.Background(), source("/file.ts", "const x = 1"), Options{SourceType: "commonjs", HasBOM: true}); err != nil || binary.LittleEndian.Uint32(data) != 1 {
 		t.Fatal("builder cannot recover after a failure")
 	}

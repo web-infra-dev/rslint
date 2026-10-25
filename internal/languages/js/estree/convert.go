@@ -23,7 +23,9 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 	if expression := utils.JSDocTypeCastExpression(node); expression != nil {
 		return p.convert(expression, pattern)
 	}
-	if utils.IsJSDocSyntaxNode(node) {
+	// Only compiler-synthesized comment syntax is absent from ESTree. An
+	// unsupported type authored in source must not become a null AST field.
+	if node.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsReparsed) != 0 {
 		return 0
 	}
 	p.recordTokenCover(node, false)
@@ -630,9 +632,6 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 			nodeValue(p.convertJsxName(n.Namespace)), nodeValue(p.convertJsxName(n.Name())))
 	}
 
-	if ast.IsJSDocNodeKind(node.Kind) {
-		return 0
-	}
 	return p.unsupported(node)
 }
 

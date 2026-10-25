@@ -28,14 +28,8 @@
  *   - scopeManager        scope-factory thunk fires on first scope call
  */
 
-// Use the runner's canonical visitor-key table (vendored from
-// canonical ESTree child order; see
-// `visitor-keys.ts`). The bare `eslint-visitor-keys` `KEYS` covers
-// only ESTree, missing every TS-specific node type (TSEnumDeclaration,
-// TSInterfaceDeclaration, TSAsExpression, TSMappedType, …). Using it
-// for `sourceCode.visitorKeys` silently dropped TS subtrees from
-// `for (const k of sc.visitorKeys[node.type])` walks, and made
-// `getNodeByRangeIndex` stop descending into TS bodies.
+// Language-owned canonical keys cover JavaScript, JSX and TypeScript.
+// SourceCode metadata and structural queries share that child order.
 import {
   VISITOR_KEYS as RUNNER_VISITOR_KEYS,
   getVisitorKeys,
@@ -691,14 +685,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     get tokensAndComments(): readonly Token[] {
       return fullStreamFor(true);
     },
-    // Full ESTree + TypeScript visitor-keys map (vendored from
-    // canonical ESTree child order; see
-    // `visitor-keys.ts`). The runner needs the TS-aware set because
-    // plugin rules iterate `sourceCode.visitorKeys[node.type]` on .ts
-    // files and expect to recurse into TSEnumDeclaration /
-    // TSInterfaceDeclaration / TSAsExpression children. The plain
-    // ESTree KEYS would return `undefined` for those types, silently
-    // skipping every TS subtree.
+    // Share canonical language traversal metadata with plugin queries.
     visitorKeys: RUNNER_VISITOR_KEYS as Record<string, readonly string[]>,
     // Empty in plain JS (matches ESLint v10's default). Type-aware
     // plugins that probe `parserServices.program` correctly skip

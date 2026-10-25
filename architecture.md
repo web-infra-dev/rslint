@@ -1919,6 +1919,10 @@ reuse. Rust contains no parser, ESTree schema, filename, BOM or plugin policy.
 JavaScript language data lives in `packages/rslint/src/languages/js`:
 ESTree types, the frame schema/decoder, source positions, visitor keys, token
 reconstruction, JSX token text decoding, built-in globals and scope analyzers.
+Visitor keys use the public TypeScript-ESLint data for JS, JSX and TS, independently
+of the frame's supported node set. Unknown synthetic nodes use ESLint's public
+key lookup. Compiler-synthesized JSDoc remains comment data; unsupported types
+authored in source fail projection instead of becoming null AST fields.
 These modules consume syntax data and explicit language options; they import
 no ESLint plugin runtime, native binding, IPC, config loader or worker host.
 The dependency direction is `eslint-plugin → languages/js`. SourceCode and
