@@ -20,10 +20,13 @@ import { describe, test, expect } from 'rstack/test';
 import { lintFile } from '../../eslint-plugin/project-frame.js';
 import type { LoadedPlugins } from '../../../../rslint/src/eslint-plugin/plugin/plugin-loader.js';
 import type { RuleContext } from '../../../../rslint/src/eslint-plugin/linter/context.js';
+import type { ESTreeNode } from '../../../../rslint/src/languages/js/types.js';
 import {
+  makeScopeManagerFactory,
   seedEcmaGlobals,
   seedGlobals,
 } from '../../../../rslint/src/languages/js/scope-factory.js';
+import { projectSyntax } from './project-frame.js';
 
 interface Probe {
   globalScopeType?: string;
@@ -80,6 +83,31 @@ function baseReq(text: string) {
     suggestionsMode: 'off' as const,
   };
 }
+
+test('JS scope fallback visits synthetic children without following parent links', () => {
+  const ast = projectSyntax('wrapper.js', 'external;', 'script').ast;
+  const statement = (ast.body as ESTreeNode[])[0];
+  const identifier = statement.expression as ESTreeNode;
+  const wrapper: ESTreeNode = {
+    type: 'SyntheticWrapper',
+    range: [...identifier.range],
+    loc: identifier.loc,
+    expression: identifier,
+    parent: statement,
+  };
+  statement.expression = wrapper;
+  identifier.parent = wrapper;
+
+  const manager = makeScopeManagerFactory(ast, {
+    filePath: 'wrapper.js',
+    sourceType: 'script',
+  })() as {
+    globalScope: { through: Array<{ identifier: ESTreeNode }> };
+  };
+  expect(manager.globalScope.through.map((ref) => ref.identifier)).toEqual([
+    identifier,
+  ]);
+});
 
 describe('scope-factory: globalReturn forwards to eslint-scope nodejsScope', () => {
   test('sourceType:script + globalReturn:true → Program is wrapped in a Function scope', () => {

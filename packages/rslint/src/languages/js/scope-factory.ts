@@ -30,7 +30,7 @@ import type { ScopeManager as EslintScopeManager } from 'eslint-scope';
 import * as tsScopeManagerPkg from '@typescript-eslint/scope-manager';
 import * as eslintScopePkg from 'eslint-scope';
 
-import { VISITOR_KEYS } from './visitor-keys.js';
+import { getVisitorKeys, VISITOR_KEYS } from './visitor-keys.js';
 import {
   ECMASCRIPT_GLOBALS,
   LATEST_ECMASCRIPT_VERSION,
@@ -167,18 +167,8 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
   const eslintScope = eslintScopePkg as unknown as {
     analyze: (ast: object, options?: object) => EslintScopeManager;
   };
-  // `childVisitorKeys` MUST be supplied. Without it eslint-scope's
-  // `fallback: 'iteration'` default blindly iterates every enumerable
-  // property — including the `parent` backref and `loc`/`range` — and
-  // on the FIRST JSX element walks `parent` upward then re-descends,
-  // overflowing the stack ("Maximum call stack size exceeded");
-  // empirically every `.jsx` file silently failed scope analysis.
-  // We pass the runner's `VISITOR_KEYS` table (the same table the walker
-  // traverses with — see `visitor-keys.ts`): it covers JSX/TS and is a
-  // strict superset of ESLint's keys, so eslint-scope descends exactly
-  // the right children. Verified equivalent to the former
-  // `eslint-visitor-keys` `KEYS` on JS / JSX / decorator scope trees
-  // before the switch (identical scope trees).
+  // Share SourceCode's canonical lookup for caller-created nodes; enumerating
+  // every property would follow parent backreferences and other metadata.
   return eslintScope.analyze(ast, {
     ecmaVersion,
     sourceType: opts.sourceType ?? 'module',
@@ -192,7 +182,7 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
     // the Function scope rather than crashing scope analysis or
     // shifting `variableScope.type` for rules that check it.
     nodejsScope: opts.globalReturn === true,
-    fallback: 'iteration',
+    fallback: getVisitorKeys,
     childVisitorKeys: VISITOR_KEYS,
     // `opts.globals` is intentionally NOT passed here — neither eslint-scope
     // nor the TS analyzer takes globals at construct time, so both paths seed

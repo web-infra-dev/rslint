@@ -1921,7 +1921,8 @@ ESTree types, the frame schema/decoder, source positions, visitor keys, token
 reconstruction, JSX token text decoding, built-in globals and scope analyzers.
 Visitor keys use the public TypeScript-ESLint data for JS, JSX and TS, independently
 of the frame's supported node set. Unknown synthetic nodes use ESLint's public
-key lookup. Compiler-synthesized JSDoc remains comment data; unsupported types
+key lookup for traversal and scope analysis. Compiler-synthesized JSDoc remains
+comment data; unsupported types
 authored in source fail projection instead of becoming null AST fields.
 These modules consume syntax data and explicit language options; they import
 no ESLint plugin runtime, native binding, IPC, config loader or worker host.
