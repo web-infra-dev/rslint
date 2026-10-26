@@ -166,10 +166,14 @@ var typescriptFallbackOptions = moduleresolver.Options{
 
 func (r *ImportResolver) resolveTypeScriptFallback(name string) (string, bool) {
 	// Upstream drops the query and fragment before matching paths, so
-	// `@icons/x?raw` substitutes `x` rather than `x?raw`. Split where
-	// moduleresolver does, keeping the leading `#` of package imports.
-	if i := strings.IndexAny(name, "?#"); i > 0 {
-		name = name[:i]
+	// `@icons/x?raw` substitutes `x` rather than `x?raw`. The leading `#` of
+	// package imports is part of the name, so the scan starts after it.
+	start := 0
+	if strings.HasPrefix(name, "#") {
+		start = 1
+	}
+	if i := strings.IndexAny(name[start:], "?#"); i >= 0 {
+		name = name[:start+i]
 	}
 	p := r.ctx.Program()
 	fileName := r.ctx.SourceFile.FileName()

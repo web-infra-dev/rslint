@@ -39,7 +39,9 @@ export declare const value: number;
 -- default-resolver/node_modules/exports-only/dist/index.js --
 export const value = 1;
 -- typescript-fallback/tsconfig.json --
-{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","paths":{"@/*":["./src/*"],"~/*":["./missing/*","./src/*"],"@icons/*":["./src/*.svg"],"#lib/*":["./src/*"],"theme":["./src/theme.css"]}},"include":["src"]}
+{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","paths":{"@/*":["./src/*"],"~/*":["./missing/*","./src/*"],"@icons/*":["./src/*.svg"],"#lib/*":["./src/*"],"#icons/*":["./src/*.svg"],"#theme":["./src/theme.css"],"theme":["./src/theme.css"]}},"include":["src"]}
+-- typescript-fallback/package.json --
+{"name":"typescript-fallback","imports":{"#style":"./src/style.css"}}
 -- typescript-fallback/src/style.css --
 .example { color: red; }
 -- typescript-fallback/src/logo.svg --

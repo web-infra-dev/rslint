@@ -203,6 +203,8 @@ func TestNoUnresolvedTypeScriptFallback(t *testing.T) {
 			{Code: `import '@icons/logo?raw'; import 'theme?inline'; import '@icons/logo?raw?x'; import '@icons/logo#icon';`, FileName: fileName, Settings: typescript},
 			// A leading `#` is part of the name, not a fragment.
 			{Code: `import '#lib/style.css'; import '#lib/style.css?raw';`, FileName: fileName, Settings: typescript},
+			// A suffix after the leading `#` is still dropped.
+			{Code: `import '#style?inline'; import '#style#x'; import '#theme?inline'; import '#icons/logo?raw'; import '#icons/logo#a';`, FileName: fileName, Settings: typescript},
 		},
 		[]rule_tester.InvalidTestCase{
 			// Package exports still restrict which files can be imported.
@@ -210,6 +212,7 @@ func TestNoUnresolvedTypeScriptFallback(t *testing.T) {
 			// Substituting `ghost?raw` would yield `ghost?raw.svg` and resolve ghost.ts.
 			{Code: `import '@icons/ghost?raw';`, FileName: fileName, Settings: typescript, Errors: unresolvedErrors(`import '@icons/ghost?raw';`, "@icons/ghost?raw")},
 			{Code: `import '@icons/ghost?raw?x'; import '@icons/ghost#icon';`, FileName: fileName, Settings: typescript, Errors: unresolvedErrors(`import '@icons/ghost?raw?x'; import '@icons/ghost#icon';`, "@icons/ghost?raw?x", "@icons/ghost#icon")},
+			{Code: `import '#icons/ghost?raw'; import '#icons/ghost#a';`, FileName: fileName, Settings: typescript, Errors: unresolvedErrors(`import '#icons/ghost?raw'; import '#icons/ghost#a';`, "#icons/ghost?raw", "#icons/ghost#a")},
 		})
 }
 
