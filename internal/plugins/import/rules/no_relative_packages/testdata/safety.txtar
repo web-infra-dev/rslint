@@ -1,0 +1,365 @@
+Candidate-safety regressions and controls from the Node 26.3.0 investigation.
+-- C01/package.json --
+ {"name":"root"}
+-- C01/packages/a/index.js --
+module.exports = "IMPORTER";
+-- C01/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- C01/packages/a/source.cjs --
+const value = require("../b");
+-- C01/packages/b/index.js --
+module.exports = "B";
+-- C01/packages/b/package.json --
+{"name":"b"}
+-- C02/package.json --
+ {"name":"root"}
+-- C02/packages/a/index.js --
+module.exports = "IMPORTER";
+-- C02/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- C02/packages/a/source.cjs --
+const value = require("../b/sub/tool.js");
+-- C02/packages/b/package.json --
+{"name":"b"}
+-- C02/packages/b/sub/tool.js --
+module.exports = "TOOL";
+-- C03/package.json --
+ {"name":"root"}
+-- C03/packages/a/index.js --
+module.exports = "IMPORTER";
+-- C03/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- C03/packages/a/source.cjs --
+const value = require("../b/sub/tool");
+-- C03/packages/b/package.json --
+{"name":"b"}
+-- C03/packages/b/sub/tool.js --
+module.exports = "TOOL";
+-- D01/package.json --
+ {"name":"root"}
+-- D01/packages/a/index.js --
+module.exports = "IMPORTER";
+-- D01/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- D01/packages/a/source.cjs --
+const value = require("../b/sub");
+-- D01/packages/b/package.json --
+{"name":"b"}
+-- D01/packages/b/sub/index.js --
+module.exports = "ORIGINAL";
+-- D02/package.json --
+ {"name":"root"}
+-- D02/packages/a/index.js --
+module.exports = "IMPORTER";
+-- D02/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- D02/packages/a/source.cjs --
+const value = require("../b/sub");
+-- D02/packages/b/package.json --
+{"name":"b"}
+-- D02/packages/b/sub/index.js --
+module.exports = "ORIGINAL";
+-- D02/packages/b/sub/sub/index.js --
+module.exports = "WRONG";
+-- D03/package.json --
+ {"name":"root"}
+-- D03/packages/a/index.js --
+module.exports = "IMPORTER";
+-- D03/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- D03/packages/a/source.cjs --
+const value = require("../b/sub");
+-- D03/packages/b/package.json --
+{"name":"b"}
+-- D03/packages/b/sub/entry.js --
+module.exports = "ORIGINAL";
+-- D03/packages/b/sub/package.json --
+{"main":"entry.js"}
+-- D04/package.json --
+ {"name":"root"}
+-- D04/packages/a/index.js --
+module.exports = "IMPORTER";
+-- D04/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- D04/packages/a/source.cjs --
+const value = require("../b/sub/index.js");
+-- D04/packages/b/package.json --
+{"name":"b"}
+-- D04/packages/b/sub/index.js --
+module.exports = "ORIGINAL";
+-- M01/package.json --
+ {"name":"root"}
+-- M01/packages/a/index.js --
+module.exports = "IMPORTER";
+-- M01/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- M01/packages/a/source.cjs --
+const value = require("../b");
+-- M01/packages/b/package.json --
+{"name":"b","main":"dist/entry.js"}
+-- M01/packages/b/dist/entry.js --
+module.exports = "ORIGINAL";
+-- M02/package.json --
+ {"name":"root"}
+-- M02/packages/a/index.js --
+module.exports = "IMPORTER";
+-- M02/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- M02/packages/a/source.cjs --
+const value = require("../b");
+-- M02/packages/b/package.json --
+{"name":"b","main":"dist/entry.js"}
+-- M02/packages/b/dist/entry.js --
+module.exports = "ORIGINAL";
+-- M02/packages/b/dist/index.js --
+module.exports = "WRONG";
+-- M03/package.json --
+ {"name":"root"}
+-- M03/packages/a/index.js --
+module.exports = "IMPORTER";
+-- M03/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- M03/packages/a/source.cjs --
+const value = require("../b/dist/entry.js");
+-- M03/packages/b/package.json --
+{"name":"b","main":"dist/entry.js"}
+-- M03/packages/b/dist/entry.js --
+module.exports = "ORIGINAL";
+-- M03/packages/b/dist/index.js --
+module.exports = "WRONG";
+-- M04/package.json --
+ {"name":"root"}
+-- M04/packages/a/index.js --
+module.exports = "IMPORTER";
+-- M04/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- M04/packages/a/source.cjs --
+const value = require("../b");
+-- M04/packages/b/entry.js --
+module.exports = "ORIGINAL";
+-- M04/packages/b/package.json --
+{"name":"b","main":"entry.js"}
+-- N01/package.json --
+ {"name":"root"}
+-- N01/packages/a/index.js --
+module.exports = "IMPORTER";
+-- N01/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- N01/packages/a/source.cjs --
+const value = require("../b/b");
+-- N01/packages/b/b.js --
+module.exports = "ORIGINAL";
+-- N01/packages/b/index.js --
+module.exports = "WRONG";
+-- N01/packages/b/package.json --
+{"name":"b"}
+-- N02/package.json --
+ {"name":"root"}
+-- N02/packages/a/index.js --
+module.exports = "IMPORTER";
+-- N02/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- N02/packages/a/source.cjs --
+const value = require("../b/b.js");
+-- N02/packages/b/b.js --
+module.exports = "ORIGINAL";
+-- N02/packages/b/index.js --
+module.exports = "WRONG";
+-- N02/packages/b/package.json --
+{"name":"b"}
+-- P01/package.json --
+ {"name":"root"}
+-- P01/packages/b/index.js --
+module.exports = "ORIGINAL";
+-- P01/packages/b/package.json --
+{"name":"b"}
+-- P01/packages/b/a/index.js --
+module.exports = "IMPORTER";
+-- P01/packages/b/a/package.json --
+{"name":"a","main":"index.js"}
+-- P01/packages/b/a/source.cjs --
+const value = require("..");
+-- X01/package.json --
+ {"name":"root"}
+-- X01/packages/a/index.js --
+module.exports = "IMPORTER";
+-- X01/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- X01/packages/a/source.cjs --
+const value = require("../b/hidden.js");
+-- X01/packages/b/hidden.js --
+module.exports = "ORIGINAL";
+-- X01/packages/b/package.json --
+{"name":"b","exports":{"./api":"./hidden.js"}}
+-- X02/package.json --
+ {"name":"root"}
+-- X02/packages/a/index.js --
+module.exports = "IMPORTER";
+-- X02/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- X02/packages/a/source.mjs --
+import value from "../b/hidden.js";
+-- X02/packages/b/hidden.js --
+module.exports = "ORIGINAL";
+-- X02/packages/b/package.json --
+{"name":"b","exports":{"./api":"./hidden.js"}}
+-- X03/package.json --
+ {"name":"root"}
+-- X03/packages/a/index.js --
+module.exports = "IMPORTER";
+-- X03/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- X03/packages/a/source.cjs --
+const value = require("../b/hidden.js");
+-- X03/packages/b/hidden.js --
+module.exports = "ORIGINAL";
+-- X03/packages/b/index.js --
+module.exports = "PUBLIC";
+-- X03/packages/b/package.json --
+{"name":"b","exports":{".":"./index.js"}}
+-- X04/package.json --
+ {"name":"root"}
+-- X04/packages/a/index.js --
+module.exports = "IMPORTER";
+-- X04/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- X04/packages/a/source.cjs --
+const value = require("../b/hidden.js");
+-- X04/packages/b/hidden.js --
+module.exports = "ORIGINAL";
+-- X04/packages/b/other.js --
+module.exports = "WRONG";
+-- X04/packages/b/package.json --
+{"name":"b","exports":{"./hidden.js":"./other.js"}}
+-- X05/package.json --
+ {"name":"root"}
+-- X05/packages/a/index.js --
+module.exports = "IMPORTER";
+-- X05/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- X05/packages/a/source.cjs --
+const value = require("../b/hidden.js");
+-- X05/packages/b/hidden.js --
+module.exports = "ORIGINAL";
+-- X05/packages/b/package.json --
+{"name":"b","exports":{"./hidden.js":"./hidden.js"}}
+-- X06/package.json --
+ {"name":"root"}
+-- X06/packages/a/index.js --
+module.exports = "IMPORTER";
+-- X06/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- X06/packages/a/source.cjs --
+const value = require("../b/hidden.js");
+-- X06/packages/b/hidden.js --
+module.exports = "ORIGINAL";
+-- X06/packages/b/other.js --
+module.exports = "WRONG";
+-- X06/packages/b/package.json --
+{"name":"b","exports":{"./hidden.js":{"require":"./hidden.js","import":"./other.js"}}}
+-- X07/package.json --
+ {"name":"root"}
+-- X07/packages/a/index.js --
+module.exports = "IMPORTER";
+-- X07/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- X07/packages/a/source.mjs --
+import value from "../b/hidden.js";
+-- X07/packages/b/hidden.js --
+module.exports = "ORIGINAL";
+-- X07/packages/b/other.js --
+module.exports = "WRONG";
+-- X07/packages/b/package.json --
+{"name":"b","exports":{"./hidden.js":{"require":"./hidden.js","import":"./other.js"}}}
+-- X08/package.json --
+ {"name":"root"}
+-- X08/packages/a/index.js --
+module.exports = "IMPORTER";
+-- X08/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- X08/packages/a/source.cjs --
+const value = require("../b/lib/tool.js");
+-- X08/packages/b/package.json --
+{"name":"b","exports":{"./api/*":"./lib/*.js"}}
+-- X08/packages/b/lib/tool.js --
+module.exports = "ORIGINAL";
+-- L01/package.json --
+ {"name":"root"}
+-- L01/packages/a/index.js --
+module.exports = "IMPORTER";
+-- L01/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- L01/packages/a/source.cjs --
+const value = require("../b/tool.js");
+-- L01/packages/b/package.json --
+{"name":"b"}
+-- L01/packages/b/tool.js --
+module.exports = "ORIGINAL";
+-- L02/package.json --
+ {"name":"root"}
+-- L02/installed-b/package.json --
+ {"name":"b"}
+-- L02/installed-b/tool.js --
+module.exports = "OTHER-VERSION";
+-- L02/packages/a/index.js --
+module.exports = "IMPORTER";
+-- L02/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- L02/packages/a/source.cjs --
+const value = require("../b/tool.js");
+-- L02/packages/b/package.json --
+{"name":"b"}
+-- L02/packages/b/tool.js --
+module.exports = "ORIGINAL";
+-- R01/package.json --
+ {"name":"root"}
+-- R01/packages/a/index.js --
+module.exports = "IMPORTER";
+-- R01/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- R01/packages/a/source.cjs --
+const value = require("../b");
+-- R01/packages/b/index.js --
+module.exports = "ORIGINAL";
+-- R01/packages/b/package.json --
+{"name":"b","module":"dist/module.js","main":"index.js"}
+-- R01/packages/b/dist/index.js --
+module.exports = "WRONG";
+-- R01/packages/b/dist/module.js --
+module.exports = "BUNDLER";
+-- E01/package.json --
+ {"name":"root"}
+-- E01/packages/a/index.js --
+module.exports = "IMPORTER";
+-- E01/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- E01/packages/a/source.mjs --
+import value from "../b/sub";
+-- E01/packages/b/package.json --
+{"name":"b"}
+-- E01/packages/b/sub/index.js --
+module.exports = "ORIGINAL";
+-- E02/package.json --
+ {"name":"root"}
+-- E02/packages/a/index.js --
+module.exports = "IMPORTER";
+-- E02/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- E02/packages/a/source.mjs --
+import value from "../b/tool";
+-- E02/packages/b/package.json --
+{"name":"b"}
+-- E02/packages/b/tool.js --
+module.exports = "ORIGINAL";
+-- E03/package.json --
+ {"name":"root"}
+-- E03/packages/a/index.js --
+module.exports = "IMPORTER";
+-- E03/packages/a/package.json --
+{"name":"a","main":"index.js"}
+-- E03/packages/a/source.mjs --
+import value from "../b/tool.js";
+-- E03/packages/b/package.json --
+{"name":"b"}
+-- E03/packages/b/tool.js --
+module.exports = "ORIGINAL";

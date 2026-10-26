@@ -242,6 +242,7 @@ define.test({
     './tests/eslint-plugin-import/rules/no-named-export.test.ts',
     './tests/eslint-plugin-import/rules/no-namespace.test.ts',
     './tests/eslint-plugin-import/rules/no-nodejs-modules.test.ts',
+    './tests/eslint-plugin-import/rules/no-relative-packages.test.ts',
     './tests/eslint-plugin-import/rules/no-relative-parent-imports.test.ts',
     './tests/eslint-plugin-import/rules/no-restricted-paths.test.ts',
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
