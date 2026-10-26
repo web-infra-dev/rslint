@@ -156,7 +156,8 @@ func TestNoUnresolvedExtras(t *testing.T) {
 	add(`import 'exact/subpath';`, nil, map[string]any{"import/core-modules": []any{"exact"}}, "exact/subpath")
 	add(`import './bar';`, nil, map[string]any{"import/resolver": map[string]any{"node": map[string]any{"extensions": []any{}}}}, "./bar")
 	add(`import './bar';`, nil, map[string]any{"import/resolver": []any{"node", map[string]any{"node": map[string]any{"extensions": []any{}}}}}, "./bar")
-	add(`import './bar.js?raw';`, nil, nil, "./bar.js?raw")
+	// The node resolver reads a query as part of the file name.
+	add(`import './bar.js?raw';`, nil, map[string]any{"import/resolver": "node"}, "./bar.js?raw")
 	add(`import './jsx/MyUncoolComponent.jsx';`, map[string]any{"caseSensitive": false}, nil, "./jsx/MyUncoolComponent.jsx")
 	add(`import 'missing'; require('checked');`, map[string]any{"esmodule": false, "commonjs": true}, nil, "checked")
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &no_unresolved.NoUnresolvedRule, valid, invalid)
@@ -176,6 +177,8 @@ func TestNoUnresolvedDefaultResolver(t *testing.T) {
 			{Code: code, FileName: fileName, Settings: map[string]any{"import/resolver": false}},
 			// Declarations satisfy the TypeScript resolver, as they do upstream.
 			{Code: `import './types-only';`, FileName: fileName},
+			// The TypeScript resolver also resolves files TypeScript does not load.
+			{Code: `import './style.css?inline'; import '@/style.css';`, FileName: fileName},
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: `import '@/missing'; import './missing.js';`, FileName: fileName, Errors: unresolvedErrors(`import '@/missing'; import './missing.js';`, "@/missing", "./missing.js")},
