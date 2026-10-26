@@ -81,6 +81,14 @@ var NoRestrictedSyntaxRule = rule.Rule{
 			// A dispatch key read from the physical node cannot prune its
 			// folded ESTree child: type, parent and fields can all differ.
 			target := virtualTarget(node)
+			visitExportWrapper := func() {
+				if !bucket.hasVirtual || !isExportNamedWrapped(node) {
+					return
+				}
+				for index := range bucket.entries {
+					bucket.matchVirtual(index, node, "ExportNamedDeclaration", mc, &ctx)
+				}
+			}
 			visitVirtual := func() {
 				if !bucket.hasVirtual {
 					return
@@ -100,6 +108,12 @@ var NoRestrictedSyntaxRule = rule.Rule{
 			// ChainExpression surrounds the physical node; the other facades
 			// are its children. Exit events reverse that order.
 			virtualBeforePhysical := bucket.entries[0].exit != (target == "ChainExpression")
+			// ExportNamedDeclaration also surrounds the exported declaration,
+			// which may own a child facade such as ClassBody.
+			exit := bucket.entries[0].exit
+			if !exit {
+				visitExportWrapper()
+			}
 			if virtualBeforePhysical {
 				visitVirtual()
 			}
@@ -108,6 +122,9 @@ var NoRestrictedSyntaxRule = rule.Rule{
 			})
 			if !virtualBeforePhysical {
 				visitVirtual()
+			}
+			if exit {
+				visitExportWrapper()
 			}
 		}
 
@@ -459,7 +476,12 @@ func (bucket *ruleBucket) matchPhysical(index int, node *ast.Node, mc *matchCont
 		return
 	}
 	if matchesInScopeTarget(compiled, node, mc, nil, "physical") {
-		ctx.ReportRange(utils.GetESTreeBindingIdentifierRange(mc.sf, node), rule.RuleMessage{
+		textRange := utils.GetESTreeBindingIdentifierRange(mc.sf, node)
+		if isExportNamedWrapped(node) {
+			// The ExportNamedDeclaration wrapper owns the `export` keyword.
+			textRange = core.NewTextRange(utils.FindFunctionKeywordPos(mc.sf, node), textRange.End())
+		}
+		ctx.ReportRange(textRange, rule.RuleMessage{
 			Id:          "restrictedSyntax",
 			Description: entry.formatMessage(),
 		})
