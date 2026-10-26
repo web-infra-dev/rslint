@@ -838,6 +838,23 @@ func TestNoDuplicatesTypeOnlyMerge(t *testing.T) {
 				Code:   "import type {C} from './foo';\nimport {type B, C} from './foo';\n",
 				Errors: lines(1, 2),
 			},
+			// A fully deduplicated import does not add a comma after a trailing one.
+			{
+				Code:   "import {type A,} from './foo';\nimport type {A} from './foo';\nimport {type B} from './foo';\n",
+				Output: []string{"import {type A,type B} from './foo';\n"},
+				Errors: lines(1, 2, 3),
+			},
+			{
+				Code:    "import {type A,} from './foo';\nimport type {A} from './foo';\nimport {type B} from './foo';\n",
+				Options: preferInline,
+				Output:  []string{"import {type A,type B} from './foo';\n"},
+				Errors:  lines(1, 2, 3),
+			},
+			{
+				Code:   "import {A,} from './foo';\nimport {A} from './foo';\nimport {B} from './foo';\n",
+				Output: []string{"import {A,B} from './foo';\n"},
+				Errors: lines(1, 2, 3),
+			},
 		},
 	)
 }

@@ -725,7 +725,6 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 
 	for _, info := range specifiers {
 		typeOnly := isTypeOnlyImport(info.importNode)
-		wroteSpecifier := false
 
 		// Copy each specifier's source text up to the comma that follows it, so
 		// comments, string-literal names and layout survive the merge.
@@ -753,7 +752,7 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 				tail = text[end+1 : info.closeBrace]
 			}
 
-			if wroteSpecifier || needsComma {
+			if needsComma {
 				specBuf.WriteByte(',')
 			}
 			specStart := scanner.SkipTrivia(text, start)
@@ -763,14 +762,14 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 			}
 			specBuf.WriteString(text[specStart:end])
 			specBuf.WriteString(tail)
-			wroteSpecifier = true
+			needsComma = true
 		}
 
-		if len(info.elements) > 0 {
-			needsComma = true
-		} else if inner := text[info.openBrace+1 : info.closeBrace]; ecmascript.StringTrim(inner) != "" {
-			// Keep comments from empty braces, as upstream does for `import {/*c*/}`.
-			specBuf.WriteString(inner)
+		if len(info.elements) == 0 {
+			if inner := text[info.openBrace+1 : info.closeBrace]; ecmascript.StringTrim(inner) != "" {
+				// Keep comments from empty braces, as upstream does for `import {/*c*/}`.
+				specBuf.WriteString(inner)
+			}
 		}
 	}
 
