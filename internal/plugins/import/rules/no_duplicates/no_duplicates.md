@@ -99,12 +99,12 @@ The autofix keeps type-only specifiers type-only and value specifiers importable
 import type { A } from './foo';
 import { type B, C } from './foo';
 // is fixed to
-import { type A, type B, C } from './foo';
+import { type A , type B, C } from './foo';
 ```
 
-Specifiers merged from `import type` into an inline import receive `type`, so `import { type B, C } from './foo'` followed by `import type { A } from './foo'` is fixed to `import { type B, C, type A } from './foo'`.
+Specifiers merged from `import type` into an inline import receive `type`, so `import { type B, C } from './foo'` followed by `import type { A } from './foo'` is fixed to `import { type B, C , type A } from './foo'`.
 
-The autofix is not offered when a type-only default import such as `import type D from './foo'` would share a statement with other bindings. A bare import such as `import './foo'` is not removed when the merged import would have no value binding, because TypeScript may then elide that import and its side effects.
+The autofix is not offered when a type-only default import such as `import type D from './foo'` would share a statement with other bindings, or when the same local name is imported as different bindings. A bare import such as `import './foo'` is not removed when the merged import would have no value binding, because TypeScript may then elide that import and its side effects.
 
 ## Original Documentation
 

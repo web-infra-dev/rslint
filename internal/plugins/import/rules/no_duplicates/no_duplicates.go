@@ -566,9 +566,26 @@ func checkImports(resolver *importResolver, imports importMap) {
 }
 
 type specifierInfo struct {
-	importNode     *ast.Node
-	identifiersRaw string // raw identifier text between `{` and `}`
-	isEmpty        bool   // true when braces contain no actual specifiers (e.g., `import {} from ...`)
+	importNode    *ast.Node
+	elements      []*ast.Node // named specifiers; empty for `import {} from ...`
+	openBrace     int
+	closeBrace    int
+	trailingComma bool
+}
+
+// specifierKey describes what a named specifier binds. Two specifiers with the
+// same local name are merged only when their keys are equal.
+type specifierKey struct {
+	imported string
+	typeOnly bool
+}
+
+func newSpecifierKey(spec *ast.ImportSpecifier, importTypeOnly bool) specifierKey {
+	imported := spec.Name()
+	if spec.PropertyName != nil {
+		imported = spec.PropertyName
+	}
+	return specifierKey{imported: imported.Text(), typeOnly: importTypeOnly || spec.IsTypeOnly}
 }
 
 // getFix builds autofix operations to merge duplicate imports into the first one.
@@ -635,11 +652,12 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 			mergesNonTypeOnly = true
 			mergesValueBinding = mergesValueBinding || hasValueSpecifier(clause)
 		}
-		specifiers = append(specifiers, specifierInfo{
-			importNode:     node,
-			identifiersRaw: text[openBrace+1 : closeBrace],
-			isEmpty:        namedImports.Elements == nil || len(namedImports.Elements.Nodes) == 0,
-		})
+		info := specifierInfo{importNode: node, openBrace: openBrace, closeBrace: closeBrace}
+		if namedImports.Elements != nil {
+			info.elements = namedImports.Elements.Nodes
+			info.trailingComma = namedImports.Elements.HasTrailingComma()
+		}
+		specifiers = append(specifiers, info)
 	}
 
 	shouldAddDefault := firstDefaultName == "" && defaultImportName != ""
@@ -684,21 +702,20 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 		return nil
 	}
 
-	// --- Build merged specifier text, deduplicating identifiers ---
+	// --- Build merged specifier text, deduplicating by local name ---
 
 	firstOpenBrace, firstCloseBrace := findBraces(first, text)
 	firstHasTrailingComma := false
 	firstIsEmpty := !hasNamedSpecifiers(first)
 
-	existingIdentifiers := make(map[string]bool)
-	if firstOpenBrace >= 0 && firstCloseBrace >= 0 && !firstIsEmpty {
-		for id := range strings.SplitSeq(text[firstOpenBrace+1:firstCloseBrace], ",") {
-			if trimmed := ecmascript.StringTrim(id); trimmed != "" {
-				existingIdentifiers[trimmed] = true
-			}
+	seen := make(map[string]specifierKey)
+	if !firstIsEmpty {
+		elements := first.AsImportDeclaration().ImportClause.AsImportClause().NamedBindings.AsNamedImports().Elements
+		firstHasTrailingComma = elements.HasTrailingComma()
+		for _, elem := range elements.Nodes {
+			spec := elem.AsImportSpecifier()
+			seen[spec.Name().Text()] = newSpecifierKey(spec, firstTypeOnly)
 		}
-		trimmedInside := strings.TrimRight(text[firstOpenBrace+1:firstCloseBrace], " \t\n\r")
-		firstHasTrailingComma = strings.HasSuffix(trimmedInside, ",")
 	}
 
 	// Build specifiersText following ESLint's reduce pattern:
@@ -706,35 +723,54 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 	var specBuf strings.Builder
 	needsComma := !firstHasTrailingComma && !firstIsEmpty
 
-	for _, spec := range specifiers {
-		isTypeSpec := isTypeOnlyImport(spec.importNode)
+	for _, info := range specifiers {
+		typeOnly := isTypeOnlyImport(info.importNode)
 		wroteSpecifier := false
 
-		// Append this import's identifiers directly, deduplicating as we go.
-		for id := range strings.SplitSeq(spec.identifiersRaw, ",") {
-			trimmed := ecmascript.StringTrim(id)
-			if trimmed == "" || existingIdentifiers[trimmed] {
+		// Copy each specifier's source text up to the comma that follows it, so
+		// comments, string-literal names and layout survive the merge.
+		for i, elem := range info.elements {
+			spec := elem.AsImportSpecifier()
+			key := newSpecifierKey(spec, typeOnly)
+			localName := spec.Name().Text()
+			if existing, ok := seen[localName]; ok {
+				if existing != key {
+					// One local name bound to different imports does not compile.
+					return nil
+				}
 				continue
 			}
-			existingIdentifiers[trimmed] = true
+			seen[localName] = key
 
-			if wroteSpecifier {
-				specBuf.WriteByte(',')
-			} else if needsComma && !spec.isEmpty {
-				specBuf.WriteByte(',')
+			start := elem.Pos()
+			end := info.closeBrace
+			tail := ""
+			if i+1 < len(info.elements) {
+				end = info.elements[i+1].Pos() - 1
+			} else if info.trailingComma {
+				// Drop the trailing comma but keep the comments after it.
+				end = scanner.SkipTrivia(text, elem.End())
+				tail = text[end+1 : info.closeBrace]
 			}
 
-			if targetInline && isTypeSpec {
+			if wroteSpecifier || needsComma {
+				specBuf.WriteByte(',')
+			}
+			specStart := scanner.SkipTrivia(text, start)
+			specBuf.WriteString(text[start:specStart])
+			if targetInline && typeOnly {
 				specBuf.WriteString("type ")
-				specBuf.WriteString(trimmed)
-			} else {
-				specBuf.WriteString(id)
 			}
+			specBuf.WriteString(text[specStart:end])
+			specBuf.WriteString(tail)
 			wroteSpecifier = true
 		}
 
-		if !spec.isEmpty {
+		if len(info.elements) > 0 {
 			needsComma = true
+		} else if inner := text[info.openBrace+1 : info.closeBrace]; ecmascript.StringTrim(inner) != "" {
+			// Keep comments from empty braces, as upstream does for `import {/*c*/}`.
+			specBuf.WriteString(inner)
 		}
 	}
 

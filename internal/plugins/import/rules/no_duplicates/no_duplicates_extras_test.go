@@ -784,6 +784,60 @@ func TestNoDuplicatesTypeOnlyMerge(t *testing.T) {
 				Output: []string{"import {x} from './foo';\n"},
 				Errors: lines(1, 2),
 			},
+			// Merged specifiers keep their source text, including comments and
+			// commas inside string-literal names or comments.
+			{
+				Code:   "import {type A} from './foo';\nimport type {\n B // comment\n} from './foo';\n",
+				Output: []string{"import {type A,\n type B // comment\n} from './foo';\n"},
+				Errors: lines(1, 4),
+			},
+			{
+				Code:   "import {type A} from './foo';\nimport type {\n  B, // c\n} from './foo';\n",
+				Output: []string{"import {type A,\n  type B // c\n} from './foo';\n"},
+				Errors: lines(1, 4),
+			},
+			{
+				Code:   "import {type A} from './foo';\nimport type {'x,y' as Q} from './foo';\n",
+				Output: []string{"import {type A,type 'x,y' as Q} from './foo';\n"},
+				Errors: lines(1, 2),
+			},
+			{
+				Code:   "import {type A} from './foo';\nimport type {B /* x, y */} from './foo';\n",
+				Output: []string{"import {type A,type B /* x, y */} from './foo';\n"},
+				Errors: lines(1, 2),
+			},
+			{
+				Code:   "import {type A, C} from './foo';\nimport type {\n  B, // b\n  E\n} from './foo';\n",
+				Output: []string{"import {type A, C,\n  type B, // b\n  type E\n} from './foo';\n"},
+				Errors: lines(1, 5),
+			},
+			{
+				Code:    "import {C} from './foo';\nimport type {\n 'x,y' as Q // q\n} from './foo';\n",
+				Options: preferInline,
+				Output:  []string{"import {C,\n type 'x,y' as Q // q\n} from './foo';\n"},
+				Errors:  lines(1, 4),
+			},
+			// A trailing comma followed by a comment does not produce `, ,`.
+			{
+				Code:   "import {C} from './foo';\nimport {\n  F, // f\n} from './foo';\nimport {D} from './foo';\n",
+				Output: []string{"import {C,\n  F // f\n,D} from './foo';\n"},
+				Errors: lines(1, 4, 5),
+			},
+			{
+				Code:   "import {\n  C, // c\n} from './foo';\nimport {F} from './foo';\n",
+				Output: []string{"import {\n  C, // c\nF} from './foo';\n"},
+				Errors: lines(3, 4),
+			},
+			// Specifiers are deduplicated by local name; conflicting bindings get no fix.
+			{
+				Code:   "import type {A} from './foo';\nimport {type A} from './foo';\n",
+				Output: []string{"import {type A} from './foo';\n"},
+				Errors: lines(1, 2),
+			},
+			{
+				Code:   "import type {C} from './foo';\nimport {type B, C} from './foo';\n",
+				Errors: lines(1, 2),
+			},
 		},
 	)
 }

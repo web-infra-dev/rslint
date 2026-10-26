@@ -548,7 +548,7 @@ func TestNoDuplicatesRule(t *testing.T) {
 			{
 				Code:    "import {A} from './foo'; import type {B, C} from './foo'",
 				Options: map[string]interface{}{"prefer-inline": true},
-				Output:  []string{"import {A,type B,type C} from './foo'; "},
+				Output:  []string{"import {A,type B, type C} from './foo'; "},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noDuplicates", Line: 1, Column: 17},
 					{MessageId: "noDuplicates", Line: 1, Column: 50},
