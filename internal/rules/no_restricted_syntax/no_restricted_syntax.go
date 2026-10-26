@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -81,6 +82,14 @@ var NoRestrictedSyntaxRule = rule.Rule{
 			// A dispatch key read from the physical node cannot prune its
 			// folded ESTree child: type, parent and fields can all differ.
 			target := virtualTarget(node)
+			visitExportWrapper := func() {
+				if !bucket.hasVirtual || !isExportNamedWrapped(node) {
+					return
+				}
+				for index := range bucket.entries {
+					bucket.matchVirtual(index, node, "ExportNamedDeclaration", mc, &ctx)
+				}
+			}
 			visitVirtual := func() {
 				if !bucket.hasVirtual {
 					return
@@ -100,6 +109,12 @@ var NoRestrictedSyntaxRule = rule.Rule{
 			// ChainExpression surrounds the physical node; the other facades
 			// are its children. Exit events reverse that order.
 			virtualBeforePhysical := bucket.entries[0].exit != (target == "ChainExpression")
+			// ExportNamedDeclaration also surrounds the exported declaration,
+			// which may own a child facade such as ClassBody.
+			exit := bucket.entries[0].exit
+			if !exit {
+				visitExportWrapper()
+			}
 			if virtualBeforePhysical {
 				visitVirtual()
 			}
@@ -108,6 +123,9 @@ var NoRestrictedSyntaxRule = rule.Rule{
 			})
 			if !virtualBeforePhysical {
 				visitVirtual()
+			}
+			if exit {
+				visitExportWrapper()
 			}
 		}
 
@@ -459,7 +477,12 @@ func (bucket *ruleBucket) matchPhysical(index int, node *ast.Node, mc *matchCont
 		return
 	}
 	if matchesInScopeTarget(compiled, node, mc, nil, "physical") {
-		ctx.ReportRange(utils.GetESTreeBindingIdentifierRange(mc.sf, node), rule.RuleMessage{
+		textRange := utils.GetESTreeBindingIdentifierRange(mc.sf, node)
+		if isExportNamedWrapped(node) {
+			// The ExportNamedDeclaration wrapper owns the `export` keyword.
+			textRange = core.NewTextRange(utils.FindFunctionKeywordPos(mc.sf, node), textRange.End())
+		}
+		ctx.ReportRange(textRange, rule.RuleMessage{
 			Id:          "restrictedSyntax",
 			Description: entry.formatMessage(),
 		})
@@ -481,6 +504,8 @@ func (bucket *ruleBucket) matchVirtual(index int, node *ast.Node, target string,
 		}
 	case "ClassBody":
 		ctx.ReportRange(classBodyTextRange(mc.sf, node), message)
+	case "ExportNamedDeclaration":
+		ctx.ReportRange(exportNamedTextRange(mc.sf, node), message)
 	case "TSEnumBody":
 		ctx.ReportRange(enumBodyTextRange(mc.sf, node), message)
 	case "JSXEmptyExpression":
@@ -507,6 +532,20 @@ func functionValueTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
 		return core.NewTextRange(parameters.Pos()-1, node.End())
 	}
 	return utils.TrimNodeTextRange(sf, node)
+}
+
+// exportNamedTextRange starts the virtual ExportNamedDeclaration at the authored
+// `export` keyword: decorators written before it belong to the declaration.
+func exportNamedTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
+	textRange := utils.TrimNodeTextRange(sf, node)
+	if modifiers := node.Modifiers(); modifiers != nil {
+		for _, modifier := range modifiers.Nodes {
+			if modifier.Kind == ast.KindExportKeyword {
+				return core.NewTextRange(scanner.SkipTrivia(sf.Text(), modifier.Pos()), textRange.End())
+			}
+		}
+	}
+	return textRange
 }
 
 func classBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {

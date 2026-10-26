@@ -75,6 +75,9 @@ func collectKinds(sel selector, s *kindSet) {
 			return
 		}
 		s.addAll(ks)
+		if v.Name == "ExportNamedDeclaration" {
+			s.addAll(exportedDeclarationKinds)
+		}
 	case classSelector:
 		collectKinds(v.Inner, s)
 	case attrSelector:
@@ -256,6 +259,10 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 		return node.Kind == ast.KindBinaryExpression && isCommaOperator(node)
 	case "ChainExpression":
 		return isChainRoot(node)
+	case "ExportNamedDeclaration":
+		return node.Kind == ast.KindExportDeclaration && isNamedExportDeclaration(node)
+	case "ExportAllDeclaration":
+		return node.Kind == ast.KindExportDeclaration && !isNamedExportDeclaration(node)
 	case "UnaryExpression":
 		// ESTree's UnaryExpression wraps `+`, `-`, `!`, `~`, `typeof`, `void`,
 		// `delete`. ESTree's UpdateExpression wraps `++`/`--`. tsgo splits
@@ -661,8 +668,12 @@ func isChainRoot(node *ast.Node) bool {
 }
 
 func childTarget(node *ast.Node) string {
-	if isChainRoot(unwrapEstreeNode(node)) {
+	node = unwrapEstreeNode(node)
+	if isChainRoot(node) {
 		return "ChainExpression"
+	}
+	if isExportNamedWrapped(node) {
+		return "ExportNamedDeclaration"
 	}
 	return "physical"
 }
@@ -671,7 +682,57 @@ func estreeChildValue(node *ast.Node) interface{} {
 	if isChainRoot(node) {
 		return virtualNodeFacade{node, "ChainExpression"}
 	}
+	if isExportNamedWrapped(node) {
+		return virtualNodeFacade{node, "ExportNamedDeclaration"}
+	}
 	return node
+}
+
+// exportedDeclarationKinds lists the declarations that can carry tsgo's
+// `export` modifier. ESTree moves that modifier to an ExportNamedDeclaration
+// wrapper whose `declaration` is the declaration itself.
+var exportedDeclarationKinds = []ast.Kind{
+	ast.KindVariableStatement,
+	ast.KindFunctionDeclaration,
+	ast.KindClassDeclaration,
+	ast.KindInterfaceDeclaration,
+	ast.KindTypeAliasDeclaration,
+	ast.KindEnumDeclaration,
+	ast.KindModuleDeclaration,
+	ast.KindImportEqualsDeclaration,
+}
+
+// isExportNamedWrapped reports whether ESTree wraps node in a virtual
+// ExportNamedDeclaration. `export default` declarations use a different
+// wrapper and are excluded. In `namespace A.B {}` tsgo nests B directly in A
+// with a synthesized `export` modifier; ESTree has a single declaration there.
+func isExportNamedWrapped(node *ast.Node) bool {
+	if node == nil || !slices.Contains(exportedDeclarationKinds, node.Kind) {
+		return false
+	}
+	if node.Kind == ast.KindModuleDeclaration && node.Parent != nil && node.Parent.Kind == ast.KindModuleDeclaration {
+		return false
+	}
+	return ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) &&
+		!ast.HasSyntacticModifier(node, ast.ModifierFlagsDefault)
+}
+
+// isNamedExportDeclaration separates `export { a }` / `export { a } from`
+// (ExportNamedDeclaration) from `export *` / `export * as ns`
+// (ExportAllDeclaration); tsgo uses ExportDeclaration for both.
+func isNamedExportDeclaration(node *ast.Node) bool {
+	clause := node.AsExportDeclaration().ExportClause
+	return clause != nil && clause.Kind == ast.KindNamedExports
+}
+
+// exportNamedKind mirrors ExportNamedDeclaration.exportKind for a wrapped
+// declaration: type-only and ambient declarations export types.
+func exportNamedKind(node *ast.Node) string {
+	if node.Kind == ast.KindInterfaceDeclaration || node.Kind == ast.KindTypeAliasDeclaration ||
+		ast.HasSyntacticModifier(node, ast.ModifierFlagsAmbient) {
+		return "type"
+	}
+	return "value"
 }
 
 func constructorKey(node *ast.Node, mc *matchContext) virtualNodeFacade {
@@ -714,6 +775,10 @@ func virtualParent(node *ast.Node, target string) (*ast.Node, string, bool) {
 	switch target {
 	case "ChainExpression":
 		return structuralParent(node)
+	case "ExportNamedDeclaration":
+		if isExportNamedWrapped(node) {
+			return structuralParent(node)
+		}
 	case "Identifier", "Literal":
 		if node.Kind == ast.KindConstructor {
 			return node, "physical", true
@@ -754,6 +819,9 @@ func logicalParentTarget(node *ast.Node, target string, scopeRoot *virtualNodeFa
 	}
 	if isChainRoot(node) {
 		return node, "ChainExpression", true
+	}
+	if isExportNamedWrapped(node) {
+		return node, "ExportNamedDeclaration", true
 	}
 	return structuralParent(node)
 }
@@ -1090,7 +1158,7 @@ func forEachLogicalChild(node *ast.Node, target string, mc *matchContext, visit 
 			visitPhysicalChildren(nil)
 		}
 		return
-	case "ChainExpression":
+	case "ChainExpression", "ExportNamedDeclaration":
 		visit(node, "physical")
 		return
 	case "JSXEmptyExpression", "Identifier", "Literal":
@@ -1503,7 +1571,8 @@ func nodeIndexInListFieldTarget(node *ast.Node, scopeRoot *virtualNodeFacade, ta
 
 func siblingsOf(node *ast.Node, target string, scopeRoot *virtualNodeFacade) ([]*ast.Node, int) {
 	// All folded children occupy scalar fields, never a sibling array.
-	if target != "physical" && target != "ChainExpression" || target == "physical" && isChainRoot(node) {
+	if target != "physical" && target != "ChainExpression" && target != "ExportNamedDeclaration" ||
+		target == "physical" && (isChainRoot(node) || isExportNamedWrapped(node)) {
 		return nil, -1
 	}
 	parent, parentTarget, ok := logicalParentTarget(node, target, scopeRoot)
@@ -1790,6 +1859,13 @@ func readNodeAttr(node *ast.Node, name string, mc *matchContext) (interface{}, b
 		return readLocalAttr(node)
 	case "exported":
 		return readExportedAttr(node)
+	case "exportKind":
+		if node.Kind == ast.KindExportDeclaration {
+			if node.AsExportDeclaration().IsTypeOnly {
+				return "type", true
+			}
+			return "value", true
+		}
 	case "meta":
 		return readMetaAttr(node)
 	case "tag":
@@ -1917,6 +1993,13 @@ func readExportedAttr(node *ast.Node) (interface{}, bool) {
 		// Name() always holds that value.
 		es := node.AsExportSpecifier()
 		return es.Name(), true
+	}
+	if node.Kind == ast.KindExportDeclaration && !isNamedExportDeclaration(node) {
+		// ExportAllDeclaration.exported is `ns` in `export * as ns`, else null.
+		if clause := node.AsExportDeclaration().ExportClause; clause != nil {
+			return clause.Name(), true
+		}
+		return nil, true
 	}
 	return nil, false
 }
@@ -2839,6 +2922,17 @@ func readVirtualNodeAttr(facade virtualNodeFacade, name string, mc *matchContext
 	case "ChainExpression":
 		if name == "expression" {
 			return node, true
+		}
+	case "ExportNamedDeclaration":
+		switch name {
+		case "declaration":
+			return node, true
+		case "exportKind":
+			return exportNamedKind(node), true
+		case "source":
+			return nil, true
+		case "specifiers", "attributes":
+			return []*ast.Node{}, true
 		}
 	case "Literal":
 		if node.Kind == ast.KindConstructor && name == "value" {
