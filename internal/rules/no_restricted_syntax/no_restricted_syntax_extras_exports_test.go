@@ -22,6 +22,9 @@ func TestNoRestrictedSyntaxExportRegressions(t *testing.T) {
 			{Code: "export const a = 1;", Options: []any{":not(ExportNamedDeclaration) > VariableDeclaration"}},
 			{Code: "export const a = 1;", Options: []any{"ExportNamedDeclaration > VariableDeclaration ~ *"}},
 			{Code: "if (x) { sample(); }\nexport const a = 1;", Options: []any{"Program:not(:has(ExportNamedDeclaration)) CallExpression"}},
+			{Code: "namespace A.B {}", Options: []any{"ExportNamedDeclaration"}},
+			{Code: "namespace A.B.C {}", Options: []any{"ExportNamedDeclaration"}},
+			{Code: "declare module A.B {}", Options: []any{"ExportNamedDeclaration"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -363,6 +366,78 @@ func TestNoRestrictedSyntaxExportRegressions(t *testing.T) {
 				Options: []any{"Program > .body"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    "export namespace A.B {}",
+				Options: []any{"ExportNamedDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    "namespace A.B {} sample();",
+				Options: []any{"Program:not(:has(ExportNamedDeclaration)) > ExpressionStatement > CallExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:    "namespace A { export namespace B {} }",
+				Options: []any{"ExportNamedDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 36},
+				},
+			},
+			{
+				Code:    "@dec export class C {}",
+				Options: []any{"ExportNamedDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 6, EndLine: 1, EndColumn: 23},
+				},
+			},
+			{
+				Code:    "@dec export abstract class C {}",
+				Options: []any{"ExportNamedDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 6, EndLine: 1, EndColumn: 32},
+				},
+			},
+			{
+				Code:    "@dec export class C {}",
+				Options: []any{":matches(ExportNamedDeclaration, ClassDeclaration)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 6, EndLine: 1, EndColumn: 23},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 23},
+				},
+			},
+			{
+				Code:    "export @dec class C {}",
+				Options: []any{":matches(ExportNamedDeclaration, ClassDeclaration)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 23},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 23},
+				},
+			},
+			{
+				Code:    "@dec export class C {}",
+				Options: []any{"ClassDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 23},
+				},
+			},
+			{
+				Code:    "@dec export class C {}",
+				Options: []any{"ExportNamedDeclaration > ClassDeclaration > Decorator"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 5},
+				},
+			},
+			{
+				Code:    "@dec\nexport class C {}",
+				Options: []any{"ExportNamedDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 18},
 				},
 			},
 		})

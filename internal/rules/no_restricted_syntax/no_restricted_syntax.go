@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -503,6 +504,8 @@ func (bucket *ruleBucket) matchVirtual(index int, node *ast.Node, target string,
 		}
 	case "ClassBody":
 		ctx.ReportRange(classBodyTextRange(mc.sf, node), message)
+	case "ExportNamedDeclaration":
+		ctx.ReportRange(exportNamedTextRange(mc.sf, node), message)
 	case "TSEnumBody":
 		ctx.ReportRange(enumBodyTextRange(mc.sf, node), message)
 	case "JSXEmptyExpression":
@@ -529,6 +532,20 @@ func functionValueTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
 		return core.NewTextRange(parameters.Pos()-1, node.End())
 	}
 	return utils.TrimNodeTextRange(sf, node)
+}
+
+// exportNamedTextRange starts the virtual ExportNamedDeclaration at the authored
+// `export` keyword: decorators written before it belong to the declaration.
+func exportNamedTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
+	textRange := utils.TrimNodeTextRange(sf, node)
+	if modifiers := node.Modifiers(); modifiers != nil {
+		for _, modifier := range modifiers.Nodes {
+			if modifier.Kind == ast.KindExportKeyword {
+				return core.NewTextRange(scanner.SkipTrivia(sf.Text(), modifier.Pos()), textRange.End())
+			}
+		}
+	}
+	return textRange
 }
 
 func classBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {

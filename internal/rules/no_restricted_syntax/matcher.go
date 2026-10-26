@@ -704,9 +704,13 @@ var exportedDeclarationKinds = []ast.Kind{
 
 // isExportNamedWrapped reports whether ESTree wraps node in a virtual
 // ExportNamedDeclaration. `export default` declarations use a different
-// wrapper and are excluded.
+// wrapper and are excluded. In `namespace A.B {}` tsgo nests B directly in A
+// with a synthesized `export` modifier; ESTree has a single declaration there.
 func isExportNamedWrapped(node *ast.Node) bool {
 	if node == nil || !slices.Contains(exportedDeclarationKinds, node.Kind) {
+		return false
+	}
+	if node.Kind == ast.KindModuleDeclaration && node.Parent != nil && node.Parent.Kind == ast.KindModuleDeclaration {
 		return false
 	}
 	return ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) &&
