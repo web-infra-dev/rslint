@@ -1742,7 +1742,7 @@ exports[`no-restricted-syntax > invalid 60`] = `
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 16,
           "line": 1,
         },
       },
