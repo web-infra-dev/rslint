@@ -245,7 +245,7 @@ func TestNoUselessPathSegmentsRequireResolutionMode(t *testing.T) {
 // rootDirs merge directories, so the physical depth of the resolved file need
 // not match the written path. Only shorten to a path that reaches it again.
 func TestNoUselessPathSegmentsRootDirs(t *testing.T) {
-	const fileName = "rootdirs/src/app/input.ts"
+	const fileName = "root-dirs/src/app/input.ts"
 	var valid []rule_tester.ValidTestCase
 	var invalid []rule_tester.InvalidTestCase
 	for _, settings := range []map[string]any{nil, {"import/resolver": "typescript"}} {
@@ -255,5 +255,5 @@ func TestNoUselessPathSegmentsRootDirs(t *testing.T) {
 		item.Settings = settings
 		invalid = append(invalid, item)
 	}
-	rule_tester.RunRuleTester(pathRoot(t), "rootdirs/tsconfig.json", t, &target.NoUselessPathSegmentsRule, valid, invalid)
+	rule_tester.RunRuleTester(pathRoot(t), "root-dirs/tsconfig.json", t, &target.NoUselessPathSegmentsRule, valid, invalid)
 }
