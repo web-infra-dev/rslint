@@ -516,6 +516,7 @@ ruleTester.run('no-unresolved (import/resolve legacy)', rule, {
   invalid: [
     test({
       code: 'import * as foo from "jsx-module/foo"',
+      settings: { 'import/resolver': 'node' },
       errors: ["Unable to resolve path to module 'jsx-module/foo'."],
     }),
   ],

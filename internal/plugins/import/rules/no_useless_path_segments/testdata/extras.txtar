@@ -18,3 +18,7 @@ export default 2;
 export default 1;
 -- tsconfig.nodenext.json --
 {"compilerOptions":{"allowJs":true,"module":"nodenext","moduleResolution":"nodenext","target":"esnext"},"include":["**/*"]}
+-- root-dirs/tsconfig.json --
+{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","rootDirs":["src","generated/types"]},"include":["src"]}
+-- root-dirs/src/app/helper.ts --
+export const value = 1;

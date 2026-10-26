@@ -717,6 +717,7 @@ describe('TypeScript', () => {
     // Type-only imports were added in TypeScript ESTree 2.23.0
     .filter((parser) => parser !== parsers.TS_OLD)
     .forEach((parser) => {
+      // Upstream runs this group with its default node resolver.
       ruleTester.run(`${parser}: extensions ignore type-only`, rule, {
         valid: [
           test({
@@ -726,6 +727,7 @@ describe('TypeScript', () => {
               { ts: 'never', tsx: 'never', js: 'never', jsx: 'never' },
             ],
             parser,
+            settings: { 'import/resolver': 'node' },
           }),
           test({
             code: 'export type { MyType } from "./typescript-declare";',
@@ -734,6 +736,7 @@ describe('TypeScript', () => {
               { ts: 'never', tsx: 'never', js: 'never', jsx: 'never' },
             ],
             parser,
+            settings: { 'import/resolver': 'node' },
           }),
         ],
         invalid: [
@@ -745,6 +748,7 @@ describe('TypeScript', () => {
               { ts: 'never', tsx: 'never', js: 'never', jsx: 'never' },
             ],
             parser,
+            settings: { 'import/resolver': 'node' },
           }),
           test({
             code: 'export { MyType } from "./typescript-declare";',
@@ -754,6 +758,7 @@ describe('TypeScript', () => {
               { ts: 'never', tsx: 'never', js: 'never', jsx: 'never' },
             ],
             parser,
+            settings: { 'import/resolver': 'node' },
           }),
           test({
             code: 'import type T from "./typescript-declare";',
@@ -769,6 +774,7 @@ describe('TypeScript', () => {
               },
             ],
             parser,
+            settings: { 'import/resolver': 'node' },
           }),
           test({
             code: 'export type { MyType } from "./typescript-declare";',
@@ -784,6 +790,7 @@ describe('TypeScript', () => {
               },
             ],
             parser,
+            settings: { 'import/resolver': 'node' },
           }),
         ],
       });

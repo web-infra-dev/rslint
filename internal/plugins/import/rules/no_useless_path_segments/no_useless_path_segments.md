@@ -74,6 +74,11 @@ not check whether a directory's `package.json` selects a different entry point.
 - If an `import/resolver` object contains several resolver names, they are tried
   alphabetically. Use an array, such as `['typescript', 'node']`, to choose the
   order explicitly.
+- A path that leaves and re-enters the current directory is shortened only when
+  the shorter path resolves to the same file. Upstream derives it from the
+  resolved file's location, which breaks imports through tsconfig `rootDirs`:
+  `'../../generated/types/app/helper'` in `src/app/input.ts` is not reported,
+  although it resolves to `src/app/helper.ts`.
 - Babel's experimental `export value from './module'` syntax is not supported.
   Use `export { default as value } from './module'` instead.
 

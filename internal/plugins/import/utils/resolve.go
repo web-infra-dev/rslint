@@ -29,7 +29,14 @@ func NewImportResolver(ctx rule.RuleContext) *ImportResolver {
 	r := &ImportResolver{ctx: ctx, core: settingsStringList(ctx.Settings, "import/core-modules")}
 	raw := ctx.Settings["import/resolver"]
 	if raw == nil || raw == false || raw == "" {
-		raw = map[string]any{"node": ctx.Settings["import/resolve"]}
+		if legacy := ctx.Settings["import/resolve"]; legacy != nil {
+			raw = map[string]any{"node": legacy}
+		} else {
+			// Unlike upstream's node-only default, let the TypeScript project
+			// resolve what node cannot, such as tsconfig paths and `.js` -> `.ts`
+			// imports. Node stays first so the paths it finds keep upstream's view.
+			raw = []any{"node", "typescript"}
+		}
 	}
 	set := func(name string, config map[string]any) {
 		entry := importResolver{name: name}

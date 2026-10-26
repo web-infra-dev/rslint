@@ -117,7 +117,13 @@ var NoUselessPathSegmentsRule = rule.Rule{
 			if diff > 0 {
 				// JavaScript slice permits an offset beyond the end.
 				suffix := segments[min(parents+diff, len(segments)):]
-				report(toRelativePath(strings.Join(append(segments[:expectedParents:expectedParents], suffix...), "/")))
+				proposed := toRelativePath(strings.Join(append(segments[:expectedParents:expectedParents], suffix...), "/"))
+				// Unlike upstream, require the shorter path to reach the same
+				// file: with tsconfig rootDirs, the written depth can differ from
+				// the resolved file's physical depth.
+				if candidate, ok := resolve(proposed, source); ok && candidate == resolved {
+					report(proposed)
+				}
 			}
 		}, import_utils.VisitModulesOptions{ESModule: true, Commonjs: commonjs})
 	},

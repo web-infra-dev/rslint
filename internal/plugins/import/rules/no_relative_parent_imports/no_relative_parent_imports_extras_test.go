@@ -32,8 +32,8 @@ func TestNoRelativeParentImportsExtras(t *testing.T) {
 		{Code: "define('name', ['../plugin.js'], () => {}); define(['../plugin.js']); define('../plugin.js', () => {}); obj.define(['../plugin.js'], () => {});\nrequire(['require', 'exports', , 1, null, `../plugin.js`, name, ...paths], () => {});", Options: map[string]any{"amd": true}},
 		{FileName: tsFile, Code: `define(['../plugin.js'] as string[], () => {}); define(['../plugin.js' as string], () => {});`, Options: map[string]any{"amd": true}},
 		{Code: `define(['require', 'exports'], () => {});`, Options: map[string]any{"amd": true}, Settings: typescript},
-		// Resolver defaults do not infer a TypeScript extension.
-		{FileName: tsFile, Code: `import type { Value } from '../types';`},
+		// The node resolver does not infer a TypeScript extension.
+		{FileName: tsFile, Code: `import type { Value } from '../types';`, Settings: map[string]any{"import/resolver": "node"}},
 		{Code: `import '@outside';`, Settings: typescript},
 		{Code: `import '@vendor';`, Settings: map[string]any{"import/resolver": "typescript", "import/external-module-folders": []any{"vendor"}}},
 		{Code: `import 'package';`, Settings: map[string]any{"import/external-module-folders": []any{""}}},
