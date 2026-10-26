@@ -3,8 +3,6 @@ import { define } from 'rstack';
 const ecosystemTests = {
   testEnvironment: 'node' as const,
   globals: true,
-  // CI pods expose the shared host's CPU count, so cap worker-process churn.
-  pool: { maxWorkers: 16 },
   // Normal completion is event-driven. This is only the final in-process
   // deadlock sentinel, deliberately later than the 30-minute child watchdogs.
   testTimeout: 35 * 60_000,
@@ -933,6 +931,8 @@ const ecosystemTests = {
 
 // Cross-language tests own their Go producer; other tests need no Go setup.
 define.test({
+  // All projects share one runner pool; limits must be set at the root.
+  pool: { maxWorkers: process.platform === 'win32' ? 1 : 16 },
   projects: [
     {
       ...ecosystemTests,
@@ -942,7 +942,6 @@ define.test({
       name: 'go-frame',
       testEnvironment: 'node',
       globals: true,
-      pool: { maxWorkers: process.platform === 'win32' ? 1 : 16 },
       testTimeout: ecosystemTests.testTimeout,
       hookTimeout: ecosystemTests.hookTimeout,
       include: [
