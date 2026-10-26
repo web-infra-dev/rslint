@@ -108,7 +108,7 @@ export function buildToken(
       break;
     case CODE_IDENTIFIER:
       // espree decodes unicode escapes in identifier values (`abc` → `abc`).
-      if (raw.indexOf('\\') !== -1) value = decodeIdentEscapes(raw);
+      if (raw.includes('\\')) value = decodeIdentEscapes(raw);
       break;
     case CODE_JSX_TEXT:
       value = decodeJsxText(raw); // entity decode + CRLF→LF (JSX text only, NOT attr string)

@@ -792,8 +792,7 @@ export function visit(
     fireEnter(node);
 
     const keys =
-      VISITOR_KEYS[(node as { type: string }).type] ??
-      getVisitorKeys(node as { type?: string });
+      VISITOR_KEYS[(node as { type: string }).type] ?? getVisitorKeys(node);
     if (keys.length > 0) {
       // `hasEsquery` is hoisted from the enclosing closure and constant
       // for the entire walk; V8's JIT promotes it to a hot constant so

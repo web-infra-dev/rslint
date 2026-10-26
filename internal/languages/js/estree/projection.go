@@ -456,7 +456,7 @@ func (p *estreeProjector) accessibility(node *ast.Node) uint32 {
 }
 
 func (p *estreeProjector) typeAnnotation(node *ast.Node) uint32 {
-	if node == nil || utils.IsJSDocSyntaxNode(node) || p.isJavaScriptFile() {
+	if node == nil || isJSDocCommentSyntax(node) || p.isJavaScriptFile() {
 		return undefinedValue()
 	}
 	typeID := p.convert(node, false)
@@ -476,7 +476,7 @@ func (p *estreeProjector) typeAnnotation(node *ast.Node) uint32 {
 }
 
 func (p *estreeProjector) typeParameters(list *ast.NodeList, declaration bool) uint32 {
-	if list == nil || p.isJavaScriptFile() || (len(list.Nodes) > 0 && utils.IsJSDocSyntaxNode(list.Nodes[0])) {
+	if list == nil || p.isJavaScriptFile() || (len(list.Nodes) > 0 && isJSDocCommentSyntax(list.Nodes[0])) {
 		return undefinedValue()
 	}
 	typeName := "TSTypeParameterInstantiation"
@@ -499,7 +499,7 @@ func (p *estreeProjector) typeParameters(list *ast.NodeList, declaration bool) u
 
 func (p *estreeProjector) identifierWithAnnotation(name, typeNode *ast.Node) uint32 {
 	id := p.convert(name, true)
-	if typeNode == nil || id == 0 || p.isJavaScriptFile() || utils.IsJSDocSyntaxNode(typeNode) {
+	if typeNode == nil || id == 0 || p.isJavaScriptFile() || isJSDocCommentSyntax(typeNode) {
 		return id
 	}
 	record := p.nodes[id-1]
@@ -513,6 +513,12 @@ func (p *estreeProjector) identifierWithAnnotation(name, typeNode *ast.Node) uin
 		}
 	}
 	return id
+}
+
+// JSDoc kinds can also represent source-authored TypeScript recovery syntax.
+// Only the flags identify syntax synthesized from comments.
+func isJSDocCommentSyntax(node *ast.Node) bool {
+	return node != nil && node.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsReparsed) != 0
 }
 
 func (p *estreeProjector) isJavaScriptFile() bool {

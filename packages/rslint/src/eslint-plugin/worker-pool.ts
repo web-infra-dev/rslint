@@ -326,8 +326,10 @@ export class WorkerPool {
     // Adopt ready workers immediately so crash recovery can find their slots.
     // Wait for all starts before cleaning up a failed warmup.
     const settled = await Promise.allSettled(
-      Array.from({ length: this.opts.warmupWorkerCount }, () =>
-        this.startWorker(),
+      Array.from(
+        { length: this.opts.warmupWorkerCount },
+        // rslint-disable-next-line @typescript-eslint/promise-function-async -- Preserve the tracked startup promise.
+        () => this.startWorker(),
       ),
     );
     const failure = settled.find((result) => result.status === 'rejected');
@@ -504,6 +506,7 @@ export class WorkerPool {
   }
 
   /** Reserve capacity synchronously, before worker initialization can yield. */
+  // rslint-disable-next-line @typescript-eslint/promise-function-async -- Return the promise tracked by startingWorkers.
   private startWorker(): Promise<void> {
     const start = this.spawnWorker(this.nextWorkerId++)
       .then(async (slot) => {
@@ -538,7 +541,9 @@ export class WorkerPool {
     const count = Math.min(queued - starting - respawning, capacity);
     for (let i = 0; i < count; i++) {
       void this.startWorker().then(
-        () => this.kickQueue(),
+        () => {
+          this.kickQueue();
+        },
         (error: unknown) => {
           if (this.closed) return;
           this.growthDisabled = true;
@@ -590,6 +595,7 @@ export class WorkerPool {
   }
 
   /** Graceful shutdown — message all workers, wait for exit. */
+  // rslint-disable-next-line @typescript-eslint/promise-function-async -- Repeated calls share this exact promise.
   shutdown(): Promise<void> {
     this.shutdownPromise ??= this.close();
     return this.shutdownPromise;
@@ -733,13 +739,7 @@ export class WorkerPool {
         stdout: true,
         stderr: true,
       };
-      let worker: Worker;
-      try {
-        worker = new Worker(resolveWorkerFile(), workerOptions);
-      } catch (err) {
-        reject(err as Error);
-        return;
-      }
+      const worker = new Worker(resolveWorkerFile(), workerOptions);
       const exited = new Promise<void>((resolve) => {
         worker.once('exit', () => {
           this.initializingWorkers.delete(worker);
@@ -1278,7 +1278,3 @@ export class WorkerPool {
     }
   }
 }
-
-// require for cpus() — in ESM context we use createRequire.
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);

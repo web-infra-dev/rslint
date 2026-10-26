@@ -397,6 +397,7 @@ add(
     '/** @type {T} */ (value);',
     '/** @type {T} */ value;',
     '/** @param {T} value */ function f(value) {}',
+    '/** @param {number} [value] */ function f(value) {}',
   ],
   'js',
 );

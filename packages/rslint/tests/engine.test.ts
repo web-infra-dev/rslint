@@ -13,11 +13,18 @@ import { resolveRslintBinary } from '../src/internal/resolve-binary.js';
 import { createMemoryTransport } from '../src/ipc/memory-transport.js';
 import { IpcClient, decodeFrame, encodeFrame } from '../src/ipc/client.js';
 import { createPluginLintHost } from '../src/eslint-plugin/host.js';
+import { setWorkerEntryForTests } from '../src/eslint-plugin/worker-pool.js';
 import { resolvePluginAttachments } from '../src/eslint-plugin/plugin/attachments.js';
 import { getNativeBinding } from '../src/native/binding.js';
 import { decodeFrame as decodeEstreeFrame } from '../src/languages/js/frame.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+setWorkerEntryForTests(
+  fileURLToPath(
+    new URL('../dist/eslint-plugin/lint-worker.js', import.meta.url),
+  ),
+);
+
 const FAKE_BIN = path.resolve(__dirname, './fixtures/fake-ipc-binary.cjs');
 const CONFIG_RACE_BIN = path.resolve(
   __dirname,

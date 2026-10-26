@@ -2,7 +2,7 @@
 import { visitorKeys as canonicalVisitorKeys } from '@typescript-eslint/visitor-keys';
 import { getKeys } from 'eslint-visitor-keys';
 
-const _vkObj = Object.create(null) as Record<string, readonly string[]>;
+const _vkObj: Record<string, readonly string[]> = Object.create(null);
 for (const [type, keys] of Object.entries(canonicalVisitorKeys)) {
   if (keys !== undefined) _vkObj[type] = keys;
 }

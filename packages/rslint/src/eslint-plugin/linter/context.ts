@@ -304,5 +304,5 @@ export function createRuleContext(opts: CreateContextOptions): RuleContext {
     },
   };
 
-  return ctx as unknown as RuleContext;
+  return ctx;
 }

@@ -221,7 +221,15 @@ func TestProjectionCancellationAndFailure(t *testing.T) {
 	if data, err := builder.Build(context.Background(), file, Options{SourceType: "module"}); data != nil || err == nil {
 		t.Fatal("unsupported syntax became a successful tree")
 	}
-	for _, text := range []string{"type Value = ?number;", "type Value = !number;"} {
+	for _, text := range []string{
+		"type Value = ?number;",
+		"type Value = !number;",
+		"let value: ?number;",
+		"function value(input: !number) {}",
+		"function value(): ?number {}",
+		"class Value { field: !number; }",
+		"invoke<?number>();",
+	} {
 		data, err := builder.Build(context.Background(), source("/file.ts", text), Options{SourceType: "module"})
 		if data != nil || err == nil || !strings.Contains(err.Error(), "unsupported syntax KindJSDoc") {
 			t.Fatalf("projection of unsupported source type %q = %v/%v", text, data, err)

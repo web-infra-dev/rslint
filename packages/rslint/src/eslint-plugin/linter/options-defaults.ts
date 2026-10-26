@@ -165,7 +165,7 @@ function mergeDefault(userValue: unknown, defaultValue: unknown): unknown {
     const result: Record<string, unknown> = {
       ...(defaultValue as Record<string, unknown>),
     };
-    for (const k of Object.keys(userValue as Record<string, unknown>)) {
+    for (const k of Object.keys(userValue)) {
       result[k] = mergeDefault(
         (userValue as Record<string, unknown>)[k],
         (defaultValue as Record<string, unknown>)[k],

@@ -686,7 +686,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       return fullStreamFor(true);
     },
     // Share canonical language traversal metadata with plugin queries.
-    visitorKeys: RUNNER_VISITOR_KEYS as Record<string, readonly string[]>,
+    visitorKeys: RUNNER_VISITOR_KEYS,
     // Empty in plain JS (matches ESLint v10's default). Type-aware
     // plugins that probe `parserServices.program` correctly skip
     // type-aware checks under rslint.
@@ -808,9 +808,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
           // that may not be enumerated upfront (nonstandard nodes,
           // future TS additions). Pre-fix the bare `?? []` made the
           // walk stop at unknown nodes, mismatching the main visitor.
-          const keys =
-            RUNNER_VISITOR_KEYS[cur.type] ??
-            getVisitorKeys(cur as { type?: string });
+          const keys = RUNNER_VISITOR_KEYS[cur.type] ?? getVisitorKeys(cur);
           for (let i = 0; i < keys.length; i++) {
             const v = cur[keys[i]];
             if (Array.isArray(v)) {
@@ -1564,5 +1562,5 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     },
   };
 
-  return sc as unknown as SourceCode;
+  return sc;
 }

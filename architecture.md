@@ -2260,7 +2260,8 @@ The current architecture already leaves room for:
 - **Rule Engine Tests**: `internal/linter` and `internal/config` have focused behavior tests
 - **Go Rule Testing Helpers**: `internal/rule_tester`
 - **Shared Go Test Infrastructure**: `internal/testutil`; package-specific helpers remain beside the owning tests
-- **Core JS/TS and API Tests**: `packages/rslint/tests`
+- **Core JS/TS and API Tests**: `packages/rslint/tests`; CLI engine integration
+  selects its own built worker locally, without shared test setup.
 - **Cross-Language and Ecosystem Tests**: `packages/rslint-test-tools/tests` owns
   the Go ESTree producer, upstream AST/token/SourceCode comparisons, and real
   plugin worker/package integration. Its `go-frame` project builds the producer
