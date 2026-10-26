@@ -165,9 +165,10 @@ var typescriptFallbackOptions = moduleresolver.Options{
 }
 
 func (r *ImportResolver) resolveTypeScriptFallback(name string) (string, bool) {
-	// Upstream drops the query before matching paths, so `@icons/x?raw`
-	// substitutes `x` rather than `x?raw`.
-	if i := strings.LastIndex(name, "?"); i >= 0 {
+	// Upstream drops the query and fragment before matching paths, so
+	// `@icons/x?raw` substitutes `x` rather than `x?raw`. Split where
+	// moduleresolver does, keeping the leading `#` of package imports.
+	if i := strings.IndexAny(name, "?#"); i > 0 {
 		name = name[:i]
 	}
 	p := r.ctx.Program()
