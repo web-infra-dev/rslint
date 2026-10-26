@@ -37,7 +37,7 @@ func TestPreferSingleCallEditDemand(t *testing.T) {
 			for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
 				var found []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
+					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: prefer_single_call.PreferSingleCallRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return prefer_single_call.PreferSingleCallRule.Run(ctx, nil)

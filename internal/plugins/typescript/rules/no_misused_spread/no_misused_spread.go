@@ -143,12 +143,12 @@ func isClassInstance(typeChecker *checker.Checker, t *checker.Type) bool {
 		}
 
 		symbol := checker.Type_symbol(t)
-		if symbol == nil || symbol.Declarations == nil {
+		if symbol == nil || symbol.Declarations() == nil {
 			return false
 		}
 
 		// If the type's symbol has a construct signature, the type is an instance
-		for _, decl := range symbol.Declarations {
+		for _, decl := range symbol.Declarations() {
 			if len(utils.GetConstructSignatures(typeChecker, typeChecker.GetTypeOfSymbolAtLocation(symbol, decl))) != 0 {
 				return true
 			}
@@ -164,7 +164,7 @@ func isClassDeclaration(t *checker.Type) bool {
 		}
 
 		symbol := checker.Type_symbol(t)
-		return symbol != nil && symbol.ValueDeclaration != nil && (ast.IsClassExpression(symbol.ValueDeclaration) || ast.IsClassDeclaration(symbol.ValueDeclaration))
+		return symbol != nil && symbol.ValueDeclaration() != nil && (ast.IsClassExpression(symbol.ValueDeclaration()) || ast.IsClassDeclaration(symbol.ValueDeclaration()))
 	})
 }
 

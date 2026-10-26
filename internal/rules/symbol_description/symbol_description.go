@@ -70,7 +70,7 @@ func isUserBoundSymbol(ctx rule.RuleContext, callee *ast.Node) bool {
 	if sym == nil {
 		return false
 	}
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		if decl == nil {
 			continue
 		}

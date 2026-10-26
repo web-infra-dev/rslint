@@ -19,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func unresolvedRoot(t *testing.T, insensitive bool) embedfs.Root {
@@ -66,18 +67,24 @@ func (fs caseInsensitiveFS) actual(path string) string {
 	}
 	return path
 }
-func (fs caseInsensitiveFS) UseCaseSensitiveFileNames() bool { return false }
-func (fs caseInsensitiveFS) FileExists(path string) bool     { return fs.FS.FileExists(fs.actual(path)) }
-func (fs caseInsensitiveFS) DirectoryExists(path string) bool {
-	return fs.FS.DirectoryExists(fs.actual(path))
+func (fs caseInsensitiveFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
 }
-func (fs caseInsensitiveFS) ReadFile(path string) (string, bool) {
-	return fs.FS.ReadFile(fs.actual(path))
+func (fs caseInsensitiveFS) FileExists(path tspath.RootedFilePath) bool {
+	return fs.FS.FileExists(pathutil.File(fs.actual(path.AsString())))
 }
-func (fs caseInsensitiveFS) GetAccessibleEntries(path string) vfs.Entries {
-	return fs.FS.GetAccessibleEntries(fs.actual(path))
+func (fs caseInsensitiveFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	return fs.FS.DirectoryExists(pathutil.Directory(fs.actual(path.AsString())))
 }
-func (fs caseInsensitiveFS) Realpath(path string) string { return fs.FS.Realpath(fs.actual(path)) }
+func (fs caseInsensitiveFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	return fs.FS.ReadFile(pathutil.File(fs.actual(path.AsString())))
+}
+func (fs caseInsensitiveFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	return fs.FS.GetAccessibleEntries(pathutil.Directory(fs.actual(path.AsString())))
+}
+func (fs caseInsensitiveFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	return fs.FS.Realpath(pathutil.Path(fs.actual(path.AsString())))
+}
 
 func unresolvedErrors(code string, names ...string) []rule_tester.InvalidTestCaseError {
 	errors := make([]rule_tester.InvalidTestCaseError, 0, len(names))

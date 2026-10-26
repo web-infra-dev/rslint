@@ -47,7 +47,7 @@ func IsReferenceToGlobalIdentifier(ctx rule.RuleContext, ident *ast.Node) bool {
 
 	if ctx.TypeChecker != nil {
 		if sym := ctx.TypeChecker.GetSymbolAtLocation(ident); sym != nil {
-			for _, decl := range sym.Declarations {
+			for _, decl := range sym.Declarations() {
 				if decl == nil {
 					continue
 				}

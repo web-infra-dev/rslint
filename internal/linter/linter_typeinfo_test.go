@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func checkerProbeRule(checkerWasNil *bool) []rule.ConfiguredRule {
@@ -61,7 +62,7 @@ func TestSourceOnlyProgramWithholdsTypeChecker(t *testing.T) {
 	raw, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x = 1;",
 	})
-	file := raw.GetSourceFile(paths["a.ts"])
+	file := raw.GetSourceFile(pathutil.File(paths["a.ts"]))
 	if file == nil {
 		t.Fatal("fixture Program did not contain a.ts")
 	}
@@ -79,7 +80,7 @@ func TestSourceOnlyProgramFiltersTypeAwareRule(t *testing.T) {
 	raw, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x = 1;",
 	})
-	file := raw.GetSourceFile(paths["a.ts"])
+	file := raw.GetSourceFile(pathutil.File(paths["a.ts"]))
 	if file == nil {
 		t.Fatal("fixture Program did not contain a.ts")
 	}

@@ -100,9 +100,11 @@ func TestHandleGetAstInfoProgramCacheInvalidation(t *testing.T) {
 func TestHandleGetAstInfoUsesRequestedSourceFileName(t *testing.T) {
 	handler := &Handler{}
 	for _, testCase := range []struct {
-		name     string
-		fileName string
-		content  string
+		name          string
+		fileName      string
+		queryFileName string
+		content       string
+		missing       bool
 	}{
 		{name: "default", content: "const value = 1\n"},
 		{name: "JavaScript", fileName: "index.js", content: "const value = 1\n"},
@@ -111,17 +113,26 @@ func TestHandleGetAstInfoUsesRequestedSourceFileName(t *testing.T) {
 		{name: "dot segment", fileName: "./index.ts", content: "const value = 1\n"},
 		{name: "parent segment", fileName: "src/../index.ts", content: "const value = 1\n"},
 		{name: "absolute", fileName: "/index.ts", content: "const value = 1\n"},
+		{name: "relative query", queryFileName: "index.ts", content: "const value = 1\n"},
+		{name: "dot segment query", queryFileName: "./index.ts", content: "const value = 1\n"},
+		{name: "nested query", fileName: "src/index.ts", queryFileName: "./src/index.ts", content: "const value = 1\n"},
+		{name: "missing query", queryFileName: "missing.ts", content: "const value = 1\n", missing: true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			response, err := handler.HandleGetAstInfo(api.GetAstInfoRequest{
 				FileContent:    testCase.content,
 				SourceFileName: testCase.fileName,
+				FileName:       testCase.queryFileName,
 				Kind:           int(ast.KindSourceFile),
 			})
 			if err != nil {
 				t.Fatalf("HandleGetAstInfo() error = %v", err)
 			}
-			if response.Node == nil || response.Node.Kind != int(ast.KindSourceFile) {
+			if testCase.missing {
+				if response.Node != nil {
+					t.Fatalf("HandleGetAstInfo() node = %#v, want no node for missing file", response.Node)
+				}
+			} else if response.Node == nil || response.Node.Kind != int(ast.KindSourceFile) {
 				t.Fatalf("HandleGetAstInfo() node = %#v, want SourceFile", response.Node)
 			}
 
@@ -130,7 +141,7 @@ func TestHandleGetAstInfoUsesRequestedSourceFileName(t *testing.T) {
 				wantFileName = "index.ts"
 			}
 			wantFileName = tspath.ResolvePath("/", wantFileName)
-			if astInfoProgramCache.sourceFile == nil || astInfoProgramCache.sourceFile.FileName() != wantFileName {
+			if astInfoProgramCache.sourceFile == nil || astInfoProgramCache.sourceFile.FileName().AsString() != wantFileName {
 				t.Fatalf("source file = %v, want %s", astInfoProgramCache.sourceFile, wantFileName)
 			}
 		})

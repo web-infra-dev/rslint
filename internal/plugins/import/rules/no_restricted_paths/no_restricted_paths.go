@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/isglob"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed no_restricted_paths.schema.json
@@ -60,7 +61,7 @@ var NoRestrictedPathsRule = rule.Rule{
 		currentFilename := ctx.SourceFile.FileName()
 		matchingZones := make([]zone, 0, len(opts.zones))
 		for _, z := range opts.zones {
-			if isMatchingZone(z, basePath, currentFilename, windows) {
+			if isMatchingZone(z, basePath, currentFilename.AsString(), windows) {
 				matchingZones = append(matchingZones, z)
 			}
 		}
@@ -122,7 +123,7 @@ func resolveBasePath(ctx rule.RuleContext, configured string) string {
 	if configured == "" {
 		return tspath.NormalizePath(cwd)
 	}
-	return tspath.GetNormalizedAbsolutePath(configured, cwd)
+	return pathutil.GetNormalizedAbsolutePath(configured, cwd)
 }
 
 func parseOptions(options []any) ruleOptions {
@@ -378,7 +379,7 @@ func equalPathComponent(a string, b string, windows bool) bool {
 // pathComponents splits a path into its root plus segments, dropping the empty
 // trailing segment a path written with a trailing separator would produce.
 func pathComponents(p string) []string {
-	components := tspath.GetPathComponents(p, "")
+	components := tspath.GetPathComponents(p)
 	for len(components) > 1 && components[len(components)-1] == "" {
 		components = components[:len(components)-1]
 	}

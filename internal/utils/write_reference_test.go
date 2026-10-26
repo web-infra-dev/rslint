@@ -11,7 +11,7 @@ import (
 func TestIsWriteReferenceThroughSatisfiesExpression(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/write-reference.ts",
-		Path:     "/write-reference.ts",
+		PathKey:  "/write-reference.ts",
 	}, `(callback satisfies (() => void)) = replacement;`, core.ScriptKindTS)
 
 	var callback *ast.Node

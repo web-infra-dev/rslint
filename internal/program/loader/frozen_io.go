@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // WithFrozenIO keeps Program filenames in their authored path space while
@@ -61,9 +62,9 @@ func WithFrozenIO(baseFS vfs.FS, pathSpaces *config.PathSpaceSnapshot, files []t
 			}
 		}
 	}
-	if !baseFS.UseCaseSensitiveFileNames() {
+	if !baseFS.CaseSensitivity().IsCaseSensitive() {
 		view.keyPrefix = frozenKeyPrefix(view.files, view.parents)
-		view.foldedKeyPrefix = tspath.GetCanonicalFileName(view.keyPrefix, false)
+		view.foldedKeyPrefix = pathutil.GetCanonicalFileName(view.keyPrefix, false)
 		view.foldedFiles = foldedFrozenPaths(view.files, view.keyPrefix)
 		view.foldedParents = foldedFrozenPaths(view.parents, view.keyPrefix)
 	}
@@ -127,7 +128,7 @@ func frozenKeyPrefix(groups ...map[string]string) string {
 func foldedFrozenPaths(paths map[string]string, prefix string) map[string]string {
 	folded := make(map[string]string, len(paths))
 	for path, physical := range paths {
-		id := tspath.GetCanonicalFileName(strings.TrimPrefix(path, prefix), false)
+		id := pathutil.GetCanonicalFileName(strings.TrimPrefix(path, prefix), false)
 		if existing, ok := folded[id]; !ok {
 			folded[id] = physical
 		} else if config.ExactPathID(existing) != config.ExactPathID(physical) {
@@ -139,11 +140,11 @@ func foldedFrozenPaths(paths map[string]string, prefix string) map[string]string
 
 func (f *frozenFileSystem) foldedKey(path string) string {
 	if suffix, ok := strings.CutPrefix(path, f.keyPrefix); ok {
-		return tspath.GetCanonicalFileName(suffix, false)
+		return pathutil.GetCanonicalFileName(suffix, false)
 	}
 	// Fold before removing a differently-cased prefix: Unicode folding can
 	// change byte lengths, including inside the prefix itself.
-	folded := tspath.GetCanonicalFileName(path, false)
+	folded := pathutil.GetCanonicalFileName(path, false)
 	if suffix, ok := strings.CutPrefix(folded, f.foldedKeyPrefix); ok {
 		return suffix
 	}
@@ -224,7 +225,7 @@ func (f *frozenFileSystem) computePath(path string) (string, bool) {
 				}
 				return path, false
 			}
-			relative := tspath.GetRelativePathFromDirectory(directory, path, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+			relative := pathutil.GetRelativePathFromDirectory(directory, path, pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: true})
 			return tspath.ResolvePath(physical, relative), false
 		}
 		parent := tspath.GetDirectoryPath(directory)
@@ -257,54 +258,50 @@ func (f *frozenFileSystem) computePath(path string) (string, bool) {
 	return path, false
 }
 
-func (f *frozenFileSystem) FileExists(path string) bool { return f.FS.FileExists(f.ioPath(path)) }
+func (f *frozenFileSystem) FileExists(path tspath.RootedFilePath) bool {
+	return f.FS.FileExists(pathutil.File(f.ioPath(path.AsString())))
+}
 
-func (f *frozenFileSystem) ReadFile(path string) (string, bool) { return f.FS.ReadFile(f.ioPath(path)) }
+func (f *frozenFileSystem) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	return f.FS.ReadFile(pathutil.File(f.ioPath(path.AsString())))
+}
 
 func (f *frozenFileSystem) SourceHasBOM(path string) bool {
 	return utils.SourceHasBOM(f.FS, f.ioPath(path))
 }
 
-func (f *frozenFileSystem) DirectoryExists(path string) bool {
-	return f.FS.DirectoryExists(f.ioPath(path))
+func (f *frozenFileSystem) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	return f.FS.DirectoryExists(pathutil.Directory(f.ioPath(path.AsString())))
 }
 
-func (f *frozenFileSystem) GetAccessibleEntries(path string) vfs.Entries {
-	return f.FS.GetAccessibleEntries(f.ioPath(path))
+func (f *frozenFileSystem) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	return f.FS.GetAccessibleEntries(pathutil.Directory(f.ioPath(path.AsString())))
 }
 
-func (f *frozenFileSystem) Stat(path string) vfs.FileInfo { return f.FS.Stat(f.ioPath(path)) }
+func (f *frozenFileSystem) Stat(path tspath.RootedPath) vfs.FileInfo {
+	return f.FS.Stat(pathutil.Path(f.ioPath(path.AsString())))
+}
 
-func (f *frozenFileSystem) Realpath(path string) string {
-	physical, frozenFile := f.resolvePath(path)
+func (f *frozenFileSystem) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	physical, frozenFile := f.resolvePath(path.AsString())
 	if frozenFile {
-		return physical
+		return pathutil.Path(physical)
 	}
-	return f.FS.Realpath(physical)
+	return f.FS.Realpath(pathutil.Path(physical))
 }
 
-func (f *frozenFileSystem) WriteFile(path string, data string) error {
-	return f.FS.WriteFile(f.ioPath(path), data)
+func (f *frozenFileSystem) WriteFile(path tspath.RootedFilePath, data string) error {
+	return f.FS.WriteFile(pathutil.File(f.ioPath(path.AsString())), data)
 }
 
-func (f *frozenFileSystem) AppendFile(path string, data string) error {
-	return f.FS.AppendFile(f.ioPath(path), data)
+func (f *frozenFileSystem) AppendFile(path tspath.RootedFilePath, data string) error {
+	return f.FS.AppendFile(pathutil.File(f.ioPath(path.AsString())), data)
 }
 
-func (f *frozenFileSystem) Remove(path string) error { return f.FS.Remove(f.ioPath(path)) }
-
-func (f *frozenFileSystem) Chtimes(path string, atime time.Time, mtime time.Time) error {
-	return f.FS.Chtimes(f.ioPath(path), atime, mtime)
+func (f *frozenFileSystem) Remove(path tspath.RootedPath) error {
+	return f.FS.Remove(pathutil.Path(f.ioPath(path.AsString())))
 }
 
-func (f *frozenFileSystem) WalkDir(root string, walkFn vfs.WalkDirFunc) error {
-	root = tspath.NormalizePath(root)
-	physicalRoot := f.ioPath(root)
-	if physicalRoot == root {
-		return f.FS.WalkDir(root, walkFn)
-	}
-	return f.FS.WalkDir(physicalRoot, func(path string, entry vfs.DirEntry, err error) error {
-		relative := tspath.GetRelativePathFromDirectory(physicalRoot, tspath.NormalizePath(path), tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
-		return walkFn(tspath.ResolvePath(root, relative), entry, err)
-	})
+func (f *frozenFileSystem) Chtimes(path tspath.RootedPath, atime time.Time, mtime time.Time) error {
+	return f.FS.Chtimes(pathutil.Path(f.ioPath(path.AsString())), atime, mtime)
 }

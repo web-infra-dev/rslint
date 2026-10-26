@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func normalizeStopWalkDirs(configDir string, stopDirs []string, useCaseSensitive bool) []string {
@@ -12,7 +13,7 @@ func normalizeStopWalkDirs(configDir string, stopDirs []string, useCaseSensitive
 		return nil
 	}
 
-	compareOptions := tspath.ComparePathsOptions{
+	compareOptions := pathutil.ComparePathsOptions{
 		CurrentDirectory:          configDir,
 		UseCaseSensitiveFileNames: useCaseSensitive,
 	}
@@ -21,10 +22,10 @@ func normalizeStopWalkDirs(configDir string, stopDirs []string, useCaseSensitive
 	for _, rawDir := range stopDirs {
 		dir := tspath.NormalizePath(rawDir)
 		if pathsEqual(dir, configDir, useCaseSensitive) ||
-			!tspath.StartsWithDirectory(dir, configDir, useCaseSensitive) {
+			!pathutil.StartsWithDirectory(dir, configDir, useCaseSensitive) {
 			continue
 		}
-		rel := tspath.NormalizePath(tspath.GetRelativePathFromDirectory(configDir, dir, compareOptions))
+		rel := tspath.NormalizePath(pathutil.GetRelativePathFromDirectory(configDir, dir, compareOptions))
 		if rel == "" || rel == "." {
 			continue
 		}
@@ -80,7 +81,7 @@ func isStoppedWalkPath(walkPath string, stopWalkDirs []string, useCaseSensitive 
 	}
 	for _, stopDir := range stopWalkDirs {
 		if pathsEqual(walkPath, stopDir, useCaseSensitive) ||
-			tspath.StartsWithDirectory(walkPath, stopDir, useCaseSensitive) {
+			pathutil.StartsWithDirectory(walkPath, stopDir, useCaseSensitive) {
 			return true
 		}
 	}

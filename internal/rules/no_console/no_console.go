@@ -29,7 +29,7 @@ var NoConsoleRule = rule.Rule{
 			if ctx.TypeChecker != nil {
 				symbol := ctx.TypeChecker.GetSymbolAtLocation(consoleIdent)
 				if symbol != nil {
-					for _, declaration := range symbol.Declarations {
+					for _, declaration := range symbol.Declarations() {
 						declarationSourceFile := ast.GetSourceFileOfNode(declaration)
 						if declarationSourceFile != nil && declarationSourceFile == ctx.SourceFile {
 							return

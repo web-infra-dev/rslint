@@ -263,7 +263,7 @@ func (state *ruleState) collectLocalRootNames() {
 	for container := state.ctx.SourceFile.AsNode(); container != nil; {
 		collect(container.Locals())
 		if symbol := container.Symbol(); symbol != nil {
-			collect(symbol.Exports)
+			collect(symbol.Exports())
 		}
 		if name := container.Name(); name != nil && name.Kind == ast.KindIdentifier &&
 			potentialReferenceRoots[name.Text()] {
@@ -383,7 +383,7 @@ func symbolMayDeclareAlias(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		variableDeclaration := declaration
 		if variableDeclaration.Kind != ast.KindVariableDeclaration {
 			variableDeclaration = ast.FindAncestorKind(variableDeclaration, ast.KindVariableDeclaration)
@@ -883,7 +883,7 @@ func (state *ruleState) aliasInfoForIdentifier(node *ast.Node) (aliasInfo, bool)
 	if state.ctx.TypeChecker != nil {
 		symbol := utils.GetReferenceSymbol(node, state.ctx.TypeChecker)
 		if symbol != nil {
-			for _, declaration := range symbol.Declarations {
+			for _, declaration := range symbol.Declarations() {
 				if info, ok := state.aliases[declaration]; ok && state.aliasInfoApplies(node, info) {
 					return info, true
 				}
@@ -916,12 +916,12 @@ func (state *ruleState) aliasInfoForBinderSymbol(symbol *ast.Symbol) (aliasInfo,
 	if info, ok := state.aliasesBySymbol[symbol]; ok {
 		return info, true
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if info, ok := state.aliases[declaration]; ok {
 			return info, true
 		}
 	}
-	for _, info := range state.aliasesByID[symbol.Name] {
+	for _, info := range state.aliasesByID[symbol.Name()] {
 		if aliasBindingSymbol(info.binding) == symbol {
 			return info, true
 		}

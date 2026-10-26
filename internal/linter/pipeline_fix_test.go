@@ -99,7 +99,7 @@ func TestPipelineFreezesTextOnlyForFixableTargets(t *testing.T) {
 			SingleThreaded:   true,
 			Cwd:              root,
 			RulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
-				if source.FileName() != fixablePath {
+				if source.FileName().AsString() != fixablePath {
 					return nil
 				}
 				return []rule.ConfiguredRule{{

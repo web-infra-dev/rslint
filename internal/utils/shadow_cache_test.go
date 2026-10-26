@@ -124,7 +124,7 @@ func TestShadowCacheMatchesIsShadowed(t *testing.T) {
 		t.Run(code, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.ts",
-				Path:     "/test.ts",
+				PathKey:  "/test.ts",
 			}, code, core.ScriptKindTS)
 
 			identifiers := collectIdentifierNodes(sourceFile.AsNode())
@@ -194,7 +194,7 @@ func TestShadowCacheDeclaresName(t *testing.T) {
 		t.Run(test.code, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.tsx",
-				Path:     "/test.tsx",
+				PathKey:  "/test.tsx",
 			}, test.code, core.ScriptKindTSX)
 			cache := NewShadowCache(sourceFile)
 			if got := cache.DeclaresName("Promise"); got != test.declares {
@@ -218,7 +218,7 @@ func TestShadowCacheReusesOuterDeclarationScans(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%d/%s", test.kind, test.code), func(t *testing.T) {
 			source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/test.ts", Path: "/test.ts",
+				FileName: "/test.ts", PathKey: "/test.ts",
 			}, "function unrelated(Promise) {}\n"+test.code, core.ScriptKindTS)
 			var references []*ast.Node
 			for _, node := range collectIdentifierNodes(source.AsNode()) {
@@ -263,7 +263,7 @@ func BenchmarkShadowCacheSiblingFactories(b *testing.B) {
 				code := "function unrelated(Promise) {}\n" + wrapper.prefix +
 					strings.Repeat("rs.doMock('m', () => Promise.resolve({}));\n", size) + wrapper.suffix
 				source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-					FileName: "/bench.ts", Path: "/bench.ts",
+					FileName: "/bench.ts", PathKey: "/bench.ts",
 				}, code, core.ScriptKindTS)
 				var references []*ast.Node
 				for _, node := range collectIdentifierNodes(source.AsNode()) {

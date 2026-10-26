@@ -116,7 +116,7 @@ var NoImpliedEvalRule = rule.CreateRule(rule.Rule{
 
 			if slices.Contains(evalLikeFunctions, calleeName) && !isFunction(handler) {
 				symbol := ctx.TypeChecker.GetSymbolAtLocation(node.Expression())
-				if symbol == nil || !utils.Some(symbol.Declarations, func(d *ast.Node) bool {
+				if symbol == nil || !utils.Some(symbol.Declarations(), func(d *ast.Node) bool {
 					return ast.GetSourceFileOfNode(d) == ctx.SourceFile
 				}) {
 					ctx.ReportNode(handler, buildNoImpliedEvalErrorMessage())

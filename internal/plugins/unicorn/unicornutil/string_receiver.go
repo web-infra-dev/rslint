@@ -107,7 +107,7 @@ func classifyStringIdentifier(ctx rule.RuleContext, node *ast.Node, state *strin
 		return TypeUnknown
 	}
 	symbol := ctx.Refs.ResolveInFile(node)
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	if symbol == nil || len(symbol.Declarations()) != 1 {
 		return TypeUnknown
 	}
 	if class, ok := state.memo[symbol]; ok {
@@ -119,7 +119,7 @@ func classifyStringIdentifier(ctx rule.RuleContext, node *ast.Node, state *strin
 	state.visiting[symbol] = true
 	defer delete(state.visiting, symbol)
 
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if declaration == nil {
 		return TypeUnknown
 	}
@@ -231,7 +231,7 @@ func classifyStringTypeReference(
 	visitedSymbols[symbol] = true
 	defer delete(visitedSymbols, symbol)
 
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil {
 			continue
 		}
@@ -318,7 +318,7 @@ func classifyStringClassReference(
 	symbol := ctx.Refs.ResolveInFileWithMeaning(
 		node, ast.SymbolFlagsValue|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
 	)
-	if symbol == nil || len(symbol.Declarations) == 0 || visitedSymbols[symbol] {
+	if symbol == nil || len(symbol.Declarations()) == 0 || visitedSymbols[symbol] {
 		return TypeUnknown
 	}
 	visitedSymbols[symbol] = true
@@ -326,7 +326,7 @@ func classifyStringClassReference(
 
 	// Match Unicorn's first definition, including merged type/value
 	// declarations. Skipping an earlier type declaration changes its answer.
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if declaration == nil {
 		return TypeUnknown
 	}
@@ -470,7 +470,7 @@ func classifyStringCheckerType(ctx rule.RuleContext, t *checker.Type) TypeClass 
 
 func stringTypeHasTargetBase(ctx rule.RuleContext, t *checker.Type) bool {
 	symbol := checker.Type_symbol(t)
-	if symbol == nil || symbol.Flags&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface) == 0 {
+	if symbol == nil || symbol.Flags()&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface) == 0 {
 		return false
 	}
 	declared := checker.Checker_getDeclaredTypeOfSymbol(ctx.TypeChecker, symbol)

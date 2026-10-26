@@ -19,10 +19,10 @@ func (b *Builder) BuildShallowTypeInfo(t *checker.Type) *TypeInfo {
 	// Get position from symbol's declaration for fetching full info later
 	if symbol := t.Symbol(); symbol != nil && !IsInternalSymbol(symbol) {
 		var decl *ast.Node
-		if symbol.ValueDeclaration != nil {
-			decl = symbol.ValueDeclaration
-		} else if len(symbol.Declarations) > 0 {
-			decl = symbol.Declarations[0]
+		if symbol.ValueDeclaration() != nil {
+			decl = symbol.ValueDeclaration()
+		} else if len(symbol.Declarations()) > 0 {
+			decl = symbol.Declarations()[0]
 		}
 		if decl != nil {
 			if name := decl.Name(); name != nil {
@@ -33,7 +33,7 @@ func (b *Builder) BuildShallowTypeInfo(t *checker.Type) *TypeInfo {
 			// Check if declaration is from external file
 			declFile := ast.GetSourceFileOfNode(decl)
 			if declFile != nil && declFile != b.sourceFile {
-				info.FileName = declFile.FileName()
+				info.FileName = declFile.FileName().AsString()
 			}
 		}
 	}
@@ -56,10 +56,10 @@ func (b *Builder) BuildTypeInfo(t *checker.Type) *TypeInfo {
 	// Get position from symbol's declaration for fetching full info later
 	if symbol := t.Symbol(); symbol != nil {
 		var decl *ast.Node
-		if symbol.ValueDeclaration != nil {
-			decl = symbol.ValueDeclaration
-		} else if len(symbol.Declarations) > 0 {
-			decl = symbol.Declarations[0]
+		if symbol.ValueDeclaration() != nil {
+			decl = symbol.ValueDeclaration()
+		} else if len(symbol.Declarations()) > 0 {
+			decl = symbol.Declarations()[0]
 		}
 		if decl != nil {
 			if name := decl.Name(); name != nil {
@@ -70,7 +70,7 @@ func (b *Builder) BuildTypeInfo(t *checker.Type) *TypeInfo {
 			// Check if declaration is from external file
 			declFile := ast.GetSourceFileOfNode(decl)
 			if declFile != nil && declFile != b.sourceFile {
-				info.FileName = declFile.FileName()
+				info.FileName = declFile.FileName().AsString()
 			}
 		}
 	}

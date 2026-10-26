@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type projectTargetGroup struct {
@@ -123,7 +124,7 @@ func directRootProgramOwners(
 	roots := make([][]string, len(set.compilerPrograms))
 	for index, program := range set.compilerPrograms {
 		if program != nil && program.CommandLine() != nil {
-			roots[index] = program.CommandLine().FileNames()
+			roots[index] = pathutil.Strings(program.CommandLine().FileNames())
 		}
 	}
 	return directRootOwners(roots, targets, set.targetProjects, groups, fsys, singleThreaded)
@@ -320,8 +321,8 @@ func bindTargetToProgram(
 		return false
 	}
 	sourcePath := sourceFile.FileName()
-	binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath)
-	storeSourceTargetMapping(binding.LintTargetBySourcePath, sourcePath, target.CanonicalPath, target)
+	binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath.AsString())
+	storeSourceTargetMapping(binding.LintTargetBySourcePath, sourcePath.AsString(), target.CanonicalPath, target)
 	return true
 }
 

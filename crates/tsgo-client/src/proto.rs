@@ -1,6 +1,9 @@
 // cspell:ignore vecmap symtab typetab primtypes
 use serde::{Deserialize, Deserializer};
 use serde_bytes::Bytes;
+/// Compiler symbol identities can use the high bits of a 64-bit ID.
+pub type SymbolId = u64;
+
 #[derive(Debug, Clone, Deserialize)]
 #[non_exhaustive]
 pub struct ProjectResponse<'base> {
@@ -9,7 +12,7 @@ pub struct ProjectResponse<'base> {
     pub source_files: Vec<&'base Bytes>,
     pub module_list: Vec<&'base str>,
     #[serde(default)]
-    pub module_exports: Vec<Vec<u32>>,
+    pub module_exports: Vec<Vec<SymbolId>>,
     pub semantic: Semantic,
     pub diagnostics: Vec<Diagnostic>,
     pub source_file_extra: Vec<SourceFileExtra>,
@@ -34,13 +37,13 @@ pub struct Diagnostic {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Semantic {
     #[serde(deserialize_with = "vecmap")]
-    pub symtab: Vec<(u32, SymbolData)>,
+    pub symtab: Vec<(SymbolId, SymbolData)>,
     #[serde(deserialize_with = "vecmap")]
     pub typetab: Vec<(u32, TypeData)>,
     #[serde(deserialize_with = "vecmap")]
-    pub sym2type: Vec<(u32, u32)>,
+    pub sym2type: Vec<(SymbolId, u32)>,
     #[serde(deserialize_with = "vecmap")]
-    pub node2sym: Vec<(NodeReference, u32)>,
+    pub node2sym: Vec<(NodeReference, SymbolId)>,
     // Import specifiers without module symbols (source node -> resolved module ID).
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub node2module: Vec<(NodeReference, u32)>,
@@ -51,19 +54,19 @@ pub struct Semantic {
     pub primtypes: PrimTypes,
     // (aliasSymbolId, targetSymbolId)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
-    pub alias_symbols: Vec<(u32, u32)>,
+    pub alias_symbols: Vec<(SymbolId, SymbolId)>,
     // Instantiated symbols point to original declarations; their concrete types remain separate.
     #[serde(default, deserialize_with = "vecmap_or_empty")]
-    pub symbol_targets: Vec<(u32, u32)>,
+    pub symbol_targets: Vec<(SymbolId, SymbolId)>,
     // Shorthand property assignment value symbols (node -> value_symbol_id)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
-    pub shorthand_symbols: Vec<(NodeReference, u32)>,
+    pub shorthand_symbols: Vec<(NodeReference, SymbolId)>,
     // Shorthand object binding symbols (local_symbol_id -> property_symbol_id).
     #[serde(default, deserialize_with = "vecmap_or_empty")]
-    pub shorthand_binding_symbols: Vec<(u32, u32)>,
+    pub shorthand_binding_symbols: Vec<(SymbolId, SymbolId)>,
     // Parameter property declarations create another symbol at the same name node; node2sym keeps the primary symbol.
     #[serde(default, deserialize_with = "vecmap_or_empty")]
-    pub parameter_property_symbols: Vec<(NodeReference, u32)>,
+    pub parameter_property_symbols: Vec<(NodeReference, SymbolId)>,
     // Shallow global names and qualified standard library and dependency declarations, including non-exports.
     // Dependency namespaces use package names, without import subpath suffixes.
     // Symbol IDs may repeat through aliases or re-exports.
@@ -90,7 +93,7 @@ pub struct SymbolData {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ExternalSymbol {
-    pub symbol_id: u32,
+    pub symbol_id: SymbolId,
     #[serde(with = "serde_bytes")]
     pub namespace: Vec<u8>,
     #[serde(with = "serde_bytes")]
@@ -104,7 +107,7 @@ pub struct TypeData {
     #[serde(default)]
     pub object_flags: u32,
     #[serde(default)]
-    pub symbol: Option<u32>,
+    pub symbol: Option<SymbolId>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -235,12 +238,15 @@ impl Semantic {
     /// * `location` - The node reference to query
     ///
     /// # Returns
-    /// * `Some(u32)` - The symbol ID if found and has Value or Alias flags
+    /// * `Some(SymbolId)` - The symbol ID if found and has Value or Alias flags
     /// * `None` - If no symbol is found or the symbol doesn't have the required flags
     ///
     /// # Reference
     /// TypeScript implementation: https://github.com/microsoft/TypeScript/blob/9e8eaa1746b0d09c3cd29048126ef9cf24f29c03/src/compiler/checker.ts
-    pub fn get_shorthand_assignment_value_symbol(&self, location: &NodeReference) -> Option<u32> {
+    pub fn get_shorthand_assignment_value_symbol(
+        &self,
+        location: &NodeReference,
+    ) -> Option<SymbolId> {
         // Look up in the shorthand_symbols mapping
         self.shorthand_symbols
             .iter()
@@ -256,7 +262,10 @@ impl Semantic {
     ///
     /// In `const { x } = value`, this maps the newly declared local `x` symbol
     /// to the property symbol equivalent to `x` in `value.x`.
-    pub fn get_shorthand_binding_property_symbol(&self, local_symbol: u32) -> Option<u32> {
+    pub fn get_shorthand_binding_property_symbol(
+        &self,
+        local_symbol: SymbolId,
+    ) -> Option<SymbolId> {
         self.shorthand_binding_symbols
             .iter()
             .find(|(symbol, _)| *symbol == local_symbol)
@@ -268,7 +277,7 @@ impl Semantic {
     /// TypeScript parameter properties such as `constructor(private x: string)` declare two
     /// symbols at the same source location. The primary symbol remains in `node2sym`; this
     /// method returns the other one.
-    pub fn get_parameter_property_symbol(&self, location: &NodeReference) -> Option<u32> {
+    pub fn get_parameter_property_symbol(&self, location: &NodeReference) -> Option<SymbolId> {
         self.parameter_property_symbols
             .iter()
             .find(|(node_ref, _)| {

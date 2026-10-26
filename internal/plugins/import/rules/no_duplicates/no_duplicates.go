@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed no_duplicates.schema.json
@@ -71,6 +72,7 @@ const (
 	namespaceImport
 	defaultTypeImport
 	namedTypeImport
+	sourcePhaseImport
 	importCategoryCount
 )
 
@@ -257,23 +259,23 @@ func (r *importResolver) resolveExistingFile(sourcePath string) (string, bool) {
 	if !r.ctx.Program().IsValid() || !tspath.IsExternalModuleNameRelative(sourcePath) {
 		return "", false
 	}
-	fileName := r.physicalPath(r.ctx.SourceFile.FileName())
+	fileName := r.physicalPath(r.ctx.SourceFile.FileName().AsString())
 	filePath := tspath.ResolvePath(tspath.GetDirectoryPath(fileName), sourcePath)
-	if !r.ctx.Program().FileExists(filePath) {
+	if !r.ctx.Program().FileExists(pathutil.File(filePath)) {
 		return "", false
 	}
 	return r.canonicalPath(filePath), true
 }
 
 func (r *importResolver) canonicalPath(filePath string) string {
-	return tspath.GetCanonicalFileName(r.physicalPath(filePath), r.ctx.Program().FS().UseCaseSensitiveFileNames())
+	return pathutil.GetCanonicalFileName(r.physicalPath(filePath), r.ctx.Program().FS().CaseSensitivity().IsCaseSensitive())
 }
 
 func (r *importResolver) physicalPath(filePath string) string {
 	program := r.ctx.Program()
 	if program.Options().PreserveSymlinks != core.TSTrue {
-		if realPath := program.FS().Realpath(filePath); realPath != "" {
-			filePath = realPath
+		if realPath := program.FS().Realpath(pathutil.Path(filePath)); realPath != "" {
+			filePath = realPath.AsString()
 		}
 	}
 	return filePath
@@ -297,7 +299,7 @@ func (r *importResolver) hasRuntimeSibling(resolvedPath string) bool {
 	}
 	stem := strings.TrimSuffix(resolvedPath, extension)
 	for _, runtimeExtension := range runtimeExtensions {
-		if r.ctx.Program().FileExists(stem + runtimeExtension) {
+		if r.ctx.Program().FileExists(pathutil.File(stem + runtimeExtension)) {
 			return true
 		}
 	}
@@ -347,7 +349,7 @@ func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, source
 	if !program.IsValid() {
 		return moduleIdentity{}, false
 	}
-	fileName := r.physicalPath(r.ctx.SourceFile.FileName())
+	fileName := r.physicalPath(r.ctx.SourceFile.FileName().AsString())
 	relative := tspath.IsExternalModuleNameRelative(sourcePath)
 	if !relative && !r.hasPathAlias(importDecl, sourcePath) || relative && mode == core.ResolutionModeCommonJS {
 		// Package entry points can share declarations while loading distinct
@@ -379,7 +381,7 @@ func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, source
 
 	// A symlinked importer can run from a different directory than the one
 	// used by the compiler cache. That cache cannot prove runtime identity.
-	if tspath.GetDirectoryPath(fileName) != r.physicalPath(tspath.GetDirectoryPath(r.ctx.SourceFile.FileName())) {
+	if tspath.GetDirectoryPath(fileName) != r.physicalPath(tspath.GetDirectoryPath(r.ctx.SourceFile.FileName().AsString())) {
 		return moduleIdentity{}, false
 	}
 
@@ -419,6 +421,11 @@ func getImportCategory(importDecl *ast.ImportDeclaration, opts ruleOptions) impo
 	}
 
 	importClause := clause.AsImportClause()
+	// Source-phase imports request the module's source object rather than
+	// its evaluated exports, so they cannot merge with ordinary imports.
+	if importClause.PhaseModifier == ast.KindSourceKeyword {
+		return sourcePhaseImport
+	}
 
 	if !opts.preferInline && importClause.IsTypeOnly() {
 		// `import type X from ...` → defaultTypesImported

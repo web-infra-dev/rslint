@@ -1606,7 +1606,7 @@ func TestNoUselessEscapeRule(t *testing.T) {
 func TestReportEscapeDefersSuggestions(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, `"\#"`, core.ScriptKindTS)
 
 	for _, testCase := range []struct {
@@ -1651,7 +1651,7 @@ func TestReportEscapeDefersSuggestions(t *testing.T) {
 func TestRawTextAndStartParity(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/raw-text.ts",
-		Path:     "/raw-text.ts",
+		PathKey:  "/raw-text.ts",
 	}, "const stringValue = /* comment */\n  \"\\#\";\n"+
 		"const templateValue = /* comment */ `head\\@${value}middle\\_${other}tail\\#`;\n"+
 		"const regexValue = /* comment */ /before\\;[é]after/u;\n", core.ScriptKindTS)

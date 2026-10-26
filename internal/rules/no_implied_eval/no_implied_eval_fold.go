@@ -164,7 +164,7 @@ func isEvaluatedString(node *ast.Node) bool {
 //   - TypeOfExpression: always yields a string if the operand resolves
 //   - VoidExpression: always undefined
 //   - CallExpression: `String(x)` / `String()` with resolvable arg
-//   - TaggedTemplateExpression: `String.raw`…``  with resolvable subs
+//   - TaggedTemplateExpression: `String.raw`…“  with resolvable subs
 //   - TemplateExpression: substitution folding
 //
 // Returns foldResult{} (value==nil) when the node can't be statically resolved.
@@ -235,10 +235,10 @@ func (s *strCtx) foldIdentifier(node *ast.Node) foldResult {
 	// identifier is the key of `{ foo }` — there the plain GetSymbolAtLocation
 	// returns the property symbol, not the outer binding we want to resolve.
 	sym := utils.GetReferenceSymbol(node, s.ruleCtx.TypeChecker)
-	if sym == nil || len(sym.Declarations) != 1 {
+	if sym == nil || len(sym.Declarations()) != 1 {
 		return foldResult{}
 	}
-	decl := sym.Declarations[0]
+	decl := sym.Declarations()[0]
 	if decl.Kind != ast.KindVariableDeclaration {
 		return foldResult{}
 	}
@@ -690,10 +690,10 @@ func (s *strCtx) resolveToObjectLiteral(node *ast.Node) *ast.Node {
 			return nil
 		}
 		sym := utils.GetReferenceSymbol(node, s.ruleCtx.TypeChecker)
-		if sym == nil || len(sym.Declarations) != 1 {
+		if sym == nil || len(sym.Declarations()) != 1 {
 			return nil
 		}
-		decl := sym.Declarations[0]
+		decl := sym.Declarations()[0]
 		if decl.Kind != ast.KindVariableDeclaration {
 			return nil
 		}
@@ -789,7 +789,7 @@ func (s *strCtx) propertyKeyMatches(nameNode *ast.Node, key string) bool {
 	return false
 }
 
-// foldStringRawTag handles `` String.raw`...` `` — ESLint's getStaticValue
+// foldStringRawTag handles “ String.raw`...` “ — ESLint's getStaticValue
 // recognises the built-in tag and folds the template with each substitution
 // recursively evaluated.
 func (s *strCtx) foldStringRawTag(node *ast.Node) foldResult {

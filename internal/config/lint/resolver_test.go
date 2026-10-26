@@ -20,6 +20,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func newBaseResolver(options ResolverOptions) *Resolver {
@@ -154,9 +155,11 @@ type caseInsensitiveResolverFS struct {
 	vfs.FS
 }
 
-func (fs *caseInsensitiveResolverFS) UseCaseSensitiveFileNames() bool { return false }
-func (fs *caseInsensitiveResolverFS) Realpath(filePath string) string {
-	return strings.ToLower(tspath.NormalizePath(filePath))
+func (fs *caseInsensitiveResolverFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
+}
+func (fs *caseInsensitiveResolverFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	return pathutil.Path(strings.ToLower(tspath.NormalizePath(filePath.AsString())))
 }
 
 func TestResolverSourceMappingsUseCanonicalFilesystemIdentity(t *testing.T) {
@@ -237,10 +240,10 @@ type ownerAliasResolverFS struct {
 	root string
 }
 
-func (fs *ownerAliasResolverFS) Realpath(path string) string {
+func (fs *ownerAliasResolverFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
 	alias := fs.root + "/symlink"
-	if path == alias || strings.HasPrefix(path, alias+"/") {
-		return fs.root + "/real" + strings.TrimPrefix(path, alias)
+	if path.AsString() == alias || strings.HasPrefix(path.AsString(), alias+"/") {
+		return pathutil.Path(fs.root + "/real" + strings.TrimPrefix(path.AsString(), alias))
 	}
 	return path
 }
@@ -476,9 +479,9 @@ type projectPolicyResolverFS struct {
 	realpath func(string) string
 }
 
-func (fs *projectPolicyResolverFS) Realpath(path string) string {
+func (fs *projectPolicyResolverFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
 	if fs.realpath != nil {
-		return fs.realpath(path)
+		return pathutil.Path(fs.realpath(path.AsString()))
 	}
 	return path
 }

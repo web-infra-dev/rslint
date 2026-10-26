@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -362,7 +363,7 @@ func runUnicodeBom(t *testing.T, code string, demand rule.EditDemand) []rule.Rul
 	programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
 	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 		Programs:         programs,
-		TargetsByProgram: [][]string{{program.GetSourceFile(fileName).FileName()}},
+		TargetsByProgram: [][]string{{program.GetSourceFile(tspath.ToRootedFilePath(fileName, pathutil.Directory(root.Dir))).FileName().AsString()}},
 		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{

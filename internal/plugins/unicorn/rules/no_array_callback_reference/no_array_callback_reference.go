@@ -161,11 +161,11 @@ func isConstNonFunction(ctx rule.RuleContext, node *ast.Node) bool {
 			return false
 		}
 		symbol := ctx.Refs.ResolveInFile(node)
-		if symbol == nil || visited[symbol] || len(symbol.Declarations) != 1 {
+		if symbol == nil || visited[symbol] || len(symbol.Declarations()) != 1 {
 			return false
 		}
 		visited[symbol] = true
-		declaration := symbol.Declarations[0]
+		declaration := symbol.Declarations()[0]
 		if !ast.IsVariableDeclaration(declaration) || !ast.IsIdentifier(declaration.Name()) ||
 			declaration.Name().Text() != node.Text() || !ast.IsVarConst(declaration) {
 			return false
@@ -180,12 +180,12 @@ func isTypePredicateCallback(ctx rule.RuleContext, node *ast.Node) bool {
 		return false
 	}
 	symbol := ctx.Refs.ResolveInFile(node)
-	if symbol == nil || len(symbol.Declarations) == 0 {
+	if symbol == nil || len(symbol.Declarations()) == 0 {
 		return false
 	}
 	// Merged symbols can list a function before an earlier interface/namespace.
 	// ESLint's first scope definition follows source order.
-	declaration := slices.MinFunc(symbol.Declarations, func(a, b *ast.Node) int { return a.Pos() - b.Pos() })
+	declaration := slices.MinFunc(symbol.Declarations(), func(a, b *ast.Node) int { return a.Pos() - b.Pos() })
 	switch declaration.Kind {
 	case ast.KindImportClause, ast.KindImportSpecifier, ast.KindNamespaceImport, ast.KindImportEqualsDeclaration:
 		return true

@@ -178,10 +178,10 @@ var ConsistentThisRule = rule.Rule{
 				// the export symbol the references — and eslint-scope has a
 				// single variable for both. The export symbol carries the
 				// declarations too, so it is the identity to go on with.
-				if sym.ExportSymbol != nil {
-					sym = sym.ExportSymbol
+				if sym.ExportSymbol() != nil {
+					sym = sym.ExportSymbol()
 				}
-				decls = append(decls, sym.Declarations...)
+				decls = append(decls, sym.Declarations()...)
 				addSymbol(sym)
 			}
 
@@ -664,11 +664,11 @@ func exportedImportEqualsSymbol(scopeNode *ast.Node, alias string) *ast.Symbol {
 	if symbol == nil {
 		return nil
 	}
-	sym := symbol.Exports[alias]
-	if sym == nil || len(sym.Declarations) == 0 {
+	sym := symbol.Exports()[alias]
+	if sym == nil || len(sym.Declarations()) == 0 {
 		return nil
 	}
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		if decl.Kind != ast.KindImportEqualsDeclaration {
 			return nil
 		}

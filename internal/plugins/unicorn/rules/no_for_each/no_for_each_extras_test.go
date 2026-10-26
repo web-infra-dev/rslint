@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestNoForEachExtras(t *testing.T) {
@@ -217,7 +218,7 @@ func createNoForEachProgram(t testing.TB, fileName, code string) (*compiler.Prog
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.ToRootedFilePath(fileName, pathutil.Directory(rootDir.Dir)))
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", fileName)
 	}
@@ -228,7 +229,7 @@ func lintNoForEachWithDemand(program *compiler.Program, sourceFile *ast.SourceFi
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:     lintprogram.NewFromCompiler(program),
-		File:        sourceFile.FileName(),
+		File:        sourceFile.FileName().AsString(),
 		HasTypeInfo: true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{

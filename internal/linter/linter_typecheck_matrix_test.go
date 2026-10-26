@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // Cross-matrix tests for --type-check semantics.
@@ -225,10 +226,10 @@ export type T = typeof M;
 
 	// Baseline confirmation: program loaded both files (otherwise the test
 	// would pass trivially because the program is empty).
-	if program.GetSourceFile(filepath.Join(dir, "local.d.ts")) == nil {
+	if program.GetSourceFile(pathutil.File(filepath.Join(dir, "local.d.ts"))) == nil {
 		t.Fatal("baseline: local.d.ts not loaded into program — test setup broken")
 	}
-	if program.GetSourceFile(filepath.Join(dir, "entry.ts")) == nil {
+	if program.GetSourceFile(pathutil.File(filepath.Join(dir, "entry.ts"))) == nil {
 		t.Fatal("baseline: entry.ts not loaded into program — test setup broken")
 	}
 
@@ -648,7 +649,7 @@ func TestMatrix_NoEmitSemantics_SyntacticErrorStillShortCircuits(t *testing.T) {
 	dirAbs, _ := filepath.Abs(dir)
 	host := utils.CreateCompilerHost(dirAbs, bundled.WrapFS(cachedvfs.From(osvfs.FS())))
 	configParse, _ := tsoptions.GetParsedCommandLineOfConfigFile(
-		filepath.Join(dirAbs, "tsconfig.json"), &core.CompilerOptions{}, nil, host, nil)
+		pathutil.File(filepath.Join(dirAbs, "tsconfig.json")), &core.CompilerOptions{}, nil, host.FS(), nil)
 	program := compiler.NewProgram(compiler.ProgramOptions{
 		Config:         configParse,
 		SingleThreaded: core.TSTrue,

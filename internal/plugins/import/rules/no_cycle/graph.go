@@ -198,10 +198,10 @@ func buildModuleGraph(ctx rule.RuleContext, sourceGraph program.ModuleGraph, set
 // empty path, so every reference resolving to this file has the same answer.
 func fileIsExcluded(settings *import_utils.ModuleSettings, opts ruleOptions, file *ast.SourceFile) bool {
 	fileName := file.FileName()
-	if settings.IsIgnoredPath(fileName) {
+	if settings.IsIgnoredPath(fileName.AsString()) {
 		return true
 	}
-	return opts.ignoreExternal && settings.IsExternalPath("", fileName)
+	return opts.ignoreExternal && settings.IsExternalPath("", fileName.AsString())
 }
 
 // withheldDynamicEdges applies allowUnsafeDynamicCyclicDependency: a file's

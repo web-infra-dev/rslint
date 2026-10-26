@@ -87,7 +87,7 @@ var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
 			}
 
 			symbol := checker.Type_symbol(t)
-			if symbol != nil && allAllowedPromiseNames.Has(symbol.Name) {
+			if symbol != nil && allAllowedPromiseNames.Has(symbol.Name()) {
 				return true
 			}
 

@@ -513,7 +513,7 @@ func isConstant(ctx *rule.RuleContext, node *ast.Node, inBooleanPosition bool) b
 
 					// Check if any of the symbol's declarations is from the current source file
 					// If so, it's a local shadowed variable, not the global builtin
-					for _, declaration := range symbol.Declarations {
+					for _, declaration := range symbol.Declarations() {
 						declarationSourceFile := ast.GetSourceFileOfNode(declaration)
 						if declarationSourceFile != nil && declarationSourceFile == ctx.SourceFile {
 							// This is a local declaration (shadowing the global), not constant

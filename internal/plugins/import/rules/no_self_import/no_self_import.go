@@ -28,7 +28,7 @@ func isImportingSelf(ctx rule.RuleContext, source modules.Source) {
 	filePath := ctx.SourceFile.FileName()
 
 	if resolvedPath, _, ok := ctx.Program().ResolveModule(ctx.SourceFile, source); ok {
-		if /** filePath != "<text>" && */ filePath == resolvedPath {
+		if /** filePath != "<text>" && */ filePath.AsString() == resolvedPath {
 			ctx.ReportNode(source.Declaration(), rule.RuleMessage{
 				Id:          "import/no-self-import",
 				Description: "Module imports itself.",

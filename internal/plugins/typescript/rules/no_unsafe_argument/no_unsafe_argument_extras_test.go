@@ -16,6 +16,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func runNoUnsafeArgumentLenientProgram(
@@ -45,7 +46,7 @@ func runNoUnsafeArgumentLenientProgram(
 		t.Fatalf("create lenient program: %v", err)
 	}
 	entryPath := tspath.ResolvePath(root.Dir, entryFileName)
-	sourceFile := program.GetSourceFile(entryPath)
+	sourceFile := program.GetSourceFile(pathutil.File(entryPath))
 	if sourceFile == nil {
 		t.Fatalf("lenient program did not contain %s", entryFileName)
 	}
@@ -54,7 +55,7 @@ func runNoUnsafeArgumentLenientProgram(
 	programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
 	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 		Programs:         programs,
-		TargetsByProgram: [][]string{{sourceFile.FileName()}},
+		TargetsByProgram: [][]string{{sourceFile.FileName().AsString()}},
 		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{

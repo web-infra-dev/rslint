@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // physicalDirectory freezes non-input directory identities on first use.
@@ -28,8 +29,8 @@ func (coordinator *discoveryCoordinator) physicalDirectory(directory string) str
 			}
 		}
 	}
-	if realPath := coordinator.fs.Realpath(physical); realPath != "" {
-		physical = tspath.NormalizePath(realPath)
+	if realPath := coordinator.fs.Realpath(pathutil.Path(physical)); realPath != "" {
+		physical = tspath.NormalizePath(realPath.AsString())
 	}
 	coordinator.physicalDirectories[directory] = physical
 	return physical
@@ -69,19 +70,19 @@ func isSymlinkDirectoryChild(
 ) bool {
 	if entries.Symlinks != nil {
 		for symlink := range entries.Symlinks {
-			if symlink == name || (!fsys.UseCaseSensitiveFileNames() && strings.EqualFold(symlink, name)) {
+			if symlink == name || (!fsys.CaseSensitivity().IsCaseSensitive() && strings.EqualFold(symlink, name)) {
 				return true
 			}
 		}
 		return false
 	}
 	childDirectory := tspath.CombinePaths(parentDirectory, name)
-	childRealPath := fsys.Realpath(childDirectory)
+	childRealPath := fsys.Realpath(pathutil.Path(childDirectory))
 	if parentRealPath == "" || childRealPath == "" {
 		return false
 	}
 	expectedRealPath := tspath.CombinePaths(parentRealPath, name)
-	return tspath.ComparePaths(childRealPath, expectedRealPath, tspath.ComparePathsOptions{
-		UseCaseSensitiveFileNames: fsys.UseCaseSensitiveFileNames(),
+	return pathutil.ComparePaths(childRealPath.AsString(), expectedRealPath, pathutil.ComparePathsOptions{
+		UseCaseSensitiveFileNames: fsys.CaseSensitivity().IsCaseSensitive(),
 	}) != 0
 }

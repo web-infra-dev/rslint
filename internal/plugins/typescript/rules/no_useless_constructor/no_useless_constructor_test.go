@@ -1366,7 +1366,7 @@ class C {
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program:     lintprogram.NewFromCompiler(program),
-			File:        sourceFile.FileName(),
+			File:        sourceFile.FileName().AsString(),
 			HasTypeInfo: true,
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
@@ -1460,7 +1460,7 @@ func TestNoUselessConstructorRecoveryAST(t *testing.T) {
 
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/no-useless-constructor-recovery.ts",
-				Path:     "/no-useless-constructor-recovery.ts",
+				PathKey:  "/no-useless-constructor-recovery.ts",
 			}, source, core.ScriptKindTS)
 			var diagnostics []rule.RuleDiagnostic
 			ctx := rule.RuleContext{

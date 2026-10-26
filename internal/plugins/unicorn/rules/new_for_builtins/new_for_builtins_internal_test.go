@@ -306,7 +306,7 @@ func TestSourcePotentialReferenceGate(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/new-for-builtins-gate-test.ts",
-				Path:     tspath.Path("/new-for-builtins-gate-test.ts"),
+				PathKey:  tspath.PathKey("/new-for-builtins-gate-test.ts"),
 			}, testCase.source, core.ScriptKindTS)
 			if got := sourceHasPotentialReference(sourceFile); got != testCase.want {
 				t.Fatalf("sourceHasPotentialReference() = %t, want %t", got, testCase.want)
@@ -316,7 +316,7 @@ func TestSourcePotentialReferenceGate(t *testing.T) {
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/new-for-builtins-gate-fallback-test.ts",
-		Path:     tspath.Path("/new-for-builtins-gate-fallback-test.ts"),
+		PathKey:  tspath.PathKey("/new-for-builtins-gate-fallback-test.ts"),
 	}, `\u0041rray();`, core.ScriptKindTS) // cspell:disable-line
 	if !sourceHasPotentialReference(sourceFile) {
 		t.Fatal("sourceHasPotentialReference() must collect normalized names for an uncached source file")
@@ -326,7 +326,7 @@ func TestSourcePotentialReferenceGate(t *testing.T) {
 func TestTrimmedNodeRangeMatchesCanonicalRange(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/new-for-builtins-range-test.ts",
-		Path:     tspath.Path("/new-for-builtins-range-test.ts"),
+		PathKey:  tspath.PathKey("/new-for-builtins-range-test.ts"),
 	}, `/* leading call */ Array();
 		const value = new /* constructor */ (Symbol);
 		function make() {
@@ -372,7 +372,7 @@ func resolveCallReferences(t *testing.T, source string, withRefs bool) []string 
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/new-for-builtins-reference-test.ts",
-		Path:     tspath.Path("/new-for-builtins-reference-test.ts"),
+		PathKey:  tspath.PathKey("/new-for-builtins-reference-test.ts"),
 	}, source, core.ScriptKindTS)
 	binder.BindSourceFile(sourceFile)
 
@@ -418,7 +418,7 @@ func runRuleForTest(t *testing.T, source string, demand rule.EditDemand) []rule.
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/new-for-builtins-deferred-report-test.ts",
-		Path:     tspath.Path("/new-for-builtins-deferred-report-test.ts"),
+		PathKey:  tspath.PathKey("/new-for-builtins-deferred-report-test.ts"),
 	}, source, core.ScriptKindTS)
 	binder.BindSourceFile(sourceFile)
 

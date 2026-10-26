@@ -138,7 +138,7 @@ func TestNameReplacementsEditDemand(t *testing.T) {
 			for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
 				var found []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
+					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: name_replacements.NameReplacementsRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return name_replacements.NameReplacementsRule.Run(ctx, nil)

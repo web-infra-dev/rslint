@@ -39,7 +39,8 @@ export * from './helper.js';
 With `"never"`, the same file is imported as `./helper`. Removing an extension
 is only fixed automatically when there is one matching entry in its directory.
 For example, if both `helper.js` and `helper.json` exist, the rule reports the
-extension without removing it.
+extension without removing it. The directory must be fully enumerable, including
+broken links and special files.
 
 Directory imports with an index file are expanded by `"always"`: `./helpers`
 becomes `./helpers/index.js`. If several extensions exist, the rule follows
@@ -59,6 +60,12 @@ precedence over TypeScript configuration. Relative lookup paths use the process
 working directory.
 
 ## Differences from upstream
+
+When a virtual filesystem exposes only accessible files, or a host directory
+cannot be fully verified and read, `"never"` reports the extension without an
+automatic removal. For example, a virtual `helper.js` whose directory cannot be
+fully enumerated keeps its extension. This prevents a hidden sibling from changing
+the import target after a fix.
 
 For `"never"`, rslint removes the extension while preserving escapes elsewhere
 in the path. For example, `import './\u0061.js'` becomes `import './\u0061'`;

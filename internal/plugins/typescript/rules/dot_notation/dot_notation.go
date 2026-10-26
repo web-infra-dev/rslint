@@ -117,7 +117,7 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 						propertySymbol = checker.Checker_getPropertyOfType(tc, apparentType, propertyName)
 						if propertySymbol == nil {
 							for _, candidate := range checker.Checker_getPropertiesOfType(tc, apparentType) {
-								if candidate != nil && candidate.Name == propertyName {
+								if candidate != nil && candidate.Name() == propertyName {
 									propertySymbol = candidate
 									break
 								}

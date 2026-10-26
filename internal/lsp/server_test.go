@@ -9,7 +9,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/jsonrpc"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // mockFS is a mock implementation of vfs.FS for testing. Only FileExists is properly implemented;
@@ -18,8 +20,8 @@ type mockFS struct {
 	files map[string]bool // path -> exists
 }
 
-func (m *mockFS) FileExists(path string) bool {
-	exists, found := m.files[path]
+func (m *mockFS) FileExists(path tspath.RootedFilePath) bool {
+	exists, found := m.files[path.AsString()]
 	if !found {
 		return false
 	}
@@ -27,17 +29,37 @@ func (m *mockFS) FileExists(path string) bool {
 }
 
 // Stubbed implementations of other vfs.FS interface methods for testing purposes
-func (m *mockFS) UseCaseSensitiveFileNames() bool                             { return true }
-func (m *mockFS) ReadFile(path string) (string, bool)                         { return "", false }
-func (m *mockFS) WriteFile(path string, data string) error                    { return nil }
-func (m *mockFS) AppendFile(path string, data string) error                   { return nil }
-func (m *mockFS) Remove(path string) error                                    { return nil }
-func (m *mockFS) Chtimes(path string, aTime time.Time, mTime time.Time) error { return nil }
-func (m *mockFS) DirectoryExists(path string) bool                            { return false }
-func (m *mockFS) GetAccessibleEntries(path string) vfs.Entries                { return vfs.Entries{} }
-func (m *mockFS) Stat(path string) vfs.FileInfo                               { return nil }
-func (m *mockFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error           { return nil }
-func (m *mockFS) Realpath(path string) string                                 { return path }
+func (m *mockFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(true)
+}
+func (m *mockFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	return "", false
+}
+func (m *mockFS) WriteFile(path tspath.RootedFilePath, data string) error {
+	return nil
+}
+func (m *mockFS) AppendFile(path tspath.RootedFilePath, data string) error {
+	return nil
+}
+func (m *mockFS) Remove(path tspath.RootedPath) error {
+	return nil
+}
+func (m *mockFS) Chtimes(path tspath.RootedPath, aTime time.Time, mTime time.Time) error {
+	return nil
+}
+func (m *mockFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	return false
+}
+func (m *mockFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	return vfs.Entries{}
+}
+func (m *mockFS) Stat(path tspath.RootedPath) vfs.FileInfo {
+	return nil
+}
+func (m *mockFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error { return nil }
+func (m *mockFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	return path
+}
 
 func TestDecodeParamsAcceptsRawJSONValue(t *testing.T) {
 	data := []byte(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":null,"rootUri":"file:///tmp","capabilities":{}}}`)

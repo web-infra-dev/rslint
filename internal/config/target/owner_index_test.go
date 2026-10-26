@@ -3,9 +3,11 @@ package target
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type configPathSpaceFS struct {
@@ -19,7 +21,7 @@ type rejectRealpathAfterFreezeFS struct {
 	reject bool
 }
 
-func (fs *rejectRealpathAfterFreezeFS) Realpath(filePath string) string {
+func (fs *rejectRealpathAfterFreezeFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
 	if fs.reject {
 		panic("owner lookup consulted the live filesystem")
 	}
@@ -32,9 +34,11 @@ type retargetingConfigDirectoryFS struct {
 	configCalls int
 }
 
-func (fs *retargetingConfigDirectoryFS) UseCaseSensitiveFileNames() bool { return true }
-func (fs *retargetingConfigDirectoryFS) Realpath(filePath string) string {
-	if filePath != fs.configPath {
+func (fs *retargetingConfigDirectoryFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(true)
+}
+func (fs *retargetingConfigDirectoryFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	if filePath.AsString() != fs.configPath {
 		return filePath
 	}
 	fs.configCalls++
@@ -44,18 +48,28 @@ func (fs *retargetingConfigDirectoryFS) Realpath(filePath string) string {
 	return "/owner-b"
 }
 
-func (fs *configPathSpaceFS) DirectoryExists(string) bool    { return false }
-func (fs *configPathSpaceFS) FileExists(string) bool         { return false }
-func (fs *configPathSpaceFS) ReadFile(string) (string, bool) { return "", false }
-func (fs *configPathSpaceFS) Stat(string) vfs.FileInfo       { return nil }
-func (fs *configPathSpaceFS) GetAccessibleEntries(string) vfs.Entries {
+func (fs *configPathSpaceFS) DirectoryExists(tspath.RootedDirectoryPath) bool {
+	return false
+}
+func (fs *configPathSpaceFS) FileExists(tspath.RootedFilePath) bool {
+	return false
+}
+func (fs *configPathSpaceFS) ReadFile(tspath.RootedFilePath) (string, bool) {
+	return "", false
+}
+func (fs *configPathSpaceFS) Stat(tspath.RootedPath) vfs.FileInfo {
+	return nil
+}
+func (fs *configPathSpaceFS) GetAccessibleEntries(tspath.RootedDirectoryPath) vfs.Entries {
 	return vfs.Entries{Symlinks: map[string]struct{}{}}
 }
 
-func (fs *configPathSpaceFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
-func (fs *configPathSpaceFS) Realpath(filePath string) string {
-	if realPath := fs.realPaths[filePath]; realPath != "" {
-		return realPath
+func (fs *configPathSpaceFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(fs.caseSensitive)
+}
+func (fs *configPathSpaceFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	if realPath := fs.realPaths[filePath.AsString()]; realPath != "" {
+		return pathutil.Path(realPath)
 	}
 	return filePath
 }

@@ -127,7 +127,7 @@ createElement("ns:Panel");`,
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/react.tsx",
-				Path:     tspath.Path("/react.tsx"),
+				PathKey:  tspath.PathKey("/react.tsx"),
 			}, testCase.code, core.ScriptKindTSX)
 			binder.BindSourceFile(sourceFile)
 			refs := rule.NewRefStore(sourceFile, &core.CompilerOptions{}, nil, rule.RefStoreInit{})

@@ -771,10 +771,10 @@ func evaluateStaticIdentifier(ctx rule.RuleContext, node *ast.Node, visited map[
 		return staticValue{}, false
 	}
 	symbol := ctx.Refs.Resolve(node)
-	if symbol == nil || visited[symbol] || len(symbol.Declarations) != 1 {
+	if symbol == nil || visited[symbol] || len(symbol.Declarations()) != 1 {
 		return staticValue{}, false
 	}
-	declarationNode := symbol.Declarations[0]
+	declarationNode := symbol.Declarations()[0]
 	if declarationNode == nil || declarationNode.Kind != ast.KindVariableDeclaration {
 		return staticValue{}, false
 	}

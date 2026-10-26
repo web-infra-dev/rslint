@@ -118,7 +118,7 @@ func TestPreferStringTrimStartEndEditDemand(t *testing.T) {
 	const fixedSource = `foo.trimStart()`
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.js",
-		Path:     "/edit-demand.js",
+		PathKey:  "/edit-demand.js",
 	}, source, core.ScriptKindJS)
 
 	run := func(demand rule.EditDemand) rule.RuleDiagnostic {

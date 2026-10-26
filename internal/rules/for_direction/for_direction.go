@@ -450,7 +450,7 @@ func (checker *forDirectionChecker) staticIdentifierValue(node *ast.Node) (stati
 	checker.staticCache[symbol] = staticCacheEntry{}
 
 	var declaration *ast.Node
-	for _, candidate := range symbol.Declarations {
+	for _, candidate := range symbol.Declarations() {
 		if candidate == nil || candidate.Kind != ast.KindVariableDeclaration ||
 			candidate.Name() == nil || candidate.Name().Kind != ast.KindIdentifier {
 			continue

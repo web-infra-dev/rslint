@@ -23,6 +23,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func programForResolution(t *testing.T, files map[string]string, fileName string) *program.Program {
@@ -67,10 +68,18 @@ func programForResolutionFS(t *testing.T, files map[string]string, fileName stri
 // remaining FS behavior without touching the host filesystem.
 type resolutionFixtureBase struct{ vfs.FS }
 
-func (resolutionFixtureBase) FileExists(string) bool                  { return false }
-func (resolutionFixtureBase) ReadFile(string) (string, bool)          { return "", false }
-func (resolutionFixtureBase) DirectoryExists(string) bool             { return false }
-func (resolutionFixtureBase) GetAccessibleEntries(string) vfs.Entries { return vfs.Entries{} }
+func (resolutionFixtureBase) FileExists(tspath.RootedFilePath) bool {
+	return false
+}
+func (resolutionFixtureBase) ReadFile(tspath.RootedFilePath) (string, bool) {
+	return "", false
+}
+func (resolutionFixtureBase) DirectoryExists(tspath.RootedDirectoryPath) bool {
+	return false
+}
+func (resolutionFixtureBase) GetAccessibleEntries(tspath.RootedDirectoryPath) vfs.Entries {
+	return vfs.Entries{}
+}
 
 func TestResolveModuleGenerationAndOptions(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/node_resolution.txtar")
@@ -159,19 +168,19 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 		}
 		fileName := tspath.ResolvePath(root, "input.ts")
 		p := programForResolution(t, map[string]string{fileName: "import 'linked';"}, fileName)
-		want := osvfs.FS().Realpath(tspath.ResolvePath(target, "lib/index.js"))
+		want := osvfs.FS().Realpath(pathutil.Path(tspath.ResolvePath(target, "lib/index.js")))
 
 		options := moduleresolver.Options{Modules: []string{"node_modules/custom"}, Aliases: []moduleresolver.Alias{{Name: "virtual", Targets: []string{"linked"}}}}
-		if got := moduleresolver.ResolveModule(p, "virtual", fileName, options); got != want {
+		if got := moduleresolver.ResolveModule(p, "virtual", fileName, options); got != want.AsString() {
 			t.Errorf("alias symlink = %q, want %q", got, want)
 		}
 		replacement := tspath.ResolvePath(root, "node_modules/pkg/index.js")
 		options.Aliases = []moduleresolver.Alias{{Name: tspath.ResolvePath(root, "node_modules/custom/linked/lib/index.js"), Targets: []string{replacement}}}
-		if got := moduleresolver.ResolveModule(p, "linked", fileName, options); got != osvfs.FS().Realpath(replacement) {
+		if got := moduleresolver.ResolveModule(p, "linked", fileName, options); got != osvfs.FS().Realpath(pathutil.Path(replacement)).AsString() {
 			t.Errorf("alias before symlink resolution = %q", got)
 		}
 
-		if got := moduleresolver.ResolveModule(p, "linked", fileName, moduleresolver.Options{Modules: []string{"node_modules/custom"}}); got != want {
+		if got := moduleresolver.ResolveModule(p, "linked", fileName, moduleresolver.Options{Modules: []string{"node_modules/custom"}}); got != want.AsString() {
 			t.Errorf("symlinked directory export = %q, want %q", got, want)
 		}
 	})
@@ -575,7 +584,7 @@ func TestResolverEntryFields(t *testing.T) {
 				files[tspath.ResolvePath(root, name)] = strings.ReplaceAll(string(data), "@ROOT@", root)
 			}
 			// Missing virtual UNC paths must not probe a real network share.
-			base := resolutionFixtureBase{iovfs.From(fstest.MapFS{}, osvfs.FS().UseCaseSensitiveFileNames())}
+			base := resolutionFixtureBase{iovfs.From(fstest.MapFS{}, pathutil.CaseSensitivity(osvfs.FS().CaseSensitivity().IsCaseSensitive()))}
 			p := programForResolutionFS(t, files, tspath.ResolvePath(root, "input.js"), base)
 			for _, tc := range cases {
 				t.Run(tc.name, func(t *testing.T) {
@@ -702,15 +711,15 @@ func TestResolverEntryFieldSymlinks(t *testing.T) {
 	} {
 		var options moduleresolver.Options
 		applyResolverConfig(&options, tc.config)
-		want := osvfs.FS().Realpath(tspath.ResolvePath(root, tc.want))
-		if got, err := moduleresolver.ResolveModuleWithError(p, tc.request, fileName, options); got != want || err != "" {
+		want := osvfs.FS().Realpath(pathutil.Path(tspath.ResolvePath(root, tc.want)))
+		if got, err := moduleresolver.ResolveModuleWithError(p, tc.request, fileName, options); got != want.AsString() || err != "" {
 			t.Errorf("symlink %q (%v) = %q, %s; want %q", tc.request, tc.config, got, err, want)
 		}
 	}
-	if !osvfs.FS().UseCaseSensitiveFileNames() {
+	if !osvfs.FS().CaseSensitivity().IsCaseSensitive() {
 		options := moduleresolver.Options{MainFields: []moduleresolver.MainField{{Name: []string{"module"}, ForceRelative: true}}}
-		want := osvfs.FS().Realpath(tspath.ResolvePath(root, "main/module.js"))
-		if got := moduleresolver.ResolveModule(p, "./MAIN", fileName, options); tspath.GetCanonicalFileName(got, false) != tspath.GetCanonicalFileName(want, false) {
+		want := osvfs.FS().Realpath(pathutil.Path(tspath.ResolvePath(root, "main/module.js")))
+		if got := moduleresolver.ResolveModule(p, "./MAIN", fileName, options); pathutil.GetCanonicalFileName(got, false) != pathutil.GetCanonicalFileName(want.AsString(), false) {
 			t.Errorf("case-insensitive package entry = %q, want %q", got, want)
 		}
 	}

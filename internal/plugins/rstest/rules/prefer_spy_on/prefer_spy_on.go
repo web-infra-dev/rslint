@@ -212,7 +212,7 @@ func isGlobalUndefined(ctx rule.RuleContext, node *ast.Node) bool {
 	if symbol == nil {
 		return true
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration != nil && ast.GetSourceFileOfNode(declaration) == ctx.SourceFile {
 			return false
 		}

@@ -14,10 +14,10 @@ import (
 
 func trackerContext(code string) rule.RuleContext {
 	source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: "/tracker.tsx", Path: "/tracker.tsx",
+		FileName: "/tracker.tsx", PathKey: "/tracker.tsx",
 	}, code, core.ScriptKindTSX)
 	binder.BindSourceFile(source)
-	globals, refs, language := rule.ResolveLanguageDefaults(source.FileName(), rule.LanguageOptions{SourceType: "module"})
+	globals, refs, language := rule.ResolveLanguageDefaults(source.FileName().AsString(), rule.LanguageOptions{SourceType: "module"})
 	return rule.RuleContext{
 		SourceFile:      source,
 		LanguageOptions: language,

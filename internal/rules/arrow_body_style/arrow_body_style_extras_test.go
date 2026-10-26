@@ -309,7 +309,7 @@ func TestArrowBodyStyleEditDemand(t *testing.T) {
 
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/edit-demand.ts",
-				Path:     "/edit-demand.ts",
+				PathKey:  "/edit-demand.ts",
 			}, testCase.code, core.ScriptKindTS)
 			var arrowNode *ast.Node
 			var visit func(*ast.Node) bool

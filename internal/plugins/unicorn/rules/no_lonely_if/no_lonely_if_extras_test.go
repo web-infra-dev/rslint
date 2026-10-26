@@ -82,7 +82,7 @@ func TestNoLonelyIfFixSafety(t *testing.T) {
 func TestNoLonelyIfUnterminatedBlocks(t *testing.T) {
 	for _, code := range []string{"if (a) { if (b) {}", "if (a) { if (b) {"} {
 		source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-			FileName: "/unterminated.ts", Path: "/unterminated.ts",
+			FileName: "/unterminated.ts", PathKey: "/unterminated.ts",
 		}, code, core.ScriptKindTS)
 		var diagnostics []rule.RuleDiagnostic
 		ctx := rule.RuleContext{SourceFile: source}.WithDiagnosticConsumer(
@@ -116,7 +116,7 @@ func TestNoLonelyIfEditDemand(t *testing.T) {
 	for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program: lintprogram.NewFromCompiler(program), File: source.FileName(),
+			Program: lintprogram.NewFromCompiler(program), File: source.FileName().AsString(),
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{Name: "unicorn/no-lonely-if", Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners { return no_lonely_if.NoLonelyIfRule.Run(ctx, nil) },
@@ -170,7 +170,7 @@ func TestNoLonelyIfDirectives(t *testing.T) {
 			t.Fatal(err)
 		}
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program: lintprogram.NewFromCompiler(program), File: source.FileName(),
+			Program: lintprogram.NewFromCompiler(program), File: source.FileName().AsString(),
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{Name: "unicorn/no-lonely-if", Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners { return no_lonely_if.NoLonelyIfRule.Run(ctx, nil) },

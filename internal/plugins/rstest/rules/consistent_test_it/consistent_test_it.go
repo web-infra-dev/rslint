@@ -59,7 +59,7 @@ func callFixes(ctx rule.RuleContext, node *ast.Node, parsed *testFramework.Parse
 	if original != nil && original != root && original.Pos() >= node.Pos() && original.End() <= node.End() {
 		if root.Kind == ast.KindIdentifier {
 			symbol := ctx.Refs.Resolve(root)
-			if symbol == nil || len(symbol.Declarations) != 1 || symbol.Declarations[0].Kind != ast.KindNamespaceImport {
+			if symbol == nil || len(symbol.Declarations()) != 1 || symbol.Declarations()[0].Kind != ast.KindNamespaceImport {
 				// CommonJS namespace objects and local aliases can be mutated.
 				return nil
 			}
@@ -151,7 +151,7 @@ func isShadowedByModuleBlock(root *ast.Node, sourceFile *ast.SourceFile, name st
 		if symbol == nil {
 			return true
 		}
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if ast.IsNodeDescendantOf(declaration, ancestor) {
 				return false
 			}

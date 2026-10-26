@@ -101,7 +101,7 @@ func TestPreferUnicodeCodePointEscapesExtras(t *testing.T) {
 }
 
 func lintEscapesSource(code string, demand rule.EditDemand) []rule.RuleDiagnostic {
-	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.js", Path: "/test.js"}, code, core.ScriptKindJS)
+	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.js", PathKey: "/test.js"}, code, core.ScriptKindJS)
 	comments := rule.NewCommentStore(source)
 	var diagnostics []rule.RuleDiagnostic
 	ctx := (rule.RuleContext{SourceFile: source, Comments: comments, DisableManager: rule.NewDisableManager(source, comments)}).WithDiagnosticConsumer(

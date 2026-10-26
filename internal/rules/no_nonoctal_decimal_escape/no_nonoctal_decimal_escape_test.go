@@ -378,7 +378,7 @@ func TestNoNonoctalDecimalEscapeFastPath(t *testing.T) {
 			}
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/fast-path.ts",
-				Path:     "/fast-path.ts",
+				PathKey:  "/fast-path.ts",
 			}, tt.code, scriptKind)
 			diagnostics := runRuleOnParsedSource(t, sourceFile, rule.EditDemandNone)
 			if len(diagnostics) != len(tt.wantRanges) {
@@ -397,7 +397,7 @@ func TestNoNonoctalDecimalEscapeFastPath(t *testing.T) {
 func TestNoNonoctalDecimalEscapeEditDemand(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, `const value = '\0\8\9';`, core.ScriptKindTS)
 
 	diagnostics := make(map[rule.EditDemand][]rule.RuleDiagnostic)
@@ -1336,7 +1336,7 @@ func runRuleLeniently(t *testing.T, code string, tsx bool) []rule.RuleDiagnostic
 		Program:                lintprogram.NewFromCompiler(program),
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
 		GetRulesForFile: func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			if sf.FileName() != filePath {
+			if sf.FileName().AsString() != filePath {
 				return nil
 			}
 			return []rule.ConfiguredRule{configured}

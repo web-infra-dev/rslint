@@ -118,7 +118,7 @@ func TestNoUselessDefaultAssignmentUndefinedRange(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/range.ts", Path: "/range.ts"}, c.source, core.ScriptKindTS)
+			sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/range.ts", PathKey: "/range.ts"}, c.source, core.ScriptKindTS)
 			node := &ast.Node{Kind: c.kind, Loc: core.NewTextRange(c.start, c.end)}
 			want := utils.TrimNodeTextRange(sf, node)
 			if got := undefinedRange(sf, node); got != want {

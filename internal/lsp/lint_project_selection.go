@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"slices"
 	"sync"
 	"weak"
@@ -22,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type lintProgramLoader func(
@@ -59,7 +59,7 @@ func newLintProjectMetadata(
 		configPath:  tspath.NormalizePath(configPath),
 		commandLine: commandLine,
 		rootFiles: lintprogram.NewRootFileIndex(
-			commandLine.FileNames(),
+			pathutil.Strings(commandLine.FileNames()),
 			identityFS,
 		),
 	}
@@ -82,18 +82,12 @@ func parseStandaloneLintProject(
 	if parseFS == nil {
 		return nil, fmt.Errorf("cannot parse TypeScript config %q without a filesystem", tsConfigPath)
 	}
-	// Session URI decoding normalizes the Windows drive through this same
-	// tsgo helper. Parse from that base so equivalent snapshots also agree on
-	// resolved option paths, while retaining the declared metadata identity.
-	volume, path, _ := tspath.SplitVolumePath(tsConfigPath)
-	parsePath := volume + path
-	configDir := tspath.GetDirectoryPath(parsePath)
-	host := utils.CreateCompilerHost(configDir, parseFS)
+	// Preserve the declared path spelling; config diagnostics also embed it.
 	parsed, _ := tsoptions.GetParsedCommandLineOfConfigFile(
-		parsePath,
+		pathutil.File(tsConfigPath),
 		&core.CompilerOptions{},
 		nil,
-		host,
+		parseFS,
 		nil,
 	)
 	if parsed == nil {
@@ -170,14 +164,14 @@ func selectConfiguredLintProject(
 			if !available || metadata == nil {
 				return nil, fmt.Errorf("no parsed config returned for %q", configPath)
 			}
-			metadataByConfig[metadata.commandLine.ConfigName()] = metadata
+			metadataByConfig[metadata.commandLine.ConfigName().AsString()] = metadata
 			return metadata.commandLine, nil
 		})
 		parsed, err := discovery.Find(target.Path, serviceRootDirectory)
 		if err != nil || parsed == nil {
 			return selectedLintProject{}, false, err
 		}
-		return loadDirectLintProject(metadataByConfig[parsed.ConfigName()], target, loaders.program)
+		return loadDirectLintProject(metadataByConfig[parsed.ConfigName().AsString()], target, loaders.program)
 	}
 
 	if loaders.metadata != nil {
@@ -331,18 +325,18 @@ func (request *standaloneLintProjectRequest) loaders() lintProjectLoaders {
 // The immutable host never retains a request, its overlay supplier, or watchers.
 type lintProjectReferenceHost struct {
 	compiler.CompilerHost
-	configs map[tspath.Path]*tsoptions.ParsedCommandLine
+	configs map[tspath.PathKey]*tsoptions.ParsedCommandLine
 }
 
 func newLintProjectReferenceHost(host compiler.CompilerHost, projects map[string]*lintProjectMetadata) compiler.CompilerHost {
-	configs := make(map[tspath.Path]*tsoptions.ParsedCommandLine, len(projects))
+	configs := make(map[tspath.PathKey]*tsoptions.ParsedCommandLine, len(projects))
 	for _, metadata := range projects {
 		configs[lintProgramLexicalPathID(metadata.configPath, host.FS())] = metadata.commandLine
 	}
 	return &lintProjectReferenceHost{CompilerHost: host, configs: configs}
 }
 
-func (host *lintProjectReferenceHost) GetResolvedProjectReference(fileName string, path tspath.Path) *tsoptions.ParsedCommandLine {
+func (host *lintProjectReferenceHost) GetResolvedProjectReference(fileName tspath.RootedFilePath, path tspath.PathKey) *tsoptions.ParsedCommandLine {
 	if config := host.configs[path]; config != nil {
 		return config
 	}
@@ -356,17 +350,62 @@ func lintProjectSnapshotsEqual(selected, built *tsoptions.ParsedCommandLine, fs 
 		return true
 	}
 	if selected == nil || built == nil ||
-		!reflect.DeepEqual(selected.CompilerOptions(), built.CompilerOptions()) ||
+		!lintProjectCompilerOptionsEqual(selected.CompilerOptions(), built.CompilerOptions()) ||
 		!slices.EqualFunc(selected.GetConfigFileParsingDiagnostics(), built.GetConfigFileParsingDiagnostics(), ast.EqualDiagnostics) {
 		return false
 	}
 	samePath := func(a, b string) bool {
 		return lintProgramLexicalPathID(a, fs) == lintProgramLexicalPathID(b, fs)
 	}
-	return slices.EqualFunc(selected.FileNames(), built.FileNames(), samePath) &&
+	return slices.EqualFunc(selected.FileNames(), built.FileNames(), func(a, b tspath.RootedFilePath) bool { return samePath(a.AsString(), b.AsString()) }) &&
 		slices.EqualFunc(selected.ProjectReferences(), built.ProjectReferences(), func(a, b *core.ProjectReference) bool {
-			return samePath(a.Path, b.Path) && a.Circular == b.Circular
+			return samePath(a.Path.AsString(), b.Path.AsString()) && a.Circular == b.Circular
 		})
+}
+
+func lintProjectCompilerOptionsEqual(selected, built *core.CompilerOptions) bool {
+	if selected.Equals(built) {
+		return true
+	}
+	if selected == nil || built == nil {
+		return false
+	}
+	// TypeScript now retains the drive spelling decoded from a document URI.
+	// Compare rooted option paths by rslint's drive identity without changing
+	// the Session's immutable options or the paths used for filesystem access.
+	normalize := func(options *core.CompilerOptions) *core.CompilerOptions {
+		result := options.Clone()
+		directory := func(path tspath.RootedDirectoryPath) tspath.RootedDirectoryPath {
+			return pathutil.Directory(utils.NormalizeAbsoluteDrive(path.AsString()))
+		}
+		file := func(path tspath.RootedFilePath) tspath.RootedFilePath {
+			return pathutil.File(utils.NormalizeAbsoluteDrive(path.AsString()))
+		}
+		result.DeclarationDir = directory(options.DeclarationDir)
+		result.OutDir = directory(options.OutDir)
+		result.Project = pathutil.Path(utils.NormalizeAbsoluteDrive(options.Project.AsString()))
+		result.RootDir = directory(options.RootDir)
+		result.RootDirs = slices.Clone(options.RootDirs)
+		for i, path := range result.RootDirs {
+			result.RootDirs[i] = directory(path)
+		}
+		result.TsBuildInfoFile = file(options.TsBuildInfoFile)
+		result.TypeRoots = slices.Clone(options.TypeRoots)
+		for i, path := range result.TypeRoots {
+			result.TypeRoots[i] = directory(path)
+		}
+		result.BaseUrl = directory(options.BaseUrl) //nolint:staticcheck // Deprecated paths still affect parsed configuration identity.
+		result.OutFile = file(options.OutFile)      //nolint:staticcheck // Deprecated paths still affect parsed configuration identity.
+		result.ConfigFilePath = file(options.ConfigFilePath)
+		result.PathsBasePath = directory(options.PathsBasePath)
+		result.GenerateCpuProfile = file(options.GenerateCpuProfile)
+		result.GenerateTrace = directory(options.GenerateTrace)
+		result.PprofDir = directory(options.PprofDir)
+		result.MapRoot = tspath.ToSourceMapLocation(utils.NormalizeAbsoluteDrive(options.MapRoot.AsString()))
+		result.SourceRoot = tspath.ToSourceMapLocation(utils.NormalizeAbsoluteDrive(options.SourceRoot.AsString()))
+		return result
+	}
+	return normalize(selected).Equals(normalize(built))
 }
 
 func lintSessionProgramMatchesConfig(
@@ -379,14 +418,14 @@ func lintSessionProgramMatchesConfig(
 		return false
 	}
 	compatible := true
-	program.RangeResolvedProjectReference(func(_ tspath.Path, built, parent *tsoptions.ParsedCommandLine, index int) bool {
+	program.RangeResolvedProjectReference(func(_ tspath.PathKey, built, parent *tsoptions.ParsedCommandLine, index int) bool {
 		// A canonical path is an identity key, not a parser base. Preserve the
 		// declaration's spelling so case-insensitive hosts retain equal options.
 		configPath := core.ResolveProjectReferencePath(parent.ProjectReferences()[index])
 		if built != nil {
 			configPath = built.ConfigName()
 		}
-		current, available, err := loadMetadata(configPath)
+		current, available, err := loadMetadata(configPath.AsString())
 		if err != nil || !available || current == nil || !lintProjectSnapshotsEqual(current.commandLine, built, fs) {
 			compatible = false
 		}
@@ -465,10 +504,10 @@ func lintSessionProgramSupportsService(program *compiler.Program) bool {
 	}
 	supported := func(fileName string) bool {
 		return lintprogram.CompilerOptionsSupportFileName(program.Options(),
-			tspath.GetCanonicalFileName(fileName, program.UseCaseSensitiveFileNames()))
+			pathutil.GetCanonicalFileName(fileName, program.CaseSensitivity().IsCaseSensitive()))
 	}
 	for _, fileName := range program.CommandLine().FileNames() {
-		if !supported(fileName) {
+		if !supported(fileName.AsString()) {
 			return false
 		}
 	}
@@ -514,7 +553,7 @@ func selectLintProgram(
 		program     *compiler.Program
 		commandLine *tsoptions.ParsedCommandLine
 	}
-	loadedByConfig := make(map[tspath.Path]loadedLintProject)
+	loadedByConfig := make(map[tspath.PathKey]loadedLintProject)
 	var sessionSnapshot *project.Snapshot
 	sessionLoaded := false
 	loadSession := func() error {
@@ -534,7 +573,7 @@ func selectLintProgram(
 				continue
 			}
 			candidateProgram := candidate.GetProgram()
-			configPath := string(candidate.Id())
+			configPath := candidate.Id()
 			if configPath == "" {
 				continue
 			}

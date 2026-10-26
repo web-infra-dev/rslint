@@ -148,7 +148,7 @@ func canThenResultCatch(call unicornutil.DotMethodCall, node *ast.Node, ctx rule
 // type-parameter constraints.
 func isNativePromiseType(ctx rule.RuleContext, t *checker.Type) bool {
 	symbol := checker.Type_symbol(t)
-	return symbol != nil && symbol.Name == "Promise" && utils.IsSymbolFromDefaultLibrary(ctx.Program(), symbol)
+	return symbol != nil && symbol.Name() == "Promise" && utils.IsSymbolFromDefaultLibrary(ctx.Program(), symbol)
 }
 
 // hasCallableCatch mirrors upstream's hasCallableCatch. A union type is only

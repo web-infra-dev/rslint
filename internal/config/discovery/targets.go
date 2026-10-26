@@ -7,13 +7,14 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // discoveryTargetTrie bounds a directory walk to branches that can govern an
 // invocation target. A nil trie means the current subtree is unbounded. A
 // leaf still visits that directory so its sources can govern files within it.
 type discoveryTargetTrie struct {
-	children map[tspath.Path]*discoveryTargetTrie
+	children map[string]*discoveryTargetTrie
 	files    []*rslintconfig.PathIdentity
 }
 
@@ -35,9 +36,9 @@ func addDiscoveryTarget(
 	node := root
 	for _, component := range splitDiscoveryPath(relative) {
 		if node.children == nil {
-			node.children = make(map[tspath.Path]*discoveryTargetTrie)
+			node.children = make(map[string]*discoveryTargetTrie)
 		}
-		identity := tspath.ToPath(component, "", useCaseSensitive)
+		identity := pathutil.GetCanonicalFileName(component, useCaseSensitive)
 		child := node.children[identity]
 		if child == nil {
 			child = &discoveryTargetTrie{}
@@ -54,8 +55,8 @@ func (coordinator *discoveryCoordinator) normalizedDirectoryRoots() []rslintconf
 	if len(raw) == 0 && len(coordinator.request.Files) == 0 && coordinator.request.ImplicitCWD {
 		raw = rslintconfig.ResolveDirectoryIdentities([]string{coordinator.request.CWD}, coordinator.fs)
 	}
-	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
-	byIdentity := make(map[tspath.Path]rslintconfig.DirectoryIdentity, len(raw))
+	useCaseSensitive := coordinator.fs.CaseSensitivity().IsCaseSensitive()
+	byIdentity := make(map[tspath.PathKey]rslintconfig.DirectoryIdentity, len(raw))
 	for _, directory := range raw {
 		directory.LexicalPath = normalizeDiscoveryPath(directory.LexicalPath, coordinator.request.CWD)
 		if directory.CanonicalPath == "" {
@@ -63,7 +64,7 @@ func (coordinator *discoveryCoordinator) normalizedDirectoryRoots() []rslintconf
 		} else {
 			directory.CanonicalPath = normalizeDiscoveryPath(directory.CanonicalPath, coordinator.request.CWD)
 		}
-		identity := tspath.ToPath(directory.LexicalPath, "", useCaseSensitive)
+		identity := pathutil.ToPath(directory.LexicalPath, "", useCaseSensitive)
 		if current, exists := byIdentity[identity]; !exists || directory.LexicalPath < current.LexicalPath {
 			byIdentity[identity] = directory
 		}
@@ -128,7 +129,7 @@ func (coordinator *discoveryCoordinator) targetAncestorTries(
 	files []DiscoveryFile,
 ) map[string]*discoveryTargetTrie {
 	tries := make(map[string]*discoveryTargetTrie, len(roots))
-	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
+	useCaseSensitive := coordinator.fs.CaseSensitivity().IsCaseSensitive()
 	for index := range files {
 		file := &files[index]
 		for _, directory := range roots {
@@ -154,7 +155,7 @@ func (trie *discoveryTargetTrie) child(name string, useCaseSensitive bool) *disc
 	if trie == nil || len(trie.children) == 0 {
 		return nil
 	}
-	return trie.children[tspath.ToPath(name, "", useCaseSensitive)]
+	return trie.children[pathutil.GetCanonicalFileName(name, useCaseSensitive)]
 }
 func splitDiscoveryPath(path string) []string {
 	path = strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")

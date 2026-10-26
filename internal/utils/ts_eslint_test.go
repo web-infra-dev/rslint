@@ -61,7 +61,7 @@ func TestGetStaticPropertyNameNumericLiteral(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.ts",
-				Path:     "/test.ts",
+				PathKey:  "/test.ts",
 			}, tt.code, core.ScriptKindTS)
 			property := findFirstNodeOfKind(t, sourceFile, ast.KindPropertyAssignment)
 			nameNode := property.Name()
@@ -89,7 +89,7 @@ func TestGetStaticPropertyNameDetachedNumericLiteral(t *testing.T) {
 func TestGetStaticPropertyNameRegularExpressionLiteral(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, `({ [/a/mi]: 0 })`, core.ScriptKindTS)
 	property := findFirstNodeOfKind(t, sourceFile, ast.KindPropertyAssignment)
 	nameNode := property.Name()
@@ -224,7 +224,7 @@ func TestGetFunctionNameWithKindCore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.ts",
-				Path:     "/test.ts",
+				PathKey:  "/test.ts",
 			}, tt.code, core.ScriptKindTS)
 			node := findFirstNodeOfKind(t, sourceFile, tt.kind)
 			if got := GetFunctionNameWithKindCore(node); got != tt.want {

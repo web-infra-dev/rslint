@@ -75,7 +75,7 @@ func GetLocalExportNames(ctx rule.RuleContext, source modules.Source) []string {
 	if link.View == moduleViewDefaultOnly {
 		return []string{defaultExportName}
 	}
-	if link.Target == nil || !exportExtensionAllowed(ctx.Settings, link.Target.FileName()) {
+	if link.Target == nil || !exportExtensionAllowed(ctx.Settings, link.Target.FileName().AsString()) {
 		return nil
 	}
 	if len(ctx.Program().SyntacticDiagnostics(context.Background(), link.Target)) != 0 {

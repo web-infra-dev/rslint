@@ -34,10 +34,11 @@ func main() {
 		panic(err)
 	}
 	path := tspath.ResolvePath(tspath.NormalizePath(cwd), input.FilePath)
-	kind := core.GetScriptKindFromFileName(path)
+	fileName := tspath.RootedFilePathFromAbsolute(path)
+	kind := core.GetScriptKindFromFileName(fileName)
 	hasBOM := strings.HasPrefix(input.Text, "\ufeff")
 	text := strings.TrimPrefix(input.Text, "\ufeff")
-	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: path, Path: tspath.Path(path)}, text, kind)
+	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: fileName, PathKey: tspath.CaseSensitive.PathKey(fileName.AsPath())}, text, kind)
 	if len(file.Diagnostics()) != 0 {
 		fmt.Fprintln(os.Stderr, "test source contains syntax errors")
 		os.Exit(1)

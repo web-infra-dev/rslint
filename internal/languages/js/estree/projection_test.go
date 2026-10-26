@@ -24,7 +24,8 @@ import (
 )
 
 func source(path, text string) *ast.SourceFile {
-	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: path, Path: tspath.Path(path)}, text, core.GetScriptKindFromFileName(path))
+	fileName := tspath.RootedFilePathFromAbsolute(path)
+	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: fileName, PathKey: tspath.CaseSensitive.PathKey(fileName.AsPath())}, text, core.GetScriptKindFromFileName(fileName))
 }
 
 type nativeSyntaxState struct {

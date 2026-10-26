@@ -20,7 +20,7 @@ func isConstantBindingSymbol(symbol *ast.Symbol, sourceFile *ast.SourceFile) boo
 	if symbol == nil || sourceFile == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if ast.GetSourceFileOfNode(declaration) != sourceFile {
 			continue
 		}

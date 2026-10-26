@@ -169,7 +169,7 @@ func TestNoNamespaceSchema(t *testing.T) {
 func TestNoNamespaceEditDemand(t *testing.T) {
 	for _, use := range []string{`ns.foo;`, `consume(ns);`} {
 		t.Run(use, func(t *testing.T) {
-			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.ts", Path: "/test.ts"}, `import * as ns from 'm'; `+use, core.ScriptKindTS)
+			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.ts", PathKey: "/test.ts"}, `import * as ns from 'm'; `+use, core.ScriptKindTS)
 			binder.BindSourceFile(file)
 			node := file.Statements.Nodes[0].AsImportDeclaration().ImportClause.AsImportClause().NamedBindings
 			var all rule.RuleDiagnostic

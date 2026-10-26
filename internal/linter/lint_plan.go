@@ -392,10 +392,10 @@ func resolveExactProgramFiles(sourceProgram *program.Program, targets []string) 
 			return nil, fmt.Errorf("%w: %q", errTargetNotInProgram, target)
 		}
 		fileName := file.FileName()
-		if _, ok := seen[fileName]; ok {
+		if _, ok := seen[fileName.AsString()]; ok {
 			continue
 		}
-		seen[fileName] = struct{}{}
+		seen[fileName.AsString()] = struct{}{}
 		filesToLint = append(filesToLint, file)
 	}
 	return filesToLint, nil

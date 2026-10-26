@@ -18,7 +18,7 @@ func TestNoUselessSpreadEditDemand(t *testing.T) {
 	t.Parallel()
 	const source = `const x = [...[foo]]; const y = [...foo.concat(bar)]; Object.assign(target, {...source}); new Set(...items); for (const value of [...items]) {} function* f() { yield* [...items]; }`
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: "/edit-demand.js", Path: "/edit-demand.js",
+		FileName: "/edit-demand.js", PathKey: "/edit-demand.js",
 	}, source, core.ScriptKindJS)
 	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
 		comments := rule.NewCommentStore(file)

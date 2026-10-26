@@ -44,6 +44,54 @@ func canBeExported(t types.Signature) bool {
 	return true
 }
 
+// mirrorTypeString preserves the layout and GC pointer shape of private fields.
+// Private pointers stay opaque so recursive compiler structures cannot cause
+// infinite generation. Private values, including generic arguments, need their
+// underlying representation because Go cannot name them from a shim package.
+func mirrorTypeString(t types.Type, qualifier types.Qualifier) string {
+	t = types.Unalias(t)
+	switch t := t.(type) {
+	case *types.Named:
+		if !t.Obj().Exported() {
+			return mirrorTypeString(t.Underlying(), qualifier)
+		}
+		name := types.TypeString(t.Origin(), qualifier)
+		if t.TypeArgs().Len() == 0 {
+			return types.TypeString(t, qualifier)
+		}
+		name, _, _ = strings.Cut(name, "[")
+		args := make([]string, t.TypeArgs().Len())
+		for i := range args {
+			args[i] = mirrorTypeString(t.TypeArgs().At(i), qualifier)
+		}
+		return name + "[" + strings.Join(args, ", ") + "]"
+	case *types.Pointer:
+		if named, ok := types.Unalias(t.Elem()).(*types.Named); ok && !named.Obj().Exported() {
+			return "unsafe.Pointer"
+		}
+		return "*" + mirrorTypeString(t.Elem(), qualifier)
+	case *types.Slice:
+		return "[]" + mirrorTypeString(t.Elem(), qualifier)
+	case *types.Array:
+		return fmt.Sprintf("[%d]%s", t.Len(), mirrorTypeString(t.Elem(), qualifier))
+	case *types.Map:
+		return "map[" + mirrorTypeString(t.Key(), qualifier) + "]" + mirrorTypeString(t.Elem(), qualifier)
+	case *types.Struct:
+		var result strings.Builder
+		result.WriteString("struct {\n")
+		for field := range t.Fields() {
+			result.WriteString(field.Name())
+			result.WriteByte(' ')
+			result.WriteString(mirrorTypeString(field.Type(), qualifier))
+			result.WriteByte('\n')
+		}
+		result.WriteByte('}')
+		return result.String()
+	default:
+		return types.TypeString(t, qualifier)
+	}
+}
+
 func main() {
 	packagesToShim := []string{
 		"ast",
@@ -346,62 +394,12 @@ func main() {
 					matchedExtraFields[name] = true
 					mirrorStructName := "extra_" + name
 
-					var emitExtraStruct func(name string, s *types.Struct)
-					emitExtraStruct = func(name string, s *types.Struct) {
+					emitExtraStruct := func(name string, s *types.Struct) {
 						shimBuilder.WriteString("type extra_")
 						shimBuilder.WriteString(name)
-						shimBuilder.WriteString(" struct {")
-
-						dependencies := [](struct {
-							string
-							*types.Struct
-						}){}
-						for field := range s.Fields() {
-							shimBuilder.WriteString("\n  ")
-							if !field.Embedded() {
-								shimBuilder.WriteString(field.Name())
-								shimBuilder.WriteByte(' ')
-							}
-
-							// Private struct values (including instantiated generic stores)
-							// need an anonymous mirror with the same layout. Their names
-							// cannot be referenced from this shim's package.
-							if named, ok := field.Type().(*types.Named); ok && !named.Obj().Exported() {
-								if structType, ok := named.Underlying().(*types.Struct); ok {
-									shimBuilder.WriteString(types.TypeString(structType, qualifierOnlyPackageName))
-									continue
-								}
-							}
-
-							ptrType, ok := field.Type().(*types.Pointer)
-							if ok {
-								named, ok := ptrType.Elem().(*types.Named)
-								if ok && !named.Obj().Exported() {
-									structType, ok := named.Underlying().(*types.Struct)
-									if ok {
-										n := named.Obj().Name()
-										dependencies = append(dependencies, struct {
-											string
-											*types.Struct
-										}{n, structType})
-										shimBuilder.WriteString("extra_")
-										shimBuilder.WriteString(n)
-										continue
-									}
-								}
-							}
-
-							// TODO: move to extra-shim.json
-							typeStr := types.TypeString(field.Type(), qualifierOnlyPackageName)
-							typeStr = strings.ReplaceAll(typeStr, "checker.thisAssignmentDeclarationKind", "int32")
-							typeStr = strings.ReplaceAll(typeStr, "checker.symbolTableID", "uint64")
-							shimBuilder.WriteString(typeStr)
-						}
-						shimBuilder.WriteString("\n}\n")
-
-						for _, dep := range dependencies {
-							emitExtraStruct(dep.string, dep.Struct)
-						}
+						shimBuilder.WriteByte(' ')
+						shimBuilder.WriteString(mirrorTypeString(s, qualifierOnlyPackageName))
+						shimBuilder.WriteByte('\n')
 					}
 
 					structType, ok := named.Underlying().(*types.Struct)

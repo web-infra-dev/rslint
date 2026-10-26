@@ -793,10 +793,10 @@ func eachDestructuredKey(pattern *ast.Node, visit func(name string)) {
 // types are intentionally unsupported (mirroring upstream's known limit).
 func resolveBySymbol(tc *checker.Checker, ident *ast.Node, find func(string) *classScope) (*classScope, bool, bool) {
 	sym := tc.GetSymbolAtLocation(ident)
-	if sym == nil || len(sym.Declarations) == 0 {
+	if sym == nil || len(sym.Declarations()) == 0 {
 		return nil, false, false
 	}
-	decl := sym.Declarations[0]
+	decl := sym.Declarations()[0]
 	var typeNode *ast.Node
 	switch decl.Kind {
 	case ast.KindParameter:

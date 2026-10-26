@@ -104,7 +104,7 @@ func testPreferDateNowEditDemand(t *testing.T, source, fixedSource string, messa
 	if err != nil {
 		t.Fatal(err)
 	}
-	if compilerProgram.GetSourceFile(fileName) == nil {
+	if compilerProgram.GetSourceFile(tspath.ToRootedFilePath(fileName, compilerProgram.GetCurrentDirectory())) == nil {
 		t.Fatal("missing edit-demand source file")
 	}
 	diagnostics := make(map[rule.EditDemand]rule.RuleDiagnostic)

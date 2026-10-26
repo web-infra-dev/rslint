@@ -265,7 +265,7 @@ func lintNoUnsafeEnumComparisonFiles(t testing.TB, files map[string]string, targ
 	if err != nil {
 		t.Fatalf("create program: %v", err)
 	}
-	sourceFile := compilerProgram.GetSourceFile(target)
+	sourceFile := compilerProgram.GetSourceFile(tspath.ToRootedFilePath(target, compilerProgram.GetCurrentDirectory()))
 	if sourceFile == nil {
 		t.Fatalf("missing target %q", target)
 	}
@@ -273,7 +273,7 @@ func lintNoUnsafeEnumComparisonFiles(t testing.TB, files map[string]string, targ
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:     lintprogram.NewFromCompiler(compilerProgram),
-		File:        sourceFile.FileName(),
+		File:        sourceFile.FileName().AsString(),
 		HasTypeInfo: true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{

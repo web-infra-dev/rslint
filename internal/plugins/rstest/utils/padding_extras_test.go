@@ -88,7 +88,7 @@ func TestRstestAtomicPaddingRuleOwnsAggregateBoundary(t *testing.T) {
 	const code = "setup();\nbeforeAll(connect);"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/padding.ts",
-		Path:     "/padding.ts",
+		PathKey:  "/padding.ts",
 	}, code, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	disableManager := rule.NewDisableManager(sourceFile, comments)

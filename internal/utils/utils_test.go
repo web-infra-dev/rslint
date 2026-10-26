@@ -71,7 +71,7 @@ func TestRegExpLiteralStringValueCanonicalizesFlags(t *testing.T) {
 func TestIsSameReferenceNumericLiteralUsesJavaScriptValue(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, `0x10000000000000801; 18446744073709552000;`, core.ScriptKindTS)
 
 	left := findNodeWithText(t, sourceFile, `0x10000000000000801`)
@@ -203,7 +203,7 @@ func TestIsDefaultValueInDestructuringAssignment(t *testing.T) {
 			t.Parallel()
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.ts",
-				Path:     "/test.ts",
+				PathKey:  "/test.ts",
 			}, tt.code, core.ScriptKindTS)
 			node := findNodeWithText(t, sourceFile, tt.nodeText)
 			if got := IsDefaultValueInDestructuringAssignment(node); got != tt.want {
@@ -242,7 +242,7 @@ func TestHasCommentInsideNode(t *testing.T) {
 		"const d = 1 /* keep */ + 2;\n"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 
 	tests := []struct {
@@ -273,7 +273,7 @@ func TestBracedNodeInnerRange(t *testing.T) {
 		"function work() { doWork(); }\n"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 
 	tests := []struct {
@@ -301,7 +301,7 @@ func TestGetStaticStringLiteralValue(t *testing.T) {
 		"const parenthesized = (\"x\");\n"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 
 	tests := []struct {
@@ -334,7 +334,7 @@ func TestAccessExpressionStaticName(t *testing.T) {
 		"class C { #property; m() { this.#property; this[\"#property\"]; } }\n"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 
 	tests := []struct {
@@ -382,7 +382,7 @@ func TestIsIntegerElementAccess(t *testing.T) {
 		"array.value;\n"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 
 	tests := []struct {
@@ -433,7 +433,7 @@ func TestEslintLikePrecedence(t *testing.T) {
 		"(<></>);\n"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.tsx",
-		Path:     "/test.tsx",
+		PathKey:  "/test.tsx",
 	}, source, core.ScriptKindTSX)
 
 	tests := []struct {
@@ -510,7 +510,7 @@ func TestGetPropertyDisplayName(t *testing.T) {
 		"class C { #private() {} }\n"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 
 	tests := []struct {
@@ -536,7 +536,7 @@ func TestGetPropertyDisplayName(t *testing.T) {
 func TestIsThisVoidParameter(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, "function f(this: void, value: void) {}\nfunction g(this: Foo) {}\n", core.ScriptKindTS)
 
 	if IsThisVoidParameter(nil) {

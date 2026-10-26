@@ -249,7 +249,7 @@ rs.mock(modulePath, () => ({}));`, "edit-demand.ts", "tsconfig.json")
 		for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
 			var diagnostics []rule.RuleDiagnostic
 			linter.LintSingleFile(linter.LintSingleFileOptions{
-				Program: program, File: file.FileName(), HasTypeInfo: typed,
+				Program: program, File: file.FileName().AsString(), HasTypeInfo: typed,
 				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{Name: NoUntypedMockFactoryRule.Name, Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -366,7 +366,7 @@ func lintNoUntypedMockFactory(t *testing.T, code string, typed bool) int {
 	count := 0
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:     program,
-		File:        file.FileName(),
+		File:        file.FileName().AsString(),
 		HasTypeInfo: typed,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{

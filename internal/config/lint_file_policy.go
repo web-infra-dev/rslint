@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // DefaultLintFileExtensions are the file extensions rslint discovers when a
@@ -63,11 +64,11 @@ func IsDefaultExcludedPath(filePath string, scanRoot string, useCaseSensitive bo
 		return true
 	}
 	if pathsEqual(filePath, scanRoot, useCaseSensitive) ||
-		tspath.StartsWithDirectory(filePath, scanRoot, useCaseSensitive) {
-		relativePath := tspath.GetRelativePathFromDirectory(
+		pathutil.StartsWithDirectory(filePath, scanRoot, useCaseSensitive) {
+		relativePath := pathutil.GetRelativePathFromDirectory(
 			scanRoot,
 			filePath,
-			tspath.ComparePathsOptions{
+			pathutil.ComparePathsOptions{
 				CurrentDirectory:          scanRoot,
 				UseCaseSensitiveFileNames: useCaseSensitive,
 			},

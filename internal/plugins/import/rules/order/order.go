@@ -565,7 +565,7 @@ func newImportClassifier(ctx rule.RuleContext) *importClassifier {
 		caseSensitive: true,
 	}
 	if sourceProgram := ctx.Program(); sourceProgram != nil && sourceProgram.FS() != nil {
-		classifier.caseSensitive = sourceProgram.FS().UseCaseSensitiveFileNames()
+		classifier.caseSensitive = sourceProgram.FS().CaseSensitivity().IsCaseSensitive()
 	}
 	return classifier
 }
@@ -643,7 +643,7 @@ func (classifier *importClassifier) contextPackagePath() string {
 	classifier.packagePathLoaded = true
 	start := ""
 	if classifier.ctx.SourceFile != nil {
-		start = tspath.GetDirectoryPath(classifier.ctx.SourceFile.FileName())
+		start = tspath.GetDirectoryPath(classifier.ctx.SourceFile.FileName().AsString())
 	}
 	if sourceProgram := classifier.ctx.Program(); sourceProgram != nil && start != "" {
 		if packageDir := sourceProgram.NearestPackageJSONDirectory(start); packageDir != "" {

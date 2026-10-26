@@ -271,7 +271,7 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 				Cwd:              root,
 				RulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
 					rules := []rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}
-					if source.FileName() == paths[0] && source.Text() == "a" {
+					if source.FileName().AsString() == paths[0] && source.Text() == "a" {
 						rules = append(rules, rule.ConfiguredRule{
 							Name: "native/fix",
 							Run: func(ruleCtx rule.RuleContext) rule.RuleListeners {

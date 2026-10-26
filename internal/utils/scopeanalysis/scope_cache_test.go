@@ -18,7 +18,7 @@ import (
 
 func cacheContext() rule.RuleContext {
 	return rule.RuleContext{SourceFile: tsParser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: "/scope.tsx", Path: "/scope.tsx",
+		FileName: "/scope.tsx", PathKey: "/scope.tsx",
 	}, `const x = 1; function f(a = x) { let x = a; return x; } f(x); missing;`, core.ScriptKindTSX)}.WithFileCache(rule.NewFileCache())
 }
 
@@ -190,7 +190,7 @@ func TestProductionCodeUsesScopeAnalysisFacade(t *testing.T) {
 
 func BenchmarkGet(b *testing.B) {
 	ctx := rule.RuleContext{SourceFile: tsParser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: "/scope.ts", Path: "/scope.ts",
+		FileName: "/scope.ts", PathKey: "/scope.ts",
 	}, strings.Repeat(`{ let x = value; function f(a = x) { let y = a; return y; } f(x); }`, 100), core.ScriptKindTS)}
 	for _, shared := range []bool{false, true} {
 		name := "uncached"

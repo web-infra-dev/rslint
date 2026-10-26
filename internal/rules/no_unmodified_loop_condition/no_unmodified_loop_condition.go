@@ -189,17 +189,17 @@ func nodeIsInLoopRange(node *ast.Node, condition *ast.Node, body *ast.Node, incr
 // intentionally omits because declaration names are not references. ESLint
 // counts these only for variables whose first definition is a var declaration.
 func isVarDeclarationWrittenInLoop(sym *ast.Symbol, condition *ast.Node, body *ast.Node, incrementor *ast.Node) bool {
-	if sym == nil || len(sym.Declarations) == 0 {
+	if sym == nil || len(sym.Declarations()) == 0 {
 		return false
 	}
 
-	first := ast.GetRootDeclaration(sym.Declarations[0])
+	first := ast.GetRootDeclaration(sym.Declarations()[0])
 	if first == nil || first.Kind != ast.KindVariableDeclaration || first.Parent == nil ||
 		!utils.IsVarKeyword(first.Parent) {
 		return false
 	}
 
-	for _, declaration := range sym.Declarations {
+	for _, declaration := range sym.Declarations() {
 		root := ast.GetRootDeclaration(declaration)
 		if root == nil || root.Kind != ast.KindVariableDeclaration || root.Parent == nil ||
 			!utils.IsVarKeyword(root.Parent) ||

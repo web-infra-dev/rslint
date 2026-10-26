@@ -73,7 +73,7 @@ func TestPipelineReleasesGenerationOnPreparationFailureAndPanic(t *testing.T) {
 			case <-time.After(5 * time.Second):
 				panic("timed out waiting for both parallel resolvers")
 			}
-			panic(source.FileName())
+			panic(source.FileName().AsString())
 		})
 		firstPanic, firstOK := recovered.(string)
 		if !firstOK ||

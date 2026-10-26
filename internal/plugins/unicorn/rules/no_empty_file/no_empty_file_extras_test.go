@@ -32,7 +32,7 @@ func TestNoEmptyFileDirectiveSuppression(t *testing.T) {
 		} {
 			code := strings.ReplaceAll(tc.code, "PREFIX", prefix)
 			t.Run(code, func(t *testing.T) {
-				sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/example.js", Path: "/example.js"}, code, core.ScriptKindJS)
+				sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/example.js", PathKey: "/example.js"}, code, core.ScriptKindJS)
 				comments := rule.NewCommentStore(sf)
 				var diagnostics []rule.RuleDiagnostic
 				ctx := rule.RuleContext{SourceFile: sf, Comments: comments, DisableManager: rule.NewDisableManager(sf, comments)}.

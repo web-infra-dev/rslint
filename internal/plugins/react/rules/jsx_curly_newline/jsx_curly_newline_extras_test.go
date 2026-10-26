@@ -73,7 +73,7 @@ func TestJsxCurlyNewlineExtras(t *testing.T) {
 
 func TestJsxCurlyNewlineEditDemand(t *testing.T) {
 	for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
-		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/demand.tsx", Path: "/demand.tsx"}, "<App>{value}</App>", core.ScriptKindTSX)
+		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/demand.tsx", PathKey: "/demand.tsx"}, "<App>{value}</App>", core.ScriptKindTSX)
 		comments := rule.NewCommentStore(sourceFile)
 		var diagnostics []rule.RuleDiagnostic
 		ctx := rule.RuleContext{SourceFile: sourceFile, Comments: comments, DisableManager: rule.NewDisableManager(sourceFile, comments)}.WithDiagnosticConsumer("react/jsx-curly-newline", rule.SeverityError, rule.DiagnosticConsumer{

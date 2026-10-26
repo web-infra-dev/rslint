@@ -19,7 +19,7 @@ func isLocallyDeclaredIdentifier(node *ast.Node, ctx rule.RuleContext) bool {
 		return false
 	}
 	if symbol := ctx.TypeChecker.GetSymbolAtLocation(node); symbol != nil {
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if ast.GetSourceFileOfNode(declaration) == ctx.SourceFile {
 				return true
 			}

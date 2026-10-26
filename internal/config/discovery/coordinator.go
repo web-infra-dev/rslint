@@ -144,7 +144,7 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		if boundedDirectoryWalk && targetsByRoot[directory] == nil {
 			continue
 		}
-		useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
+		useCaseSensitive := coordinator.fs.CaseSensitivity().IsCaseSensitive()
 		defaultExcluded := isDefaultDiscoveryExcluded(directory, cwd, useCaseSensitive)
 		ancestryOnly := defaultExcluded
 		searchDirectory := directory
@@ -184,7 +184,7 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 			continue
 		}
 		fileDirectory := tspath.GetDirectoryPath(file.Path)
-		defaultExcluded := isDefaultDiscoveryExcluded(file.Path, cwd, coordinator.fs.UseCaseSensitiveFileNames())
+		defaultExcluded := isDefaultDiscoveryExcluded(file.Path, cwd, coordinator.fs.CaseSensitivity().IsCaseSensitive())
 		seed := &discoverySeed{
 			path:         file.Path,
 			searchDir:    fileDirectory,
@@ -290,7 +290,7 @@ func (coordinator *discoveryCoordinator) adoptCandidate(state *configLoadState, 
 }
 
 func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
-	configs, scopes, effectiveIDs, err := coordinator.draft.finalize(coordinator.physicalDirectory, coordinator.fs.UseCaseSensitiveFileNames())
+	configs, scopes, effectiveIDs, err := coordinator.draft.finalize(coordinator.physicalDirectory, coordinator.fs.CaseSensitivity().IsCaseSensitive())
 	if err != nil {
 		return nil, err
 	}

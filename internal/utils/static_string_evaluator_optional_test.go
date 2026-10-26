@@ -25,7 +25,7 @@ func TestStaticOptionalChainUnknownReceiverCost(t *testing.T) {
 		for _, length := range []int{8, 16, 32, 64} {
 			t.Run(fmt.Sprintf("%s/%d", test.suffix, length), func(t *testing.T) {
 				code := "const value = unknown" + strings.Repeat(test.suffix, length)
-				source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/chain.ts", Path: "/chain.ts"}, code, core.ScriptKindTS)
+				source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/chain.ts", PathKey: "/chain.ts"}, code, core.ScriptKindTS)
 				resolver := &countingStaticReferenceResolver{}
 				evaluator := NewStaticStringEvaluatorWithReferenceResolver(nil, source, resolver)
 				if _, known := evaluator.EvalValue(findVariableInitializer(t, source, "value")); known {
@@ -56,7 +56,7 @@ func TestStaticOptionalJoinClassification(t *testing.T) {
 		{`(null?.join).call()`, "", StaticEvalUnknown},
 	} {
 		t.Run(test.expression, func(t *testing.T) {
-			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/chain.ts", Path: "/chain.ts"}, "const value = "+test.expression, core.ScriptKindTS)
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/chain.ts", PathKey: "/chain.ts"}, "const value = "+test.expression, core.ScriptKindTS)
 			evaluator := NewStaticStringEvaluatorWithSourceFile(nil, source)
 			got, kind := evaluator.EvalStringValue(findVariableInitializer(t, source, "value"))
 			if got != test.want || kind != test.kind {
@@ -67,7 +67,7 @@ func TestStaticOptionalJoinClassification(t *testing.T) {
 }
 
 func TestStaticOptionalChainEvaluationBoundaries(t *testing.T) {
-	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/chain.ts", Path: "/chain.ts"}, `
+	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/chain.ts", PathKey: "/chain.ts"}, `
 		const value = undefined?.x;
 		const symbol = Symbol?.for("x");
 	`, core.ScriptKindTS)

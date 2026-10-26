@@ -54,11 +54,11 @@ var JsxFilenameExtensionRule = rule.Rule{
 		fileName := ctx.SourceFile.FileName()
 
 		// Skip virtual files like <text>
-		if strings.HasPrefix(fileName, "<") {
+		if strings.HasPrefix(fileName.AsString(), "<") {
 			return rule.RuleListeners{}
 		}
 
-		ext := path.Ext(fileName)
+		ext := path.Ext(fileName.AsString())
 
 		if allow == "as-needed" && isExtensionAllowed(ext) {
 			// Need to check if file contains JSX. Walk AST eagerly.

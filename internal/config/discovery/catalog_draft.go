@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type selectedConfigSource struct {
@@ -139,10 +140,10 @@ func (draft *catalogDraft) validateDirectoryIdentities(physicalDirectory func(st
 	}
 	sort.Strings(directories)
 
-	lexicalByPhysical := make(map[tspath.Path]string, len(directories))
+	lexicalByPhysical := make(map[tspath.PathKey]string, len(directories))
 	for _, directory := range directories {
 		physicalPath := physicalDirectory(directory)
-		physicalID := tspath.ToPath(physicalPath, "", true)
+		physicalID := pathutil.ToPath(physicalPath, "", true)
 		existing, collision := lexicalByPhysical[physicalID]
 		if !collision {
 			lexicalByPhysical[physicalID] = directory

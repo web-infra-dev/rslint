@@ -55,7 +55,7 @@ func TestNewRuleBuildsThreeNonOverlappingSuggestions(t *testing.T) {
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, `expect(a === b).not.toBe(false);`, core.ScriptKindTS)
 
 	var calls []*ast.Node

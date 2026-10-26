@@ -140,7 +140,7 @@ func TestNoNewBufferEditDemand(t *testing.T) {
 		var got []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: lintprogram.NewFromCompiler(program),
-			File:    sourceFile.FileName(),
+			File:    sourceFile.FileName().AsString(),
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:     no_new_buffer.NoNewBufferRule.Name,

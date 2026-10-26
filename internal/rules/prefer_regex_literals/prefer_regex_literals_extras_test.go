@@ -307,7 +307,7 @@ func TestPreferRegexLiteralsEditDemand(t *testing.T) {
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, `RegExp("item-(a|b)+", "giu");`, core.ScriptKindTS)
 	statement := sourceFile.Statements.Nodes[0].AsExpressionStatement()
 	callNode := statement.Expression

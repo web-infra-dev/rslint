@@ -138,7 +138,7 @@ func hasOtherInterfaceOrClassDeclaration(symbol *ast.Symbol, node *ast.Node) boo
 	if symbol == nil {
 		return false
 	}
-	for _, decl := range symbol.Declarations {
+	for _, decl := range symbol.Declarations() {
 		if decl != node && (decl.Kind == ast.KindClassDeclaration || decl.Kind == ast.KindInterfaceDeclaration) {
 			return true
 		}

@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed hashbang.schema.json
@@ -72,7 +73,7 @@ var HashbangRule = rule.Rule{
 			return nil
 		}
 		fileName := ctx.SourceFile.FileName()
-		pkg := packagejson.FindNearestValid(program, fileName)
+		pkg := packagejson.FindNearestValid(program, fileName.AsString())
 		if pkg == nil {
 			return nil
 		}
@@ -80,7 +81,7 @@ var HashbangRule = rule.Rule{
 		if len(options) > 0 {
 			opts, _ = options[0].(map[string]any)
 		}
-		relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), fileName, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: program.FS().UseCaseSensitiveFileNames()})
+		relative := pathutil.GetRelativePathFromDirectory(pkg.Directory(), fileName.AsString(), pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: program.FS().CaseSensitivity().IsCaseSensitive()})
 		converted, ok := nodeutil.ConvertPath(relative, opts, ctx.Settings)
 		if !ok {
 			return nil
@@ -93,7 +94,7 @@ var HashbangRule = rule.Rule{
 		needsShebang := additional || nodeutil.IsBinFile(program, pkg, absolute)
 		executable := "node"
 		if mapping, ok := opts["executableMap"].(map[string]any); ok {
-			if value, ok := mapping[fileExtension(fileName)].(string); ok {
+			if value, ok := mapping[fileExtension(fileName.AsString())].(string); ok {
 				executable = value
 			}
 		}

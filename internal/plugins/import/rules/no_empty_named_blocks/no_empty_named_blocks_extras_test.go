@@ -149,7 +149,7 @@ func TestNoEmptyNamedBlocksEditDemand(t *testing.T) {
 		{code: `import type {} from 'mod' with { 'resolution-mode': 'require' };`, suggestions: []string{""}},
 	} {
 		t.Run(tc.code, func(t *testing.T) {
-			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.ts", Path: "/test.ts"}, tc.code, core.ScriptKindTS)
+			file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.ts", PathKey: "/test.ts"}, tc.code, core.ScriptKindTS)
 			var all rule.RuleDiagnostic
 			for _, demand := range []rule.EditDemand{rule.EditDemandAll, rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion} {
 				var diagnostics []rule.RuleDiagnostic

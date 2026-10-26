@@ -14,7 +14,7 @@ func TestNewRuleParsesEachCallOnce(t *testing.T) {
 	parseCount := 0
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, "describe(); nested();", core.ScriptKindTS)
 	var calls []*ast.Node
 	var collectCalls func(*ast.Node) bool

@@ -149,17 +149,17 @@ func collectSignatureReturnTypeParameterUsages(tc *checker.Checker, sig *checker
 	allUsages := make(map[*ast.Node]int)
 	collectTypeParameterUsageCounts(tc, declaration, allUsages, false)
 	nonReturnUsages := make(map[*ast.Node]int)
-	if this := sig.ThisParameter(); this != nil && this.ValueDeclaration != nil {
-		collectTypeParameterUsageCounts(tc, this.ValueDeclaration, nonReturnUsages, false)
+	if this := sig.ThisParameter(); this != nil && this.ValueDeclaration() != nil {
+		collectTypeParameterUsageCounts(tc, this.ValueDeclaration(), nonReturnUsages, false)
 	}
 	for _, parameter := range sig.Parameters() {
-		if parameter.ValueDeclaration != nil {
-			collectTypeParameterUsageCounts(tc, parameter.ValueDeclaration, nonReturnUsages, false)
+		if parameter.ValueDeclaration() != nil {
+			collectTypeParameterUsageCounts(tc, parameter.ValueDeclaration(), nonReturnUsages, false)
 		}
 	}
 	for _, typeParameter := range sig.TypeParameters() {
-		if symbol := typeParameter.Symbol(); symbol != nil && len(symbol.Declarations) != 0 {
-			collectTypeParameterUsageCounts(tc, symbol.Declarations[0], nonReturnUsages, false)
+		if symbol := typeParameter.Symbol(); symbol != nil && len(symbol.Declarations()) != 0 {
+			collectTypeParameterUsageCounts(tc, symbol.Declarations()[0], nonReturnUsages, false)
 		}
 	}
 
@@ -220,8 +220,8 @@ func genericCallArgumentReturnUsages(tc *checker.Checker, callNode *ast.Node, ar
 	if callee != nil && callee.Kind == ast.KindIdentifier {
 		if symbol := tc.GetSymbolAtLocation(callee); symbol != nil {
 			var declaration *ast.Node
-			if len(symbol.Declarations) == 1 && ast.IsFunctionLike(symbol.Declarations[0]) {
-				declaration = symbol.Declarations[0]
+			if len(symbol.Declarations()) == 1 && ast.IsFunctionLike(symbol.Declarations()[0]) {
+				declaration = symbol.Declarations()[0]
 			}
 			if declaration == nil {
 				goto resolveSignature
@@ -274,7 +274,7 @@ resolveSignature:
 		}
 		parameterIndex = len(parameters) - 1
 	}
-	parameterDeclaration := parameters[parameterIndex].ValueDeclaration
+	parameterDeclaration := parameters[parameterIndex].ValueDeclaration()
 	if parameterDeclaration == nil {
 		return nil
 	}
@@ -380,22 +380,22 @@ func isTypeScriptLibValueNamed(tc *checker.Checker, node *ast.Node, name string)
 	if symbol == nil {
 		return false
 	}
-	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
+	if symbol.Flags()&ast.SymbolFlagsAlias != 0 {
 		symbol = tc.GetAliasedSymbol(symbol)
 	}
-	return symbol != nil && symbol.Name == name && isTypeScriptLibSymbol(tc, symbol)
+	return symbol != nil && symbol.Name() == name && isTypeScriptLibSymbol(tc, symbol)
 }
 
 func isTypeScriptLibSymbol(tc *checker.Checker, symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
-	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
+	if symbol.Flags()&ast.SymbolFlagsAlias != 0 {
 		symbol = tc.GetAliasedSymbol(symbol)
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if sourceFile := ast.GetSourceFileOfNode(declaration); sourceFile != nil && sourceFile.IsDeclarationFile {
-			base := filepath.Base(sourceFile.FileName())
+			base := filepath.Base(sourceFile.FileName().AsString())
 			if strings.HasPrefix(base, "lib.") && strings.HasSuffix(base, ".d.ts") {
 				return true
 			}
@@ -427,7 +427,7 @@ func returnTypeAssumesMultipleUses(tc *checker.Checker, sig *checker.Signature) 
 	}
 	if tc.IsArrayType(target) {
 		symbol := t.Symbol()
-		return symbol != nil && symbol.Name == "Array"
+		return symbol != nil && symbol.Name() == "Array"
 	}
 	return true
 }
@@ -472,8 +472,8 @@ func collectInferableTypeParameterUsages(tc *checker.Checker, root *checker.Type
 			return
 		}
 		if utils.IsTypeParameter(t) {
-			if symbol := t.Symbol(); symbol != nil && len(symbol.Declarations) != 0 {
-				declaration := symbol.Declarations[0]
+			if symbol := t.Symbol(); symbol != nil && len(symbol.Declarations()) != 0 {
+				declaration := symbol.Declarations()[0]
 				if ast.IsTypeParameterDeclaration(declaration) && declaration.Name() != nil && wanted[declaration.Name()] != 0 && !usages[declaration.Name()] {
 					usages[declaration.Name()] = true
 					remaining--
@@ -582,11 +582,14 @@ func collectLegacySpreadTypeParameterUsages(tc *checker.Checker, t *checker.Type
 		return
 	}
 	if utils.IsTypeParameter(t) {
+		if checker.IsDistributedTypeParameter(t) {
+			t = tc.GetConstraintOfTypeParameter(t)
+		}
 		symbol := t.Symbol()
-		if symbol == nil || len(symbol.Declarations) == 0 || !ast.IsTypeParameterDeclaration(symbol.Declarations[0]) {
+		if symbol == nil || len(symbol.Declarations()) == 0 || !ast.IsTypeParameterDeclaration(symbol.Declarations()[0]) {
 			return
 		}
-		declaration := symbol.Declarations[0].AsTypeParameterDeclaration()
+		declaration := symbol.Declarations()[0].AsTypeParameterDeclaration()
 		if declaration.Name() == nil {
 			return
 		}
@@ -665,7 +668,7 @@ func typeContainsTypeParameterDeclaration(t *checker.Type, name *ast.Node, visit
 	visited[t] = true
 	if utils.IsTypeParameter(t) {
 		symbol := t.Symbol()
-		return symbol != nil && len(symbol.Declarations) != 0 && ast.IsTypeParameterDeclaration(symbol.Declarations[0]) && symbol.Declarations[0].Name() == name
+		return symbol != nil && len(symbol.Declarations()) != 0 && ast.IsTypeParameterDeclaration(symbol.Declarations()[0]) && symbol.Declarations()[0].Name() == name
 	}
 	if utils.IsUnionType(t) || utils.IsIntersectionType(t) {
 		for _, constituent := range t.Types() {
@@ -682,7 +685,7 @@ func isObjectSpreadProperty(property *ast.Symbol) bool {
 		return false
 	}
 	isClassElement := false
-	for _, declaration := range property.Declarations {
+	for _, declaration := range property.Declarations() {
 		if ast.IsPrivateIdentifierClassElementDeclaration(declaration) {
 			return false
 		}
@@ -690,7 +693,7 @@ func isObjectSpreadProperty(property *ast.Symbol) bool {
 			isClassElement = true
 		}
 	}
-	return property.Flags&(ast.SymbolFlagsMethod|ast.SymbolFlagsGetAccessor|ast.SymbolFlagsSetAccessor) == 0 || !isClassElement
+	return property.Flags()&(ast.SymbolFlagsMethod|ast.SymbolFlagsGetAccessor|ast.SymbolFlagsSetAccessor) == 0 || !isClassElement
 }
 
 func computedPropertyAssumesMultipleUses(tc *checker.Checker, property *ast.Node) bool {
@@ -959,7 +962,7 @@ func collectInferredObjectSpreadUsagesWorker(tc *checker.Checker, node *ast.Node
 			}
 		case ast.KindShorthandPropertyAssignment:
 			if symbol := tc.GetShorthandAssignmentValueSymbol(property); symbol != nil {
-				collectDeclaration(symbol.ValueDeclaration)
+				collectDeclaration(symbol.ValueDeclaration())
 			}
 			collectExpression(property.AsShorthandPropertyAssignment().ObjectAssignmentInitializer)
 		case ast.KindMethodDeclaration, ast.KindGetAccessor:
@@ -990,8 +993,8 @@ func collectInferredObjectSpreadUsagesWorker(tc *checker.Checker, node *ast.Node
 				recordSpreadUsages(base, directUsages)
 				return
 			}
-			if symbol := tc.GetSymbolAtLocation(base); symbol != nil && symbol.ValueDeclaration != nil {
-				declaration := symbol.ValueDeclaration
+			if symbol := tc.GetSymbolAtLocation(base); symbol != nil && symbol.ValueDeclaration() != nil {
+				declaration := symbol.ValueDeclaration()
 				selectionKey := objectRestSelectionKey(excluded)
 				seenNames := activeSelections[declaration]
 				if seenNames == nil {
@@ -1081,7 +1084,7 @@ func collectInferredObjectSpreadUsagesWorker(tc *checker.Checker, node *ast.Node
 			}
 			for _, spreadProperty := range checker.Checker_getPropertiesOfType(tc, spreadType) {
 				if isObjectSpreadProperty(spreadProperty) {
-					excluded[spreadProperty.Name] = true
+					excluded[spreadProperty.Name()] = true
 				}
 			}
 		}
@@ -1094,8 +1097,8 @@ func collectInferredObjectSpreadUsagesWorker(tc *checker.Checker, node *ast.Node
 		}
 		base = ast.SkipParentheses(base)
 		if base.Kind == ast.KindIdentifier {
-			if symbol := tc.GetSymbolAtLocation(base); symbol != nil && symbol.ValueDeclaration != nil {
-				declaration := symbol.ValueDeclaration
+			if symbol := tc.GetSymbolAtLocation(base); symbol != nil && symbol.ValueDeclaration() != nil {
+				declaration := symbol.ValueDeclaration()
 				selectionKey := "\x00array-rest:" + strconv.Itoa(start)
 				seenNames := activeSelections[declaration]
 				if seenNames == nil {
@@ -1192,8 +1195,8 @@ func collectInferredObjectSpreadUsagesWorker(tc *checker.Checker, node *ast.Node
 				}
 				return nil
 			case ast.KindIdentifier:
-				if symbol := tc.GetSymbolAtLocation(expression); symbol != nil && symbol.ValueDeclaration != nil {
-					declaration := symbol.ValueDeclaration
+				if symbol := tc.GetSymbolAtLocation(expression); symbol != nil && symbol.ValueDeclaration() != nil {
+					declaration := symbol.ValueDeclaration()
 					if resolving[declaration] {
 						return nil
 					}
@@ -1360,8 +1363,8 @@ func collectInferredObjectSpreadUsagesWorker(tc *checker.Checker, node *ast.Node
 			return
 		case ast.KindIdentifier:
 			symbol := tc.GetSymbolAtLocation(base)
-			if symbol != nil && symbol.ValueDeclaration != nil {
-				declaration := symbol.ValueDeclaration
+			if symbol != nil && symbol.ValueDeclaration() != nil {
+				declaration := symbol.ValueDeclaration()
 				seenNames := activeSelections[declaration]
 				if seenNames == nil {
 					seenNames = make(map[string]bool)
@@ -1438,7 +1441,7 @@ func collectInferredObjectSpreadUsagesWorker(tc *checker.Checker, node *ast.Node
 
 		if objectType := tc.GetTypeAtLocation(base); objectType != nil {
 			if property := checker.Checker_getPropertyOfType(tc, objectType, name); property != nil {
-				collectProperty(property.ValueDeclaration)
+				collectProperty(property.ValueDeclaration())
 			}
 		}
 	}
@@ -1594,7 +1597,7 @@ func collectInferredObjectSpreadUsagesWorker(tc *checker.Checker, node *ast.Node
 			if symbol == nil {
 				return
 			}
-			collectDeclaration(symbol.ValueDeclaration)
+			collectDeclaration(symbol.ValueDeclaration())
 		}
 	}
 
@@ -1629,10 +1632,10 @@ func collectLegacyObjectSpreadSignatureUsages(tc *checker.Checker, node *ast.Nod
 			return
 		}
 		for _, parameter := range sig.Parameters() {
-			if parameter.ValueDeclaration == nil || parameter.ValueDeclaration.Type() != nil {
+			if parameter.ValueDeclaration() == nil || parameter.ValueDeclaration().Type() != nil {
 				continue
 			}
-			for name, count := range collectInferredObjectSpreadExpressionUsages(tc, parameter.ValueDeclaration.Initializer()) {
+			for name, count := range collectInferredObjectSpreadExpressionUsages(tc, parameter.ValueDeclaration().Initializer()) {
 				usages[name] += count
 			}
 		}
@@ -1877,6 +1880,12 @@ func collectTypeParameterUsageCountsWorker(tc *checker.Checker, node *ast.Node, 
 	}
 
 	visitType = func(t *checker.Type, assumeMultipleUses bool, isReturnType bool) {
+		// Distributed parameters wrap their original parameter as a constraint.
+		// Count the original once rather than treating that implementation edge
+		// as another occurrence in the declaring signature.
+		if t != nil && checker.IsDistributedTypeParameter(t) {
+			t = tc.GetConstraintOfTypeParameter(t)
+		}
 		if t == nil || incrementTypeUsages(t) > 9 {
 			return
 		}
@@ -1884,14 +1893,14 @@ func collectTypeParameterUsageCountsWorker(tc *checker.Checker, node *ast.Node, 
 		switch {
 		case utils.IsTypeParameter(t):
 			sym := t.Symbol()
-			if sym == nil || len(sym.Declarations) == 0 {
+			if sym == nil || len(sym.Declarations()) == 0 {
 				return
 			}
 			// A polymorphic `this` type also carries TypeFlagsTypeParameter, but
 			// its symbol is the declaring class/interface, so its first
 			// declaration is not a type parameter. Such a type contributes no
 			// count and has no constraint or default to recurse into.
-			decl := sym.Declarations[0]
+			decl := sym.Declarations()[0]
 			if !ast.IsTypeParameterDeclaration(decl) {
 				return
 			}
@@ -1939,7 +1948,7 @@ func collectTypeParameterUsageCountsWorker(tc *checker.Checker, node *ast.Node, 
 						thisAssumeMultipleUses = isReturnType && !target.AsTupleType().IsReadonly()
 					case tc.IsArrayType(target):
 						sym := t.Symbol()
-						thisAssumeMultipleUses = isReturnType && sym != nil && sym.Name == "Array"
+						thisAssumeMultipleUses = isReturnType && sym != nil && sym.Name() == "Array"
 					default:
 						thisAssumeMultipleUses = true
 					}

@@ -594,7 +594,7 @@ func (scanner *betweenScanner) isLibraryCall(node *ast.Node) bool {
 	if symbol == nil || !internalUtils.IsSymbolFromDefaultLibrary(scanner.ctx.Program(), symbol) {
 		return false
 	}
-	switch symbol.Name {
+	switch symbol.Name() {
 	case "eval", "call", "apply":
 		return false
 	}

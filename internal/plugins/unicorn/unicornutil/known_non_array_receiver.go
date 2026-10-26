@@ -63,7 +63,7 @@ func isSourceOnlyFile(ctx rule.RuleContext) bool {
 	if name == "" {
 		return true
 	}
-	ext := ecmascript.StringToLowerCase(filepath.Ext(name))
+	ext := ecmascript.StringToLowerCase(filepath.Ext(name.AsString()))
 	return ext != ".ts" && ext != ".tsx" && ext != ".mts" && ext != ".cts"
 }
 

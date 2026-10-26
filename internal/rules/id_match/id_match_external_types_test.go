@@ -32,7 +32,7 @@ func TestMayReferenceExternalTypeOrNamespaceCoversExactMeanings(t *testing.T) {
 		t.Run(source, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.ts",
-				Path:     "/test.ts",
+				PathKey:  "/test.ts",
 			}, source, core.ScriptKindTS)
 			var subject *ast.Node
 			var visit func(*ast.Node) bool

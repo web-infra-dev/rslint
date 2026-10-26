@@ -67,7 +67,7 @@ class C {}`, want: []bool{true}},
 				{"typescript", core.ScriptKindTSX}, {"javascript", core.ScriptKindJSX},
 			} {
 				t.Run(script.name, func(t *testing.T) {
-					sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/component.tsx", Path: "/component.tsx"}, tc.code, script.kind)
+					sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/component.tsx", PathKey: "/component.tsx"}, tc.code, script.kind)
 					var got []bool
 					var visit func(*ast.Node) bool
 					visit = func(node *ast.Node) bool {
@@ -115,7 +115,7 @@ func TestExtendsReactComponent(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/component.tsx", Path: "/component.tsx"}, tc.code, tc.kind)
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/component.tsx", PathKey: "/component.tsx"}, tc.code, tc.kind)
 			var got []bool
 			utils.VisitDescendants(source.AsNode(), func(node *ast.Node) bool {
 				if ast.IsClassLike(node) {

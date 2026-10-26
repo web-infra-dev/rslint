@@ -117,7 +117,7 @@ func parseNoExplicitAnySource(t *testing.T, code string) *ast.SourceFile {
 	t.Helper()
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/source.ts",
-		Path:     "/source.ts",
+		PathKey:  "/source.ts",
 	}, code, core.ScriptKindTS)
 }
 

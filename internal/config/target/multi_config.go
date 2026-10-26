@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func discoverLintTargetsMultiConfigWithPreparedFiles(
@@ -47,14 +48,14 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 	// it cannot own. A non-nil empty bucket is preserved below so the explicit
 	// file-only fast path still suppresses directory walking for configs that own
 	// no requested files.
-	assignedExplicitOwners := make(map[tspath.Path]string)
+	assignedExplicitOwners := make(map[tspath.PathKey]string)
 	for _, configDir := range configDirs {
 		scope, ok := scopes[configDir]
 		if !ok || scope.ExplicitFiles == nil {
 			continue
 		}
 		for _, filePath := range scope.ExplicitFiles {
-			key := tspath.ToPath(tspath.NormalizePath(filePath), "", true)
+			key := pathutil.ToPath(tspath.NormalizePath(filePath), "", true)
 			if _, exists := assignedExplicitOwners[key]; !exists {
 				assignedExplicitOwners[key] = configDir
 			}
@@ -65,7 +66,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 	}
 	filesByConfig := make(map[string][]*explicitLintTarget)
 	for _, explicitFile := range explicitSet.targetsForIdentities(allowFiles) {
-		pathID := tspath.ToPath(explicitFile.target.Path, "", true)
+		pathID := pathutil.ToPath(explicitFile.target.Path, "", true)
 		if _, assigned := assignedExplicitOwners[pathID]; assigned {
 			continue
 		}
@@ -101,7 +102,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 		filesSpecifiedByConfig[configDir] = true
 	}
 
-	seen := make(map[tspath.Path]struct{})
+	seen := make(map[tspath.PathKey]struct{})
 	var allTargets []File
 	for _, configDir := range configDirs {
 		var configAllowFiles []*explicitLintTarget
@@ -135,7 +136,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 			gitPolicy,
 		)
 		for _, target := range targets {
-			pathID := tspath.ToPath(tspath.NormalizePath(target.Path), "", true)
+			pathID := pathutil.ToPath(tspath.NormalizePath(target.Path), "", true)
 			if _, exists := seen[pathID]; !exists {
 				seen[pathID] = struct{}{}
 				allTargets = append(allTargets, target)
@@ -155,9 +156,9 @@ func appendUniqueExplicitLintTarget(
 	if target == nil {
 		return targets
 	}
-	pathID := tspath.ToPath(target.target.Path, "", true)
+	pathID := pathutil.ToPath(target.target.Path, "", true)
 	for _, existing := range targets {
-		if existing != nil && tspath.ToPath(existing.target.Path, "", true) == pathID {
+		if existing != nil && pathutil.ToPath(existing.target.Path, "", true) == pathID {
 			return targets
 		}
 	}
@@ -167,7 +168,7 @@ func appendUniqueExplicitLintTarget(
 func discoverLintTargetsForConfigInMap(
 	configMap map[string]rslintconfig.RslintConfig,
 	ownerIndex *OwnerIndex,
-	assignedExplicitOwners map[tspath.Path]string,
+	assignedExplicitOwners map[tspath.PathKey]string,
 	configDir string,
 	fsys vfs.FS,
 	explicitFiles []*explicitLintTarget,
@@ -204,7 +205,7 @@ func discoverLintTargetsForConfigInMap(
 
 	ownedTargets := make([]File, 0, len(targets))
 	for _, target := range targets {
-		targetID := tspath.ToPath(tspath.NormalizePath(target.Path), "", true)
+		targetID := pathutil.ToPath(tspath.NormalizePath(target.Path), "", true)
 		if assignedOwner, assigned := assignedExplicitOwners[targetID]; assigned {
 			if assignedOwner == configDir {
 				target.ConfigDirectory = configDir

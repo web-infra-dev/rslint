@@ -13,7 +13,7 @@ func parseFirstCall(t *testing.T, code string) (*ast.SourceFile, *ast.Node) {
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, code, core.ScriptKindTS)
 
 	call := findFirstNodeOfKind(sourceFile, ast.KindCallExpression)
@@ -29,7 +29,7 @@ func parseFirstNodeOfKind(t *testing.T, code string, kind ast.Kind) *ast.Node {
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, code, core.ScriptKindTS)
 
 	node := findFirstNodeOfKind(sourceFile, kind)

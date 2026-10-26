@@ -151,8 +151,17 @@ module/import/linkname paths use `github.com/microsoft/TypeScript/tsc`.
 `packages/rslint-api` imports the JS AST API from the same checkout's
 `packages/typescript` sources. The tsgo release workflow copies that compiler's
 bundled standard libraries through the upstream `lib` build task.
+The API declaration build uses the published TypeScript compiler matching this
+checkout's release.
+The compiler helpers in `internal/utils` retain the explicit base directory
+required by rslint's source-only builders. Compiler-backed
+Programs take their base directory from the parsed configuration. The
+`internal/utils/pathutil` adapters keep configuration and wire paths as strings
+while passing normalized rooted file/directory paths into the compiler and VFS;
+`PathKey` values are used only for identity. Module-source lookup retains the
+complete upstream resolution result, including its path key and redirects.
 See [the compiler dependency guide](./CONTRIBUTING.md#typescript-compiler-dependency)
-for the pinned revision, migration rationale, and update workflow.
+for the pinned revision and update workflow.
 
 Rule-facing string and matching helpers belong under `internal/utils/`:
 `ecmascript` owns JavaScript string values and UTF-16 conversion,
@@ -2229,7 +2238,7 @@ String plugin declarations select bundled Go plugin namespaces. Live third-party
 - **WASM Playground**: `packages/rslint-wasm` runs the API server in a browser worker
 - **Rust Client**: `crates/tsgo-client` consumes `cmd/tsgo`
 
-`cmd/tsgo` dispatches two one-shot subcommands, each parsing its own options.
+`cmd/tsgo` dispatches two one-shot subcommands, each parsing its own options. Compiler symbol identities in its semantic protocol use 64-bit integers, represented by `proto::SymbolId` in `tsgo-client`; type IDs, file indexes and source positions remain 32-bit.
 `project --api --config <path>` returns the existing binary project information;
 the Rust client selects this command, and flag-only invocations remain compatible.
 `config --config <path>` resolves tsconfig inheritance and prints

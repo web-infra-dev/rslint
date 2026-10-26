@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -25,7 +26,7 @@ func parseFileAndFindNode(t *testing.T, code string, kind ast.Kind, fileName str
 	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	program, err := CreateProgram(true, fs, rootDir.Dir, tsconfigPath, CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program for code: "+code)
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 
 	var found *ast.Node
 	var walk func(node *ast.Node) bool
@@ -395,7 +396,7 @@ func TestHasUseStrictDirective(t *testing.T) {
 			fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: tt.code})
 			program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 			assert.NilError(t, err)
-			sourceFile := program.GetSourceFile(filePath)
+			sourceFile := program.GetSourceFile(pathutil.File(filePath))
 			result := HasUseStrictDirective(sourceFile.AsNode())
 			assert.Equal(t, result, tt.expected, "HasUseStrictDirective mismatch for: %s", tt.code)
 		})

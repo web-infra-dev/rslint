@@ -383,9 +383,9 @@ func resolveLatestWrite(ident *ast.Node, tc *checker.Checker) *ast.Node {
 func resolveDeclarationOf(ident *ast.Node, name string, tc *checker.Checker) *ast.Node {
 	if tc != nil {
 		if sym := tc.GetSymbolAtLocation(ident); sym != nil {
-			d := sym.ValueDeclaration
-			if d == nil && len(sym.Declarations) > 0 {
-				d = sym.Declarations[0]
+			d := sym.ValueDeclaration()
+			if d == nil && len(sym.Declarations()) > 0 {
+				d = sym.Declarations()[0]
 			}
 			if d != nil {
 				switch d.Kind {

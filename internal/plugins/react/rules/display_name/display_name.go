@@ -726,7 +726,7 @@ func (w *nodeWalker) resolveAndMarkComponentRef(obj *ast.Node) bool {
 	if symbol == nil {
 		return false
 	}
-	decl := symbol.ValueDeclaration
+	decl := symbol.ValueDeclaration()
 	if decl == nil {
 		return false
 	}

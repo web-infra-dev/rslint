@@ -832,7 +832,7 @@ func decodeParams[Req any](req *lsproto.RequestMessage) (Req, error) {
 			return params, nil
 		}
 	}
-	return lsproto.UnmarshalParams[Req](req)
+	return req.UnmarshalParams[Req]()
 }
 
 func (s *Server) handleShutdown(ctx context.Context, params lsproto.NoParams) (lsproto.ShutdownResponse, error) {

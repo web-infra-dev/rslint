@@ -48,7 +48,7 @@ var NoUnpublishedRequireRule = rule.Rule{
 								value := nodeutil.RequireResolutionOptions(ctx, opts)
 								resolution = &value
 							}
-							filePath := nodeutil.RequireFilePath(ctx.Program(), resource, ctx.SourceFile.FileName(), *resolution)
+							filePath := nodeutil.RequireFilePath(ctx.Program(), resource, ctx.SourceFile.FileName().AsString(), *resolution)
 							ignored = publication.IsUnpublishedFile(filePath)
 						}
 						if ignored {

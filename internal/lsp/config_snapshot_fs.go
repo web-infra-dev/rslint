@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // configSnapshotFS freezes path bases for one discovery transaction. Git source
@@ -20,7 +21,7 @@ type configSnapshotFS struct {
 func newConfigSnapshotFS(fsys vfs.FS) *configSnapshotFS {
 	caseSensitive := true
 	if fsys != nil {
-		caseSensitive = fsys.UseCaseSensitiveFileNames()
+		caseSensitive = fsys.CaseSensitivity().IsCaseSensitive()
 	}
 	return &configSnapshotFS{
 		FS:               fsys,
@@ -35,18 +36,18 @@ func newConfigSnapshotFS(fsys vfs.FS) *configSnapshotFS {
 // Target capture anchors leaf resolution in one physical parent. Owner
 // selection, Git projection, and authored-base matching that follow it must
 // agree on the config directory's identity throughout this transaction.
-func (fsys *configSnapshotFS) Realpath(filePath string) string {
+func (fsys *configSnapshotFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
 	if fsys == nil || fsys.FS == nil {
 		return ""
 	}
-	key := fsys.snapshotKey(filePath)
+	key := fsys.snapshotKey(filePath.AsString())
 	fsys.mu.Lock()
 	defer fsys.mu.Unlock()
 	if realPath, ok := fsys.realpathSnapshot[key]; ok {
-		return realPath
+		return pathutil.Path(realPath)
 	}
 	realPath := fsys.FS.Realpath(filePath)
-	fsys.realpathSnapshot[key] = realPath
+	fsys.realpathSnapshot[key] = realPath.AsString()
 	return realPath
 }
 

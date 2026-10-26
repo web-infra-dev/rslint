@@ -162,10 +162,10 @@ func isManualMemoIdentifier(id *ast.Node, expected string, typeChecker *checker.
 		return true
 	}
 	sym := utils.GetReferenceSymbol(id, typeChecker)
-	if sym == nil || len(sym.Declarations) == 0 {
+	if sym == nil || len(sym.Declarations()) == 0 {
 		return true
 	}
-	for _, decl := range sym.Declarations {
+	for _, decl := range sym.Declarations() {
 		if isManualMemoDeclaration(decl, expected) {
 			return true
 		}

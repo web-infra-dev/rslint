@@ -195,7 +195,7 @@ func resolveIdentifierReferenceFromSymbolModules(
 	}
 
 	hasLocalDeclaration := false
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil {
 			continue
 		}
@@ -245,7 +245,7 @@ func IsNamedESMImportSymbolModules(symbol *ast.Symbol, importModules, exportName
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || ast.IsTypeOnlyImportDeclaration(declaration) {
 			continue
 		}
@@ -275,7 +275,7 @@ func IsModuleNamespaceSymbolModules(symbol *ast.Symbol, importModules []string) 
 		return false
 	}
 
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil {
 			continue
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed no_import_module_exports.schema.json
@@ -25,7 +26,7 @@ var NoImportModuleExportsRule = rule.Rule{
 	Name:   "import/no-import-module-exports",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		fileName := tspath.NormalizePath(ctx.SourceFile.FileName())
+		fileName := tspath.NormalizePath(ctx.SourceFile.FileName().AsString())
 		if program := ctx.Program(); program != nil {
 			fileName = tspath.ResolvePath(program.CurrentDirectory(), fileName)
 		}
@@ -66,7 +67,7 @@ var NoImportModuleExportsRule = rule.Rule{
 				return
 			}
 			symbol := ctx.Refs.ResolveInFile(object)
-			hasCommonJSExport = symbol == nil || symbol.Flags&ast.SymbolFlagsModuleExports != 0
+			hasCommonJSExport = symbol == nil || symbol.Flags()&ast.SymbolFlagsModuleExports != 0
 		}
 
 		return rule.RuleListeners{
@@ -105,7 +106,7 @@ func packageEntryPoint(ctx rule.RuleContext) string {
 	if program == nil || ctx.SourceFile == nil {
 		return ""
 	}
-	pkg := packagejson.FindNearest(program, ctx.SourceFile.FileName())
+	pkg := packagejson.FindNearest(program, ctx.SourceFile.FileName().AsString())
 	if pkg == nil {
 		return ""
 	}
@@ -172,11 +173,11 @@ func probeNodeExtensions(program *program.Program, base string) string {
 }
 
 func nodeFile(program *program.Program, candidate string) string {
-	if !program.FileExists(candidate) {
+	if !program.FileExists(pathutil.File(candidate)) {
 		return ""
 	}
-	if realPath := program.FS().Realpath(candidate); realPath != "" {
-		return tspath.NormalizePath(realPath)
+	if realPath := program.FS().Realpath(pathutil.Path(candidate)); realPath != "" {
+		return tspath.NormalizePath(realPath.AsString())
 	}
 	return tspath.NormalizePath(candidate)
 }

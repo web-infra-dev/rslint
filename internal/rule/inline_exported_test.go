@@ -13,7 +13,7 @@ func parseInlineExportedForTest(t *testing.T, source string) (map[string]bool, [
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, source, core.ScriptKindTS)
 
 	return ParseInlineExported(sourceFile, NewCommentStore(sourceFile))

@@ -7,12 +7,13 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func parseMethodCallTestSource(fileName, code string, scriptKind core.ScriptKind) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName,
-		Path:     tspath.Path(fileName),
+		FileName: pathutil.File(fileName),
+		PathKey:  tspath.PathKey(fileName),
 	}, code, scriptKind)
 }
 

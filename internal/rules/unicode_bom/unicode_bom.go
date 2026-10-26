@@ -43,8 +43,8 @@ func hasBOM(ctx rule.RuleContext) bool {
 	fileSystem := ctx.Program().FS()
 	if fileSystem != nil && ctx.SourceFile != nil && sourceIsASCII(ctx.SourceFile.Text()) {
 		path := ctx.SourceFile.FileName()
-		vfsInfo := fileSystem.Stat(path)
-		diskInfo, err := os.Stat(path)
+		vfsInfo := fileSystem.Stat(path.AsPath())
+		diskInfo, err := os.Stat(path.AsString())
 		if err == nil && vfsInfo != nil && vfsInfo.Sys() != nil &&
 			os.SameFile(vfsInfo, diskInfo) &&
 			vfsInfo.Size() == diskInfo.Size() &&

@@ -104,7 +104,7 @@ func TestPreferNamespaceKeywordDefersAutofix(t *testing.T) {
 	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
 		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 			FileName: "/test.ts",
-			Path:     "/test.ts",
+			PathKey:  "/test.ts",
 		}, source, core.ScriptKindTS)
 		comments := rule.NewCommentStore(sourceFile)
 		var diagnostics []rule.RuleDiagnostic

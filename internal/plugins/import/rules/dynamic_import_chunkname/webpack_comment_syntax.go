@@ -47,7 +47,7 @@ func isValidWebpackCommentBody(body string) bool {
 	text := "(function() {return {" + body + "}})()"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/webpack-comment.js",
-		Path:     "/webpack-comment.js",
+		PathKey:  "/webpack-comment.js",
 	}, text, core.ScriptKindJS)
 	if len(sourceFile.Diagnostics()) != 0 {
 		return false

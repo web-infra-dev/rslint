@@ -195,7 +195,7 @@ func (ctx *RuleContext) emitRange(textRange core.TextRange, msg RuleMessage, fix
 		FixesPtr:    fixes,
 		Suggestions: suggestions,
 		SourceFile:  ctx.SourceFile,
-		FilePath:    ctx.SourceFile.FileName(),
+		FilePath:    ctx.SourceFile.FileName().AsString(),
 		Severity:    reporter.severity,
 	})
 }

@@ -298,7 +298,7 @@ func TestNoWarningCommentsUnterminatedBlockComment(t *testing.T) {
 
 		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 			FileName: "/unterminated.ts",
-			Path:     "/unterminated.ts",
+			PathKey:  "/unterminated.ts",
 		}, code, core.ScriptKindTS)
 
 		var messages []string

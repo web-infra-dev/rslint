@@ -510,7 +510,7 @@ func TestRequireAwaitSuggestionDemand(t *testing.T) {
 		var got []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program:         program,
-			File:            sourceFile.FileName(),
+			File:            sourceFile.FileName().AsString(),
 			HasTypeInfo:     true,
 			GetRulesForFile: getRules,
 			Consumer: rule.DiagnosticConsumer{

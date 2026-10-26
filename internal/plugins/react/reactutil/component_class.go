@@ -186,7 +186,7 @@ func componentJSDoc(host *ast.Node, pos int, sourceFile *ast.SourceFile) (*ast.N
 		scanner.ComputeLineOfPosition(sourceFile.ECMALineMap(), start)-scanner.ComputeLineOfPosition(sourceFile.ECMALineMap(), last.End()) > 1 {
 		return nil, sourceFile
 	}
-	fragment := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/component.ts", Path: "/component.ts"}, text[last.Pos():last.End()]+"\nconst component = 0;", core.ScriptKindTS)
+	fragment := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/component.ts", PathKey: "/component.ts"}, text[last.Pos():last.End()]+"\nconst component = 0;", core.ScriptKindTS)
 	docs := fragment.Statements.Nodes[0].JSDoc(fragment)
 	if len(docs) == 0 {
 		return nil, sourceFile

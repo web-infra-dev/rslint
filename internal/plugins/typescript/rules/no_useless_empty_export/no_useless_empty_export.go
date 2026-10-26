@@ -288,7 +288,7 @@ var NoUselessEmptyExportRule = rule.CreateRule(rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// In a definition file, export {} is necessary to make the module properly
 		// encapsulated, even when there are other exports
-		if isDefinitionFile(ctx.SourceFile.FileName()) {
+		if isDefinitionFile(ctx.SourceFile.FileName().AsString()) {
 			return rule.RuleListeners{}
 		}
 

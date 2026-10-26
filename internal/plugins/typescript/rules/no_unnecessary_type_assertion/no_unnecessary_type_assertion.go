@@ -294,12 +294,12 @@ func assertionHasSameProperties(typeChecker *checker.Checker, uncast, cast *chec
 	}
 	castPropertyNames := make(map[string]struct{}, len(castProperties))
 	for _, property := range castProperties {
-		castPropertyNames[property.Name] = struct{}{}
+		castPropertyNames[property.Name()] = struct{}{}
 	}
 	for _, property := range uncastProperties {
-		if _, ok := castPropertyNames[property.Name]; !ok ||
-			typescriptutil.IsPropertyReadonlyInType(typeChecker, uncast, property.Name) !=
-				typescriptutil.IsPropertyReadonlyInType(typeChecker, cast, property.Name) {
+		if _, ok := castPropertyNames[property.Name()]; !ok ||
+			typescriptutil.IsPropertyReadonlyInType(typeChecker, uncast, property.Name()) !=
+				typescriptutil.IsPropertyReadonlyInType(typeChecker, cast, property.Name()) {
 			return false
 		}
 	}
@@ -510,8 +510,8 @@ func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Nod
 		}
 		parameter := parameters[argumentIndex]
 		parameterType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, parameter)
-		if parameter.ValueDeclaration != nil && ast.IsParameterDeclaration(parameter.ValueDeclaration) &&
-			parameter.ValueDeclaration.AsParameterDeclaration().DotDotDotToken != nil {
+		if parameter.ValueDeclaration() != nil && ast.IsParameterDeclaration(parameter.ValueDeclaration()) &&
+			parameter.ValueDeclaration().AsParameterDeclaration().DotDotDotToken != nil {
 			if typeArguments := assertionTypeArguments(ctx.TypeChecker, parameterType); len(typeArguments) > 0 {
 				parameterType = typeArguments[0]
 			}
@@ -544,7 +544,7 @@ func assertionGenericsMismatch(ctx rule.RuleContext, uncastType, contextualType 
 		if !assertionHasGenericCallSignature(ctx.TypeChecker, propertyType) {
 			continue
 		}
-		uncastProperty := ctx.TypeChecker.GetPropertyOfType(uncastType, property.Name)
+		uncastProperty := ctx.TypeChecker.GetPropertyOfType(uncastType, property.Name())
 		if uncastProperty == nil || !assertionHasGenericCallSignature(
 			ctx.TypeChecker,
 			checker.Checker_getTypeOfSymbol(ctx.TypeChecker, uncastProperty),
@@ -746,8 +746,8 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			}
 
 			info := identifierInfo{}
-			if len(symbol.Declarations) > 0 {
-				info.declaration = symbol.Declarations[0]
+			if len(symbol.Declarations()) > 0 {
+				info.declaration = symbol.Declarations()[0]
 			}
 			declaredType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(symbol, nil)
 			if declaredType != nil {

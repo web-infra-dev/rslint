@@ -499,11 +499,11 @@ func hasNonReportableDestructuringTarget(writeNode *ast.Node, declNode *ast.Node
 func hasNonReportableTarget(node *ast.Node, declBlock *ast.Node, ctx *rule.RuleContext) bool {
 	if node.Kind == ast.KindIdentifier {
 		sym := ctx.Refs.Resolve(node)
-		if sym == nil || len(sym.Declarations) == 0 {
+		if sym == nil || len(sym.Declarations()) == 0 {
 			// Can't resolve — treat as non-reportable (conservative)
 			return true
 		}
-		targetDeclBlock := findContainingBlock(sym.Declarations[0])
+		targetDeclBlock := findContainingBlock(sym.Declarations()[0])
 		return targetDeclBlock != declBlock
 	}
 
@@ -518,11 +518,11 @@ func hasNonReportableTarget(node *ast.Node, declBlock *ast.Node, ctx *rule.RuleC
 			return true
 		case ast.KindIdentifier:
 			sym := ctx.Refs.Resolve(child)
-			if sym == nil || len(sym.Declarations) == 0 {
+			if sym == nil || len(sym.Declarations()) == 0 {
 				found = true
 				return true
 			}
-			if findContainingBlock(sym.Declarations[0]) != declBlock {
+			if findContainingBlock(sym.Declarations()[0]) != declBlock {
 				found = true
 				return true
 			}
@@ -530,11 +530,11 @@ func hasNonReportableTarget(node *ast.Node, declBlock *ast.Node, ctx *rule.RuleC
 			shorthand := child.AsShorthandPropertyAssignment()
 			if shorthand != nil && shorthand.Name() != nil {
 				valSym := ctx.Refs.Resolve(shorthand.Name())
-				if valSym == nil || len(valSym.Declarations) == 0 {
+				if valSym == nil || len(valSym.Declarations()) == 0 {
 					found = true
 					return true
 				}
-				if findContainingBlock(valSym.Declarations[0]) != declBlock {
+				if findContainingBlock(valSym.Declarations()[0]) != declBlock {
 					found = true
 					return true
 				}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -330,8 +331,8 @@ func TestBasePathGlobalIgnoreKeepsAliasedConfigArrayRootReachable(t *testing.T) 
 		file = tspath.NormalizePath(file)
 		return matcher.MatchFile(PathIdentity{
 			Path:                file,
-			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(file)),
-			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(tspath.GetDirectoryPath(file))),
+			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(pathutil.Path(file)).AsString()),
+			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(pathutil.Path(tspath.GetDirectoryPath(file))).AsString()),
 		})
 	}
 
@@ -341,7 +342,7 @@ func TestBasePathGlobalIgnoreKeepsAliasedConfigArrayRootReachable(t *testing.T) 
 		assert.Assert(t, !decision.GloballyIgnored())
 		assert.Assert(t, !matcher.CanPruneDirectory(DirectoryIdentity{
 			LexicalPath:   tspath.NormalizePath(filepath.Dir(file)),
-			CanonicalPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(file))),
+			CanonicalPath: tspath.NormalizePath(fsys.Realpath(pathutil.Path(filepath.Dir(file))).AsString()),
 		}))
 	}
 	for _, file := range []string{lexicalBlocked, physicalBlocked} {
@@ -349,7 +350,7 @@ func TestBasePathGlobalIgnoreKeepsAliasedConfigArrayRootReachable(t *testing.T) 
 		assert.Assert(t, decision.GloballyIgnored())
 		assert.Assert(t, matcher.CanPruneDirectory(DirectoryIdentity{
 			LexicalPath:   tspath.NormalizePath(filepath.Dir(file)),
-			CanonicalPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(file))),
+			CanonicalPath: tspath.NormalizePath(fsys.Realpath(pathutil.Path(filepath.Dir(file))).AsString()),
 		}))
 	}
 }
@@ -407,7 +408,7 @@ func TestBasePathNegationReopensPhysicalAliasSubtree(t *testing.T) {
 	}, root)
 	fsys := osvfs.FS()
 	root = tspath.NormalizePath(root)
-	physical = tspath.NormalizePath(fsys.Realpath(physical))
+	physical = tspath.NormalizePath(fsys.Realpath(pathutil.Path(physical)).AsString())
 	target = tspath.NormalizePath(target)
 	snapshot := NewPathSpaceSnapshot(map[string]RslintConfig{root: config}, fsys)
 	matcher, err := NewTargetMatcherWithPathSpaces(config, root, fsys, snapshot, nil)
@@ -415,8 +416,8 @@ func TestBasePathNegationReopensPhysicalAliasSubtree(t *testing.T) {
 
 	decision := matcher.MatchFile(PathIdentity{
 		Path:                target,
-		CanonicalPath:       tspath.NormalizePath(fsys.Realpath(target)),
-		CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(tspath.GetDirectoryPath(target))),
+		CanonicalPath:       tspath.NormalizePath(fsys.Realpath(pathutil.Path(target)).AsString()),
+		CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(pathutil.Path(tspath.GetDirectoryPath(target))).AsString()),
 	})
 	assert.Assert(t, decision.Selected())
 	assert.Assert(t, !decision.GloballyIgnored())

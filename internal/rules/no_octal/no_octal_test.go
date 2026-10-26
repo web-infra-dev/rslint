@@ -67,7 +67,7 @@ func TestNoOctalParsedLiterals(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/literal.js",
-				Path:     "/literal.js",
+				PathKey:  "/literal.js",
 			}, tt.code, core.ScriptKindJS)
 			diagnostics := runNoOctalOnParsedSource(sourceFile)
 			if len(diagnostics) != tt.wantReports {

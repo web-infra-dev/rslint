@@ -20,7 +20,7 @@ func TestGetJsxStringLiteralValue(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			sourceFile := parser.ParseSourceFile(
-				ast.SourceFileParseOptions{FileName: "/component.tsx", Path: "/component.tsx"},
+				ast.SourceFileParseOptions{FileName: "/component.tsx", PathKey: "/component.tsx"},
 				testCase.code,
 				core.ScriptKindTSX,
 			)

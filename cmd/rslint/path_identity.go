@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // These live-filesystem helpers reconcile compiler-owned paths from TypeScript
@@ -12,8 +13,8 @@ import (
 func authoritativeFilesystemPath(filePath string, fsys vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
 	if fsys != nil {
-		if realPath := fsys.Realpath(filePath); realPath != "" {
-			return tspath.NormalizePath(realPath)
+		if realPath := fsys.Realpath(pathutil.Path(filePath)); realPath != "" {
+			return tspath.NormalizePath(realPath.AsString())
 		}
 	}
 	return filePath

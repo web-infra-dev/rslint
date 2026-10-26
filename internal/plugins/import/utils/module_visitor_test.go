@@ -12,7 +12,7 @@ import (
 )
 
 func TestVisitModulesAMDAndIgnore(t *testing.T) {
-	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/visitor.ts", Path: "/visitor.ts"}, `
+	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/visitor.ts", PathKey: "/visitor.ts"}, `
 import "ignored";
 export * from "ignored";
 import("ignored");
@@ -47,7 +47,7 @@ obj.define(["member"], cb);
 }
 
 func TestVisitModulesInvalidIgnore(t *testing.T) {
-	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/visitor.ts", Path: "/visitor.ts"}, `import "ignored"; import "visited";`, core.ScriptKindTS)
+	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/visitor.ts", PathKey: "/visitor.ts"}, `import "ignored"; import "visited";`, core.ScriptKindTS)
 	var sources []string
 	listeners := import_utils.VisitModules(func(source modules.Source) {
 		sources = append(sources, source.Specifier().Text())

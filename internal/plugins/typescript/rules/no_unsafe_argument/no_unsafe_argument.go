@@ -68,8 +68,8 @@ func newFunctionSignature(
 			constrainedType = t
 		}
 
-		if len(param.Declarations) != 0 {
-			decl := param.Declarations[0]
+		if len(param.Declarations()) != 0 {
+			decl := param.Declarations()[0]
 			if utils.IsRestParameterDeclaration(decl) {
 				if checker.IsTupleType(constrainedType) {
 					restT = restType{

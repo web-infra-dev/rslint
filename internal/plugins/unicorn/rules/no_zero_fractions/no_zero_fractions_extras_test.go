@@ -123,7 +123,7 @@ func TestNoZeroFractionsEditDemand(t *testing.T) {
 			for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
 				var got []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
+					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: no_zero_fractions.NoZeroFractionsRule.Name, Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {

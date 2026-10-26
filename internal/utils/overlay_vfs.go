@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type OverlayVFS struct {
@@ -18,22 +19,22 @@ type OverlayVFS struct {
 
 var _ vfs.FS = (*OverlayVFS)(nil)
 
-func (vfs *OverlayVFS) Chtimes(path string, atime time.Time, mtime time.Time) error {
+func (vfs *OverlayVFS) Chtimes(path tspath.RootedPath, atime time.Time, mtime time.Time) error {
 	return vfs.fs.Chtimes(path, atime, mtime)
 }
-func (vfs *OverlayVFS) UseCaseSensitiveFileNames() bool {
-	return vfs.fs.UseCaseSensitiveFileNames()
+func (vfs *OverlayVFS) CaseSensitivity() tspath.CaseSensitivity {
+	return vfs.fs.CaseSensitivity()
 }
 
-func (vfs *OverlayVFS) FileExists(path string) bool {
-	if _, ok := vfs.virtualFile(path); ok {
+func (vfs *OverlayVFS) FileExists(path tspath.RootedFilePath) bool {
+	if _, ok := vfs.virtualFile(path.AsString()); ok {
 		return true
 	}
 	return vfs.fs.FileExists(path)
 }
 
-func (vfs *OverlayVFS) ReadFile(path string) (contents string, ok bool) {
-	if src, ok := vfs.virtualFile(path); ok {
+func (vfs *OverlayVFS) ReadFile(path tspath.RootedFilePath) (contents string, ok bool) {
+	if src, ok := vfs.virtualFile(path.AsString()); ok {
 		return strings.TrimPrefix(src, BOM), ok
 	}
 	return vfs.fs.ReadFile(path)
@@ -48,8 +49,8 @@ func (vfs *OverlayVFS) SourceHasBOM(path string) bool {
 	return SourceHasBOM(vfs.fs, path)
 }
 
-func (vfs *OverlayVFS) DirectoryExists(path string) bool {
-	normalizedPath := tspath.NormalizePath(path)
+func (vfs *OverlayVFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	normalizedPath := tspath.NormalizePath(path.AsString())
 	if !strings.HasSuffix(normalizedPath, "/") {
 		normalizedPath = normalizedPath + "/"
 	}
@@ -64,10 +65,10 @@ func (vfs *OverlayVFS) DirectoryExists(path string) bool {
 	return vfs.fs.DirectoryExists(path)
 }
 
-func (vfs *OverlayVFS) GetAccessibleEntries(path string) (result vfs.Entries) {
+func (vfs *OverlayVFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) (result vfs.Entries) {
 	result = vfs.fs.GetAccessibleEntries(path)
 
-	normalizedPath := tspath.NormalizePath(path)
+	normalizedPath := tspath.NormalizePath(path.AsString())
 	if !strings.HasSuffix(normalizedPath, "/") {
 		normalizedPath = normalizedPath + "/"
 	}
@@ -135,23 +136,18 @@ func (fi *overlayVFSFileInfo) Type() fs.FileMode {
 	return fi.mode.Type()
 }
 
-func (vfs *OverlayVFS) Stat(path string) vfs.FileInfo {
-	if src, ok := vfs.virtualFile(path); ok {
+func (vfs *OverlayVFS) Stat(path tspath.RootedPath) vfs.FileInfo {
+	if src, ok := vfs.virtualFile(path.AsString()); ok {
 		return &overlayVFSFileInfo{
-			name: path,
+			name: path.AsString(),
 			size: int64(len(strings.TrimPrefix(src, BOM))),
 		}
 	}
 	return vfs.fs.Stat(path)
 }
 
-func (vfs *OverlayVFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error {
-	// TODO: do we need to walk over virtual files here as well?
-	return vfs.fs.WalkDir(root, walkFn)
-}
-
-func (vfs *OverlayVFS) Realpath(path string) string {
-	if _, ok := vfs.directVirtualFile(path); ok {
+func (vfs *OverlayVFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	if _, ok := vfs.directVirtualFile(path.AsString()); ok {
 		if realPath := vfs.fs.Realpath(path); realPath != "" {
 			return realPath
 		}
@@ -160,22 +156,22 @@ func (vfs *OverlayVFS) Realpath(path string) string {
 	return vfs.fs.Realpath(path)
 }
 
-func (vfs *OverlayVFS) WriteFile(path string, data string) error {
-	if _, ok := vfs.virtualFile(path); ok {
+func (vfs *OverlayVFS) WriteFile(path tspath.RootedFilePath, data string) error {
+	if _, ok := vfs.virtualFile(path.AsString()); ok {
 		panic("not implemented: cannot write to overlay file system")
 	}
 	return vfs.fs.WriteFile(path, data)
 }
 
-func (vfs *OverlayVFS) AppendFile(path string, data string) error {
-	if _, ok := vfs.virtualFile(path); ok {
+func (vfs *OverlayVFS) AppendFile(path tspath.RootedFilePath, data string) error {
+	if _, ok := vfs.virtualFile(path.AsString()); ok {
 		panic("not implemented: cannot append to overlay file system")
 	}
 	return vfs.fs.AppendFile(path, data)
 }
 
-func (vfs *OverlayVFS) Remove(path string) error {
-	if _, ok := vfs.virtualFile(path); ok {
+func (vfs *OverlayVFS) Remove(path tspath.RootedPath) error {
+	if _, ok := vfs.virtualFile(path.AsString()); ok {
 		panic("not implemented: cannot remove from overlay file system")
 	}
 	return vfs.fs.Remove(path)
@@ -185,11 +181,11 @@ func (vfs *OverlayVFS) virtualFile(path string) (string, bool) {
 	if src, ok := vfs.directVirtualFile(path); ok {
 		return src, true
 	}
-	realPath := vfs.fs.Realpath(path)
-	if realPath == "" || realPath == path {
+	realPath := vfs.fs.Realpath(pathutil.Path(path))
+	if realPath == "" || realPath.AsString() == path {
 		return "", false
 	}
-	return vfs.directVirtualFile(realPath)
+	return vfs.directVirtualFile(realPath.AsString())
 }
 
 // directVirtualFile keeps the caller's map live and gives exact entries

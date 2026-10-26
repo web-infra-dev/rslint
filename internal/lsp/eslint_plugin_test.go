@@ -23,6 +23,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/estree"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // textOnlySourceFile is a minimal ast.SourceFileLike (Text + ECMALineMap) — the
@@ -1034,9 +1035,9 @@ type retargetingConfigEvaluationFS struct {
 	configCalls      int
 }
 
-func (fsys *retargetingConfigEvaluationFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
-	switch filePath {
+func (fsys *retargetingConfigEvaluationFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
+	switch filePath.AsString() {
 	case fsys.targetPath:
 		return "/owner-a/src/index.ts"
 	case fsys.targetParentPath:
@@ -1146,9 +1147,9 @@ func TestNativeFixPassUsesFrozenTargetOverlay(t *testing.T) {
 	}
 }
 
-func (fsys *retargetingDocumentFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
-	if filePath != fsys.targetPath {
+func (fsys *retargetingDocumentFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
+	if filePath.AsString() != fsys.targetPath {
 		return filePath
 	}
 	index := fsys.targetCall
@@ -1156,7 +1157,7 @@ func (fsys *retargetingDocumentFS) Realpath(filePath string) string {
 	if index >= len(fsys.targets) {
 		index = len(fsys.targets) - 1
 	}
-	return fsys.targets[index]
+	return pathutil.Path(fsys.targets[index])
 }
 
 func TestComputeFixAllContentSharesFrozenTargetWithNativeAndPlugin(t *testing.T) {

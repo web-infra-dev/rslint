@@ -1204,9 +1204,9 @@ var PropTypesRule = rule.Rule{
 		}
 		resolveInitializer := func(identifier *ast.Node) (*ast.Node, bool) {
 			if symbol := resolveSymbol(identifier); symbol != nil {
-				declaration := symbol.ValueDeclaration
-				if declaration == nil && len(symbol.Declarations) > 0 {
-					declaration = symbol.Declarations[0]
+				declaration := symbol.ValueDeclaration()
+				if declaration == nil && len(symbol.Declarations()) > 0 {
+					declaration = symbol.Declarations()[0]
 				}
 				if declaration != nil && declaration.Kind == ast.KindVariableDeclaration {
 					return declaration.AsVariableDeclaration().Initializer, true

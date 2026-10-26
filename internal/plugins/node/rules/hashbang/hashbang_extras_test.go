@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestHashbangSourceBoundaries(t *testing.T) {
@@ -99,7 +100,9 @@ func TestHashbangPaths(t *testing.T) {
 
 type caseInsensitiveFS struct{ vfs.FS }
 
-func (caseInsensitiveFS) UseCaseSensitiveFileNames() bool { return false }
+func (caseInsensitiveFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
+}
 
 func TestHashbangPublicationPathCasing(t *testing.T) {
 	root := hashbangRoot(t)
@@ -310,7 +313,7 @@ func TestHashbangEditDemand(t *testing.T) {
 		p := lintprogram.NewFromCompiler(program)
 		run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
 			var diags []rule.RuleDiagnostic
-			ctx := rule.RuleContext{SourceFile: file, BOM: rule.NewSourceBOM(p.FS(), file.FileName())}.WithProgram(p).WithDiagnosticConsumer(HashbangRule.Name, rule.SeverityError, rule.DiagnosticConsumer{Demand: demand, Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) }})
+			ctx := rule.RuleContext{SourceFile: file, BOM: rule.NewSourceBOM(p.FS(), file.FileName().AsString())}.WithProgram(p).WithDiagnosticConsumer(HashbangRule.Name, rule.SeverityError, rule.DiagnosticConsumer{Demand: demand, Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) }})
 			HashbangRule.Run(ctx, nil)
 			return diags
 		}

@@ -60,7 +60,7 @@ var schemas = []nodeSchema{
 	{"MemberExpression", []string{"object", "property", "computed", "optional"}},
 	{"CallExpression", []string{"callee", "arguments", "optional", "typeArguments"}},
 	{"NewExpression", []string{"callee", "arguments", "typeArguments"}},
-	{"ImportExpression", []string{"source", "options"}},
+	{"ImportExpression", []string{"source", "options", "phase"}},
 	{"ArrayExpression", []string{"elements"}},
 	{"ObjectExpression", []string{"properties"}},
 	{"Property", []string{"key", "value", "kind", "method", "shorthand", "computed", "optional"}},

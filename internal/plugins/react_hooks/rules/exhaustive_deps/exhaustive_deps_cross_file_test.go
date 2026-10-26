@@ -62,8 +62,8 @@ func TestContainsNodeRejectsCrossFileNodes(t *testing.T) {
 		t.Fatalf("CreateProgram: %v", err)
 	}
 
-	fileA := program.GetSourceFile(pathA)
-	fileB := program.GetSourceFile(pathB)
+	fileA := program.GetSourceFile(tspath.ToRootedFilePath(pathA, program.GetCurrentDirectory()))
+	fileB := program.GetSourceFile(tspath.ToRootedFilePath(pathB, program.GetCurrentDirectory()))
 	if fileA == nil || fileB == nil {
 		t.Fatalf("missing source files: a=%v b=%v", fileA, fileB)
 	}
@@ -198,7 +198,7 @@ declare function setTimeout(handler: () => void, timeout: number): number;
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)
 	}
-	tsxFile := program.GetSourceFile(tsxPath)
+	tsxFile := program.GetSourceFile(tspath.ToRootedFilePath(tsxPath, program.GetCurrentDirectory()))
 	if tsxFile == nil {
 		t.Fatalf("missing user.tsx source file")
 	}

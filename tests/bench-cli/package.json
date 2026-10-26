@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "init:vscode": "bash ./scripts/init.sh",
-    "build:bench": "pnpm --filter @rslint/core run build:js && tsgo -p tsconfig.build.json --incremental false",
+    "build:bench": "pnpm --filter @rslint/core run build:js && tsc -p tsconfig.build.json --incremental false",
     "bench:cli": "pnpm run init:vscode && pnpm run build:bench && node dist/cli.bench.js",
     "bench": "pnpm run bench:cli"
   },
@@ -13,6 +13,7 @@
     "@codspeed/tinybench-plugin": "catalog:",
     "@rslint/core": "workspace:*",
     "@types/node": "catalog:",
-    "tinybench": "catalog:"
+    "tinybench": "catalog:",
+    "typescript": "catalog:typescript7"
   }
 }

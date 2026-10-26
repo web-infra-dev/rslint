@@ -80,13 +80,13 @@ type mergeDetector struct {
 
 func (d *mergeDetector) isMergedWithClass(node *ast.Node) bool {
 	symbol := node.Symbol()
-	if symbol == nil || len(symbol.Declarations) <= 1 {
+	if symbol == nil || len(symbol.Declarations()) <= 1 {
 		return false
 	}
 
 	scope := utils.FindEnclosingScope(node)
-	if len(symbol.Declarations) <= declarationScanCacheThreshold {
-		for _, declaration := range symbol.Declarations {
+	if len(symbol.Declarations()) <= declarationScanCacheThreshold {
+		for _, declaration := range symbol.Declarations() {
 			if declaration.Kind == ast.KindClassDeclaration && utils.FindEnclosingScope(declaration) == scope {
 				return true
 			}
@@ -100,7 +100,7 @@ func (d *mergeDetector) isMergedWithClass(node *ast.Node) bool {
 	classScopes := d.classScopesBySymbol[symbol]
 	if classScopes == nil {
 		classScopes = make(map[*ast.Node]bool)
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if declaration.Kind == ast.KindClassDeclaration {
 				classScopes[utils.FindEnclosingScope(declaration)] = true
 			}

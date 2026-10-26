@@ -97,7 +97,7 @@ func TestPreferIdentifierImportExportSpecifiersArtifactsFollowDemand(t *testing.
 			for index, demand := range demands {
 				var found []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
+					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName().AsString(),
 					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 						return []rule.ConfiguredRule{{Name: prefer_identifier_import_export_specifiers.PreferIdentifierImportExportSpecifiersRule.Name, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return prefer_identifier_import_export_specifiers.PreferIdentifierImportExportSpecifiersRule.Run(ctx, nil)

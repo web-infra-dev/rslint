@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // ResolveConfigFilePathSpace returns the path pair used for files and ignores
@@ -42,8 +43,8 @@ func ResolveConfigFilePathSpaceForTarget(
 	}
 	physicalConfigDir := configDir
 	if fsys != nil {
-		if realPath := fsys.Realpath(configDir); realPath != "" {
-			physicalConfigDir = tspath.NormalizePath(realPath)
+		if realPath := fsys.Realpath(pathutil.Path(configDir)); realPath != "" {
+			physicalConfigDir = tspath.NormalizePath(realPath.AsString())
 		}
 	}
 
@@ -73,11 +74,11 @@ func ResolveConfigDirectoryPathSpace(directory string, configDir string, fsys vf
 	physicalConfigDir := configDir
 	canonicalDirectory := directory
 	if fsys != nil {
-		if realPath := fsys.Realpath(configDir); realPath != "" {
-			physicalConfigDir = tspath.NormalizePath(realPath)
+		if realPath := fsys.Realpath(pathutil.Path(configDir)); realPath != "" {
+			physicalConfigDir = tspath.NormalizePath(realPath.AsString())
 		}
-		if realPath := fsys.Realpath(directory); realPath != "" {
-			canonicalDirectory = tspath.NormalizePath(realPath)
+		if realPath := fsys.Realpath(pathutil.Path(directory)); realPath != "" {
+			canonicalDirectory = tspath.NormalizePath(realPath.AsString())
 		}
 	}
 	// A requested directory that physically contains the config root selects
@@ -110,7 +111,7 @@ func ResolveConfigDirectoryPathSpace(directory string, configDir string, fsys vf
 func verifiedConfigAliasAncestors(configDir string, physicalConfigDir string, fsys vfs.FS) []string {
 	var lookup func(string) string
 	if fsys != nil {
-		lookup = fsys.Realpath
+		lookup = func(path string) string { return fsys.Realpath(pathutil.Path(path)).AsString() }
 	}
 	return verifiedConfigAliasAncestorsWithLookup(configDir, physicalConfigDir, fsys, lookup)
 }
@@ -233,11 +234,11 @@ func resolveConfigPathSpaceWithCanonicalParent(
 			for remaining := relative; remaining != ""; remaining = tspath.GetDirectoryPath(remaining) {
 				aliasRoot = tspath.GetDirectoryPath(aliasRoot)
 			}
-			if realRoot := fsys.Realpath(aliasRoot); realRoot != "" &&
-				tspath.ComparePaths(
-					tspath.NormalizePath(realRoot),
+			if realRoot := fsys.Realpath(pathutil.Path(aliasRoot)); realRoot != "" &&
+				pathutil.ComparePaths(
+					tspath.NormalizePath(realRoot.AsString()),
 					physicalConfigDir,
-					tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true},
+					pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: true},
 				) == 0 {
 				return tspath.ResolvePath(physicalConfigDir, relative), physicalConfigDir
 			}
@@ -251,8 +252,8 @@ func resolveConfigPathSpaceWithCanonicalParent(
 	if physicalFilePath == "" {
 		physicalFilePath = filePath
 		if fsys != nil {
-			if realPath := fsys.Realpath(filePath); realPath != "" {
-				physicalFilePath = tspath.NormalizePath(realPath)
+			if realPath := fsys.Realpath(pathutil.Path(filePath)); realPath != "" {
+				physicalFilePath = tspath.NormalizePath(realPath.AsString())
 			}
 		}
 	}
@@ -319,7 +320,7 @@ func expectedPhysicalFileFromLexicalPathWithCanonicalParent(
 	expectedPhysicalFile := filePath
 	physicalParent := canonicalParentPath
 	if physicalParent == "" && fsys != nil {
-		physicalParent = fsys.Realpath(tspath.GetDirectoryPath(filePath))
+		physicalParent = fsys.Realpath(pathutil.Path(tspath.GetDirectoryPath(filePath))).AsString()
 	}
 	if physicalParent == "" {
 		return expectedPhysicalFile
@@ -340,14 +341,14 @@ func hasDistinctFileIdentityWithCanonicalParent(
 	canonicalParentPath string,
 	fsys vfs.FS,
 ) bool {
-	return tspath.ComparePaths(
+	return pathutil.ComparePaths(
 		expectedPhysicalFileFromLexicalPathWithCanonicalParent(
 			filePath,
 			canonicalParentPath,
 			fsys,
 		),
 		canonicalPath,
-		tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true},
+		pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: true},
 	) != 0
 }
 
@@ -370,17 +371,17 @@ func RelativePathWithinConfigRoot(filePath string, configDir string, useCaseSens
 	}
 	filePath = utils.NormalizeAbsoluteDrive(filePath)
 	configDir = utils.NormalizeAbsoluteDrive(configDir)
-	options := tspath.ComparePathsOptions{
+	options := pathutil.ComparePathsOptions{
 		CurrentDirectory:          configDir,
 		UseCaseSensitiveFileNames: useCaseSensitive,
 	}
-	if tspath.ComparePaths(filePath, configDir, options) == 0 {
+	if pathutil.ComparePaths(filePath, configDir, options) == 0 {
 		return "", true
 	}
-	if !tspath.StartsWithDirectory(filePath, configDir, useCaseSensitive) {
+	if !pathutil.StartsWithDirectory(filePath, configDir, useCaseSensitive) {
 		return "", false
 	}
-	return tspath.GetRelativePathFromDirectory(configDir, filePath, options), true
+	return pathutil.GetRelativePathFromDirectory(configDir, filePath, options), true
 }
 
 // isPathWithinNormalizedRoot checks containment for already-normalized paths,
@@ -388,5 +389,5 @@ func RelativePathWithinConfigRoot(filePath string, configDir string, useCaseSens
 func isPathWithinNormalizedRoot(filePath string, root string) bool {
 	filePath = utils.NormalizeAbsoluteDrive(filePath)
 	root = utils.NormalizeAbsoluteDrive(root)
-	return filePath == root || tspath.StartsWithDirectory(filePath, root, true)
+	return filePath == root || pathutil.StartsWithDirectory(filePath, root, true)
 }

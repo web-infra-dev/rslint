@@ -361,7 +361,7 @@ func (p *Profile) findRegistrationInCandidate(text string, expectedRootOffset in
 func (p *Profile) findRegistrationInWindow(text string, expectedRootOffset int, scriptKind core.ScriptKind, complete bool) (int, bool) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/commented-test",
-		Path:     "/commented-test",
+		PathKey:  "/commented-test",
 	}, text, scriptKind)
 
 	// A window that stops short of the candidate can cut a registration in

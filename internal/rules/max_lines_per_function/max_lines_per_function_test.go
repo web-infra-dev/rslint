@@ -2271,7 +2271,7 @@ function enabled() {}`,
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/disable-directive.ts",
-				Path:     "/disable-directive.ts",
+				PathKey:  "/disable-directive.ts",
 			}, testCase.code, core.ScriptKindTS)
 			node := sourceFile.Statements.Nodes[0]
 			comments := rule.NewCommentStore(sourceFile)
@@ -2303,7 +2303,7 @@ func TestMaxLinesPerFunctionEditDemandParity(t *testing.T) {
 	const code = "function one() { return 1; }"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, code, core.ScriptKindTS)
 	node := sourceFile.Statements.Nodes[0]
 

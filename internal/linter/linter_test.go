@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // noopRule returns a rule that reports on every identifier (for testing file filtering).
@@ -375,7 +376,7 @@ func TestRunLinter_ExecutedRulesPerFile(t *testing.T) {
 	// Different files get different rules — ExecutedRules should be the union.
 	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			if sf.FileName() == paths["a.ts"] {
+			if sf.FileName().AsString() == paths["a.ts"] {
 				return []rule.ConfiguredRule{
 					{Name: "only-a", Severity: rule.SeverityWarning, Run: func(ctx rule.RuleContext) rule.RuleListeners { return nil }},
 				}
@@ -421,7 +422,7 @@ func TestRunLinter_ExecutedRulesAcrossPrograms(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{pathsA["a.ts"]}, {pathsB["b.ts"]}},
 		GetRulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
-			if file.FileName() == pathsA["a.ts"] {
+			if file.FileName().AsString() == pathsA["a.ts"] {
 				return []rule.ConfiguredRule{configuredRule("shared"), configuredRule("only-a")}
 			}
 			return []rule.ConfiguredRule{configuredRule("shared"), configuredRule("only-b")}
@@ -535,7 +536,7 @@ func TestListenerRegistryIsolationAndRuleOrderAcrossFiles(t *testing.T) {
 		SingleThreaded:   true,
 		TargetsByProgram: [][]string{{paths["a.ts"], paths["b.ts"]}},
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-			if sourceFile.FileName() == paths["a.ts"] {
+			if sourceFile.FileName().AsString() == paths["a.ts"] {
 				return []rule.ConfiguredRule{
 					configuredListenerRule(ast.KindIdentifier, "a-first", rule.SeverityWarning),
 					configuredListenerRule(ast.KindIdentifier, "a-second", rule.SeverityError),
@@ -590,7 +591,7 @@ func TestListenerRegistryIsolationAndRuleOrderAcrossFiles(t *testing.T) {
 func TestRuleContextReporterPreservesDiagnosticSemantics(t *testing.T) {
 	const source = "// rslint-disable-next-line reporter-semantics\nconst blocked = 0;\n  const target = 1;\n"
 	program, paths := createTestProgramWithFiles(t, map[string]string{"reporter.ts": source})
-	sourceFile := program.GetSourceFile(paths["reporter.ts"])
+	sourceFile := program.GetSourceFile(pathutil.File(paths["reporter.ts"]))
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 2 {
 		t.Fatal("reporter fixture did not parse into two statements")
 	}
@@ -722,10 +723,10 @@ func TestRunLinterCachesOncePerFileAcrossRules(t *testing.T) {
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {
 				fileName := ctx.SourceFile.FileName()
 				value := rule.CachedByFile(ctx, linterFileCacheTestKey{}, func() *int {
-					builds[fileName]++
+					builds[fileName.AsString()]++
 					return new(int)
 				})
-				values[fileName] = append(values[fileName], value)
+				values[fileName.AsString()] = append(values[fileName.AsString()], value)
 				return rule.RuleListeners{}
 			},
 		}

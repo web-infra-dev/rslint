@@ -49,15 +49,15 @@ func typeOverValueMessage() rule.RuleMessage {
 func isSymbolTypeBased(typeChecker *checker.Checker, symbol *ast.Symbol) (isType, known bool) {
 	var seen collections.Set[*ast.Symbol]
 	for symbol != nil && !typeChecker.IsUnknownSymbol(symbol) {
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if ast.IsTypeOnlyImportOrExportDeclaration(declaration) {
 				return true, true
 			}
 		}
-		if symbol.Flags&ast.SymbolFlagsValue != 0 {
+		if symbol.Flags()&ast.SymbolFlagsValue != 0 {
 			return false, true
 		}
-		if symbol.Flags&ast.SymbolFlagsAlias == 0 {
+		if symbol.Flags()&ast.SymbolFlagsAlias == 0 {
 			return true, true
 		}
 		// Immediate aliases can form cycles. Resolving the final symbol first
@@ -65,7 +65,7 @@ func isSymbolTypeBased(typeChecker *checker.Checker, symbol *ast.Symbol) (isType
 		next := typeChecker.GetImmediateAliasedSymbol(symbol)
 		// A terminal target cannot cycle; avoid allocating a set for the common
 		// single-hop export of a local type or value.
-		if next != nil && next.Flags&ast.SymbolFlagsAlias != 0 && !seen.AddIfAbsent(symbol) {
+		if next != nil && next.Flags()&ast.SymbolFlagsAlias != 0 && !seen.AddIfAbsent(symbol) {
 			return false, false
 		}
 		symbol = next
@@ -89,11 +89,11 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 				// exports and type-only star re-exports are resolved by the checker.
 				// Upstream resolves without a usage mode, including in NodeNext
 				// files; the import/require-specific cached resolution can differ.
-				resolved := ctx.Program().ResolveModuleName(declaration.ModuleSpecifier.Text(), ctx.SourceFile.FileName(), core.ResolutionModeNone)
+				resolved := ctx.Program().ResolveModuleName(declaration.ModuleSpecifier.Text(), ctx.SourceFile.FileName().AsString(), core.ResolutionModeNone)
 				if resolved == nil {
 					return
 				}
-				source := ctx.Program().GetSourceFileForResolvedModule(resolved.ResolvedFileName)
+				source := ctx.Program().GetSourceFileForResolvedModule(resolved)
 				if source == nil {
 					return
 				}
@@ -104,7 +104,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 				moduleType := ctx.TypeChecker.GetTypeOfSymbol(symbol)
 				for _, property := range ctx.TypeChecker.GetPropertiesOfType(moduleType) {
 					// GetPropertyOfType excludes values reached through export type *.
-					if ctx.TypeChecker.GetPropertyOfType(moduleType, property.Name) != nil {
+					if ctx.TypeChecker.GetPropertyOfType(moduleType, property.Name()) != nil {
 						return
 					}
 				}

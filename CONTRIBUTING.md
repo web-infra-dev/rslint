@@ -57,24 +57,11 @@ The existing pre-commit hook runs `rs staged`. Install it through `pnpm run prep
 
 ## TypeScript compiler dependency
 
-The `typescript-go/` submodule tracks [microsoft/TypeScript](https://github.com/microsoft/TypeScript). The Go compiler lives under `typescript-go/tsc/`, and its JS AST API lives under `typescript-go/packages/typescript/`. Existing checkouts must run `git submodule sync -- typescript-go` before updating the submodule to pick up the new remote URL.
+The `typescript-go/` submodule pins [TypeScript 7.1 Beta](https://github.com/microsoft/TypeScript/releases/tag/v7.1-beta) (`3e9236361fa9`). The Go compiler lives under `typescript-go/tsc/`; `@rslint/api` exports its JS AST API from the same checkout. `go.work` resolves the compiler module, `github.com/microsoft/TypeScript/tsc`, locally.
 
-The migration pins the latest main-branch commit checked on **2026-09-05**:
+API declaration builds and root type checking use `typescript@7.1.0-beta`, whose `gitHead` matches the submodule. Legacy JavaScript compiler API consumers retain TypeScript 6. Versions are managed in `pnpm-workspace.yaml`.
 
-| Reference                       | Commit                                                                                                                                |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Selected TypeScript main        | [`1f70213d4922b434345f639b441681e470c7cfc1`](https://github.com/microsoft/TypeScript/commit/1f70213d4922b434345f639b441681e470c7cfc1) |
-| Latest stable release, `v7.0.2` | [`1e4744d68260a7cb91b62b12edc3f6a2187faaf1`](https://github.com/microsoft/TypeScript/releases/tag/v7.0.2)                             |
-| Previous standalone compiler    | `01cbcdd8643cfa17cc8156b60849559c56324601`                                                                                            |
-| Corresponding imported history  | [`3e5f89624cdd03a69d6c5bb92d3a352195ad3a41`](https://github.com/microsoft/TypeScript/commit/3e5f89624cdd03a69d6c5bb92d3a352195ad3a41) |
-
-The old commit hash is absent from the new repository because its history was rewritten. Its root tree exactly matches the imported commit's `tsc/` tree (`23a5bf0c01e3f6dc1d4c0caf7aaef69ba9d9de64`). However, that historical commit retains `tsc/_submodules/TypeScript` without a root `.gitmodules` mapping. Recursive Git operations, including the authentication setup in our `actions/checkout` version, fail on it. The stable tag also predates the final repository layout. The selected main commit has the completed layout and removes this obsolete nested submodule.
-
-The Go compiler module and all shim module/import/linkname paths use `github.com/microsoft/TypeScript/tsc`. `go.work` resolves the compiler to `typescript-go/tsc`. Both `@rslint/api` and the Go encoder use this same pinned checkout so that AST layouts and enum values stay aligned.
-
-The JS declaration build uses TypeScript `6.0.3`, matching upstream's build dependency. TypeScript `5.9.3` rejects the new generator-backed API method types. The AST declarations now reference both the synchronous and asynchronous APIs, which are included in `packages/rslint-api/tsconfig.build.json`.
-
-Compiler compatibility changes include the lazy `SourceFile.HasIdentifier` cache, type-reference nodes for interface `extends` and class `implements`, and new compiler-host, resolver, and LSP client interfaces. Rules retain their existing ESLint diagnostics and fix boundaries despite the new node kinds. On macOS, upstream's `Realpath` now preserves path casing; config discovery verifies filesystem identity before coalescing native case aliases. The shim generator also mirrors private generic checker stores and validates their memory layout.
+Use matching server, Rust client and JS API versions: binary AST protocol 9 has a 64-byte header, and compiler symbol IDs are 64-bit. Independent decoders must update. Compiler-backed analysis rejects UNC/network paths with TS5116; use local filesystem paths.
 
 To select a future upstream revision and refresh its integration:
 

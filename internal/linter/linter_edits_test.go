@@ -7,12 +7,13 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestRunLinterDiagnosticConsumerEditDemand(t *testing.T) {
 	const source = "const value = 1;\n"
 	program, paths := createTestProgramWithFiles(t, map[string]string{"edits.ts": source})
-	sourceFile := program.GetSourceFile(paths["edits.ts"])
+	sourceFile := program.GetSourceFile(pathutil.File(paths["edits.ts"]))
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 1 {
 		t.Fatal("edit-demand fixture did not parse into one statement")
 	}
@@ -163,7 +164,7 @@ func TestRunLinterDiagnosticConsumerEditDemand(t *testing.T) {
 func TestRunLinterDeferredFixesSkipSuppressedDiagnostic(t *testing.T) {
 	const source = "const visible = 1;\n// rslint-disable-next-line deferred-rule\nconst blocked = 2;\n"
 	program, paths := createTestProgramWithFiles(t, map[string]string{"suppressed.ts": source})
-	sourceFile := program.GetSourceFile(paths["suppressed.ts"])
+	sourceFile := program.GetSourceFile(pathutil.File(paths["suppressed.ts"]))
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 2 {
 		t.Fatal("suppression fixture did not parse into two statements")
 	}
@@ -219,7 +220,7 @@ func TestRunLinterDeferredFixesSkipSuppressedDiagnostic(t *testing.T) {
 
 func TestRunLinterDeferredBuilderMayDeclineArtifact(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{"decline.ts": "const value = 1;\n"})
-	sourceFile := program.GetSourceFile(paths["decline.ts"])
+	sourceFile := program.GetSourceFile(pathutil.File(paths["decline.ts"]))
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 1 {
 		t.Fatal("decline fixture did not parse into one statement")
 	}
@@ -273,7 +274,7 @@ func TestRunLinterDeferredBuilderMayDeclineArtifact(t *testing.T) {
 
 func TestRunLinterLegacyReportsRespectEditDemand(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{"legacy.ts": "const value = 1;\n"})
-	sourceFile := program.GetSourceFile(paths["legacy.ts"])
+	sourceFile := program.GetSourceFile(pathutil.File(paths["legacy.ts"]))
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 1 {
 		t.Fatal("legacy fixture did not parse into one statement")
 	}
@@ -347,7 +348,7 @@ func TestRunLinterLegacyReportsRespectEditDemand(t *testing.T) {
 
 func TestRunLinterDiscardingConsumerSkipsDeferredEdits(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{"discarded.ts": "const value = 1;\n"})
-	sourceFile := program.GetSourceFile(paths["discarded.ts"])
+	sourceFile := program.GetSourceFile(pathutil.File(paths["discarded.ts"]))
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 1 {
 		t.Fatal("discard fixture did not parse into one statement")
 	}

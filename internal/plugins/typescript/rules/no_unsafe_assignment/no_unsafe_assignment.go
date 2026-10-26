@@ -210,10 +210,10 @@ func (r assignmentTypeResolver) recoverType(node *ast.Node, rawType *checker.Typ
 		}
 	case ast.IsIdentifier(node):
 		symbol := r.typeChecker.GetSymbolAtLocation(node)
-		if symbol == nil || len(symbol.Declarations) != 1 {
+		if symbol == nil || len(symbol.Declarations()) != 1 {
 			return rawType
 		}
-		declaration := symbol.Declarations[0]
+		declaration := symbol.Declarations()[0]
 		if !ast.IsVariableDeclaration(declaration) || declaration.Type() != nil {
 			return rawType
 		}
@@ -306,7 +306,7 @@ func (r assignmentTypeResolver) substitutedIdentifierType(node *ast.Node, substi
 	if symbol == nil {
 		return nil, false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if substitutedType, ok := substitutions[declaration]; ok {
 			return substitutedType, true
 		}
@@ -322,10 +322,10 @@ func (r assignmentTypeResolver) recoverFunctionReturnType(callNode *ast.Node, ra
 		functionNode = callee
 	} else if ast.IsIdentifier(callee) {
 		symbol := r.typeChecker.GetSymbolAtLocation(callee)
-		if symbol == nil || len(symbol.Declarations) != 1 {
+		if symbol == nil || len(symbol.Declarations()) != 1 {
 			return rawType
 		}
-		declaration := symbol.Declarations[0]
+		declaration := symbol.Declarations()[0]
 		if ast.IsFunctionDeclaration(declaration) {
 			functionNode = declaration
 		} else if ast.IsVariableDeclaration(declaration) {

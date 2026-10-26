@@ -22,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // newCLIChannelPair wires two ipc.Channels back-to-back over two io.Pipes so
@@ -67,7 +68,7 @@ func TestClassifyPaths(t *testing.T) {
 }
 
 func TestDiscoverCLIExplicitConfigProjectsMixedTargetsOnly(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	t.Chdir(root)
 	selectedDir := filepath.Join(root, "selected")
 	unrelatedDir := tspath.NormalizePath(filepath.Join(root, "unrelated"))
@@ -170,7 +171,7 @@ func TestDiscoverCLIExplicitConfigProjectsMixedTargetsOnly(t *testing.T) {
 				}
 			} else {
 				for _, accessed := range spy.accessedDirs {
-					if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+					if accessed == unrelatedDir || pathutil.StartsWithDirectory(accessed, unrelatedDir, true) {
 						t.Fatalf("explicit CLI projection entered unrelated directory %q", accessed)
 					}
 				}

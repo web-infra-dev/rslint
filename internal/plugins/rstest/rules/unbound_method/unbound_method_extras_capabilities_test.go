@@ -16,6 +16,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestUnboundMethodProgramCapabilities(t *testing.T) {
@@ -26,7 +27,7 @@ func TestUnboundMethodProgramCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file := raw.GetSourceFile(tspath.ResolvePath(root, "input.ts"))
+	file := raw.GetSourceFile(pathutil.File(tspath.ResolvePath(root, "input.ts")))
 	if file == nil {
 		t.Fatal("missing capability input")
 	}
@@ -43,7 +44,7 @@ func TestUnboundMethodProgramCapabilities(t *testing.T) {
 			var ran bool
 			var reports []string
 			plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
-				Programs: []*lintprogram.Program{program}, TargetsByProgram: [][]string{{file.FileName()}}, SingleThreaded: true,
+				Programs: []*lintprogram.Program{program}, TargetsByProgram: [][]string{{file.FileName().AsString()}}, SingleThreaded: true,
 				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 					return []rule.ConfiguredRule{{
 						Name: UnboundMethodRule.Name, RequiresTypeInfo: UnboundMethodRule.RequiresTypeInfo, Severity: rule.SeverityError,
@@ -100,10 +101,10 @@ func probeCapabilities(t *testing.T, ctx rule.RuleContext) {
 	utils.VisitDescendants(ctx.SourceFile.AsNode(), func(node *ast.Node) bool {
 		if ast.IsPropertyAccessExpression(node) && node.Name().Text() == "method" {
 			symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
-			if symbol == nil || symbol.ValueDeclaration == nil {
+			if symbol == nil || symbol.ValueDeclaration() == nil {
 				t.Fatalf("method lost its declaration: %s", node.Expression().Text())
 			}
-			file := ast.GetSourceFileOfNode(symbol.ValueDeclaration).FileName()
+			file := ast.GetSourceFileOfNode(symbol.ValueDeclaration()).FileName().AsString()
 			if node.Expression().Text() == "ambient" {
 				if !strings.HasSuffix(file, "/ambient.d.ts") {
 					t.Fatalf("ambient symbol source: %s", file)
@@ -131,7 +132,7 @@ func probeCapabilities(t *testing.T, ctx rule.RuleContext) {
 			switch node.Name().Text() {
 			case "native":
 				symbol := ctx.TypeChecker.GetSymbolAtLocation(node.Initializer())
-				if symbol == nil || symbol.ValueDeclaration == nil || !strings.Contains(ast.GetSourceFileOfNode(symbol.ValueDeclaration).FileName(), "lib.es5.d.ts") {
+				if symbol == nil || symbol.ValueDeclaration() == nil || !strings.Contains(ast.GetSourceFileOfNode(symbol.ValueDeclaration()).FileName().AsString(), "lib.es5.d.ts") {
 					t.Error("native symbol is not from default lib")
 				}
 				seen["native"] = true

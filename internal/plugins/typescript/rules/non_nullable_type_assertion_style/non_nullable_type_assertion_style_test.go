@@ -582,7 +582,7 @@ const suppressed = maybe as string;
 		programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
 		lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 			Programs:         programs,
-			TargetsByProgram: [][]string{{sourceFile.FileName()}},
+			TargetsByProgram: [][]string{{sourceFile.FileName().AsString()}},
 			SingleThreaded:   true,
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{

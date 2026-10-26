@@ -32,7 +32,7 @@ var ExpiringTodoCommentsRule = rule.Rule{
 			return rule.RuleListeners{}
 		}
 		opts := parseOptions(options)
-		pkg := packagejson.FindNearest(ctx.Program(), ctx.SourceFile.FileName())
+		pkg := packagejson.FindNearest(ctx.Program(), ctx.SourceFile.FileName().AsString())
 		// Upstream parseArgument checks package availability from cwd, while
 		// comparisons read the package nearest the linted file.
 		cwd := ctx.ProcessCurrentDirectory()

@@ -1239,7 +1239,7 @@ func TestPreferEnumInitializersSuggestionDemand(t *testing.T) {
 	const source = "enum Direction { /* leading */ Up, Down }"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/prefer-enum-initializers-suggestion-demand.ts",
-		Path:     "/prefer-enum-initializers-suggestion-demand.ts",
+		PathKey:  "/prefer-enum-initializers-suggestion-demand.ts",
 	}, source, core.ScriptKindTS)
 	enumDeclaration := sourceFile.Statements.Nodes[0]
 

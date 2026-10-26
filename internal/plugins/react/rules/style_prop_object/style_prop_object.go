@@ -189,8 +189,8 @@ var StylePropObjectRule = rule.Rule{
 							return
 						}
 						valueSymbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(prop)
-						if valueSymbol != nil && len(valueSymbol.Declarations) > 0 {
-							decl := valueSymbol.Declarations[0]
+						if valueSymbol != nil && len(valueSymbol.Declarations()) > 0 {
+							decl := valueSymbol.Declarations()[0]
 							if decl.Kind == ast.KindVariableDeclaration {
 								init := decl.AsVariableDeclaration().Initializer
 								if init != nil && isNonObjectExpression(init) {

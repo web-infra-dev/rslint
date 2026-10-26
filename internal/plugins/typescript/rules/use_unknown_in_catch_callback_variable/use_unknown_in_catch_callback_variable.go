@@ -74,7 +74,7 @@ var UseUnknownInCatchCallbackVariableRule = rule.CreateRule(rule.Rule{
 					firstParam := params[0]
 
 					firstParamType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, firstParam)
-					decl := firstParam.ValueDeclaration
+					decl := firstParam.ValueDeclaration()
 
 					if decl != nil && decl.AsParameterDeclaration().DotDotDotToken != nil {
 						// a rest arg that's not an array or tuple should definitely be flagged.

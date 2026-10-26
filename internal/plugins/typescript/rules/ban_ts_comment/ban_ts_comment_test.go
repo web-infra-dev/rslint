@@ -609,7 +609,7 @@ func TestBanTsCommentSuggestionDemand(t *testing.T) {
 	const source = "// @ts-ignore"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/ban-ts-comment-suggestion.ts",
-		Path:     "/ban-ts-comment-suggestion.ts",
+		PathKey:  "/ban-ts-comment-suggestion.ts",
 	}, source, core.ScriptKindTS)
 
 	run := func(demand rule.EditDemand) rule.RuleDiagnostic {

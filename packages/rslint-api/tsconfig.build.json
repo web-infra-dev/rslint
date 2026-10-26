@@ -4,7 +4,7 @@
     "customConditions": ["@typescript/source"],
     "skipLibCheck": true,
     "types": ["node"],
-    "lib": ["esnext", "dom"],
+    "lib": ["es2022"],
     "noImplicitReturns": false,
     "noImplicitOverride": false,
     "rootDir": "../..",

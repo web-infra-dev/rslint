@@ -20,7 +20,7 @@ func TestRunLinterInProgram_AllowDirsBasic(t *testing.T) {
 
 	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir}, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			lintedFileNames = append(lintedFileNames, sf.FileName())
+			lintedFileNames = append(lintedFileNames, sf.FileName().AsString())
 			return noopRule()
 		},
 		false, func(d rule.RuleDiagnostic) {}, nil,
@@ -48,7 +48,7 @@ func TestRunLinterInProgram_AllowDirsNoFalsePrefix(t *testing.T) {
 
 	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir}, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			lintedFileNames = append(lintedFileNames, sf.FileName())
+			lintedFileNames = append(lintedFileNames, sf.FileName().AsString())
 			return noopRule()
 		},
 		false, func(d rule.RuleDiagnostic) {}, nil,
@@ -80,7 +80,7 @@ func TestRunLinterInProgram_AllowDirsAndFilesOR(t *testing.T) {
 		[]string{srcDir},            // allowDirs
 		legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			lintedFileNames = append(lintedFileNames, sf.FileName())
+			lintedFileNames = append(lintedFileNames, sf.FileName().AsString())
 			return noopRule()
 		},
 		false, func(d rule.RuleDiagnostic) {}, nil,
@@ -143,7 +143,7 @@ func TestRunLinterInProgram_MultipleAllowDirs(t *testing.T) {
 
 	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir, libDir}, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			lintedFileNames = append(lintedFileNames, sf.FileName())
+			lintedFileNames = append(lintedFileNames, sf.FileName().AsString())
 			return noopRule()
 		},
 		false, func(d rule.RuleDiagnostic) {}, nil,
@@ -207,7 +207,7 @@ func TestRunLinterInProgram_NestedAllowDirs(t *testing.T) {
 
 	lintedFiles := runLinterInCompilerProgram(program, nil, []string{componentsDir}, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			lintedFileNames = append(lintedFileNames, sf.FileName())
+			lintedFileNames = append(lintedFileNames, sf.FileName().AsString())
 			return noopRule()
 		},
 		false, func(d rule.RuleDiagnostic) {}, nil,
@@ -402,7 +402,7 @@ func TestRunLinter_MultiplePrograms(t *testing.T) {
 		nil,
 		legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []rule.ConfiguredRule {
-			lintedFileNames = append(lintedFileNames, sf.FileName())
+			lintedFileNames = append(lintedFileNames, sf.FileName().AsString())
 			return noopRule()
 		},
 		false, func(d rule.RuleDiagnostic) {}, nil,

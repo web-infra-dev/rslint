@@ -294,13 +294,13 @@ func isGlobalObjectSymbol(symbol *ast.Symbol, sourceFile *ast.SourceFile) bool {
 	// top-level binding, handled above) shadows that candidate. The binder's
 	// SourceFile.Locals identity also handles a `var` nested syntactically in a
 	// block but hoisted into the script's global scope.
-	topLevel := sourceFile.Locals[symbol.Name]
+	topLevel := sourceFile.Locals[symbol.Name()]
 	if topLevel == symbol {
 		return true
 	}
 	if topLevel != nil {
-		for _, declaration := range symbol.Declarations {
-			for _, topLevelDeclaration := range topLevel.Declarations {
+		for _, declaration := range symbol.Declarations() {
+			for _, topLevelDeclaration := range topLevel.Declarations() {
 				if declaration == topLevelDeclaration {
 					return true
 				}

@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
@@ -583,7 +584,7 @@ func TestNoNamespaceDisableDirective(t *testing.T) {
 
 func runNoNamespaceRule(fileName string, source string, options []any) []rule.RuleDiagnostic {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName,
+		FileName: tspath.RootedFilePathFromAbsolute(fileName),
 	}, source, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	var diagnostics []rule.RuleDiagnostic

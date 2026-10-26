@@ -74,8 +74,8 @@ func (a *analysis) initializer(node *ast.Node) *ast.Node {
 	if symbol == nil {
 		return nil
 	}
-	for i := len(symbol.Declarations) - 1; i >= 0; i-- {
-		decl := symbol.Declarations[i]
+	for i := len(symbol.Declarations()) - 1; i >= 0; i-- {
+		decl := symbol.Declarations()[i]
 		if decl.Kind == ast.KindVariableDeclaration {
 			return decl.AsVariableDeclaration().Initializer
 		}
@@ -265,7 +265,7 @@ func (a *analysis) namedTypeProps(name *ast.Node, out map[string]bool, seen map[
 		return true
 	}
 	found, opaque := false, false
-	for _, decl := range symbol.Declarations {
+	for _, decl := range symbol.Declarations() {
 		if decl.Kind == ast.KindTypeAliasDeclaration || decl.Kind == ast.KindInterfaceDeclaration {
 			found = true
 			opaque = a.typeProps(decl, out, seen) || opaque

@@ -18,10 +18,10 @@ import (
 //     mirroring upstream's `reference.isTypeReference` short-circuit.
 func isSafe(s *core.RunState, loopNode *ast.Node, ref core.ReferenceEntry) bool {
 	sym := ref.Symbol()
-	if sym == nil || len(sym.Declarations) == 0 {
+	if sym == nil || len(sym.Declarations()) == 0 {
 		return true
 	}
-	decl := sym.Declarations[0]
+	decl := sym.Declarations()[0]
 
 	declList := core.GetDeclListForSymbolDecl(decl)
 	kind := core.GetVarDeclListKind(declList)

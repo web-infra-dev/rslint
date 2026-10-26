@@ -11,7 +11,7 @@ func (coordinator *discoveryCoordinator) collectExplicitGitSources(ownerDirector
 		if targetsByRoot != nil && targetsByRoot[directory.LexicalPath] == nil {
 			continue
 		}
-		if isDefaultDiscoveryExcluded(directory.LexicalPath, coordinator.request.CWD, coordinator.fs.UseCaseSensitiveFileNames()) {
+		if isDefaultDiscoveryExcluded(directory.LexicalPath, coordinator.request.CWD, coordinator.fs.CaseSensitivity().IsCaseSensitive()) {
 			coordinator.walkStats.directoriesPruned++
 			continue
 		}

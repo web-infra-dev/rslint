@@ -104,7 +104,7 @@ func (s *mergeRuleState) reportIfUnsafeMerge(declNode *ast.Node, name *ast.Node,
 	// merges with `interface Foo {}`) is a separate symbol in the
 	// enclosing LocalsContainer. Prefer the binder's direct link to that
 	// local, with the Locals lookup retained as a defensive fallback.
-	if symbol != nil && symbol.Name == ast.InternalSymbolNameDefault {
+	if symbol != nil && symbol.Name() == ast.InternalSymbolNameDefault {
 		if local := declNode.LocalSymbol(); local != nil {
 			symbol = local
 		} else if container := nearestLocalsContainer(declNode); container != nil {
@@ -113,14 +113,14 @@ func (s *mergeRuleState) reportIfUnsafeMerge(declNode *ast.Node, name *ast.Node,
 			}
 		}
 	}
-	if symbol == nil || len(symbol.Declarations) <= 1 {
+	if symbol == nil || len(symbol.Declarations()) <= 1 {
 		return
 	}
 
 	scope := utils.FindEnclosingScope(declNode)
 	hasUnsafeDeclaration := false
-	if len(symbol.Declarations) <= declarationScanCacheThreshold {
-		for _, declaration := range symbol.Declarations {
+	if len(symbol.Declarations()) <= declarationScanCacheThreshold {
+		for _, declaration := range symbol.Declarations() {
 			if declaration.Kind == unsafeKind && utils.FindEnclosingScope(declaration) == scope {
 				hasUnsafeDeclaration = true
 				break
@@ -133,7 +133,7 @@ func (s *mergeRuleState) reportIfUnsafeMerge(declNode *ast.Node, name *ast.Node,
 		kindsByScope := s.scopeKindsBySymbol[symbol]
 		if kindsByScope == nil {
 			kindsByScope = make(map[*ast.Node]declarationKinds)
-			for _, declaration := range symbol.Declarations {
+			for _, declaration := range symbol.Declarations() {
 				kind := declarationKind(declaration.Kind)
 				if kind != 0 {
 					declarationScope := utils.FindEnclosingScope(declaration)

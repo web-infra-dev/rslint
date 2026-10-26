@@ -2,19 +2,20 @@
 package file_extension_in_import
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func extensionRoot(t *testing.T, archives ...string) rule_tester.Root {
 	t.Helper()
-	base := fixtures.GetRootDir()
-	directory := tspath.ResolvePath(base.Dir, "node-file-extension")
+	directory := tspath.NormalizePath(t.TempDir())
 	files := map[string]string{tspath.ResolvePath(directory, "tsconfig.json"): `{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"nodenext","jsx":"preserve"},"include":["**/*"]}`}
 	for _, archiveName := range archives {
 		archive := txtarfs.MustParseFile(t, archiveName)
@@ -30,7 +31,16 @@ func extensionRoot(t *testing.T, archives ...string) rule_tester.Root {
 			files[tspath.ResolvePath(directory, name)] = string(data)
 		}
 	}
-	return rule_tester.Root{Dir: directory, FS: utils.NewOverlayVFS(base.FS, files)}
+	// Upstream's filesystem cases need complete directory names for safe removals.
+	for name, content := range files {
+		if err := os.MkdirAll(filepath.Dir(name), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(name, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return rule_tester.Root{Dir: directory, FS: bundled.WrapFS(osvfs.FS())}
 }
 
 // All 62 upstream cases and six documentation examples from eslint-plugin-n v18.3.0.

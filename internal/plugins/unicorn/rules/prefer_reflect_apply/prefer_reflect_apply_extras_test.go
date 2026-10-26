@@ -186,7 +186,7 @@ func TestPreferReflectApplyEditDemand(t *testing.T) {
 	} {
 		t.Run(test.code, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/edit-demand.js", Path: "/edit-demand.js",
+				FileName: "/edit-demand.js", PathKey: "/edit-demand.js",
 			}, test.code, core.ScriptKindJS)
 			var baseline rule.RuleDiagnostic
 			for _, demand := range []rule.EditDemand{

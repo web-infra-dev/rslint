@@ -1,4 +1,4 @@
-github.com/microsoft/TypeScript/tsc v0.0.0-20260904213532-1f70213d4922 h1:H3et6ePCnXVkrIUeimt6P9ZEfdu4Qkz4bzKUI8SIS6g=
-github.com/microsoft/TypeScript/tsc v0.0.0-20260904213532-1f70213d4922/go.mod h1:6f+klDc2PnmxR35Fqsn05T+T87JubDJH6WCVDiu3BE4=
-golang.org/x/text v0.38.0 h1:sXmwo9DwP3OK9EZ7PqAdaooSGozfl/3a6/xJcbzPRhE=
-golang.org/x/text v0.38.0/go.mod h1:YXZt3QhHUKYT53r2lLKFIVi6Ao1jdzrTR/KQ09qyxF4=
+github.com/microsoft/TypeScript/tsc v0.0.0-20261019203854-3e9236361fa9 h1:Og2uoDMqySqhqlNF0JYY6zO2w6SVyAjrhgjop9DUfRg=
+github.com/microsoft/TypeScript/tsc v0.0.0-20261019203854-3e9236361fa9/go.mod h1:28hWKaTYwRARPm0T9Y0XvdvYpU2HtjONzsMqAdYLucY=
+golang.org/x/text v0.42.0 h1:JbOZXgfeCPU9gacVtYliJqOhD+zhrEqK4LfdpmlUZqI=
+golang.org/x/text v0.42.0/go.mod h1:ojzP1Z+2QtioaF8DTtO8K5q7JWVVYwZKenzujK0Zd0E=

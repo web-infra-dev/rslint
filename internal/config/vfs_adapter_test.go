@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -172,20 +174,20 @@ type vfsAdapterMockFS struct {
 	caseSensitiveFS bool
 }
 
-func (m *vfsAdapterMockFS) GetAccessibleEntries(path string) vfs.Entries {
-	return m.entries[path]
+func (m *vfsAdapterMockFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	return m.entries[path.AsString()]
 }
 
-func (m *vfsAdapterMockFS) Realpath(path string) string {
-	m.realpathCalls = append(m.realpathCalls, path)
-	if realpath, ok := m.resolvedPaths[path]; ok {
-		return realpath
+func (m *vfsAdapterMockFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	m.realpathCalls = append(m.realpathCalls, path.AsString())
+	if realpath, ok := m.resolvedPaths[path.AsString()]; ok {
+		return pathutil.Path(realpath)
 	}
 	return path
 }
 
-func (m *vfsAdapterMockFS) UseCaseSensitiveFileNames() bool {
-	return m.caseSensitiveFS
+func (m *vfsAdapterMockFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(m.caseSensitiveFS)
 }
 
 func TestVfsAdapter_UsesSymlinkMetadataBeforeRealpath(t *testing.T) {
@@ -285,10 +287,11 @@ func TestVfsAdapter_RealpathFallbackJoinsFilesystemRoots(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			root := pathutil.Directory(test.root).AsString()
 			mock := &vfsAdapterMockFS{
 				FS: osvfs.FS(),
 				entries: map[string]vfs.Entries{
-					test.root: {Directories: []string{"child"}},
+					root: {Directories: []string{"child"}},
 				},
 			}
 			adapter := &vfsAdapter{vfs: mock, root: test.root}
@@ -299,7 +302,7 @@ func TestVfsAdapter_RealpathFallbackJoinsFilesystemRoots(t *testing.T) {
 			assert.NilError(t, err)
 			assert.Equal(t, len(entries), 1)
 			assert.Equal(t, entries[0].Name(), "child")
-			assert.DeepEqual(t, mock.realpathCalls, []string{test.root, test.childPath})
+			assert.DeepEqual(t, mock.realpathCalls, []string{root, test.childPath})
 		})
 	}
 }
@@ -331,7 +334,7 @@ type spyVFS struct {
 	directoryExistsCalls int
 }
 
-func (s *spyVFS) DirectoryExists(path string) bool {
+func (s *spyVFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
 	s.directoryExistsCalls++
 	return s.FS.DirectoryExists(path)
 }

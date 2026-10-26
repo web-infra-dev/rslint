@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/project"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 	"github.com/zeebo/xxh3"
 )
 
@@ -319,7 +320,7 @@ func WithSourceSnapshots(host compiler.CompilerHost, cache *ParseCache) compiler
 func (h *cachingCompilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *ast.SourceFile {
 	if h.useSourceSnapshots {
 		generation := h.cache.currentSourceGeneration() // I7: capture exactly one generation
-		snapshot, ok := h.acquireSourceSnapshot(generation, opts.FileName)
+		snapshot, ok := h.acquireSourceSnapshot(generation, opts.FileName.AsString())
 		if !ok {
 			return nil // I1: failed reads are never published
 		}
@@ -390,7 +391,7 @@ func (h *cachingCompilerHost) readAndPublishSourceSnapshot(
 		}
 	}()
 
-	text, ok := h.FS().ReadFile(fileName)
+	text, ok := h.FS().ReadFile(pathutil.File(fileName))
 	if !ok {
 		flight.completed = true
 		completed = true

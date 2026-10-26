@@ -22,6 +22,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func TestPipelineReclaimsCompletedProgramWhileOtherConsumersRun(t *testing.T) {
@@ -44,7 +45,7 @@ func TestPipelineReclaimsCompletedProgramWhileOtherConsumersRun(t *testing.T) {
 						other, otherPaths := createTestProgramWithFilesAndCompilerOptions(t,
 							map[string]string{"other.ts": "const other = 1;"}, `{"noLib":true}`)
 						completedProgram = weak.Make(completed)
-						completedSource = weak.Make(completed.GetSourceFile(completedPaths["completed.ts"]))
+						completedSource = weak.Make(completed.GetSourceFile(pathutil.File(completedPaths["completed.ts"])))
 						// A plugin rule may carry Go-only fields in the prepared plan.
 						// Its wire projection must never keep this native closure.
 						pluginRun := func(rule.RuleContext) rule.RuleListeners {
@@ -58,7 +59,7 @@ func TestPipelineReclaimsCompletedProgramWhileOtherConsumersRun(t *testing.T) {
 								TargetsByProgram: [][]string{{otherPaths["other.ts"]}, {completedPaths["completed.ts"]}},
 								SingleThreaded:   singleThreaded,
 								RulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
-									if strings.HasSuffix(file.FileName(), "/other.ts") {
+									if strings.HasSuffix(file.FileName().AsString(), "/other.ts") {
 										return []rule.ConfiguredRule{{Name: "native/wait", Run: func(rule.RuleContext) rule.RuleListeners {
 											close(otherStarted)
 											<-resume
@@ -165,7 +166,7 @@ func TestPipelineCompletesTypeCheckBeforeReleasingProgram(t *testing.T) {
 		other, otherPaths := createTestProgramWithFilesAndCompilerOptions(t,
 			map[string]string{"other.ts": `export const value = 1;`}, `{}`)
 		completedProgram = weak.Make(completed)
-		completedSource = weak.Make(completed.GetSourceFile(paths["completed.ts"]))
+		completedSource = weak.Make(completed.GetSourceFile(pathutil.File(paths["completed.ts"])))
 		return Generation{Native: NativeGeneration{
 			Programs: wrapTestPrograms(other, completed),
 			// The zero-target Program must still run type checking. The
@@ -229,7 +230,7 @@ func TestConcurrentPipelineJoinsPluginBatchesBeforeReleaseOnPanic(t *testing.T) 
 			SingleThreaded:   true,
 			RulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
 				name := "plugin/panic"
-				if file.FileName() == waitPath {
+				if file.FileName().AsString() == waitPath {
 					name = "plugin/wait"
 				}
 				return []rule.ConfiguredRule{{Name: name, IsEslintPluginRule: true}}
@@ -306,11 +307,11 @@ func TestConcurrentPipelineJoinsNativeShardsBeforeReleaseOnPanic(t *testing.T) {
 	const marker = "native shard failed"
 	run := func(ctx rule.RuleContext) rule.RuleListeners {
 		switch {
-		case strings.HasSuffix(ctx.SourceFile.FileName(), "/file-000.ts"):
+		case strings.HasSuffix(ctx.SourceFile.FileName().AsString(), "/file-000.ts"):
 			<-waitStarted
 			close(panicTriggered)
 			panic(marker)
-		case strings.HasSuffix(ctx.SourceFile.FileName(), "/file-128.ts"):
+		case strings.HasSuffix(ctx.SourceFile.FileName().AsString(), "/file-128.ts"):
 			close(waitStarted)
 			<-resume
 			if !ctx.Program().IsValid() || ctx.SourceFile.Text() != "const value = 1;" {
@@ -325,7 +326,7 @@ func TestConcurrentPipelineJoinsNativeShardsBeforeReleaseOnPanic(t *testing.T) {
 	plan := options.LintPlan.programs[0]
 	paths := make([]string, len(plan.files))
 	for index, file := range plan.files {
-		paths[index] = file.file.FileName()
+		paths[index] = file.file.FileName().AsString()
 	}
 	generation := Generation{Native: NativeGeneration{
 		Programs:         []*program.Program{plan.program},
@@ -386,7 +387,7 @@ func TestPipelineSharedCompilerRemainsValidUntilLastProjectCompletes(t *testing.
 			SingleThreaded:   true,
 			RulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{Name: "native/shared", Run: func(ctx rule.RuleContext) rule.RuleListeners {
-					if strings.HasSuffix(ctx.SourceFile.FileName(), "/second.ts") {
+					if strings.HasSuffix(ctx.SourceFile.FileName().AsString(), "/second.ts") {
 						close(blocked)
 						<-resume
 						if !ctx.Program().IsValid() || len(ctx.Program().SourceFiles()) != 2 || ctx.TypeChecker == nil {

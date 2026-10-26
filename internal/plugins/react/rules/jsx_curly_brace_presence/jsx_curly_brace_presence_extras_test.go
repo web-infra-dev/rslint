@@ -96,7 +96,7 @@ func TestJsxCurlyBracePresenceEditDemand(t *testing.T) {
 
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/edit-demand.tsx",
-				Path:     "/edit-demand.tsx",
+				PathKey:  "/edit-demand.tsx",
 			}, testCase.code, core.ScriptKindTSX)
 
 			run := func(demand rule.EditDemand) rule.RuleDiagnostic {

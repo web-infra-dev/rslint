@@ -309,12 +309,12 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		// Import aliases resolve the same way, but their declarations are
 		// filtered out by `shouldCheckDefinition` (matching upstream's
 		// ImportBinding skip).
-		if sym.Flags&ast.SymbolFlagsAlias != 0 {
+		if sym.Flags()&ast.SymbolFlagsAlias != 0 {
 			if resolved := ctx.TypeChecker.SkipAlias(sym); resolved != nil {
 				sym = resolved
 			}
 		}
-		for _, decl := range sym.Declarations {
+		for _, decl := range sym.Declarations() {
 			if !shouldCheckDefinition(decl) {
 				continue
 			}
@@ -948,7 +948,7 @@ func shouldCheckDefinition(decl *ast.Node) bool {
 func hasOverloadSignatures(ctx rule.RuleContext, node *ast.Node) bool {
 	if nameNode := node.Name(); nameNode != nil {
 		if sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode); sym != nil {
-			for _, decl := range sym.Declarations {
+			for _, decl := range sym.Declarations() {
 				if decl == node {
 					continue
 				}

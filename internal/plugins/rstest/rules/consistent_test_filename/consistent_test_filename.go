@@ -89,10 +89,10 @@ var ConsistentTestFilenameRule = rule.Rule{
 			return nil
 		}
 
-		if !opts.allTestPattern.TestOrTimeout(fileName) {
+		if !opts.allTestPattern.TestOrTimeout(fileName.AsString()) {
 			return nil
 		}
-		if opts.pattern.TestOrTimeout(fileName) {
+		if opts.pattern.TestOrTimeout(fileName.AsString()) {
 			return nil
 		}
 

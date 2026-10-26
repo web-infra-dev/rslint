@@ -21,7 +21,7 @@ func (c *syntaxChecker) matchesPrototype(member, object *ast.Node, inferred, cla
 	}
 	matches := func(t *checker.Type) bool { return c.typeMatches(t, class, aggressive, map[*checker.Type]bool{}) }
 	if symbol := c.ctx.TypeChecker.GetSymbolAtLocation(propertyKey(member)); symbol != nil {
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if declaration.Parent != nil && matches(c.ctx.TypeChecker.GetTypeAtLocation(declaration.Parent)) {
 				return true
 			}
@@ -37,7 +37,7 @@ func (c *syntaxChecker) typeMatches(t *checker.Type, class string, aggressive bo
 	}
 	seen[t] = true
 	symbol := checker.Type_symbol(t)
-	if symbol != nil && symbol.Flags&(ast.SymbolFlagsFunction|ast.SymbolFlagsMethod) != 0 || len(utils.GetCallSignatures(c.ctx.TypeChecker, t)) > 0 {
+	if symbol != nil && symbol.Flags()&(ast.SymbolFlagsFunction|ast.SymbolFlagsMethod) != 0 || len(utils.GetCallSignatures(c.ctx.TypeChecker, t)) > 0 {
 		return class == "Function"
 	}
 	if utils.IsTypeFlagSet(t, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
@@ -71,7 +71,7 @@ func (c *syntaxChecker) typeMatches(t *checker.Type, class string, aggressive bo
 		if strings.Contains(class, ".") {
 			return c.ctx.TypeChecker.GetFullyQualifiedName(symbol) == class
 		}
-		return symbol.Name == class || symbol.Name == "Readonly"+class || class == "Function" && symbol.Name == "CallableFunction"
+		return symbol.Name() == class || symbol.Name() == "Readonly"+class || class == "Function" && symbol.Name() == "CallableFunction"
 	}
 	return c.ctx.TypeChecker.TypeToString(t) == class
 }

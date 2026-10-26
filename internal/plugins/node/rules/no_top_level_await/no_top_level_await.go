@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 //go:embed no_top_level_await.schema.json
@@ -33,11 +34,11 @@ var NoTopLevelAwaitRule = rule.Rule{
 		if program == nil || fileName == "<input>" {
 			return nil
 		}
-		pkg := packagejson.FindNearestValid(program, fileName)
+		pkg := packagejson.FindNearestValid(program, fileName.AsString())
 		if pkg == nil {
 			return nil
 		}
-		relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), fileName, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+		relative := pathutil.GetRelativePathFromDirectory(pkg.Directory(), fileName.AsString(), pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: true})
 		converted, ok := nodeutil.ConvertPath(relative, opts, ctx.Settings)
 		if !ok {
 			return nil

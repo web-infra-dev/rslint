@@ -51,14 +51,14 @@ func TestArrayClassificationQueryOrder(t *testing.T) {
 func parseTestSource(code string) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
-		Path:     "/test.ts",
+		PathKey:  "/test.ts",
 	}, code, core.ScriptKindTS)
 }
 
 func parseTestJavaScript(code string) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.js",
-		Path:     "/test.js",
+		PathKey:  "/test.js",
 	}, code, core.ScriptKindJS)
 }
 

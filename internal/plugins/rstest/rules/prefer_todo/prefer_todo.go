@@ -251,7 +251,7 @@ func isSafeHiddenSkipReference(
 		defer delete(visited, symbol)
 
 		sameFileDecls := 0
-		for _, declaration := range symbol.Declarations {
+		for _, declaration := range symbol.Declarations() {
 			if declaration == nil || ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
 				continue
 			}
@@ -376,7 +376,7 @@ func isSafeRstestNamespaceReceiver(
 	defer delete(visited, symbol)
 
 	sameFileDecls := 0
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
 			continue
 		}
@@ -397,7 +397,7 @@ func isRstestNamespaceImportSymbol(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || declaration.Kind != ast.KindNamespaceImport {
 			continue
 		}
@@ -502,7 +502,7 @@ func isSafeBareIdentifierReference(
 	defer delete(visited, symbol)
 
 	sameFileDecls := 0
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
 			continue
 		}

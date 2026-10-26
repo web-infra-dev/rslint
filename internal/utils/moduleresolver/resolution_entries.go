@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // MainField selects a package property path for an entry point.
@@ -66,8 +67,8 @@ func (resolver *nodeResolver) aliasField(request, directory string, file bool) (
 			return Result{}, false
 		}
 		absolute := tspath.ResolvePath(directory, request)
-		inner = tspath.GetRelativePathFromDirectory(pkg.Directory(), absolute, tspath.ComparePathsOptions{
-			UseCaseSensitiveFileNames: resolver.program.FS().UseCaseSensitiveFileNames(),
+		inner = pathutil.GetRelativePathFromDirectory(pkg.Directory(), absolute, pathutil.ComparePathsOptions{
+			UseCaseSensitiveFileNames: resolver.program.FS().CaseSensitivity().IsCaseSensitive(),
 		})
 		if file {
 			inner = "./" + inner
@@ -109,7 +110,7 @@ func (f *nodeResolutionFS) isDirectoryIndex(logical, physical string) bool {
 		return true
 	}
 	canonical := func(name string) string {
-		return tspath.GetCanonicalFileName(tspath.NormalizePath(name), f.UseCaseSensitiveFileNames())
+		return pathutil.GetCanonicalFileName(tspath.NormalizePath(name), f.CaseSensitivity().IsCaseSensitive())
 	}
 	request := canonical(f.request)
 	if tspath.IsExternalModuleNameRelative(f.request) {

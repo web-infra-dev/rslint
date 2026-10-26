@@ -17,6 +17,7 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type retargetingExplicitOwnerFS struct {
@@ -26,13 +27,15 @@ type retargetingExplicitOwnerFS struct {
 	parentCalls      int
 }
 
-func (fsys *retargetingExplicitOwnerFS) UseCaseSensitiveFileNames() bool { return false }
-func (fsys *retargetingExplicitOwnerFS) FileExists(filePath string) bool {
-	return tspath.NormalizePath(filePath) == "/repo/shared.ts"
+func (fsys *retargetingExplicitOwnerFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
 }
-func (fsys *retargetingExplicitOwnerFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
-	switch filePath {
+func (fsys *retargetingExplicitOwnerFS) FileExists(filePath tspath.RootedFilePath) bool {
+	return tspath.NormalizePath(filePath.AsString()) == "/repo/shared.ts"
+}
+func (fsys *retargetingExplicitOwnerFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	filePath = pathutil.Path(tspath.NormalizePath(filePath.AsString()))
+	switch filePath.AsString() {
 	case tspath.CombinePaths("/repo/Project", tspath.GetBaseFileName(fsys.targetPath)):
 		return "/repo/shared.ts"
 	case fsys.targetParentPath:
@@ -169,7 +172,7 @@ func TestTargetPlanExplicitFileExistenceUsesFrozenIdentity(t *testing.T) {
 			}
 			t.Run(aliasKind+"/"+name, func(t *testing.T) {
 				fsys := osvfs.FS()
-				root := tspath.NormalizePath(fsys.Realpath(t.TempDir()))
+				root := tspath.NormalizePath(fsys.Realpath(pathutil.Path(t.TempDir())).AsString())
 				first, replacement := tspath.ResolvePath(root, "first"), tspath.ResolvePath(root, "replacement")
 				for _, directory := range []string{first, replacement} {
 					if err := os.Mkdir(directory, 0o755); err != nil {
@@ -221,7 +224,7 @@ func TestTargetPlanExplicitFileExistenceUsesFrozenIdentity(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				if fsys.FileExists(path) == exists || fsys.FileExists(firstFile) != exists {
+				if fsys.FileExists(pathutil.File(path)) == exists || fsys.FileExists(pathutil.File(firstFile)) != exists {
 					t.Fatal("alias and captured file must have opposite existence")
 				}
 				plan, err := Resolve(request)
@@ -523,7 +526,7 @@ func TestTargetPlanCarriesDiscoveryMatches(t *testing.T) {
 }
 
 func TestTargetPlanRetainsNestedRepositoryEntryUnderIgnoredAncestor(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	nested := tspath.ResolvePath(root, "vendor/nested")
 	for path, content := range map[string]string{
 		".gitignore":             "vendor/\n",
@@ -585,8 +588,8 @@ type frozenDirectoryRequestFS struct {
 	frozen bool
 }
 
-func (fsys *frozenDirectoryRequestFS) Realpath(path string) string {
-	if fsys.frozen && tspath.NormalizePath(path) == fsys.root {
+func (fsys *frozenDirectoryRequestFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	if fsys.frozen && tspath.NormalizePath(path.AsString()) == fsys.root {
 		panic("requested root resolved after freezing")
 	}
 	return fsys.FS.Realpath(path)

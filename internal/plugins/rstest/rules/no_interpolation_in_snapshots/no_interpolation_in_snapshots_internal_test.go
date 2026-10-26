@@ -21,7 +21,7 @@ func TestSourceMayContainInterpolatedSnapshot(t *testing.T) {
 		sourceFile := parser.ParseSourceFile(
 			ast.SourceFileParseOptions{
 				FileName: "/source.test.ts",
-				Path:     "/source.test.ts",
+				PathKey:  "/source.test.ts",
 			},
 			testCase.source,
 			core.ScriptKindTS,
@@ -82,7 +82,7 @@ func TestMayContainInterpolatedInlineSnapshot(t *testing.T) {
 		sourceFile := parser.ParseSourceFile(
 			ast.SourceFileParseOptions{
 				FileName: "/source.test.ts",
-				Path:     "/source.test.ts",
+				PathKey:  "/source.test.ts",
 			},
 			testCase.source,
 			core.ScriptKindTS,

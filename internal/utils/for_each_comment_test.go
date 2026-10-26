@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // ForEachComment now reuses one *ast.NodeFactory across every token of a file
@@ -45,7 +46,7 @@ func TestForEachComment_ReuseFactoryReportsAllCommentsPerToken(t *testing.T) {
 	}
 	var sf *ast.SourceFile
 	for _, f := range prog.GetSourceFiles() {
-		if f.FileName() == file || filepath.Base(f.FileName()) == "f.ts" {
+		if f.FileName().AsString() == file || filepath.Base(f.FileName().AsString()) == "f.ts" {
 			sf = f
 		}
 	}
@@ -112,7 +113,7 @@ func TestForEachComment_CommentOnlySourceFile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.ts",
-				Path:     "/test.ts",
+				PathKey:  "/test.ts",
 			}, test.source, core.ScriptKindTS)
 
 			var got []string
@@ -140,7 +141,7 @@ func TestHasCommentInSpan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sf := prog.GetSourceFile(file)
+	sf := prog.GetSourceFile(pathutil.File(file))
 	if sf == nil {
 		t.Fatal("source file not found")
 	}

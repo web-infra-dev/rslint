@@ -799,7 +799,7 @@ func resolveBindingSymbol(tc *checker.Checker, ident *ast.Node) *ast.Symbol {
 	sym := tc.GetSymbolAtLocation(ident)
 	for i := 0; i < 16 && sym != nil; i++ {
 		// Resolve import / export aliases first.
-		if sym.Flags&ast.SymbolFlagsAlias != 0 {
+		if sym.Flags()&ast.SymbolFlagsAlias != 0 {
 			aliased := tc.GetAliasedSymbol(sym)
 			if aliased == nil || aliased == sym {
 				return sym
@@ -808,10 +808,10 @@ func resolveBindingSymbol(tc *checker.Checker, ident *ast.Node) *ast.Symbol {
 			continue
 		}
 		// Follow `const X = Y` (Identifier-only) chains.
-		if len(sym.Declarations) == 0 {
+		if len(sym.Declarations()) == 0 {
 			return sym
 		}
-		decl := sym.Declarations[0]
+		decl := sym.Declarations()[0]
 		if decl.Kind != ast.KindVariableDeclaration {
 			return sym
 		}

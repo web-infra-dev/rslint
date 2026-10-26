@@ -20,6 +20,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type selectionObservation struct {
@@ -54,8 +55,8 @@ type caseSensitivityFS struct {
 	caseSensitive bool
 }
 
-func (fsys *caseSensitivityFS) UseCaseSensitiveFileNames() bool {
-	return fsys.caseSensitive
+func (fsys *caseSensitivityFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(fsys.caseSensitive)
 }
 
 func newRecordingHost(fsys vfs.FS) *recordingHost {
@@ -63,7 +64,7 @@ func newRecordingHost(fsys vfs.FS) *recordingHost {
 }
 
 func (h *recordingHost) compilerHost(configPath string) compiler.CompilerHost {
-	return compiler.NewCompilerHost(tspath.GetDirectoryPath(configPath), h.fs, bundled.LibPath(), nil, nil, nil)
+	return compiler.NewCompilerHost(h.fs, bundled.LibPath(), nil, nil, nil)
 }
 
 type recordingProjectHost struct {
@@ -77,7 +78,7 @@ func (h *recordingHost) host() recordingProjectHost {
 		FS: h.fs,
 		ParseConfig: func(configPath string) (*tsoptions.ParsedCommandLine, error) {
 			h.parsed[configPath]++
-			parsed, _ := tsoptions.GetParsedCommandLineOfConfigFile(configPath, &core.CompilerOptions{}, nil, h.compilerHost(configPath), nil)
+			parsed, _ := tsoptions.GetParsedCommandLineOfConfigFile(pathutil.File(configPath), &core.CompilerOptions{}, nil, h.fs, nil)
 			return parsed, nil
 		},
 		CreateProgram: func(configPath string, parsed *tsoptions.ParsedCommandLine) (*compiler.Program, error) {
@@ -111,14 +112,14 @@ func TestServiceProgramKeepsParsedConfigModesIsolated(t *testing.T) {
 		t.Fatal("service construction changed config identity or complete roots")
 	}
 	file := tspath.ResolvePath(root, "gap.js")
-	if service.GetSourceFile(file) == nil {
+	if service.GetSourceFile(pathutil.File(file)) == nil {
 		t.Fatal("service must retain the listed JavaScript source")
 	}
 	legacy, err := utils.CreateProgramFromParsedConfigLenient(true, parsed, host.compilerHost(configPath))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if legacy.GetSourceFile(file) != nil || legacy.Options().AllowNonTsExtensions != originalExtensions {
+	if legacy.GetSourceFile(pathutil.File(file)) != nil || legacy.Options().AllowNonTsExtensions != originalExtensions {
 		t.Fatal("legacy construction borrowed the service extension policy")
 	}
 }
@@ -183,8 +184,8 @@ func TestTypeScriptProjectDiscoveryObservations(t *testing.T) {
 				selected, err := discovery.Find(fileName, tspath.ResolvePath(root, rootDirectory))
 				var program *compiler.Program
 				if err == nil && selected != nil {
-					program, err = host.host().CreateProgram(selected.ConfigName(), selected)
-					if err == nil && program.GetSourceFile(fileName) == nil {
+					program, err = host.host().CreateProgram(selected.ConfigName().AsString(), selected)
+					if err == nil && program.GetSourceFile(pathutil.File(fileName)) == nil {
 						err = errors.New("selected config cannot supply its source file")
 					}
 				}
@@ -208,10 +209,10 @@ func TestTypeScriptProjectDiscoveryObservations(t *testing.T) {
 					t.Errorf("%s: no selected config, want %s", step.File, step.Config)
 					continue
 				}
-				if selected.ConfigName() != tspath.ResolvePath(root, step.Config) {
+				if selected.ConfigName().AsString() != tspath.ResolvePath(root, step.Config) {
 					t.Errorf("%s: selected %s, want %s", step.File, selected.ConfigName(), step.Config)
 				}
-				if program.GetSourceFile(fileName) == nil {
+				if program.GetSourceFile(pathutil.File(fileName)) == nil {
 					t.Errorf("%s: selected Program does not contain its source", step.File)
 				}
 				wantRoots := make([]string, len(step.Roots))
@@ -221,14 +222,14 @@ func TestTypeScriptProjectDiscoveryObservations(t *testing.T) {
 				gotRoots := slices.Clone(program.CommandLine().FileNames())
 				slices.Sort(wantRoots)
 				slices.Sort(gotRoots)
-				if !slices.Equal(gotRoots, wantRoots) {
+				if !slices.Equal(pathutil.Strings(gotRoots), wantRoots) {
 					t.Errorf("%s: complete roots = %v, want %v", step.File, gotRoots, wantRoots)
 				}
 				if step.Strict != nil && program.Options().Strict.IsTrue() != *step.Strict {
 					t.Errorf("%s: strict = %v, want %v", step.File, program.Options().Strict.IsTrue(), *step.Strict)
 				}
 				var diagnosticCodes []int
-				for _, diagnostic := range program.GetSemanticDiagnostics(context.Background(), program.GetSourceFile(fileName)) {
+				for _, diagnostic := range program.GetSemanticDiagnostics(context.Background(), program.GetSourceFile(pathutil.File(fileName))) {
 					diagnosticCodes = append(diagnosticCodes, int(diagnostic.Code()))
 				}
 				slices.Sort(diagnosticCodes)
@@ -262,9 +263,9 @@ type discoveryReadTrackingFS struct {
 	sources []string
 }
 
-func (fsys *discoveryReadTrackingFS) ReadFile(name string) (string, bool) {
-	if !strings.HasSuffix(name, ".json") {
-		fsys.sources = append(fsys.sources, name)
+func (fsys *discoveryReadTrackingFS) ReadFile(name tspath.RootedFilePath) (string, bool) {
+	if !strings.HasSuffix(name.AsString(), ".json") {
+		fsys.sources = append(fsys.sources, name.AsString())
 	}
 	return fsys.FS.ReadFile(name)
 }
@@ -290,7 +291,7 @@ func TestTypeScriptProjectDiscoveryReadsOnlyMetadata(t *testing.T) {
 			if test.want != "" {
 				want = tspath.ResolvePath(root, test.want)
 			}
-			if selected.ConfigName() != want {
+			if selected.ConfigName().AsString() != want {
 				t.Fatalf("selected %s, want %s", selected.ConfigName(), want)
 			}
 			if len(fsys.sources) != 0 {
@@ -369,7 +370,7 @@ func TestSelectionKeepsLexicalConfigIdentity(t *testing.T) {
 		}
 		host := newRecordingHost(bundled.WrapFS(osvfs.FS()))
 		selected, err := utils.NewTypeScriptProjectDiscovery(host.fs, host.host().ParseConfig).Find(alias+"/group/link/file.ts", realDir)
-		if err != nil || selected == nil || selected.ConfigName() != alias+"/tsconfig.json" {
+		if err != nil || selected == nil || selected.ConfigName().AsString() != alias+"/tsconfig.json" {
 			t.Fatalf("nested directory alias lost its project: selected=%s parsed=%v error=%v", selected.ConfigName(), host.parsed, err)
 		}
 	})
@@ -419,7 +420,7 @@ func TestSelectionKeepsLexicalConfigIdentity(t *testing.T) {
 				if err != nil || selected != nil {
 					t.Fatalf("node_modules boundary was crossed: selected %s, built %v", selected.ConfigName(), host.built)
 				}
-			} else if err != nil || selected.ConfigName() != tspath.ResolvePath(root, "tsconfig.json") {
+			} else if err != nil || selected.ConfigName().AsString() != tspath.ResolvePath(root, "tsconfig.json") {
 				t.Fatalf("uppercase directory must remain distinct: selection %s, error %v", selected.ConfigName(), err)
 			}
 		})
@@ -438,7 +439,7 @@ func TestSelectionKeepsLexicalConfigIdentity(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if selected.ConfigName() != tspath.ResolvePath(root, "tsconfig.json") {
+		if selected.ConfigName().AsString() != tspath.ResolvePath(root, "tsconfig.json") {
 			t.Fatalf("case alias selected %s", selected.ConfigName())
 		}
 	})

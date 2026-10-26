@@ -160,7 +160,7 @@ func TestSortVarsEditDemand(t *testing.T) {
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/edit-demand.ts",
-		Path:     "/edit-demand.ts",
+		PathKey:  "/edit-demand.ts",
 	}, "let b = 2, a = 1;", core.ScriptKindTS)
 
 	var declarationList *ast.Node

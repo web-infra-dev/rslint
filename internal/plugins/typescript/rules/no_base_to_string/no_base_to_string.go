@@ -258,7 +258,7 @@ var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 				return usefulnessAlways
 			}
 
-			declarations := toString.Declarations
+			declarations := toString.Declarations()
 
 			if declarations == nil || len(declarations) != 1 {
 				// If there are multiple declarations, at least one of them must not be

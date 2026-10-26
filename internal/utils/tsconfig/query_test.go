@@ -9,11 +9,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/iovfs"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 func configProgram(t testing.TB, files map[string]string, fileName string) *program.Program {
 	t.Helper()
-	fs := utils.NewOverlayVFS(iovfs.From(fstest.MapFS{}, true), files)
+	fs := utils.NewOverlayVFS(iovfs.From(fstest.MapFS{}, pathutil.CaseSensitivity(true)), files)
 	p, err := program.NewFromRoots(program.RootOptions{Host: utils.CreateCompilerHost(tspath.GetDirectoryPath(fileName), fs), CompilerOptions: &core.CompilerOptions{NoLib: core.TSTrue}})
 	if err != nil {
 		t.Fatal(err)

@@ -218,7 +218,7 @@ suite('rslint fixAll - code actions', function () {
   });
 
   test('works after rapid edit without debounce', async () => {
-    const { replaceAll } = await import('./fixall-helpers');
+    const { replaceAll } = await import('./fixall-helpers.js');
     await withTmpFile('// initial\nexport {};\n', async (doc, editor) => {
       await new Promise((r) => setTimeout(r, 2000));
 

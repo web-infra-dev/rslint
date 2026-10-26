@@ -6,11 +6,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type configDirectoryIndex struct {
 	configKeyByPath          map[string]string
-	caseFoldedConfigKeys     map[tspath.Path][]string
+	caseFoldedConfigKeys     map[string][]string
 	canonicalConfigKeyByPath map[string]string
 	ambiguousCanonicalPaths  map[string]struct{}
 	normalizedByKey          map[string]string
@@ -25,7 +26,7 @@ func newConfigDirectoryIndexWithPathSpaces(
 ) *configDirectoryIndex {
 	index := &configDirectoryIndex{
 		configKeyByPath:          make(map[string]string, len(configMap)),
-		caseFoldedConfigKeys:     make(map[tspath.Path][]string, len(configMap)),
+		caseFoldedConfigKeys:     make(map[string][]string, len(configMap)),
 		canonicalConfigKeyByPath: make(map[string]string, len(configMap)),
 		ambiguousCanonicalPaths:  make(map[string]struct{}),
 		normalizedByKey:          make(map[string]string, len(configMap)),
@@ -40,14 +41,14 @@ func newConfigDirectoryIndexWithPathSpaces(
 	for _, configKey := range configKeys {
 		normalized := tspath.NormalizePath(configKey)
 		if len(normalized) > tspath.GetRootLength(normalized) {
-			normalized = tspath.RemoveTrailingDirectorySeparators(normalized)
+			normalized = pathutil.RemoveTrailingDirectorySeparators(normalized)
 		}
 		index.normalizedByKey[configKey] = normalized
 		pathID := rslintconfig.ExactPathID(normalized)
 		if _, exists := index.configKeyByPath[pathID]; !exists {
 			index.configKeyByPath[pathID] = configKey
 		}
-		foldedPathID := tspath.ToPath(normalized, "", false)
+		foldedPathID := pathutil.GetCanonicalFileName(normalized, false)
 		index.caseFoldedConfigKeys[foldedPathID] = append(index.caseFoldedConfigKeys[foldedPathID], configKey)
 
 		canonical, frozen := pathSpaces.PhysicalDirectory(normalized)
@@ -139,7 +140,7 @@ func (index *configDirectoryIndex) nearestConfigForIdentity(
 			return configKey, true
 		}
 		if canonicalParent != "" {
-			candidates := index.caseFoldedConfigKeys[tspath.ToPath(lexicalDirectory, "", false)]
+			candidates := index.caseFoldedConfigKeys[pathutil.GetCanonicalFileName(lexicalDirectory, false)]
 			for _, configKey := range candidates {
 				if rslintconfig.ExactPathID(canonicalParent) ==
 					rslintconfig.ExactPathID(index.canonicalByKey[configKey]) {
@@ -187,17 +188,17 @@ func (index *configDirectoryIndex) configKeyForLexicalDirectory(
 	if fsys == nil {
 		return "", false
 	}
-	candidates := index.caseFoldedConfigKeys[tspath.ToPath(directory, "", false)]
+	candidates := index.caseFoldedConfigKeys[pathutil.GetCanonicalFileName(directory, false)]
 	if len(candidates) == 0 {
 		return "", false
 	}
-	canonicalDirectory := fsys.Realpath(directory)
+	canonicalDirectory := fsys.Realpath(pathutil.Path(directory))
 	if canonicalDirectory == "" {
 		return "", false
 	}
-	canonicalDirectory = tspath.NormalizePath(canonicalDirectory)
+	canonicalDirectory = pathutil.Path(tspath.NormalizePath(canonicalDirectory.AsString()))
 	for _, configKey := range candidates {
-		if pathsEqual(canonicalDirectory, index.canonicalByKey[configKey], true) {
+		if pathsEqual(canonicalDirectory.AsString(), index.canonicalByKey[configKey], true) {
 			return configKey, true
 		}
 	}

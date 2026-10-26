@@ -40,7 +40,7 @@ value[index];
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.ts",
-				Path:     "/test.ts",
+				PathKey:  "/test.ts",
 			}, test.code, core.ScriptKindTS)
 			listeners := NoUnsafeOptionalChainingRule.Run(rule.RuleContext{SourceFile: sourceFile}, nil)
 			if got := len(listeners) > 0; got != test.wantListeners {

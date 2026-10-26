@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // Test suites in this package are split across three files by case origin
@@ -53,7 +54,7 @@ function MyComponent({ theme }: { theme: string }) {
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)
 	}
-	sourceFile := program.GetSourceFile(filePath)
+	sourceFile := program.GetSourceFile(pathutil.File(filePath))
 	if sourceFile == nil {
 		t.Fatalf("source file not found for %s", filePath)
 		return
@@ -119,7 +120,7 @@ func TestSourceMayUseHooks(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/source.tsx",
-				Path:     "/source.tsx",
+				PathKey:  "/source.tsx",
 			}, testCase.code, core.ScriptKindTSX)
 			if got := sourceMayUseHooks(sourceFile); got != testCase.want {
 				t.Fatalf("sourceMayUseHooks(%q) = %v, want %v", testCase.code, got, testCase.want)
@@ -147,7 +148,7 @@ func TestHookNameShapeMatchesSharedClassifier(t *testing.T) {
 func TestReportRangeMatchesNodeTrimming(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/source.tsx",
-		Path:     "/source.tsx",
+		PathKey:  "/source.tsx",
 	}, `
 function Component() {
   const value = (

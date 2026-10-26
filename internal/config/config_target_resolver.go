@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // configTargetResolver matches one immutable flat-config array while retaining
@@ -214,7 +215,7 @@ func newConfigTargetResolverWithBases(
 		config:           config,
 		gitPolicy:        gitPolicy,
 		fs:               fsys,
-		useCaseSensitive: fsys == nil || fsys.UseCaseSensitiveFileNames(),
+		useCaseSensitive: fsys == nil || fsys.CaseSensitivity().IsCaseSensitive(),
 		entries:          make([]configTargetEntry, len(config)),
 	}
 	baseIndexByDirectory := make(map[string]int)
@@ -259,8 +260,8 @@ func freezeConfigTargetBase(directory string, fsys vfs.FS) configTargetBase {
 	directory = normalizeAuthoredBase(directory)
 	physicalDirectory := directory
 	if fsys != nil {
-		if realPath := fsys.Realpath(directory); realPath != "" {
-			physicalDirectory = tspath.NormalizePath(realPath)
+		if realPath := fsys.Realpath(pathutil.Path(directory)); realPath != "" {
+			physicalDirectory = tspath.NormalizePath(realPath.AsString())
 		}
 	}
 	return configTargetBase{
@@ -380,8 +381,8 @@ func (resolver *configTargetResolver) resolvePathSpacesWithCanonicalParent(
 	if canonicalPath != "" {
 		canonicalPath = tspath.NormalizePath(canonicalPath)
 	} else if resolver.fs != nil && resolver.needsCanonicalPath(path) {
-		if realPath := resolver.fs.Realpath(path); realPath != "" {
-			canonicalPath = tspath.NormalizePath(realPath)
+		if realPath := resolver.fs.Realpath(pathutil.Path(path)); realPath != "" {
+			canonicalPath = tspath.NormalizePath(realPath.AsString())
 		}
 	}
 	if canonicalParentPath != "" {

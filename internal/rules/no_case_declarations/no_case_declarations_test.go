@@ -167,7 +167,7 @@ func lintNoCaseDeclarationsSource(t *testing.T, source string, demand rule.EditD
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/no-case-declarations.ts",
-		Path:     "/no-case-declarations.ts",
+		PathKey:  "/no-case-declarations.ts",
 	}, source, core.ScriptKindTS)
 	comments := rule.NewCommentStore(sourceFile)
 	var diagnostics []rule.RuleDiagnostic

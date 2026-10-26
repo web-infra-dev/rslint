@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "rs lib",
-    "compile": "tsgo -p tsconfig.build.json"
+    "compile": "tsc -p tsconfig.build.json"
   },
   "keywords": [],
   "author": "",
@@ -18,7 +18,7 @@
   "packageManager": "pnpm@10.34.4",
   "devDependencies": {
     "@types/node": "catalog:",
-    "@typescript/native-preview": "catalog:"
+    "typescript": "catalog:typescript7"
   },
   "publishConfig": {
     "access": "public"

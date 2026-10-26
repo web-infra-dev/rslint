@@ -19,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/gitignore"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // IsAbsolutePath follows Node's path.isAbsolute on the host. Unlike Go's
@@ -30,14 +31,14 @@ func IsAbsolutePath(name string) bool {
 // IsBinFile applies eslint-plugin-n's syntactic bin aliases (.js and /index).
 // This deliberately does not perform TypeScript module or exports resolution.
 func IsBinFile(p *program.Program, pkg *packagejson.Package, fileName string) bool {
-	return isBinFile(fileName, pkg.Field("bin"), pkg.Directory(), p.FS().UseCaseSensitiveFileNames())
+	return isBinFile(fileName, pkg.Field("bin"), pkg.Directory(), p.FS().CaseSensitivity().IsCaseSensitive())
 }
 
 func isBinFile(fileName string, bin any, directory string, caseSensitive bool) bool {
 	// Compare canonical filenames without folding again: tsgo deliberately
 	// keeps some Unicode names, such as İ and i, distinct on insensitive hosts.
-	comparison := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}
-	fileName = tspath.GetCanonicalFileName(fileName, caseSensitive)
+	comparison := pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: true}
+	fileName = pathutil.GetCanonicalFileName(fileName, caseSensitive)
 	withoutJS := strings.TrimSuffix(fileName, ".js")
 	withoutIndex := strings.TrimSuffix(withoutJS, "/index")
 	match := func(value any) bool {
@@ -45,10 +46,10 @@ func isBinFile(fileName string, bin any, directory string, caseSensitive bool) b
 		if !ok {
 			return false
 		}
-		resolved := tspath.GetCanonicalFileName(tspath.ResolvePath(directory, name), caseSensitive)
-		return tspath.ComparePaths(resolved, fileName, comparison) == 0 ||
-			tspath.ComparePaths(resolved, withoutJS, comparison) == 0 ||
-			tspath.ComparePaths(resolved, withoutIndex, comparison) == 0
+		resolved := pathutil.GetCanonicalFileName(tspath.ResolvePath(directory, name), caseSensitive)
+		return pathutil.ComparePaths(resolved, fileName, comparison) == 0 ||
+			pathutil.ComparePaths(resolved, withoutJS, comparison) == 0 ||
+			pathutil.ComparePaths(resolved, withoutIndex, comparison) == 0
 	}
 	switch value := bin.(type) {
 	case string:
@@ -160,18 +161,18 @@ type publication struct {
 // pkg is the source's publishing package; absolute is the converted target.
 // Nested package metadata cannot change what the publishing package includes.
 func IsUnpublished(p *program.Program, pkg *packagejson.Package, absolute string) bool {
-	comparison := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: p.FS().UseCaseSensitiveFileNames()}
-	if !tspath.ContainsPath(pkg.Directory(), absolute, comparison) {
+	comparison := pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: p.FS().CaseSensitivity().IsCaseSensitive()}
+	if !pathutil.ContainsPath(pkg.Directory(), absolute, comparison) {
 		return true
 	}
-	relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), absolute, comparison)
+	relative := pathutil.GetRelativePathFromDirectory(pkg.Directory(), absolute, comparison)
 	published := program.Cached(p, publicationKey(pkg.Directory()), func() *publication {
 		return compilePublication(p, pkg)
 	})
 	if main, ok := pkg.Field("main").(string); ok {
-		mainPath := tspath.GetCanonicalFileName(tspath.ResolvePath(pkg.Directory(), main), comparison.UseCaseSensitiveFileNames)
-		filePath := tspath.GetCanonicalFileName(absolute, comparison.UseCaseSensitiveFileNames)
-		if tspath.ComparePaths(mainPath, filePath, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}) == 0 {
+		mainPath := pathutil.GetCanonicalFileName(tspath.ResolvePath(pkg.Directory(), main), comparison.UseCaseSensitiveFileNames)
+		filePath := pathutil.GetCanonicalFileName(absolute, comparison.UseCaseSensitiveFileNames)
+		if pathutil.ComparePaths(mainPath, filePath, pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: true}) == 0 {
 			return false
 		}
 	}
@@ -202,9 +203,9 @@ func publicationIgnored(p *program.Program, packageDirectory, relative string, p
 		base := ""
 		for _, part := range strings.Split(directory, "/") {
 			base = tspath.CombinePaths(base, part)
-			text, ok := p.FS().ReadFile(tspath.ResolvePath(packageDirectory, base, ".npmignore"))
+			text, ok := p.FS().ReadFile(pathutil.File(tspath.ResolvePath(packageDirectory, base, ".npmignore")))
 			if !ok {
-				text, _ = p.FS().ReadFile(tspath.ResolvePath(packageDirectory, base, ".gitignore"))
+				text, _ = p.FS().ReadFile(pathutil.File(tspath.ResolvePath(packageDirectory, base, ".gitignore")))
 			}
 			if text != "" {
 				sources = append(sources, gitignore.TextSource{BaseDir: base, Text: text})
@@ -217,9 +218,9 @@ func publicationIgnored(p *program.Program, packageDirectory, relative string, p
 
 func compilePublication(p *program.Program, pkg *packagejson.Package) *publication {
 	files, hasFiles := pkg.Field("files").([]any)
-	ignoreText, hasIgnore := p.FS().ReadFile(tspath.ResolvePath(pkg.Directory(), ".npmignore"))
+	ignoreText, hasIgnore := p.FS().ReadFile(pathutil.File(tspath.ResolvePath(pkg.Directory(), ".npmignore")))
 	if !hasIgnore && !hasFiles {
-		ignoreText, hasIgnore = p.FS().ReadFile(tspath.ResolvePath(pkg.Directory(), ".gitignore"))
+		ignoreText, hasIgnore = p.FS().ReadFile(pathutil.File(tspath.ResolvePath(pkg.Directory(), ".gitignore")))
 	}
 	published := &publication{hasFiles: hasFiles}
 	if hasIgnore {

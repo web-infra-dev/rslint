@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // writeTestFile writes bytes to a file under dir and returns the path in the
@@ -78,10 +79,10 @@ func TestSourceHasBOMFromOverlay(t *testing.T) {
 
 	// The text handed to the parser never carries the mark, whichever side it
 	// came from, so offsets measured against it agree across both shapes.
-	if text, _ := fs.ReadFile(cleanOnDisk); text != "let a = 1;\n" {
+	if text, _ := fs.ReadFile(pathutil.File(cleanOnDisk)); text != "let a = 1;\n" {
 		t.Errorf("overlay ReadFile = %q, want the text without its mark", text)
 	}
-	if size := fs.Stat(cleanOnDisk).Size(); size != int64(len("let a = 1;\n")) {
+	if size := fs.Stat(pathutil.Path(cleanOnDisk)).Size(); size != int64(len("let a = 1;\n")) {
 		t.Errorf("overlay Stat size = %d, want the size without the mark", size)
 	}
 

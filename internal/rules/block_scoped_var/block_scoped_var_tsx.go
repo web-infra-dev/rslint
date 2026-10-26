@@ -352,7 +352,7 @@ func symbolHasTSETypeDefinitionInHost(symbol *ast.Symbol, host *ast.Node) bool {
 	if symbol == nil || host == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration != nil && isTSETypeDefinitionKind(declaration.Kind) &&
 			tseDefinitionScopeHost(declaration) == host {
 			return true

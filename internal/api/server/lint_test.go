@@ -28,6 +28,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 type canonicalPathBaseFS struct {
@@ -92,7 +93,7 @@ func TestHandleLintInvalidOptionsDoesNotReportPluginShadowWarning(t *testing.T) 
 	}
 }
 
-func (fs *canonicalPathBaseFS) Realpath(filePath string) string {
+func (fs *canonicalPathBaseFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
 	fs.realpathCalls.Add(1)
 	return fs.FS.Realpath(filePath)
 }
@@ -892,20 +893,32 @@ func TestHandleLint_LowLevelResponsePathsRemainRelativeToConfigDirectory(t *test
 		"src/source.js": "debugger;\n",
 	})
 
-	response, err := (&Handler{}).HandleLint(api.LintRequest{
-		Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
-		ConfigDirectory:  configDirectory,
-		WorkingDirectory: workingDirectory,
-		Files:            []string{target},
-	})
-	if err != nil {
-		t.Fatalf("HandleLint: %v", err)
-	}
-	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "src/source.js" {
-		t.Fatalf("diagnostic paths = %+v, want config-relative source", response.Diagnostics)
-	}
-	if !reflect.DeepEqual(response.LintedFiles, []string{"src/source.js"}) {
-		t.Fatalf("linted files = %v, want config-relative source", response.LintedFiles)
+	for _, testCase := range []struct {
+		name             string
+		workingDirectory string
+		configDirectory  string
+	}{
+		{name: "absolute", workingDirectory: workingDirectory, configDirectory: configDirectory},
+		{name: "relative", workingDirectory: workingDirectory, configDirectory: "./config"},
+		{name: "current directory", workingDirectory: configDirectory, configDirectory: "."},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			response, err := (&Handler{}).HandleLint(api.LintRequest{
+				Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
+				ConfigDirectory:  testCase.configDirectory,
+				WorkingDirectory: testCase.workingDirectory,
+				Files:            []string{target},
+			})
+			if err != nil {
+				t.Fatalf("HandleLint: %v", err)
+			}
+			if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "src/source.js" {
+				t.Fatalf("diagnostic paths = %+v, want config-relative source", response.Diagnostics)
+			}
+			if !reflect.DeepEqual(response.LintedFiles, []string{"src/source.js"}) {
+				t.Fatalf("linted files = %v, want config-relative source", response.LintedFiles)
+			}
+		})
 	}
 }
 
@@ -959,8 +972,8 @@ func TestHandleLint_LowLevelExternalConfigSeparatesAuthoredAndScanRoots(t *testi
 			t.Fatal(err)
 		}
 	}
-	target = tspath.NormalizePath(osvfs.FS().Realpath(target))
-	ignored = tspath.NormalizePath(osvfs.FS().Realpath(ignored))
+	target = tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(target)).AsString())
+	ignored = tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(ignored)).AsString())
 
 	response, err := (&Handler{}).HandleLint(api.LintRequest{
 		Config:           json.RawMessage(`[{"files":["../physical-workspace/*.js"],"rules":{"no-debugger":"error"}}]`),
@@ -1301,7 +1314,7 @@ func TestHandleLint_FileContentsPreferRequestedAliasAcrossGenerations(t *testing
 		for _, symlink := range []bool{false, true} {
 			for _, fix := range []bool{false, true} {
 				t.Run(fmt.Sprintf("project=%v/symlink=%v/fix=%v", project, symlink, fix), func(t *testing.T) {
-					dir := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+					dir := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 					canonical := tspath.ResolvePath(dir, "real.ts")
 					alias := tspath.ResolvePath(dir, "alias.ts")
 					dependency := tspath.ResolvePath(dir, "dependency.ts")
@@ -1783,12 +1796,12 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 					Status: "loaded",
 				}
 				switch filepath.Clean(candidate.ConfigPath) {
-				case filepath.Clean(osvfs.FS().Realpath(rootConfigPath)):
+				case filepath.Clean(osvfs.FS().Realpath(pathutil.Path(rootConfigPath)).AsString()):
 					if filepath.Clean(candidate.ConfigDirectory) != filepath.Clean(root) {
 						return nil, fmt.Errorf("root configDirectory = %q, want %q", candidate.ConfigDirectory, root)
 					}
 					result.Entries = rootEntries
-				case filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)):
+				case filepath.Clean(osvfs.FS().Realpath(pathutil.Path(nestedConfigPath)).AsString()):
 					if filepath.Clean(candidate.ConfigDirectory) != filepath.Clean(nestedDir) {
 						return nil, fmt.Errorf("nested configDirectory = %q, want %q", candidate.ConfigDirectory, nestedDir)
 					}
@@ -2007,10 +2020,10 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
 				requestedPaths = append(requestedPaths, filepath.Clean(candidate.ConfigPath))
-				if filepath.Clean(candidate.ConfigPath) == filepath.Clean(osvfs.FS().Realpath(unrelatedConfigPath)) {
+				if filepath.Clean(candidate.ConfigPath) == filepath.Clean(osvfs.FS().Realpath(pathutil.Path(unrelatedConfigPath)).AsString()) {
 					return nil, fmt.Errorf("unrelated config was evaluated: %q", candidate.ConfigPath)
 				}
-				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(osvfs.FS().Realpath(rootConfigPath)) {
+				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(osvfs.FS().Realpath(pathutil.Path(rootConfigPath)).AsString()) {
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
 				response.Results = append(response.Results, discovery.ConfigLoadResult{
@@ -2044,7 +2057,7 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 	if err != nil {
 		t.Fatalf("HandleLintWithContext: %v", err)
 	}
-	if !reflect.DeepEqual(requestedPaths, []string{filepath.Clean(osvfs.FS().Realpath(rootConfigPath))}) {
+	if !reflect.DeepEqual(requestedPaths, []string{filepath.Clean(osvfs.FS().Realpath(pathutil.Path(rootConfigPath)).AsString())}) {
 		t.Fatalf("requested config paths = %v, want only root", requestedPaths)
 	}
 	if response.FileCount != 1 || len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
@@ -2153,7 +2166,7 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 			request := payload.(discovery.ConfigLoadBatchRequest)
 			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
-				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(osvfs.FS().Realpath(configPath)) {
+				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(osvfs.FS().Realpath(pathutil.Path(configPath)).AsString()) {
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
 				response.Results = append(response.Results, discovery.ConfigLoadResult{
@@ -2228,9 +2241,9 @@ func TestHandleLint_ConfigDiscoveryOverrideNegationReopensGitHiddenConfig(t *tes
 					Status: "loaded",
 				}
 				switch filepath.Clean(candidate.ConfigPath) {
-				case filepath.Clean(osvfs.FS().Realpath(rootConfigPath)):
+				case filepath.Clean(osvfs.FS().Realpath(pathutil.Path(rootConfigPath)).AsString()):
 					result.Entries = rootEntries
-				case filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)):
+				case filepath.Clean(osvfs.FS().Realpath(pathutil.Path(nestedConfigPath)).AsString()):
 					result.Entries = nestedEntries
 				default:
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
@@ -2261,8 +2274,8 @@ func TestHandleLint_ConfigDiscoveryOverrideNegationReopensGitHiddenConfig(t *tes
 		t.Fatalf("HandleLintWithContext: %v", err)
 	}
 	wantRequestedPaths := []string{
-		filepath.Clean(osvfs.FS().Realpath(rootConfigPath)),
-		filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)),
+		filepath.Clean(osvfs.FS().Realpath(pathutil.Path(rootConfigPath)).AsString()),
+		filepath.Clean(osvfs.FS().Realpath(pathutil.Path(nestedConfigPath)).AsString()),
 	}
 	if !reflect.DeepEqual(requestedPaths, wantRequestedPaths) {
 		t.Fatalf("requested config paths = %v, want %v", requestedPaths, wantRequestedPaths)
@@ -2309,9 +2322,9 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(
 					Status: "loaded",
 				}
 				switch filepath.Clean(candidate.ConfigPath) {
-				case filepath.Clean(osvfs.FS().Realpath(rootConfigPath)):
+				case filepath.Clean(osvfs.FS().Realpath(pathutil.Path(rootConfigPath)).AsString()):
 					result.Entries = rootEntries
-				case filepath.Clean(osvfs.FS().Realpath(nestedConfigPath)):
+				case filepath.Clean(osvfs.FS().Realpath(pathutil.Path(nestedConfigPath)).AsString()):
 					result.Entries = nestedEntries
 				default:
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
@@ -2388,7 +2401,7 @@ func TestHandleLint_ExplicitConfigUsesEachTargetGitignore(t *testing.T) {
 		switch kind {
 		case api.KindLoadConfigs:
 			request := payload.(discovery.ConfigLoadBatchRequest)
-			if len(request.Candidates) != 1 || filepath.Clean(request.Candidates[0].ConfigPath) != filepath.Clean(osvfs.FS().Realpath(configPath)) {
+			if len(request.Candidates) != 1 || filepath.Clean(request.Candidates[0].ConfigPath) != filepath.Clean(osvfs.FS().Realpath(pathutil.Path(configPath)).AsString()) {
 				return nil, fmt.Errorf("unexpected explicit candidates: %+v", request.Candidates)
 			}
 			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigLoadBatchResponse{
@@ -2672,7 +2685,8 @@ func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 		}
 		// Assert the same bytes as a direct projection of this generation.
 		var builder estree.Builder
-		syntax := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: target, Path: tspath.Path(target)}, strings.TrimPrefix(wantText, "\ufeff"), core.GetScriptKindFromFileName(target))
+		fileName := tspath.RootedFilePathFromAbsolute(target)
+		syntax := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: fileName, PathKey: tspath.CaseSensitive.PathKey(fileName.AsPath())}, strings.TrimPrefix(wantText, "\ufeff"), core.GetScriptKindFromFileName(fileName))
 		expectedFrame, frameErr := builder.Build(context.Background(), syntax, estree.Options{SourceType: "module", HasBOM: strings.HasPrefix(wantText, "\ufeff")})
 		if frameErr != nil || !reflect.DeepEqual(attachments, []ipc.Attachment{ipc.Bytes(expectedFrame)}) {
 			t.Fatal("plugin frame did not freeze the generation")
@@ -3050,7 +3064,7 @@ func TestHandleLint_ConfigGitignoreIndependentOfWorkingDirectory(t *testing.T) {
 }
 
 func TestHandleLint_VirtualDirectoryAliasesInheritAncestorGitignore(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	repo := tspath.ResolvePath(root, "repo")
 	physical := tspath.ResolvePath(repo, "packages/app")
 	writeProgramTestFiles(t, repo, map[string]string{
@@ -3104,7 +3118,7 @@ func TestHandleLint_VirtualDirectoryAliasesInheritAncestorGitignore(t *testing.T
 							t.Fatalf("virtual target ignored=%t: %+v", test.ignored, response)
 						}
 						if wantFiles > 0 {
-							wantPath := tspath.GetRelativePathFromDirectory(repo, file, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+							wantPath := pathutil.GetRelativePathFromDirectory(repo, file, pathutil.ComparePathsOptions{UseCaseSensitiveFileNames: true})
 							if response.LintedFiles[0] != wantPath {
 								t.Fatalf("lost caller path %s: %v", wantPath, response.LintedFiles)
 							}
@@ -3128,7 +3142,7 @@ func TestHandleLint_VirtualDirectoryAliasesInheritAncestorGitignore(t *testing.T
 }
 
 func TestHandleLint_VirtualDirectoryAliasOverlayGitignore(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	physical := tspath.ResolvePath(root, "repo/packages/app")
 	if err := os.MkdirAll(physical, 0o755); err != nil {
 		t.Fatal(err)
@@ -3162,7 +3176,7 @@ func TestHandleLint_VirtualDirectoryAliasOverlayGitignore(t *testing.T) {
 }
 
 func TestHandleLint_FileSymlinkKeepsContainingRepositoryGitPolicy(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	root := tspath.NormalizePath(osvfs.FS().Realpath(pathutil.Path(t.TempDir())).AsString())
 	repo, external := tspath.ResolvePath(root, "repo"), tspath.ResolvePath(root, "external")
 	writeProgramTestFiles(t, repo, map[string]string{".gitignore": "ignored-link.js\n", "packages/app/keep.js": ""})
 	writeProgramTestFiles(t, external, map[string]string{".gitignore": "ignored.js\n", "ignored.js": "", "visible.js": ""})

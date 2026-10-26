@@ -716,7 +716,7 @@ func TestNoUselessAssignmentReporting(t *testing.T) {
 }`
 	for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
 		t.Run(fmt.Sprint(demand), func(t *testing.T) {
-			sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/reporting.ts", Path: "/reporting.ts"}, source, core.ScriptKindTS)
+			sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/reporting.ts", PathKey: "/reporting.ts"}, source, core.ScriptKindTS)
 			binder.BindSourceFile(sf)
 			_, init, _ := rule.ResolveLanguageDefaults("/reporting.ts", rule.LanguageOptions{})
 			comments := rule.NewCommentStore(sf)

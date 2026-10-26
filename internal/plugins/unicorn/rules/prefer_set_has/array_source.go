@@ -84,12 +84,12 @@ func isIdentifierInitializedWithArray(ctx rule.RuleContext, node *ast.Node, visi
 		return false
 	}
 	symbol := ctx.Refs.Resolve(node)
-	if symbol == nil || visited[symbol] || len(symbol.Declarations) != 1 {
+	if symbol == nil || visited[symbol] || len(symbol.Declarations()) != 1 {
 		return false
 	}
 	visited[symbol] = true
 
-	declarationNode := symbol.Declarations[0]
+	declarationNode := symbol.Declarations()[0]
 	if declarationNode == nil || declarationNode.Kind != ast.KindVariableDeclaration {
 		return false
 	}

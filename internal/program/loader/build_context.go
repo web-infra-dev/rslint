@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // buildContext owns the services shared by every TypeScript Program
@@ -92,20 +93,18 @@ func (c *buildContext) compilerFS() vfs.FS {
 // newCompilerHostWithCache returns a host wired to every cache owned by the context.
 // Project-reference configs are registered before ts-go reads them; extended
 // configs are registered by programExtendedConfigCache.
-func (c *buildContext) newCompilerHostWithCache(cwd string) compiler.CompilerHost {
-	host := c.newCompilerHost(cwd)
-	return utils.WithParseCache(host, c.parseCache)
+func (c *buildContext) newCompilerHostWithCache(cwd string) utils.CompilerHost {
+	return utils.WithCompilerHostDirectory(utils.WithParseCache(c.newCompilerHost(), c.parseCache), pathutil.Directory(cwd))
 }
 
 // newTransientCompilerHost shares source snapshots with Program construction
 // without publishing its bound ASTs into the project-owned parse cache.
-func (c *buildContext) newTransientCompilerHost(cwd string) compiler.CompilerHost {
-	host := c.newCompilerHost(cwd)
-	return utils.WithSourceSnapshots(host, c.parseCache)
+func (c *buildContext) newTransientCompilerHost(cwd string) utils.CompilerHost {
+	return utils.WithCompilerHostDirectory(utils.WithSourceSnapshots(c.newCompilerHost(), c.parseCache), pathutil.Directory(cwd))
 }
 
-func (c *buildContext) newCompilerHost(cwd string) compiler.CompilerHost {
-	host := compiler.NewCompilerHost(cwd, c.compilerFS(), bundled.LibPath(), c.extendedConfigCacheInterface(), nil, nil)
+func (c *buildContext) newCompilerHost() compiler.CompilerHost {
+	host := compiler.NewCompilerHost(c.compilerFS(), bundled.LibPath(), c.extendedConfigCacheInterface(), nil, nil)
 	if c.metadataFS != nil {
 		host = &programBuildCompilerHost{
 			CompilerHost: host,
@@ -129,17 +128,16 @@ func (c *buildContext) createProjectProgram(singleThreaded bool, cwd string, tsc
 // Program construction chooses its serial or parallel view before doing that.
 func (c *buildContext) parseConfig(cwd string, tsconfigPath string) (*tsoptions.ParsedCommandLine, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
-	if !c.compilerFS().FileExists(resolvedConfigPath) {
+	if !c.compilerFS().FileExists(pathutil.File(resolvedConfigPath)) {
 		return nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
 	}
 	c.registerTSConfig(resolvedConfigPath)
 
-	host := c.newCompilerHost(cwd)
 	config, _ := tsoptions.GetParsedCommandLineOfConfigFile(
-		tsconfigPath,
+		pathutil.File(resolvedConfigPath),
 		&core.CompilerOptions{},
 		nil,
-		host,
+		c.compilerFS(),
 		c.extendedConfigCacheInterface(),
 	)
 	return config, nil
@@ -197,14 +195,14 @@ type programBuildCompilerHost struct {
 	context *buildContext
 }
 
-func (h *programBuildCompilerHost) GetResolvedProjectReference(fileName string, path tspath.Path) *tsoptions.ParsedCommandLine {
-	h.context.registerTSConfig(fileName)
+func (h *programBuildCompilerHost) GetResolvedProjectReference(fileName tspath.RootedFilePath, path tspath.PathKey) *tsoptions.ParsedCommandLine {
+	h.context.registerTSConfig(fileName.AsString())
 	commandLine, _ := tsoptions.GetParsedCommandLineOfConfigFilePath(
 		fileName,
 		path,
 		nil,
 		nil,
-		h,
+		h.FS(),
 		h.context.extendedConfigCacheInterface(),
 	)
 	return commandLine
@@ -227,18 +225,16 @@ type programExtendedConfigGeneration struct {
 var _ tsoptions.ExtendedConfigCache = (*programExtendedConfigCache)(nil)
 
 func (c *programExtendedConfigCache) GetExtendedConfig(
-	fileName string,
-	path tspath.Path,
-	resolutionStack []tspath.Path,
-	host tsoptions.ParseConfigHost,
+	fileName tspath.RootedFilePath,
+	path tspath.PathKey, resolutionStack []tspath.PathKey, fs vfs.FS,
 ) *tsoptions.ExtendedConfigCacheEntry {
-	c.metadataFS.registerTSConfig(fileName)
+	c.metadataFS.registerTSConfig(fileName.AsString())
 	generation := c.metadataFS.currentExtendedConfigGeneration()
 	if cached, ok := generation.entries.Load(fileName); ok {
 		return mustExtendedConfigCacheEntry(cached)
 	}
 
-	candidate := tsoptions.ParseExtendedConfig(fileName, path, resolutionStack, host, c)
+	candidate := tsoptions.ParseExtendedConfig(fileName, path, resolutionStack, fs, c)
 	actual, _ := generation.entries.LoadOrStore(fileName, candidate)
 	return mustExtendedConfigCacheEntry(actual)
 }
@@ -304,8 +300,8 @@ func isPackageJSONPath(fileName string) bool {
 	return fileName == "package.json"
 }
 
-func (f *programMetadataFS) ReadFile(fileName string) (string, bool) {
-	if !f.shouldCache(fileName) {
+func (f *programMetadataFS) ReadFile(fileName tspath.RootedFilePath) (string, bool) {
+	if !f.shouldCache(fileName.AsString()) {
 		return f.FS.ReadFile(fileName)
 	}
 
@@ -338,7 +334,7 @@ func mustProgramMetadataRead(value any) *programMetadataRead {
 
 func (f *programMetadataFS) readAndPublish(
 	generation *programMetadataGeneration,
-	fileName string,
+	fileName tspath.RootedFilePath,
 	read *programMetadataRead,
 ) (content string, ok bool) {
 	completed := false
@@ -402,19 +398,19 @@ func (f *programMetadataFS) invalidate() {
 // callers. Swap generations both before and after the mutation: an in-flight
 // old read may complete, while every read begun after the write returns does
 // so against a fresh generation.
-func (f *programMetadataFS) WriteFile(path string, data string) error {
+func (f *programMetadataFS) WriteFile(path tspath.RootedFilePath, data string) error {
 	f.invalidate()
 	defer f.invalidate()
 	return f.FS.WriteFile(path, data)
 }
 
-func (f *programMetadataFS) AppendFile(path string, data string) error {
+func (f *programMetadataFS) AppendFile(path tspath.RootedFilePath, data string) error {
 	f.invalidate()
 	defer f.invalidate()
 	return f.FS.AppendFile(path, data)
 }
 
-func (f *programMetadataFS) Remove(path string) error {
+func (f *programMetadataFS) Remove(path tspath.RootedPath) error {
 	f.invalidate()
 	defer f.invalidate()
 	return f.FS.Remove(path)

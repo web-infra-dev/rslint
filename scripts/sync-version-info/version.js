@@ -8,7 +8,9 @@ function compareVersions(a, b) {
   const aParts = normalizeVersion(a).split('.').map(Number);
   const bParts = normalizeVersion(b).split('.').map(Number);
   for (let i = 0; i < 3; i++) {
-    if (aParts[i] !== bParts[i]) return aParts[i] - bParts[i];
+    const aPart = aParts[i] ?? 0;
+    const bPart = bParts[i] ?? 0;
+    if (aPart !== bPart) return aPart - bPart;
   }
   return 0;
 }
@@ -42,7 +44,7 @@ function getTypeScriptBinding(getGitOutput) {
   const refs = new Map();
   for (const line of tags.split('\n')) {
     const match =
-      /^([0-9a-f]{40})\s+refs\/tags\/v(\d+\.\d+\.\d+(?:-[\w.-]+)?)(\^\{\})?$/.exec(
+      /^([0-9a-f]{40})\s+refs\/tags\/v(\d+\.\d+(?:\.\d+)?(?:-[\w.-]+)?)(\^\{\})?$/.exec(
         line,
       );
     if (!match) continue;
@@ -58,7 +60,13 @@ function getTypeScriptBinding(getGitOutput) {
       (a, b) =>
         compareVersions(a.split('-')[0], b.split('-')[0]) ||
         Number(!a.includes('-')) - Number(!b.includes('-')) ||
-        a.localeCompare(b, 'en', { numeric: true }),
+        a
+          .split('-')
+          .slice(1)
+          .join('-')
+          .localeCompare(b.split('-').slice(1).join('-'), 'en', {
+            numeric: true,
+          }),
     );
   return { commit, releaseVersion: versions.at(-1) ?? null };
 }

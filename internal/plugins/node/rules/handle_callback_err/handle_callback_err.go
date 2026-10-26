@@ -59,7 +59,7 @@ var HandleCallbackErrRule = rule.Rule{
 			// RefStore excludes declaration writes. ESLint counts defaults and
 			// initialized redeclarations as references, even without a read.
 			if symbol != nil {
-				for _, declaration := range symbol.Declarations {
+				for _, declaration := range symbol.Declarations() {
 					if hasInitialization(declaration, node, first.Text()) {
 						return
 					}

@@ -20,10 +20,10 @@ func LocalFunctionBinding(
 	refs *rule.RefStore,
 	symbol *ast.Symbol,
 ) *ast.Node {
-	if refs == nil || symbol == nil || len(symbol.Declarations) != 1 {
+	if refs == nil || symbol == nil || len(symbol.Declarations()) != 1 {
 		return nil
 	}
-	declaration := symbol.Declarations[0]
+	declaration := symbol.Declarations()[0]
 	if declaration == nil || ast.GetSourceFileOfNode(declaration) != sourceFile ||
 		localFunctionBindingIsWritten(refs, symbol) {
 		return nil
@@ -56,7 +56,7 @@ func LocalFunctionImplementation(
 	}
 
 	var implementation *ast.Node
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range symbol.Declarations() {
 		if declaration == nil || ast.GetSourceFileOfNode(declaration) != sourceFile {
 			return nil
 		}

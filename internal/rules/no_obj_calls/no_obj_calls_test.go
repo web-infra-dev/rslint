@@ -627,7 +627,7 @@ func TestSourceMayUseNonCallableGlobal(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/source.ts",
-				Path:     "/source.ts",
+				PathKey:  "/source.ts",
 			}, testCase.code, core.ScriptKindTS)
 			if got := sourceMayUseNonCallableGlobal(sourceFile); got != testCase.want {
 				t.Fatalf("sourceMayUseNonCallableGlobal() = %v, want %v", got, testCase.want)

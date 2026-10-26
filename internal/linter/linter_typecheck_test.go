@@ -19,6 +19,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/pathutil"
 )
 
 // --- Type-check basic functionality ---
@@ -582,7 +583,7 @@ const x: Foo = { a: 'hello' };
 func TestTypeCheckDedupeKeyIncludesMessageChainAndRelatedInformation(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{"a.ts": "export const value = 1;"})
 	sourceProgram := lintprogram.NewFromCompiler(program)
-	sourceFile := program.GetSourceFile(paths["a.ts"])
+	sourceFile := program.GetSourceFile(pathutil.File(paths["a.ts"]))
 	if sourceFile == nil {
 		t.Fatal("expected a.ts source file")
 	}
@@ -668,7 +669,7 @@ func TestCompleteProgramsPreservesDuplicateInputsAndReusablePlan(t *testing.T) {
 			t.Fatal(err)
 		}
 		execution.run(rule.DiagnosticConsumer{Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }})
-		if len(diagnostics) != 1 || diagnostics[0].SourceFile != raw.GetSourceFile(paths["source.ts"]) || len(plan.programs) != 3 {
+		if len(diagnostics) != 1 || diagnostics[0].SourceFile != raw.GetSourceFile(pathutil.File(paths["source.ts"])) || len(plan.programs) != 3 {
 			t.Fatalf("mode %d changed dedupe, source identity, or the reusable input plan: %+v", mode, diagnostics)
 		}
 	}
@@ -692,10 +693,12 @@ type caseInsensitiveTypeCheckFS struct {
 	realPaths map[string]string
 }
 
-func (fs *caseInsensitiveTypeCheckFS) UseCaseSensitiveFileNames() bool { return false }
-func (fs *caseInsensitiveTypeCheckFS) Realpath(filePath string) string {
-	if realPath := fs.realPaths[tspath.NormalizePath(filePath)]; realPath != "" {
-		return realPath
+func (fs *caseInsensitiveTypeCheckFS) CaseSensitivity() tspath.CaseSensitivity {
+	return pathutil.CaseSensitivity(false)
+}
+func (fs *caseInsensitiveTypeCheckFS) Realpath(filePath tspath.RootedPath) tspath.RootedPath {
+	if realPath := fs.realPaths[tspath.NormalizePath(filePath.AsString())]; realPath != "" {
+		return pathutil.Path(realPath)
 	}
 	return fs.FS.Realpath(filePath)
 }
