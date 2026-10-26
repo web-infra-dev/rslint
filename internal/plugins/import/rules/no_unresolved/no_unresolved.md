@@ -57,6 +57,8 @@ The `node` resolver checks runtime files, including JSON and native modules. It 
 
 `import/resolver` accepts `node`, `typescript`, an object containing resolver options, or an array of resolvers tried in order. Node options include `extensions`, `paths`, `moduleDirectory`, and `preserveSymlinks`. The legacy `import/resolve` setting supplies Node options and selects only the `node` resolver when `import/resolver` is absent.
 
+The `typescript` resolver follows the TypeScript project. Like `eslint-import-resolver-typescript`, it also resolves existing files that TypeScript does not load, such as `./style.css`, `@/style.css` through tsconfig `paths`, or `package/dist/reset.css`. Package `exports` still apply.
+
 ```javascript
 export default [
   {

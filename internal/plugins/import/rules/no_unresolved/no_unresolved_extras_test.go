@@ -156,7 +156,8 @@ func TestNoUnresolvedExtras(t *testing.T) {
 	add(`import 'exact/subpath';`, nil, map[string]any{"import/core-modules": []any{"exact"}}, "exact/subpath")
 	add(`import './bar';`, nil, map[string]any{"import/resolver": map[string]any{"node": map[string]any{"extensions": []any{}}}}, "./bar")
 	add(`import './bar';`, nil, map[string]any{"import/resolver": []any{"node", map[string]any{"node": map[string]any{"extensions": []any{}}}}}, "./bar")
-	add(`import './bar.js?raw';`, nil, nil, "./bar.js?raw")
+	// The node resolver reads a query as part of the file name.
+	add(`import './bar.js?raw';`, nil, map[string]any{"import/resolver": "node"}, "./bar.js?raw")
 	add(`import './jsx/MyUncoolComponent.jsx';`, map[string]any{"caseSensitive": false}, nil, "./jsx/MyUncoolComponent.jsx")
 	add(`import 'missing'; require('checked');`, map[string]any{"esmodule": false, "commonjs": true}, nil, "checked")
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &no_unresolved.NoUnresolvedRule, valid, invalid)
@@ -176,12 +177,45 @@ func TestNoUnresolvedDefaultResolver(t *testing.T) {
 			{Code: code, FileName: fileName, Settings: map[string]any{"import/resolver": false}},
 			// Declarations satisfy the TypeScript resolver, as they do upstream.
 			{Code: `import './types-only';`, FileName: fileName},
+			// The TypeScript resolver also resolves files TypeScript does not load.
+			{Code: `import './style.css?inline'; import '@/style.css';`, FileName: fileName},
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: `import '@/missing'; import './missing.js';`, FileName: fileName, Errors: unresolvedErrors(`import '@/missing'; import './missing.js';`, "@/missing", "./missing.js")},
 			{Code: code, FileName: fileName, Settings: node, Errors: unresolvedErrors(code, "@/util", "./util.js", "exports-only")},
 			{Code: code, FileName: fileName, Settings: map[string]any{"import/resolve": map[string]any{}}, Errors: unresolvedErrors(code, "@/util", "./util.js", "exports-only")},
 			{Code: `import './types-only';`, FileName: fileName, Settings: node, Errors: unresolvedErrors(`import './types-only';`, "./types-only")},
+		})
+}
+
+// eslint-import-resolver-typescript v4.4.4 also resolves files TypeScript does
+// not load, through tsconfig paths and enhanced-resolve lookup.
+func TestNoUnresolvedTypeScriptFallback(t *testing.T) {
+	root := unresolvedRoot(t, false)
+	const fileName = "typescript-fallback/src/input.ts"
+	const tsconfig = "typescript-fallback/tsconfig.json"
+	typescript := map[string]any{"import/resolver": "typescript"}
+	missing := `import '@/missing.css'; import './missing.css'; import 'pkg/missing.css'; import 'exported/private/hidden.css';`
+	rule_tester.RunRuleTester(root, tsconfig, t, &no_unresolved.NoUnresolvedRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `import '@/style.css'; import './style.css'; import './style.css?inline'; import '@/util';`, FileName: fileName, Settings: typescript},
+			// A later paths target is tried when an earlier one is missing.
+			{Code: `import '~/logo.svg';`, FileName: fileName, Settings: typescript},
+			{Code: `import './legacy.js'; import 'pkg/dist/reset.css'; import 'exported/style.css';`, FileName: fileName, Settings: typescript},
+			// The query and fragment are dropped before paths are matched and substituted.
+			{Code: `import '@icons/logo?raw'; import 'theme?inline'; import '@icons/logo?raw?x'; import '@icons/logo#icon';`, FileName: fileName, Settings: typescript},
+			// A leading `#` is part of the name, not a fragment.
+			{Code: `import '#lib/style.css'; import '#lib/style.css?raw';`, FileName: fileName, Settings: typescript},
+			// A suffix after the leading `#` is still dropped.
+			{Code: `import '#style?inline'; import '#style#x'; import '#theme?inline'; import '#icons/logo?raw'; import '#icons/logo#a';`, FileName: fileName, Settings: typescript},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Package exports still restrict which files can be imported.
+			{Code: missing, FileName: fileName, Settings: typescript, Errors: unresolvedErrors(missing, "@/missing.css", "./missing.css", "pkg/missing.css", "exported/private/hidden.css")},
+			// Substituting `ghost?raw` would yield `ghost?raw.svg` and resolve ghost.ts.
+			{Code: `import '@icons/ghost?raw';`, FileName: fileName, Settings: typescript, Errors: unresolvedErrors(`import '@icons/ghost?raw';`, "@icons/ghost?raw")},
+			{Code: `import '@icons/ghost?raw?x'; import '@icons/ghost#icon';`, FileName: fileName, Settings: typescript, Errors: unresolvedErrors(`import '@icons/ghost?raw?x'; import '@icons/ghost#icon';`, "@icons/ghost?raw?x", "@icons/ghost#icon")},
+			{Code: `import '#icons/ghost?raw'; import '#icons/ghost#a';`, FileName: fileName, Settings: typescript, Errors: unresolvedErrors(`import '#icons/ghost?raw'; import '#icons/ghost#a';`, "#icons/ghost?raw", "#icons/ghost#a")},
 		})
 }
 
