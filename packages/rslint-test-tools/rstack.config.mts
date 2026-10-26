@@ -932,7 +932,7 @@ const ecosystemTests = {
 // Cross-language tests own their Go producer; other tests need no Go setup.
 define.test({
   // All projects share one runner pool; limits must be set at the root.
-  pool: { maxWorkers: process.platform === 'win32' ? 1 : 16 },
+  pool: { maxWorkers: 16 },
   projects: [
     {
       ...ecosystemTests,
