@@ -1,11 +1,49 @@
 package rule
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
+
+func TestExportedZeroAndCopiedViews(t *testing.T) {
+	t.Parallel()
+
+	declarations := []InlineExported{
+		{Name: "first", NameRanges: []core.TextRange{core.NewTextRange(10, 15), core.NewTextRange(30, 35)}},
+		{Name: "second", NameRanges: []core.TextRange{core.NewTextRange(16, 22)}},
+	}
+	original := NewExported(map[string]bool{"first": true, "second": false}, declarations)
+	copied := original
+	original = NewExported(map[string]bool{"second": true}, nil)
+
+	for _, test := range []struct {
+		name         string
+		view         Exported
+		first        bool
+		second       bool
+		declarations []InlineExported
+	}{
+		{"zero", Exported{}, false, false, nil},
+		{"nil inputs", NewExported(nil, nil), false, false, nil},
+		{"empty declarations", NewExported(nil, []InlineExported{}), false, false, []InlineExported{}},
+		{"first file", copied, true, false, declarations},
+		{"another rule in first file", copied, true, false, declarations},
+		{"second file", original, false, true, nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if test.view.Has("first") != test.first || test.view.Has("second") != test.second || test.view.Has("missing") {
+				t.Fatal("exported names do not belong to this view's file")
+			}
+			if got := test.view.Declarations(); !reflect.DeepEqual(got, test.declarations) {
+				t.Errorf("Declarations() = %#v, want %#v", got, test.declarations)
+			}
+		})
+	}
+}
 
 func TestIsGlobalScopeBinding(t *testing.T) {
 	t.Parallel()
