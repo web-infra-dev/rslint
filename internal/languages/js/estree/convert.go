@@ -23,7 +23,7 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 	if expression := utils.JSDocTypeCastExpression(node); expression != nil {
 		return p.convert(expression, pattern)
 	}
-	if utils.IsJSDocSyntaxNode(node) {
+	if isJSDocCommentSyntax(node) {
 		return 0
 	}
 	p.recordTokenCover(node, false)
@@ -630,9 +630,6 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 			nodeValue(p.convertJsxName(n.Namespace)), nodeValue(p.convertJsxName(n.Name())))
 	}
 
-	if ast.IsJSDocNodeKind(node.Kind) {
-		return 0
-	}
 	return p.unsupported(node)
 }
 
@@ -827,7 +824,7 @@ func (p *estreeProjector) convertParameters(parameters []*ast.Node) uint32 {
 }
 
 func (p *estreeProjector) convertParameter(node *ast.Node) uint32 {
-	if node == nil || utils.IsJSDocSyntaxNode(node) {
+	if node == nil || isJSDocCommentSyntax(node) {
 		return 0
 	}
 	n := node.AsParameterDeclaration()
@@ -837,7 +834,8 @@ func (p *estreeProjector) convertParameter(node *ast.Node) uint32 {
 	} else {
 		parameter = p.convert(n.Name(), true)
 	}
-	if n.QuestionToken != nil {
+	optional := n.QuestionToken != nil && !isJSDocCommentSyntax(n.QuestionToken)
+	if optional {
 		record := p.nodes[parameter-1]
 		for index, field := range schemas[record.typeID].fields {
 			if field == "optional" {
@@ -850,11 +848,11 @@ func (p *estreeProjector) convertParameter(node *ast.Node) uint32 {
 	result := parameter
 	if n.DotDotDotToken != nil {
 		result = p.addNode("RestElement", node,
-			p.listValue(nil), nodeValue(parameter), boolValue(n.QuestionToken != nil),
+			p.listValue(nil), nodeValue(parameter), boolValue(optional),
 			p.typeAnnotation(n.Type))
 	} else if n.Initializer != nil {
 		result = p.addNode("AssignmentPattern", node,
-			p.listValue(nil), nodeValue(parameter), boolValue(n.QuestionToken != nil),
+			p.listValue(nil), nodeValue(parameter), boolValue(optional),
 			nodeValue(p.convert(n.Initializer, false)), undefinedValue())
 	}
 	// Accessibility and readonly belong to TSParameterProperty, not its binding.

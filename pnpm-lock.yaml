@@ -313,9 +313,6 @@ importers:
       '@types/picomatch':
         specifier: 'catalog:'
         version: 4.0.3
-      '@typescript-eslint/parser':
-        specifier: 'catalog:'
-        version: 8.65.0(eslint@10.13.0(jiti@2.7.0))(typescript@6.0.3)
       '@typescript-eslint/scope-manager':
         specifier: 'catalog:'
         version: 8.65.0
@@ -325,18 +322,12 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20250904.1
-      eslint:
-        specifier: 'catalog:'
-        version: 10.13.0(jiti@2.7.0)
       eslint-scope:
         specifier: 'catalog:'
         version: 9.1.2
       eslint-visitor-keys:
         specifier: 'catalog:'
         version: 5.0.1
-      espree:
-        specifier: 'catalog:'
-        version: 11.2.0
       esquery:
         specifier: 'catalog:'
         version: 1.7.0
@@ -410,6 +401,9 @@ importers:
       '@typescript-eslint/utils':
         specifier: workspace:*
         version: link:../utils
+      '@typescript-eslint/visitor-keys':
+        specifier: 'catalog:'
+        version: 8.65.0
       eslint:
         specifier: 'catalog:'
         version: 10.13.0(jiti@2.7.0)
@@ -437,6 +431,9 @@ importers:
       eslint-plugin-unicorn:
         specifier: 'catalog:'
         version: 72.0.0(eslint@10.13.0(jiti@2.7.0))
+      espree:
+        specifier: 'catalog:'
+        version: 11.2.0
 
   packages/rslint-wasm:
     dependencies:

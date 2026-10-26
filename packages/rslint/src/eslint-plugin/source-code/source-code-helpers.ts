@@ -338,7 +338,7 @@ export function markVariableAsUsedInScopeChain(
   // walk always reaches Program at the top and `acquire(Program, true)`
   // returns the program / module scope.
   if (!scope) {
-    scope = (sm.globalScope as ScopeView | undefined) ?? null;
+    scope = sm.globalScope ?? null;
   }
   while (scope) {
     const variable = scope.variables?.find((v) => v.name === name);

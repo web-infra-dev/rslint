@@ -20,6 +20,7 @@
     "@typescript-eslint/parser": "catalog:",
     "@typescript-eslint/rule-tester": "workspace:*",
     "@typescript-eslint/utils": "workspace:*",
+    "@typescript-eslint/visitor-keys": "catalog:",
     "eslint": "catalog:",
     "eslint-plugin-cypress": "catalog:",
     "eslint-plugin-es-x": "catalog:",
@@ -28,7 +29,8 @@
     "eslint-plugin-security": "catalog:",
     "eslint-plugin-simple-import-sort": "catalog:",
     "eslint-plugin-sonarjs": "catalog:",
-    "eslint-plugin-unicorn": "catalog:"
+    "eslint-plugin-unicorn": "catalog:",
+    "espree": "catalog:"
   },
   "publishConfig": {
     "access": "public"

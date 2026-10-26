@@ -1919,6 +1919,11 @@ reuse. Rust contains no parser, ESTree schema, filename, BOM or plugin policy.
 JavaScript language data lives in `packages/rslint/src/languages/js`:
 ESTree types, the frame schema/decoder, source positions, visitor keys, token
 reconstruction, JSX token text decoding, built-in globals and scope analyzers.
+Visitor keys use the public TypeScript-ESLint data for JS, JSX and TS, independently
+of the frame's supported node set. Unknown synthetic nodes use ESLint's public
+key lookup for traversal and scope analysis. Compiler-synthesized JSDoc remains
+comment data; unsupported types
+authored in source fail projection instead of becoming null AST fields.
 These modules consume syntax data and explicit language options; they import
 no ESLint plugin runtime, native binding, IPC, config loader or worker host.
 The dependency direction is `eslint-plugin → languages/js`. SourceCode and
@@ -2255,7 +2260,13 @@ The current architecture already leaves room for:
 - **Rule Engine Tests**: `internal/linter` and `internal/config` have focused behavior tests
 - **Go Rule Testing Helpers**: `internal/rule_tester`
 - **Shared Go Test Infrastructure**: `internal/testutil`; package-specific helpers remain beside the owning tests
-- **JS/TS Integration Tests**: `packages/rslint/tests` and `packages/rslint-test-tools/tests`
+- **Core JS/TS and API Tests**: `packages/rslint/tests`; CLI engine integration
+  selects its own built worker locally, without shared test setup.
+- **Cross-Language and Ecosystem Tests**: `packages/rslint-test-tools/tests` owns
+  the Go ESTree producer, upstream AST/token/SourceCode comparisons, and real
+  plugin worker/package integration. Its `go-frame` project builds the producer
+  only for source-to-frame tests. Reference parsers and ESLint are test-tools
+  dependencies; core keeps the libraries bundled into its runtime.
 - **VS Code Extension Tests**: `packages/vscode-extension/__tests__`
 - **Rust / tsgo Tests**: `crates/tsgo-client/tests` verifies exported semantic data through the matching `cmd/tsgo` binary
 

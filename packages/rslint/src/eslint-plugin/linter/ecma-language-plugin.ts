@@ -51,7 +51,7 @@ import {
   type FixTextPart,
   type SuggestionsMode,
 } from './diagnostic-builder.js';
-import type { ESTreeNode, GlobalsConfig } from '../../languages/js/types.js';
+import type { GlobalsConfig } from '../../languages/js/types.js';
 import type { LoadedPlugins } from '../plugin/plugin-loader.js';
 import type { Fix } from './fixer.js';
 import { applyDisableDirectives } from './apply-disable-directives.js';
@@ -279,14 +279,7 @@ export function lintFile(
     // `SourceCode.hasBOM` reflects whether the source on disk started
     // with a BOM (matches ESLint's API).
     hasBOM: hadBOM,
-    parsedComments: parsed.comments as
-      | ReadonlyArray<{
-          type: 'Line' | 'Block';
-          value: string;
-          start: number;
-          end: number;
-        }>
-      | undefined,
+    parsedComments: parsed.comments,
     // Go-projected token stream (columnar, UTF-16). The SourceCode lazily rebuilds
     // Token[] from these on first token-API use.
     parsedTokens: {
@@ -302,7 +295,7 @@ export function lintFile(
   // see `undefined` and throw. Attach a lazy getter that delegates to
   // the shared SourceCode's tokenizer — only pays the tokenize cost if
   // a rule actually consumes the field.
-  if (!('tokens' in (ast as object))) {
+  if (!('tokens' in ast)) {
     // Memoize on first access. `getTokens(ast)` rebuilds the array
     // every call (each call allocates a fresh `out` and re-walks the
     // tokens stream), so `program.tokens !== program.tokens` pre-fix.
@@ -312,7 +305,7 @@ export function lintFile(
     // array once on the AST root; we match by caching after the first
     // get and serving the same reference thereafter.
     let cached: ReturnType<typeof sharedSourceCode.getTokens> | undefined;
-    Object.defineProperty(ast as object, 'tokens', {
+    Object.defineProperty(ast, 'tokens', {
       get() {
         if (cached === undefined) cached = sharedSourceCode.getTokens(ast);
         return cached;
@@ -327,13 +320,13 @@ export function lintFile(
   // top-level scanners read `program.comments` directly (rather than
   // going through `sourceCode.getAllComments()`). Without this getter
   // they get `undefined` and `.length` / `.forEach` throw a TypeError.
-  if (!('comments' in (ast as object))) {
+  if (!('comments' in ast)) {
     // Memoize for the same `===` identity reasons as `tokens` above.
     // `getAllComments()` returns `_comments.slice()` (new array every
     // call) under the hood, so identity-sensitive consumers would see
     // a different array every read pre-fix.
     let cached: ReturnType<typeof sharedSourceCode.getAllComments> | undefined;
-    Object.defineProperty(ast as object, 'comments', {
+    Object.defineProperty(ast, 'comments', {
       get() {
         if (cached === undefined) cached = sharedSourceCode.getAllComments();
         return cached;
