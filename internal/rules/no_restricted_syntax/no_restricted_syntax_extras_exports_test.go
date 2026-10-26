@@ -25,6 +25,13 @@ func TestNoRestrictedSyntaxExportRegressions(t *testing.T) {
 			{Code: "namespace A.B {}", Options: []any{"ExportNamedDeclaration"}},
 			{Code: "namespace A.B.C {}", Options: []any{"ExportNamedDeclaration"}},
 			{Code: "declare module A.B {}", Options: []any{"ExportNamedDeclaration"}},
+			{Code: "const x = 1; export = x;", Options: []any{"ExportDefaultDeclaration"}},
+			{Code: "export default function f() {}", Options: []any{"Program > FunctionDeclaration"}},
+			{Code: "export default function f() {} sample();", Options: []any{"Program:not(:has(ExportNamedDeclaration, ExportDefaultDeclaration, ExportAllDeclaration)) > ExpressionStatement > CallExpression"}},
+			{Code: "sample(); export default class {}", Options: []any{"Program:not(:has(ExportDefaultDeclaration)) CallExpression"}},
+			{Code: "export default function f() {}", Options: []any{"ExportNamedDeclaration"}},
+			{Code: "const f = 1;\nexport { f as default };", Options: []any{"ExportDefaultDeclaration"}},
+			{Code: "export default function f() {}", Options: []any{":not(ExportDefaultDeclaration) > FunctionDeclaration"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -438,6 +445,298 @@ func TestNoRestrictedSyntaxExportRegressions(t *testing.T) {
 				Options: []any{"ExportNamedDeclaration"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 18},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function () {}",
+				Options: []any{"ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
+				},
+			},
+			{
+				Code:    "export default async function f() {}",
+				Options: []any{"ExportDefaultDeclaration > FunctionDeclaration[async=true]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 37},
+				},
+			},
+			{
+				Code:    "export default class {}",
+				Options: []any{"ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    "export default class C {}",
+				Options: []any{"ExportDefaultDeclaration > ClassDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:    "export default abstract class C {}",
+				Options: []any{"ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 35},
+				},
+			},
+			{
+				Code:    "export default interface I {}",
+				Options: []any{"ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
+				},
+			},
+			{
+				Code:    "const x = 1; export default x;",
+				Options: []any{"ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 14, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "const x = 1; export default x;",
+				Options: []any{"ExportDefaultDeclaration > Identifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 29, EndLine: 1, EndColumn: 30},
+				},
+			},
+			{
+				Code:    "export default 1;",
+				Options: []any{"ExportDefaultDeclaration > Literal"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 17},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"FunctionDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default class C {}",
+				Options: []any{"ClassDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:    "@dec export default class C {}",
+				Options: []any{"ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 6, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "@dec export default class C {}",
+				Options: []any{"ClassDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 21, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default class C { m() {} }",
+				Options: []any{"ExportDefaultDeclaration MethodDefinition"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 26, EndLine: 1, EndColumn: 32},
+				},
+			},
+			{
+				Code:    "export default function f() { sample(); }",
+				Options: []any{"ExportDefaultDeclaration CallExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 31, EndLine: 1, EndColumn: 39},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"ExportDefaultDeclaration[declaration.type='FunctionDeclaration']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"ExportDefaultDeclaration[exportKind='value']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"ExportDefaultDeclaration[parent.type='Program']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"FunctionDeclaration[parent.type='ExportDefaultDeclaration']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"ExportDefaultDeclaration > .declaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "const a = 1; export default function f() {}",
+				Options: []any{"VariableDeclaration + ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 14, EndLine: 1, EndColumn: 44},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"Program > ExportDefaultDeclaration:last-child"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{":matches(ExportDefaultDeclaration, FunctionDeclaration)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"ExportDefaultDeclaration:exit"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"[type=/^Export/]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{":statement"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 31},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 29, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f(): void;\nexport default function f() {}",
+				Options: []any{"ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 35},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default class {}",
+				Options: []any{"ClassDeclaration[id=null]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    "export default function () {}",
+				Options: []any{"FunctionDeclaration[id=null]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 30},
+				},
+			},
+			{
+				Code:    "declare module 'm' { export default function f(): void; }",
+				Options: []any{"ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 22, EndLine: 1, EndColumn: 56},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"Program:has(> ExportDefaultDeclaration)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f() {}\nexport const a = 1;",
+				Options: []any{"ExportDefaultDeclaration ~ ExportNamedDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 20},
+				},
+			},
+			{
+				Code:    "export const a = 1;\nexport default function f() {}",
+				Options: []any{"ExportNamedDeclaration + ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"ExportDefaultDeclaration[declaration.id.name='f']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"[type='ExportDefaultDeclaration']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default class C { static {} }",
+				Options: []any{"ExportDefaultDeclaration StaticBlock"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 26, EndLine: 1, EndColumn: 35},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{"ExportDefaultDeclaration > FunctionDeclaration > Identifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 25, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:    "export default function f() {}",
+				Options: []any{":declaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default (function () {});",
+				Options: []any{"ExportDefaultDeclaration > FunctionExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 17, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "export default class {}",
+				Options: []any{"ExportDefaultDeclaration > ClassDeclaration > ClassBody"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 22, EndLine: 1, EndColumn: 24},
 				},
 			},
 		})
