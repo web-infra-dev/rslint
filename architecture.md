@@ -548,7 +548,12 @@ an omitted source type from the filename (`.cjs` to `commonjs`; `.js`/`.jsx`/
 `.mjs` and TypeScript-flavoured `.ts`/`.tsx`/`.cts`/`.mts` to `module`).
 The remaining zero value has module semantics through `EffectiveSourceType`.
 Source type does not change TypeScript parsing or compiler module resolution. The linter uses the normalized edition to build
-one `Globals` value for each native rule context. Rules read
+one `Globals` view per file, shared by its native rule contexts. `Globals` and
+`Exported` are value handles to private, immutable per-file data; copying a
+context copies these handles rather than their private storage. Their zero
+values retain the default global set and no exported names,
+respectively. Rule identity and diagnostic consumers remain independently bound
+to each context. Rules read
 `LanguageOptions` when upstream behavior depends on language configuration;
 they use `Globals` for variable-availability decisions. `Globals` owns the
 ESLint-versioned language-global set, resolved language defaults, the authored

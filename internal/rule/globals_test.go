@@ -1,11 +1,74 @@
 package rule
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestGlobalsCopiedViewsKeepFileConfiguration(t *testing.T) {
+	t.Parallel()
+
+	options := LanguageOptions{ECMAVersion: 5, SourceType: "commonjs"}
+	init, _, options := ResolveLanguageDefaults("first.cjs", options)
+	declarations := []InlineGlobal{{
+		Name: "custom", Access: utils.GlobalAccessOff,
+		NameRanges: []core.TextRange{core.NewTextRange(10, 16), core.NewTextRange(30, 36)},
+	}}
+	original := NewGlobals(options, init,
+		map[string]utils.GlobalAccess{"custom": utils.GlobalAccessReadonly},
+		map[string]utils.GlobalAccess{"custom": utils.GlobalAccessOff}, declarations)
+	copied := original
+	access := original.Access
+	options = LanguageOptions{ECMAVersion: 2026, SourceType: "module"}
+	init, _, options = ResolveLanguageDefaults("second.mjs", options)
+	original = NewGlobals(options, init,
+		map[string]utils.GlobalAccess{"custom": utils.GlobalAccessWritable}, nil, nil)
+	if access("custom") != utils.GlobalAccessOff {
+		t.Fatal("a captured view changed when the original was reassigned")
+	}
+
+	for _, test := range []struct {
+		name         string
+		view         Globals
+		version      int
+		require      utils.GlobalAccess
+		custom       utils.GlobalAccess
+		declarations []InlineGlobal
+	}{
+		{"zero", Globals{}, LatestECMAScriptVersion, utils.GlobalAccessUnset, utils.GlobalAccessUnset, nil},
+		{"first file", copied, 5, utils.GlobalAccessReadonly, utils.GlobalAccessOff, declarations},
+		{"another rule in first file", copied, 5, utils.GlobalAccessReadonly, utils.GlobalAccessOff, declarations},
+		{"second file", original, 2026, utils.GlobalAccessUnset, utils.GlobalAccessWritable, nil},
+		{"empty declarations", NewGlobals(LanguageOptions{}, GlobalsInit{}, nil, nil, []InlineGlobal{}), LatestECMAScriptVersion, utils.GlobalAccessUnset, utils.GlobalAccessUnset, []InlineGlobal{}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if got := test.view.EffectiveECMAVersion(); got != test.version {
+				t.Errorf("EffectiveECMAVersion() = %d, want %d", got, test.version)
+			}
+			if got := test.view.LanguageAccess("require"); got != test.require {
+				t.Errorf("LanguageAccess(require) = %s, want %s", got, test.require)
+			}
+			if got := test.view.Access("custom"); got != test.custom {
+				t.Errorf("Access(custom) = %s, want %s", got, test.custom)
+			}
+			if got := test.view.InlineDeclarations(); !reflect.DeepEqual(got, test.declarations) {
+				t.Errorf("InlineDeclarations() = %#v, want %#v", got, test.declarations)
+			}
+			seed := map[string]bool{"custom": true, "require": true, "unrelated": true}
+			test.view.ApplyTo(seed)
+			// An unmentioned custom name remains part of the caller's seed.
+			wantCustom := test.custom != utils.GlobalAccessOff
+			if seed["custom"] != wantCustom || seed["require"] != test.require.IsDeclared() || !seed["unrelated"] {
+				t.Errorf("ApplyTo() did not preserve the file's globals: %v", seed)
+			}
+		})
+	}
+}
 
 func TestECMAScriptGlobalsMatchESLint10_8(t *testing.T) {
 	t.Parallel()

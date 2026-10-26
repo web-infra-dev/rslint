@@ -23,6 +23,11 @@ import (
 // rules that have no binding to resolve, such as no-implicit-globals'
 // assignment to a read-only global.
 type Exported struct {
+	data *exportedData
+}
+
+// exportedData is initialized once per file and shared by its rule contexts.
+type exportedData struct {
 	names        map[string]bool
 	declarations []InlineExported
 }
@@ -31,19 +36,25 @@ type Exported struct {
 // treated as read-only and may be shared with the comment store that produced
 // them.
 func NewExported(names map[string]bool, declarations []InlineExported) Exported {
-	return Exported{names: names, declarations: declarations}
+	if names == nil && declarations == nil {
+		return Exported{}
+	}
+	return Exported{data: &exportedData{names: names, declarations: declarations}}
 }
 
 // Has reports whether an `/* exported */` comment in this file lists name.
 func (e Exported) Has(name string) bool {
-	return e.names[name]
+	return e.data != nil && e.data.names[name]
 }
 
 // Declarations returns every parsed inline exported declaration in source
 // order, including repeated names and their source ranges. Treat it as
 // read-only.
 func (e Exported) Declarations() []InlineExported {
-	return e.declarations
+	if e.data == nil {
+		return nil
+	}
+	return e.data.declarations
 }
 
 // IsExportedGlobalBinding reports whether an `/* exported */` comment in this

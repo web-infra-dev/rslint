@@ -110,11 +110,26 @@ var ecmaScriptGlobalIntroducedIn = map[string]int{
 // Its zero value represents the latest ECMAScript edition with no authored
 // overrides.
 type Globals struct {
+	data *globalsData
+}
+
+// globalsData is initialized once per file and shared by its rule contexts.
+type globalsData struct {
 	languageOptions    LanguageOptions
 	init               GlobalsInit
 	configOverrides    map[string]utils.GlobalAccess
 	inlineOverrides    map[string]utils.GlobalAccess
 	inlineDeclarations []InlineGlobal
+}
+
+// The zero-value view shares these defaults; no view writes to them.
+var emptyGlobalsData globalsData
+
+func (g Globals) view() *globalsData {
+	if g.data == nil {
+		return &emptyGlobalsData
+	}
+	return g.data
 }
 
 // NewGlobals constructs the per-file globals view. All maps and slices are
@@ -127,19 +142,19 @@ func NewGlobals(
 	inlineOverrides map[string]utils.GlobalAccess,
 	inlineDeclarations []InlineGlobal,
 ) Globals {
-	return Globals{
+	return Globals{data: &globalsData{
 		languageOptions:    languageOptions,
 		init:               init,
 		configOverrides:    configOverrides,
 		inlineOverrides:    inlineOverrides,
 		inlineDeclarations: inlineDeclarations,
-	}
+	}}
 }
 
 // EffectiveECMAVersion returns the normalized ECMAScript edition selected for
 // this file. The zero-value Globals selects the moving latest edition.
 func (g Globals) EffectiveECMAVersion() int {
-	return g.languageOptions.EffectiveECMAVersion()
+	return g.view().languageOptions.EffectiveECMAVersion()
 }
 
 // LanguageAccess returns the globals implicitly supplied by the selected
@@ -147,11 +162,12 @@ func (g Globals) EffectiveECMAVersion() int {
 // compose after edition globals, matching ESLint's default config.
 // Wrapper-local bindings belong to RefStore instead.
 func (g Globals) LanguageAccess(name string) utils.GlobalAccess {
-	if access := g.init.access(name); access != utils.GlobalAccessUnset {
+	data := g.view()
+	if access := data.init.access(name); access != utils.GlobalAccessUnset {
 		return access
 	}
 	introduced, ok := ecmaScriptGlobalIntroducedIn[name]
-	if ok && introduced <= g.languageOptions.EffectiveECMAVersion() {
+	if ok && introduced <= data.languageOptions.EffectiveECMAVersion() {
 		return utils.GlobalAccessReadonly
 	}
 	return utils.GlobalAccessUnset
@@ -170,22 +186,23 @@ func (Globals) IsECMAScriptGlobalName(name string) bool {
 // ConfigOverride returns only the access authored in
 // languageOptions.globals. It does not include language or inline globals.
 func (g Globals) ConfigOverride(name string) utils.GlobalAccess {
-	return g.configOverrides[name]
+	return g.view().configOverrides[name]
 }
 
 // Override returns the final explicitly authored access: an inline setting
 // wins over languageOptions.globals. It excludes implicit language defaults.
 func (g Globals) Override(name string) utils.GlobalAccess {
-	if access, ok := g.inlineOverrides[name]; ok {
+	data := g.view()
+	if access, ok := data.inlineOverrides[name]; ok {
 		return access
 	}
-	return g.configOverrides[name]
+	return data.configOverrides[name]
 }
 
 // ConfiguredAccess returns the effective access before inline comments are
 // applied. This matches ESLint's internal configGlobals value for a name.
 func (g Globals) ConfiguredAccess(name string) utils.GlobalAccess {
-	if access, ok := g.configOverrides[name]; ok {
+	if access, ok := g.view().configOverrides[name]; ok {
 		return access
 	}
 	return g.LanguageAccess(name)
@@ -194,7 +211,7 @@ func (g Globals) ConfiguredAccess(name string) utils.GlobalAccess {
 // Access returns the final effective access for name. Inline comments win over
 // languageOptions.globals, which wins over resolved language and edition defaults.
 func (g Globals) Access(name string) utils.GlobalAccess {
-	if access, ok := g.inlineOverrides[name]; ok {
+	if access, ok := g.view().inlineOverrides[name]; ok {
 		return access
 	}
 	return g.ConfiguredAccess(name)
@@ -204,7 +221,7 @@ func (g Globals) Access(name string) utils.GlobalAccess {
 // order, including repeated names and their source ranges. Treat it as
 // read-only.
 func (g Globals) InlineDeclarations() []InlineGlobal {
-	return g.inlineDeclarations
+	return g.view().inlineDeclarations
 }
 
 // ApplyTo applies this view to dst. Every known ECMAScript and resolved-language
@@ -226,14 +243,15 @@ func (g Globals) ApplyTo(dst map[string]bool) {
 			delete(dst, entry.name)
 		}
 	}
-	for name := range g.configOverrides {
+	data := g.view()
+	for name := range data.configOverrides {
 		if g.Access(name).IsDeclared() {
 			dst[name] = true
 		} else {
 			delete(dst, name)
 		}
 	}
-	for name := range g.inlineOverrides {
+	for name := range data.inlineOverrides {
 		if g.Access(name).IsDeclared() {
 			dst[name] = true
 		} else {
