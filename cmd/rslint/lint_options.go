@@ -11,6 +11,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 )
 
@@ -40,8 +41,11 @@ type lintArgs struct {
 	StartTimeMs int64
 	RuleFlags   []string
 	// Positional args resolved into existing-dir vs file paths.
-	AllowFiles []string
-	AllowDirs  []string
+	AllowFiles      []string
+	AllowDirs       []string
+	Positional      []string
+	GlobRoots       []rslintconfig.DirectoryIdentity
+	ScanDirectories map[string][]string
 	// FS is an optional run-scoped filesystem shared with Go config discovery.
 	// Native CLI supplies one cached instance so the later target/program phases
 	// reuse directory entries already read by the staged frontier.
@@ -178,6 +182,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 
 	// Collect file/directory arguments for targeted linting (e.g. rslint file1.ts src/)
 	if positional := fs.Args(); len(positional) > 0 {
+		args.Positional = positional
 		for _, arg := range positional {
 			absPath, err := filepath.Abs(arg)
 			if err != nil {

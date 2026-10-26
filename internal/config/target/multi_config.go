@@ -112,7 +112,11 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 			}
 		}
 		configAllowDirs := allowDirs
-		if directories := scopes[configDir].Directories; len(allowDirs) > 0 && directories != nil {
+		directories := scopes[configDir].Directories
+		if recursive := scopes[configDir].RecursiveDirectories; recursive != nil {
+			directories = recursive
+		}
+		if len(allowDirs) > 0 && directories != nil {
 			// Config ancestry chooses the rules, not a wider scan root. Reuse
 			// only entries discovery admitted for this owner, including requested
 			// subdirectories and normally reached child-config boundaries. A

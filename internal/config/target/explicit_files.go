@@ -23,6 +23,8 @@ type explicitLintTarget struct {
 	exists    bool
 	ignored   bool
 	evaluated bool
+	scanned   bool
+	selected  bool
 }
 
 type explicitLintTargetSet struct {
@@ -40,6 +42,7 @@ func (target *explicitLintTarget) selectedBy(
 		return false
 	}
 	if !target.evaluated {
+		target.selected = !target.scanned
 		target.target.ConfigDirectory = tspath.NormalizePath(configDirectory)
 		target.ignored = rslintconfig.IsDefaultExcludedPath(
 			target.target.Path,
@@ -48,6 +51,7 @@ func (target *explicitLintTarget) selectedBy(
 		)
 		if matcher != nil {
 			match := matcher.MatchFile(target.target.Identity())
+			target.selected = target.selected || match.Selected()
 			if match.GloballyIgnored() {
 				target.ignored = true
 			}
@@ -58,7 +62,7 @@ func (target *explicitLintTarget) selectedBy(
 		}
 		target.evaluated = true
 	}
-	return target.supported && target.exists && !target.ignored
+	return target.supported && target.exists && !target.ignored && target.selected
 }
 
 func newExplicitLintTargetSet(
@@ -133,7 +137,7 @@ func (set *explicitLintTargetSet) outcomes() []ExplicitFileOutcome {
 	outcomes := make([]ExplicitFileOutcome, 0, len(set.requestedPaths))
 	for _, filePath := range set.requestedPaths {
 		target := set.byPath[tspath.ToPath(filePath, "", true)]
-		if target == nil {
+		if target == nil || target.scanned {
 			continue
 		}
 		outcomes = append(outcomes, ExplicitFileOutcome{

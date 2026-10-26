@@ -141,7 +141,7 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 	directorySeedByPath := make(map[string]*discoverySeed, len(directoryRoots))
 	for _, identity := range directoryRoots {
 		directory := identity.LexicalPath
-		if boundedDirectoryWalk && targetsByRoot[directory] == nil {
+		if boundedDirectoryWalk && targetsByRoot[directory] == nil && !coordinator.recursiveDirectory(directory) {
 			continue
 		}
 		useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
@@ -225,7 +225,7 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		if !seed.explicitFile {
 			coordinator.draft.addDirectory(seed.ownerDir, rslintconfig.DirectoryIdentity{
 				LexicalPath: seed.path, CanonicalPath: seed.physicalDirectory,
-			})
+			}, coordinator.recursiveDirectory(seed.path))
 		}
 	}
 	for _, seed := range explicitSeeds {
@@ -253,6 +253,7 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 			configReachable:    true,
 			gitCursor:          seed.gitCursor,
 			targets:            targetsByRoot[directory],
+			recursive:          coordinator.recursiveDirectory(directory),
 		})
 	}
 	if err := coordinator.walkDirectories(walkRoots, true); err != nil {
@@ -297,6 +298,14 @@ func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
 	eslintPlugins, err := coordinator.modules.activateEffectiveConfigs(effectiveIDs)
 	if err != nil {
 		return nil, err
+	}
+	if len(coordinator.request.RecursiveDirectories) > 0 {
+		for owner, scope := range scopes {
+			if scope.RecursiveDirectories == nil {
+				scope.RecursiveDirectories = []rslintconfig.DirectoryIdentity{}
+				scopes[owner] = scope
+			}
+		}
 	}
 	targetFiles := coordinator.targetFiles
 	if coordinator.reachableFiles != nil {

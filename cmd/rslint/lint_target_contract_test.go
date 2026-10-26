@@ -12,8 +12,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -185,7 +187,7 @@ func TestCLITypeCheckKeepsLintTargetsAndChecksWholeProject(t *testing.T) {
 
 	run := func(t *testing.T, typeCheck bool) []lintTargetContractDiagnostic {
 		t.Helper()
-		code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+		args := lintArgs{
 			ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
 				Files: []string{"**/*.ts"},
 				LanguageOptions: &rslintconfig.LanguageOptions{
@@ -195,12 +197,18 @@ func TestCLITypeCheckKeepsLintTargetsAndChecksWholeProject(t *testing.T) {
 				},
 				Rules: rslintconfig.Rules{"no-debugger": "error"},
 			}}),
-			AllowFiles:     []string{selected},
+			Positional:     []string{"selected*.ts"},
 			Format:         "jsonline",
 			NoColor:        true,
 			SingleThreaded: true,
 			TypeCheck:      typeCheck,
-		})
+		}
+		t.Chdir(dir)
+		args.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		if err := prepareCLIInputs(context.Background(), &args); err != nil {
+			t.Fatal(err)
+		}
+		code, stdout, stderr := runLintCommandForTest(t, dir, args)
 		if code != 1 {
 			t.Fatalf("typeCheck=%v exit code = %d, want 1; stdout=%q stderr=%q", typeCheck, code, stdout, stderr)
 		}
@@ -250,17 +258,23 @@ func TestCLIFixOnlyWritesSelectedTargets(t *testing.T) {
 	selected := tspath.NormalizePath(filepath.Join(dir, "selected.js"))
 	unselected := filepath.Join(dir, "unselected.js")
 
-	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+	args := lintArgs{
 		ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
 			Files: []string{"**/*.js"},
 			Rules: rslintconfig.Rules{"no-var": "error"},
 		}}),
-		AllowFiles:     []string{selected},
+		Positional:     []string{"selected*.js"},
 		Fix:            true,
 		Format:         "jsonline",
 		NoColor:        true,
 		SingleThreaded: true,
-	})
+	}
+	t.Chdir(dir)
+	args.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	if err := prepareCLIInputs(context.Background(), &args); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := runLintCommandForTest(t, dir, args)
 	if code != 0 || stdout != "" {
 		t.Fatalf("targeted fix failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}

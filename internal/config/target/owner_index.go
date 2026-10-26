@@ -15,9 +15,13 @@ import (
 // ExplicitOnly keeps a config loaded solely for literal files out of automatic
 // ownership, handoff, and directory-walk decisions.
 type OwnerScope struct {
-	Directories   []rslintconfig.DirectoryIdentity
-	ExplicitFiles []string
-	ExplicitOnly  bool
+	Directories []rslintconfig.DirectoryIdentity
+	// RecursiveDirectories restricts target walking to entries reached through
+	// literal directory inputs when a catalog also contains bounded glob roots.
+	// Nil preserves the existing Directories scope.
+	RecursiveDirectories []rslintconfig.DirectoryIdentity
+	ExplicitFiles        []string
+	ExplicitOnly         bool
 }
 
 func configMapForAutomaticTargets(

@@ -30,7 +30,7 @@ rslint [options] [files/directories...]
 
 ## File and Directory Arguments
 
-You can pass file paths, directory paths, or a mix of both. Rslint discovers the config file by walking upward from the target location.
+You can pass file paths, directory paths, quoted glob patterns, or a mix of them. Rslint discovers the config file by walking upward from the target location.
 
 ```bash
 # Lint specific files
@@ -38,6 +38,9 @@ rslint src/index.ts src/utils.ts
 
 # Lint a directory (only files under that directory are linted)
 rslint src/
+
+# Lint files matched by a glob, including nested directories
+rslint "src/**/*.{js,ts}"
 
 # Mix files and directories
 rslint src/ lib/utils.ts
@@ -47,6 +50,8 @@ rslint --fix src/index.ts
 ```
 
 When no arguments are given, rslint scopes linting to the current working directory.
+
+Quoted globs are expanded by rslint relative to the working directory; absolute patterns also work. Patterns support `*`, `**`, `?`, character classes such as `[ab]`, and brace alternatives such as `{js,ts}`. Existing file or directory paths are treated literally, even when their names contain glob characters. Glob results follow the existing config, ignore, and `.gitignore` policies, and overlapping targets are checked only once.
 
 ### Config Discovery
 

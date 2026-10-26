@@ -1519,6 +1519,7 @@ and the inspector cache remain in `internal/api/server`; planning, execution,
 and mutation sequencing do not.
 
 1. **Node.js Wrapper**: parses args, starts the Go engine, and hosts JS/TS module evaluation plus live third-party plugin objects
+   Go expands raw CLI glob inputs into lexical scan candidates before config discovery, using target-owned filesystem enumeration and the existing glob dependency. Candidates retain their scan roots and do not acquire literal-file config-discovery exceptions. Config discovery bounds glob roots to candidate ancestry while preserving recursive literal directory inputs; target planning applies ordinary file selection and canonical deduplication. IPC-supplied exact files are never reinterpreted as patterns.
 2. **Config Catalog**: for automatic JS/TS discovery or an explicitly selected JS/TS config, Go builds the staged catalog and batches exact module-evaluation requests to Node. If automatic discovery finds no candidate, or a non-JS config was explicitly selected, the existing Go JSON loader path remains in control
 3. **Mode Selection**:
    - `--lsp`: starts the LSP server

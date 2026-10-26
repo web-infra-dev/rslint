@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
 
 // newCLIChannelPair wires two ipc.Channels back-to-back over two io.Pipes so
@@ -63,6 +65,48 @@ func TestClassifyPaths(t *testing.T) {
 	wantFiles := []string{tspath.NormalizePath(file), tspath.NormalizePath(missing)}
 	if len(files) != 2 || files[0] != wantFiles[0] || files[1] != wantFiles[1] {
 		t.Errorf("files = %v, want %v", files, wantFiles)
+	}
+}
+
+func TestRunCLIQuotedGlobs(t *testing.T) {
+	root := txtarfs.MustParseFile(t, "testdata/cli_globs.txtar").Materialize(t, "")
+	if err := os.Mkdir(filepath.Join(root, "src/git-ignored/.git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	entries := config.RslintConfig{
+		{Ignores: []string{"src/generated/**"}},
+		{Files: []string{"**/*.{js,ts}"}, Rules: config.Rules{"no-debugger": "error"}},
+	}
+	recursive := []string{"src/.hidden.ts", "src/[ab].ts", "src/a.ts", "src/nested/b.ts"}
+	for _, test := range []struct {
+		name string
+		argv []string
+		want []string
+	}{
+		{"recursive", []string{"src/**/*.ts"}, recursive},
+		{"question mark", []string{"src/?.ts"}, []string{"src/a.ts"}},
+		{"absolute", []string{tspath.ResolvePath(root, "src/**/*.ts")}, recursive},
+		{"literal priority", []string{"src/[ab].ts"}, []string{"src/[ab].ts"}},
+		{"brace and shallow", []string{"src/*.{js,ts}"}, []string{"src/.hidden.ts", "src/[ab].ts", "src/a.ts", "src/bundle.min.js"}},
+		{"mixed overlap", []string{"src/**/*.ts", "src/a.ts", "other"}, append([]string{"other/c.js", "other/deep/d.js"}, recursive...)},
+		{"directory does not borrow glob scope", []string{".", "src/git-ignored/*.js"}, []string{"other/c.js", "other/deep/d.js", "src/.hidden.ts", "src/[ab].ts", "src/a.ts", "src/bundle.min.js", "src/git-ignored/entry.js", "src/nested/b.ts"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			code, stdout := runCLIArgsForTest(t, map[string]any{
+				"workingDirectory": root,
+				"format":           "jsonline",
+				"configDiscovery":  map[string]any{},
+			}, entries, 0, true, test.argv)
+			diagnostics := parseLintTargetContractDiagnostics(t, stdout)
+			got := lintTargetContractPaths(t, root, diagnostics, func(rule string) bool { return rule == "no-debugger" })
+			want := make([]string, len(test.want))
+			for i, path := range test.want {
+				want[i] = tspath.ResolvePath(root, path)
+			}
+			if code != 1 || !slices.Equal(got, want) {
+				t.Fatalf("exit=%d targets=%v, want %v; output=%s", code, got, want, stdout)
+			}
+		})
 	}
 }
 
@@ -804,6 +848,17 @@ func runCLIInitForTest(
 	wantAcknowledgedOutputRequests int,
 	wantShutdown bool,
 ) (int, string) {
+	return runCLIArgsForTest(t, payload, loadedConfig, wantAcknowledgedOutputRequests, wantShutdown, nil)
+}
+
+func runCLIArgsForTest(
+	t *testing.T,
+	payload any,
+	loadedConfig config.RslintConfig,
+	wantAcknowledgedOutputRequests int,
+	wantShutdown bool,
+	argv []string,
+) (int, string) {
 	t.Helper()
 
 	// runCLI binds its IPC channel to the os.Stdin/os.Stdout globals and
@@ -839,7 +894,7 @@ func runCLIInitForTest(
 	}()
 
 	codeCh := make(chan int, 1)
-	go func() { codeCh <- runCLI(nil) }()
+	go func() { codeCh <- runCLI(argv) }()
 
 	initRequest, err := ipc.NewMessage(kindInit, cliTestInitRequestID, payload)
 	if err != nil {
