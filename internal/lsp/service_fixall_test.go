@@ -9,7 +9,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
-	"github.com/microsoft/TypeScript/tsc/shim/project"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
@@ -118,14 +117,14 @@ func TestIsFixAllRequest_SourceOrganizeImports(t *testing.T) {
 
 // ======== handleFixAllCodeAction tests ========
 
-func TestHandleFixAllCodeAction_SessionNil(t *testing.T) {
+func TestHandleFixAllCodeActionBeforeInitialization(t *testing.T) {
 	s := newTestServer()
 	resp, err := s.handleFixAllCodeAction(context.Background(), "file:///project/test.ts")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if resp.CommandOrCodeActionArray == nil || len(*resp.CommandOrCodeActionArray) != 0 {
-		t.Error("expected empty code actions when session is nil")
+		t.Error("expected empty code actions before initialization")
 	}
 }
 
@@ -153,7 +152,7 @@ func TestHandleFixAllCodeAction_GitignoredFile(t *testing.T) {
 	s := newTestServer()
 	s.cwd = dir
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	s.session = &project.Session{}
+	s.initialized = true
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		tspath.NormalizePath(dir): {{Rules: config.Rules{"no-var": "error"}}},
 	})
@@ -547,7 +546,7 @@ func TestHandleFixAllCodeAction_DocumentNotInMap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Session is nil, so it returns empty without panicking
+	// The server is uninitialized, so it returns empty without panicking
 	if resp.CommandOrCodeActionArray == nil || len(*resp.CommandOrCodeActionArray) != 0 {
 		t.Error("expected empty code actions for document not in map")
 	}

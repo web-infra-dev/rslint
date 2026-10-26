@@ -110,7 +110,7 @@ type speculativeGenerationAcquire func(
 
 // speculativeGenerationProvider maps the pipeline-owned memory snapshot onto an
 // isolated editor overlay. It never advances fix rounds and never mutates the
-// TypeScript Session, open-document store, or diagnostics cache.
+// resident Programs, open-document store, or diagnostics cache.
 type speculativeGenerationProvider struct {
 	uri             lsproto.DocumentUri
 	targetPath      string

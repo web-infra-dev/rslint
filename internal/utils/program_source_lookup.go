@@ -22,6 +22,17 @@ func NewProgramSourceLookup(program *compiler.Program, fs vfs.FS) *ProgramSource
 	return &ProgramSourceLookup{program: program, fs: fs}
 }
 
+// UpdateProgramForReusedGraph preserves path identities after a source edit.
+// The caller must have received a reused graph from Program.UpdateProgram:
+// membership and resolution are unchanged, but source objects may be replaced.
+func (lookup *ProgramSourceLookup) UpdateProgramForReusedGraph(program *compiler.Program, fs vfs.FS) {
+	lookup.program = program
+	lookup.fs = fs
+	for canonicalID, sourceFile := range lookup.canonicalSources {
+		lookup.canonicalSources[canonicalID] = program.GetSourceFileByPath(sourceFile.Path())
+	}
+}
+
 func (lookup *ProgramSourceLookup) canonicalPathID(filePath string) string {
 	filePath = tspath.NormalizePath(filePath)
 	if lookup.fs != nil {

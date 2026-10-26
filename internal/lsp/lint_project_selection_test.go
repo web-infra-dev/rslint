@@ -349,13 +349,13 @@ func TestLintProjectSnapshotNormalizesWindowsDrive(t *testing.T) {
 		t.Fatal("normalization changed the declared project identity")
 	}
 	if !lintProjectSnapshotsEqual(upper.commandLine, lower.commandLine, fsys) {
-		t.Fatal("Session drive normalization made unchanged roots or path options incompatible")
+		t.Fatal("Drive normalization made unchanged roots or path options incompatible")
 	}
 	program, err := createStandaloneLintProgram(lower, fsys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !lintSessionProgramMatchesConfig(program, upper, nil, fsys) {
+	if !lintProjectSnapshotsEqual(upper.commandLine, program.CommandLine(), fsys) {
 		t.Fatal("equivalent Windows configuration could not reuse its Program")
 	}
 }
@@ -409,85 +409,6 @@ func TestRunConfiguredLintForContentDirectRootSkipsEarlierImportProgram(t *testi
 	}
 	if fs.reads != 0 {
 		t.Fatalf("fix-all built the earlier import-only Program %d times", fs.reads)
-	}
-}
-
-func TestLintSessionProjectRootCacheUsesCommandLineGeneration(t *testing.T) {
-	dir := t.TempDir()
-	firstSource := filepath.Join(dir, "first.ts")
-	secondSource := filepath.Join(dir, "second.ts")
-	for _, source := range []string{firstSource, secondSource} {
-		if err := os.WriteFile(source, []byte("export const value = 1;\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	fs := bundled.WrapFS(osvfs.FS())
-	host := utils.CreateCompilerHost(dir, fs)
-	firstProgram, err := utils.CreateProgramFromOptionsLenient(
-		true,
-		&core.CompilerOptions{},
-		[]string{firstSource},
-		host,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	secondProgram, err := utils.CreateProgramFromOptionsLenient(
-		true,
-		&core.CompilerOptions{},
-		[]string{secondSource},
-		host,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cache := newLintSessionProjectRootCache()
-	configPath := filepath.Join(dir, "tsconfig.json")
-	first := cache.metadata(configPath, firstProgram.CommandLine(), fs)
-	if reused := cache.metadata(configPath, firstProgram.CommandLine(), fs); reused != first {
-		t.Fatal("unchanged Session command line rebuilt its root index")
-	}
-	second := cache.metadata(configPath, secondProgram.CommandLine(), fs)
-	if second == first || !second.Contains(secondSource, "") || second.Contains(firstSource, "") {
-		t.Fatal("new Session command line did not replace cached root metadata")
-	}
-}
-
-func TestLintSessionProjectRootCacheTracksServiceProgramGeneration(t *testing.T) {
-	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
-	directory := tspath.NormalizePath(archive.Materialize(t, "javascript-reference"))
-	configPath := tspath.ResolvePath(directory, "tsconfig.json")
-	fsys := bundled.WrapFS(osvfs.FS())
-	metadata, err := parseStandaloneLintProject(configPath, fsys, fsys)
-	if err != nil {
-		t.Fatal(err)
-	}
-	first, err := createStandaloneLintProgram(metadata, fsys)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cache := newLintSessionProjectRootCache()
-	if cache.canUseServiceProgram(configPath, first, fsys) {
-		t.Fatal("JS reference rejected by configured construction was considered compatible")
-	}
-	if err := os.WriteFile(tspath.ResolvePath(directory, "target.ts"), []byte("export const result = 1;\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	second, err := createStandaloneLintProgram(metadata, fsys)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first.CommandLine() != second.CommandLine() || !cache.canUseServiceProgram(configPath, second, fsys) {
-		t.Fatal("a source-only Program generation did not refresh construction compatibility")
-	}
-	cache.metadata(configPath, second.CommandLine(), fsys)
-	entry := cache.entries[string(lintProgramLexicalPathID(configPath, fsys))]
-	if len(cache.entries) != 1 || entry.program.Value() != second || !entry.serviceCompatible {
-		t.Fatal("config metadata refresh discarded or accumulated Program compatibility generations")
-	}
-	if !cache.Invalidate() || len(cache.entries) != 0 {
-		t.Fatal("project invalidation retained a Program compatibility result")
 	}
 }
 
@@ -556,7 +477,6 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 		unreadConfig string
 		failConfig   string
 		wantError    string
-		withSession  bool
 	}{
 		{name: "nearest complete project", fixture: "nested", target: "pkg/src/target.ts", wantConfig: "pkg/tsconfig.json", wantRoots: 3, unreadConfig: "tsconfig.json"},
 		{name: "external lint config", fixture: "nested", target: "pkg/src/target.ts", configDir: "tooling", wantConfig: "pkg/tsconfig.json", wantRoots: 3, unreadConfig: "tsconfig.json"},
@@ -571,8 +491,7 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 		{name: "triple slash target gap", fixture: "triple-slash-gap", target: "target.js", wantRoots: 1},
 		{name: "overlapping reference chooses child", fixture: "overlapping-reference", target: "target.ts", wantConfig: "leaf.json", wantRoots: 1},
 		{name: "disabled source redirect remains an error", fixture: "disabled-source-redirect", target: "target.ts", wantError: "configured project root"},
-		{name: "Session disabled source redirect remains an error", fixture: "disabled-source-redirect", target: "target.ts", wantError: "configured project root", withSession: true},
-		{name: "explicit JS root without allowJs", fixture: "explicit-js", target: "target.js", wantConfig: "tsconfig.json", wantRoots: 1, withSession: true},
+		{name: "explicit JS root without allowJs", fixture: "explicit-js", target: "target.js", wantConfig: "tsconfig.json", wantRoots: 1},
 		{name: "unreadable config remains an error", fixture: "unowned", target: "target.ts", failConfig: "tsconfig.json", wantError: "no parsed config returned"},
 		{name: "conflicting explicit project", fixture: "nested", target: "pkg/src/target.ts", project: []string{}, wantError: "enabling parserOptions.project"},
 	} {
@@ -594,20 +513,6 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 			uri := documentURIFromPath(fileName)
 			const editorText = "export const editor = 1;\n"
 			server.documents[uri] = editorText
-			if test.withSession {
-				server.backgroundCtx = context.Background()
-				server.defaultLibraryPath = bundled.LibPath()
-				server.initializeParams = &lsproto.InitializeParams{}
-				if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
-					t.Fatal(err)
-				}
-				defer server.session.Close()
-				language := lsproto.LanguageKindTypeScript
-				if strings.HasSuffix(fileName, ".js") {
-					language = lsproto.LanguageKindJavaScript
-				}
-				server.session.DidOpenFile(context.Background(), uri, 1, editorText, language)
-			}
 			options := &config.ParserOptions{ProjectService: config.BoolPtr(true), Project: test.project}
 			if test.rootDir != "" {
 				rootDir := tspath.ResolvePath(directory, test.rootDir)
@@ -704,8 +609,8 @@ func TestLSPWindowsAbsoluteRootsKeepGenerationContext(t *testing.T) {
 		resident    bool
 		jsReference bool
 	}{
-		{name: "ordinary Session"},
-		{name: "service Session", service: true},
+		{name: "ordinary fresh request"},
+		{name: "service fresh request", service: true},
 		{name: "service fresh fallback", service: true, jsReference: true},
 		{name: "service resident fallback", service: true, resident: true, jsReference: true},
 	} {
@@ -741,7 +646,7 @@ func TestLSPWindowsAbsoluteRootsKeepGenerationContext(t *testing.T) {
 			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 				t.Fatal(err)
 			}
-			defer server.session.Close()
+
 			if test.resident {
 				server.lintPrograms = newLintProgramStore(server)
 				server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error {
@@ -752,7 +657,7 @@ func TestLSPWindowsAbsoluteRootsKeepGenerationContext(t *testing.T) {
 				t.Fatal("fixture target must exist only in the editor overlay")
 			}
 			server.documents[uri] = content
-			server.session.DidOpenFile(context.Background(), uri, 1, content, lsproto.LanguageKindTypeScript)
+
 			options := &config.ParserOptions{}
 			if test.service {
 				options.ProjectService = config.BoolPtr(true)
@@ -764,18 +669,6 @@ func TestLSPWindowsAbsoluteRootsKeepGenerationContext(t *testing.T) {
 				Rules:           config.Rules{"no-var": "error"},
 			}}
 			snapshot := documentLintSnapshotForTest(server, uri, entries, server.cwd, false, nil)
-			languageService, err := server.session.GetLanguageService(context.Background(), uri)
-			if err != nil {
-				t.Fatal(err)
-			}
-			sessionProgram := languageService.GetProgram()
-			sessionSource := sessionProgram.GetSourceFile(snapshot.target.Path)
-			if sessionSource == nil || config.ExactPathID(sessionSource.FileName()) != config.ExactPathID(sourcePath) || snapshot.target.Path != "c:/Repo/new.ts" {
-				t.Fatalf("fixture lost the source across drive spellings: source=%v target=%q", sessionSource, snapshot.target.Path)
-			}
-			if compatible := lintSessionProgramSupportsService(sessionProgram); compatible == test.jsReference {
-				t.Fatalf("Session service compatibility=%v, want %v", compatible, !test.jsReference)
-			}
 			for _, speculative := range []bool{false, true} {
 				var generation linter.Generation
 				var release linter.ReleaseFunc
@@ -804,9 +697,6 @@ func TestLSPWindowsAbsoluteRootsKeepGenerationContext(t *testing.T) {
 					if reference := program.GetSourceFile("C:/Repo/globals.js"); reference == nil || reference.Text() != globalText {
 						t.Fatalf("speculative=%v: fallback lost the selected Program's JavaScript context", speculative)
 					}
-				}
-				if !speculative && !test.jsReference && source != sessionSource {
-					t.Fatal("normal diagnostics unnecessarily rebuilt the compatible Session Program")
 				}
 				result, err := runLSPGenerationForTest(context.Background(), generation, nil,
 					linter.ArtifactDemand{Native: rule.EditDemandAutofix})
@@ -870,7 +760,7 @@ func TestSelectConfiguredLintProjectServiceDoesNotProbePrograms(t *testing.T) {
 	}
 }
 
-func TestProjectServiceLSPDoesNotUseIndirectSessionMembership(t *testing.T) {
+func TestProjectServiceLSPDoesNotUseIndirectMembership(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
 	directory := tspath.NormalizePath(archive.Materialize(t, "imported-gap"))
 	fileName := tspath.ResolvePath(directory, "target.ts")
@@ -884,7 +774,7 @@ func TestProjectServiceLSPDoesNotUseIndirectSessionMembership(t *testing.T) {
 	if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 		t.Fatal(err)
 	}
-	defer server.session.Close()
+
 	const content = "export const value = 2;\ndebugger;\n"
 	server.documents[uri] = content
 	entries := config.RslintConfig{{
@@ -916,33 +806,11 @@ func TestProjectServiceLSPDoesNotUseIndirectSessionMembership(t *testing.T) {
 		}
 		gap := generation.Native.Programs[0]
 		if gap.Options().ConfigFilePath != "" || !gap.Options().NoResolve.IsTrue() || gap.GetSourceFile(fileName).Text() != content {
-			t.Fatal("indirect Session membership replaced the frozen gap source")
+			t.Fatal("indirect project membership replaced the frozen gap source")
 		}
 	}
-	// The lint selection phase must not load Session projects just to decide
-	// ownership. DidOpen below is a separate, existing TypeScript lifecycle.
-	if projects := server.session.Snapshot().ProjectCollection.ConfiguredProjects(); len(projects) != 0 {
-		t.Fatal("fixture Session was not cold")
-	}
 	assertGap()
-	if projects := server.session.Snapshot().ProjectCollection.ConfiguredProjects(); len(projects) != 0 {
-		t.Fatal("gap discovery loaded a Session project")
-	}
-	server.session.DidOpenFile(context.Background(), uri, 1, content, "typescript")
-	ls, err := server.session.GetLanguageService(context.Background(), uri)
-	if err != nil {
-		t.Fatal(err)
-	}
-	importingProgram := ls.GetProgram()
-	configPath := tspath.ResolvePath(directory, "tsconfig.json")
-	caseSensitive := server.fs.UseCaseSensitiveFileNames()
-	if got := importingProgram.Options().ConfigFilePath; tspath.ToPath(got, "", caseSensitive) != tspath.ToPath(configPath, "", caseSensitive) {
-		t.Fatalf("Session selected config %q, want %q", got, configPath)
-	}
-	if importingProgram.GetSourceFile(fileName) == nil {
-		t.Fatalf("Session Program does not contain imported source %q", fileName)
-	}
-	assertGap()
+
 }
 
 func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
@@ -1208,26 +1076,24 @@ func TestLSPDisabledProjectKeepsDiagnosticAndFixContext(t *testing.T) {
 		name       string
 		project    string
 		wantCycles int
-		cold       bool
 		javascript bool
 	}{
 		{name: "no project"},
-		{name: "cold no project", cold: true},
+
 		{name: "JavaScript without project", javascript: true},
-		{name: "cold JavaScript without project", javascript: true, cold: true},
+
 		{name: "JavaScript configured control", javascript: true, project: `["tsconfig.json"]`, wantCycles: 1},
 		{name: "false", project: "false"},
 		{name: "null", project: "null"},
-		{name: "cold false", project: "false", cold: true},
-		{name: "cold null", project: "null", cold: true},
+
 		{name: "empty projects", project: `[]`},
 		{name: "unmatched project", project: `["tsconfig.other.json"]`},
 		{name: "configured control", project: `["tsconfig.json"]`, wantCycles: 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			fixture, source, language := "disabled-binding", "target.ts", lsproto.LanguageKindTypeScript
+			fixture, source := "disabled-binding", "target.ts"
 			if test.javascript {
-				fixture, source, language = "disabled-binding-js", "target.js", lsproto.LanguageKindJavaScript
+				fixture, source = "disabled-binding-js", "target.js"
 			}
 			directory := tspath.NormalizePath(archive.Materialize(t, fixture))
 			fileName := tspath.ResolvePath(directory, source)
@@ -1240,16 +1106,13 @@ func TestLSPDisabledProjectKeepsDiagnosticAndFixContext(t *testing.T) {
 			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 				t.Fatal(err)
 			}
-			defer server.session.Close()
+
 			content, ok := server.fs.ReadFile(fileName)
 			if !ok {
 				t.Fatal("missing target fixture")
 			}
 			uri := documentURIFromPath(fileName)
 			server.documents[uri] = content
-			if !test.cold {
-				server.session.DidOpenFile(context.Background(), uri, 1, content, language)
-			}
 			options := `{}`
 			if test.project != "" {
 				options = `{"project":` + test.project + `}`
@@ -1292,14 +1155,12 @@ func TestLSPDisabledProjectKeepsDiagnosticAndFixContext(t *testing.T) {
 			if server.documents[uri] != content {
 				t.Fatal("fix-all changed editor text")
 			}
-			if test.cold && len(server.session.Snapshot().ProjectCollection.ConfiguredProjects()) != 0 {
-				t.Fatal("disabled binding requested a Session project")
-			}
+
 		})
 	}
 }
 
-func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
+func TestProjectServiceLSPConfigSnapshot(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
 	for _, test := range []struct {
 		name, fixture, directory, editFile, replacement string
@@ -1335,20 +1196,20 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 			server.fs = bundled.WrapFS(osvfs.FS())
 			server.backgroundCtx = context.Background()
 			server.defaultLibraryPath = bundled.LibPath()
-			// No dynamic watched-file registration: Session does not hear the
-			// disk config edit, but lint discovery observes the new snapshot.
+			// Without dynamic watched-file registration, each lint request reads
+			// the current configuration instead of retaining a Program.
 			server.initializeParams = &lsproto.InitializeParams{}
 			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 				t.Fatal(err)
 			}
-			defer server.session.Close()
+
 			content, ok := server.fs.ReadFile(fileName)
 			if !ok {
 				t.Fatal("missing target fixture")
 			}
 			uri := documentURIFromPath(fileName)
 			server.documents[uri] = content
-			server.session.DidOpenFile(context.Background(), uri, 1, content, lsproto.LanguageKindTypeScript)
+
 			entries := config.RslintConfig{{
 				Plugins:         []string{"@typescript-eslint"},
 				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
@@ -1368,7 +1229,7 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 						}
 						content += "// edited after disk config changed\n"
 						server.documents[uri] = content
-						server.session.DidChangeFile(context.Background(), uri, 2, makeDidChangeParams(uri, 2, content).ContentChanges)
+
 					}
 					snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
 					for _, speculative := range []bool{false, false, true} {
@@ -1377,11 +1238,9 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 						if speculative {
 							result, err = speculativePipelineResultForTest(server, context.Background(), uri, content, snapshot)
 						} else {
-							var selectedProgram *compiler.Program
 							provider := &documentGenerationProvider{
 								server: server, uri: uri, snapshot: snapshot,
 								buildGeneration: func(program *compiler.Program, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
-									selectedProgram = program
 									return buildDocumentGeneration(program, source, lintTarget, cwd, typed, snapshot)
 								},
 							}
@@ -1394,15 +1253,7 @@ func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
 								},
 								nil,
 							))
-							if phase.name == "initial" && err == nil {
-								languageService, sessionErr := server.session.GetLanguageService(context.Background(), uri)
-								if sessionErr != nil {
-									t.Fatal(sessionErr)
-								}
-								if selectedProgram != languageService.GetProgram() {
-									t.Error("unchanged configuration rebuilt a Session-owned Program")
-								}
-							}
+
 						}
 						if err != nil {
 							t.Fatal(err)
@@ -1570,30 +1421,17 @@ func TestProjectServiceLSPUsesReferencedEditorSources(t *testing.T) {
 			server := newTestServer()
 			server.cwd = directory
 			server.fs = bundled.WrapFS(osvfs.FS())
-			server.lintSessionRoots = newLintSessionProjectRootCache()
 			server.backgroundCtx = context.Background()
 			server.defaultLibraryPath = bundled.LibPath()
 			server.initializeParams = &lsproto.InitializeParams{}
 			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 				t.Fatal(err)
 			}
-			defer server.session.Close()
+
 			uri := documentURIFromPath(targetPath)
 			referenceURI := documentURIFromPath(referencePath)
 			server.documents[uri] = test.targetContent
 			server.documents[referenceURI] = test.referenceContent
-			language := lsproto.LanguageKindTypeScript
-			if strings.HasSuffix(referencePath, ".js") {
-				language = lsproto.LanguageKindJavaScript
-			}
-			server.session.DidOpenFile(context.Background(), referenceURI, 1, test.referenceContent, language)
-			server.session.DidOpenFile(context.Background(), uri, 1, test.targetContent, "typescript")
-			if test.wantMismatch {
-				ls, err := server.session.GetLanguageService(context.Background(), uri)
-				if err != nil || ls.GetProgram().GetSourceFile(targetPath) == nil || ls.GetProgram().GetSourceFile(referencePath) != nil {
-					t.Fatalf("fixture did not expose a JS reference rejected by a target-containing Session Program: %v", err)
-				}
-			}
 			entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
 				ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)},
 			}}}
@@ -2053,13 +1891,13 @@ func TestDocumentProjectPolicyUsesFlatConfigAndAuthoredBases(t *testing.T) {
 			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 				t.Fatal(err)
 			}
-			defer server.session.Close()
+
 			server.lintPrograms = newLintProgramStore(server)
 			server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
 			uri := documentURIFromPath(fileName)
 			const content = "export const result = (() => { var output = value.member; return output; })();\n"
 			server.documents[uri] = content
-			server.session.DidOpenFile(context.Background(), uri, 1, content, "typescript")
+
 			first := test.firstProject
 			if first == "" {
 				first = "./tsconfig.unsafe.json"

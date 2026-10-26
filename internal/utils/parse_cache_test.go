@@ -266,6 +266,34 @@ func TestParseCache_DifferentEMIOptionsNotShared(t *testing.T) {
 	}
 }
 
+func TestASTCacheReadsCurrentHost(t *testing.T) {
+	const fileName = "/virtual/current.ts"
+	const original = "export const value = 1;\n"
+	firstFS := newMemoryReadFS(map[string]string{fileName: original})
+	secondFS := newMemoryReadFS(map[string]string{fileName: original})
+	cache := NewParseCache()
+	firstHost := WithASTCache(CreateCompilerHost("/virtual", firstFS), cache)
+	secondHost := WithASTCache(CreateCompilerHost("/virtual", secondFS), cache)
+	opts := testParseOpts(fileName, ast.ExternalModuleIndicatorOptions{})
+	first := firstHost.GetSourceFile(opts)
+	if first == nil || secondHost.GetSourceFile(opts) != first {
+		t.Fatal("matching source versions did not share the AST")
+	}
+	const changed = "export const value = 2;\n"
+	secondFS.set(fileName, changed)
+	updated := secondHost.GetSourceFile(opts)
+	if updated == nil || updated == first || updated.Text() != changed || first.Text() != original {
+		t.Fatal("AST cache did not preserve both source generations")
+	}
+	if firstHost.GetSourceFile(opts) != first {
+		t.Fatal("one host's edit changed the other host's source")
+	}
+	cache.RetainOnly(nil)
+	if secondHost.GetSourceFile(opts) == updated {
+		t.Fatal("evicted AST remained cached")
+	}
+}
+
 func TestCachingHost_SourceSnapshotSharedAcrossParseOptions(t *testing.T) {
 	fileName := "/virtual/options.ts"
 	fs := newMemoryReadFS(map[string]string{fileName: "const value = 1;\n"})

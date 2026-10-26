@@ -17,9 +17,7 @@ import (
 	"github.com/go-json-experiment/json"
 	"github.com/microsoft/TypeScript/tsc/shim/collections"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/diagnostics"
 	"github.com/microsoft/TypeScript/tsc/shim/jsonrpc"
-	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/project"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
@@ -39,9 +37,6 @@ type ServerOptions struct {
 	Cwd                string
 	FS                 vfs.FS
 	DefaultLibraryPath string
-	TypingsLocation    string
-
-	ParseCache *project.ParseCache
 }
 
 func NewServer(opts *ServerOptions) *Server {
@@ -59,8 +54,6 @@ func NewServer(opts *ServerOptions) *Server {
 		cwd:                    opts.Cwd,
 		fs:                     opts.FS,
 		defaultLibraryPath:     opts.DefaultLibraryPath,
-		typingsLocation:        opts.TypingsLocation,
-		parseCache:             opts.ParseCache,
 		jsConfigs:              make(map[string]config.RslintConfig),
 		jsUnavailableConfigs:   make(map[string]struct{}),
 		ruleCatalog:            rules.All(),
@@ -72,13 +65,8 @@ func NewServer(opts *ServerOptions) *Server {
 		pluginResultCh:         make(chan pluginLintResult, 16),
 		docGeneration:          make(map[lsproto.DocumentUri]uint64),
 		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
-		lintSessionRoots:       newLintSessionProjectRootCache(),
 	}
 }
-
-var (
-	_ project.Client = (*Server)(nil)
-)
 
 type pendingClientRequest struct {
 	req    *lsproto.RequestMessage
@@ -154,7 +142,6 @@ type Server struct {
 	cwd                string
 	fs                 vfs.FS
 	defaultLibraryPath string
-	typingsLocation    string
 
 	backgroundCtx    context.Context
 	initializeParams *lsproto.InitializeParams
@@ -162,15 +149,8 @@ type Server struct {
 	watchEnabled     bool
 	watchers         collections.SyncSet[project.WatcherID]
 
-	session          *project.Session
-	lintPrograms     *lintProgramStore
-	lintSessionRoots *lintSessionProjectRootCache
-
-	// enables tests to share a cache of parsed source files
-	parseCache *project.ParseCache
-
-	// !!! temporary; remove when we have `handleDidChangeConfiguration`/implicit project config support
-	compilerOptionsForInferredProjects *core.CompilerOptions
+	initialized  bool
+	lintPrograms *lintProgramStore
 
 	// rslint config
 	// jsConfigs is keyed by the catalog's absolute filesystem directory
@@ -226,9 +206,8 @@ type Server struct {
 	// the current configuration generation.
 	ruleCatalog *rule.Catalog
 
-	// refreshCh receives signals from RefreshDiagnostics (called by Session's
-	// background goroutine) and is consumed by the main dispatch loop so that
-	// relinting runs on the main goroutine (session is not goroutine-safe).
+	// refreshCh coalesces project and configuration changes on the dispatch
+	// loop, which owns document and Program state.
 	refreshCh chan struct{}
 
 	// debounceCh receives a signal when the debounce timer fires, telling
@@ -295,40 +274,7 @@ type pluginLintResult struct {
 	diags      []rule.RuleDiagnostic
 }
 
-// FS implements project.ServiceHost.
-func (s *Server) FS() vfs.FS {
-	return s.fs
-}
-
-// DefaultLibraryPath implements project.ServiceHost.
-func (s *Server) DefaultLibraryPath() string {
-	return s.defaultLibraryPath
-}
-
-// TypingsLocation implements project.ServiceHost.
-func (s *Server) TypingsLocation() string {
-	return s.typingsLocation
-}
-
-// GetCurrentDirectory implements project.ServiceHost.
-func (s *Server) GetCurrentDirectory() string {
-	return s.cwd
-}
-
-// Trace implements project.ServiceHost.
-func (s *Server) Trace(msg string) {
-	s.Log(msg)
-}
-
-// Client implements project.ServiceHost.
-func (s *Server) Client() project.Client {
-	if !s.watchEnabled {
-		return nil
-	}
-	return s
-}
-
-// WatchFiles implements project.Client.
+// WatchFiles registers compiler and configuration dependencies with the client.
 func (s *Server) WatchFiles(ctx context.Context, id project.WatcherID, watchers []*lsproto.FileSystemWatcher) error {
 	_, err := s.sendRequest(ctx, lsproto.MethodClientRegisterCapability, &lsproto.RegistrationParams{
 		Registrations: []*lsproto.Registration{
@@ -350,7 +296,7 @@ func (s *Server) WatchFiles(ctx context.Context, id project.WatcherID, watchers 
 	return nil
 }
 
-// UnwatchFiles implements project.Client.
+// UnwatchFiles removes an existing client registration.
 func (s *Server) UnwatchFiles(ctx context.Context, id project.WatcherID) error {
 	if s.watchers.Has(id) {
 		_, err := s.sendRequest(ctx, lsproto.MethodClientUnregisterCapability, &lsproto.UnregistrationParams{
@@ -372,10 +318,7 @@ func (s *Server) UnwatchFiles(ctx context.Context, id project.WatcherID) error {
 	return fmt.Errorf("no file watcher exists with ID %s", id)
 }
 
-// RefreshDiagnostics implements project.Client.
-// Called from Session's background goroutine when project state changes
-// (e.g. tsconfig reload). We signal the main dispatch loop via refreshCh
-// so that relinting happens on the main goroutine (session is not goroutine-safe).
+// RefreshDiagnostics coalesces relint requests onto the serialized dispatch loop.
 func (s *Server) RefreshDiagnostics(ctx context.Context) error {
 	select {
 	case s.refreshCh <- struct{}{}:
@@ -385,45 +328,9 @@ func (s *Server) RefreshDiagnostics(ctx context.Context) error {
 	return nil
 }
 
-// PublishDiagnostics implements project.Client.
+// PublishDiagnostics queues document diagnostics for the client.
 func (s *Server) PublishDiagnostics(ctx context.Context, params *lsproto.PublishDiagnosticsParams) error {
 	s.outgoingQueue <- lsproto.TextDocumentPublishDiagnosticsInfo.NewNotificationMessage(params).Message()
-	return nil
-}
-
-// RefreshInlayHints implements project.Client.
-func (s *Server) RefreshInlayHints(ctx context.Context) error {
-	// TODO: implement inlay hints refresh
-	return nil
-}
-
-// RefreshCodeLens implements project.Client.
-func (s *Server) RefreshCodeLens(ctx context.Context) error {
-	// TODO: implement code lens refresh
-	return nil
-}
-
-// ProgressStart implements project.Client.
-func (s *Server) ProgressStart(message *diagnostics.Message, args ...any) {}
-
-// ProgressFinish implements project.Client.
-func (s *Server) ProgressFinish(message *diagnostics.Message, args ...any) {}
-
-// SendTelemetry implements project.Client.
-func (s *Server) SendTelemetry(ctx context.Context, telemetry lsproto.TelemetryEvent) error {
-	return nil
-}
-
-// IsActive implements project.Client.
-func (s *Server) IsActive() bool { return s.session != nil }
-
-// Rslint keeps its existing default diagnostic language.
-func (s *Server) GetLocale() locale.Locale { return locale.Default }
-func (s *Server) SetLocale(string)         {}
-
-// Rslint's supported document types are registered statically by the client.
-// Content mappers do not expand the lint target set.
-func (s *Server) RegisterContentMapperExtensions(context.Context, []string) error {
 	return nil
 }
 
@@ -571,7 +478,7 @@ func (s *Server) dispatchLoop(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-s.refreshCh:
-			// Session detected a project change (e.g. tsconfig reload).
+			// Project or configuration state changed.
 			// Re-lint all open documents on the main goroutine.
 			for uri := range s.documents {
 				s.pushDiagnostics(uri)
@@ -836,7 +743,8 @@ func decodeParams[Req any](req *lsproto.RequestMessage) (Req, error) {
 }
 
 func (s *Server) handleShutdown(ctx context.Context, params lsproto.NoParams) (lsproto.ShutdownResponse, error) {
-	s.session.Close()
+	s.initialized = false
+	s.invalidateLintProjectCaches()
 	return lsproto.ShutdownResponse{}, nil
 }
 
@@ -846,14 +754,6 @@ func (s *Server) handleExit(ctx context.Context, params lsproto.NoParams) error 
 
 func (s *Server) Log(msg ...any) {
 	fmt.Fprintln(s.stderr, msg...)
-}
-
-// !!! temporary; remove when we have `handleDidChangeConfiguration`/implicit project config support
-func (s *Server) SetCompilerOptionsForInferredProjects(options *core.CompilerOptions) {
-	s.compilerOptionsForInferredProjects = options
-	if s.session != nil {
-		s.session.DidChangeCompilerOptionsForInferredProjects(context.Background(), options)
-	}
 }
 
 // defaultPluginReverseTimeout caps the aggregate source.fixAll plugin budget and

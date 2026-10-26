@@ -2,7 +2,6 @@ package lsp
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -33,7 +31,7 @@ import (
 )
 
 // newTestServer creates a minimal Server for handler unit tests.
-// Session is nil so session calls are safely skipped via nil guards.
+// The server has not received the initialized notification.
 func newTestServer() *Server {
 	return &Server{
 		jsConfigs:              make(map[string]config.RslintConfig),
@@ -819,7 +817,7 @@ func newTestServerWithQueue() (*Server, chan *lsproto.Message) {
 	}, queue
 }
 
-func TestHandleDidClose_NoPublishWhenSessionNil(t *testing.T) {
+func TestHandleDidCloseNoPublishBeforeInitialization(t *testing.T) {
 	s, queue := newTestServerWithQueue()
 	ctx := context.Background()
 	uri := lsproto.DocumentUri("file:///project/test.ts")
@@ -834,10 +832,10 @@ func TestHandleDidClose_NoPublishWhenSessionNil(t *testing.T) {
 		t.Fatalf("handleDidClose failed: %v", err)
 	}
 
-	// With session == nil, no PublishDiagnostics should be sent
+	// Before initialization, no PublishDiagnostics should be sent
 	select {
 	case msg := <-queue:
-		t.Fatalf("unexpected message when session is nil: %v", msg)
+		t.Fatalf("unexpected message before initialization: %v", msg)
 	default:
 		// good — no message sent
 	}
@@ -1070,9 +1068,9 @@ func TestHandleDidChange_UsesDebounce(t *testing.T) {
 		t.Errorf("content = %q, want %q", s.documents[uri], "const x = 2;")
 	}
 
-	// With nil session, no debounce should be scheduled
+	// With uninitialized server, no debounce should be scheduled
 	if len(s.pendingLintURIs) != 0 {
-		t.Error("no pending URIs expected when session is nil")
+		t.Error("no pending URIs expected before initialization")
 	}
 
 	if s.lintTimer != nil {
@@ -1587,7 +1585,7 @@ func TestDocumentProjectPaths_NoConfig(t *testing.T) {
 	}
 }
 
-// ======== runLintWithSession: ignored-file short-circuit ========
+// ======== runLint: ignored-file short-circuit ========
 
 func TestIsLintableScriptFile_UsesDefaultLintExtensions(t *testing.T) {
 	tests := []struct {
@@ -1786,7 +1784,7 @@ func TestSourceFileForPath_FindsProgramFileSymlinkFromRealTarget(t *testing.T) {
 	}
 }
 
-func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) {
+func TestAcquireLintProgramUsesDeclaredProjectOrderAndGapFallback(t *testing.T) {
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "src", "index.ts")
 	importerPath := filepath.Join(dir, "importer.ts")
@@ -1824,9 +1822,8 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	s.backgroundCtx = ctx
 	s.initializeParams = &lsproto.InitializeParams{}
 	if err := s.handleInitialized(ctx, &lsproto.InitializedParams{}); err != nil {
-		t.Fatalf("initialize test session: %v", err)
+		t.Fatalf("initialize test server: %v", err)
 	}
-	defer s.session.Close()
 
 	toURI := func(filePath string) lsproto.DocumentUri {
 		return documentURIFromPath(filePath)
@@ -1853,16 +1850,12 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		).loaders()
 	}
 	sourceTarget := lspConfigTarget(sourcePath, dir, fsys)
-	program, _, hasTypeInfo, err := selectLintProgram(
-		sourceURI,
-		sourceTarget,
-		s.session,
-		ctx,
+	program, _, hasTypeInfo, err := acquireLintProgram(
 		[]string{secondConfig, firstConfig},
 		config.ProjectPolicy{},
+		sourceTarget,
 		fsys,
 		standaloneLoaders(sourceURI),
-		s.lintSessionRoots,
 	)
 	if err != nil {
 		t.Fatalf("select typed program: %v", err)
@@ -1874,16 +1867,12 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		t.Fatalf("expected first declared containing project %q, got %q", secondConfig, program.Options().ConfigFilePath)
 	}
 
-	directProgram, _, directHasTypeInfo, err := selectLintProgram(
-		sourceURI,
-		sourceTarget,
-		s.session,
-		ctx,
+	directProgram, _, directHasTypeInfo, err := acquireLintProgram(
 		[]string{importConfig, firstConfig},
 		config.ProjectPolicy{},
+		sourceTarget,
 		fsys,
 		standaloneLoaders(sourceURI),
-		s.lintSessionRoots,
 	)
 	if err != nil {
 		t.Fatalf("select direct project over import: %v", err)
@@ -1893,10 +1882,6 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	}
 	if got := lspFilesystemPathID(directProgram.Options().ConfigFilePath, fsys); got != lspFilesystemPathID(firstConfig, fsys) {
 		t.Fatalf("expected direct project %q to outrank importing project %q, got %q", firstConfig, importConfig, directProgram.Options().ConfigFilePath)
-	}
-	secondConfigID := tspath.ToPath(fsys.Realpath(secondConfig), "", fsys.UseCaseSensitiveFileNames())
-	if opened := s.session.Snapshot().ProjectCollection.ConfiguredProject(secondConfigID); opened != nil {
-		t.Fatal("lint-only custom tsconfig must not be added to the Session's permanent API-open project set")
 	}
 	if _, err := speculativePipelineResultForTest(
 		s,
@@ -1914,26 +1899,18 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	); err != nil {
 		t.Fatalf("isolated fix pass: %v", err)
 	}
-	languageService, err := s.session.GetLanguageService(ctx, toURI(sourcePath))
-	if err != nil {
-		t.Fatalf("get language service after speculative fix: %v", err)
-	}
-	if got := languageService.GetProgram().GetSourceFile(tspath.NormalizePath(sourcePath)).Text(); got != "export const value = 1;\n" {
-		t.Fatalf("speculative fix polluted Session overlay: got %q", got)
+	if got := s.documents[sourceURI]; got != "export const value = 1;\n" {
+		t.Fatalf("speculative fix polluted editor text: got %q", got)
 	}
 
 	gapURI := toURI(gapPath)
 	gapTarget := lspConfigTarget(gapPath, dir, fsys)
-	gapProgram, _, gapHasTypeInfo, err := selectLintProgram(
-		gapURI,
-		gapTarget,
-		s.session,
-		ctx,
+	gapProgram, _, gapHasTypeInfo, err := acquireLintProgram(
 		[]string{secondConfig, firstConfig},
 		config.ProjectPolicy{},
+		gapTarget,
 		fsys,
 		standaloneLoaders(gapURI),
-		s.lintSessionRoots,
 	)
 	if err != nil {
 		t.Fatalf("select gap program: %v", err)
@@ -1943,126 +1920,6 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	}
 	if gapProgram.GetSourceFile(tspath.NormalizePath(gapPath)) == nil {
 		t.Fatal("gap fallback program must contain the open file")
-	}
-}
-
-func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testing.T) {
-	dir := t.TempDir()
-	sourcePath := filepath.Join(dir, "src", "index.ts")
-	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	const content = "export const value = 1;\n"
-	if err := os.WriteFile(sourcePath, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	configPath := filepath.Join(dir, "tsconfig.json")
-	if err := os.WriteFile(
-		configPath,
-		[]byte(`{"compilerOptions":{"noLib":true},"include":["src/**/*.ts"]}`),
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
-
-	ctx := context.Background()
-	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	s := NewServer(&ServerOptions{
-		Cwd:                dir,
-		FS:                 fsys,
-		DefaultLibraryPath: bundled.LibPath(),
-	})
-	s.backgroundCtx = ctx
-	s.initializeParams = &lsproto.InitializeParams{}
-	if err := s.handleInitialized(ctx, &lsproto.InitializedParams{}); err != nil {
-		t.Fatal(err)
-	}
-	defer s.session.Close()
-
-	uri := documentURIFromPath(sourcePath)
-	if err := s.handleDidOpen(ctx, &lsproto.DidOpenTextDocumentParams{
-		TextDocument: &lsproto.TextDocumentItem{
-			Uri:        uri,
-			LanguageId: lsproto.LanguageKindTypeScript,
-			Version:    1,
-			Text:       content,
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	loaderCalls := 0
-	rootLoaderCalls := 0
-	program, sourceFile, hasTypeInfo, err := selectLintProgram(
-		uri,
-		lspConfigTarget(sourcePath, dir, fsys),
-		s.session,
-		ctx,
-		[]string{configPath},
-		config.ProjectPolicy{},
-		fsys,
-		lintProjectLoaders{
-			program: func(*lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
-				loaderCalls++
-				return nil, nil, errors.New("standalone loader must not run")
-			},
-			metadata: func(string) (*lintProjectMetadata, bool, error) {
-				rootLoaderCalls++
-				return nil, false, errors.New("standalone root loader must not run")
-			},
-		},
-		s.lintSessionRoots,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if loaderCalls != 0 {
-		t.Fatalf("standalone loader called %d times for a Session-owned project", loaderCalls)
-	}
-	if rootLoaderCalls != 0 {
-		t.Fatalf("standalone root loader called %d times for a Session-owned project", rootLoaderCalls)
-	}
-	if !hasTypeInfo || sourceFile == nil {
-		t.Fatal("Session-owned configured source lost type information")
-	}
-	if got := lspFilesystemPathID(program.Options().ConfigFilePath, fsys); got != lspFilesystemPathID(configPath, fsys) {
-		t.Fatalf("selected Program config = %q, want %q", program.Options().ConfigFilePath, configPath)
-	}
-
-	entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
-		ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)},
-	}}}
-	serviceRequest := newStandaloneLintProjectRequestWithFS(lspConfigTarget(sourcePath, dir, fsys), fsys)
-	var serviceProgram *compiler.Program
-	provider := &documentGenerationProvider{
-		server: s, uri: uri,
-		snapshot: documentLintSnapshotForTest(s, uri, entries, dir, false, nil),
-		requestPrograms: func(context.Context, lsproto.DocumentUri, target.File) (lintProjectLoaders, linter.ReleaseFunc) {
-			return lintProjectLoaders{
-				program: func(*lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
-					loaderCalls++
-					return nil, nil, errors.New("service must reuse the Session Program")
-				},
-				metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
-					rootLoaderCalls++
-					return serviceRequest.loadMetadata(configPath)
-				},
-			}, nil
-		},
-		buildGeneration: func(selected *compiler.Program, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
-			serviceProgram = selected
-			if !typed {
-				t.Fatal("direct service root lost type information")
-			}
-			return buildDocumentGeneration(selected, source, lintTarget, cwd, typed, snapshot)
-		},
-	}
-	_, release, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{})
-	if release != nil {
-		release()
-	}
-	if err != nil || serviceProgram != program || loaderCalls != 0 || rootLoaderCalls != 1 {
-		t.Fatalf("service duplicated Session ownership: same Program=%v builds=%d parses=%d error=%v", serviceProgram == program, loaderCalls, rootLoaderCalls, err)
 	}
 }
 
@@ -2679,7 +2536,7 @@ func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.
 
 // Ignored documents must return before requesting projects. The same source in
 // a non-ignored file must reach project loading and produce a native diagnostic.
-func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
+func TestRunLint_IgnoredFileShortCircuits(t *testing.T) {
 	ctx := context.Background()
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
 	cwd := tspath.NormalizePath(archive.Materialize(t, "ignored-documents"))
@@ -2739,7 +2596,7 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 	}
 }
 
-func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) {
+func TestRunLint_DefaultExcludedDirectoryShortCircuits(t *testing.T) {
 	cfg := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
 	s := newTestServer()
 	s.cwd = "/project"
@@ -2750,7 +2607,7 @@ func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) 
 		t.Run(string(uri), func(t *testing.T) {
 			defer func() {
 				if recovered := recover(); recovered != nil {
-					t.Fatalf("default-excluded file reached the nil session: %v", recovered)
+					t.Fatalf("default-excluded file reached the uninitialized server: %v", recovered)
 				}
 			}()
 

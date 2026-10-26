@@ -39,7 +39,7 @@ func rulesServedToEditors(configuredRules []rule.ConfiguredRule) []rule.Configur
 	return served
 }
 
-// documentGenerationProvider adapts the current LSP Session and document
+// documentGenerationProvider adapts the resident Programs and document
 // snapshot to the linter's generation port. It selects and leases Programs but
 // never decides how or when lint work runs.
 type documentGenerationProvider struct {
@@ -110,6 +110,7 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	server := p.server
 	snapshot := p.snapshot
 	if snapshot.unavailable {
+		server.releaseDocumentProgram(p.uri)
 		return emptyLintGeneration(server.cwd), nil, nil
 	}
 	if !snapshot.configResolved {
@@ -117,9 +118,11 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	}
 	if isDefaultExcludedLintPath(snapshot.target.Path, server.cwd, server.fs) ||
 		snapshot.resolvedConfig.GloballyIgnored {
+		server.releaseDocumentProgram(p.uri)
 		return emptyLintGeneration(server.cwd), nil, nil
 	}
 	if snapshot.projectPolicyError != nil {
+		server.releaseDocumentProgram(p.uri)
 		return linter.Generation{}, nil, &documentProjectConfigError{cause: snapshot.projectPolicyError}
 	}
 
@@ -131,9 +134,6 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	request.sourceReferences = serviceEnabled
 	loaders := request.loaders()
 	var selectionFS vfs.FS
-	if !serviceEnabled {
-		selectionFS = server.fs
-	}
 	release := linter.ReleaseFunc(nil)
 	releasePending := false
 	defer func() {
@@ -147,29 +147,25 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		resident := server.lintPrograms.request(ctx, p.uri, snapshot.target, serviceEnabled)
 		loaders = lintProjectLoaders{program: resident.load, metadata: resident.loadMetadata}
 		release = resident.finalize
+		resident.prepareOverlay()
+		selectionFS = resident.overlayFS
 		if serviceEnabled {
-			resident.prepareOverlay()
-			selectionFS = resident.overlayFS
+			selectionFS = resident.discoveryFS
 		}
+		request.fs = resident.overlayFS
 	}
 	loaders.fallback = request.fallback
 	releasePending = release != nil
 	if selectionFS == nil {
 		selectionFS = request.filesystem()
-	} else if serviceEnabled {
-		request.fs = selectionFS
 	}
 
-	program, sourceFile, hasTypeInfo, err := selectLintProgram(
-		p.uri,
-		snapshot.target,
-		server.session,
-		ctx,
+	program, sourceFile, hasTypeInfo, err := acquireLintProgram(
 		snapshot.typeScriptConfigPaths,
 		snapshot.projectPolicy,
+		snapshot.target,
 		selectionFS,
 		loaders,
-		server.lintSessionRoots,
 	)
 	if err != nil {
 		return linter.Generation{}, nil, err

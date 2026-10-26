@@ -189,9 +189,6 @@ func (s *Server) invalidateLintProjectCaches() {
 	if s.lintPrograms != nil {
 		s.lintPrograms.Invalidate()
 	}
-	if s.lintSessionRoots != nil {
-		s.lintSessionRoots.Invalidate()
-	}
 }
 
 func validateRuleOptionsForConfig(
@@ -221,11 +218,6 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		_ = s.RefreshDiagnostics(ctx)
 	}
 
-	// Preserve Session's original watched-file input. It owns configured
-	// project identity and may need a disk event while an overlay is open.
-	if s.session != nil {
-		s.session.DidChangeWatchedFiles(ctx, params.Changes)
-	}
 	needsTypeInfoRebuild := false
 	needsIgnoreRefresh := false
 	needsAncestorJSConfigRefresh := false
@@ -269,7 +261,7 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		return nil
 	}
 	if needsTypeInfoRebuild {
-		// Discard project contents, including projects outside the Session.
+		// Discard resident project contents and parsed configuration metadata.
 		s.invalidateLintProjectCaches()
 		s.invalidateOpenDocumentDiagnostics()
 		return s.RefreshDiagnostics(ctx)
