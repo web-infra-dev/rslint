@@ -151,8 +151,8 @@ catalogs:
       specifier: ^0.8.3
       version: 0.8.3
     globals:
-      specifier: 17.11.0
-      version: 17.11.0
+      specifier: 17.13.0
+      version: 17.13.0
     jiti:
       specifier: ^2.7.0
       version: 2.7.0
@@ -342,7 +342,7 @@ importers:
         version: 1.7.0
       globals:
         specifier: 'catalog:'
-        version: 17.11.0
+        version: 17.13.0
       json-schema-to-typescript:
         specifier: 'catalog:'
         version: 15.0.4
@@ -4165,6 +4165,10 @@ packages:
 
   globals@17.11.0:
     resolution: {integrity: sha512-Z2I8hM+PbJDXQDq3Icgpzv+mPdwr68iZUU9d5WW4FuXfDUQfkZaZuvjMv42/5crNyw154+9+VWXbYrUgDXbxNw==}
+    engines: {node: '>=18'}
+
+  globals@17.13.0:
+    resolution: {integrity: sha512-RwMTC61u7hrG3ZJMkZQOK4JLJrKS8QtoTii63EmWvFXHqycY9FObBJQCbsLxSO8kjKhWE5kV1GC+Vb1g3RI0Zg==}
     engines: {node: '>=18'}
 
   globalthis@1.0.4:
@@ -9827,6 +9831,8 @@ snapshots:
       once: 1.4.0
 
   globals@17.11.0: {}
+
+  globals@17.13.0: {}
 
   globalthis@1.0.4:
     dependencies:
